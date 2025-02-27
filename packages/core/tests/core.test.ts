@@ -10,6 +10,7 @@ import {
   safeResolve,
   safeRun,
   run,
+  prepare,
 } from "../src/core/index";
 import { ScopeInner } from "../src/core/core";
 
@@ -131,6 +132,19 @@ describe("core", () => {
 
     expect(directValue).toBe("hello1");
     expect(calculate).toEqual({ status: "ok", value: "hello1" });
+  });
+
+  it("can use prepare", async () => {
+    const scope = createScope();
+
+    const stringValue = provide<string>(() => "hello");
+
+    const helloworld = prepare(scope, stringValue, async (value, world: string) => {
+      return value.get() + world;
+    });
+
+    const msg = await helloworld("world");
+    expect(msg).toBe("helloworld");
   });
 });
 
