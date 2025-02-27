@@ -2,11 +2,7 @@
   "name": "@pumped-fn/react",
   "version": "0.5.0",
   "description": "React bindings for Pumped Functions",
-  "keywords": [
-    "pumped-fn",
-    "react",
-    "functional programming"
-  ],
+  "keywords": ["pumped-fn", "react", "functional programming"],
   "author": "Lagz0ne",
   "license": "MIT",
   "homepage": "https://github.com/pumped-fn/pumped-fn",
@@ -21,15 +17,11 @@
     "test": "vitest run",
     "test:watch": "vitest watch"
   },
-  "dependencies": {
-    "@pumped-fn/core": "^0.5.0"
-  },
   "peerDependencies": {
+    "@pumped-fn/core": "^0.5.0",
     "react": "^18.0.0"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "devDependencies": {
     "@pumped-fn/core": "workspace:*",
     "@testing-library/dom": "^10.4.0",
