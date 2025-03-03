@@ -1,4 +1,4 @@
-export type Cleanup = () => void;
+export type Cleanup = () => void | Promise<void>;
 
 export type InferOutput<T> = T extends Promise<infer X> ? InferOutput<X> : T extends Output<infer X> ? X : T;
 
@@ -26,17 +26,16 @@ export interface ImmutableOutput<T> extends Output<T> {
 }
 
 export interface ResourceOutput<T> extends Output<T> {
-  cleanup: () => void;
+  readonly cleanup: Cleanup;
   [outputSymbol]: "resource";
 }
 
 export interface EffectOutput extends Output<never> {
   [outputSymbol]: "effect";
-  cleanup: () => void;
+  readonly cleanup: Cleanup;
 }
 
 import { isEffectOutput, isResouceOutput, isOutput } from "./outputs";
-import { resolve, run, prepare, provide, derive } from "./functions";
 
 export const executorSymbol = Symbol("jumped-fn.executor");
 
@@ -237,7 +236,7 @@ class BaseScope implements Scope, ScopeInner {
       for (const dependent of dependents) {
         const cleanup = this.#cleanups.get(dependent);
         if (cleanup !== undefined) {
-          cleanup();
+          await cleanup();
         }
 
         await this.#evalute(dependent);
@@ -280,7 +279,7 @@ class BaseScope implements Scope, ScopeInner {
 
     const currentCleanup = this.#cleanups.get(executor);
     if (currentCleanup !== undefined) {
-      currentCleanup();
+      await currentCleanup();
     }
 
     const promise = Promise.resolve()
@@ -313,7 +312,7 @@ class BaseScope implements Scope, ScopeInner {
 
     const currentCleanup = this.#cleanups.get(executor);
     if (currentCleanup !== undefined) {
-      currentCleanup();
+      await currentCleanup();
     }
 
     const promise = this.#evalute(executor)
@@ -345,7 +344,7 @@ class BaseScope implements Scope, ScopeInner {
 
     const currentCleanup = this.#cleanups.get(executor);
     if (currentCleanup !== undefined) {
-      currentCleanup();
+      await currentCleanup();
     }
 
     this.#values.delete(executor);
@@ -371,7 +370,8 @@ class BaseScope implements Scope, ScopeInner {
 
   async dispose(): Promise<void> {
     this.#ensureNotDisposed();
-    this.#cleanups.forEach((cleanup) => cleanup());
+    await Promise.all([...this.#cleanups.values()].map((cleanup) => cleanup()));
+
     this.#cleanups.clear();
     this.#listeners.clear();
 
