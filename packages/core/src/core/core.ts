@@ -47,8 +47,9 @@ export function isExecutor<T>(value: unknown): value is Executor<T> {
 
 export interface Executor<T> {
   [executorSymbol]: true;
-  get factory(): (dependencies: unknown, scope: Scope) => T | Promise<T>;
-  get dependencies(): Executor<unknown>[] | Record<string, Executor<unknown>> | undefined;
+  readonly factory: (dependencies: unknown, scope: Scope) => T | Promise<T>;
+  readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | undefined;
+  readonly id: string;
 }
 
 export interface Scope {
@@ -61,7 +62,7 @@ export interface Scope {
     updateFn: (current: T) => T,
   ): Promise<void>;
   reset<T>(executor: Executor<T>): Promise<void>;
-  release(executor: Executor<any>): Promise<void>;
+  release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
   dispose(): Promise<void>;
   on<T>(executor: Executor<T>, listener: (value: T) => void): Cleanup;
@@ -76,22 +77,6 @@ export interface ScopeInner {
 
 export const createScope = (): Scope => {
   return new BaseScope();
-};
-
-const refSymbol = Symbol("jumped-fn.ref");
-type RefExecutor<T> = Executor<Executor<T>> & { [refSymbol]: true };
-
-export const ref = <T>(executor: Executor<T>): RefExecutor<T> => {
-  return {
-    factory: async (_, scope) => {
-      await scope.resolve(executor);
-
-      return executor;
-    },
-    dependencies: [],
-    [executorSymbol]: true,
-    [refSymbol]: true,
-  };
 };
 
 export const errors = {
@@ -330,11 +315,13 @@ class BaseScope implements Scope, ScopeInner {
     return await promise;
   }
 
-  async release(executor: Executor<any>): Promise<void> {
+  async release(executor: Executor<any>, soft: boolean = false): Promise<void> {
     this.#ensureNotDisposed();
 
     const container = this.#values.get(executor);
     if (container === undefined) {
+      if (soft) return;
+
       throw errors.unResolved();
     }
 
@@ -353,7 +340,7 @@ class BaseScope implements Scope, ScopeInner {
     const dependents = this.#dependencyMap.get(executor);
     if (dependents !== undefined) {
       for (const dependent of dependents) {
-        await this.release(dependent);
+        await this.release(dependent, soft);
       }
     }
 
@@ -370,7 +357,7 @@ class BaseScope implements Scope, ScopeInner {
 
   async dispose(): Promise<void> {
     this.#ensureNotDisposed();
-    await Promise.all([...this.#cleanups.values()].map((cleanup) => cleanup()));
+    await Promise.all(Array.from(this.#values.keys()).map((executor) => this.release(executor, true)));
 
     this.#cleanups.clear();
     this.#listeners.clear();

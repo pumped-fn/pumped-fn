@@ -1,4 +1,51 @@
-import { Scope, Executor, GetAccessor, InferOutput, executorSymbol, isExecutor } from "./core";
+import { Scope, Executor, GetAccessor, InferOutput, executorSymbol, isExecutor, ResourceOutput } from "./core";
+import { resource } from "./outputs";
+
+let id = 0;
+function nextId(type: string) {
+  return `${id++}:${type}`;
+}
+
+export function bundle<B extends object>(
+  input: { [K in keyof B]: Executor<B[K]> },
+): Executor<ResourceOutput<{ [K in keyof B]: GetAccessor<B[K]> }>> {
+  const refs = Object.fromEntries(
+    Object.entries(input).map(([key, executor]) => [key, ref(executor as Executor<unknown>)]),
+  );
+
+  const executor: Executor<ResourceOutput<{ [K in keyof B]: GetAccessor<B[K]> }>> = {
+    async factory(_, scope) {
+      const resolved = (await resolve(scope, refs)) as { [K in keyof B]: GetAccessor<B[K]> };
+
+      return resource(resolved, async () => {
+        await Promise.all(Object.values(input).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
+        await Promise.all(Object.values(refs).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
+      });
+    },
+    dependencies: [],
+    [executorSymbol]: true,
+    id: nextId("bundle"),
+  };
+
+  return executor;
+}
+
+const refSymbol = Symbol("jumped-fn.ref");
+type RefExecutor<T> = Executor<Executor<T>> & { [refSymbol]: true };
+
+export const ref = <T>(executor: Executor<T>): RefExecutor<T> => {
+  return {
+    factory: async (_, scope) => {
+      await scope.resolve(executor);
+
+      return executor;
+    },
+    id: nextId("ref"),
+    dependencies: [],
+    [executorSymbol]: true,
+    [refSymbol]: true,
+  };
+};
 
 export function resolve<T>(scope: Scope, input: Executor<T>): Promise<GetAccessor<Awaited<T>>>;
 export function resolve<T extends Array<unknown> | object>(
@@ -66,6 +113,7 @@ export const provide = <T>(factory: (scope: Scope) => T): Executor<T> => {
       return [];
     },
     [executorSymbol]: true,
+    id: nextId("provide"),
   };
 };
 
@@ -77,6 +125,7 @@ export const derive = <T extends Array<unknown> | object, R>(
     factory: (dependencies, scope) => factory(dependencies as any, scope),
     dependencies,
     [executorSymbol]: true,
+    id: nextId("derive"),
   };
 };
 
