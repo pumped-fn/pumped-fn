@@ -36,11 +36,5 @@
     "type": "git",
     "directory": "packages/core",
     "url": "https://github.com/pumped-fn/pumped-fn"
-  },
-  "release-it": {
-    "plugins": {
-      "@release-it-plugins/workspaces": true
-    },
-    "npm": false
   }
 }
