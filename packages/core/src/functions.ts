@@ -1,4 +1,13 @@
-import { Scope, Executor, GetAccessor, InferOutput, executorSymbol, isExecutor, ResourceOutput } from "./core";
+import {
+  Scope,
+  Executor,
+  GetAccessor,
+  InferOutput,
+  executorSymbol,
+  isExecutor,
+  ResourceOutput,
+  EffectOutput,
+} from "./core";
 import { resource } from "./outputs";
 
 let id = 0;
@@ -8,14 +17,14 @@ function nextId(type: string) {
 
 export function bundle<B extends object>(
   input: { [K in keyof B]: Executor<B[K]> },
-): Executor<ResourceOutput<{ [K in keyof B]: GetAccessor<B[K]> }>> {
+): Executor<ResourceOutput<{ [K in keyof B as B[K] extends EffectOutput ? never : K]: GetAccessor<B[K]> }>> {
   const refs = Object.fromEntries(
     Object.entries(input).map(([key, executor]) => [key, ref(executor as Executor<unknown>)]),
   );
 
-  const executor: Executor<ResourceOutput<{ [K in keyof B]: GetAccessor<B[K]> }>> = {
+  const executor: Executor<any> = {
     async factory(_, scope) {
-      const resolved = (await resolve(scope, refs)) as { [K in keyof B]: GetAccessor<B[K]> };
+      const resolved = await resolve(scope, refs);
 
       return resource(resolved, async () => {
         await Promise.all(Object.values(input).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));

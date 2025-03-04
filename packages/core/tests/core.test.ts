@@ -12,8 +12,8 @@ import {
   run,
   prepare,
   bundle,
-} from "../src/core/index";
-import { ScopeInner } from "../src/core/core";
+} from "../src/index";
+import { ScopeInner } from "../src/core";
 
 describe("core", () => {
   it("syntax", async () => {
@@ -192,7 +192,6 @@ describe("test the bundle", () => {
     const scope = createScope();
     const inner = scope as unknown as ScopeInner;
     const resolvedBundled = await scope.resolve(bundled);
-
     expect(inResourceFn).toHaveBeenCalled();
 
     await scope.release(bundled);
