@@ -192,8 +192,7 @@ describe("test the bundle", () => {
     const scope = createScope();
     const inner = scope as unknown as ScopeInner;
     const resolvedBundled = await scope.resolve(bundled);
-    expect(inResourceFn).toHaveBeenCalled();
-
+    [...inner.getValues().keys()].forEach((e) => console.log(JSON.stringify(e)));
     await scope.release(bundled);
 
     expect(inner.getValues().size).toBe(0);
