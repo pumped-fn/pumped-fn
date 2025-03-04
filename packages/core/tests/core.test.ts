@@ -11,7 +11,6 @@ import {
   safeRun,
   run,
   prepare,
-  bundle,
 } from "../src/index";
 import { ScopeInner } from "../src/core";
 
@@ -170,36 +169,5 @@ describe("it's all about errors", () => {
 
     result = await safeRun(scope, derived, (v) => v);
     expect(result).toEqual({ status: "error", error: expect.any(Error) });
-  });
-});
-
-describe("test the bundle", () => {
-  it("bundle should work", async () => {
-    const inResourceFn = vi.fn();
-    const resourceCleanupFn = vi.fn();
-    const effectCleanupFn = vi.fn();
-
-    const value1 = provide(() => 1);
-    const value2 = derive([value1], ([v]) => v + 1);
-    const resourceValue = provide(() => {
-      inResourceFn();
-      return resource(1, resourceCleanupFn);
-    });
-    const effectValue = derive([value2], ([value2]) => effect(effectCleanupFn));
-
-    const bundled = bundle({ value1, value2, resourceValue, effectValue });
-
-    const scope = createScope();
-    const inner = scope as unknown as ScopeInner;
-
-    const resolvedBundled = await scope.resolve(bundled);
-    expect(resolvedBundled.get().value1.get()).toBe(1);
-    expect(resolvedBundled.get().resourceValue.get()).toBe(1);
-
-    await scope.release(bundled);
-
-    expect(inner.getValues().size).toBe(0);
-    expect(inner.getCleanups().size).toBe(0);
-    expect(inner.getDependencyMap().size).toBe(0);
   });
 });

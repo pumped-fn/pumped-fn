@@ -1,42 +1,8 @@
-import {
-  Scope,
-  Executor,
-  GetAccessor,
-  InferOutput,
-  executorSymbol,
-  isExecutor,
-  ResourceOutput,
-  EffectOutput,
-} from "./core";
-import { resource } from "./outputs";
+import { Scope, Executor, GetAccessor, InferOutput, executorSymbol, isExecutor } from "./core";
 
 let id = 0;
 function nextId(type: string) {
   return `${id++}:${type}`;
-}
-
-export function bundle<B extends object>(
-  input: { [K in keyof B]: Executor<B[K]> },
-): Executor<ResourceOutput<{ [K in keyof B as B[K] extends EffectOutput ? never : K]: GetAccessor<B[K]> }>> {
-  const refs = Object.fromEntries(
-    Object.entries(input).map(([key, executor]) => [key, ref(executor as Executor<unknown>)]),
-  );
-
-  const executor: Executor<any> = {
-    async factory(_refs, scope) {
-      const values = await resolve(scope, _refs as any);
-
-      return resource(values, async () => {
-        await Promise.all(Object.values(input).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
-        await Promise.all(Object.values(refs).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
-      });
-    },
-    dependencies: refs,
-    [executorSymbol]: true,
-    id: nextId("bundle"),
-  };
-
-  return executor;
 }
 
 const refSymbol = Symbol("jumped-fn.ref");
