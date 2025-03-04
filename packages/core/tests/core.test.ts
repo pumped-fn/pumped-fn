@@ -183,7 +183,7 @@ describe("test the bundle", () => {
     const value2 = derive([value1], ([v]) => v + 1);
     const resourceValue = provide(() => {
       inResourceFn();
-      resource(1, resourceCleanupFn);
+      return resource(1, resourceCleanupFn);
     });
     const effectValue = derive([value2], ([value2]) => effect(effectCleanupFn));
 
@@ -191,8 +191,11 @@ describe("test the bundle", () => {
 
     const scope = createScope();
     const inner = scope as unknown as ScopeInner;
+
     const resolvedBundled = await scope.resolve(bundled);
-    [...inner.getValues().keys()].forEach((e) => console.log(JSON.stringify(e)));
+    expect(resolvedBundled.get().value1.get()).toBe(1);
+    expect(resolvedBundled.get().resourceValue.get()).toBe(1);
+
     await scope.release(bundled);
 
     expect(inner.getValues().size).toBe(0);

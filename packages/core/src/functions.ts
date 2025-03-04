@@ -23,15 +23,15 @@ export function bundle<B extends object>(
   );
 
   const executor: Executor<any> = {
-    async factory(_, scope) {
-      const resolved = await resolve(scope, refs);
+    async factory(_refs, scope) {
+      const values = await resolve(scope, _refs as any);
 
-      return resource(resolved, async () => {
+      return resource(values, async () => {
         await Promise.all(Object.values(input).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
         await Promise.all(Object.values(refs).map(async (ref) => await scope.release(ref as Executor<unknown>, true)));
       });
     },
-    dependencies: [],
+    dependencies: refs,
     [executorSymbol]: true,
     id: nextId("bundle"),
   };
