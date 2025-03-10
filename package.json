@@ -21,8 +21,8 @@
     "@biomejs/biome": "^1.9.4",
     "@release-it-plugins/workspaces": "^4.2.0",
     "conventional-changelog-cli": "^4.1.0",
-    "esbuild": "^0.25.0",
-    "typescript": "^5.3.3"
+    "esbuild": "^0.25.1",
+    "typescript": "^5.8.2"
   },
   "license": "MIT",
   "pnpm": {
