@@ -132,8 +132,8 @@ export function useResolve<T extends Executor<unknown>, K = InferOutput<T>>(
   );
 }
 
-export function useResolveMany<T extends Array<unknown>>(
-  ...executors: { [K in keyof T]: Executor<T[K]> }
+export function useResolveMany<T extends Array<Executor<unknown>>>(
+  ...executors: { [K in keyof T]: T[K] }
 ): { [K in keyof T]: InferOutput<T[K]> } {
   const scope = useScope();
   const entries = [] as CacheEntry[];

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
 import { createScope, mutable, provide, ref } from "@pumped-fn/core";
-import { ScopeProvider, useResolve } from "../src/index";
+import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
 
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
@@ -23,11 +23,10 @@ describe("React Integration", () => {
       () => {
         fn();
         // Test multiple hooks working together
-        const derived = useResolve(derivedCount);
-        const update = useResolve(updateCount);
-        const wholesumValue = useResolve(wholesum);
+        const [derived, update, wholesumValue] = useResolveMany(derivedCount, updateCount, wholesum);
+        const onlyMod3 = useResolve(derivedCount, (v) => v % 3 === 0);
 
-        return { derived, update, wholesumValue };
+        return { derived, update, wholesumValue, onlyMod3 };
       },
       {
         wrapper: ({ children }) => (
@@ -41,6 +40,7 @@ describe("React Integration", () => {
     await waitFor(() => {
       expect(result.current.derived).toBe(2);
       expect(result.current.wholesumValue).toBe(2);
+      expect(result.current.onlyMod3).toBe(false);
     });
 
     act(() => {
@@ -49,9 +49,7 @@ describe("React Integration", () => {
 
     await waitFor(() => {
       expect(result.current.derived).toBe(6);
-    });
-
-    await waitFor(() => {
+      expect(result.current.onlyMod3).toBe(true);
       expect(result.current.wholesumValue).toBe(10);
     });
   });
