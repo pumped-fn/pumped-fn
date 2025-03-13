@@ -42,9 +42,6 @@
     }
   },
   "release-it": {
-    "plugins": {
-      "release-it-pnpm": {}
-    },
     "git": {
       "commitMessage": "chore: release v${version}",
       "tagName": "react-v${version}"
