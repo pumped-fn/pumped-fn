@@ -1,4 +1,4 @@
-import type { MutableOutput, Scope, InferOutput } from "@pumped-fn/core";
+import type { Scope, InferOutput, MutableExecutor } from "@pumped-fn/core";
 import type { GetAccessor } from "@pumped-fn/core";
 import { Cleanup } from "@pumped-fn/core";
 import { createScope, type Executor } from "@pumped-fn/core";
@@ -191,10 +191,10 @@ export function useResolveMany<T extends Array<unknown>>(
   );
 }
 
-export function useUpdate<T>(executor: Executor<MutableOutput<T>>): (updateFn: (current: T) => T) => void {
+export function useUpdate<T>(executor: MutableExecutor<T>): (updateFn: T | ((current: T) => T)) => void {
   const scope = useScope();
 
-  return (updateFn: (current: T) => T) => {
+  return (updateFn: T | ((current: T) => T)) => {
     scope.scope.update(executor, updateFn);
   };
 }
