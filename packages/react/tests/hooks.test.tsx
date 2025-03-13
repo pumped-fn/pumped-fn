@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
-import { createScope, mutable, provide, ref } from "@pumped-fn/core";
+import { createScope, mutable, provide, ref, resource } from "@pumped-fn/core";
 import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
 
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
     const scope = createScope();
     const countExecutor = mutable(() => 0);
+    const derivedResource = resource(countExecutor, (v) => [v, () => {}]);
     const derivedCount = provide([countExecutor], ([v]) => v + 2);
     const wholesum = provide([countExecutor, derivedCount], ([v1, v2]) => {
       return v1 + v2;
@@ -23,10 +24,15 @@ describe("React Integration", () => {
       () => {
         fn();
         // Test multiple hooks working together
-        const [derived, update, wholesumValue] = useResolveMany(derivedCount, updateCount, wholesum);
+        const [derived, update, wholesumValue, derivedResourceValue] = useResolveMany(
+          derivedCount,
+          updateCount,
+          wholesum,
+          derivedResource,
+        );
         const onlyMod3 = useResolve(derivedCount, (v) => v % 3 === 0);
 
-        return { derived, update, wholesumValue, onlyMod3 };
+        return { derived, update, wholesumValue, onlyMod3, derivedResourceValue };
       },
       {
         wrapper: ({ children }) => (
@@ -41,6 +47,7 @@ describe("React Integration", () => {
       expect(result.current.derived).toBe(2);
       expect(result.current.wholesumValue).toBe(2);
       expect(result.current.onlyMod3).toBe(false);
+      expect(result.current.derivedResourceValue).toBe(0);
     });
 
     act(() => {
