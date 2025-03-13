@@ -1,78 +1,19 @@
-export type Cleanup = () => void | Promise<void>;
-
-export type InferOutput<T> = T extends Promise<infer X> ? InferOutput<X> : T extends Output<infer X> ? X : T;
-
-export interface GetAccessor<T> {
-  get: () => InferOutput<T>;
-}
-
-const getAccessor = <T>(get: () => T): GetAccessor<T> => ({
-  get: () => get() as InferOutput<T>,
-});
-
-export const outputSymbol = Symbol("jumped-fn.output");
-
-export interface Output<T> {
-  value: T;
-  [outputSymbol]: string;
-}
-
-export interface MutableOutput<T> extends Output<T> {
-  [outputSymbol]: "mutable";
-}
-
-export interface ImmutableOutput<T> extends Output<T> {
-  [outputSymbol]: "immutable";
-}
-
-export interface ResourceOutput<T> extends Output<T> {
-  readonly cleanup: Cleanup;
-  [outputSymbol]: "resource";
-}
-
-export interface EffectOutput extends Output<never> {
-  [outputSymbol]: "effect";
-  readonly cleanup: Cleanup;
-}
-
-import { isEffectOutput, isResouceOutput, isOutput } from "./outputs";
-
-export const executorSymbol = Symbol("jumped-fn.executor");
-
-export function isExecutor<T>(value: unknown): value is Executor<T> {
-  return (
-    typeof value === "object" && value !== null && executorSymbol in value && (value as Executor<T>)[executorSymbol]
-  );
-}
-
-export interface Executor<T> {
-  [executorSymbol]: true;
-  readonly factory: (dependencies: unknown, scope: Scope) => T | Promise<T>;
-  readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | undefined;
-  readonly id: string;
-}
-
-export interface Scope {
-  readonly isDisposed: boolean;
-  get<T>(executor: Executor<T>): GetAccessor<T> | undefined;
-
-  resolve<T>(executor: Executor<T>): Promise<GetAccessor<T>>;
-  update<T>(
-    executor: Executor<MutableOutput<T> | Promise<MutableOutput<T>>>,
-    updateFn: (current: T) => T,
-  ): Promise<void>;
-  reset<T>(executor: Executor<T>): Promise<void>;
-  release(executor: Executor<any>, soft?: boolean): Promise<void>;
-
-  dispose(): Promise<void>;
-  on<T>(executor: Executor<T>, listener: (value: T) => void): Cleanup;
-  once<T>(executor: Executor<T>): Promise<void>;
-}
+import {
+  Cleanup,
+  Executor,
+  executorSymbol,
+  getAccessor,
+  GetAccessor,
+  InferOutput,
+  isExecutor,
+  MutableExecutor,
+  Scope,
+} from "./types";
 
 export interface ScopeInner {
   getValues(): Map<Executor<unknown>, Container>;
   getDependencyMap(): Map<Executor<unknown>, Set<Executor<unknown>>>;
-  getCleanups(): Map<Executor<unknown>, Cleanup>;
+  getCleanups(): Map<Executor<unknown> | null, Cleanup>;
 }
 
 export const createScope = (): Scope => {
@@ -96,7 +37,7 @@ class BaseScope implements Scope, ScopeInner {
   #disposed = false;
   #values = new Map<Executor<unknown>, Container>();
   #dependencyMap = new Map<Executor<unknown>, Set<Executor<unknown>>>();
-  #cleanups = new Map<Executor<unknown>, Cleanup>();
+  #cleanups = new Map<Executor<unknown> | null, Cleanup>();
   #listeners = new Map<Executor<unknown>, Set<(value: unknown) => void>>();
 
   #ensureNotDisposed() {
@@ -139,36 +80,59 @@ class BaseScope implements Scope, ScopeInner {
     }
   }
 
-  async #resolveDependencyArray(dependencies: Executor<unknown>[]): Promise<unknown[]> {
+  async #resolveDependencyArray(dependencies: Executor<unknown>[], reactive = false): Promise<unknown[]> {
     const result: unknown[] = [];
     for (const dep of dependencies) {
-      result.push((await this.resolve(dep)).get());
+      const value = (await this.resolve(dep)).get();
+      result.push(reactive ? getAccessor(() => value) : value);
     }
 
     return result;
   }
 
-  async #resolveDependencyObject(dependencies: Record<string, Executor<unknown>>): Promise<Record<string, unknown>> {
+  async #resolveDependencyObject(
+    dependencies: Record<string, Executor<unknown>>,
+    reactive = false,
+  ): Promise<Record<string, unknown>> {
     const result = {} as Record<string, unknown>;
     for (const [key, dep] of Object.entries(dependencies)) {
-      result[key] = (await this.resolve(dep)).get();
+      const value = (await this.resolve(dep)).get();
+      result[key] = reactive ? getAccessor(() => value) : value;
     }
 
     return result;
   }
 
   async #resolveDependency(
-    dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | undefined,
-  ): Promise<unknown[] | Record<string, unknown> | undefined> {
+    dependencies: Executor<unknown> | Executor<unknown>[] | Record<string, Executor<unknown>> | undefined,
+    reactive = false,
+  ): Promise<unknown[] | Record<string, unknown> | unknown | undefined> {
     if (!dependencies) return undefined;
 
+    if (isExecutor(dependencies)) {
+      const resolved = await this.resolve(dependencies);
+
+      return reactive ? resolved : resolved.get();
+    }
+
     return Array.isArray(dependencies)
-      ? await this.#resolveDependencyArray(dependencies)
-      : await this.#resolveDependencyObject(dependencies);
+      ? await this.#resolveDependencyArray(dependencies, reactive)
+      : await this.#resolveDependencyObject(dependencies, reactive);
   }
 
   #trackDependencies(executor: Executor<unknown>): void {
     if (executor.dependencies === undefined) return;
+
+    if (isExecutor(executor.dependencies)) {
+      const currentSet = this.#dependencyMap.get(executor.dependencies);
+      if (currentSet === undefined) {
+        this.#dependencyMap.set(executor.dependencies, new Set([executor]));
+      } else {
+        currentSet.add(executor);
+      }
+
+      return;
+    }
 
     for (const dependency of Object.values(executor.dependencies)) {
       const currentSet = this.#dependencyMap.get(dependency);
@@ -186,25 +150,45 @@ class BaseScope implements Scope, ScopeInner {
 
     const willResolve = new Promise(async (resolve, reject) => {
       try {
-        const dependencies = await this.#resolveDependency(executor.dependencies);
-        this.#trackDependencies(executor);
+        const dependencies = await this.#resolveDependency(
+          executor.dependencies,
+          executor[executorSymbol].kind === "reactive",
+        );
 
-        const value = await executor.factory(dependencies, this);
-        if (isEffectOutput(value) || isResouceOutput(value)) {
-          this.#cleanups.set(executor, value.cleanup);
+        if (
+          executor[executorSymbol].kind !== "reactive" &&
+          executor[executorSymbol].kind !== "reactive-resource" &&
+          executor[executorSymbol].kind !== "reference"
+        ) {
+          this.#trackDependencies(executor);
         }
 
-        if (isOutput(value)) {
-          Object.assign(container, { kind: "resolved", value: value.value });
+        const value = await executor.factory(dependencies, this);
+
+        if (executor[executorSymbol].kind === "resource" || executor[executorSymbol].kind === "reactive-resource") {
+          const [_, cleanup] = value as [unknown, Cleanup];
+          this.#cleanups.set(executor, cleanup);
+        } else if (executor[executorSymbol].kind === "effect") {
+          this.#cleanups.set(executor, value as Cleanup);
+        }
+
+        if (executor[executorSymbol].kind === "resource") {
+          const [resource] = value as [unknown, Cleanup];
+          Object.assign(container, { kind: "resolved", value: resource });
         } else {
           Object.assign(container, { kind: "resolved", value });
         }
 
         this.#triggerEvent(executor, value);
+
         resolve(this.#makeGetAccessor(executor));
       } catch (error) {
         this.#values.delete(executor);
         reject(error);
+      } finally {
+        if (executor[executorSymbol].kind === "reference") {
+          this.release(executor);
+        }
       }
     });
 
@@ -230,23 +214,27 @@ class BaseScope implements Scope, ScopeInner {
     }
   }
 
-  async resolve<T>(executor: Executor<T>): Promise<GetAccessor<T>> {
+  async resolve<T extends Executor<unknown>>(executor: T): Promise<GetAccessor<InferOutput<T>>> {
     this.#ensureNotDisposed();
 
     const container = this.#values.get(executor);
     if (container !== undefined) {
       if (container.kind === "resolved") {
-        return this.#makeGetAccessor(executor);
+        return this.#makeGetAccessor(executor) as GetAccessor<InferOutput<T>>;
       }
 
-      return container.promise as Promise<GetAccessor<T>>;
+      return container.promise as Promise<GetAccessor<InferOutput<T>>>;
     }
 
-    return this.#evalute(executor);
+    return this.#evalute(executor) as Promise<GetAccessor<InferOutput<T>>>;
   }
 
-  async update<T>(executor: Executor<MutableOutput<T>>, updateFn: (current: T) => T): Promise<void> {
+  async update<T>(executor: MutableExecutor<T>, updateFn: T | ((current: T) => T)): Promise<void> {
     this.#ensureNotDisposed();
+
+    if (executor[executorSymbol].kind !== "mutable") {
+      throw errors.notMutableExecutor();
+    }
 
     let container = this.#values.get(executor);
     if (container === undefined) {
@@ -269,7 +257,7 @@ class BaseScope implements Scope, ScopeInner {
 
     const promise = Promise.resolve()
       .then(() => {
-        const value = updateFn(container.value as T);
+        const value = typeof updateFn === "function" ? (updateFn as (current: T) => T)(container.value as T) : updateFn;
         Object.assign(container, { kind: "resolved", value });
 
         return value;
@@ -357,7 +345,11 @@ class BaseScope implements Scope, ScopeInner {
 
   async dispose(): Promise<void> {
     this.#ensureNotDisposed();
-    await Promise.all(Array.from(this.#values.keys()).map((executor) => this.release(executor, true)));
+    await Promise.all(
+      Array.from(this.#values.keys())
+        .reverse()
+        .map((executor) => this.release(executor, true)),
+    );
 
     this.#cleanups.clear();
     this.#listeners.clear();
@@ -402,6 +394,14 @@ class BaseScope implements Scope, ScopeInner {
     });
   }
 
+  addCleanup(cleanup: Cleanup): Cleanup {
+    this.#cleanups.set(null, cleanup);
+
+    return () => {
+      this.#cleanups.delete(null);
+    };
+  }
+
   /** SCOPE INNER */
   getValues(): Map<Executor<unknown>, Container> {
     return this.#values;
@@ -411,7 +411,7 @@ class BaseScope implements Scope, ScopeInner {
     return this.#dependencyMap;
   }
 
-  getCleanups(): Map<Executor<unknown>, Cleanup> {
+  getCleanups(): Map<Executor<unknown> | null, Cleanup> {
     return this.#cleanups;
   }
 }
