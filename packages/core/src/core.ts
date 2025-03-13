@@ -185,10 +185,6 @@ class BaseScope implements Scope, ScopeInner {
       } catch (error) {
         this.#values.delete(executor);
         reject(error);
-      } finally {
-        if (executor[executorSymbol].kind === "reference") {
-          this.release(executor);
-        }
       }
     });
 

@@ -1,20 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
-import { createScope, provide, mutable, Executor, derive, ref } from "@pumped-fn/core";
-import { ScopeProvider, useResolve, useUpdate } from "../src/index";
+import { createScope, mutable, provide, ref } from "@pumped-fn/core";
+import { ScopeProvider, useResolve } from "../src/index";
 
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
     const scope = createScope();
-    const countExecutor = provide(() => mutable(0));
-    const derivedCount = derive([countExecutor], ([v]) => v + 2);
-    const wholesum = derive([countExecutor, derivedCount], ([v1, v2]) => {
+    const countExecutor = mutable(() => 0);
+    const derivedCount = provide([countExecutor], ([v]) => v + 2);
+    const wholesum = provide([countExecutor, derivedCount], ([v1, v2]) => {
       return v1 + v2;
     });
 
-    const updateCount = derive([ref(countExecutor)], ([ref], scope) => {
-      return (value: number) => scope.update(ref, () => value);
+    const updateCount = provide([ref(countExecutor)], ([ref], scope) => {
+      return (value: number) => scope.update(ref, value);
     });
 
     const fn = vi.fn();

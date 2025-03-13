@@ -1,9 +1,9 @@
-import { Executor, executorSymbol } from "../types";
+import { Executor, executorSymbol, ReferenceExecutor } from "../types";
 
 let refId = 0;
 const nextRefId = () => `ref:${refId++}`;
 
-export const ref = <T>(executor: Executor<T>): Executor<Executor<T>> => {
+export const ref = <T extends Executor<unknown>>(executor: T): ReferenceExecutor<T> => {
   return {
     factory: async (_, scope) => {
       await scope.resolve(executor);
@@ -14,7 +14,6 @@ export const ref = <T>(executor: Executor<T>): Executor<Executor<T>> => {
     dependencies: [],
     [executorSymbol]: {
       kind: "reference",
-      to: [executor],
     },
   };
 };

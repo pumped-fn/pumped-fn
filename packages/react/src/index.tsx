@@ -84,15 +84,15 @@ type UseResolveOption<T> = {
   equality?: (thisValue: T, thatValue: T) => boolean;
 };
 
-export function useResolve<T>(executor: Executor<T>): InferOutput<T>;
-export function useResolve<T, K>(
-  executor: Executor<T>,
+export function useResolve<T extends Executor<unknown>>(executor: T): InferOutput<T>;
+export function useResolve<T extends Executor<unknown>, K>(
+  executor: T,
   selector: (value: InferOutput<T>) => K,
   options?: UseResolveOption<T>,
 ): K;
 
-export function useResolve<T, K = InferOutput<T>>(
-  executor: Executor<T>,
+export function useResolve<T extends Executor<unknown>, K = InferOutput<T>>(
+  executor: T,
   selector?: (value: InferOutput<T>) => K,
   options?: UseResolveOption<T>,
 ): K {

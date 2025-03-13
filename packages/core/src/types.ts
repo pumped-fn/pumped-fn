@@ -6,7 +6,7 @@ export type Effect = { kind: "effect" };
 export type Reactive = { kind: "reactive" };
 export type Resource = { kind: "resource" };
 export type ReactiveResource = { kind: "reactive-resource" };
-export type Reference = { kind: "reference"; to: Executor<unknown>[] };
+export type Reference = { kind: "reference" };
 
 export const executorSymbol = Symbol("jumped-fn.executor");
 
@@ -37,7 +37,7 @@ export interface ReactiveResourceExecutor<T> extends Executor<[T, Cleanup]> {
   [executorSymbol]: ReactiveResource;
 }
 
-export interface ReferenceExecutor<T> extends Executor<T> {
+export interface ReferenceExecutor<T extends Executor<unknown>> extends Executor<T> {
   [executorSymbol]: Reference;
 }
 
@@ -55,15 +55,16 @@ export type InferOutput<T> = T extends
   | ResourceExecutor<infer U>
   | ReactiveExecutor<infer U>
   | ReactiveResourceExecutor<infer U>
-  | ReferenceExecutor<infer U>
   ? Awaited<U>
   : T extends EffectExecutor
     ? Cleanup
-    : T extends Record<string, Executor<unknown>>
-      ? { [K in keyof T]: InferOutput<T[K]> }
-      : T extends [...infer U]
-        ? { [K in keyof U]: InferOutput<U[K]> }
-        : unknown;
+    : T extends Executor<infer U>
+      ? Awaited<U>
+      : T extends Record<string, Executor<unknown>>
+        ? { [K in keyof T]: InferOutput<T[K]> }
+        : T extends [...infer U]
+          ? { [K in keyof U]: InferOutput<U[K]> }
+          : unknown;
 
 export interface Scope {
   readonly isDisposed: boolean;
