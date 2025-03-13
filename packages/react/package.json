@@ -18,7 +18,7 @@
     "test:watch": "vitest watch"
   },
   "peerDependencies": {
-    "@pumped-fn/core": "^0.5.0",
+    "@pumped-fn/core": "^0.5.7",
     "react": "^18.0.0"
   },
   "files": ["dist"],
