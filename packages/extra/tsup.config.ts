@@ -1,7 +1,14 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/client.ts", "src/server.ts", "src/bun/index.ts", "src/meta/http.ts", "src/standardschema.ts"],
+  entry: [
+    "src/index.ts",
+    "src/client.ts",
+    "src/server.ts",
+    "src/bun/index.ts",
+    "src/meta/http.ts",
+    "src/standardschema.ts",
+  ],
   format: ["cjs", "esm"],
   dts: true,
   clean: true,
