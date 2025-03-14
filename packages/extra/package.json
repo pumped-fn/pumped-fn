@@ -1,0 +1,58 @@
+{
+  "name": "@pumped-fn/extra",
+  "version": "0.5.0",
+  "description": "Utilities to build full stack application using @pumped-fn/core",
+  "keywords": [
+    "pumped-fn",
+    "functional programming"
+  ],
+  "author": "Lagz0ne",
+  "license": "MIT",
+  "homepage": "https://github.com/pumped-fn/pumped-fn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git",
+    "directory": "packages/extra"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "peerDependencies": {
+    "@pumped-fn/core": "^0.5.8"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@pumped-fn/core": "workspace:*",
+    "@types/bun": "^1.2.5",
+    "tsup": "^8.3.6",
+    "vitest": "^1.6.1"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "release-it": {
+    "hooks": {
+      "after:bump": "pnpm run build"
+    },
+    "git": {
+      "commitMessage": "chore: release v${version}",
+      "tagName": "extra-v${version}",
+      "changelog": "git log --pretty=format:\"* %s (%h)\" ${from}...${to}"
+    },
+    "npm": {
+      "publish": true
+    }
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  }
+}
