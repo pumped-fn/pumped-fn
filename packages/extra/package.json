@@ -2,10 +2,7 @@
   "name": "@pumped-fn/extra",
   "version": "0.5.2",
   "description": "Utilities to build full stack application using @pumped-fn/core",
-  "keywords": [
-    "pumped-fn",
-    "functional programming"
-  ],
+  "keywords": ["pumped-fn", "functional programming"],
   "author": "Lagz0ne",
   "license": "MIT",
   "homepage": "https://github.com/pumped-fn/pumped-fn",
@@ -24,9 +21,7 @@
     "@pumped-fn/core": "^0.5.8",
     "zod": "^3.24.2"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "devDependencies": {
     "@pumped-fn/core": "workspace:*",
     "@types/bun": "^1.2.5",
@@ -50,9 +45,9 @@
       "require": "./dist/server.cjs"
     },
     "./bun": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "types": "./dist/bun/index.d.ts",
+      "import": "./dist/bun/index.js",
+      "require": "./dist/bun/index.cjs"
     },
     "./meta/http": {
       "types": "./dist/meta/http.d.ts",
