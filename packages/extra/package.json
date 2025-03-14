@@ -18,7 +18,8 @@
     "test:watch": "vitest watch"
   },
   "peerDependencies": {
-    "@pumped-fn/core": "^0.5.8"
+    "@pumped-fn/core": "^0.5.8",
+    "zod": "^3.24.2"
   },
   "files": ["dist"],
   "devDependencies": {
@@ -76,8 +77,5 @@
     "npm": {
       "publish": true
     }
-  },
-  "dependencies": {
-    "zod": "^3.24.2"
   }
 }
