@@ -1,4 +1,4 @@
-import { Executor, executorSymbol, InferOutput, isExecutor, ResourceExecutor } from "../types";
+import { createExecutor, Executor, executorSymbol, InferOutput, isExecutor, ResourceExecutor } from "../types";
 import { Factory, Cleanup } from "../types";
 
 let resourceId = 0;
@@ -22,18 +22,8 @@ export function resource<P, T>(
   factory: Factory<[P, Cleanup], T>,
 ): ResourceExecutor<P> {
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "resource" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: pDependencyOrFactory,
-      id: nextResourceId(),
-    };
+    return createExecutor({ kind: "resource" }, factory, pDependencyOrFactory, nextResourceId()) as ResourceExecutor<P>;
   }
 
-  return {
-    [executorSymbol]: { kind: "resource" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextResourceId(),
-  };
+  return createExecutor({ kind: "resource" }, factory, pDependencyOrFactory, nextResourceId()) as ResourceExecutor<P>;
 }

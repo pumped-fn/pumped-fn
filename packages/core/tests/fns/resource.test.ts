@@ -2,6 +2,7 @@ import { it, expect, describe, vi, beforeEach } from "vitest";
 import { resource } from "../../src/fns/resource";
 import { createScope } from "../../src/core";
 import { mutable } from "../../src/fns/mutable";
+import { expectEmpty } from "../utils";
 
 describe("resource test", () => {
   const mutableInt = mutable(() => 1);
@@ -25,5 +26,9 @@ describe("resource test", () => {
 
     await scope.release(theResource);
     expect(fn).toHaveBeenCalledTimes(2);
+
+    await scope.release(mutableInt);
+
+    expectEmpty(scope);
   });
 });

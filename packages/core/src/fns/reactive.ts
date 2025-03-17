@@ -1,7 +1,7 @@
 import {
   Cleanup,
+  createExecutor,
   Executor,
-  executorSymbol,
   GetAccessor,
   isExecutor,
   ReactiveExecutor,
@@ -27,20 +27,10 @@ export function reactive<P, T>(
   factory: Factory<P, GetAccessor<T>> | Factory<P, { [K in keyof T]: GetAccessor<T[K]> }>,
 ): ReactiveExecutor<P> {
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "reactive" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: pDependencyOrFactory,
-      id: nextReactiveId(),
-    };
+    return createExecutor({ kind: "reactive" }, factory, pDependencyOrFactory, nextReactiveId());
   }
 
-  return {
-    [executorSymbol]: { kind: "reactive" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextReactiveId(),
-  };
+  return createExecutor({ kind: "reactive" }, factory, pDependencyOrFactory, nextReactiveId());
 }
 
 export function reactiveResource<P, T>(
@@ -58,18 +48,18 @@ export function reactiveResource<P, T>(
   factory: Factory<[P, Cleanup], T>,
 ): ReactiveResourceExecutor<P> {
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "reactive-resource" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: [pDependencyOrFactory],
-      id: nextReactiveId(),
-    };
+    return createExecutor(
+      { kind: "reactive-resource" },
+      factory,
+      pDependencyOrFactory,
+      nextReactiveId(),
+    ) as ReactiveResourceExecutor<P>;
   }
 
-  return {
-    [executorSymbol]: { kind: "reactive-resource" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextReactiveId(),
-  };
+  return createExecutor(
+    { kind: "reactive-resource" },
+    factory,
+    pDependencyOrFactory,
+    nextReactiveId(),
+  ) as ReactiveResourceExecutor<P>;
 }

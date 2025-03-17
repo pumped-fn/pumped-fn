@@ -1,4 +1,4 @@
-import { Executor, executorSymbol, isExecutor, EffectExecutor, InferOutput } from "../types";
+import { Executor, isExecutor, EffectExecutor, InferOutput, createExecutor } from "../types";
 import { Factory, Cleanup } from "../types";
 
 let effectId = 0;
@@ -22,18 +22,8 @@ export function effect<T>(
   factory: Factory<Cleanup, T>,
 ): EffectExecutor {
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "effect" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: pDependencyOrFactory,
-      id: nextEffectId(),
-    };
+    return createExecutor({ kind: "effect" }, factory, pDependencyOrFactory, nextEffectId());
   }
 
-  return {
-    [executorSymbol]: { kind: "effect" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextEffectId(),
-  };
+  return createExecutor({ kind: "effect" }, factory, pDependencyOrFactory, nextEffectId());
 }

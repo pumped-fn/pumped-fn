@@ -2,6 +2,7 @@ import { it, expect, describe } from "vitest";
 import { reactive } from "../../src/fns/reactive";
 import { createScope } from "../../src/core";
 import { mutable } from "../../src/fns/mutable";
+import { expectEmpty } from "../utils";
 
 describe("reactive test", () => {
   const mutableInt = mutable(() => 1);
@@ -18,5 +19,10 @@ describe("reactive test", () => {
 
     const fn2 = await scope.resolve(getLatest);
     expect(fn2.get()).toBe(fn);
+
+    await scope.release(mutableInt);
+    await scope.release(getLatest);
+
+    expectEmpty(scope);
   });
 });

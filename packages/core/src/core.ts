@@ -336,6 +336,10 @@ class BaseScope implements Scope, ScopeInner {
       }
     }
 
+    if (executor[executorSymbol].kind !== "reference" && this.#values.has(executor.ref)) {
+      await this.release(executor.ref);
+    }
+
     this.#dependencyMap.delete(executor);
   }
 

@@ -1,13 +1,17 @@
 import { it, expect, describe } from "vitest";
-import { ref } from "../../src/fns/ref";
 import { resolve, resolveOnce } from "../../src/statics";
 import { createScope, ScopeInner } from "../../src/core";
 import { mutable } from "../../src/fns/mutable";
 import { provide } from "../../src/fns/immutable";
+import { expectEmpty } from "../utils";
 
 describe("ref test", () => {
   const mutableInt = mutable(() => 1);
-  const updator = provide([ref(mutableInt)], ([ref], scope) => {
+  const updator = provide([mutableInt.ref], ([ref], scope) => {
+    return (value: number) => scope.update(ref, value);
+  });
+
+  const updator2 = provide(mutableInt.ref, async (ref, scope) => {
     return (value: number) => scope.update(ref, value);
   });
 
@@ -23,6 +27,13 @@ describe("ref test", () => {
     await updatorAPI(2);
     expect(val.get()).toBe(2);
 
+    const updatorAPI2 = await resolveOnce(scope, updator2);
+    await updatorAPI2(3);
+    expect(val.get()).toBe(3);
+
+    expect(inner.getValues().size).toBe(4);
+
     await scope.release(mutableInt);
+    expectEmpty(scope);
   });
 });

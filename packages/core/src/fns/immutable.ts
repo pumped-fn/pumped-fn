@@ -1,4 +1,4 @@
-import { Executor, executorSymbol, ImmutableExecutor, InferOutput, isExecutor, Scope } from "../types";
+import { createExecutor, Executor, ImmutableExecutor, InferOutput, isExecutor, Scope } from "../types";
 import { Factory } from "../types";
 
 let providerId = 0;
@@ -24,12 +24,7 @@ export function provide<P, T>(
   factory?: Factory<P, { [K in keyof T]: InferOutput<T[K]> }> | Factory<P, InferOutput<T>>,
 ): ImmutableExecutor<P> {
   if (typeof pDependencyOrFactory === "function") {
-    return {
-      [executorSymbol]: { kind: "immutable" },
-      factory: (_, scope) => pDependencyOrFactory(scope),
-      dependencies: undefined,
-      id: nextProviderId(),
-    };
+    return createExecutor({ kind: "immutable" }, pDependencyOrFactory, undefined, nextProviderId());
   }
 
   if (factory === undefined) {
@@ -37,18 +32,8 @@ export function provide<P, T>(
   }
 
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "immutable" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: pDependencyOrFactory,
-      id: nextProviderId(),
-    };
+    return createExecutor({ kind: "immutable" }, factory, pDependencyOrFactory, nextProviderId());
   }
 
-  return {
-    [executorSymbol]: { kind: "immutable" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextProviderId(),
-  };
+  return createExecutor({ kind: "immutable" }, factory, pDependencyOrFactory, nextProviderId());
 }

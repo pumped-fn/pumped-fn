@@ -19,6 +19,7 @@ export interface Executor<T> {
   readonly factory: (dependencies: unknown, scope: Scope) => T | Promise<T>;
   readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined;
   readonly id: string;
+  readonly ref: Executor<Executor<T>>;
 }
 
 export interface ImmutableExecutor<T> extends Executor<T> {
@@ -71,7 +72,7 @@ export interface Scope {
   get<T>(executor: Executor<T>): GetAccessor<T> | undefined;
 
   resolve<T extends Executor<unknown>>(executor: T): Promise<GetAccessor<InferOutput<T>>>;
-  update<T>(executor: MutableExecutor<T>, updateFn: T | ((current: T) => T)): Promise<void>;
+  update<T>(executor: Executor<T>, updateFn: T | ((current: T) => T)): Promise<void>;
   reset<T>(executor: Executor<T>): Promise<void>;
   release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
@@ -97,3 +98,104 @@ export interface GetAccessor<T> {
 export const getAccessor = <T>(get: () => T): GetAccessor<T> => ({
   get: () => get() as Awaited<T>,
 });
+
+export function createExecutor<T, K extends Immutable | Mutable | Effect | Reactive | Resource | ReactiveResource>(
+  kind: K,
+  factory: (dependencies: any, scope: Scope) => any,
+  dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined,
+  id: string,
+): K extends Immutable
+  ? ImmutableExecutor<T>
+  : K extends Mutable
+    ? MutableExecutor<T>
+    : K extends Effect
+      ? EffectExecutor
+      : K extends Reactive
+        ? ReactiveExecutor<T>
+        : K extends Resource
+          ? ResourceExecutor<T>
+          : K extends ReactiveResource
+            ? ReactiveResourceExecutor<T>
+            : never {
+  const executor = {} as Executor<T>;
+
+  Object.defineProperties(executor, {
+    [executorSymbol]: {
+      value: kind,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    factory: {
+      value: factory,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    dependencies: {
+      value: dependencies,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    id: {
+      value: id,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+  });
+
+  const ref = createRefExecutor(executor);
+
+  Object.defineProperty(executor, "ref", {
+    value: ref,
+    writable: false,
+    configurable: false,
+    enumerable: true,
+  });
+
+  return executor as any;
+}
+
+function createRefExecutor<T extends Executor<unknown>>(executor: T): ReferenceExecutor<T> {
+  if (executor[executorSymbol].kind === "reference") {
+    throw new Error(`a ref couldn't be refed`);
+  }
+
+  return Object.defineProperties<ReferenceExecutor<T>>({} as ReferenceExecutor<T>, {
+    [executorSymbol]: {
+      value: { kind: "reference" },
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    factory: {
+      value: async (_: unknown, scope: Scope) => {
+        await scope.resolve(executor);
+
+        return executor;
+      },
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    dependencies: {
+      value: [executor],
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    id: {
+      value: `ref(${executor.id})`,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    ref: {
+      get() {
+        throw new Error(`a ref couldn't be refed`);
+      },
+    },
+  });
+}

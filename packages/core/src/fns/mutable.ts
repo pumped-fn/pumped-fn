@@ -1,4 +1,4 @@
-import { Executor, executorSymbol, Factory, InferOutput, isExecutor, MutableExecutor, Scope } from "../types";
+import { createExecutor, Executor, Factory, InferOutput, isExecutor, MutableExecutor, Scope } from "../types";
 
 let mutableId = 0;
 
@@ -23,12 +23,7 @@ export function mutable<P, T>(
   factory?: Factory<P, { [K in keyof T]: InferOutput<T[K]> }> | Factory<P, InferOutput<T>>,
 ): MutableExecutor<P> {
   if (typeof pDependencyOrFactory === "function") {
-    return {
-      [executorSymbol]: { kind: "mutable" },
-      factory: (_, scope) => pDependencyOrFactory(scope),
-      dependencies: undefined,
-      id: nextMutableId(),
-    };
+    return createExecutor({ kind: "mutable" }, pDependencyOrFactory, undefined, nextMutableId());
   }
 
   if (factory === undefined) {
@@ -36,18 +31,8 @@ export function mutable<P, T>(
   }
 
   if (isExecutor(pDependencyOrFactory)) {
-    return {
-      [executorSymbol]: { kind: "mutable" },
-      factory: (dependencies, scope) => factory(dependencies as any, scope),
-      dependencies: pDependencyOrFactory,
-      id: nextMutableId(),
-    };
+    return createExecutor({ kind: "mutable" }, factory, pDependencyOrFactory, nextMutableId());
   }
 
-  return {
-    [executorSymbol]: { kind: "mutable" },
-    factory: (dependencies, scope) => factory(dependencies as any, scope),
-    dependencies: pDependencyOrFactory,
-    id: nextMutableId(),
-  };
+  return createExecutor({ kind: "mutable" }, factory, pDependencyOrFactory, nextMutableId());
 }
