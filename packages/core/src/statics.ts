@@ -1,4 +1,5 @@
-import { Scope, Executor, GetAccessor, InferOutput, isExecutor, Cleanup } from "./types";
+import { ScopeMiddleware } from "./core";
+import { Scope, Executor, GetAccessor, InferOutput, isExecutor, Cleanup, Middleware } from "./types";
 
 export function resolve<T extends Executor<unknown>>(scope: Scope, input: T): Promise<GetAccessor<InferOutput<T>>>;
 export function resolve<T extends Array<Executor<unknown>> | Record<string, Executor<unknown>>>(
@@ -57,15 +58,15 @@ export async function resolveOnce(scope: Scope, input: unknown): Promise<unknown
   return result;
 }
 
-export function run<I, O>(
+export function run<I extends Executor<unknown>, O>(
   scope: Scope,
-  executor: Executor<I>,
+  executor: I,
   effect: (input: InferOutput<I>) => O | Promise<O>,
 ): Promise<O>;
 
-export function run<I extends Array<unknown> | object, O>(
+export function run<I extends Array<Executor<unknown>> | Record<string, Executor<unknown>>, O>(
   scope: Scope,
-  executor: { [K in keyof I]: Executor<I[K]> },
+  executor: { [K in keyof I]: I[K] },
   effect: (input: { [K in keyof I]: InferOutput<I[K]> }) => O | Promise<O>,
 ): Promise<O>;
 
@@ -74,21 +75,25 @@ export async function run(scope: Scope, executor: any, effect: any): Promise<any
   return await effect(resolved);
 }
 
-export function prepare<I, O, P extends Array<unknown>>(
+export function prepare<I extends Executor<unknown>, O, P extends Array<unknown>>(
   scope: Scope,
-  executor: Executor<I>,
+  executor: I,
   effect: (input: InferOutput<I>, ...params: P) => O | Promise<O>,
 ): (...params: P) => Promise<O>;
 
-export function prepare<I extends Array<unknown> | object, O, P extends Array<unknown>>(
+export function prepare<
+  I extends Array<Executor<unknown>> | Record<string, Executor<unknown>>,
+  O,
+  P extends Array<unknown>,
+>(
   scope: Scope,
-  executor: { [K in keyof I]: Executor<I[K]> },
+  executor: { [K in keyof I]: I[K] },
   effect: (input: { [K in keyof I]: InferOutput<I[K]> }, ...params: P) => O | Promise<O>,
 ): (...params: P) => Promise<O>;
 
 export function prepare<I, O, P extends Array<unknown>>(
   scope: Scope,
-  executor: Executor<I> | { [K in keyof I]: Executor<I[K]> },
+  executor: any,
   effect: (input: any, ...params: P) => O | Promise<O>,
 ): (...params: P) => Promise<O> {
   return (...params: P) => {
@@ -261,4 +266,20 @@ export function runEffect(scope: Scope, executor: any, effect: any): Cleanup {
     controller.abort();
     await process;
   };
+}
+
+export function registerMiddlewares(scope: Scope, ...middlewares: Middleware[]) {
+  const middlwareScope = scope as unknown as ScopeMiddleware;
+
+  for (const m of middlewares) {
+    middlwareScope.registerMiddleware(m);
+  }
+}
+
+export async function cleanMiddlewares(scope: Scope, ...middleware: Middleware[]): Promise<void> {
+  const middlwareScope = scope as unknown as ScopeMiddleware;
+
+  for (const m of middleware) {
+    await middlwareScope.cleanMiddleware(m);
+  }
 }

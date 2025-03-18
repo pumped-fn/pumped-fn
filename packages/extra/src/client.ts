@@ -1,33 +1,32 @@
-import type { AnyAPI, Service } from "./types";
+import type { Def } from "./types";
 import { type Executor, provide } from "@pumped-fn/core";
-import type { StandardSchemaV1 } from "./standardschema";
+import type { StandardSchemaV1 } from "@pumped-fn/core";
 
-type RequestBuilder = <A extends AnyAPI>(
-  id: string,
-  def: AnyAPI,
-  params: unknown,
-) => Promise<StandardSchemaV1.InferOutput<A["output"]>>;
+export declare namespace Client {
+  export type RequestHandler<S extends Def.Service, K extends keyof S> = (
+    def: S,
+    path: K,
+    param: StandardSchemaV1.InferInput<S[K]["input"]>,
+  ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
 
-export const clientProvider =
-  <S extends Service>(def: S, requestBuilder: RequestBuilder) =>
-  async <K extends keyof S, I extends StandardSchemaV1.InferInput<S[K]["input"]>>(
-    key: K,
-    ...params: I extends undefined ? [] : [I]
-  ): Promise<StandardSchemaV1.InferOutput<S[K]["output"]>> => {
-    console.log(params);
-    return await requestBuilder(key as string, def[key], params.at(0));
-  };
-
-export function buildClient<S extends Service>(def: S, requestBuilder: RequestBuilder | Executor<RequestBuilder>) {
-  if (typeof requestBuilder === "function") {
-    return provide(() => clientProvider(def, requestBuilder));
-  }
-
-  return provide([requestBuilder], async ([requestBuilder]) => {
-    return clientProvider(def, requestBuilder);
-  });
+  export type ServiceCaller<S extends Def.Service, K extends keyof S> = (
+    path: K,
+    param: StandardSchemaV1.InferInput<S[K]["input"]>,
+  ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
 }
 
-export function defineRequestBuilder(def: RequestBuilder): RequestBuilder {
-  return def;
-}
+export const client = {
+  createAnyRequestHandler(
+    handler: Executor<Client.RequestHandler<Def.Service, string>>,
+  ): Executor<Client.RequestHandler<Def.Service, string>> {
+    return handler;
+  },
+  createCaller<D extends Def.Service, K extends keyof D>(
+    def: D,
+    handler: Executor<Client.RequestHandler<Def.Service, string>>,
+  ): Executor<Client.ServiceCaller<D, K>> {
+    return provide(handler, async (handler) => {
+      return async (path, param) => handler(def, path as any, param);
+    });
+  },
+};

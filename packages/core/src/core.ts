@@ -6,6 +6,7 @@ import {
   GetAccessor,
   InferOutput,
   isExecutor,
+  Middleware,
   MutableExecutor,
   Scope,
 } from "./types";
@@ -14,6 +15,11 @@ export interface ScopeInner {
   getValues(): Map<Executor<unknown>, Container>;
   getDependencyMap(): Map<Executor<unknown>, Set<Executor<unknown>>>;
   getCleanups(): Map<Executor<unknown> | null, Cleanup>;
+}
+
+export interface ScopeMiddleware {
+  registerMiddleware: (middleware: Middleware) => void;
+  cleanMiddleware: (middlware: Middleware) => Promise<void>;
 }
 
 export const createScope = (): Scope => {
@@ -33,7 +39,7 @@ type UpdatingContainer = { kind: "updating"; promise: Promise<unknown>; value: u
 
 type Container = ResolvedContainer | PendingContainer | UpdatingContainer;
 
-class BaseScope implements Scope, ScopeInner {
+class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
   #disposed = false;
   #values = new Map<Executor<unknown>, Container>();
   #dependencyMap = new Map<Executor<unknown>, Set<Executor<unknown>>>();
@@ -163,7 +169,8 @@ class BaseScope implements Scope, ScopeInner {
           this.#trackDependencies(executor);
         }
 
-        const value = await executor.factory(dependencies, this);
+        let value = await executor.factory(dependencies, this);
+        value = (await this.#triggerMiddlewareOnResolve(executor, value)) as Awaited<T>;
 
         if (executor[executorSymbol].kind === "resource" || executor[executorSymbol].kind === "reactive-resource") {
           const [_, cleanup] = value as [unknown, Cleanup];
@@ -351,6 +358,8 @@ class BaseScope implements Scope, ScopeInner {
         .map((executor) => this.release(executor, true)),
     );
 
+    this.#triggerDisposeOnMiddleware();
+
     this.#cleanups.clear();
     this.#listeners.clear();
 
@@ -413,5 +422,37 @@ class BaseScope implements Scope, ScopeInner {
 
   getCleanups(): Map<Executor<unknown> | null, Cleanup> {
     return this.#cleanups;
+  }
+
+  /** SCOPE MIDDLEWARE */
+  #middlewares: Set<Middleware> = new Set();
+  registerMiddleware(middleware: Middleware): void {
+    this.#middlewares.add(middleware);
+  }
+
+  async cleanMiddleware(middleware: Middleware): Promise<void> {
+    this.#middlewares.delete(middleware);
+  }
+
+  async #triggerMiddlewareOnResolve(executor: Executor<unknown>, value: unknown): Promise<unknown> {
+    let _value = value;
+
+    for (const m of this.#middlewares) {
+      if (m.onResolve) {
+        _value = await m.onResolve(this, executor, value);
+      }
+    }
+
+    return _value;
+  }
+
+  async #triggerDisposeOnMiddleware(): Promise<void> {
+    const middlewares = Array.from(this.#middlewares).reverse();
+
+    for (const m of middlewares) {
+      if (m.onDispose) {
+        await m.onDispose(this);
+      }
+    }
   }
 }

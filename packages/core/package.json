@@ -13,9 +13,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -41,12 +39,12 @@
   },
   "release-it": {
     "hooks": {
-      "after:bump": "pnpm run build"
+      "after:bump": "pnpm run build && pnpm dlx auto-changelog -p"
     },
     "git": {
       "commitMessage": "chore: release v${version}",
-      "tagName": "core-v${version}",
-      "changelog": "git log --pretty=format:\"* %s (%h)\" ${from}...${to} -- ./*"
+      "tagName": "${npm.name}@${version}",
+      "changelog": "pnpm dlx auto-changelog --stdout --commit-limit false --unreleased --template https://raw.githubusercontent.com/release-it/release-it/main/templates/changelog-compact.hbs"
     },
     "npm": {
       "publish": true

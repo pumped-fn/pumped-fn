@@ -1,0 +1,7 @@
+{
+  "name": "@pumped-fn/validations",
+  "description": "A very simple validations mostly used internally",
+  "devDependencies": {
+    "@pumped-fn/core": "workspace:*"
+  }
+}

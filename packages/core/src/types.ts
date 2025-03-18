@@ -1,3 +1,5 @@
+import { Meta } from "./meta";
+
 export type Factory<P, D = undefined> = (value: D, scope: Scope) => P | Promise<P>;
 
 export type Immutable = { kind: "immutable" };
@@ -19,7 +21,8 @@ export interface Executor<T> {
   readonly factory: (dependencies: unknown, scope: Scope) => T | Promise<T>;
   readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined;
   readonly id: string;
-  readonly ref: Executor<Executor<T>>;
+  readonly ref: Executor<this>;
+  readonly metas?: Meta<unknown>[];
 }
 
 export interface ImmutableExecutor<T> extends Executor<T> {
@@ -67,12 +70,24 @@ export type InferOutput<T> = T extends
           ? { [K in keyof U]: InferOutput<U[K]> }
           : unknown;
 
+export interface Middleware {
+  onResolve?: (scope: Scope, executor: Executor<unknown>, value: unknown) => Promise<unknown>;
+  onUpdate?: (
+    scope: Scope,
+    executor: MutableExecutor<unknown>,
+    nextValue: unknown,
+    previousValue: unknown,
+  ) => Promise<unknown>;
+  onRelease?: (scope: Scope, executor: Executor<unknown>) => Promise<void>;
+  onDispose?: (scope: Scope) => Promise<void>;
+}
+
 export interface Scope {
   readonly isDisposed: boolean;
   get<T>(executor: Executor<T>): GetAccessor<T> | undefined;
 
   resolve<T extends Executor<unknown>>(executor: T): Promise<GetAccessor<InferOutput<T>>>;
-  update<T>(executor: Executor<T>, updateFn: T | ((current: T) => T)): Promise<void>;
+  update<T>(executor: MutableExecutor<T>, updateFn: T | ((current: T) => T)): Promise<void>;
   reset<T>(executor: Executor<T>): Promise<void>;
   release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
@@ -104,6 +119,7 @@ export function createExecutor<T, K extends Immutable | Mutable | Effect | React
   factory: (dependencies: any, scope: Scope) => any,
   dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined,
   id: string,
+  meta: Meta<unknown>[] | undefined,
 ): K extends Immutable
   ? ImmutableExecutor<T>
   : K extends Mutable
@@ -140,6 +156,12 @@ export function createExecutor<T, K extends Immutable | Mutable | Effect | React
     },
     id: {
       value: id,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    metas: {
+      value: meta,
       writable: false,
       configurable: false,
       enumerable: false,

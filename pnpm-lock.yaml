@@ -119,6 +119,12 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@22.13.5)(jsdom@26.0.0)
 
+  packages/validations:
+    devDependencies:
+      '@pumped-fn/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@adobe/css-tools@4.4.2':
