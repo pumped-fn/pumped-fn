@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.9](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.8...@pumped-fn/extra@0.5.9) (2025-03-18)
+
+
+### Features
+
+* refined client.server apis ([556e23c](https://github.com/pumped-fn/pumped-fn/commit/556e23c24f6e04fb0e2cc8e8f44f7cfa45bed7b1))
+
 ## [0.5.8](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.7...@pumped-fn/extra@0.5.8) (2025-03-18)
 
 ## 0.5.7 (2025-03-18)
