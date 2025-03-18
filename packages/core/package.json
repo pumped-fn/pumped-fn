@@ -37,7 +37,7 @@
   "repository": {
     "type": "git",
     "directory": "packages/core",
-    "url": "https://github.com/pumped-fn/pumped-fn"
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   },
   "release-it": {
     "hooks": {
