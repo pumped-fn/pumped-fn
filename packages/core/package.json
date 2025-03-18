@@ -13,15 +13,15 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "typecheck": "tsc --noEmit",
-    "typecheck:test": "vitest typecheck"
+    "typecheck:test": "vitest typecheck",
+    "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/core@",
+    "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "devDependencies": {
     "tsup": "^8.3.6",

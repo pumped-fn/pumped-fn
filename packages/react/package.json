@@ -15,7 +15,9 @@
   "scripts": {
     "build": "tsup src/index.tsx --format esm,cjs --dts",
     "test": "vitest run",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/core@",
+    "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "peerDependencies": {
     "@pumped-fn/core": "^0.5.8",
