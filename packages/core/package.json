@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/core",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "description": "Enhanced function utilities for TypeScript",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,7 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
