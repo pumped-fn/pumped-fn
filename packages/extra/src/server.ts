@@ -1,17 +1,18 @@
-import { Executor, type Meta, provide, type StandardSchemaV1 } from "@pumped-fn/core";
+import { Executor, isExecutor, type Meta, provide, type StandardSchemaV1 } from "@pumped-fn/core";
 import type { Context, Def, Impl } from "./types";
 
 export declare namespace Server {
-  export type RequestHandler<D extends Impl.AnyAPI> = (
+  export type RequestHandler<D extends Impl.AnyService> = <K extends keyof D>(
     def: D,
+    path: K,
     rawContext: unknown,
-  ) => Promise<StandardSchemaV1.InferOutput<D["output"]>>;
+  ) => Promise<StandardSchemaV1.InferOutput<D[K]["output"]>>;
 
   export type Caller<D extends Impl.AnyAPI> = (
     rawContext: unknown,
   ) => Promise<StandardSchemaV1.InferOutput<D["output"]>>;
 
-  export type ServiceCaller<S extends Impl.AnyService, K extends keyof S> = (
+  export type ServiceCaller<S extends Impl.AnyService> = <K extends keyof S>(
     path: K,
     rawContext: unknown,
   ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
@@ -34,33 +35,28 @@ export const server = {
     return callerContext;
   },
   createAnyRequestHandler(
-    handler: Executor<Server.RequestHandler<Impl.AnyAPI>>,
-  ): Executor<Server.RequestHandler<Impl.AnyAPI>> {
-    return handler;
-  },
-  createCaller<D extends Impl.AnyAPI>(
-    def: Executor<D>,
-    implementation: Executor<Server.RequestHandler<D>>,
-    ...metas: Meta<unknown>[]
-  ): Executor<Server.Caller<D>> {
-    return provide(
-      { def, implementation },
-      async ({ def, implementation }) => {
-        return async (rawContext) => implementation(def, rawContext);
-      },
-      ...metas,
-    );
-  },
-  createServiceCaller<S extends Impl.AnyService, K extends keyof S>(
-    service: Executor<S>,
-    handler: Executor<Server.RequestHandler<S[K]>>,
+    handler: Executor<Server.RequestHandler<Impl.AnyService>> | Server.RequestHandler<Impl.AnyService>,
     ...metas: Meta[]
-  ): Executor<Server.ServiceCaller<S, K>> {
+  ): Executor<Server.RequestHandler<Impl.AnyService>> {
+    if (isExecutor(handler)) {
+      return handler;
+    }
+
+    return provide(() => handler, ...metas);
+  },
+  createServiceCaller<S extends Impl.AnyService>(
+    service: Executor<S>,
+    phandler: Executor<Server.RequestHandler<S>> | Server.RequestHandler<S>,
+    ...metas: Meta[]
+  ): Executor<Server.ServiceCaller<S>> {
+    const handler = isExecutor(phandler) ? phandler : provide(() => phandler);
+
     return provide(
       { service, handler },
-      ({ service, handler }) => {
-        return async (path, rawContext) => handler(service[path], rawContext);
-      },
+      ({ service, handler }) =>
+        async (path, rawContext) => {
+          return await handler(service, path, rawContext);
+        },
       ...metas,
     );
   },

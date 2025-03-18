@@ -32,13 +32,10 @@ test("server syntax", async () => {
     }),
   });
 
-  const directCall = server.createAnyRequestHandler(
-    provide(() => async (def, context) => {
-      return await def.handler({ data: context as any });
-    }),
-  );
+  const directCall = server.createAnyRequestHandler(async (def, path, context) => {
+    return await def[path].handler({ data: context });
+  });
 
-  const apiCaller = server.createCaller(helloHandler, directCall);
   const serviceCaller = server.createServiceCaller(service, directCall);
 
   const clientRequestBuilder = client.createAnyRequestHandler(
@@ -51,22 +48,17 @@ test("server syntax", async () => {
 
   const scope = createScope();
 
-  const result = await safeRun(
-    scope,
-    { apiCaller, serviceCaller, serviceClient },
-    async ({ apiCaller, serviceCaller, serviceClient }) => {
-      return await Promise.all([
-        apiCaller("hello"),
-        serviceClient("hello"),
-        serviceCaller("count", "hello"),
-        serviceClient("count", "hello"),
-      ]);
-    },
-  );
+  const result = await safeRun(scope, { serviceCaller, serviceClient }, async ({ serviceCaller, serviceClient }) => {
+    return await Promise.all([
+      serviceClient("hello"),
+      serviceCaller("count", "hello"),
+      serviceClient("count", "hello"),
+    ]);
+  });
 
   if (result.status === "error") {
     expect.fail(`shouldn't be here`, result.error);
   } else {
-    expect(result.value).toEqual(["hello", "hello", 5, 5]);
+    expect(result.value).toEqual(["hello", 5, 5]);
   }
 });
