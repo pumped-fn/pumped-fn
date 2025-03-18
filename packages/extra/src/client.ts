@@ -9,9 +9,13 @@ export declare namespace Client {
     param: StandardSchemaV1.InferInput<S[K]["input"]>,
   ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
 
-  export type ServiceCaller<S extends Def.Service, K extends keyof S> = (
+  export type ServiceCaller<S extends Def.Service> = <
+    K extends keyof S,
+    P extends StandardSchemaV1.InferInput<S[K]["input"]>,
+    Params extends P extends void | undefined ? [] : [P],
+  >(
     path: K,
-    param: StandardSchemaV1.InferInput<S[K]["input"]>,
+    ...params: Params
   ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
 }
 
@@ -21,12 +25,12 @@ export const client = {
   ): Executor<Client.RequestHandler<Def.Service, string>> {
     return handler;
   },
-  createCaller<D extends Def.Service, K extends keyof D>(
+  createCaller<D extends Def.Service>(
     def: D,
     handler: Executor<Client.RequestHandler<Def.Service, string>>,
-  ): Executor<Client.ServiceCaller<D, K>> {
+  ): Executor<Client.ServiceCaller<D>> {
     return provide(handler, async (handler) => {
-      return async (path, param) => handler(def, path as any, param);
+      return async (path, ...params) => handler(def, path as any, params.length === 1 ? params[0] : undefined);
     });
   },
 };

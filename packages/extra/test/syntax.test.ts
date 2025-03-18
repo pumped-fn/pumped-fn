@@ -7,7 +7,7 @@ import { createScope, provide, run, safeRun } from "@pumped-fn/core";
 
 const rpc = define.service({
   hello: {
-    input: cast<string>(),
+    input: cast<undefined>(),
     output: cast<string>(),
   },
   count: {
@@ -55,13 +55,18 @@ test("server syntax", async () => {
     scope,
     { apiCaller, serviceCaller, serviceClient },
     async ({ apiCaller, serviceCaller, serviceClient }) => {
-      return await Promise.all([apiCaller("hello"), serviceCaller("count", "hello"), serviceClient("count", "hello")]);
+      return await Promise.all([
+        apiCaller("hello"),
+        serviceClient("hello"),
+        serviceCaller("count", "hello"),
+        serviceClient("count", "hello"),
+      ]);
     },
   );
 
   if (result.status === "error") {
     expect.fail(`shouldn't be here`, result.error);
   } else {
-    expect(result.value).toEqual(["hello", 5, 5]);
+    expect(result.value).toEqual(["hello", "hello", 5, 5]);
   }
 });
