@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.5.11 (2025-03-20)
+
+
+### Features
+
+* add release automation and changelog generation ([7295862](https://github.com/pumped-fn/pumped-fn/commit/7295862e2e07f4fde31b033290c17b997be8fde5))
+* added selector ([04feebe](https://github.com/pumped-fn/pumped-fn/commit/04feebef4c032fd6470017cc12e1c214c73c78a7))
+* finalized API for client and server RPC ([fe28243](https://github.com/pumped-fn/pumped-fn/commit/fe28243b524519fe95e1fce739c9bfdd173d2ba0))
+* revamped ref, make sure only one ref per executor ([94f0a17](https://github.com/pumped-fn/pumped-fn/commit/94f0a177c2cbdf4b656779667c85cc9b86ad42fe))
+* rewrite core, moved from output to upfront structure ([2d342ff](https://github.com/pumped-fn/pumped-fn/commit/2d342fffc8c6b657dfe35124261e74e68ed47713))
+* simplify derive API ([2b78e14](https://github.com/pumped-fn/pumped-fn/commit/2b78e14d1f9252dcb30387d16acfd0de07784344))
+* simplify server apis ([6324f83](https://github.com/pumped-fn/pumped-fn/commit/6324f83a5cfae26016bf90059755b4a5e4c72181))
+
+
+### Bug Fixes
+
+* corrected bundle behavior ([5161b6b](https://github.com/pumped-fn/pumped-fn/commit/5161b6bbfb29679c5af32920907d214005255bae))
+* corrected bundle behavior ([7c93ab3](https://github.com/pumped-fn/pumped-fn/commit/7c93ab33aceb81f8a71dceec57a283e40d653e3c))
+* corrected issues with ref ([68ec0d5](https://github.com/pumped-fn/pumped-fn/commit/68ec0d58cc9c0970c2d8d1d6780a9791f6b4e9c3))
+* go ([3e571fa](https://github.com/pumped-fn/pumped-fn/commit/3e571fab82ffcf8008da32864bc7a5aa103da2ba))
+* make @pumped-fn/react to not depedent on fixed version of core ([3604149](https://github.com/pumped-fn/pumped-fn/commit/3604149ca17a874a39fa74826e731e733c6ccfd4))
+* support awaiting cleanups ([ca6bb9f](https://github.com/pumped-fn/pumped-fn/commit/ca6bb9fec4fe5020631858eacf592f517634565a))
+* update dependencies to resolve security vulnerabilities ([7e89509](https://github.com/pumped-fn/pumped-fn/commit/7e8950982bc4630017ef3449db65f7e71b26ca0e))
+
 ## [0.5.10](https://github.com/pumped-fn/pumped-fn/compare/v0.5.7...v0.5.10) (2025-03-18)
 
 
