@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
-import { createScope, mutable, provide, ref, resource } from "@pumped-fn/core";
+import { createScope, mutable, provide, resource } from "@pumped-fn/core";
 import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
 
 describe("React Integration", () => {
@@ -14,7 +14,7 @@ describe("React Integration", () => {
       return v1 + v2;
     });
 
-    const updateCount = provide([ref(countExecutor)], ([ref], scope) => {
+    const updateCount = provide([countExecutor.ref], ([ref], scope) => {
       return (value: number) => scope.update(ref, value);
     });
 

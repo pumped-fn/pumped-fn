@@ -1,5 +1,7 @@
 import { ScopeMiddleware } from "./core";
-import { Scope, Executor, GetAccessor, InferOutput, isExecutor, Cleanup, Middleware } from "./types";
+import { provide } from "./fns/immutable";
+import { mutable } from "./fns/mutable";
+import { Scope, Executor, GetAccessor, InferOutput, isExecutor, Cleanup, Middleware, MutableExecutor } from "./types";
 
 export function resolve<T extends Executor<unknown>>(scope: Scope, input: T): Promise<GetAccessor<InferOutput<T>>>;
 export function resolve<T extends Array<Executor<unknown>> | Record<string, Executor<unknown>>>(
@@ -282,4 +284,25 @@ export async function cleanMiddlewares(scope: Scope, ...middleware: Middleware[]
   for (const m of middleware) {
     await middlwareScope.cleanMiddleware(m);
   }
+}
+
+export function value<V>(value: V): Executor<V> {
+  return provide(() => value);
+}
+
+export function mvalue<V>(value: V): MutableExecutor<V> {
+  return mutable(() => value);
+}
+
+export type ReduceFn<A, C> = (accumulator: A, currentValue: C, index: number) => A;
+
+export function reduce<Arr extends Array<Executor<unknown>>, A>(
+  input: Arr,
+  preduceFn: Executor<ReduceFn<A, InferOutput<Arr[number]>>> | ReduceFn<A, InferOutput<Arr[number]>>,
+  accumulator: Executor<A>,
+): Executor<A> {
+  const reduceFn = isExecutor(preduceFn) ? preduceFn : value(preduceFn);
+  return provide([reduceFn, accumulator, ...input], async ([reduceFn, accumulator, ...input]) => {
+    return input.reduce(reduceFn, accumulator);
+  });
 }

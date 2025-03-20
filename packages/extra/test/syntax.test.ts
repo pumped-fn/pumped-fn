@@ -32,8 +32,8 @@ test("server syntax", async () => {
     }),
   });
 
-  const directCall = server.createAnyRequestHandler(async (def, path, context) => {
-    return await def[path].handler({ data: context });
+  const directCall = server.createAnyServiceHandler(async (def, path, context) => {
+    return await def[path as any].handler({ data: context });
   });
 
   const serviceCaller = server.createServiceCaller(service, directCall);
@@ -59,6 +59,19 @@ test("server syntax", async () => {
   if (result.status === "error") {
     expect.fail(`shouldn't be here`, result.error);
   } else {
-    expect(result.value).toEqual(["hello", 5, 5]);
+    expect(result.value).toEqual([
+      {
+        kind: "ok",
+        value: "hello",
+      },
+      {
+        kind: "ok",
+        value: 5,
+      },
+      {
+        kind: "ok",
+        value: 5,
+      },
+    ]);
   }
 });
