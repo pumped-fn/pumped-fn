@@ -38,9 +38,7 @@ export declare namespace Impl {
 
   export type AnyAPI = API<any, any, any, any>;
 
-  export type Service<S extends Def.Service> = {
-    [K in keyof S]: API<S, K>;
-  };
+  export type Service<S extends Def.Service> = Record<string, API<S, keyof S>>;
 
   export type AnyService = Service<any>;
 }

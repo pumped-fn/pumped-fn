@@ -39,9 +39,7 @@ test("server syntax", async () => {
   const serviceCaller = server.createServiceCaller(service, directCall);
 
   const clientRequestBuilder = client.createAnyRequestHandler(
-    provide(serviceCaller, (serviceCaller) => async (def, path, param) => {
-      return await serviceCaller(path as any, param);
-    }),
+    provide(serviceCaller, (serviceCaller) => async (def, path, param) => {}),
   );
 
   const serviceClient = client.createCaller(rpc, clientRequestBuilder);

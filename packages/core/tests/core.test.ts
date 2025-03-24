@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createScope, resolveOnce } from "../src/index";
+import { createScope, resolveOnce, safeResolve } from "../src/index";
 
 import { provide } from "../src/fns/immutable";
 import { effect } from "../src/fns/effect";

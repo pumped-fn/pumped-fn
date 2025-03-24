@@ -1,6 +1,7 @@
 import { Meta } from "./meta";
 
 export type Factory<P, D = undefined> = (value: D, scope: Scope) => P | Promise<P>;
+export type ExecutionFactory<P, D = undefined> = (value: D, scope: ExecutionScope) => P | Promise<P>;
 
 export type Immutable = { kind: "immutable" };
 export type Mutable = { kind: "mutable" };
@@ -9,6 +10,8 @@ export type Reactive = { kind: "reactive" };
 export type Resource = { kind: "resource" };
 export type ReactiveResource = { kind: "reactive-resource" };
 export type Reference = { kind: "reference" };
+export type Execution = { kind: "execution" };
+export type ExecutionOptional = { kind: "execution-optional" };
 
 export const executorSymbol = Symbol("jumped-fn.executor");
 
@@ -17,8 +20,18 @@ export function isExecutor<T>(value: unknown): value is Executor<T> {
 }
 
 export interface Executor<T> {
-  [executorSymbol]: Immutable | Mutable | Effect | Reactive | Resource | ReactiveResource | Reference;
-  readonly factory: (dependencies: unknown, scope: Scope) => T | Promise<T>;
+  [executorSymbol]:
+    | Immutable
+    | Mutable
+    | Effect
+    | Reactive
+    | Resource
+    | ReactiveResource
+    | Reference
+    | Execution
+    | ExecutionOptional;
+
+  readonly factory: (dependencies: unknown, scope: Scope | ExecutionScope) => T | Promise<T>;
   readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined;
   readonly id: string;
   readonly ref: Executor<this>;
@@ -52,6 +65,29 @@ export interface MutableExecutor<T> extends Executor<T> {
 export interface EffectExecutor extends Executor<Cleanup> {
   [executorSymbol]: Effect;
 }
+
+export interface ExecutionExecutor<T> extends Executor<T> {
+  [executorSymbol]: Execution;
+}
+
+export interface ExecutionOptionalExecutor<T> extends Executor<T | undefined> {
+  [executorSymbol]: ExecutionOptional;
+}
+
+export declare namespace ExecutionValue {
+  export type Preset = (scope: ExecutionScope) => void;
+  export type PresetFn<V> = (value: V) => Preset;
+  export type Setter<V> = ExecutionExecutor<(value: V) => void>;
+  export type Getter<V> = ExecutionExecutor<V>;
+  export type Finder<V> = ExecutionOptionalExecutor<V>;
+}
+
+export type ExecutionValue<V> = {
+  readonly preset: ExecutionValue.PresetFn<V>;
+  readonly getter: ExecutionValue.Getter<V>;
+  readonly setter: ExecutionValue.Setter<V>;
+  readonly finder: ExecutionValue.Finder<V>;
+};
 
 export type InferOutput<T> = T extends
   | ImmutableExecutor<infer U>
@@ -98,6 +134,11 @@ export interface Scope {
   addCleanup(cleanup: Cleanup): Cleanup;
 }
 
+export interface ExecutionScope extends Scope {
+  readonly context: Map<unknown, unknown>;
+  readonly refScope: Scope;
+}
+
 export type Cleanup = () => void | Promise<void>;
 
 export const outputSymbol = Symbol("jumped-fn.output");
@@ -114,9 +155,12 @@ export const getAccessor = <T>(get: () => T): GetAccessor<T> => ({
   get: () => get() as Awaited<T>,
 });
 
-export function createExecutor<T, K extends Immutable | Mutable | Effect | Reactive | Resource | ReactiveResource>(
+export function createExecutor<
+  T,
+  K extends Immutable | Mutable | Effect | Reactive | Resource | ReactiveResource | Execution | ExecutionOptional,
+>(
   kind: K,
-  factory: (dependencies: any, scope: Scope) => any,
+  factory: (dependencies: any, scope: Scope | ExecutionScope) => any,
   dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined,
   id: string,
   meta: Meta<unknown>[] | undefined,

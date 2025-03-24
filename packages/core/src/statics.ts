@@ -1,7 +1,18 @@
-import { ScopeMiddleware } from "./core";
+import { EScope, ScopeMiddleware } from "./core";
 import { provide } from "./fns/immutable";
 import { mutable } from "./fns/mutable";
-import { Scope, Executor, GetAccessor, InferOutput, isExecutor, Cleanup, Middleware, MutableExecutor } from "./types";
+import {
+  Scope,
+  Executor,
+  GetAccessor,
+  InferOutput,
+  isExecutor,
+  Cleanup,
+  Middleware,
+  MutableExecutor,
+  Execution,
+  ExecutionValue,
+} from "./types";
 
 export function resolve<T extends Executor<unknown>>(scope: Scope, input: T): Promise<GetAccessor<InferOutput<T>>>;
 export function resolve<T extends Array<Executor<unknown>> | Record<string, Executor<unknown>>>(
@@ -103,8 +114,8 @@ export function prepare<I, O, P extends Array<unknown>>(
   };
 }
 
-type OKResult<T> = { status: "ok"; value: T };
-type ErrorResult = { status: "error"; error: Error };
+type OKResult<T> = { status: "ok"; value: T; error?: undefined };
+type ErrorResult = { status: "error"; value?: undefined; error: Error };
 type Result<T> = OKResult<T> | ErrorResult;
 
 export function safeResolve<T>(scope: Scope, input: Executor<T>): Promise<Result<GetAccessor<Awaited<T>>>>;
@@ -142,7 +153,7 @@ export async function safeResolve(scope: Scope, input: unknown): Promise<unknown
   }
 }
 
-export function safeResolveOnce<T>(scope: Scope, input: Executor<T>): Promise<Result<InferOutput<T>>>;
+export function safeResolveOnce<T extends Executor<unknown>>(scope: Scope, input: T): Promise<Result<InferOutput<T>>>;
 export function safeResolveOnce<T extends Array<Executor<unknown>> | Record<string, Executor<unknown>>>(
   scope: Scope,
   input: { [K in keyof T]: T[K] },
@@ -155,7 +166,10 @@ export async function safeResolveOnce(scope: Scope, input: unknown): Promise<unk
     }
 
     if (isExecutor(input)) {
-      return await resolveOnce(scope, input);
+      return {
+        status: "ok",
+        value: await resolveOnce(scope, input),
+      };
     }
 
     if (Array.isArray(input)) {
@@ -189,16 +203,16 @@ export function safeRun<I extends Array<Executor<unknown>> | Record<string, Exec
   effect: (input: { [K in keyof I]: InferOutput<I[K]> }) => O | Promise<O>,
 ): Promise<Result<O>>;
 
-export async function safeRun<I, O>(
+export async function safeRun<I>(
   scope: Scope,
   executor: Executor<I> | { [K in keyof I]: Executor<I[K]> },
-  effect: (input: any) => O | Promise<O>,
-): Promise<Result<O>> {
+  effect: (input: any) => any,
+): Promise<Result<any>> {
   try {
     if (isExecutor(executor)) {
       const resolved = await safeResolveOnce(scope, executor);
       if (resolved.status === "error") {
-        return resolved as Result<O>;
+        return resolved;
       }
 
       return {
@@ -209,7 +223,7 @@ export async function safeRun<I, O>(
 
     const resolved = await safeResolveOnce(scope, executor);
     if (resolved.status === "error") {
-      return resolved as Result<O>;
+      return resolved;
     }
 
     return {
@@ -305,4 +319,17 @@ export function reduce<Arr extends Array<Executor<unknown>>, A>(
   return provide([reduceFn, accumulator, ...input], async ([reduceFn, accumulator, ...input]) => {
     return input.reduce(reduceFn, accumulator);
   });
+}
+
+export async function safeRunFlow<F extends Executor<unknown>>(
+  scope: Scope,
+  flow: F,
+  ...initialValues: ExecutionValue.Preset[]
+): Promise<Result<InferOutput<F>>> {
+  const escope = new EScope(scope, ...initialValues);
+
+  const result = await safeResolveOnce(escope, flow);
+  await escope.dispose();
+
+  return result;
 }
