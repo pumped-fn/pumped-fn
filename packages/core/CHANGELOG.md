@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.12](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.11...@pumped-fn/core@0.5.12) (2025-03-24)
+
+
+### Features
+
+* added execution API ([0519cdf](https://github.com/pumped-fn/pumped-fn/commit/0519cdf39a8ccb583b6ca1f452bb1d44fb0f8a72))
+
 ## 0.5.11 (2025-03-20)
 
 
