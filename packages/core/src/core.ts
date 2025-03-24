@@ -181,7 +181,7 @@ class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
           this.cleanups.set(executor, value as Cleanup);
         }
 
-        if (executor[executorSymbol].kind === "resource") {
+        if (executor[executorSymbol].kind === "resource" || executor[executorSymbol].kind === "reactive-resource") {
           const [resource] = value as [unknown, Cleanup];
           Object.assign(container, { kind: "resolved", value: resource });
         } else {
