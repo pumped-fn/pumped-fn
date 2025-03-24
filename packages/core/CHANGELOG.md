@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.13](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.12...@pumped-fn/core@0.5.13) (2025-03-24)
+
+
+### Bug Fixes
+
+* corrected reactiveResource typing ([61886b9](https://github.com/pumped-fn/pumped-fn/commit/61886b992f1da75fcffc1304d7fb24893e06f9ac))
+
 ## [0.5.12](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.11...@pumped-fn/core@0.5.12) (2025-03-24)
 
 
