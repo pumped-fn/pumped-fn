@@ -486,11 +486,11 @@ export class EScope extends BaseScope implements ExecutionScope {
         const value = await this.refScope.resolve(step.executor);
         this.getValues().set(step.executor, { kind: "resolved", value: value.get() });
       } else {
-        await super.resolve(step.executor);
+        await super.resolve.bind(this)(step.executor);
       }
     }
 
-    return await super.resolve(executor);
+    return await super.resolve.bind(this)(executor);
   }
 }
 

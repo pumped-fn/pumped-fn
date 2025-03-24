@@ -42,13 +42,13 @@ export function reactive<P, T>(
 
 export function reactiveResource<P, T>(
   executor: Executor<T>,
-  factory: Factory<[P, Cleanup], T>,
+  factory: Factory<[P, Cleanup], GetAccessor<T>>,
   ...metas: Meta<unknown>[]
 ): ReactiveResourceExecutor<P>;
 
 export function reactiveResource<P, T extends Array<unknown> | object>(
   executor: { [K in keyof T]: Executor<T[K]> },
-  factory: Factory<[P, Cleanup], T>,
+  factory: Factory<[P, Cleanup], { [K in keyof T]: GetAccessor<T[K]> }>,
   ...metas: Meta<unknown>[]
 ): ReactiveResourceExecutor<P>;
 
