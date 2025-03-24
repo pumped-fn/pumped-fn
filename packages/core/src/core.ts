@@ -160,7 +160,7 @@ class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
       try {
         const dependencies = await this.resolveDependency(
           executor.dependencies,
-          executor[executorSymbol].kind === "reactive",
+          executor[executorSymbol].kind === "reactive" || executor[executorSymbol].kind === "reactive-resource",
         );
 
         if (
