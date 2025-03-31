@@ -1,12 +1,15 @@
 import { Meta } from "../meta";
-import { createExecutor, Executor, executorSymbol, InferOutput, isExecutor, ResourceExecutor } from "../types";
+import { Executor, executorSymbol, InferOutput, isExecutor, ResourceExecutor, Scope } from "../types";
 import { Factory, Cleanup } from "../types";
+import { anyCreate } from "./_internal";
 
 let resourceId = 0;
 
 const nextResourceId = () => {
   return `resource:${resourceId++}`;
 };
+
+export function resource<P>(factory: Factory<[P, Cleanup], P>, ...metas: Meta<unknown>[]): ResourceExecutor<P>;
 
 export function resource<P, T extends Executor<unknown>>(
   executor: T,
@@ -20,26 +23,8 @@ export function resource<P, T extends Array<Executor<unknown>> | Record<string, 
   ...metas: Meta<unknown>[]
 ): ResourceExecutor<P>;
 
-export function resource<P, T>(
-  pDependencyOrFactory: Executor<T> | { [K in keyof T]: Executor<T[K]> },
-  factory: Factory<[P, Cleanup], T>,
-  ...metas: Meta<unknown>[]
-): ResourceExecutor<P> {
-  if (isExecutor(pDependencyOrFactory)) {
-    return createExecutor(
-      { kind: "resource" },
-      factory,
-      pDependencyOrFactory,
-      nextResourceId(),
-      metas,
-    ) as ResourceExecutor<P>;
-  }
-
-  return createExecutor(
-    { kind: "resource" },
-    factory,
-    pDependencyOrFactory,
-    nextResourceId(),
-    metas,
-  ) as ResourceExecutor<P>;
+export function resource(
+  ...params: unknown[]
+) {
+  return anyCreate({ kind: "resource" }, nextResourceId(), ...params);
 }

@@ -1,5 +1,7 @@
 import { validateInput, type StandardSchemaV1 } from "./standardschema";
 
+export const metaSymbol = Symbol.for("pumped-fn.meta");
+
 export interface Meta<V = unknown> {
   readonly key: string | symbol;
   readonly schema: StandardSchemaV1<V>;
@@ -11,6 +13,10 @@ export interface MetaFn<V> {
   readonly key: string | symbol;
 }
 
+export const isMeta = (value: unknown): value is Meta<unknown> => {
+  return typeof value === "function" && metaSymbol in value;
+};
+
 export const meta = <V>(key: string | symbol, schema: StandardSchemaV1<V>): MetaFn<V> => {
   const fn = (value: V) =>
     ({
@@ -21,6 +27,13 @@ export const meta = <V>(key: string | symbol, schema: StandardSchemaV1<V>): Meta
 
   Object.defineProperty(fn, "key", {
     value: key,
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
+
+  Object.defineProperty(fn, metaSymbol, {
+    value: true,
     configurable: false,
     enumerable: false,
     writable: false,

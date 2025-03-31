@@ -1,5 +1,6 @@
 import { StandardSchemaV1, validateInput } from "../standardschema";
-import { createExecutor, ExecutionScope, ExecutionValue, Executor } from "../types";
+import { ExecutionScope, ExecutionValue, Executor } from "../types";
+import { createExecutor } from "./_internal";
 
 let executionId = 0;
 

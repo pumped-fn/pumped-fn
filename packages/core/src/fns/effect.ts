@@ -1,6 +1,7 @@
-import { Executor, isExecutor, EffectExecutor, InferOutput, createExecutor } from "../types";
+import { Executor, EffectExecutor, InferOutput } from "../types";
 import { Factory, Cleanup } from "../types";
 import type { Meta } from "../meta";
+import { anyCreate } from "./_internal";
 
 let effectId = 0;
 
@@ -22,12 +23,7 @@ export function effect<T extends Array<Executor<unknown>> | Record<string, Execu
 
 export function effect<T>(
   pDependencyOrFactory: Executor<T> | { [K in keyof T]: Executor<T[K]> },
-  factory: Factory<Cleanup, T>,
-  ...metas: Meta<unknown>[]
+  ...params: unknown[]
 ): EffectExecutor {
-  if (isExecutor(pDependencyOrFactory)) {
-    return createExecutor({ kind: "effect" }, factory, pDependencyOrFactory, nextEffectId(), metas);
-  }
-
-  return createExecutor({ kind: "effect" }, factory, pDependencyOrFactory, nextEffectId(), metas);
+  return anyCreate({ kind: "effect" }, nextEffectId(), pDependencyOrFactory, ...params);
 }

@@ -1,14 +1,7 @@
 import { Meta } from "../meta";
-import {
-  Cleanup,
-  createExecutor,
-  Executor,
-  GetAccessor,
-  isExecutor,
-  ReactiveExecutor,
-  ReactiveResourceExecutor,
-} from "../types";
+import { Cleanup, Executor, GetAccessor, InferOutput, ReactiveExecutor, ReactiveResourceExecutor } from "../types";
 import { Factory } from "../types";
+import { anyCreate } from "./_internal";
 
 let reactiveId = 0;
 
@@ -18,13 +11,13 @@ const nextReactiveId = () => {
 
 export function reactive<P, T>(
   executor: Executor<T>,
-  factory: Factory<P, GetAccessor<T>>,
+  factory: Factory<P, GetAccessor<InferOutput<Executor<T>>>>,
   ...metas: Meta<unknown>[]
 ): ReactiveExecutor<P>;
 
 export function reactive<P, T extends Array<unknown> | object>(
   executor: { [K in keyof T]: Executor<T[K]> },
-  factory: Factory<P, { [K in keyof T]: GetAccessor<T[K]> }>,
+  factory: Factory<P, { [K in keyof T]: GetAccessor<InferOutput<Executor<T[K]>>> }>,
   ...metas: Meta<unknown>[]
 ): ReactiveExecutor<P>;
 
@@ -33,45 +26,37 @@ export function reactive<P, T>(
   factory: Factory<P, GetAccessor<T>> | Factory<P, { [K in keyof T]: GetAccessor<T[K]> }>,
   ...metas: Meta<unknown>[]
 ): ReactiveExecutor<P> {
-  if (isExecutor(pDependencyOrFactory)) {
-    return createExecutor({ kind: "reactive" }, factory, pDependencyOrFactory, nextReactiveId(), metas);
-  }
-
-  return createExecutor({ kind: "reactive" }, factory, pDependencyOrFactory, nextReactiveId(), metas);
+  return anyCreate({ kind: "reactive" }, nextReactiveId(), pDependencyOrFactory, factory, ...metas);
 }
+
+let reactiveResourceId = 0;
+
+const nextReactiveResourceId = () => {
+  return `reactive-resource:${reactiveResourceId++}`;
+};
 
 export function reactiveResource<P, T>(
   executor: Executor<T>,
-  factory: Factory<[P, Cleanup], GetAccessor<T>>,
+  factory: Factory<[P, Cleanup], GetAccessor<InferOutput<Executor<T>>>>,
   ...metas: Meta<unknown>[]
 ): ReactiveResourceExecutor<P>;
 
 export function reactiveResource<P, T extends Array<unknown> | object>(
   executor: { [K in keyof T]: Executor<T[K]> },
-  factory: Factory<[P, Cleanup], { [K in keyof T]: GetAccessor<T[K]> }>,
+  factory: Factory<[P, Cleanup], { [K in keyof T]: GetAccessor<InferOutput<Executor<T[K]>>> }>,
   ...metas: Meta<unknown>[]
 ): ReactiveResourceExecutor<P>;
 
 export function reactiveResource<P, T>(
   pDependencyOrFactory: Executor<T> | { [K in keyof T]: Executor<T[K]> },
   factory: Factory<[P, Cleanup], T>,
-  ...metas: Meta<unknown>[]
+  ...metas: unknown[]
 ): ReactiveResourceExecutor<P> {
-  if (isExecutor(pDependencyOrFactory)) {
-    return createExecutor(
-      { kind: "reactive-resource" },
-      factory,
-      pDependencyOrFactory,
-      nextReactiveId(),
-      metas,
-    ) as ReactiveResourceExecutor<P>;
-  }
-
-  return createExecutor(
+  return anyCreate(
     { kind: "reactive-resource" },
-    factory,
+    nextReactiveResourceId(),
     pDependencyOrFactory,
-    nextReactiveId(),
-    metas,
+    factory,
+    ...metas,
   ) as ReactiveResourceExecutor<P>;
 }

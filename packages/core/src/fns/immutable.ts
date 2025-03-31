@@ -1,6 +1,7 @@
 import { Meta } from "../meta";
-import { createExecutor, Executor, ImmutableExecutor, InferOutput, isExecutor, Scope } from "../types";
+import { Executor, ImmutableExecutor, InferOutput, Scope } from "../types";
 import { Factory } from "../types";
+import { anyCreate } from "./_internal";
 
 let providerId = 0;
 
@@ -26,37 +27,5 @@ export function provide<P, T>(
   pDependencyOrFactory: Executor<T> | { [K in keyof T]: Executor<T[K]> } | ((scope: Scope) => P | Promise<P>),
   ...params: unknown[]
 ): ImmutableExecutor<P> {
-  if (typeof pDependencyOrFactory === "function") {
-    return createExecutor(
-      { kind: "immutable" },
-      pDependencyOrFactory,
-      undefined,
-      nextProviderId(),
-      params as Meta<unknown>[],
-    );
-  }
-
-  if (params.length === 0) {
-    throw new Error("Expected a factory function.");
-  }
-
-  const [factory, ...metas] = params;
-
-  if (isExecutor(pDependencyOrFactory)) {
-    return createExecutor(
-      { kind: "immutable" },
-      factory as any,
-      pDependencyOrFactory,
-      nextProviderId(),
-      metas as Meta<unknown>[] | undefined,
-    );
-  }
-
-  return createExecutor(
-    { kind: "immutable" },
-    factory as any,
-    pDependencyOrFactory,
-    nextProviderId(),
-    metas as Meta<unknown>[] | undefined,
-  );
+  return anyCreate({ kind: "immutable" }, nextProviderId(), pDependencyOrFactory, ...params);
 }
