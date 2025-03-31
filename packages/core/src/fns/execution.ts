@@ -24,6 +24,25 @@ export function executionValue<V>(key: string | symbol, schema: StandardSchemaV1
     undefined,
   );
 
+  const finder = createExecutor(
+    { kind: "execution-optional" },
+    async (_, scope) => {
+      if ("context" in scope) {
+        const value = scope.context.get(key);
+        if (value === undefined) {
+          return undefined;
+        }
+
+        return await validateInput(schema, value);
+      } else {
+        return undefined;
+      }
+    },
+    undefined,
+    nextExecutionId(),
+    undefined,
+  );
+
   const setter = createExecutor(
     { kind: "execution" },
     (_, scope) => {
@@ -47,25 +66,6 @@ export function executionValue<V>(key: string | symbol, schema: StandardSchemaV1
       throw new Error("execution value can only be operated inside ExecutionScope");
     }
   };
-
-  const finder = createExecutor(
-    { kind: "execution-optional" },
-    async (_, scope) => {
-      if ("context" in scope) {
-        const value = scope.context.get(key);
-        if (value === undefined) {
-          return undefined;
-        }
-
-        return await validateInput(schema, value);
-      } else {
-        return undefined;
-      }
-    },
-    undefined,
-    nextExecutionId(),
-    undefined,
-  );
 
   return {
     getter,

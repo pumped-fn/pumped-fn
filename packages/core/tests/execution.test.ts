@@ -1,6 +1,6 @@
 import { vi, test, expect } from "vitest";
 import { buildResolvePlan, createScope } from "../src/core";
-import { Executor, mvalue, provide, reactiveResource, resource, safeRunFlow, value } from "../src";
+import { Executor, executorSymbol, mvalue, provide, reactiveResource, resource, safeRunFlow, value } from "../src";
 import { executionValue } from "../src/fns/execution";
 import { cast } from "./utils";
 
@@ -28,6 +28,10 @@ test("test execution plan", () => {
 
     expect(x).toBeDefined();
     expect(x?.target).toBe(target);
+
+    if (target === "scope") {
+      expect(e[executorSymbol].kind).not.toSatisfy((v: string) => ["execution", "execution-optional"].includes(v));
+    }
   }
 
   expectResolve(a, "scope");

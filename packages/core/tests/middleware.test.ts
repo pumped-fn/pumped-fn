@@ -23,7 +23,6 @@ describe("middleware runway", () => {
 
     registerMiddlewares(scope, loggingMiddleware);
     const resolvedValue = await resolveOnce(scope, value);
-
-    expect(resolvedValue["$test"]).toBe("test");
+    expect(resolvedValue).toMatchObject({ $test: "test" });
   });
 });
