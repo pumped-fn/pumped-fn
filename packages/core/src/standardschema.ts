@@ -97,3 +97,15 @@ export async function validateInput<TSchema extends StandardSchemaV1>(
   }
   return result.value;
 }
+
+export function any<T>(): StandardSchemaV1<any, T> {
+  return {
+    "~standard": {
+      vendor: "pumped-fn",
+      version: 1,
+      validate: async (value) => {
+        return { value: value as T };
+      },
+    },
+  };
+}

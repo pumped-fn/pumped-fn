@@ -1,5 +1,5 @@
 import { StandardSchemaV1, validateInput } from "../standardschema";
-import { ExecutionScope, ExecutionValue, Executor } from "../types";
+import { ExecutionScope, ExecutionValue, Executor, isExecutor } from "../types";
 import { createExecutor } from "./_internal";
 
 let executionId = 0;
@@ -8,13 +8,27 @@ const nextExecutionId = () => {
   return `execution:${executionId++}`;
 };
 
-export function executionValue<V>(key: string | symbol, schema: StandardSchemaV1<V>): ExecutionValue<V> {
+export function executionValue<V>(
+  key: string | symbol,
+  schema: StandardSchemaV1<V>,
+  fallback?: V | Executor<V>,
+): ExecutionValue<V> {
   const getter = createExecutor(
     { kind: "execution" },
     async (_, scope) => {
       if ("context" in scope) {
-        const value = scope.context.get(key);
-        return await validateInput(schema, value);
+        if (scope.context.has(key)) {
+          const value = scope.context.get(key);
+          return await validateInput(schema, value);
+        } else if (fallback) {
+          if (isExecutor(fallback)) {
+            return await validateInput(schema, await scope.resolve(fallback));
+          } else {
+            return await validateInput(schema, fallback);
+          }
+        }
+
+        throw new Error(`execution value "${String(key)}" is not set in ExecutionContext`);
       } else {
         throw new Error("execution value can only be operated inside ExecutionScope");
       }
@@ -27,15 +41,11 @@ export function executionValue<V>(key: string | symbol, schema: StandardSchemaV1
   const finder = createExecutor(
     { kind: "execution-optional" },
     async (_, scope) => {
-      if ("context" in scope) {
+      if ("context" in scope && scope.context.has(key)) {
         const value = scope.context.get(key);
-        if (value === undefined) {
-          return undefined;
-        }
-
         return await validateInput(schema, value);
       } else {
-        return undefined;
+        return isExecutor(fallback) ? await scope.resolve(fallback) : fallback;
       }
     },
     undefined,
