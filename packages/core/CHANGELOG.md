@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.16](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.15...@pumped-fn/core@0.5.16) (2025-03-31)
+
+
+### Features
+
+* simplified executor creation ([246e51d](https://github.com/pumped-fn/pumped-fn/commit/246e51d30b07ddb8078ba2577455b350d2663934))
+
 ## [0.5.15](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.14...@pumped-fn/core@0.5.15) (2025-03-24)
 
 
