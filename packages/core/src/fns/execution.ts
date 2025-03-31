@@ -33,7 +33,7 @@ export function executionValue<V>(
         throw new Error("execution value can only be operated inside ExecutionScope");
       }
     },
-    undefined,
+    isExecutor(fallback) ? fallback : undefined,
     nextExecutionId(),
     undefined,
   );
@@ -48,7 +48,7 @@ export function executionValue<V>(
         return isExecutor(fallback) ? await scope.resolve(fallback) : fallback;
       }
     },
-    undefined,
+    isExecutor(fallback) ? fallback : undefined,
     nextExecutionId(),
     undefined,
   );
