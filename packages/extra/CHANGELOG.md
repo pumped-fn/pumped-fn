@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.11](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.10...@pumped-fn/extra@0.5.11) (2025-04-03)
+
+
+### Features
+
+* added execution API ([0519cdf](https://github.com/pumped-fn/pumped-fn/commit/0519cdf39a8ccb583b6ca1f452bb1d44fb0f8a72))
+
+
+### Bug Fixes
+
+* added metas to impls ([f81a8ba](https://github.com/pumped-fn/pumped-fn/commit/f81a8ba75a98e6505bfe6de26237d30746e37ae4))
+
 ## [0.5.10](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.9...@pumped-fn/extra@0.5.10) (2025-03-20)
 
 
