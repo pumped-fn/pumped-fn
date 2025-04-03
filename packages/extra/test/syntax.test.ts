@@ -1,6 +1,5 @@
 import { vi, test, expect } from "vitest";
 import { define, impl } from "../src";
-import { server } from "../src/server";
 import { client } from "../src/client";
 import { cast } from "./utils";
 import { createScope, provide, run, safeRun } from "@pumped-fn/core";
@@ -27,49 +26,34 @@ test("server syntax", async () => {
 
   const service = impl.service(rpc, {
     hello: helloHandler,
-    count: provide(() => (context) => {
-      return context.data.length;
+    count: provide(() => (input) => {
+      return input.length;
     }),
   });
 
-  const directCall = server.createAnyServiceHandler(async (def, path, context) => {
-    return await def[path as any].handler({ data: context });
+  const directCall = provide(service, (service) => {
+    return async (path: string, ...params: unknown[]) => {
+      return await service[path].handler(params.at(0) as any);
+    };
   });
 
-  const serviceCaller = server.createServiceCaller(service, directCall);
-
   const clientRequestBuilder = client.createAnyRequestHandler(
-    provide(serviceCaller, (serviceCaller) => async (def, path, param) => {}),
+    provide(directCall, (directCall) => async (def, path, param) => {
+      return directCall(path, param) as any;
+    }),
   );
 
   const serviceClient = client.createCaller(rpc, clientRequestBuilder);
 
   const scope = createScope();
 
-  const result = await safeRun(scope, { serviceCaller, serviceClient }, async ({ serviceCaller, serviceClient }) => {
-    return await Promise.all([
-      serviceClient("hello"),
-      serviceCaller("count", "hello"),
-      serviceClient("count", "hello"),
-    ]);
+  const result = await safeRun(scope, { directCall, serviceClient }, async ({ directCall, serviceClient }) => {
+    return await Promise.all([serviceClient("hello"), directCall("count", "hello"), serviceClient("count", "hello")]);
   });
 
   if (result.status === "error") {
     expect.fail(`shouldn't be here`, result.error);
   } else {
-    expect(result.value).toEqual([
-      {
-        kind: "ok",
-        value: "hello",
-      },
-      {
-        kind: "ok",
-        value: 5,
-      },
-      {
-        kind: "ok",
-        value: 5,
-      },
-    ]);
+    expect(result.value).toEqual(["hello", 5, 5]);
   }
 });

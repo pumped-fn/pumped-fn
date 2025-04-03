@@ -1,8 +1,13 @@
-import { type StandardSchemaV1, type Meta, type Executor, provide } from "@pumped-fn/core";
-
-export interface Context<I = unknown> extends Record<string, unknown> {
-  readonly data: Awaited<I>;
-}
+import {
+  type StandardSchemaV1,
+  type Meta,
+  type Executor,
+  provide,
+  any,
+  meta,
+  isExecutor,
+  findValue,
+} from "@pumped-fn/core";
 
 export declare namespace Def {
   export interface API<I, O> extends Record<string | symbol, unknown> {
@@ -32,7 +37,7 @@ export declare namespace Impl {
   > extends Def.API<I, O> {
     def: S;
     id: Key;
-    handler: (context: Context<I>) => O | Promise<O>;
+    handler: (context: I) => O | Promise<O>;
   }
 
   export type AnyAPI = API<any, any, any, any>;
@@ -54,7 +59,14 @@ export const define = {
   },
 } as const;
 
+const routeMeta = meta("pumped-fn.extra.route", any<Record<string, Meta[]>>());
+
 export const impl = {
+  getRouteMeta(serviceExecutor: Executor<Impl.AnyService>): Record<string, Meta[]> {
+    const _meta = findValue(serviceExecutor, routeMeta);
+
+    return _meta || {};
+  },
   api<S extends Def.Service, K extends keyof S>(
     service: S,
     path: K,
@@ -80,6 +92,21 @@ export const impl = {
     },
     ...metas: Meta[]
   ): Executor<Impl.Service<S>> {
+    const _meta = routeMeta(
+      Object.keys(impls).reduce(
+        (acc, next) => {
+          const entry = impls[next];
+
+          if (isExecutor(entry) && entry.metas) {
+            Object.defineProperty(acc, next, { value: entry.metas });
+          }
+
+          return acc;
+        },
+        {} as Record<string, Meta[]>,
+      ),
+    );
+
     return provide(
       impls,
       (impls) => {
@@ -104,6 +131,7 @@ export const impl = {
         return result;
       },
       ...metas,
+      _meta,
     );
   },
 };

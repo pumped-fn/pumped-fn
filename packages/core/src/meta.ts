@@ -1,8 +1,10 @@
 import { validateInput, type StandardSchemaV1 } from "./standardschema";
+import { Executor } from "./types";
 
 export const metaSymbol = Symbol.for("pumped-fn.meta");
 
 export interface Meta<V = unknown> {
+  readonly [metaSymbol]: true;
   readonly key: string | symbol;
   readonly schema: StandardSchemaV1<V>;
   readonly value: V;
@@ -14,12 +16,13 @@ export interface MetaFn<V> {
 }
 
 export const isMeta = (value: unknown): value is Meta<unknown> => {
-  return typeof value === "function" && metaSymbol in value;
+  return !!value && typeof value === "object" && metaSymbol in value;
 };
 
 export const meta = <V>(key: string | symbol, schema: StandardSchemaV1<V>): MetaFn<V> => {
   const fn = (value: V) =>
     ({
+      [metaSymbol]: true,
       key,
       schema,
       value,
@@ -44,21 +47,21 @@ export const meta = <V>(key: string | symbol, schema: StandardSchemaV1<V>): Meta
 
 export type InferMeta<S> = S extends Meta<infer V> ? V : never;
 
-export async function getValue<V>(meta: Meta<V>) {
-  return await validateInput(meta.schema, meta.value);
+export function getValue<V>(meta: Meta<V>) {
+  return validateInput(meta.schema, meta.value);
 }
 
-export async function findValues<V = unknown>(metas: Meta<unknown>[] | undefined, meta: MetaFn<V>): Promise<V[]> {
-  if (!metas) {
+export function findValues<V = unknown>(executor: Executor<unknown>, meta: MetaFn<V>): V[] {
+  if (!executor.metas) {
     return [];
   }
 
-  const maybeMeta = metas.filter((m) => m.key === meta.key);
+  const maybeMeta = executor.metas.filter((m) => m.key === meta.key);
 
-  return Promise.all(maybeMeta.map(async (m) => getValue(m as Meta<V>)));
+  return maybeMeta.map((m) => getValue(m as Meta<V>));
 }
 
-export async function findValue<V>(metas: Meta<unknown>[] | undefined, meta: MetaFn<V>): Promise<V | undefined> {
-  const values = await findValues(metas, meta);
+export function findValue<V>(executor: Executor<unknown>, meta: MetaFn<V>): V | undefined {
+  const values = findValues(executor, meta);
   return values.at(0);
 }
