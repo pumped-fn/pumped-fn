@@ -1,5 +1,4 @@
 import { type StandardSchemaV1, type Meta, type Executor, provide } from "@pumped-fn/core";
-import { OK } from "zod";
 
 export interface Context<I = unknown> extends Record<string, unknown> {
   readonly data: Awaited<I>;
@@ -60,41 +59,51 @@ export const impl = {
     service: S,
     path: K,
     impl: Executor<Impl.API<S, K>["handler"]>,
+    ...metas: Meta[]
   ): Executor<Impl.API<S, K>> {
-    return provide(impl, (impl) => ({
-      id: path,
-      def: service,
-      handler: impl,
-      input: service[path]["input"],
-      output: service[path]["output"],
-    }));
+    return provide(
+      impl,
+      (impl) => ({
+        id: path,
+        def: service,
+        handler: impl,
+        input: service[path]["input"],
+        output: service[path]["output"],
+      }),
+      ...metas,
+    );
   },
   service<S extends Def.Service>(
     service: S,
     impls: {
       [K in keyof S]: Executor<Impl.API<S, K> | Impl.API<S, K>["handler"]>;
     },
+    ...metas: Meta[]
   ): Executor<Impl.Service<S>> {
-    return provide(impls, (impls) => {
-      const result = {} as Impl.Service<S>;
+    return provide(
+      impls,
+      (impls) => {
+        const result = {} as Impl.Service<S>;
 
-      for (const key in service) {
-        const impl = (impls as Record<keyof S, Impl.API<S, keyof S> | Impl.API<S, keyof S>["handler"]>)[key];
+        for (const key in service) {
+          const impl = (impls as Record<keyof S, Impl.API<S, keyof S> | Impl.API<S, keyof S>["handler"]>)[key];
 
-        if (typeof impl === "function") {
-          result[key] = {
-            id: key,
-            def: service,
-            handler: impl,
-            input: service[key]["input"],
-            output: service[key]["output"],
-          };
-        } else {
-          result[key] = impl as any;
+          if (typeof impl === "function") {
+            result[key] = {
+              id: key,
+              def: service,
+              handler: impl,
+              input: service[key]["input"],
+              output: service[key]["output"],
+            };
+          } else {
+            result[key] = impl as any;
+          }
         }
-      }
 
-      return result;
-    });
+        return result;
+      },
+      ...metas,
+    );
   },
 };
