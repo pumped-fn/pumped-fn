@@ -4,7 +4,7 @@ import { Executor } from "./types";
 export const metaSymbol = Symbol.for("pumped-fn.meta");
 
 export interface Meta<V = unknown> {
-  readonly [metaSymbol]: true;
+  readonly [metaSymbol]: true
   readonly key: string | symbol;
   readonly schema: StandardSchemaV1<V>;
   readonly value: V;

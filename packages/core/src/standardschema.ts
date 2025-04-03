@@ -12,7 +12,7 @@ export declare namespace StandardSchemaV1 {
     /** The vendor name of the schema library. */
     readonly vendor: string;
     /** Validates unknown input values. */
-    readonly validate: (value: unknown) => Result<Output>;
+    readonly validate: (value: unknown) => Result<Output> | Promise<Result<Output>>;
     /** Inferred types associated with the schema. */
     readonly types?: Types<Input, Output> | undefined;
   }
@@ -90,13 +90,17 @@ export class SchemaError extends Error {
 export function validateInput<TSchema extends StandardSchemaV1>(
   schema: TSchema,
   data: unknown,
-): StandardSchemaV1.InferOutput<TSchema> {
+): Awaited<StandardSchemaV1.InferOutput<TSchema>> {
   const result = schema["~standard"].validate(data);
+
+  if ("then" in result) {
+    throw new Error("validating async is not supported");
+  }
+
   if (result.issues) {
     throw new SchemaError(result.issues);
   }
-
-  return result.value;
+  return result.value as any;
 }
 
 export function any<T>(): StandardSchemaV1<T, T> {
@@ -104,7 +108,7 @@ export function any<T>(): StandardSchemaV1<T, T> {
     "~standard": {
       vendor: "pumped-fn",
       version: 1,
-      validate: (value) => {
+      validate: async (value) => {
         return { value: value as T };
       },
     },
