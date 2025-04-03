@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.22](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.21...@pumped-fn/core@0.5.22) (2025-04-03)
+
+
+### Bug Fixes
+
+* we yet support async validation ([3edaf01](https://github.com/pumped-fn/pumped-fn/commit/3edaf01564c2188fddbff58b6b338a71e9c5a103))
+
 ## [0.5.21](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.20...@pumped-fn/core@0.5.21) (2025-04-03)
 
 
