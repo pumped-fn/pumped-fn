@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.12](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.11...@pumped-fn/extra@0.5.12) (2025-04-03)
+
+
+### Bug Fixes
+
+* make validation sync only ([18ba768](https://github.com/pumped-fn/pumped-fn/commit/18ba76828032285385d0fdc0dd3488c78ea36f1a))
+
 ## [0.5.11](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.10...@pumped-fn/extra@0.5.11) (2025-04-03)
 
 
