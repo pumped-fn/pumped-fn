@@ -72,7 +72,7 @@ export function anyCreate<P, T, K extends ExecutorKind>(
       throw new CreateExecutorError(`failed to create resource ${kind.kind}:${id}, metas are invalid`, metas);
     }
 
-    return createExecutor(kind, factory as any, undefined, id, metas as Meta<unknown>[] | undefined);
+    return createExecutor(kind, (_, scope) => factory(scope), undefined, id, metas as Meta<unknown>[] | undefined);
   }
 
   if (isExecutor(params[0]) || (isAllValuesExecutor(params[0]) && typeof params[1] === "function")) {

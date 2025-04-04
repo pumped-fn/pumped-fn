@@ -1,4 +1,4 @@
-import { type StandardSchemaV1, type Meta, type Executor, provide, isExecutor } from "@pumped-fn/core";
+import { type StandardSchemaV1, type Meta, type Executor, InferOutput, isExecutor } from "@pumped-fn/core";
 
 export declare namespace Def {
   export interface API<I, O> extends Record<string | symbol, unknown> {
@@ -27,14 +27,14 @@ export declare namespace Impl {
     O extends StandardSchemaV1.InferOutput<S[Key]["output"]> = StandardSchemaV1.InferOutput<S[Key]["output"]>,
   > extends Def.API<I, O> {
     def: S;
-    id: Key;
-    handler: (context: I) => O | Promise<O>;
+    path: Key;
+    handler: Executor<(param: I) => O | Promise<O>>;
   }
 
   export type AnyAPI = API<any, any, any, any>;
 
   export type Service = {
-    routes: Record<string, Executor<AnyAPI>>;
+    routes: Record<string, AnyAPI>;
     metas?: Meta[];
   };
 }
@@ -55,26 +55,22 @@ export const impl = {
   api<S extends Def.Service, K extends keyof S>(
     service: S,
     path: K,
-    impl: Executor<Impl.API<S, K>["handler"]>,
+    handler: Impl.API<S, K>["handler"],
     ...metas: Meta[]
-  ): Executor<Impl.API<S, K>> {
-    return provide(
-      impl,
-      (impl) => ({
-        id: path,
-        def: service,
-        handler: impl,
-        input: service[path]["input"],
-        output: service[path]["output"],
-      }),
-      ...(service[path].metas || []),
-      ...metas,
-    );
+  ): Impl.API<S, K> {
+    return {
+      def: service,
+      path,
+      input: service[path].input,
+      output: service[path].output,
+      metas: service[path].metas ? [...service[path].metas, ...metas] : metas,
+      handler,
+    };
   },
   service<S extends Def.Service>(
     service: S,
     impls: {
-      [K in keyof S]: Executor<Impl.API<S, K> | Impl.API<S, K>["handler"]>;
+      [K in keyof S]: Impl.API<S, K> | Impl.API<S, K>["handler"];
     },
     ...metas: Meta[]
   ): Impl.Service {
@@ -87,9 +83,16 @@ export const impl = {
       const route = impls[key];
 
       if (isExecutor(route)) {
-        result.routes[key] = route as any;
+        result.routes[key] = {
+          handler: route,
+          def: service,
+          path: key,
+          input: service[key].input,
+          output: service[key].output,
+          metas: service[key].metas,
+        };
       } else {
-        result.routes[key] = provide(() => impls) as any;
+        result.routes[key] = route;
       }
     }
 

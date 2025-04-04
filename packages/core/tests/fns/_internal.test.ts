@@ -26,7 +26,7 @@ test("anyCreate test", () => {
     "2",
     value,
     fn,
-    meta("direct", castAny()),
+    meta("direct", castAny())(""),
   );
 
   const arrayDerive = anyCreate(
@@ -36,7 +36,7 @@ test("anyCreate test", () => {
     "3",
     [value],
     fn,
-    meta("array", castAny()),
+    meta("array", castAny())([]),
   );
 
   const objectDerive = anyCreate(
@@ -46,7 +46,7 @@ test("anyCreate test", () => {
     "4",
     { value },
     fn,
-    meta("object", castAny()),
+    meta("object", castAny())({}),
   );
 
   expect(value[executorSymbol]).toEqual({ kind: "immutable" });

@@ -231,7 +231,7 @@ export async function safeRun<I>(
       value: await effect(resolved.value as any),
     };
   } catch (error) {
-    return { status: "error", error: error as any };
+    return { status: "error", error: new Error("failed to finished safeRun", { cause: error }) };
   }
 }
 

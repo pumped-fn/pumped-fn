@@ -19,21 +19,23 @@ test("server syntax", async () => {
   const helloHandler = impl.api(
     rpc,
     "hello",
-    provide(() => (context) => {
+    provide(() => () => {
       return "hello";
     }),
   );
 
   const service = impl.service(rpc, {
     hello: helloHandler,
-    count: provide(() => (input) => {
-      return input.length;
+    count: provide(() => (param) => {
+      return param.length;
     }),
   });
 
-  const directCall = provide(service, (service) => {
+  const directCall = provide((scope) => {
     return async (path: string, ...params: unknown[]) => {
-      return await service[path].handler(params.at(0) as any);
+      return await run(scope, service.routes[path].handler, async (handler) => {
+        return await handler(params.at(0) as any);
+      });
     };
   });
 
