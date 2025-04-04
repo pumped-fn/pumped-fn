@@ -1,13 +1,4 @@
-import {
-  type StandardSchemaV1,
-  type Meta,
-  type Executor,
-  provide,
-  any,
-  meta,
-  isExecutor,
-  findValue,
-} from "@pumped-fn/core";
+import { type StandardSchemaV1, type Meta, type Executor, provide, isExecutor } from "@pumped-fn/core";
 
 export declare namespace Def {
   export interface API<I, O> extends Record<string | symbol, unknown> {
@@ -42,9 +33,10 @@ export declare namespace Impl {
 
   export type AnyAPI = API<any, any, any, any>;
 
-  export type Service<S extends Def.Service> = Record<string, API<S, keyof S>>;
-
-  export type AnyService = Service<any>;
+  export type Service = {
+    routes: Record<string, Executor<AnyAPI>>;
+    metas?: Meta[];
+  };
 }
 
 export const define = {
@@ -59,14 +51,7 @@ export const define = {
   },
 } as const;
 
-const routeMeta = meta("pumped-fn.extra.route", any<Record<string, Meta[]>>());
-
 export const impl = {
-  getRouteMeta(serviceExecutor: Executor<Impl.AnyService>): Record<string, Meta[]> {
-    const _meta = findValue(serviceExecutor, routeMeta);
-
-    return _meta || {};
-  },
   api<S extends Def.Service, K extends keyof S>(
     service: S,
     path: K,
@@ -82,6 +67,7 @@ export const impl = {
         input: service[path]["input"],
         output: service[path]["output"],
       }),
+      ...(service[path].metas || []),
       ...metas,
     );
   },
@@ -91,47 +77,22 @@ export const impl = {
       [K in keyof S]: Executor<Impl.API<S, K> | Impl.API<S, K>["handler"]>;
     },
     ...metas: Meta[]
-  ): Executor<Impl.Service<S>> {
-    const _meta = routeMeta(
-      Object.keys(impls).reduce(
-        (acc, next) => {
-          const entry = impls[next];
+  ): Impl.Service {
+    const result: Impl.Service = {
+      routes: {},
+      metas: service.metas ? [...service.metas, ...metas] : metas,
+    };
 
-          if (isExecutor(entry) && entry.metas) {
-            Object.defineProperty(acc, next, { value: entry.metas });
-          }
+    for (const key in service) {
+      const route = impls[key];
 
-          return acc;
-        },
-        {} as Record<string, Meta[]>,
-      ),
-    );
+      if (isExecutor(route)) {
+        result.routes[key] = route as any;
+      } else {
+        result.routes[key] = provide(() => impls) as any;
+      }
+    }
 
-    return provide(
-      impls,
-      (impls) => {
-        const result = {} as Impl.Service<S>;
-
-        for (const key in service) {
-          const impl = (impls as Record<keyof S, Impl.API<S, keyof S> | Impl.API<S, keyof S>["handler"]>)[key];
-
-          if (typeof impl === "function") {
-            result[key] = {
-              id: key,
-              def: service,
-              handler: impl,
-              input: service[key]["input"],
-              output: service[key]["output"],
-            };
-          } else {
-            result[key] = impl as any;
-          }
-        }
-
-        return result;
-      },
-      ...metas,
-      _meta,
-    );
+    return result;
   },
 };

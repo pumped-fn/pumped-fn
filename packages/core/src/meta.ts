@@ -1,10 +1,10 @@
 import { validateInput, type StandardSchemaV1 } from "./standardschema";
-import { Executor } from "./types";
+import { Executor, isExecutor } from "./types";
 
 export const metaSymbol = Symbol.for("pumped-fn.meta");
 
 export interface Meta<V = unknown> {
-  readonly [metaSymbol]: true
+  readonly [metaSymbol]: true;
   readonly key: string | symbol;
   readonly schema: StandardSchemaV1<V>;
   readonly value: V;
@@ -51,13 +51,12 @@ export function getValue<V>(meta: Meta<V>) {
   return validateInput(meta.schema, meta.value);
 }
 
-export function findValues<V = unknown>(executor: Executor<unknown>, meta: MetaFn<V>): V[] {
-  if (!executor.metas) {
-    return [];
-  }
+export function findValues<V = unknown>(executor: Executor<unknown> | Meta[] | undefined, meta: MetaFn<V>): V[] {
+  if (!executor) return [];
 
-  const maybeMeta = executor.metas.filter((m) => m.key === meta.key);
+  const metas = isExecutor(executor) ? executor.metas || [] : executor;
 
+  const maybeMeta = metas.filter((m) => m.key === meta.key);
   return maybeMeta.map((m) => getValue(m as Meta<V>));
 }
 
