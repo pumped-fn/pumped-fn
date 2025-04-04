@@ -60,7 +60,7 @@ export function findValues<V = unknown>(executor: Executor<unknown> | Meta[] | u
   return maybeMeta.map((m) => getValue(m as Meta<V>));
 }
 
-export function findValue<V>(executor: Executor<unknown>, meta: MetaFn<V>): V | undefined {
+export function findValue<V>(executor: Executor<unknown> | Meta[] | undefined, meta: MetaFn<V>): V | undefined {
   const values = findValues(executor, meta);
   return values.at(0);
 }
