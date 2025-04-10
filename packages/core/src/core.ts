@@ -1,3 +1,7 @@
+import { isRefExecutor } from "./fns/_internal";
+import { isEffectExecutor } from "./fns/effect";
+import { isReactiveExecutor, isReactiveResourceExecutor } from "./fns/reactive";
+import { isResourceExecutor } from "./fns/resource";
 import {
   Cleanup,
   ExecutionScope,
@@ -160,28 +164,24 @@ class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
       try {
         const dependencies = await this.resolveDependency(
           executor.dependencies,
-          executor[executorSymbol].kind === "reactive" || executor[executorSymbol].kind === "reactive-resource",
+          isReactiveExecutor(executor) || isReactiveResourceExecutor(executor),
         );
 
-        if (
-          executor[executorSymbol].kind !== "reactive" &&
-          executor[executorSymbol].kind !== "reactive-resource" &&
-          executor[executorSymbol].kind !== "reference"
-        ) {
+        if (!isReactiveExecutor(executor) && !isReactiveResourceExecutor(executor) && !isRefExecutor(executor)) {
           this.trackDependencies(executor);
         }
 
         let value = await executor.factory(dependencies, this);
         value = (await this.triggerMiddlewareOnResolve(executor, value)) as Awaited<T>;
 
-        if (executor[executorSymbol].kind === "resource" || executor[executorSymbol].kind === "reactive-resource") {
+        if (isResourceExecutor(executor) || isReactiveResourceExecutor(executor)) {
           const [_, cleanup] = value as [unknown, Cleanup];
           this.cleanups.set(executor, cleanup);
-        } else if (executor[executorSymbol].kind === "effect") {
+        } else if (isEffectExecutor(executor)) {
           this.cleanups.set(executor, value as Cleanup);
         }
 
-        if (executor[executorSymbol].kind === "resource" || executor[executorSymbol].kind === "reactive-resource") {
+        if (isResourceExecutor(executor) || isReactiveResourceExecutor(executor)) {
           const [resource] = value as [unknown, Cleanup];
           Object.assign(container, { kind: "resolved", value: resource });
         } else {
@@ -346,7 +346,7 @@ class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
       }
     }
 
-    if (executor[executorSymbol].kind !== "reference" && this.values.has(executor.ref)) {
+    if (!isRefExecutor(executor) && this.values.has(executor.ref)) {
       await this.release(executor.ref);
     }
 

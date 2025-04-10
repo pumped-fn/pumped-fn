@@ -154,6 +154,10 @@ export function createExecutor<T, K extends ExecutorKind>(
   return executor as any;
 }
 
+export function isRefExecutor(executor: Executor<unknown>): executor is ReferenceExecutor<any> {
+  return executor[executorSymbol].kind === "reference";
+}
+
 function createRefExecutor<T extends Executor<unknown>>(executor: T): ReferenceExecutor<T> {
   if (executor[executorSymbol].kind === "reference") {
     throw new Error(`a ref couldn't be refed`);

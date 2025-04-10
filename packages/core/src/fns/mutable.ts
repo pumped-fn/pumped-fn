@@ -1,5 +1,5 @@
 import { Meta } from "../meta";
-import { Executor, Factory, InferOutput, MutableExecutor, Scope } from "../types";
+import { Executor, executorSymbol, Factory, InferOutput, MutableExecutor, Scope } from "../types";
 import { anyCreate } from "./_internal";
 
 let mutableId = 0;
@@ -7,6 +7,10 @@ let mutableId = 0;
 const nextMutableId = () => {
   return `mutable:${mutableId++}`;
 };
+
+export function isMutable<P>(executor: Executor<unknown>): executor is MutableExecutor<P> {
+  return executor[executorSymbol].kind === "mutable";
+}
 
 export function mutable<P>(factory: (scope: Scope) => P, ...metas: Meta<unknown>[]): MutableExecutor<P>;
 

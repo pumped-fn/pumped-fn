@@ -1,5 +1,5 @@
 import { Meta } from "../meta";
-import { Executor, ImmutableExecutor, InferOutput, Scope } from "../types";
+import { Executor, executorSymbol, ImmutableExecutor, InferOutput, Scope } from "../types";
 import { Factory } from "../types";
 import { anyCreate } from "./_internal";
 
@@ -8,6 +8,10 @@ let providerId = 0;
 const nextProviderId = () => {
   return `immutable:${providerId++}`;
 };
+
+export function isImmutableExecutor<T>(executor: Executor<unknown>): executor is ImmutableExecutor<T> {
+  return executor[executorSymbol].kind === "immutable";
+}
 
 export function provide<P>(factory: (scope: Scope) => P, ...metas: Meta<unknown>[]): ImmutableExecutor<P>;
 

@@ -1,4 +1,4 @@
-import { Executor, EffectExecutor, InferOutput } from "../types";
+import { Executor, EffectExecutor, InferOutput, executorSymbol } from "../types";
 import { Factory, Cleanup } from "../types";
 import type { Meta } from "../meta";
 import { anyCreate } from "./_internal";
@@ -8,6 +8,10 @@ let effectId = 0;
 const nextEffectId = () => {
   return `effect:${effectId++}`;
 };
+
+export function isEffectExecutor(value: Executor<unknown>): value is EffectExecutor {
+  return value[executorSymbol].kind === "effect";
+}
 
 export function effect<T extends Executor<unknown>>(
   executor: T,

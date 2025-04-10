@@ -1,5 +1,5 @@
 import { StandardSchemaV1, validateInput } from "../standardschema";
-import { ExecutionScope, ExecutionValue, Executor, isExecutor } from "../types";
+import { ExecutionExecutor, ExecutionScope, ExecutionValue, Executor, executorSymbol, isExecutor } from "../types";
 import { createExecutor } from "./_internal";
 
 let executionId = 0;
@@ -7,6 +7,10 @@ let executionId = 0;
 const nextExecutionId = () => {
   return `execution:${executionId++}`;
 };
+
+export function isExecutionExecutor<T>(value: Executor<unknown>): value is ExecutionExecutor<T> {
+  return value[executorSymbol].kind === "execution";
+}
 
 export function executionValue<V>(
   key: string | symbol,
