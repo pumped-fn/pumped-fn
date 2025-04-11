@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/core",
-  "version": "0.5.31",
+  "version": "0.5.32",
   "description": "Enhanced function utilities for TypeScript",
   "type": "module",
   "main": "./dist/index.js",
