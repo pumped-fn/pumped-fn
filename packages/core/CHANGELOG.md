@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.26](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.25...@pumped-fn/core@0.5.26) (2025-04-11)
+
+
+### Features
+
+* added envelopExecutor to retain meta informatin ([343045a](https://github.com/pumped-fn/pumped-fn/commit/343045aef2ae87b20c50549fdc79f8bbb387d1e6))
+
 ## [0.5.25](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.24...@pumped-fn/core@0.5.25) (2025-04-04)
 
 
