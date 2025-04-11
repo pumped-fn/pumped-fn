@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.33](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.32...@pumped-fn/core@0.5.33) (2025-04-11)
+
+
+### Features
+
+* improved meta API, added some and find ([ae078e5](https://github.com/pumped-fn/pumped-fn/commit/ae078e5a35a41895a9a070396b48c9d9e5a864ff))
+
 ## [0.5.32](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/core@0.5.31...@pumped-fn/core@0.5.32) (2025-04-11)
 
 
