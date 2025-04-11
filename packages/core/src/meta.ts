@@ -1,5 +1,4 @@
 import { validateInput, type StandardSchemaV1 } from "./standardschema";
-import { Executor, isExecutor } from "./types";
 
 export const metaSymbol = Symbol.for("pumped-fn.meta");
 
@@ -14,6 +13,9 @@ export interface MetaFn<V> {
   (value: V): Meta<V>;
   readonly key: string | symbol;
   partial: <D extends Partial<V>>(d: D) => D;
+  some: (source: MetaContainer | Meta[] | undefined) => V[];
+  find: (source: MetaContainer | Meta[] | undefined) => V | undefined;
+  get: (source: MetaContainer | Meta[] | undefined) => V;
 }
 
 export const isMeta = (value: unknown): value is Meta<unknown> => {
@@ -43,11 +45,34 @@ export const meta = <V>(key: string | symbol, schema: StandardSchemaV1<V>): Meta
     writable: false,
   });
 
-  Object.defineProperty(fn, "partial", {
-    value: (value: any) => value,
-    configurable: false,
-    enumerable: false,
-    writable: false,
+  Object.defineProperties(fn, {
+    partial: {
+      value: (d: Partial<V>) => {
+        return Object.assign({}, fn({} as V), d);
+      },
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    },
+    some: {
+      value: (source: MetaContainer | Meta[] | undefined) => findValues(source, fn as unknown as MetaFn<unknown>),
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    },
+    find: {
+      value: (source: MetaContainer | Meta[] | undefined) => findValue(source, fn as unknown as MetaFn<unknown>),
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    },
+    get: {
+      value: (source: MetaContainer | Meta[] | undefined) =>
+        getValue(findValue(source, fn as unknown as MetaFn<unknown>) as Meta<V>),
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    },
   });
 
   return fn as any;
