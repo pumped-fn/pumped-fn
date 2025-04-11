@@ -2,7 +2,7 @@ import { vi, test, expect } from "vitest";
 import { define, impl } from "../src";
 import { client } from "../src/client";
 import { cast } from "./utils";
-import { createScope, provide, run, safeRun } from "@pumped-fn/core";
+import { createScope, provide, run, validateInput, safeRun } from "@pumped-fn/core";
 
 const rpc = define.service({
   hello: {
@@ -15,33 +15,50 @@ const rpc = define.service({
   },
 });
 
+const contextMeta = cast<{ id: string }>();
+
 test("server syntax", async () => {
-  const helloHandler = impl.api(
+  const helloAPI = impl.api(
     rpc,
     "hello",
+    contextMeta,
     provide(() => () => {
       return "hello";
     }),
   );
 
-  const service = impl.service(rpc, {
-    hello: helloHandler,
-    count: provide(() => (param) => {
-      return param.length;
+  const countAPI = impl.api(
+    rpc,
+    "count",
+    contextMeta,
+    provide(() => (_, word) => {
+      return word.length;
     }),
-  });
+  );
 
-  const directCall = provide((scope) => {
-    return async (path: string, ...params: unknown[]) => {
-      return await run(scope, service.routes[path].handler, async (handler) => {
-        return await handler(params.at(0) as any);
-      });
+  const directCall = provide([helloAPI, countAPI], ([...routes]) => {
+    return async (path: string, context: unknown, param: unknown) => {
+      const route = routes.find((route) => route.path === path);
+
+      if (!route) {
+        throw new Error(`Route ${path} not found`);
+      }
+
+      const validatedInput = validateInput(route.input, param);
+
+      if (route.context) {
+        const validatedContext = validateInput(route.context, context);
+
+        return await route.handler(validatedContext, validatedInput as never);
+      }
+
+      return await route.handler(undefined as any, validatedInput as never);
     };
   });
 
   const clientRequestBuilder = client.createAnyRequestHandler(
-    provide(directCall, (directCall) => async (def, path, param) => {
-      return directCall(path, param) as any;
+    provide(directCall, (directCall) => async (def: unknown, path: string, param: unknown) => {
+      return directCall(path, { id: "1234" }, param);
     }),
   );
 
@@ -50,7 +67,11 @@ test("server syntax", async () => {
   const scope = createScope();
 
   const result = await safeRun(scope, { directCall, serviceClient }, async ({ directCall, serviceClient }) => {
-    return await Promise.all([serviceClient("hello"), directCall("count", "hello"), serviceClient("count", "hello")]);
+    return await Promise.all([
+      serviceClient("hello"),
+      directCall("count", { id: "1234" }, "hello"),
+      serviceClient("count", "hello"),
+    ]);
   });
 
   if (result.status === "error") {

@@ -1,4 +1,4 @@
-import { type StandardSchemaV1, type Meta, type Executor, InferOutput, isExecutor } from "@pumped-fn/core";
+import { type StandardSchemaV1, type Meta, type Executor, InferOutput, isExecutor, provide } from "@pumped-fn/core";
 
 export declare namespace Def {
   export interface API<I, O> extends Record<string | symbol, unknown> {
@@ -23,20 +23,17 @@ export declare namespace Impl {
   export interface API<
     S extends Def.Service,
     Key extends keyof S,
+    Context,
     I extends StandardSchemaV1.InferInput<S[Key]["input"]> = StandardSchemaV1.InferInput<S[Key]["input"]>,
     O extends StandardSchemaV1.InferOutput<S[Key]["output"]> = StandardSchemaV1.InferOutput<S[Key]["output"]>,
   > extends Def.API<I, O> {
     def: S;
     path: Key;
-    handler: Executor<(param: I) => O | Promise<O>>;
+    handler: (context: Context, param: I) => O | Promise<O>;
+    context?: StandardSchemaV1<Context>;
   }
 
   export type AnyAPI = API<any, any, any, any>;
-
-  export type Service = {
-    routes: Record<string, AnyAPI>;
-    metas?: Meta[];
-  };
 }
 
 export const define = {
@@ -52,50 +49,38 @@ export const define = {
 } as const;
 
 export const impl = {
-  api<S extends Def.Service, K extends keyof S>(
+  api<S extends Def.Service, K extends keyof S, Context>(
     service: S,
     path: K,
-    handler: Impl.API<S, K>["handler"],
+    context: StandardSchemaV1<Context>,
+    handler: Impl.API<S, K, Context>["handler"] | Executor<Impl.API<S, K, Context>["handler"]>,
     ...metas: Meta[]
-  ): Impl.API<S, K> {
-    return {
-      def: service,
-      path,
-      input: service[path].input,
-      output: service[path].output,
-      metas: service[path].metas ? [...service[path].metas, ...metas] : metas,
-      handler,
-    };
-  },
-  service<S extends Def.Service>(
-    service: S,
-    impls: {
-      [K in keyof S]: Impl.API<S, K> | Impl.API<S, K>["handler"];
-    },
-    ...metas: Meta[]
-  ): Impl.Service {
-    const result: Impl.Service = {
-      routes: {},
-      metas: service.metas ? [...service.metas, ...metas] : metas,
-    };
-
-    for (const key in service) {
-      const route = impls[key];
-
-      if (isExecutor(route)) {
-        result.routes[key] = {
-          handler: route,
+  ): Executor<Impl.API<S, K, Context>> {
+    if (isExecutor(handler)) {
+      return provide(
+        handler,
+        (handler) => ({
           def: service,
-          path: key,
-          input: service[key].input,
-          output: service[key].output,
-          metas: service[key].metas,
-        };
-      } else {
-        result.routes[key] = route;
-      }
+          path,
+          handler,
+          context,
+          input: service[path].input,
+          output: service[path].output,
+        }),
+        ...metas,
+      );
     }
 
-    return result;
+    return provide(
+      () => ({
+        def: service,
+        path,
+        handler,
+        context,
+        input: service[path].input,
+        output: service[path].output,
+      }),
+      ...metas,
+    );
   },
 };

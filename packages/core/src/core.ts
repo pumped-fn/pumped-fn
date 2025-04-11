@@ -1,4 +1,4 @@
-import { isRefExecutor } from "./fns/_internal";
+import { isEnvelopExecutor, isRefExecutor } from "./fns/_internal";
 import { isEffectExecutor } from "./fns/effect";
 import { isReactiveExecutor, isReactiveResourceExecutor } from "./fns/reactive";
 import { isResourceExecutor } from "./fns/resource";
@@ -346,8 +346,14 @@ class BaseScope implements Scope, ScopeInner, ScopeMiddleware {
       }
     }
 
-    if (!isRefExecutor(executor) && this.values.has(executor.ref)) {
-      await this.release(executor.ref);
+    if (!isRefExecutor(executor) && !isEnvelopExecutor(executor)) {
+      if (!isRefExecutor(executor) && this.values.has(executor.ref)) {
+        await this.release(executor.ref);
+      }
+
+      if (!isEnvelopExecutor(executor) && this.values.has(executor.envelop)) {
+        await this.release(executor.envelop);
+      }
     }
 
     this.dependencyMap.delete(executor);

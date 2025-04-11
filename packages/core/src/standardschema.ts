@@ -108,7 +108,7 @@ export function any<T>(): StandardSchemaV1<T, T> {
     "~standard": {
       vendor: "pumped-fn",
       version: 1,
-      validate: async (value) => {
+      validate: (value) => {
         return { value: value as T };
       },
     },

@@ -1,5 +1,5 @@
 import { validateInput, type StandardSchemaV1 } from "./standardschema";
-import { Executor, isExecutor } from "./types";
+import { EnvelopLike, Executor, isExecutor } from "./types";
 
 export const metaSymbol = Symbol.for("pumped-fn.meta");
 
@@ -51,16 +51,20 @@ export function getValue<V>(meta: Meta<V>) {
   return validateInput(meta.schema, meta.value);
 }
 
-export function findValues<V = unknown>(executor: Executor<unknown> | Meta[] | undefined, meta: MetaFn<V>): V[] {
+export function findValues<V = unknown>(executor: Meta[] | MetaContainer | undefined, meta: MetaFn<V>): V[] {
   if (!executor) return [];
 
-  const metas = isExecutor(executor) ? executor.metas || [] : executor;
+  const metas = Array.isArray(executor) ? executor : executor.metas || [];
 
   const maybeMeta = metas.filter((m) => m.key === meta.key);
   return maybeMeta.map((m) => getValue(m as Meta<V>));
 }
 
-export function findValue<V>(executor: Executor<unknown> | Meta[] | undefined, meta: MetaFn<V>): V | undefined {
+interface MetaContainer {
+  metas?: Meta[];
+}
+
+export function findValue<V>(executor: Meta[] | MetaContainer | undefined, meta: MetaFn<V>): V | undefined {
   const values = findValues(executor, meta);
   return values.at(0);
 }

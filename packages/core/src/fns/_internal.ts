@@ -2,12 +2,15 @@ import { Meta, isMeta } from "../meta";
 import {
   Effect,
   EffectExecutor,
+  EnvelopExecutor,
+  EnvelopLike,
   ExecutionScope,
   Executor,
   ExecutorKind,
   executorSymbol,
   Immutable,
   ImmutableExecutor,
+  InferOutput,
   isExecutor,
   Mutable,
   MutableExecutor,
@@ -143,9 +146,17 @@ export function createExecutor<T, K extends ExecutorKind>(
   });
 
   const ref = createRefExecutor(executor);
+  const envelop = createEnvelop(executor);
 
   Object.defineProperty(executor, "ref", {
     value: ref,
+    writable: false,
+    configurable: false,
+    enumerable: true,
+  });
+
+  Object.defineProperty(executor, "envelop", {
+    value: envelop,
     writable: false,
     configurable: false,
     enumerable: true,
@@ -156,6 +167,58 @@ export function createExecutor<T, K extends ExecutorKind>(
 
 export function isRefExecutor(executor: Executor<unknown>): executor is ReferenceExecutor<any> {
   return executor[executorSymbol].kind === "reference";
+}
+
+export function isEnvelopExecutor(executor: Executor<unknown>): executor is EnvelopExecutor<any> {
+  return executor[executorSymbol].kind === "envelop";
+}
+
+function createEnvelop<T extends Executor<unknown>>(executor: T): EnvelopExecutor<T> {
+  if (executor[executorSymbol].kind === "envelop") {
+    throw new Error(`an envelop couldn't be enveloped`);
+  }
+
+  return Object.defineProperties<EnvelopExecutor<T>>({} as EnvelopExecutor<T>, {
+    [executorSymbol]: {
+      value: { kind: "envelop" },
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    factory: {
+      value: (resolved: InferOutput<T>, scope: Scope): EnvelopLike<T> => {
+        return {
+          content: resolved,
+          metas: executor.metas,
+        };
+      },
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    dependencies: {
+      value: [executor],
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    id: {
+      value: `envelop(${executor.id})`,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    ref: {
+      get() {
+        throw new Error(`an envelop couldn't be refed`);
+      },
+    },
+    envelop: {
+      get() {
+        throw new Error(`an envelop couldn't be enveloped`);
+      },
+    },
+  });
 }
 
 function createRefExecutor<T extends Executor<unknown>>(executor: T): ReferenceExecutor<T> {
@@ -195,6 +258,11 @@ function createRefExecutor<T extends Executor<unknown>>(executor: T): ReferenceE
     ref: {
       get() {
         throw new Error(`a ref couldn't be refed`);
+      },
+    },
+    envelop: {
+      get() {
+        throw new Error(`a ref couldn't be enveloped`);
       },
     },
   });

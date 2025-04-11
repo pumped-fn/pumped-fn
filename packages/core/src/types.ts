@@ -12,6 +12,7 @@ export type ReactiveResource = { kind: "reactive-resource" };
 export type Reference = { kind: "reference" };
 export type Execution = { kind: "execution" };
 export type ExecutionOptional = { kind: "execution-optional" };
+export type Envelop = { kind: "envelop" };
 
 export type ExecutorKind =
   | Immutable
@@ -40,12 +41,14 @@ export interface Executor<T> {
     | ReactiveResource
     | Reference
     | Execution
-    | ExecutionOptional;
+    | ExecutionOptional
+    | Envelop;
 
   readonly factory: (dependencies: unknown, scope: Scope | ExecutionScope) => T | Promise<T>;
   readonly dependencies: Executor<unknown>[] | Record<string, Executor<unknown>> | Executor<unknown> | undefined;
   readonly id: string;
   readonly ref: Executor<this>;
+  readonly envelop: EnvelopExecutor<this>;
   readonly metas?: Meta<unknown>[];
 }
 
@@ -83,6 +86,15 @@ export interface ExecutionExecutor<T> extends Executor<T> {
 
 export interface ExecutionOptionalExecutor<T> extends Executor<T | undefined> {
   [executorSymbol]: ExecutionOptional;
+}
+
+export type EnvelopLike<T extends Executor<unknown>> = {
+  content: InferOutput<T>;
+  metas?: Meta[];
+};
+
+export interface EnvelopExecutor<V extends Executor<unknown>> extends Executor<EnvelopLike<V>> {
+  [executorSymbol]: Envelop;
 }
 
 export declare namespace ExecutionValue {
