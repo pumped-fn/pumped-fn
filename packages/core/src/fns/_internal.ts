@@ -197,7 +197,7 @@ function createEnvelop<T extends Executor<unknown>>(executor: T): EnvelopExecuto
       enumerable: false,
     },
     dependencies: {
-      value: [executor],
+      value: executor,
       writable: false,
       configurable: false,
       enumerable: false,
