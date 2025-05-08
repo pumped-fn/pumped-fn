@@ -23,14 +23,14 @@
     "test:watch": "vitest watch"
   },
   "peerDependencies": {
-    "@pumped-fn/core": "^0.5.8",
+    "@pumped-fn/core-next": "^0.5.34",
     "zod": "^3.24.2"
   },
   "files": [
     "dist"
   ],
   "devDependencies": {
-    "@pumped-fn/core": "workspace:*",
+    "@pumped-fn/core-next": "workspace:*",
     "@types/bun": "^1.2.5",
     "tsup": "^8.3.6",
     "vitest": "^1.6.1"

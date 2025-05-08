@@ -1,21 +1,31 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
-import { createScope, mutable, provide, resource } from "@pumped-fn/core";
+import { createScope, derive, provide } from "@pumped-fn/core-next";
 import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
 
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
     const scope = createScope();
-    const countExecutor = mutable(() => 0);
-    const derivedResource = resource(countExecutor, (v) => [v, () => {}]);
-    const derivedCount = provide([countExecutor], ([v]) => v + 2);
-    const wholesum = provide([countExecutor, derivedCount], ([v1, v2]) => {
+    
+    const countExecutor = provide(() => 0);
+    const derivedResource = derive(
+      countExecutor.reactive, 
+      (count, controller) => {
+        controller.cleanup(() => {
+          console.log("Cleanup");
+        });
+
+        return count;
+      }
+    );
+    const derivedCount = derive([countExecutor.reactive], ([v]) => v + 2);
+    const wholesum = derive([countExecutor.reactive, derivedCount.reactive], ([v1, v2]) => {
       return v1 + v2;
     });
 
-    const updateCount = provide([countExecutor.ref], ([ref], scope) => {
-      return (value: number) => scope.update(ref, value);
+    const updateCount = derive([countExecutor.lazy], ([ref]) => {
+      return ref.update
     });
 
     const fn = vi.fn();
@@ -51,7 +61,7 @@ describe("React Integration", () => {
     });
 
     act(() => {
-      result.current.update(4);
+      scope.update(countExecutor, 4);
     });
 
     await waitFor(() => {

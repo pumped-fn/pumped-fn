@@ -20,12 +20,12 @@
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "peerDependencies": {
-    "@pumped-fn/core": "^0.5.8",
+    "@pumped-fn/core-next": "^0.5.8",
     "react": "^18.0.0"
   },
   "files": ["dist"],
   "devDependencies": {
-    "@pumped-fn/core": "workspace:*",
+    "@pumped-fn/core-next": "workspace:*",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
