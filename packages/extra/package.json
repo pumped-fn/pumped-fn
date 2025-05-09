@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/extra",
-  "version": "0.5.19",
+  "version": "0.5.20",
   "description": "Utilities to build full stack application using @pumped-fn/core",
   "keywords": [
     "pumped-fn",
