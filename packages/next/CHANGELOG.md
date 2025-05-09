@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.38](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.37...@pumped-fn/next@0.5.38) (2025-05-09)
+
+
+### Bug Fixes
+
+* corrected onUpdate and update behavior ([d895c8f](https://github.com/pumped-fn/pumped-fn/commit/d895c8f578daffd42e9fb35a94c791aa9a422720))
+
 ## [0.5.37](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.36...@pumped-fn/next@0.5.37) (2025-05-09)
 
 
