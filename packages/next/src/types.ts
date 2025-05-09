@@ -115,8 +115,14 @@ export declare namespace Core {
   export interface Executor<T> extends BaseExecutor<T> {
     [executorSymbol]: "main";
     factory: NoDependencyFn<T> | DependentFn<T, unknown>;
+
+    /** Return an executor controller without resolving Executor */
     readonly lazy: Lazy<T>;
+
+    /** Return an resolved executor, and mark the user to be reactived for future changes */
     readonly reactive: Reactive<T>;
+
+    /** Return an resolved executor with its controller */
     readonly static: Static<T>;
   }
 
@@ -148,7 +154,7 @@ export declare namespace Core {
 
   export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
     ? Awaited<U>
-    : T extends Lazy<infer U>
+    : T extends Lazy<infer U> | Static<infer U>
     ? Accessor<Awaited<U>>
     : never;
 

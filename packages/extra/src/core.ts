@@ -55,9 +55,11 @@ export const define = {
 class Builder<Service extends Def.Service, Context = undefined> {
   private _context: StandardSchemaV1<unknown> | undefined;
   private _service: Service;
+  private _metas: Meta.Meta[] = [];
 
-  constructor(service: Service) {
+  constructor(service: Service, ...metas: Meta.Meta[]) {
     this._service = service;
+    this._metas = metas;
   }
 
   context<UpdatedContext>(contextSchema: StandardSchemaV1<UpdatedContext>) {
@@ -94,6 +96,7 @@ class Builder<Service extends Def.Service, Context = undefined> {
           output: def.output,
           def: this._service[path],
         }),
+        ...this._metas,
         ...metas
       );
     }
@@ -108,6 +111,7 @@ class Builder<Service extends Def.Service, Context = undefined> {
         path,
         def: this._service[path],
       }),
+      ...this._metas,
       ...metas
     );
   }

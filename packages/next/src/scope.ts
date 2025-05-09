@@ -1,4 +1,8 @@
-import { isLazyExecutor, isReactiveExecutor } from "./executor";
+import {
+  isLazyExecutor,
+  isReactiveExecutor,
+  isStaticExecutor,
+} from "./executor";
 import { Core, executorSymbol } from "./types";
 
 export interface ScopeInner {
@@ -67,6 +71,10 @@ class Scope implements Core.Scope, ScopeInner {
       }
 
       await staticResult.resolve(false);
+      if (isStaticExecutor(e)) {
+        return staticResult;
+      }
+
       return staticResult.get();
     }
 

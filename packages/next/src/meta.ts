@@ -5,16 +5,18 @@ export const meta = <V>(
   key: string | symbol,
   schema: StandardSchemaV1<V>
 ): Meta.MetaFn<V> => {
+  const _key = typeof key === "string" ? Symbol(key) : key;
+
   const fn = (value: V) =>
     ({
       [metaSymbol]: true,
-      key,
+      key: _key,
       schema,
       value,
     } as unknown as Meta.MetaFn<V>);
 
   Object.defineProperty(fn, "key", {
-    value: key,
+    value: _key,
     configurable: false,
     enumerable: false,
     writable: false,

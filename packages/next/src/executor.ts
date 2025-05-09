@@ -106,10 +106,10 @@ export function derive<T, D extends Core.BaseExecutor<unknown>>(
 export function derive<
   T,
   D extends
-    | Array<Core.BaseExecutor<unknown>>
+    | ReadonlyArray<Core.BaseExecutor<unknown>>
     | Record<string, Core.BaseExecutor<unknown>>
 >(
-  dependencies: D,
+  dependencies: { [K in keyof D]: D[K] },
   factory: Core.DependentFn<T, { [K in keyof D]: Core.InferOutput<D[K]> }>,
   ...metas: Meta.Meta[]
 ): Core.Executor<T>;

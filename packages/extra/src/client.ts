@@ -1,4 +1,4 @@
-import type { Def } from "./types";
+import type { Def } from "./core";
 import { type Core, derive, isExecutor, provide } from "@pumped-fn/core-next";
 import type { Meta, StandardSchemaV1 } from "@pumped-fn/core-next";
 

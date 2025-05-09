@@ -54,7 +54,7 @@ const versionRoute = derive({ logger }, ({ logger }) => {
 });
 
 const server = derive(
-  [config, helloRoute, versionRoute] as const,
+  [config, helloRoute, versionRoute],
   ([config, ...routes]) => {
     return {
       start: () => {
