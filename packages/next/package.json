@@ -14,7 +14,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -53,5 +56,6 @@
     "npm": {
       "publish": true
     }
-  }
+  },
+  "license": "MIT"
 }

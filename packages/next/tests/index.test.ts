@@ -1,6 +1,6 @@
 import { vi, test, expect } from "vitest";
 import { provide, derive } from "../src/executor";
-import { createScope } from "../src/scope";
+import { createScope, ScopeInner } from "../src/scope";
 import { meta } from "../src/meta";
 import { custom } from "../src/ssch";
 
@@ -161,8 +161,18 @@ test("reset", async () => {
 });
 
 test("reactive changes", async () => {
+  const c = vi.fn();
   const counter = provide(() => 0, name("counter"));
   const derivedCounter = derive(counter.reactive, (count) => count.toString());
+  const derviedArrayCounter = derive([counter.reactive], (count, ctl) => {
+    ctl.cleanup(c);
+    return count.toString();
+  });
+
+  const derivedObjectCounter = derive(
+    { counter: counter.reactive },
+    ({ counter }) => counter.toString()
+  );
 
   const fn = vi.fn();
 
@@ -172,20 +182,103 @@ test("reactive changes", async () => {
   });
 
   const resolvedDerivedCounter = await scope.resolveAccessor(derivedCounter);
+  const resolvedDerivedArrayCounter = await scope.resolveAccessor(
+    derviedArrayCounter
+  );
+  const resolvedDerivedObjectCounter = await scope.resolveAccessor(
+    derivedObjectCounter
+  );
+
   expect(resolvedDerivedCounter.get()).toBe("0");
+  expect(resolvedDerivedArrayCounter.get()).toEqual("0");
+  expect(resolvedDerivedObjectCounter.get()).toEqual("0");
+  expect(c).toBeCalledTimes(0);
 
   await scope.update(counter, (current) => current + 1);
+  expect(c).toBeCalledTimes(1);
   expect(fn).toBeCalledTimes(1);
   expect(fn).toBeCalledWith(1);
 
   expect(resolvedDerivedCounter.get()).toBe("1");
+  expect(resolvedDerivedArrayCounter.get()).toEqual("1");
+  expect(resolvedDerivedObjectCounter.get()).toEqual("1");
 
   await scope.update(counter, (current) => current + 1);
   expect(fn).toBeCalledTimes(2);
   expect(fn).toBeCalledWith(2);
   expect(resolvedDerivedCounter.get()).toBe("2");
+  expect(resolvedDerivedArrayCounter.get()).toEqual("2");
+  expect(resolvedDerivedObjectCounter.get()).toEqual("2");
 
   await cleanup();
   await scope.update(counter, (current) => current + 1);
   expect(fn).toBeCalledTimes(2);
+});
+
+test("complicated cleanup", async () => {
+  const name = meta("name", custom<string>());
+  const fn = vi.fn();
+
+  const config = provide(
+    () => ({
+      increment: 1,
+      interval: 1000,
+    }),
+    name("config")
+  );
+
+  const configController = derive(
+    config.static,
+    (configCtl) => {
+      return {
+        changeIncrement: (increment: number) =>
+          configCtl.update((config) => ({ ...config, increment })),
+        changeInterval: (interval: number) =>
+          configCtl.update((config) => ({ ...config, interval })),
+      };
+    },
+    name("configCtl")
+  );
+
+  const counter = provide(() => 0, name("timer"));
+
+  const timer = derive(
+    [config.reactive, counter.static],
+    ([config, counterCtl], ctl) => {
+      fn("config", config);
+
+      ctl.cleanup(fn);
+    },
+    name("timer")
+  );
+
+  const scope = createScope();
+  const scopeInner = scope as unknown as ScopeInner;
+
+  await scope.resolve(config);
+  const ctl = await scope.resolve(configController);
+  await scope.resolve(timer);
+
+  const affectedSet = scopeInner["~findAffectedTargets"](config);
+
+  expect(affectedSet.size).toBe(2);
+  expect(affectedSet.has(timer)).toBeTruthy();
+
+  await ctl.changeIncrement(2);
+  expect(fn).toBeCalledTimes(3);
+  expect(fn.mock.calls).toEqual([
+    ["config", { increment: 1, interval: 1000 }],
+    [],
+    ["config", { increment: 2, interval: 1000 }],
+  ]);
+
+  await ctl.changeIncrement(3);
+  expect(fn).toBeCalledTimes(5);
+  expect(fn.mock.calls).toEqual([
+    ["config", { increment: 1, interval: 1000 }],
+    [],
+    ["config", { increment: 2, interval: 1000 }],
+    [],
+    ["config", { increment: 3, interval: 1000 }],
+  ]);
 });

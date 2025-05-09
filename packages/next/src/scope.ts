@@ -6,6 +6,20 @@ import {
 import { Core, executorSymbol } from "./types";
 
 export interface ScopeInner {
+  "~findAffectedTargets"(
+    target: Core.Executor<unknown>,
+    updateSet?: Set<Core.Executor<unknown>>
+  ): Set<Core.Executor<unknown>>;
+
+  "~resolveDependencies"(
+    e:
+      | undefined
+      | Core.BaseExecutor<unknown>
+      | Core.BaseExecutor<unknown>[]
+      | Record<string, Core.BaseExecutor<unknown>>,
+    ref: Core.Executor<unknown>
+  ): Promise<undefined | unknown | unknown[] | Record<string, unknown>>;
+
   getCache(): Map<Core.Executor<unknown>, Core.Accessor<unknown>>;
   getValueCache(): Map<Core.Executor<unknown>, unknown>;
   getReactiveness(): Map<Core.Executor<unknown>, Set<Core.Executor<unknown>>>;
@@ -45,7 +59,7 @@ class Scope implements Core.Scope, ScopeInner {
     currentSet.add(ref);
   }
 
-  private async "~resolveDependencies"(
+  async "~resolveDependencies"(
     e:
       | undefined
       | Core.BaseExecutor<unknown>
@@ -221,7 +235,7 @@ class Scope implements Core.Scope, ScopeInner {
       metas: e.metas,
       resolve,
       release: async (soft: boolean = false) => {
-        this.release(requestor);
+        this.release(requestor, soft);
       },
       update: (updateFn: unknown | ((current: unknown) => unknown)) => {
         return this.update(requestor, updateFn);
@@ -278,11 +292,12 @@ class Scope implements Core.Scope, ScopeInner {
     return cachedAccessor as Core.Accessor<T>;
   }
 
-  private "~findAffectedTargets"(
+  "~findAffectedTargets"(
     target: Core.Executor<unknown>,
     updateSet: Set<Core.Executor<unknown>> = new Set()
   ): Set<Core.Executor<unknown>> {
     const triggerTargets = this.reactiveness.get(target);
+
     if (triggerTargets && triggerTargets.size > 0) {
       for (const target of triggerTargets) {
         if (updateSet.has(target)) {
@@ -331,24 +346,33 @@ class Scope implements Core.Scope, ScopeInner {
       });
     }
 
+    const onUpdateSet = this.onUpdates.get(executor);
+    if (onUpdateSet) {
+      for (const callback of Array.from(onUpdateSet.values())) {
+        await callback(cached);
+      }
+    }
+
     const updateSet = this["~findAffectedTargets"](executor);
     for (const target of updateSet) {
       const cached = this.cache.get(target);
+
       if (cached) {
+        const cleanups = this.cleanups.get(target);
+        if (cleanups) {
+          for (const cleanup of Array.from(cleanups.values()).reverse()) {
+            await cleanup();
+          }
+        }
+
         await cached.resolve(true);
+
         const onUpdateSet = this.onUpdates.get(target);
         if (onUpdateSet) {
           for (const callback of Array.from(onUpdateSet.values())) {
             await callback(cached);
           }
         }
-      }
-    }
-
-    const onUpdateSet = this.onUpdates.get(executor);
-    if (onUpdateSet) {
-      for (const callback of Array.from(onUpdateSet.values())) {
-        await callback(cached);
       }
     }
   }
