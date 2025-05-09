@@ -26,21 +26,21 @@ importers:
 
   examples/react:
     dependencies:
-      '@pumped-fn/core':
-        specifier: ^0.5.0
-        version: 0.5.0
+      '@pumped-fn/core-next':
+        specifier: ^0.5.38
+        version: 0.5.38
       '@pumped-fn/react':
-        specifier: ^0.5.0
-        version: 0.5.0(react@18.3.1)
+        specifier: ^0.5.10
+        version: 0.5.10(@pumped-fn/core-next@0.5.38)(react@18.3.1)
       react:
-        specifier: ^18.0.0
+        specifier: ^18
         version: 18.3.1
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
     devDependencies:
       '@types/react':
-        specifier: ^18.0.0
+        specifier: ^18
         version: 18.3.18
       '@types/react-dom':
         specifier: ^18.0.0
@@ -54,18 +54,6 @@ importers:
       vite:
         specifier: ^6.1.1
         version: 6.1.1(@types/node@22.13.5)(jiti@2.4.2)(yaml@2.7.0)
-
-  packages/core:
-    devDependencies:
-      tsup:
-        specifier: ^8.3.6
-        version: 8.3.6(jiti@2.4.2)(postcss@8.5.3)(typescript@5.7.3)(yaml@2.7.0)
-      typescript:
-        specifier: ^5.0.0
-        version: 5.7.3
-      vitest:
-        specifier: ^1.0.0
-        version: 1.6.1(@types/node@22.13.5)(jsdom@26.0.0)
 
   packages/extra:
     dependencies:
@@ -130,12 +118,6 @@ importers:
       vitest:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@22.13.5)(jsdom@26.0.0)
-
-  packages/validations:
-    devDependencies:
-      '@pumped-fn/core':
-        specifier: workspace:*
-        version: link:../core
 
 packages:
 
@@ -697,14 +679,15 @@ packages:
     resolution: {integrity: sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw==}
     engines: {node: '>=12'}
 
-  '@pumped-fn/core@0.5.0':
-    resolution: {integrity: sha512-y4T9CTh1fRyn/IU2uWSECLga+yEl2OD8H/vRZrYGlKum3fQ3maXYFhT1v2rkxX4KkUBbwQlexdBrVgD4i1K49g==}
+  '@pumped-fn/core-next@0.5.38':
+    resolution: {integrity: sha512-q9+bbK8aaN8IQHYlb/eoDMsAgWOPLgkAx3A+pO24QsUp89qXFnCjqqOpI+t6SPPsuXuoXlf+xgTvRcMQIIvWyQ==}
     engines: {node: '>=18'}
 
-  '@pumped-fn/react@0.5.0':
-    resolution: {integrity: sha512-sulWuPLqOf3L3rgh/fY+LhMYGh1w5B5Cbf+PIziZzEhp1BBmdft3EpHnaGcwUJMc1jUkhodqjgG6hKXJqNWZfg==}
+  '@pumped-fn/react@0.5.10':
+    resolution: {integrity: sha512-Os5uNTF8z69l6Z5R8uqaJVcGqwGH3VBk4JqELDAF/togTUhNro6r/4XMWHEzASST2fHCGXZbgS0MzuBKYfPNzg==}
     peerDependencies:
-      react: ^18.0.0
+      '@pumped-fn/core-next': ^0.5.38
+      react: ^18.0.0 || ^19.0.0
 
   '@rollup/rollup-android-arm-eabi@4.34.6':
     resolution: {integrity: sha512-+GcCXtOQoWuC7hhX1P00LqjjIiS/iOouHXhMdiDSnq/1DGTox4SpUvO52Xm+div6+106r+TcvOeo/cxvyEyTgg==}
@@ -3181,11 +3164,11 @@ snapshots:
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
 
-  '@pumped-fn/core@0.5.0': {}
+  '@pumped-fn/core-next@0.5.38': {}
 
-  '@pumped-fn/react@0.5.0(react@18.3.1)':
+  '@pumped-fn/react@0.5.10(@pumped-fn/core-next@0.5.38)(react@18.3.1)':
     dependencies:
-      '@pumped-fn/core': 0.5.0
+      '@pumped-fn/core-next': 0.5.38
       react: 18.3.1
 
   '@rollup/rollup-android-arm-eabi@4.34.6':

@@ -1,4 +1,4 @@
-import { derive, mutable, provide, ref } from "@pumped-fn/core";
+import { derive, provide } from "@pumped-fn/core-next";
 
 export type Todo = {
   id: string;
@@ -14,41 +14,54 @@ const idGenerator = provide(() => {
   };
 });
 
-const todos = provide(() => mutable([] as Todo[]));
+const todos = provide(() => [] as Todo[]);
 
-const selectedTodoId = provide(() => mutable(null as string | null));
+const selectedTodoId = provide(() => null as string | null);
 
-const setSelectedTodoId = derive([ref(selectedTodoId)], ([ref], scope) => {
+const setSelectedTodoId = derive([selectedTodoId.static], ([ref]) => {
   return (id: string | null) => {
-    scope.update(ref, () => id);
+    ref.update(id);
   };
 });
 
-const selectedTodo = derive([selectedTodoId, todos], ([selectedTodoId, todos]) => {
-  const todo = selectedTodoId ? todos.find((todo) => todo.id === selectedTodoId) : null;
-  return todo;
-});
+const selectedTodo = derive(
+  [selectedTodoId, todos],
+  ([selectedTodoId, todos]) => {
+    const todo = selectedTodoId
+      ? todos.find((todo) => todo.id === selectedTodoId)
+      : null;
+    return todo;
+  }
+);
 
-const todosController = derive([idGenerator, ref(todos)], ([idGenerator, refTodos], scope) => {
-  return {
-    addTodo: (todo: Omit<Todo, "id">) => {
-      scope.update(refTodos, (v) => [...v, { ...todo, id: idGenerator() }]);
-    },
-    removeTodo: (id: string) => {
-      scope.update(refTodos, (v) => v.filter((todo) => todo.id !== id));
-    },
-    toggleComplete: (id: string) => {
-      scope.update(refTodos, (v) =>
-        v.map((todo) => {
-          if (todo.id === id) {
-            return { ...todo, completed: !todo.completed };
-          }
-          return todo;
-        }),
-      );
-    },
-  };
-});
+const todosController = derive(
+  [idGenerator, todos.static],
+  ([idGenerator, refTodos]) => {
+    return {
+      addTodo: (todo: Omit<Todo, "id">) => {
+        refTodos.update((todos) => {
+          const newTodo = { ...todo, id: idGenerator() };
+          return [...todos, newTodo];
+        });
+      },
+      removeTodo: (id: string) => {
+        refTodos.update((todos) => {
+          return todos.filter((todo) => todo.id !== id);
+        });
+      },
+      toggleComplete: (id: string) => {
+        refTodos.update((todos) => {
+          return todos.map((todo) => {
+            if (todo.id === id) {
+              return { ...todo, completed: !todo.completed };
+            }
+            return todo;
+          });
+        });
+      },
+    };
+  }
+);
 
 export const todoApp = {
   todos,

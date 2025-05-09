@@ -2,6 +2,7 @@ import { Suspense, useMemo } from "react";
 import { ScopeProvider, useResolve, useResolveMany } from "@pumped-fn/react";
 
 import { Todo, todoApp } from "./todo.pumped";
+import { counterApp } from "./counter.pumped";
 
 function TodoList() {
   const [todos, setSeletectedTodoId, controller] = useResolveMany(
@@ -97,6 +98,23 @@ function CompletedTodoList() {
   );
 }
 
+const Counter = () => {
+  const [counter, configController] = useResolveMany(
+    counterApp.counter,
+    counterApp.configController,
+    counterApp.timer,
+    counterApp.config
+  )
+
+  return <>
+  <h1>{counter}</h1>
+  <button onClick={() => configController.changeIncrement(1)}>Increment</button>
+  <button onClick={() => configController.changeInterval(-1)}>Faster</button>
+  <button onClick={() => configController.changeInterval(1)}>Slower</button>
+  </>;
+}
+
+
 export default function AppWrapper() {
   return (
     <ScopeProvider>
@@ -107,6 +125,9 @@ export default function AppWrapper() {
       </Suspense>
       <Suspense>
         <CompletedTodoList />
+      </Suspense>
+      <Suspense>
+        <Counter />
       </Suspense>
     </ScopeProvider>
   );
