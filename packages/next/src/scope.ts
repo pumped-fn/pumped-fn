@@ -143,7 +143,7 @@ class Scope implements Core.Scope, ScopeInner {
   ): Core.Accessor<unknown> {
     const accessor = {} as Core.Accessor<unknown>;
     const requestor =
-      isLazyExecutor(e) || isReactiveExecutor(e)
+      isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
         : (e as Core.Executor<unknown>);
 
