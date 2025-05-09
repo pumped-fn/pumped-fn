@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.19](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.18...@pumped-fn/extra@0.5.19) (2025-05-09)
+
+
+### Bug Fixes
+
+* improve qol for const types ([baaf719](https://github.com/pumped-fn/pumped-fn/commit/baaf719d306601a2520802a8e01cf20c5a8ddbd6))
+
 ## [0.5.18](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.17...@pumped-fn/extra@0.5.18) (2025-05-08)
 
 
