@@ -70,18 +70,12 @@ export function ScopeProvider({ children, scope }: { children: React.ReactNode; 
   );
 }
 
-type PendingState<T> = { state: "pending"; promise: Promise<T> };
-type ResolvedState<T> = { state: "resolved"; value: T };
-type ErrorState<T> = { state: "error"; error: T };
-
-export type ResolveState<T> = PendingState<T> | ResolvedState<T> | ErrorState<T>;
-
 type UseResolveOption<T> = {
   snapshot?: (value: T) => T;
   equality?: (thisValue: T, thatValue: T) => boolean;
 };
 
-export function useResolve<T extends Core.BaseExecutor<unknown>>(executor: T): Awaited<T>;
+export function useResolve<T extends Core.BaseExecutor<unknown>>(executor: T): Core.InferOutput<T>;
 export function useResolve<T extends Core.BaseExecutor<unknown>, K>(
   executor: T,
   selector: (value: Core.InferOutput<T>) => K,
@@ -115,7 +109,7 @@ export function useResolve<T, K>(
     (cb) =>
       scope.scope.onUpdate(executor, (next) => {
         const equalityFn = options?.equality ?? Object.is;
-        const value = selector ? selector(next as Awaited<T>) : next;
+        const value = selector ? selector(next.get() as Awaited<T>) : next;
 
         if (!equalityFn(valueRef.current, value as any)) {
           valueRef.current = options?.snapshot ? options.snapshot(value as any) : value;
@@ -128,9 +122,9 @@ export function useResolve<T, K>(
   );
 }
 
-export function useResolveMany<T extends Array<unknown>>(
-  ...executors: { [K in keyof T]: Core.Executor<T[K]> }
-): { [K in keyof T]: Awaited<T[K]> } {
+export function useResolveMany<T extends Array<Core.Executor<unknown>>>(
+  ...executors: { [K in keyof T]: T[K] }
+): { [K in keyof T]: Core.InferOutput<T[K]> } {
   const scope = useScope();
   const entries = [] as CacheEntry[];
 
@@ -157,8 +151,8 @@ export function useResolveMany<T extends Array<unknown>>(
     resolvedRef.current.push(state);
   }
 
-  const resultRef = useRef<{ [K in keyof T]: Awaited<T[K]> }>(
-    undefined as unknown as { [K in keyof T]: Awaited<T[K]> },
+  const resultRef = useRef<{ [K in keyof T]: Core.InferOutput<T[K]> }>(
+    undefined as unknown as { [K in keyof T]: Core.InferOutput<T[K]> },
   );
 
   if (!resultRef.current) {
