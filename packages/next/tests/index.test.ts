@@ -261,7 +261,7 @@ test("complicated cleanup", async () => {
 
   const affectedSet = scopeInner["~findAffectedTargets"](config);
 
-  expect(affectedSet.size).toBe(2);
+  expect(affectedSet.size).toBe(1); // configController
   expect(affectedSet.has(timer)).toBeTruthy();
 
   await ctl.changeIncrement(2);

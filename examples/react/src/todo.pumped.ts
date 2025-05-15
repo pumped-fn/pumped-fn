@@ -25,7 +25,7 @@ const setSelectedTodoId = derive([selectedTodoId.static], ([ref]) => {
 });
 
 const selectedTodo = derive(
-  [selectedTodoId, todos],
+  [selectedTodoId.reactive, todos.reactive],
   ([selectedTodoId, todos]) => {
     const todo = selectedTodoId
       ? todos.find((todo) => todo.id === selectedTodoId)

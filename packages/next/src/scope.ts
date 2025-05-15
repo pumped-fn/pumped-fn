@@ -2,8 +2,9 @@ import {
   isLazyExecutor,
   isReactiveExecutor,
   isStaticExecutor,
+  isExecutor,
 } from "./executor";
-import { Core, executorSymbol } from "./types";
+import { Core } from "./types";
 
 export interface ScopeInner {
   "~findAffectedTargets"(
@@ -23,10 +24,6 @@ export interface ScopeInner {
   getCache(): Map<Core.Executor<unknown>, Core.Accessor<unknown>>;
   getValueCache(): Map<Core.Executor<unknown>, unknown>;
   getReactiveness(): Map<Core.Executor<unknown>, Set<Core.Executor<unknown>>>;
-}
-
-export function isExecutor<T>(input: unknown): input is Core.BaseExecutor<T> {
-  return typeof input === "object" && input !== null && executorSymbol in input;
 }
 
 type Value =
@@ -239,6 +236,13 @@ class Scope implements Core.Scope, ScopeInner {
       },
       update: (updateFn: unknown | ((current: unknown) => unknown)) => {
         return this.update(requestor, updateFn);
+      },
+      subscribe: (cb: (value: unknown) => void) => {
+        if (this.isDisposed) {
+          throw new Error("Scope is disposed");
+        }
+
+        return this.onUpdate(requestor, cb);
       },
     } satisfies Partial<Core.Accessor<unknown>>);
   }

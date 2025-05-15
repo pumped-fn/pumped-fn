@@ -100,7 +100,7 @@ export declare namespace Core {
     scope: Scope;
   };
 
-  export type Kind = "base" | "main" | "reactive" | "lazy" | "static";
+  export type Kind = "main" | "reactive" | "lazy" | "static";
 
   export interface BaseExecutor<T> extends Meta.MetaContainer {
     [executorSymbol]: Kind;
@@ -150,6 +150,7 @@ export declare namespace Core {
     resolve(force?: boolean): Promise<T>;
     release(soft?: boolean): Promise<void>;
     update(updateFn: T | ((current: T) => T)): Promise<void>;
+    subscribe(callback: (value: T) => void): Cleanup;
   }
 
   export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>

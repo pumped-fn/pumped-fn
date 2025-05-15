@@ -1,4 +1,4 @@
-import { Core, executorSymbol, Meta, metaSymbol } from "./types";
+import { Core, executorSymbol, Meta } from "./types";
 
 function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
@@ -88,6 +88,10 @@ export function isStaticExecutor(
   executor: Core.BaseExecutor<unknown>
 ): executor is Core.Static<unknown> {
   return executor[executorSymbol] === "static";
+}
+
+export function isExecutor<T>(input: unknown): input is Core.BaseExecutor<T> {
+  return typeof input === "object" && input !== null && executorSymbol in input;
 }
 
 export function provide<T>(

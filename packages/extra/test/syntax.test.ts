@@ -1,7 +1,6 @@
 import { vi, test, expect } from "vitest";
 import { define, impl } from "../src";
 import { client } from "../src/client";
-import { cast } from "./utils";
 import {
   createScope,
   provide,
@@ -24,7 +23,7 @@ const rpc = {
 
 const name = meta("name", custom<string>());
 
-const contextMeta = cast<{ id: string }>();
+const contextMeta = custom<{ id: string }>();
 
 test("server syntax", async () => {
   const builder = impl.service(rpc).context(contextMeta);
