@@ -20,7 +20,7 @@
     "build": "tsup src/index.tsx --format esm,cjs --dts",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/core@",
+    "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/react@",
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "peerDependencies": {
