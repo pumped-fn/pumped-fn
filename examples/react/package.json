@@ -8,8 +8,8 @@
     "serve": "vite preview"
   },
   "dependencies": {
-    "@pumped-fn/core-next": "^0.5.38",
-    "@pumped-fn/react": "^0.5.10",
+    "@pumped-fn/core-next": "^0.5.39",
+    "@pumped-fn/react": "^0.5.13",
     "react": "^18",
     "react-dom": "^18.0.0"
   },
