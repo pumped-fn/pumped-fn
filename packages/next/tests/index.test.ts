@@ -282,3 +282,28 @@ test("complicated cleanup", async () => {
     ["config", { increment: 3, interval: 1000 }],
   ]);
 });
+
+test("can use release to control counter", async () => {
+  const counter = provide(() => 0, name("counter"));
+  const derivedCounter = derive(
+    counter.reactive,
+    (count) => count + 1,
+    name("derivedCounter")
+  );
+
+  const scope = createScope();
+
+  const counterAccessor = await scope.resolveAccessor(counter);
+  const derivedCounterAccessor = await scope.resolveAccessor(derivedCounter);
+
+  expect(counterAccessor.get()).toBe(0);
+  expect(derivedCounterAccessor.get()).toBe(1);
+
+  await counterAccessor.update(2);
+  expect(counterAccessor.get()).toBe(2);
+  expect(derivedCounterAccessor.get()).toBe(3);
+
+  await scope.reset(counter);
+  expect(counterAccessor.get()).toBe(0);
+  expect(await derivedCounterAccessor.resolve()).toBe(1);
+});

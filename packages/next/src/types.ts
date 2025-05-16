@@ -170,7 +170,7 @@ export declare namespace Core {
       updateFn: T | ((current: T) => T)
     ): Promise<void>;
 
-    reset<T>(executor: Executor<T>): void;
+    reset<T>(executor: Executor<T>): Promise<void>;
     release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
     dispose(): Promise<void>;

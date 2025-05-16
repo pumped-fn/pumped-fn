@@ -7,10 +7,7 @@ import {
 import { Core } from "./types";
 
 export interface ScopeInner {
-  "~findAffectedTargets"(
-    target: Core.Executor<unknown>,
-    updateSet?: Set<Core.Executor<unknown>>
-  ): Set<Core.Executor<unknown>>;
+  "~findAffectedTargets"(target: UE, updateSet?: Set<UE>): Set<UE>;
 
   "~resolveDependencies"(
     e:
@@ -18,12 +15,11 @@ export interface ScopeInner {
       | Core.BaseExecutor<unknown>
       | Core.BaseExecutor<unknown>[]
       | Record<string, Core.BaseExecutor<unknown>>,
-    ref: Core.Executor<unknown>
+    ref: UE
   ): Promise<undefined | unknown | unknown[] | Record<string, unknown>>;
 
-  getCache(): Map<Core.Executor<unknown>, Core.Accessor<unknown>>;
-  getValueCache(): Map<Core.Executor<unknown>, unknown>;
-  getReactiveness(): Map<Core.Executor<unknown>, Set<Core.Executor<unknown>>>;
+  getCache(): Map<UE, CacheEntry>;
+  getReactiveness(): Map<UE, Set<UE>>;
 }
 
 type Value =
@@ -31,25 +27,27 @@ type Value =
   | { kind: "resolved"; value: unknown }
   | { kind: "rejected"; error: unknown };
 
+type CacheEntry = {
+  accessor: Core.Accessor<unknown>;
+  value: Value | undefined;
+};
+
+type UE = Core.Executor<unknown>;
+
 class Scope implements Core.Scope, ScopeInner {
   private isDisposed: boolean = false;
-  private cache: Map<Core.Executor<unknown>, Core.Accessor<unknown>> =
-    new Map();
-  private valueCache: Map<Core.Executor<unknown>, Value> = new Map();
-  private reactiveness = new Map<
-    Core.Executor<unknown>,
-    Set<Core.Executor<unknown>>
-  >();
-  private cleanups = new Map<Core.Executor<unknown>, Set<Core.Cleanup>>();
+
+  private cache: Map<UE, CacheEntry> = new Map();
+
+  private reactiveness = new Map<UE, Set<UE>>();
+
+  private cleanups = new Map<UE, Set<Core.Cleanup>>();
   private onUpdates = new Map<
-    Core.Executor<unknown>,
+    UE,
     Set<(accessor: Core.Accessor<unknown>) => void | Promise<void>>
   >();
 
-  private "~appendReactive"(
-    reactive: Core.Executor<unknown>,
-    ref: Core.Executor<unknown>
-  ) {
+  private "~appendReactive"(reactive: UE, ref: UE) {
     const currentSet = this.reactiveness.get(reactive) ?? new Set();
     this.reactiveness.set(reactive, currentSet);
 
@@ -62,7 +60,7 @@ class Scope implements Core.Scope, ScopeInner {
       | Core.BaseExecutor<unknown>
       | Core.BaseExecutor<unknown>[]
       | Record<string, Core.BaseExecutor<unknown>>,
-    ref: Core.Executor<unknown>
+    ref: UE
   ): Promise<undefined | unknown | unknown[] | Record<string, unknown>> {
     if (e === undefined) {
       return undefined;
@@ -73,9 +71,7 @@ class Scope implements Core.Scope, ScopeInner {
         return this["~resolveLazy"](e);
       }
 
-      const staticResult = await this["~resolveStatic"](
-        e as Core.Executor<unknown>
-      );
+      const staticResult = await this["~resolveStatic"](e as UE);
 
       if (isReactiveExecutor(e)) {
         this["~appendReactive"](e.executor, ref);
@@ -113,7 +109,7 @@ class Scope implements Core.Scope, ScopeInner {
 
     const cached = this.cache.get(e.executor);
     if (cached) {
-      return cached;
+      return cached.accessor;
     }
 
     const accessor = this["~makeAccessor"](e.executor);
@@ -121,19 +117,17 @@ class Scope implements Core.Scope, ScopeInner {
     return accessor;
   }
 
-  private async "~resolveStatic"(
-    e: Core.Executor<unknown>
-  ): Promise<Core.Accessor<unknown>> {
+  private async "~resolveStatic"(e: UE): Promise<Core.Accessor<unknown>> {
     const cached = this.cache.get(e);
     if (cached) {
-      return cached;
+      return cached.accessor;
     }
 
     const accessor = this["~makeAccessor"](e, true);
     return accessor;
   }
 
-  private "~makeController"(e: Core.Executor<unknown>): Core.Controller {
+  private "~makeController"(e: UE): Core.Controller {
     return {
       cleanup: (cleanup: Core.Cleanup) => {
         const currentSet = this.cleanups.get(e) ?? new Set();
@@ -152,29 +146,31 @@ class Scope implements Core.Scope, ScopeInner {
     e: Core.BaseExecutor<unknown>,
     eager: boolean = false
   ): Core.Accessor<unknown> {
-    const accessor = {} as Core.Accessor<unknown>;
     const requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
-        : (e as Core.Executor<unknown>);
+        : (e as UE);
 
     const cachedAccessor = this.cache.get(requestor);
     if (cachedAccessor) {
-      return cachedAccessor;
+      return cachedAccessor.accessor;
     }
 
+    const accessor = {} as Core.Accessor<unknown>;
     const factory = requestor.factory;
     const controller = this["~makeController"](requestor);
 
-    const resolve = async (force: boolean): Promise<unknown> => {
+    const resolve = (force: boolean): Promise<unknown> => {
       if (this.isDisposed) {
         throw new Error("Scope is disposed");
       }
 
-      const cached = this.valueCache.get(requestor);
+      const entry = this.cache.get(requestor);
+      const cached = entry?.value;
+
       if (cached && !force) {
         if (cached.kind === "resolved") {
-          return cached.value;
+          return Promise.resolve(cached.value);
         } else if (cached.kind === "rejected") {
           throw cached.error;
         } else {
@@ -186,19 +182,31 @@ class Scope implements Core.Scope, ScopeInner {
         this["~resolveDependencies"](requestor.dependencies, requestor)
           .then((dependencies) => factory(dependencies as any, controller))
           .then((result) => {
-            this.valueCache.set(requestor, { kind: "resolved", value: result });
+            this.cache.set(requestor, {
+              accessor,
+              value: { kind: "resolved", value: result },
+            });
+
             resolve(result);
           })
           .catch((error) => {
-            this.valueCache.set(requestor, { kind: "rejected", error });
+            this.cache.set(requestor, {
+              accessor,
+              value: { kind: "rejected", error },
+            });
+
             reject(error);
           });
       });
 
-      this.valueCache.set(requestor, { kind: "resolving", promise });
-      this.cache.set(requestor, accessor);
+      this.cache.set(requestor, {
+        accessor,
+        value: { kind: "resolving", promise },
+      });
       return promise;
     };
+
+    this.cache.set(requestor, { accessor, value: undefined });
 
     if (!isLazyExecutor(e) || eager) {
       resolve(false);
@@ -210,7 +218,7 @@ class Scope implements Core.Scope, ScopeInner {
           throw new Error("Scope is disposed");
         }
 
-        const valueCached = this.valueCache.get(requestor);
+        const valueCached = this.cache.get(requestor)?.value;
 
         if (!valueCached || valueCached.kind === "resolving") {
           throw new Error("Executor not found");
@@ -227,7 +235,7 @@ class Scope implements Core.Scope, ScopeInner {
           throw new Error("Scope is disposed");
         }
 
-        return this.valueCache.get(requestor);
+        return this.cache.get(requestor)?.value;
       },
       metas: e.metas,
       resolve,
@@ -255,24 +263,16 @@ class Scope implements Core.Scope, ScopeInner {
     return this["~makeAccessor"](executor, false) as Core.Accessor<T>;
   }
 
-  async resolve<T>(executor: Core.Executor<T>): Promise<T> {
+  async resolve<T>(
+    executor: Core.Executor<T>,
+    force: boolean = false
+  ): Promise<T> {
     if (this.isDisposed) {
       throw new Error("Scope is disposed");
     }
 
-    const cached = this.valueCache.get(executor);
-    if (cached) {
-      if (cached.kind === "resolved") {
-        return cached.value as T;
-      } else if (cached.kind === "rejected") {
-        throw cached.error;
-      } else {
-        return (await cached.promise) as T;
-      }
-    }
-
     const accessor = this["~makeAccessor"](executor, true);
-    await accessor.resolve(false);
+    await accessor.resolve(force);
 
     return accessor.get() as T;
   }
@@ -292,14 +292,12 @@ class Scope implements Core.Scope, ScopeInner {
       return accessor as Core.Accessor<T>;
     }
 
-    await cachedAccessor.resolve();
-    return cachedAccessor as Core.Accessor<T>;
+    await cachedAccessor.accessor.resolve();
+
+    return cachedAccessor.accessor as Core.Accessor<T>;
   }
 
-  "~findAffectedTargets"(
-    target: Core.Executor<unknown>,
-    updateSet: Set<Core.Executor<unknown>> = new Set()
-  ): Set<Core.Executor<unknown>> {
+  "~findAffectedTargets"(target: UE, updateSet: Set<UE> = new Set()): Set<UE> {
     const triggerTargets = this.reactiveness.get(target);
 
     if (triggerTargets && triggerTargets.size > 0) {
@@ -331,7 +329,7 @@ class Scope implements Core.Scope, ScopeInner {
       throw new Error("Executor is not yet resolved");
     }
 
-    const current = (await cached.resolve(false)) as T;
+    const current = (await cached.accessor.resolve(false)) as T;
     const cleanups = this.cleanups.get(executor);
     if (cleanups) {
       for (const cleanup of Array.from(cleanups.values()).reverse()) {
@@ -342,18 +340,21 @@ class Scope implements Core.Scope, ScopeInner {
     if (typeof updateFn === "function") {
       const fn = updateFn as (current: T) => T;
       const newValue = fn(current);
-      this.valueCache.set(executor, { kind: "resolved", value: newValue });
+      this.cache.set(executor, {
+        ...cached,
+        value: { kind: "resolved", value: newValue },
+      });
     } else {
-      this.valueCache.set(executor, {
-        kind: "resolved",
-        value: updateFn,
+      this.cache.set(executor, {
+        ...cached,
+        value: { kind: "resolved", value: updateFn },
       });
     }
 
     const onUpdateSet = this.onUpdates.get(executor);
     if (onUpdateSet) {
       for (const callback of Array.from(onUpdateSet.values())) {
-        await callback(cached);
+        await callback(cached.accessor);
       }
     }
 
@@ -369,12 +370,12 @@ class Scope implements Core.Scope, ScopeInner {
           }
         }
 
-        await cached.resolve(true);
+        await cached.accessor.resolve(true);
 
         const onUpdateSet = this.onUpdates.get(target);
         if (onUpdateSet) {
           for (const callback of Array.from(onUpdateSet.values())) {
-            await callback(cached);
+            await callback(cached.accessor);
           }
         }
       }
@@ -387,7 +388,7 @@ class Scope implements Core.Scope, ScopeInner {
     }
 
     await this.release(executor, true);
-    await this.resolve(executor);
+    await this.resolve(executor, true);
   }
 
   async release(
@@ -416,7 +417,6 @@ class Scope implements Core.Scope, ScopeInner {
     }
 
     this.cache.delete(executor);
-    this.valueCache.delete(executor);
     this.reactiveness.delete(executor);
     this.onUpdates.delete(executor);
   }
@@ -429,7 +429,6 @@ class Scope implements Core.Scope, ScopeInner {
 
     this.isDisposed = true;
     this.cache.clear();
-    this.valueCache.clear();
     this.reactiveness.clear();
     this.cleanups.clear();
   }
@@ -461,15 +460,11 @@ class Scope implements Core.Scope, ScopeInner {
     };
   }
 
-  getCache(): Map<Core.Executor<unknown>, Core.Accessor<unknown>> {
+  getCache(): Map<UE, CacheEntry> {
     return this.cache;
   }
 
-  getValueCache(): Map<Core.Executor<unknown>, unknown> {
-    return this.valueCache;
-  }
-
-  getReactiveness(): Map<Core.Executor<unknown>, Set<Core.Executor<unknown>>> {
+  getReactiveness(): Map<UE, Set<UE>> {
     return this.reactiveness;
   }
 }
