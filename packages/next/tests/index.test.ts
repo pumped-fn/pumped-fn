@@ -6,107 +6,46 @@ import { custom } from "../src/ssch";
 
 const name = meta("name", custom<string>());
 
-const configFn = vi.fn(() => ({
-  dbName: "test",
-  port: 3000,
-  logLevel: "debug",
-}));
-
-const config = provide(configFn, name("config"));
-
-const logger = derive(
-  config,
-  async (config) => {
-    return (...msgs: unknown[]) => console.log(config.logLevel, ...msgs);
-  },
-  name("logger")
-);
-
-const db = derive(
-  { config, logger },
-  ({ config, logger }) => {
-    return {
-      query: (sql: string) => {
-        logger(sql);
-        return `Querying ${sql} on ${config.dbName}`;
-      },
-    };
-  },
-  name("db")
-);
-
-const helloRoute = derive({ logger, db }, ({ logger, db }) => {
-  return {
-    handler: (req: unknown) => {
-      logger("Handling request", req);
-      return db.query("SELECT * FROM users");
-    },
-  };
-});
-
-const versionRoute = derive({ logger }, ({ logger }) => {
-  return {
-    handler: (req: unknown) => {
-      logger("Handling version request", req);
-      return "Version 1.0.0";
-    },
-  };
-});
-
-const server = derive(
-  [config, helloRoute, versionRoute],
-  ([config, ...routes]) => {
-    return {
-      start: () => {
-        console.log(
-          "registered routes",
-          routes.map((route) => route.handler)
-        );
-
-        console.log(`Server started on port ${config.port}`);
-      },
-    };
-  }
-);
-
-const cmd = derive(
-  { config, hello: helloRoute.lazy, version: versionRoute.lazy },
-  ({ config, hello, version }) => {
-    // parse args
-    // based on args, call the appropriate route
-  }
-);
-
-const counter = provide(() => 0, name("counter"));
-const reactived = derive(
-  counter.reactive,
-  (count) => {
-    return count + 1;
-  },
-  name("reactived")
-);
-
-const reactiveOfReactive = derive(
-  reactived.reactive,
-  (count) => {
-    return count + 1;
-  },
-  name("reactiveOfReactive")
-);
-
 test("syntax", async () => {
+  const configFn = vi.fn(() => ({
+    dbName: "test",
+    port: 3000,
+    logLevel: "debug",
+  }));
+
+  const config = provide(configFn, name("config"));
+
+  const logger = derive(
+    config,
+    async (config) => {
+      return (...msgs: unknown[]) => console.log(config.logLevel, ...msgs);
+    },
+    name("logger")
+  );
+
+  const counter = provide(() => 0, name("counter"));
+  const reactived = derive(
+    counter.reactive,
+    (count) => {
+      return count + 1;
+    },
+    name("reactived")
+  );
+
+  const reactiveOfReactive = derive(
+    reactived.reactive,
+    (count) => {
+      return count + 1;
+    },
+    name("reactiveOfReactive")
+  );
+
   const scope = createScope();
 
   const loggerFn = await scope.resolve(logger);
   loggerFn("Hello world");
 
-  const serverCmd = await scope.resolve(cmd);
-
   expect(configFn).toBeCalledTimes(1);
-});
-
-test("reactive", async () => {
-  const scope = createScope();
 
   const currentCounterValue = await scope.resolve(counter);
   const derivedCounterValue = await scope.resolve(reactived);
@@ -314,4 +253,19 @@ test("can use preset to advance value", async () => {
   const mScope = createScope(preset(counter, 2));
   value = await mScope.resolve(derivedCounter);
   expect(value).toBe(3);
+});
+
+test("same promise with different resolves", async () => {
+  const counter = provide(() => 0);
+  const scope = createScope();
+  const accessor = scope.accessor(counter);
+
+  const p1 = accessor.resolve();
+  const p2 = accessor.resolve();
+
+  const anotherAccessor = scope.accessor(counter);
+
+  expect(p1).toBe(p2);
+  expect(anotherAccessor).toBe(accessor);
+  expect(anotherAccessor.resolve()).toBe(accessor.resolve());
 });
