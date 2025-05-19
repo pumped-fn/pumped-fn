@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.40](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.39...@pumped-fn/next@0.5.40) (2025-05-19)
+
+
+### Features
+
+* added preset to scope, now preset can be used to test ([f501c68](https://github.com/pumped-fn/pumped-fn/commit/f501c68588402624c545649c7da51ecbd502875f))
+
 ## [0.5.39](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.38...@pumped-fn/next@0.5.39) (2025-05-15)
 
 
