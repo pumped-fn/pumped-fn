@@ -2,150 +2,148 @@ import {
   isLazyExecutor,
   isReactiveExecutor,
   isStaticExecutor,
+  isMainExecutor,
   isExecutor,
 } from "./executor";
 import { Core } from "./types";
 
-export interface ScopeInner {
-  "~findAffectedTargets"(target: UE, updateSet?: Set<UE>): Set<UE>;
-
-  "~resolveDependencies"(
-    e:
-      | undefined
-      | Core.BaseExecutor<unknown>
-      | Core.BaseExecutor<unknown>[]
-      | Record<string, Core.BaseExecutor<unknown>>,
-    ref: UE
-  ): Promise<undefined | unknown | unknown[] | Record<string, unknown>>;
-
-  getCache(): Map<UE, CacheEntry>;
-  getReactiveness(): Map<UE, Set<UE>>;
-}
-
-type Value =
-  | { kind: "resolving"; promise: Promise<unknown> }
-  | { kind: "resolved"; value: unknown }
-  | { kind: "rejected"; error: unknown };
-
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
-  value: Value | undefined;
+  value:
+    | { kind: "resolving"; promise: Promise<unknown> }
+    | { kind: "resolved"; value: unknown }
+    | { kind: "rejected"; error: unknown };
 };
 
 type UE = Core.Executor<unknown>;
+type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
-class Scope implements Core.Scope, ScopeInner {
-  private isDisposed: boolean = false;
-
-  private cache: Map<UE, CacheEntry> = new Map();
-
-  private reactiveness = new Map<UE, Set<UE>>();
-
-  private cleanups = new Map<UE, Set<Core.Cleanup>>();
-  private onUpdates = new Map<
-    UE,
-    Set<(accessor: Core.Accessor<unknown>) => void | Promise<void>>
-  >();
-
-  private "~appendReactive"(reactive: UE, ref: UE) {
-    const currentSet = this.reactiveness.get(reactive) ?? new Set();
-    this.reactiveness.set(reactive, currentSet);
-
-    currentSet.add(ref);
+function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
+  if (isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)) {
+    return e.executor;
   }
 
-  async "~resolveDependencies"(
-    e:
+  return e as Core.Executor<unknown>;
+}
+
+class Scope implements Core.Scope {
+  private disposed: boolean = false;
+  private cache: Map<UE, CacheEntry> = new Map();
+  private cleanups = new Map<UE, Set<Core.Cleanup>>();
+  private onUpdates = new Map<UE, Set<OnUpdateFn | UE>>();
+
+  constructor(...presets: Core.Preset<unknown>[]) {
+    for (const preset of presets) {
+      const accessor = this["~makeAccessor"](preset.executor);
+
+      this.cache.set(preset.executor, {
+        accessor,
+        value: { kind: "resolved", value: preset.value },
+      });
+    }
+  }
+
+  private async "~triggerCleanup"(e: UE): Promise<void> {
+    const cs = this.cleanups.get(e);
+    if (cs) {
+      for (const c of Array.from(cs.values()).reverse()) {
+        await c();
+      }
+    }
+  }
+
+  private async "~triggerUpdate"(e: UE): Promise<void> {
+    const ce = this.cache.get(e);
+    if (!ce) {
+      throw new Error("Executor is not yet resolved");
+    }
+
+    const ou = this.onUpdates.get(e);
+    if (ou) {
+      for (const t of Array.from(ou.values())) {
+        if (isMainExecutor(t)) {
+          if (this.cleanups.has(t)) {
+            this["~triggerCleanup"](t);
+          }
+
+          const a = this.cache.get(t);
+          await a!.accessor.resolve(true);
+
+          if (this.onUpdates.has(t)) {
+            await this["~triggerUpdate"](t);
+          }
+        } else {
+          await t(ce.accessor);
+        }
+      }
+    }
+  }
+
+  private async "~resolveExecutor"(
+    ie: Core.UExecutor,
+    ref: UE
+  ): Promise<unknown> {
+    const e = getExecutor(ie);
+    const a = this["~makeAccessor"](e);
+
+    if (isLazyExecutor(ie)) {
+      return a;
+    }
+
+    if (isReactiveExecutor(ie)) {
+      const c = this.onUpdates.get(ie.executor) ?? new Set();
+      this.onUpdates.set(ie.executor, c);
+      c.add(ref);
+    }
+
+    await a.resolve(false);
+    if (isStaticExecutor(ie)) {
+      return a;
+    }
+
+    return a.get();
+  }
+
+  private async "~resolveDependencies"(
+    ie:
       | undefined
-      | Core.BaseExecutor<unknown>
-      | Core.BaseExecutor<unknown>[]
-      | Record<string, Core.BaseExecutor<unknown>>,
+      | Core.UExecutor
+      | Core.UExecutor[]
+      | Record<string, Core.UExecutor>,
     ref: UE
   ): Promise<undefined | unknown | unknown[] | Record<string, unknown>> {
-    if (e === undefined) {
+    if (ie === undefined) {
       return undefined;
     }
 
-    if (isExecutor(e)) {
-      if (isLazyExecutor(e)) {
-        return this["~resolveLazy"](e);
-      }
-
-      const staticResult = await this["~resolveStatic"](e as UE);
-
-      if (isReactiveExecutor(e)) {
-        this["~appendReactive"](e.executor, ref);
-      }
-
-      await staticResult.resolve(false);
-      if (isStaticExecutor(e)) {
-        return staticResult;
-      }
-
-      return staticResult.get();
+    if (isExecutor(ie)) {
+      return this["~resolveExecutor"](ie, ref);
     }
 
-    if (Array.isArray(e)) {
+    if (Array.isArray(ie)) {
       return await Promise.all(
-        e.map((item) => this["~resolveDependencies"](item, ref))
+        ie.map((item) => this["~resolveDependencies"](item, ref))
       );
     }
 
-    const result: Record<string, unknown> = {};
-    for (const key of Object.keys(e)) {
-      const target = e[key];
-      const resolvedResult = await this["~resolveDependencies"](target, ref);
+    const r: Record<string, unknown> = {};
+    for (const k of Object.keys(ie)) {
+      const t = ie[k];
+      const rd = await this["~resolveDependencies"](t, ref);
 
-      result[key] = resolvedResult;
+      r[k] = rd;
     }
 
-    return result;
+    return r;
   }
 
-  private "~resolveLazy"(e: Core.Lazy<unknown>): Core.Accessor<unknown> {
-    if (this.isDisposed) {
+  private "~ensureNotDisposed"(): void {
+    if (this.disposed) {
       throw new Error("Scope is disposed");
     }
-
-    const cached = this.cache.get(e.executor);
-    if (cached) {
-      return cached.accessor;
-    }
-
-    const accessor = this["~makeAccessor"](e.executor);
-
-    return accessor;
   }
 
-  private async "~resolveStatic"(e: UE): Promise<Core.Accessor<unknown>> {
-    const cached = this.cache.get(e);
-    if (cached) {
-      return cached.accessor;
-    }
-
-    const accessor = this["~makeAccessor"](e, true);
-    return accessor;
-  }
-
-  private "~makeController"(e: UE): Core.Controller {
-    return {
-      cleanup: (cleanup: Core.Cleanup) => {
-        const currentSet = this.cleanups.get(e) ?? new Set();
-        this.cleanups.set(e, currentSet);
-
-        currentSet.add(cleanup);
-      },
-      release: async () => {
-        this.release(e);
-      },
-      scope: this,
-    };
-  }
-
-  private "~makeAccessor"(
-    e: Core.BaseExecutor<unknown>,
-    eager: boolean = false
-  ): Core.Accessor<unknown> {
+  private "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
     const requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
@@ -158,14 +156,21 @@ class Scope implements Core.Scope, ScopeInner {
 
     const accessor = {} as Core.Accessor<unknown>;
     const factory = requestor.factory;
-    const controller = this["~makeController"](requestor);
+    const controller = {
+      cleanup: (cleanup: Core.Cleanup) => {
+        const currentSet = this.cleanups.get(requestor) ?? new Set();
+        this.cleanups.set(requestor, currentSet);
+
+        currentSet.add(cleanup);
+      },
+      release: async () => this.release(requestor),
+      scope: this,
+    };
 
     const resolve = (force: boolean): Promise<unknown> => {
-      if (this.isDisposed) {
-        throw new Error("Scope is disposed");
-      }
+      this["~ensureNotDisposed"]();
 
-      const entry = this.cache.get(requestor);
+      const entry = this.cache.get(requestor)!;
       const cached = entry?.value;
 
       if (cached && !force) {
@@ -206,34 +211,24 @@ class Scope implements Core.Scope, ScopeInner {
       return promise;
     };
 
-    this.cache.set(requestor, { accessor, value: undefined });
-
-    if (!isLazyExecutor(e) || eager) {
-      resolve(false);
-    }
-
     return Object.assign(accessor, {
       get: () => {
-        if (this.isDisposed) {
-          throw new Error("Scope is disposed");
+        this["~ensureNotDisposed"]();
+
+        const cacheEntry = this.cache.get(requestor)?.value;
+
+        if (!cacheEntry || cacheEntry.kind === "resolving") {
+          throw new Error("Executor is not resolved");
         }
 
-        const valueCached = this.cache.get(requestor)?.value;
-
-        if (!valueCached || valueCached.kind === "resolving") {
-          throw new Error("Executor not found");
+        if (cacheEntry.kind === "rejected") {
+          throw cacheEntry.error;
         }
 
-        if (valueCached.kind === "rejected") {
-          throw valueCached.error;
-        }
-
-        return valueCached.value;
+        return cacheEntry.value;
       },
       lookup: () => {
-        if (this.isDisposed) {
-          throw new Error("Scope is disposed");
-        }
+        this["~ensureNotDisposed"]();
 
         return this.cache.get(requestor)?.value;
       },
@@ -246,144 +241,64 @@ class Scope implements Core.Scope, ScopeInner {
         return this.update(requestor, updateFn);
       },
       subscribe: (cb: (value: unknown) => void) => {
-        if (this.isDisposed) {
-          throw new Error("Scope is disposed");
-        }
-
+        this["~ensureNotDisposed"]();
         return this.onUpdate(requestor, cb);
       },
     } satisfies Partial<Core.Accessor<unknown>>);
   }
 
   accessor<T>(executor: Core.Executor<T>): Core.Accessor<T> {
-    if (this.isDisposed) {
-      throw new Error("Scope is disposed");
-    }
-
-    return this["~makeAccessor"](executor, false) as Core.Accessor<T>;
+    this["~ensureNotDisposed"]();
+    return this["~makeAccessor"](executor) as Core.Accessor<T>;
   }
 
   async resolve<T>(
     executor: Core.Executor<T>,
     force: boolean = false
   ): Promise<T> {
-    if (this.isDisposed) {
-      throw new Error("Scope is disposed");
-    }
-
-    const accessor = this["~makeAccessor"](executor, true);
+    this["~ensureNotDisposed"]();
+    const accessor = this["~makeAccessor"](executor);
     await accessor.resolve(force);
-
     return accessor.get() as T;
   }
 
   async resolveAccessor<T>(
-    executor: Core.Executor<T>
+    executor: Core.Executor<T>,
+    force: boolean = false
   ): Promise<Core.Accessor<T>> {
-    if (this.isDisposed) {
-      throw new Error("Scope is disposed");
-    }
-
-    const cachedAccessor = this.cache.get(executor);
-    if (!cachedAccessor) {
-      const accessor = this["~makeAccessor"](executor, true);
-      await accessor.resolve();
-
-      return accessor as Core.Accessor<T>;
-    }
-
-    await cachedAccessor.accessor.resolve();
-
-    return cachedAccessor.accessor as Core.Accessor<T>;
-  }
-
-  "~findAffectedTargets"(target: UE, updateSet: Set<UE> = new Set()): Set<UE> {
-    const triggerTargets = this.reactiveness.get(target);
-
-    if (triggerTargets && triggerTargets.size > 0) {
-      for (const target of triggerTargets) {
-        if (updateSet.has(target)) {
-          updateSet.delete(target);
-        }
-        updateSet.add(target);
-
-        if (this.reactiveness.has(target)) {
-          this["~findAffectedTargets"](target, updateSet);
-        }
-      }
-    }
-
-    return updateSet;
+    this["~ensureNotDisposed"]();
+    const accessor = this["~makeAccessor"](executor);
+    await accessor.resolve(force);
+    return accessor as Core.Accessor<T>;
   }
 
   async update<T>(
-    executor: Core.Executor<T>,
-    updateFn: T | ((current: T) => T)
+    e: Core.Executor<T>,
+    u: T | ((current: T) => T)
   ): Promise<void> {
-    if (this.isDisposed) {
-      throw new Error("Scope is disposed");
-    }
+    this["~ensureNotDisposed"]();
+    this["~triggerCleanup"](e);
+    const accessor = this["~makeAccessor"](e);
 
-    const cached = this.cache.get(executor);
-    if (!cached) {
-      throw new Error("Executor is not yet resolved");
-    }
-
-    const current = (await cached.accessor.resolve(false)) as T;
-    const cleanups = this.cleanups.get(executor);
-    if (cleanups) {
-      for (const cleanup of Array.from(cleanups.values()).reverse()) {
-        await cleanup();
-      }
-    }
-
-    if (typeof updateFn === "function") {
-      const fn = updateFn as (current: T) => T;
-      const newValue = fn(current);
-      this.cache.set(executor, {
-        ...cached,
-        value: { kind: "resolved", value: newValue },
+    if (typeof u === "function") {
+      const fn = u as (current: T) => T;
+      const n = fn(accessor.get() as T);
+      this.cache.set(e, {
+        accessor,
+        value: { kind: "resolved", value: n },
       });
     } else {
-      this.cache.set(executor, {
-        ...cached,
-        value: { kind: "resolved", value: updateFn },
+      this.cache.set(e, {
+        accessor,
+        value: { kind: "resolved", value: u },
       });
     }
 
-    const onUpdateSet = this.onUpdates.get(executor);
-    if (onUpdateSet) {
-      for (const callback of Array.from(onUpdateSet.values())) {
-        await callback(cached.accessor);
-      }
-    }
-
-    const updateSet = this["~findAffectedTargets"](executor);
-    for (const target of updateSet) {
-      const cached = this.cache.get(target);
-
-      if (cached) {
-        const cleanups = this.cleanups.get(target);
-        if (cleanups) {
-          for (const cleanup of Array.from(cleanups.values()).reverse()) {
-            await cleanup();
-          }
-        }
-
-        await cached.accessor.resolve(true);
-
-        const onUpdateSet = this.onUpdates.get(target);
-        if (onUpdateSet) {
-          for (const callback of Array.from(onUpdateSet.values())) {
-            await callback(cached.accessor);
-          }
-        }
-      }
-    }
+    await this["~triggerUpdate"](e);
   }
 
   async reset<T>(executor: Core.Executor<T>): Promise<void> {
-    if (this.isDisposed) {
+    if (this.disposed) {
       throw new Error("Scope is disposed");
     }
 
@@ -391,84 +306,66 @@ class Scope implements Core.Scope, ScopeInner {
     await this.resolve(executor, true);
   }
 
-  async release(
-    executor: Core.Executor<any>,
-    soft: boolean = false
-  ): Promise<void> {
-    if (this.isDisposed) {
-      throw new Error("Scope is disposed");
-    }
+  async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
+    this["~ensureNotDisposed"]();
 
-    const cached = this.cache.get(executor);
-    if (!cached && !soft) {
+    const ce = this.cache.get(e);
+    if (!ce && !s) {
       throw new Error("Executor is not yet resolved");
     }
 
-    const affectedTargets = this["~findAffectedTargets"](executor);
-    for (const target of affectedTargets) {
-      await this.release(target, true);
-    }
+    await this["~triggerCleanup"](e);
 
-    const cleanups = this.cleanups.get(executor);
-    if (cleanups) {
-      for (const cleanup of Array.from(cleanups.values()).reverse()) {
-        await cleanup();
+    const ou = this.onUpdates.get(e);
+    if (ou) {
+      for (const t of Array.from(ou.values())) {
+        if (isMainExecutor(t)) {
+          await this.release(t, true);
+        }
       }
+
+      this.onUpdates.delete(e);
     }
 
-    this.cache.delete(executor);
-    this.reactiveness.delete(executor);
-    this.onUpdates.delete(executor);
+    this.cache.delete(e);
   }
 
   async dispose(): Promise<void> {
+    this["~ensureNotDisposed"]();
     const currents = this.cache.keys();
     for (const current of currents) {
       await this.release(current, true);
     }
 
-    this.isDisposed = true;
+    this.disposed = true;
     this.cache.clear();
-    this.reactiveness.clear();
     this.cleanups.clear();
   }
 
   onUpdate<T>(
-    executor: Core.Executor<T>,
-    callback: (accessor: Core.Accessor<T>) => void | Promise<void>
+    e: Core.Executor<T>,
+    cb: (a: Core.Accessor<T>) => void | Promise<void>
   ): Core.Cleanup {
-    if (this.isDisposed) {
-      throw new Error("scope is disposed");
-    }
+    this["~ensureNotDisposed"]();
 
-    const onUpdateSet = this.onUpdates.get(executor) ?? new Set();
-    this.onUpdates.set(executor, onUpdateSet);
-    onUpdateSet.add(callback as any);
+    const ou = this.onUpdates.get(e) ?? new Set();
+    this.onUpdates.set(e, ou);
+    ou.add(cb as any);
 
     return () => {
-      if (this.isDisposed) {
-        throw new Error("scope is disposed");
-      }
+      this["~ensureNotDisposed"]();
 
-      const currentSet = this.onUpdates.get(executor);
-      if (currentSet) {
-        currentSet.delete(callback as any);
-        if (currentSet.size === 0) {
-          this.onUpdates.delete(executor);
+      const ou = this.onUpdates.get(e);
+      if (ou) {
+        ou.delete(cb as any);
+        if (ou.size === 0) {
+          this.onUpdates.delete(e);
         }
       }
     };
   }
-
-  getCache(): Map<UE, CacheEntry> {
-    return this.cache;
-  }
-
-  getReactiveness(): Map<UE, Set<UE>> {
-    return this.reactiveness;
-  }
 }
 
-export function createScope(): Core.Scope {
-  return new Scope();
+export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope {
+  return new Scope(...presets);
 }

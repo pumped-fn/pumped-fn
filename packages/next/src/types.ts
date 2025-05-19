@@ -153,6 +153,12 @@ export declare namespace Core {
     subscribe(callback: (value: T) => void): Cleanup;
   }
 
+  export interface Preset<T> {
+    [executorSymbol]: "preset";
+    executor: Executor<T>;
+    value: T;
+  }
+
   export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
     ? Awaited<U>
     : T extends Lazy<infer U> | Static<infer U>

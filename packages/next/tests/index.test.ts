@@ -1,6 +1,6 @@
 import { vi, test, expect } from "vitest";
-import { provide, derive } from "../src/executor";
-import { createScope, ScopeInner } from "../src/scope";
+import { provide, derive, preset } from "../src/executor";
+import { createScope } from "../src/scope";
 import { meta } from "../src/meta";
 import { custom } from "../src/ssch";
 
@@ -253,19 +253,14 @@ test("complicated cleanup", async () => {
   );
 
   const scope = createScope();
-  const scopeInner = scope as unknown as ScopeInner;
 
   await scope.resolve(config);
   const ctl = await scope.resolve(configController);
   await scope.resolve(timer);
 
-  const affectedSet = scopeInner["~findAffectedTargets"](config);
-
-  expect(affectedSet.size).toBe(1); // configController
-  expect(affectedSet.has(timer)).toBeTruthy();
-
   await ctl.changeIncrement(2);
   expect(fn).toBeCalledTimes(3);
+
   expect(fn.mock.calls).toEqual([
     ["config", { increment: 1, interval: 1000 }],
     [],
@@ -306,4 +301,17 @@ test("can use release to control counter", async () => {
   await scope.reset(counter);
   expect(counterAccessor.get()).toBe(0);
   expect(await derivedCounterAccessor.resolve()).toBe(1);
+});
+
+test("can use preset to advance value", async () => {
+  const counter = provide(() => 0, name("counter"));
+  const derivedCounter = derive(counter, (counter) => counter + 1);
+
+  const oScope = createScope();
+  let value = await oScope.resolve(derivedCounter);
+  expect(value).toBe(1);
+
+  const mScope = createScope(preset(counter, 2));
+  value = await mScope.resolve(derivedCounter);
+  expect(value).toBe(3);
 });

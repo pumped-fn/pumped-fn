@@ -10,7 +10,7 @@ function createExecutor<T>(
   metas: Meta.Meta[] | undefined
 ): Core.Executor<T> {
   const executor = {
-    [executorSymbol]: "base",
+    [executorSymbol]: "main",
     factory: (_: unknown, controller: Core.Controller) => {
       if (dependencies === undefined) {
         const f = factory as Core.NoDependencyFn<T>;
@@ -90,6 +90,12 @@ export function isStaticExecutor(
   return executor[executorSymbol] === "static";
 }
 
+export function isMainExecutor(
+  executor: unknown
+): executor is Core.Executor<unknown> {
+  return isExecutor(executor) && executor[executorSymbol] === "main";
+}
+
 export function isExecutor<T>(input: unknown): input is Core.BaseExecutor<T> {
   return typeof input === "object" && input !== null && executorSymbol in input;
 }
@@ -129,4 +135,12 @@ export function derive<T, D>(
   ...metas: Meta.Meta[]
 ): Core.Executor<T> {
   return createExecutor(pfactory as any, pdependencies, metas);
+}
+
+export function preset<T>(e: Core.Executor<T>, v: T): Core.Preset<T> {
+  return {
+    [executorSymbol]: "preset",
+    value: v,
+    executor: e,
+  };
 }
