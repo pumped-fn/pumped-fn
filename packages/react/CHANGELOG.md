@@ -14,6 +14,29 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.14](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/react@0.5.13...@pumped-fn/react@0.5.14) (2025-05-20)
+
+
+### Features
+
+* **react:** added component api ([4980cae](https://github.com/pumped-fn/pumped-fn/commit/4980caef90ef50b8f6308724a83b8770bc32347a))
+
+# 0.5.0 (2025-02-21)
+
+
+### Features
+
+* add release automation and changelog generation ([7295862](https://github.com/pumped-fn/pumped-fn/commit/7295862e2e07f4fde31b033290c17b997be8fde5))
+* added selector ([04feebe](https://github.com/pumped-fn/pumped-fn/commit/04feebef4c032fd6470017cc12e1c214c73c78a7))
+* included selector into useResolve ([a8daaec](https://github.com/pumped-fn/pumped-fn/commit/a8daaec0b8c531f889062119dfa88294c2667b91))
+* simplify derive API ([2b78e14](https://github.com/pumped-fn/pumped-fn/commit/2b78e14d1f9252dcb30387d16acfd0de07784344))
+
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
 ## 0.5.13 (2025-05-15)
 
 
