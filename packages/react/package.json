@@ -24,7 +24,7 @@
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "peerDependencies": {
-    "@pumped-fn/core-next": "^0.5.38",
+    "@pumped-fn/core-next": "^0.5.40",
     "react": "^18.0.0 || ^19.0.0"
   },
   "files": [
