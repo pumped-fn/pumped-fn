@@ -1,65 +1,79 @@
-import { Suspense, useMemo } from "react";
-import { ScopeProvider, useResolve, useResolveMany } from "@pumped-fn/react";
+import { Suspense } from "react";
+import { pumped, ScopeProvider, useResolveMany } from "@pumped-fn/react";
 
-import { Todo, todoApp } from "./todo.pumped";
-import { counterApp } from "./counter.pumped";
+import { Todo, todoApp } from "./pumped.todo";
+import { counterApp } from "./pumped.counter";
 
 function TodoList() {
-  const [todos, setSeletectedTodoId, controller] = useResolveMany(
-    todoApp.todos,
+  const [setSelectedTodoId, controller] = useResolveMany(
     todoApp.setSelectedTodoId,
-    todoApp.todosController,
+    todoApp.todosController
   );
 
   return (
     <>
       <h1>Todo list</h1>
-      {todos.map((todo) => (
-        <div key={todo.id} onClick={() => setSeletectedTodoId(todo.id)}>
-          {todo.content}-<button onClick={() => controller.removeTodo(todo.id)}>Remove</button>
-        </div>
-      ))}
-    </>
-  );
-}
+      <pumped.Reactives e={[todoApp.todos]}>
+        {([todos]) =>
+          todos.map((todo) => (
+            <div key={todo.id} onClick={() => setSelectedTodoId(todo.id)}>
+              {todo.content}-
+              <button onClick={() => controller.removeTodo(todo.id)}>
+                Remove
+              </button>
+            </div>
+          ))
+        }
+      </pumped.Reactives>
 
-function TodoDetail() {
-  const [todo, setSelectedTodoId, controller] = useResolveMany(
-    todoApp.selectedTodo,
-    todoApp.setSelectedTodoId,
-    todoApp.todosController,
-  );
+      <pumped.Reactives e={[todoApp.selectedTodo]}>
+        {([todo]) =>
+          todo ? (
+            <>
+              <h1>{todo.content}</h1>
+              <label>
+                Mark as completed:
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  onChange={() => controller.toggleComplete(todo.id)}
+                />
+              </label>
+              <button onClick={() => setSelectedTodoId(null)}>Close</button>
+            </>
+          ) : null
+        }
+      </pumped.Reactives>
 
-  if (!todo) return null;
-
-  return (
-    <>
-      <h1>{todo.content}</h1>
-      <label>
-        Mark as completed:
-        <input type="checkbox" checked={todo.completed} onChange={() => controller.toggleComplete(todo.id)} />
-      </label>
-      <button onClick={() => setSelectedTodoId(null)}>Close</button>
-    </>
-  );
-}
-
-function TodoForm() {
-  const controller = useResolve(todoApp.todosController);
-
-  return (
-    <>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           const content = e.currentTarget.content.value;
-          controller.addTodo({ content, completed: false });
+          const completed = e.currentTarget.completed.checked;
+
+          controller.addTodo({ content, completed });
           e.currentTarget.reset();
         }}
       >
         <input type="text" name="content" />
+        <input type="checkbox" name="completed" />
         <button type="submit">Add todo</button>
       </form>
+
+      <pumped.Reselect
+        e={todoApp.todos}
+        selector={(todos) => todos.filter((todo) => todo.completed)}
+        equality={compareTodo}
+      >
+        {(todos) => (
+          <>
+            <h1>Completed todos {todos.length}</h1>
+            {todos.map((todo) => (
+              <div key={todo.id}>{todo.content}</div>
+            ))}
+          </>
+        )}
+      </pumped.Reselect>
     </>
   );
 }
@@ -79,54 +93,37 @@ function compareTodo(_prev: unknown, _next: unknown): boolean {
   return true;
 }
 
-function CompletedTodoList() {
-  const todos = useResolve(
-    todoApp.todos,
-    useMemo(() => (todos) => todos.filter((todo) => todo.completed), []),
-    {
-      equality: compareTodo,
-    },
-  );
+const Counter = () => (
+  <>
+    <pumped.Effect e={[counterApp.timer]} />
+    <pumped.Reactives e={[counterApp.counter]}>
+      {([count]) => <h1>Counter: {count}</h1>}
+    </pumped.Reactives>
 
-  return (
-    <>
-      <h1>Completed todos {todos.length}</h1>
-      {todos.map((todo) => (
-        <div key={todo.id}>{todo.content}</div>
-      ))}
-    </>
-  );
-}
-
-const Counter = () => {
-  const [counter, configController] = useResolveMany(
-    counterApp.counter,
-    counterApp.configController,
-    counterApp.timer,
-    counterApp.config
-  )
-
-  return <>
-  <h1>{counter}</h1>
-  <button onClick={() => configController.changeIncrement(1)}>Increment</button>
-  <button onClick={() => configController.changeInterval(-1)}>Faster</button>
-  <button onClick={() => configController.changeInterval(1)}>Slower</button>
-  </>;
-}
-
+    <pumped.Resolve e={counterApp.configController}>
+      {(configController) => (
+        <>
+          <button onClick={() => configController.changeIncrement(1)}>
+            Increment
+          </button>
+          <button onClick={() => configController.changeInterval(-1)}>
+            Faster
+          </button>
+          <button onClick={() => configController.changeInterval(1)}>
+            Slower
+          </button>
+        </>
+      )}
+    </pumped.Resolve>
+  </>
+);
 
 export default function AppWrapper() {
   return (
     <ScopeProvider>
       <Suspense>
-        <TodoDetail />
         <TodoList />
-        <TodoForm />
-      </Suspense>
-      <Suspense>
-        <CompletedTodoList />
-      </Suspense>
-      <Suspense>
+        <hr />
         <Counter />
       </Suspense>
     </ScopeProvider>

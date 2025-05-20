@@ -5,7 +5,7 @@ const name = meta("name", custom<string>());
 const config = provide(
   () => ({
     increment: 1,
-    interval: 1000,
+    interval: 500,
   }),
   name("config")
 );

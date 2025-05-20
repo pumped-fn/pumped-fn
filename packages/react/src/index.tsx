@@ -5,7 +5,14 @@ import {
   isReactiveExecutor,
   isStaticExecutor,
 } from "@pumped-fn/core-next";
-import { createContext, useContext, useRef, useSyncExternalStore } from "react";
+import React, {
+  createContext,
+  startTransition,
+  useContext,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 
 type ValueEntry = { kind: "value"; value: Core.Accessor<unknown> };
 type ErrorEntry = { kind: "error"; error: unknown };
@@ -81,8 +88,15 @@ export function ScopeProvider({
   children: React.ReactNode;
   scope?: Core.Scope;
 }) {
+  const scopeRef = useRef<ScopeContainer | undefined>(undefined);
+
+  if (!scopeRef.current) {
+    const _scope = scope ?? createScope();
+    scopeRef.current = ScopeContainer.create(_scope);
+  }
+
   return (
-    <scopeContainerContext.Provider value={ScopeContainer.create(scope)}>
+    <scopeContainerContext.Provider value={scopeRef.current}>
       {children}
     </scopeContainerContext.Provider>
   );
@@ -116,6 +130,7 @@ export function useResolve<T, K>(
       : (executor as Core.Executor<unknown>);
 
   const [_, entry] = scope.getResolved(target);
+  const valueRef = useRef<any>();
 
   if (isPendingEntry(entry)) {
     throw entry.promise;
@@ -125,11 +140,10 @@ export function useResolve<T, K>(
     throw entry.error;
   }
 
-  const valueRef = useRef<any>();
   if (!valueRef.current) {
-    const value = selector
-      ? selector(entry.value.get() as Awaited<T>)
-      : entry.value.get();
+    const rawValue = entry.value.get();
+    const value = selector ? selector(rawValue as Awaited<T>) : rawValue;
+
     valueRef.current = options?.snapshot
       ? options.snapshot(value as any)
       : value;
@@ -137,18 +151,24 @@ export function useResolve<T, K>(
 
   return useSyncExternalStore(
     (cb) => {
-      return scope.scope.onUpdate(target, (next) => {
-        const equalityFn = options?.equality ?? Object.is;
-        const value = selector ? selector(next.get() as Awaited<T>) : next;
+      if (isReactiveExecutor(executor)) {
+        return scope.scope.onUpdate(target, (next) => {
+          const equalityFn = options?.equality ?? Object.is;
+          const value = selector
+            ? selector(next.get() as Awaited<T>)
+            : next.get();
 
-        if (!equalityFn(valueRef.current, value as any)) {
-          valueRef.current = options?.snapshot
-            ? options.snapshot(value as any)
-            : value;
-          cb();
-          return;
-        }
-      });
+          if (!equalityFn(valueRef.current, value as any)) {
+            valueRef.current = options?.snapshot
+              ? options.snapshot(value as any)
+              : value;
+
+            startTransition(() => cb());
+            return;
+          }
+        });
+      }
+      return () => {};
     },
     () => valueRef.current,
     () => valueRef.current
@@ -205,21 +225,18 @@ export function useResolveMany<T extends Array<Core.BaseExecutor<unknown>>>(
       const cleanups = [] as Core.Cleanup[];
       for (let i = 0; i < entries.length; i++) {
         const executor = executors[i];
-        const target =
-          isLazyExecutor(executor) ||
-          isReactiveExecutor(executor) ||
-          isStaticExecutor(executor)
-            ? executor.executor
-            : (executor as Core.Executor<unknown>);
 
-        const cleanup = scope.scope.onUpdate(target, () => {
-          resultRef.current = resolvedRef.current.map((entry) =>
-            entry.value.get()
-          ) as any;
-          cb();
-        });
+        if (isReactiveExecutor(executor)) {
+          const target = executor.executor;
+          const cleanup = scope.scope.onUpdate(target, () => {
+            resultRef.current = resolvedRef.current.map((entry) =>
+              entry.value.get()
+            ) as any;
+            startTransition(() => cb());
+          });
 
-        cleanups.push(cleanup);
+          cleanups.push(cleanup);
+        }
       }
 
       return () => {
@@ -258,3 +275,70 @@ export function useRelease(executor: Core.Executor<unknown>): () => void {
     scope.scope.release(executor);
   };
 }
+
+export type ResolveProps<T> = {
+  e: Core.Executor<T>;
+  children: (props: T) => React.ReactNode | React.ReactNode[];
+};
+
+export function Resolve<T>(props: ResolveProps<T>) {
+  const value = useResolve(props.e);
+  return props.children(value);
+}
+
+export function Resolves<T extends Core.BaseExecutor<unknown>[]>(props: {
+  e: { [K in keyof T]: T[K] };
+  children: (props: { [K in keyof T]: Core.InferOutput<T[K]> }) =>
+    | React.ReactNode
+    | React.ReactNode[];
+}) {
+  const values = useResolveMany(...props.e);
+  return props.children(values);
+}
+
+export function Reselect<T, K>(props: {
+  e: Core.Executor<T>;
+  selector: (value: T) => K;
+  children: (props: K) => React.ReactNode | React.ReactNode[];
+  equality?: (thisValue: T, thatValue: T) => boolean;
+}) {
+  const value = useResolve(props.e.reactive, props.selector, {
+    equality: props.equality as any,
+  });
+  return props.children(value);
+}
+
+export function Reactives<T extends Core.Executor<unknown>[]>(props: {
+  e: { [K in keyof T]: T[K] };
+  children: (props: { [K in keyof T]: Core.InferOutput<T[K]> }) =>
+    | React.ReactNode
+    | React.ReactNode[];
+}) {
+  const values = useResolveMany(...props.e.map((e) => e.reactive));
+  return props.children(values as any);
+}
+
+export function Effect(props: { e: Core.Executor<unknown>[] }) {
+  const scope = useScope();
+
+  useEffect(() => {
+    for (const e of props.e) {
+      scope.scope.resolve(e);
+    }
+
+    return () => {
+      for (const e of props.e) {
+        scope.scope.release(e, true);
+      }
+    };
+  }, [scope, ...props.e]);
+  return null;
+}
+
+export const pumped = {
+  Effect,
+  Reactives,
+  Resolve,
+  Resolves,
+  Reselect,
+};

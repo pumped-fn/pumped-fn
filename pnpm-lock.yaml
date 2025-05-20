@@ -26,12 +26,6 @@ importers:
 
   examples/react:
     dependencies:
-      '@pumped-fn/core-next':
-        specifier: ^0.5.39
-        version: 0.5.39
-      '@pumped-fn/react':
-        specifier: ^0.5.13
-        version: 0.5.13(@pumped-fn/core-next@0.5.39)(react@18.3.1)
       react:
         specifier: ^18
         version: 18.3.1
@@ -39,6 +33,12 @@ importers:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@pumped-fn/core-next':
+        specifier: workspace:*
+        version: link:../../packages/next
+      '@pumped-fn/react':
+        specifier: workspace:*
+        version: link:../../packages/react
       '@types/react':
         specifier: ^18
         version: 18.3.18
@@ -686,16 +686,6 @@ packages:
   '@pnpm/npm-conf@2.3.1':
     resolution: {integrity: sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw==}
     engines: {node: '>=12'}
-
-  '@pumped-fn/core-next@0.5.39':
-    resolution: {integrity: sha512-Bikyt0z/bSMpo3MUe/mDCEvTq1XklRWA9a5HLzh3sxZvPN+OWP8WzXtXZRID6DgRORcjrYkFWk+OEkrRfq3ipA==}
-    engines: {node: '>=18'}
-
-  '@pumped-fn/react@0.5.13':
-    resolution: {integrity: sha512-T9Nbrbcft1ja555sNonKKfRG9pPj50xfA++2C7ClRFmlZvZTfsfFaC5uHJjb0byDlE3rI+/76R8gpi2QmnR9oQ==}
-    peerDependencies:
-      '@pumped-fn/core-next': ^0.5.38
-      react: ^18.0.0 || ^19.0.0
 
   '@rollup/rollup-android-arm-eabi@4.40.2':
     resolution: {integrity: sha512-JkdNEq+DFxZfUwxvB58tHMHBHVgX23ew41g1OQinthJ+ryhdRk67O31S7sYw8u2lTjHUPFxwar07BBt1KHp/hg==}
@@ -3136,13 +3126,6 @@ snapshots:
       '@pnpm/config.env-replace': 1.1.0
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
-
-  '@pumped-fn/core-next@0.5.39': {}
-
-  '@pumped-fn/react@0.5.13(@pumped-fn/core-next@0.5.39)(react@18.3.1)':
-    dependencies:
-      '@pumped-fn/core-next': 0.5.39
-      react: 18.3.1
 
   '@rollup/rollup-android-arm-eabi@4.40.2':
     optional: true

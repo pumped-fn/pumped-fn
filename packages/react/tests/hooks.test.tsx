@@ -7,10 +7,10 @@ import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
     const scope = createScope();
-    
+
     const countExecutor = provide(() => 0);
     const derivedResource = derive(
-      countExecutor.reactive, 
+      countExecutor.reactive,
       (count, controller) => {
         controller.cleanup(() => {
           console.log("Cleanup");
@@ -20,12 +20,15 @@ describe("React Integration", () => {
       }
     );
     const derivedCount = derive([countExecutor.reactive], ([v]) => v + 2);
-    const wholesum = derive([countExecutor.reactive, derivedCount.reactive], ([v1, v2]) => {
-      return v1 + v2;
-    });
+    const wholesum = derive(
+      [countExecutor.reactive, derivedCount.reactive],
+      ([v1, v2]) => {
+        return v1 + v2;
+      }
+    );
 
     const updateCount = derive([countExecutor.lazy], ([ref]) => {
-      return ref.update
+      return ref.update;
     });
 
     const fn = vi.fn();
@@ -34,15 +37,23 @@ describe("React Integration", () => {
       () => {
         fn();
         // Test multiple hooks working together
-        const [derived, update, wholesumValue, derivedResourceValue] = useResolveMany(
-          derivedCount,
-          updateCount,
-          wholesum,
-          derivedResource,
-        );
-        const onlyMod3 = useResolve(derivedCount, (v) => v % 3 === 0);
+        const [derived, update, wholesumValue, derivedResourceValue] =
+          useResolveMany(
+            derivedCount.reactive,
+            updateCount,
+            wholesum,
+            derivedResource
+          );
 
-        return { derived, update, wholesumValue, onlyMod3, derivedResourceValue };
+        const onlyMod3 = useResolve(derivedCount.reactive, (v) => v % 3 === 0);
+
+        return {
+          derived,
+          update,
+          wholesumValue,
+          onlyMod3,
+          derivedResourceValue,
+        };
       },
       {
         wrapper: ({ children }) => (
@@ -50,7 +61,7 @@ describe("React Integration", () => {
             <Suspense>{children}</Suspense>
           </ScopeProvider>
         ),
-      },
+      }
     );
 
     await waitFor(() => {
