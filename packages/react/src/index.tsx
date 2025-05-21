@@ -207,7 +207,7 @@ export function useResolve<T, K>(
       };
     },
     () => valueRef.current,
-    (a, b) => Object.is(a, b)
+    () => valueRef.current // Use the same selector for nextSnapshot
   );
 }
 
