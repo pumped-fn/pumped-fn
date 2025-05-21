@@ -1,8 +1,9 @@
 import { createDeepProxy, isDeepChanged } from 'proxy-compare';
 
 // Store tracking information for each component
-const trackingMap = new WeakMap<string, Set<string | number | symbol>>();
-const prevValueMap = new WeakMap<string, any>();
+// We use a regular Map instead of WeakMap since we're using string IDs
+const trackingMap = new Map<string, Set<string | number | symbol>>();
+const prevValueMap = new Map<string, any>();
 
 /**
  * Creates a proxy that tracks property access
