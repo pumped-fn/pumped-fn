@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { createExecutor } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 import { 
   EnhancedScopeProvider, 
   useEnhancedResolve, 
@@ -9,7 +9,7 @@ import {
 } from '../src/enhanced-scope';
 
 // Create a test executor with a complex nested structure
-const testExecutor = createExecutor(() => ({
+const testExecutor = provide(() => ({
   count: 0,
   user: {
     name: 'Test User',
@@ -267,4 +267,3 @@ describe('Proxy Tracking System', () => {
     expect(screen.getByTestId('toggle-1').textContent).toBe('Mark Incomplete');
   });
 });
-

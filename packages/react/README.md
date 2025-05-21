@@ -11,10 +11,10 @@ npm install @pumped-fn/react @pumped-fn/core-next
 ## Usage
 
 ```tsx
-import { createExecutor } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 import { ScopeProvider, useResolve } from '@pumped-fn/react';
 
-const countExecutor = createExecutor(() => 0);
+const countExecutor = provide(() => 0);
 
 function Counter() {
   const count = useResolve(countExecutor);
@@ -71,10 +71,10 @@ import { useEnhancedResolve, EnhancedScopeProvider } from '@pumped-fn/react';
 
 ```tsx
 import { EnhancedScopeProvider, useEnhancedResolve } from '@pumped-fn/react';
-import { createExecutor } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 
 // Create an executor with a complex nested structure
-const userExecutor = createExecutor(() => ({
+const userExecutor = provide(() => ({
   profile: {
     name: 'John Doe',
     age: 30,

@@ -57,10 +57,10 @@ import { useEnhancedResolve, EnhancedScopeProvider } from '@pumped-fn/react';
 
 ```tsx
 import { EnhancedScopeProvider, useEnhancedResolve } from '@pumped-fn/react';
-import { createExecutor } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 
 // Create an executor
-const userExecutor = createExecutor(() => ({
+const userExecutor = provide(() => ({
   name: 'John',
   age: 30,
   address: {
@@ -109,4 +109,3 @@ function App() {
 - **Automatic**: No need to manually specify dependencies
 - **Intuitive**: Just use the properties you need, and the system handles the rest
 - **Propagation**: Changes in deeply nested components properly trigger parent updates
-

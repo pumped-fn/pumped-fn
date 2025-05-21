@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createExecutor } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 import { 
   EnhancedScopeProvider, 
   useEnhancedResolve, 
@@ -7,7 +7,7 @@ import {
 } from '../enhanced-scope';
 
 // Create a complex nested data structure
-const userExecutor = createExecutor(() => ({
+const userExecutor = provide(() => ({
   profile: {
     name: 'John Doe',
     age: 30,
@@ -153,4 +153,3 @@ export function ProxyTrackingExample() {
     </EnhancedScopeProvider>
   );
 }
-
