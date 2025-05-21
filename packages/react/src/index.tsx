@@ -10,9 +10,11 @@ import React, {
   startTransition,
   useContext,
   useEffect,
+  useId,
   useRef,
   useSyncExternalStore,
 } from "react";
+import { createTrackingProxy, hasTrackedChanges, clearTracking } from "./proxy-tracking";
 
 type ValueEntry = { kind: "value"; value: Core.Accessor<unknown> };
 type ErrorEntry = { kind: "error"; error: unknown };
@@ -122,6 +124,8 @@ export function useResolve<T, K>(
   options?: UseResolveOption<T>
 ): K {
   const scope = useScope();
+  const componentId = useId(); // Generate a unique ID for this component instance
+  
   const target =
     isLazyExecutor(executor) ||
     isReactiveExecutor(executor) ||
@@ -131,6 +135,7 @@ export function useResolve<T, K>(
 
   const [_, entry] = scope.getResolved(target);
   const valueRef = useRef<any>();
+  const prevValueRef = useRef<any>(); // Store previous value for comparison
 
   if (isPendingEntry(entry)) {
     throw entry.promise;
@@ -144,10 +149,21 @@ export function useResolve<T, K>(
     const rawValue = entry.value.get();
     const value = selector ? selector(rawValue as Awaited<T>) : rawValue;
 
-    valueRef.current = options?.snapshot
-      ? options.snapshot(value as any)
+    // Apply tracking to the value if it's an object
+    const trackedValue = typeof value === 'object' && value !== null
+      ? createTrackingProxy(value, componentId)
       : value;
+    
+    valueRef.current = trackedValue;
+    prevValueRef.current = value; // Store the original value for comparison
   }
+
+  // Clean up tracking when component unmounts
+  useEffect(() => {
+    return () => {
+      clearTracking(componentId);
+    };
+  }, [componentId]);
 
   let isRendering = false;
 
@@ -156,28 +172,43 @@ export function useResolve<T, K>(
       if (isReactiveExecutor(executor)) {
         return scope.scope.onUpdate(target, (next) => {
           const equalityFn = options?.equality ?? Object.is;
-          const value = selector
-            ? selector(next.get() as Awaited<T>)
-            : next.get();
+          const rawValue = next.get();
+          const value = selector ? selector(rawValue as Awaited<T>) : rawValue;
+          
+          // For primitives, use the provided equality function
+          if (typeof value !== 'object' || value === null) {
+            if (!equalityFn(prevValueRef.current, value as any)) {
+              valueRef.current = value;
+              prevValueRef.current = value;
 
-          if (!equalityFn(valueRef.current, value as any)) {
-            valueRef.current = options?.snapshot
-              ? options.snapshot(value as any)
-              : value;
+              if (!isRendering) {
+                startTransition(() => cb());
+                isRendering = true;
+              }
+            }
+            return;
+          }
+          
+          // For objects, check if tracked properties have changed
+          if (hasTrackedChanges(prevValueRef.current, value as any, componentId)) {
+            // Create a new tracked value
+            const trackedValue = createTrackingProxy(value as any, componentId);
+            
+            valueRef.current = trackedValue;
+            prevValueRef.current = value;
 
             if (!isRendering) {
               startTransition(() => cb());
               isRendering = true;
             }
-
-            return;
           }
         });
       }
+
       return () => {};
     },
     () => valueRef.current,
-    () => valueRef.current
+    (a, b) => Object.is(a, b)
   );
 }
 

@@ -6,10 +6,6 @@ React bindings for Pumped Functions.
 
 ```bash
 npm install @pumped-fn/react @pumped-fn/core-next
-# or
-yarn add @pumped-fn/react @pumped-fn/core-next
-# or
-pnpm add @pumped-fn/react @pumped-fn/core-next
 ```
 
 ## API Documentation
@@ -287,6 +283,68 @@ function Counter() {
 }
 ```
 
+## Proxy-Based Tracking
+
+The `useResolve` hook now includes automatic property tracking using the `proxy-compare` library. This means that components will only re-render when the specific properties they access change.
+
+### How It Works
+
+1. When you use `useResolve` to access an object, the returned value is wrapped in a proxy
+2. The proxy tracks which properties your component accesses during rendering
+3. When the value changes, the component only re-renders if the accessed properties have changed
+4. This happens automatically - you don't need to specify dependencies
+
+### Example
+
+```tsx
+import { provide } from '@pumped-fn/core-next';
+import { ScopeProvider, useResolve, useUpdate } from '@pumped-fn/react';
+
+// Create a complex data structure
+const userExecutor = provide(() => ({
+  profile: {
+    name: 'John',
+    age: 30,
+  },
+  preferences: {
+    theme: 'dark',
+    notifications: true,
+  },
+}));
+
+// This component only uses profile.name
+function UserName() {
+  const user = useResolve(userExecutor);
+  
+  // This component will only re-render if user.profile.name changes
+  return <h2>{user.profile.name}</h2>;
+}
+
+// This component only uses preferences.theme
+function ThemeDisplay() {
+  const user = useResolve(userExecutor);
+  
+  // This component will only re-render if user.preferences.theme changes
+  return <div>Current theme: {user.preferences.theme}</div>;
+}
+
+function App() {
+  return (
+    <ScopeProvider>
+      <UserName />
+      <ThemeDisplay />
+    </ScopeProvider>
+  );
+}
+```
+
+In this example:
+- If `user.profile.name` changes, only the `UserName` component re-renders
+- If `user.preferences.theme` changes, only the `ThemeDisplay` component re-renders
+- If other properties change, neither component re-renders
+
+This optimization happens automatically without any additional configuration.
+
 ## TypeScript Types
 
 ### Component Props
@@ -384,4 +442,3 @@ For more information on these core concepts, refer to the `@pumped-fn/core-next`
 ## License
 
 MIT
-
