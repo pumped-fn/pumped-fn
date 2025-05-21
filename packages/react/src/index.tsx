@@ -14,6 +14,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 
+// Original implementation
 type ValueEntry = { kind: "value"; value: Core.Accessor<unknown> };
 type ErrorEntry = { kind: "error"; error: unknown };
 type PendingEntry = { kind: "pending"; promise: Promise<unknown> };
@@ -354,3 +355,7 @@ export const pumped = {
   Resolves,
   Reselect,
 };
+
+// Export enhanced scope implementation with proxy-compare tracking
+export * from './enhanced-scope';
+export * from './proxy-tracking';

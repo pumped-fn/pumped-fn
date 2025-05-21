@@ -6,286 +6,151 @@ React bindings for Pumped Functions.
 
 ```bash
 npm install @pumped-fn/react @pumped-fn/core-next
-# or
-yarn add @pumped-fn/react @pumped-fn/core-next
-# or
-pnpm add @pumped-fn/react @pumped-fn/core-next
 ```
 
-## API Documentation
-
-### Components
-
-#### `ScopeProvider`
-
-Provides a scope context for all child components to access the same scope.
+## Usage
 
 ```tsx
-import { ScopeProvider } from '@pumped-fn/react';
-import { createScope } from '@pumped-fn/core-next';
+import { createExecutor } from '@pumped-fn/core-next';
+import { ScopeProvider, useResolve } from '@pumped-fn/react';
 
-// Optional: create a custom scope
-const scope = createScope();
+const countExecutor = createExecutor(() => 0);
+
+function Counter() {
+  const count = useResolve(countExecutor);
+  const update = useUpdate(countExecutor);
+  
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => update(count + 1)}>Increment</button>
+    </div>
+  );
+}
 
 function App() {
   return (
-    <ScopeProvider scope={scope}>
-      {/* Your application components */}
+    <ScopeProvider>
+      <Counter />
     </ScopeProvider>
   );
 }
 ```
 
-#### `Resolve`
+## Enhanced Proxy-Compare Based Tracking
 
-A component that resolves an executor and passes the value to its children.
+@pumped-fn/react now includes an enhanced tracking system based on the `proxy-compare` library. This system provides automatic tracking of property access and optimized re-rendering based on actual usage patterns.
+
+### Key Features
+
+1. **Automatic Tracking**
+   - Primitives are tracked automatically
+   - Non-primitives (objects, arrays) are tracked based on actual property access
+
+2. **Propagation of Tracking**
+   - Tracking information propagates from child to parent components
+   - Parent components only re-render when tracked properties change
+
+3. **Optimized Rendering**
+   - Components only re-render when accessed properties change
+   - Prevents unnecessary re-renders for unaccessed properties
+
+### Usage
+
+Instead of using the original hooks and components, use the enhanced versions:
 
 ```tsx
-import { Resolve } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
+// Original
+import { useResolve, ScopeProvider } from '@pumped-fn/react';
 
-const countExecutor = provide(() => 0);
-
-function Counter() {
-  return (
-    <Resolve e={countExecutor}>
-      {(count) => <div>Count: {count}</div>}
-    </Resolve>
-  );
-}
+// Enhanced with proxy-compare tracking
+import { useEnhancedResolve, EnhancedScopeProvider } from '@pumped-fn/react';
 ```
 
-#### `Resolves`
-
-A component that resolves multiple executors and passes the values to its children.
+### Example
 
 ```tsx
-import { Resolves } from '@pumped-fn/react';
-import { provide, derive } from '@pumped-fn/core-next';
+import { EnhancedScopeProvider, useEnhancedResolve } from '@pumped-fn/react';
+import { createExecutor } from '@pumped-fn/core-next';
 
-const countExecutor = provide(() => 0);
-const doubleCount = derive([countExecutor.reactive], ([count]) => count * 2);
+// Create an executor with a complex nested structure
+const userExecutor = createExecutor(() => ({
+  profile: {
+    name: 'John Doe',
+    age: 30,
+  },
+  preferences: {
+    theme: 'dark',
+    notifications: {
+      email: true,
+      push: false,
+    },
+  },
+}));
 
-function CounterWithDouble() {
-  return (
-    <Resolves e={[countExecutor, doubleCount]}>
-      {([count, double]) => (
-        <div>
-          <div>Count: {count}</div>
-          <div>Double: {double}</div>
-        </div>
-      )}
-    </Resolves>
-  );
-}
-```
-
-#### `Reselect`
-
-A component that resolves an executor, applies a selector function, and passes the result to its children.
-
-```tsx
-import { Reselect } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
-
-const userExecutor = provide(() => ({ name: 'John', age: 30 }));
-
+// Component that only uses profile.name
 function UserName() {
+  const user = useEnhancedResolve(userExecutor);
+  
+  // This component will only re-render if user.profile.name changes
+  return <h2>{user.profile.name}</h2>;
+}
+
+// Component that only uses preferences.theme
+function ThemeDisplay() {
+  const user = useEnhancedResolve(userExecutor);
+  
+  // This component will only re-render if user.preferences.theme changes
+  return <div>Current theme: {user.preferences.theme}</div>;
+}
+
+function App() {
   return (
-    <Reselect 
-      e={userExecutor} 
-      selector={(user) => user.name}
-    >
-      {(name) => <div>Name: {name}</div>}
-    </Reselect>
+    <EnhancedScopeProvider>
+      <UserName />
+      <ThemeDisplay />
+    </EnhancedScopeProvider>
   );
 }
 ```
 
-#### `Reactives`
+## API Reference
 
-A component that resolves multiple reactive executors and passes the values to its children.
+### Original API
 
-```tsx
-import { Reactives } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
+- `ScopeProvider`: Provides a scope for resolving executors
+- `useResolve`: Hook to resolve an executor and subscribe to changes
+- `useResolveMany`: Hook to resolve multiple executors
+- `useUpdate`: Hook to update an executor's value
+- `useReset`: Hook to reset an executor to its initial value
+- `useRelease`: Hook to release an executor from the scope
+- `Resolve`: Component to resolve an executor and render children with the result
+- `Resolves`: Component to resolve multiple executors
+- `Reselect`: Component to resolve an executor with a selector
+- `Reactives`: Component to resolve multiple reactive executors
+- `Effect`: Component to resolve executors for side effects
 
-const countExecutor = provide(() => 0);
-const nameExecutor = provide(() => 'John');
+### Enhanced API with Proxy-Compare Tracking
 
-function ReactiveExample() {
-  return (
-    <Reactives e={[countExecutor, nameExecutor]}>
-      {([count, name]) => (
-        <div>
-          <div>Count: {count}</div>
-          <div>Name: {name}</div>
-        </div>
-      )}
-    </Reactives>
-  );
-}
-```
+- `EnhancedScopeProvider`: Provides an enhanced scope with proxy-compare tracking
+- `useEnhancedResolve`: Hook to resolve an executor with proxy-compare tracking
+- `useEnhancedResolveMany`: Hook to resolve multiple executors with tracking
+- `useEnhancedUpdate`: Hook to update an executor's value
+- `useEnhancedReset`: Hook to reset an executor
+- `useEnhancedRelease`: Hook to release an executor
+- `EnhancedResolve`: Component version of useEnhancedResolve
+- `EnhancedResolves`: Component version of useEnhancedResolveMany
+- `EnhancedReselect`: Component to resolve with a selector
+- `EnhancedReactives`: Component for multiple reactive executors
+- `EnhancedEffect`: Component for side effects
 
-#### `Effect`
+## How It Works
 
-A component that resolves executors for side effects without rendering anything.
-
-```tsx
-import { Effect } from '@pumped-fn/react';
-import { provide, derive } from '@pumped-fn/core-next';
-
-const loggerExecutor = derive([], () => {
-  console.log('Logger initialized');
-  return null;
-});
-
-function Logger() {
-  return <Effect e={[loggerExecutor]} />;
-}
-```
-
-### Hooks
-
-#### `useScope`
-
-Returns the current scope from the nearest `ScopeProvider`.
-
-```tsx
-import { useScope } from '@pumped-fn/react';
-
-function MyComponent() {
-  const scope = useScope();
-  // Use scope methods directly
-  return null;
-}
-```
-
-#### `useResolve`
-
-Resolves an executor and returns its value. Can optionally apply a selector function.
-
-```tsx
-import { useResolve } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
-
-const countExecutor = provide(() => 0);
-
-function Counter() {
-  // Basic usage
-  const count = useResolve(countExecutor);
-  
-  // With selector
-  const isEven = useResolve(countExecutor, (count) => count % 2 === 0);
-  
-  return (
-    <div>
-      <div>Count: {count}</div>
-      <div>Is even: {isEven ? 'Yes' : 'No'}</div>
-    </div>
-  );
-}
-```
-
-#### `useResolveMany`
-
-Resolves multiple executors and returns their values as an array.
-
-```tsx
-import { useResolveMany } from '@pumped-fn/react';
-import { provide, derive } from '@pumped-fn/core-next';
-
-const countExecutor = provide(() => 0);
-const doubleCount = derive([countExecutor.reactive], ([count]) => count * 2);
-
-function CounterWithDouble() {
-  const [count, double] = useResolveMany(countExecutor, doubleCount);
-  
-  return (
-    <div>
-      <div>Count: {count}</div>
-      <div>Double: {double}</div>
-    </div>
-  );
-}
-```
-
-#### `useUpdate`
-
-Returns a function that can update an executor's value.
-
-```tsx
-import { useResolve, useUpdate } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
-
-const countExecutor = provide(() => 0);
-
-function Counter() {
-  const count = useResolve(countExecutor);
-  const updateCount = useUpdate(countExecutor);
-  
-  const increment = () => {
-    // Direct value update
-    updateCount(count + 1);
-    
-    // Or with function update
-    updateCount((current) => current + 1);
-  };
-  
-  return (
-    <div>
-      <div>Count: {count}</div>
-      <button onClick={increment}>Increment</button>
-    </div>
-  );
-}
-```
-
-#### `useReset`
-
-Returns a function that resets an executor to its initial value.
-
-```tsx
-import { useResolve, useReset } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
-
-const countExecutor = provide(() => 0);
-
-function Counter() {
-  const count = useResolve(countExecutor);
-  const resetCount = useReset(countExecutor);
-  
-  return (
-    <div>
-      <div>Count: {count}</div>
-      <button onClick={resetCount}>Reset</button>
-    </div>
-  );
-}
-```
-
-#### `useRelease`
-
-Returns a function that releases an executor from the scope.
-
-```tsx
-import { useResolve, useRelease } from '@pumped-fn/react';
-import { provide } from '@pumped-fn/core-next';
-
-const countExecutor = provide(() => 0);
-
-function Counter() {
-  const count = useResolve(countExecutor);
-  const releaseCount = useRelease(countExecutor);
-  
-  return (
-    <div>
-      <div>Count: {count}</div>
-      <button onClick={releaseCount}>Release</button>
-    </div>
-  );
-}
-```
+1. When a component calls `useEnhancedResolve`, the returned value is wrapped in a proxy
+2. The proxy tracks which properties are accessed during rendering
+3. When the value changes, only the components that accessed the changed properties re-render
+4. Child components register with their parents to propagate tracking information
+5. Parent components only re-render when tracked properties used by their children change
 
 ## TypeScript Types
 
@@ -384,4 +249,3 @@ For more information on these core concepts, refer to the `@pumped-fn/core-next`
 ## License
 
 MIT
-
