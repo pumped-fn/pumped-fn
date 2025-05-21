@@ -14,7 +14,7 @@ import React, {
   useRef,
   useSyncExternalStore,
 } from "react";
-import { createTrackingProxy, hasTrackedChanges, clearTracking } from "./proxy-tracking";
+import { createTrackingProxy, hasTrackedChanges } from "./proxy-tracking";
 
 type ValueEntry = { kind: "value"; value: Core.Accessor<unknown> };
 type ErrorEntry = { kind: "error"; error: unknown };
@@ -124,7 +124,9 @@ export function useResolve<T, K>(
   options?: UseResolveOption<T>
 ): K {
   const scope = useScope();
-  const componentId = useId(); // Generate a unique ID for this component instance
+  
+  // Create a WeakMap to track property access
+  const trackingMapRef = useRef<WeakMap<object, unknown>>(new WeakMap());
   
   const target =
     isLazyExecutor(executor) ||
@@ -154,18 +156,11 @@ export function useResolve<T, K>(
 
     // Apply tracking to the value if it's an object
     const trackedValue = typeof value === 'object' && value !== null
-      ? createTrackingProxy(value, componentId)
+      ? createTrackingProxy(value, trackingMapRef.current)
       : value;
     
     valueRef.current = trackedValue;
   }
-
-  // Clean up tracking when component unmounts
-  useEffect(() => {
-    return () => {
-      clearTracking(componentId);
-    };
-  }, [componentId]);
 
   let isRendering = false;
 
@@ -192,9 +187,9 @@ export function useResolve<T, K>(
           }
           
           // For objects, check if tracked properties have changed
-          if (hasTrackedChanges(prevValueRef.current, value as any, componentId)) {
+          if (hasTrackedChanges(prevValueRef.current, value as any, trackingMapRef.current)) {
             // Create a new tracked value
-            const trackedValue = createTrackingProxy(value as any, componentId);
+            const trackedValue = createTrackingProxy(value as any, trackingMapRef.current);
             
             valueRef.current = trackedValue;
             prevValueRef.current = value;

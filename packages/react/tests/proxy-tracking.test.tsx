@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createTrackingProxy, hasTrackedChanges, clearTracking } from '../src/proxy-tracking';
+import { createTrackingProxy, hasTrackedChanges } from '../src/proxy-tracking';
 
 describe('Proxy Tracking', () => {
   it('should track property access', () => {
@@ -13,8 +13,8 @@ describe('Proxy Tracking', () => {
       }
     };
     
-    const componentId = 'test-component';
-    const trackedUser = createTrackingProxy(user, componentId);
+    const trackingMap = new WeakMap<object, unknown>();
+    const trackedUser = createTrackingProxy(user, trackingMap);
     
     // Access some properties
     const name = trackedUser.name;
@@ -33,7 +33,7 @@ describe('Proxy Tracking', () => {
     };
     
     // Should detect changes to tracked properties
-    expect(hasTrackedChanges(user, updatedUser, componentId)).toBe(true);
+    expect(hasTrackedChanges(user, updatedUser, trackingMap)).toBe(true);
     
     // Create a new object with changes only to untracked properties
     const unrelatedChanges = {
@@ -47,10 +47,7 @@ describe('Proxy Tracking', () => {
     };
     
     // Should not detect changes to untracked properties
-    expect(hasTrackedChanges(user, unrelatedChanges, componentId)).toBe(false);
-    
-    // Clean up
-    clearTracking(componentId);
+    expect(hasTrackedChanges(user, unrelatedChanges, trackingMap)).toBe(false);
   });
   
   it('should handle nested property access', () => {
@@ -70,8 +67,8 @@ describe('Proxy Tracking', () => {
       }
     };
     
-    const componentId = 'nested-component';
-    const trackedData = createTrackingProxy(data, componentId);
+    const trackingMap = new WeakMap<object, unknown>();
+    const trackedData = createTrackingProxy(data, trackingMap);
     
     // Access deeply nested properties
     const name = trackedData.user.profile.name;
@@ -95,7 +92,7 @@ describe('Proxy Tracking', () => {
     };
     
     // Should detect changes to tracked nested properties
-    expect(hasTrackedChanges(data, updatedData, componentId)).toBe(true);
+    expect(hasTrackedChanges(data, updatedData, trackingMap)).toBe(true);
     
     // Create a new object with changes only to untracked nested properties
     const unrelatedChanges = {
@@ -115,9 +112,6 @@ describe('Proxy Tracking', () => {
     };
     
     // Should not detect changes to untracked nested properties
-    expect(hasTrackedChanges(data, unrelatedChanges, componentId)).toBe(false);
-    
-    // Clean up
-    clearTracking(componentId);
+    expect(hasTrackedChanges(data, unrelatedChanges, trackingMap)).toBe(false);
   });
 });
