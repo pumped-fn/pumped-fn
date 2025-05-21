@@ -149,13 +149,15 @@ export function useResolve<T, K>(
     const rawValue = entry.value.get();
     const value = selector ? selector(rawValue as Awaited<T>) : rawValue;
 
+    // Store the original value for comparison
+    prevValueRef.current = value;
+
     // Apply tracking to the value if it's an object
     const trackedValue = typeof value === 'object' && value !== null
       ? createTrackingProxy(value, componentId)
       : value;
     
     valueRef.current = trackedValue;
-    prevValueRef.current = value; // Store the original value for comparison
   }
 
   // Clean up tracking when component unmounts
@@ -205,7 +207,9 @@ export function useResolve<T, K>(
         });
       }
 
-      return () => {};
+      return () => {
+        isRendering = false;
+      };
     },
     () => valueRef.current,
     (a, b) => Object.is(a, b)

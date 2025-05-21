@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { provide } from '@pumped-fn/core-next';
 import { ScopeProvider, useResolve, useUpdate } from '../src';
 
 describe('Proxy Tracking', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should only re-render when accessed properties change', async () => {
     // Create a test executor with a complex object
     const userExecutor = provide(() => ({
@@ -17,21 +21,21 @@ describe('Proxy Tracking', () => {
       }
     }));
 
-    // Render counters to track component renders
-    const nameRenderCount = { count: 0 };
-    const ageRenderCount = { count: 0 };
+    // Spy on component renders
+    const nameRenderSpy = vi.fn();
+    const ageRenderSpy = vi.fn();
     
     // Component that only uses name
     function NameDisplay() {
       const user = useResolve(userExecutor);
-      nameRenderCount.count++;
+      nameRenderSpy();
       return <div data-testid="name">{user.name}</div>;
     }
     
     // Component that only uses age
     function AgeDisplay() {
       const user = useResolve(userExecutor);
-      ageRenderCount.count++;
+      ageRenderSpy();
       return <div data-testid="age">{user.age}</div>;
     }
     
@@ -87,28 +91,38 @@ describe('Proxy Tracking', () => {
     render(<App />);
     
     // Initial render counts
-    const initialNameRenderCount = nameRenderCount.count;
-    const initialAgeRenderCount = ageRenderCount.count;
+    const initialNameRenderCount = nameRenderSpy.mock.calls.length;
+    const initialAgeRenderCount = ageRenderSpy.mock.calls.length;
     
     // Update name - should only re-render NameDisplay
-    fireEvent.click(screen.getByTestId('update-name'));
-    expect(nameRenderCount.count).toBeGreaterThan(initialNameRenderCount);
-    expect(ageRenderCount.count).toBe(initialAgeRenderCount);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('update-name'));
+    });
+    
+    expect(nameRenderSpy).toHaveBeenCalledTimes(initialNameRenderCount + 1);
+    expect(ageRenderSpy).toHaveBeenCalledTimes(initialAgeRenderCount);
     expect(screen.getByTestId('name').textContent).toBe('Jane');
     
     // Update age - should only re-render AgeDisplay
-    const nameRenderCountAfterNameUpdate = nameRenderCount.count;
-    fireEvent.click(screen.getByTestId('update-age'));
-    expect(nameRenderCount.count).toBe(nameRenderCountAfterNameUpdate);
-    expect(ageRenderCount.count).toBeGreaterThan(initialAgeRenderCount);
+    const nameRenderCountAfterNameUpdate = nameRenderSpy.mock.calls.length;
+    
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('update-age'));
+    });
+    
+    expect(nameRenderSpy).toHaveBeenCalledTimes(nameRenderCountAfterNameUpdate);
+    expect(ageRenderSpy).toHaveBeenCalledTimes(initialAgeRenderCount + 1);
     expect(screen.getByTestId('age').textContent).toBe('31');
     
     // Update address - should not re-render either component
-    const nameRenderCountAfterAgeUpdate = nameRenderCount.count;
-    const ageRenderCountAfterAgeUpdate = ageRenderCount.count;
-    fireEvent.click(screen.getByTestId('update-address'));
-    expect(nameRenderCount.count).toBe(nameRenderCountAfterAgeUpdate);
-    expect(ageRenderCount.count).toBe(ageRenderCountAfterAgeUpdate);
+    const nameRenderCountAfterAgeUpdate = nameRenderSpy.mock.calls.length;
+    const ageRenderCountAfterAgeUpdate = ageRenderSpy.mock.calls.length;
+    
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('update-address'));
+    });
+    
+    expect(nameRenderSpy).toHaveBeenCalledTimes(nameRenderCountAfterAgeUpdate);
+    expect(ageRenderSpy).toHaveBeenCalledTimes(ageRenderCountAfterAgeUpdate);
   });
 });
-

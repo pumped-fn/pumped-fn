@@ -1,7 +1,8 @@
 import { createDeepProxy, isDeepChanged } from 'proxy-compare';
 
 // Store tracking information for each component
-const trackingMap = new WeakMap<object, Set<string | number | symbol>>();
+const trackingMap = new WeakMap<string, Set<string | number | symbol>>();
+const prevValueMap = new WeakMap<string, any>();
 
 /**
  * Creates a proxy that tracks property access
@@ -12,13 +13,16 @@ export function createTrackingProxy<T extends object>(
 ): T {
   // Skip primitives and null
   if (value === null || typeof value !== 'object') {
-    return value;
+    return value as T;
   }
 
   // Create a tracking set for this component if it doesn't exist
   if (!trackingMap.has(componentId)) {
     trackingMap.set(componentId, new Set());
   }
+
+  // Store the original value for comparison
+  prevValueMap.set(componentId, value);
 
   // Create a proxy that tracks property access
   return createDeepProxy(
@@ -58,6 +62,9 @@ export function hasTrackedChanges<T extends object>(
     return true;
   }
 
+  // Store the new value for future comparisons
+  prevValueMap.set(componentId, nextValue);
+
   // Check if any tracked properties have changed
   return isDeepChanged(
     prevValue,
@@ -71,5 +78,5 @@ export function hasTrackedChanges<T extends object>(
  */
 export function clearTracking(componentId: string): void {
   trackingMap.delete(componentId);
+  prevValueMap.delete(componentId);
 }
-
