@@ -65,7 +65,6 @@
     }
   },
   "dependencies": {
-    "@changesets/cli": "^2.29.4",
     "proxy-compare": "^3.0.1",
     "tsdown": "^0.11.13"
   }
