@@ -34,7 +34,7 @@ class ScopeContainer {
     this.#scope = scope ?? createScope();
   }
 
-  get scope() {
+  get scope(): Core.Scope {
     return this.#scope;
   }
 
@@ -64,7 +64,7 @@ class ScopeContainer {
     return cacheEntry;
   }
 
-  static create(scope?: Core.Scope) {
+  static create(scope?: Core.Scope): ScopeContainer {
     return new ScopeContainer(scope);
   }
 }
@@ -73,7 +73,7 @@ const scopeContainerContext = createContext<ScopeContainer | undefined>(
   undefined
 );
 
-export function useScope() {
+export function useScope(): ScopeContainer {
   const context = useContext(scopeContainerContext);
   if (context === undefined) {
     throw new Error("useScope must be used within a ScopeProvider");
@@ -149,6 +149,8 @@ export function useResolve<T, K>(
       : value;
   }
 
+  let isRendering = false;
+
   return useSyncExternalStore(
     (cb) => {
       if (isReactiveExecutor(executor)) {
@@ -163,7 +165,11 @@ export function useResolve<T, K>(
               ? options.snapshot(value as any)
               : value;
 
-            startTransition(() => cb());
+            if (!isRendering) {
+              startTransition(() => cb());
+              isRendering = true;
+            }
+
             return;
           }
         });
@@ -220,6 +226,8 @@ export function useResolveMany<T extends Array<Core.BaseExecutor<unknown>>>(
     ) as any;
   }
 
+  let isRendering = false;
+
   return useSyncExternalStore(
     (cb) => {
       const cleanups = [] as Core.Cleanup[];
@@ -232,7 +240,11 @@ export function useResolveMany<T extends Array<Core.BaseExecutor<unknown>>>(
             resultRef.current = resolvedRef.current.map((entry) =>
               entry.value.get()
             ) as any;
-            startTransition(() => cb());
+
+            if (!isRendering) {
+              startTransition(() => cb());
+              isRendering = true;
+            }
           });
 
           cleanups.push(cleanup);

@@ -7,11 +7,9 @@
     "moduleResolution": "bundler",
     "strict": true,
     "declaration": true,
+    "declarationMap": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "paths": {
-      "@pumped-fn/core": ["../core/src"]
-    }
+    "skipLibCheck": true
   },
   "include": ["src", "tests"]
 }

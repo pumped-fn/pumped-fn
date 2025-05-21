@@ -17,7 +17,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsup src/index.tsx --format esm,cjs --dts",
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/react@",
@@ -35,11 +35,10 @@
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
-    "@types/react": "^18.3.18",
+    "@types/react": "^18.3.21",
     "jsdom": "^26.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tsup": "^8.5.0",
     "vitest": "^1.6.1"
   },
   "publishConfig": {
@@ -64,5 +63,10 @@
     "npm": {
       "publish": true
     }
+  },
+  "dependencies": {
+    "@changesets/cli": "^2.29.4",
+    "proxy-compare": "^3.0.1",
+    "tsdown": "^0.11.13"
   }
 }

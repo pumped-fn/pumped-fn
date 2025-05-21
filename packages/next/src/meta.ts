@@ -69,7 +69,7 @@ export const meta = <V>(
   return fn as any;
 };
 
-export function getValue<V>(meta: Meta.Meta<V>) {
+export function getValue<V>(meta: Meta.Meta<V>): Awaited<V> {
   return validate(meta.schema, meta.value);
 }
 

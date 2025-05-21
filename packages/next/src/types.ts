@@ -1,5 +1,5 @@
-export const executorSymbol = Symbol.for("@pumped-fn/core/executor");
-export const metaSymbol = Symbol.for("@pumped-fn/core/meta");
+export const executorSymbol: unique symbol = Symbol.for("@pumped-fn/core/executor");
+export const metaSymbol: unique symbol = Symbol.for("@pumped-fn/core/meta");
 
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly "~standard": StandardSchemaV1.Props<Input, Output>;

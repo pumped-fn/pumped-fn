@@ -8,14 +8,14 @@
     "serve": "vite preview"
   },
   "dependencies": {
-    "react": "^18",
-    "react-dom": "^18.0.0",
     "@pumped-fn/core-next": "^0.5.40",
-    "@pumped-fn/react": "^0.5.14"
+    "@pumped-fn/react": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18",
-    "@types/react-dom": "^18.0.0",
+    "@types/react": "^18.3.21",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
