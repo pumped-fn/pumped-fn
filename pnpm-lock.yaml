@@ -27,11 +27,11 @@ importers:
   examples/react:
     dependencies:
       '@pumped-fn/core-next':
-        specifier: workspace:*
-        version: link:../../packages/next
+        specifier: ^0.5.40
+        version: 0.5.41(typescript@5.8.3)
       '@pumped-fn/react':
-        specifier: workspace:*
-        version: link:../../packages/react
+        specifier: ^0.5.15
+        version: 0.5.15(@pumped-fn/core-next@0.5.41(typescript@5.8.3))(react@18.3.1)(typescript@5.8.3)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -700,6 +700,16 @@ packages:
   '@pnpm/npm-conf@2.3.1':
     resolution: {integrity: sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw==}
     engines: {node: '>=12'}
+
+  '@pumped-fn/core-next@0.5.41':
+    resolution: {integrity: sha512-B8rjGLcP8FLfk8ltXWjzjC5VUGaB7L4QsXlFXOWjMMe1LYQ8gjZtLdtOu6lgN+Ls5SorID4xTCZ8oT2WRxc7Rw==}
+    engines: {node: '>=18'}
+
+  '@pumped-fn/react@0.5.15':
+    resolution: {integrity: sha512-EJtDYLewln8rq2dqWXbSYAgfS2KuOE2vQfEnWszj9AhAwvxuP2a9S2IqhCDwSICIx8tLr/fn/UyC5NXrXWewyQ==}
+    peerDependencies:
+      '@pumped-fn/core-next': ^0.5.40
+      react: ^18.0.0 || ^19.0.0
 
   '@quansync/fs@0.1.3':
     resolution: {integrity: sha512-G0OnZbMWEs5LhDyqy2UL17vGhSVHkQIfVojMtEWVenvj0V5S84VBgy86kJIuNsGDp2p7sTKlpSIpBUWdC35OKg==}
@@ -3198,6 +3208,35 @@ snapshots:
       '@pnpm/config.env-replace': 1.1.0
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
+
+  '@pumped-fn/core-next@0.5.41(typescript@5.8.3)':
+    dependencies:
+      tsdown: 0.11.13(typescript@5.8.3)
+    transitivePeerDependencies:
+      - '@oxc-project/runtime'
+      - oxc-resolver
+      - publint
+      - supports-color
+      - typescript
+      - unplugin-lightningcss
+      - unplugin-unused
+      - vue-tsc
+
+  '@pumped-fn/react@0.5.15(@pumped-fn/core-next@0.5.41(typescript@5.8.3))(react@18.3.1)(typescript@5.8.3)':
+    dependencies:
+      '@pumped-fn/core-next': 0.5.41(typescript@5.8.3)
+      proxy-compare: 3.0.1
+      react: 18.3.1
+      tsdown: 0.11.13(typescript@5.8.3)
+    transitivePeerDependencies:
+      - '@oxc-project/runtime'
+      - oxc-resolver
+      - publint
+      - supports-color
+      - typescript
+      - unplugin-lightningcss
+      - unplugin-unused
+      - vue-tsc
 
   '@quansync/fs@0.1.3':
     dependencies:

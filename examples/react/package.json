@@ -9,12 +9,14 @@
     "serve": "vite preview"
   },
   "dependencies": {
-    "@pumped-fn/core-next": "workspace:*",
-    "@pumped-fn/react": "workspace:*",
+    "@pumped-fn/react": "^0.5.15",
+    "@pumped-fn/core-next": "^0.5.40",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@pumped-fn/react": "workspace:*",
+    "@pumped-fn/core-next": "workspace:*",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.4.1",
