@@ -61,44 +61,6 @@ test("syntax", async () => {
   expect(derivedOfDerivedCounterValue.get()).toBe(3);
 });
 
-test("reset", async () => {
-  const scope = createScope();
-
-  const counterFn = vi.fn(() => 1);
-  const uFn = vi.fn();
-  const rFn = vi.fn();
-
-  const counter = provide(counterFn, name("counter"));
-  const resource = derive(
-    counter.reactive,
-    (counter, controller) => {
-      controller.cleanup(uFn);
-      rFn();
-      return counter + 1;
-    },
-    name("resource")
-  );
-
-  const nonRelatedResource = derive(counter, (counter) => {
-    rFn();
-    return counter + 2;
-  });
-
-  await scope.resolve(nonRelatedResource);
-  const resolvedResource = await scope.resolveAccessor(resource);
-  expect(resolvedResource.get()).toBe(2);
-  expect(rFn).toBeCalledTimes(2);
-
-  await scope.update(counter, 2);
-  expect(rFn).toBeCalledTimes(3);
-
-  await scope.update(counter, 3);
-  expect(rFn).toBeCalledTimes(4);
-
-  await scope.release(counter);
-  expect(counterFn).toBeCalledTimes(1);
-});
-
 test("reactive changes", async () => {
   const c = vi.fn();
   const counter = provide(() => 0, name("counter"));
@@ -236,10 +198,6 @@ test("can use release to control counter", async () => {
   await counterAccessor.update(2);
   expect(counterAccessor.get()).toBe(2);
   expect(derivedCounterAccessor.get()).toBe(3);
-
-  await scope.reset(counter);
-  expect(counterAccessor.get()).toBe(0);
-  expect(await derivedCounterAccessor.resolve()).toBe(1);
 });
 
 test("can use preset to advance value", async () => {

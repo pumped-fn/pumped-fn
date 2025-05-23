@@ -1,4 +1,6 @@
-export const executorSymbol: unique symbol = Symbol.for("@pumped-fn/core/executor");
+export const executorSymbol: unique symbol = Symbol.for(
+  "@pumped-fn/core/executor"
+);
 export const metaSymbol: unique symbol = Symbol.for("@pumped-fn/core/meta");
 
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
@@ -144,8 +146,18 @@ export declare namespace Core {
     readonly executor: Executor<T>;
   }
 
+  export type PendingState<T> = { kind: "pending"; promise: Promise<T> };
+  export type ResolvedState<T> = { kind: "resolved"; value: T };
+  export type RejectedState = { kind: "rejected"; error: unknown };
+
+  export type ResolveState<T> =
+    | PendingState<T>
+    | ResolvedState<T>
+    | RejectedState;
+
   export interface Accessor<T> extends Meta.MetaContainer {
-    lookup(): T;
+    lookup(): undefined | ResolveState<T>;
+
     get(): T;
     resolve(force?: boolean): Promise<T>;
     release(soft?: boolean): Promise<void>;
@@ -176,7 +188,6 @@ export declare namespace Core {
       updateFn: T | ((current: T) => T)
     ): Promise<void>;
 
-    reset<T>(executor: Executor<T>): Promise<void>;
     release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
     dispose(): Promise<void>;

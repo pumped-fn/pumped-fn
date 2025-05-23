@@ -9,10 +9,7 @@ import { Core } from "./types";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
-  value:
-    | { kind: "resolving"; promise: Promise<unknown> }
-    | { kind: "resolved"; value: unknown }
-    | { kind: "rejected"; error: unknown };
+  value: Core.ResolveState<unknown>;
 };
 
 type UE = Core.Executor<unknown>;
@@ -206,7 +203,7 @@ class Scope implements Core.Scope {
 
       this.cache.set(requestor, {
         accessor,
-        value: { kind: "resolving", promise },
+        value: { kind: "pending", promise },
       });
       return promise;
     };
@@ -217,7 +214,7 @@ class Scope implements Core.Scope {
 
         const cacheEntry = this.cache.get(requestor)?.value;
 
-        if (!cacheEntry || cacheEntry.kind === "resolving") {
+        if (!cacheEntry || cacheEntry.kind === "pending") {
           throw new Error("Executor is not resolved");
         }
 
@@ -230,7 +227,13 @@ class Scope implements Core.Scope {
       lookup: () => {
         this["~ensureNotDisposed"]();
 
-        return this.cache.get(requestor)?.value;
+        const cacheEntry = this.cache.get(requestor);
+
+        if (!cacheEntry) {
+          return undefined;
+        }
+
+        return cacheEntry.value;
       },
       metas: e.metas,
       resolve,
@@ -295,15 +298,6 @@ class Scope implements Core.Scope {
     }
 
     await this["~triggerUpdate"](e);
-  }
-
-  async reset<T>(executor: Core.Executor<T>): Promise<void> {
-    if (this.disposed) {
-      throw new Error("Scope is disposed");
-    }
-
-    await this.release(executor, true);
-    await this.resolve(executor, true);
   }
 
   async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
