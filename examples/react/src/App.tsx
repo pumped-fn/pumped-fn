@@ -1,11 +1,12 @@
 import { Suspense } from "react";
-import { pumped, ScopeProvider, useResolveMany } from "@pumped-fn/react";
+import { Reactives, ScopeProvider, useResolves } from "@pumped-fn/react";
 
 import { Todo, todoApp } from "./pumped.todo";
 import { counterApp } from "./pumped.counter";
+import { TestApp } from "./Proxied";
 
 function TodoList() {
-  const [setSelectedTodoId, controller] = useResolveMany(
+  const [setSelectedTodoId, controller] = useResolves(
     todoApp.setSelectedTodoId,
     todoApp.todosController
   );
@@ -13,7 +14,7 @@ function TodoList() {
   return (
     <>
       <h1>Todo list</h1>
-      <pumped.Reactives e={[todoApp.todos]}>
+      <Reactives e={[todoApp.todos]}>
         {([todos]) =>
           todos.map((todo) => (
             <div key={todo.id} onClick={() => setSelectedTodoId(todo.id)}>
@@ -24,9 +25,9 @@ function TodoList() {
             </div>
           ))
         }
-      </pumped.Reactives>
+      </Reactives>
 
-      <pumped.Reactives e={[todoApp.selectedTodo]}>
+      <Reactives e={[todoApp.selectedTodo]}>
         {([todo]) =>
           todo ? (
             <>
@@ -43,7 +44,7 @@ function TodoList() {
             </>
           ) : null
         }
-      </pumped.Reactives>
+      </Reactives>
 
       <form
         onSubmit={(e) => {
@@ -60,12 +61,8 @@ function TodoList() {
         <button type="submit">Add todo</button>
       </form>
 
-      <pumped.Reselect
-        e={todoApp.todos}
-        selector={(todos) => todos.filter((todo) => todo.completed)}
-        equality={compareTodo}
-      >
-        {(todos) => (
+      <Reactives e={[todoApp.completedTodos]}>
+        {([todos]) => (
           <>
             <h1>Completed todos {todos.length}</h1>
             {todos.map((todo) => (
@@ -73,50 +70,10 @@ function TodoList() {
             ))}
           </>
         )}
-      </pumped.Reselect>
+      </Reactives>
     </>
   );
 }
-
-function compareTodo(_prev: unknown, _next: unknown): boolean {
-  const prev = _prev as Todo[];
-  const next = _next as Todo[];
-
-  if (prev.length !== next.length) return false;
-
-  for (let i = 0; i < prev.length; i++) {
-    if (prev[i].id !== next[i].id) return false;
-    if (prev[i].content !== next[i].content) return false;
-    if (prev[i].completed !== next[i].completed) return false;
-  }
-
-  return true;
-}
-
-const Counter = () => (
-  <>
-    <pumped.Effect e={[counterApp.timer]} />
-    <pumped.Reactives e={[counterApp.counter]}>
-      {([count]) => <h1>Counter: {count}</h1>}
-    </pumped.Reactives>
-
-    <pumped.Resolve e={counterApp.configController}>
-      {(configController) => (
-        <>
-          <button onClick={() => configController.changeIncrement(1)}>
-            Increment
-          </button>
-          <button onClick={() => configController.changeInterval(-1)}>
-            Faster
-          </button>
-          <button onClick={() => configController.changeInterval(1)}>
-            Slower
-          </button>
-        </>
-      )}
-    </pumped.Resolve>
-  </>
-);
 
 export default function AppWrapper() {
   return (
@@ -124,7 +81,8 @@ export default function AppWrapper() {
       <Suspense>
         <TodoList />
         <hr />
-        <Counter />
+
+        <TestApp />
       </Suspense>
     </ScopeProvider>
   );

@@ -16,6 +16,10 @@ const idGenerator = provide(() => {
 
 const todos = provide(() => [] as Todo[]);
 
+const completedTodos = derive([todos.reactive], ([todos]) => {
+  return todos.filter((todo) => todo.completed);
+});
+
 const selectedTodoId = provide(() => null as string | null);
 
 const setSelectedTodoId = derive([selectedTodoId.static], ([ref]) => {
@@ -68,4 +72,5 @@ export const todoApp = {
   todosController,
   selectedTodo,
   setSelectedTodoId,
+  completedTodos,
 };

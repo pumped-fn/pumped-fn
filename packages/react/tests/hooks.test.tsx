@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Suspense, act } from "react";
 import { createScope, derive, provide } from "@pumped-fn/core-next";
-import { ScopeProvider, useResolve, useResolveMany } from "../src/index";
+import { ScopeProvider, useResolve, useResolves } from "../src/index";
 
 describe("React Integration", () => {
   it("handles complex state management scenarios", async () => {
@@ -38,7 +38,7 @@ describe("React Integration", () => {
         fn();
         // Test multiple hooks working together
         const [derived, update, wholesumValue, derivedResourceValue] =
-          useResolveMany(
+          useResolves(
             derivedCount.reactive,
             updateCount,
             wholesum,

@@ -27,8 +27,8 @@ importers:
   examples/react:
     dependencies:
       '@pumped-fn/core-next':
-        specifier: ^0.5.40
-        version: 0.5.40
+        specifier: workspace:*
+        version: link:../../packages/next
       '@pumped-fn/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -700,10 +700,6 @@ packages:
   '@pnpm/npm-conf@2.3.1':
     resolution: {integrity: sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw==}
     engines: {node: '>=12'}
-
-  '@pumped-fn/core-next@0.5.40':
-    resolution: {integrity: sha512-8Y5+QZCYK94ElkHHmb7w5m2irhjk/oFFl7B1LKl8Km3znGmwEIFar+gfkw6e9f70XyuEnsqlRY0ruYYvVvkr/w==}
-    engines: {node: '>=18'}
 
   '@quansync/fs@0.1.3':
     resolution: {integrity: sha512-G0OnZbMWEs5LhDyqy2UL17vGhSVHkQIfVojMtEWVenvj0V5S84VBgy86kJIuNsGDp2p7sTKlpSIpBUWdC35OKg==}
@@ -3202,8 +3198,6 @@ snapshots:
       '@pnpm/config.env-replace': 1.1.0
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
-
-  '@pumped-fn/core-next@0.5.40': {}
 
   '@quansync/fs@0.1.3':
     dependencies:
