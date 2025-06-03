@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/react",
-  "version": "0.5.15",
+  "version": "0.5.16",
   "description": "React bindings for Pumped Functions",
   "keywords": [
     "pumped-fn",
