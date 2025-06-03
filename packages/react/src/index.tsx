@@ -113,8 +113,8 @@ export function useResolves<T extends Array<Core.BaseExecutor<unknown>>>(
     resolveKitRef.current = kit;
   }
 
-  return useSyncExternalStore(
-    (cb) => {
+  const sub = useMemo(
+    () => (cb: () => void) => {
       const cleanups = [] as Core.Cleanup[];
       for (let i = 0; i < resolveKitRef.current.resolved.length; i++) {
         const executor = executors[i];
@@ -160,6 +160,11 @@ export function useResolves<T extends Array<Core.BaseExecutor<unknown>>>(
         }
       };
     },
+    [scope, ...executors]
+  );
+
+  return useSyncExternalStore(
+    sub,
     () => resolveKitRef.current.proxies as any,
     () => resolveKitRef.current.proxies as any
   );
