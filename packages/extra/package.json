@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/extra",
-  "version": "0.5.20",
+  "version": "0.5.21",
   "description": "Utilities to build full stack application using @pumped-fn/core",
   "keywords": [
     "pumped-fn",
@@ -23,7 +23,7 @@
     "test:watch": "vitest watch"
   },
   "peerDependencies": {
-    "@pumped-fn/core-next": "^0.5.37",
+    "@pumped-fn/core-next": "^0.5.42",
     "zod": "^3.24.2"
   },
   "files": [
