@@ -19,6 +19,8 @@ export declare namespace Client {
   ) => Promise<StandardSchemaV1.InferOutput<S[K]["output"]>>;
 }
 
+export * from "./logger";
+
 export const client = {
   createAnyRequestHandler(
     handler:

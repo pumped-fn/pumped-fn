@@ -50,26 +50,6 @@
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
       "require": "./dist/server.cjs"
-    },
-    "./bun": {
-      "types": "./dist/bun/index.d.ts",
-      "import": "./dist/bun/index.js",
-      "require": "./dist/bun/index.cjs"
-    },
-    "./meta/http": {
-      "types": "./dist/meta/http.d.ts",
-      "import": "./dist/meta/http.js",
-      "require": "./dist/meta/http.cjs"
-    },
-    "./standardschema": {
-      "types": "./dist/standardschema.d.ts",
-      "import": "./dist/standardschema.js",
-      "require": "./dist/standardschema.cjs"
-    },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js",
-      "require": "./dist/types.cjs"
     }
   },
   "release-it": {

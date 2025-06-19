@@ -13,7 +13,9 @@ export declare namespace Def {
     readonly output: StandardSchemaV1<O>;
   }
 
-  export interface Stream<MI, MO, I, O> extends API<I, O> {
+  export interface Stream<MI, MO, I> {
+    id: string;
+    readonly input: StandardSchemaV1<I>;
     readonly messageIn: StandardSchemaV1<MI>;
     readonly messageOut: StandardSchemaV1<MO>;
   }
@@ -47,7 +49,7 @@ export const define = {
   api<I, O>(api: Def.API<I, O>): typeof api {
     return api;
   },
-  stream<MI, MO, I, O>(stream: Def.Stream<MI, MO, I, O>): typeof stream {
+  stream<MI, MO, I, O>(stream: Def.Stream<MI, MO, I>): typeof stream {
     return stream;
   },
   service<Service extends Record<string, Def.AnyAPI>>(
@@ -144,13 +146,17 @@ class Builder<Service extends Def.Service, Context = undefined> {
 
 export declare namespace Router {
   export type RouteFn<R extends Request> = (
-    request: R
+    request: R,
+    ...args: any[]
   ) => Promise<Response> | Response;
 
   export type Route<R extends Request> = Core.Executor<RouteFn<R>>;
 
-  export type RouterInput<R extends Request> = Record<string, Route<R> | RouteFn<R>>;
-  export type Router< R extends Request> = Record<string, Route<R>>;
+  export type RouterInput<R extends Request> = Record<
+    string,
+    Route<R> | RouteFn<R>
+  >;
+  export type Router<R extends Request> = Record<string, Route<R>>;
 
   export type MiddlewareFn<R extends Request> = (
     request: R,
@@ -161,13 +167,14 @@ export declare namespace Router {
 }
 
 export const routes = {
-  router: <R extends Request>(router: Router.RouterInput<R>): Router.Router<R> => {
-    const _router: Router.Router<R> = {}
+  router: <R extends Request>(
+    router: Router.RouterInput<R>
+  ): Router.Router<R> => {
+    const _router: Router.Router<R> = {};
     for (const key in router) {
       if (!isExecutor(router[key])) {
         Object.assign(_router, { [key]: provide(() => router[key]) });
-      }
-      else {
+      } else {
         Object.assign(_router, { [key]: router[key] });
       }
     }
