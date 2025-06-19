@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.22](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.21...@pumped-fn/extra@0.5.22) (2025-06-19)
+
+
+### Features
+
+* added experimental stream spi ([00e9af5](https://github.com/pumped-fn/pumped-fn/commit/00e9af58e2220739f05a117a566036ad6f70e8c1))
+* **core:** added resolves api for better QoL ([b4923ab](https://github.com/pumped-fn/pumped-fn/commit/b4923ab770faa30e96003770947446944866eb7c))
+
 ## [0.5.21](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.20...@pumped-fn/extra@0.5.21) (2025-06-17)
 
 
