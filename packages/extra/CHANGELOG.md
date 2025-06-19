@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.23](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.22...@pumped-fn/extra@0.5.23) (2025-06-19)
+
+
+### Bug Fixes
+
+* corrected stream shape ([b7eddc1](https://github.com/pumped-fn/pumped-fn/commit/b7eddc17a3a691be5f82031bfec28415404ff8de))
+* retain output ([363af29](https://github.com/pumped-fn/pumped-fn/commit/363af294c0f9edc96cd731df279edd80d6226d2b))
+
 ## [0.5.22](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/extra@0.5.21...@pumped-fn/extra@0.5.22) (2025-06-19)
 
 
