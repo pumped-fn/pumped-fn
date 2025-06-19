@@ -13,8 +13,9 @@ export declare namespace Def {
     readonly output: StandardSchemaV1<O>;
   }
 
-  export interface Stream<MI, MO, O> {
+  export interface Stream<MI, MO, I, O> {
     id: string;
+    readonly input: StandardSchemaV1<I>;
     readonly output: StandardSchemaV1<O>;
     readonly messageIn: StandardSchemaV1<MI>;
     readonly messageOut: StandardSchemaV1<MO>;
@@ -49,7 +50,7 @@ export const define = {
   api<I, O>(api: Def.API<I, O>): typeof api {
     return api;
   },
-  stream<MI, MO, O>(stream: Def.Stream<MI, MO, O>): typeof stream {
+  stream<MI, MO, I, O>(stream: Def.Stream<MI, MO, I, O>): typeof stream {
     return stream;
   },
   service<Service extends Record<string, Def.AnyAPI>>(
