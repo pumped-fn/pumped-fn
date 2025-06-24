@@ -1,4 +1,5 @@
 import { Core, executorSymbol, Meta } from "./types";
+import type { Escapable } from "./helpers";
 
 function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
@@ -137,10 +138,15 @@ export function derive<T, D>(
   return createExecutor(pfactory as any, pdependencies, metas);
 }
 
-export function preset<T>(e: Core.Executor<T>, v: T): Core.Preset<T> {
+export function preset<T>(
+  e: Core.Executor<T> | Escapable<T>,
+  v: T
+): Core.Preset<T> {
+  const executor = isExecutor(e) ? e : e.escape();
+
   return {
     [executorSymbol]: "preset",
     value: v,
-    executor: e,
+    executor,
   };
 }

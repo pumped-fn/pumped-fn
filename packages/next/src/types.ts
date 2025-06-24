@@ -1,3 +1,5 @@
+import { AdaptedExecutor, PreparedExecutor } from "./helpers";
+
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
@@ -171,10 +173,15 @@ export declare namespace Core {
     value: T;
   }
 
-  export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
+  export type InferOutput<T> = T extends
+    | Executor<infer U>
+    | Reactive<infer U>
+    | PreparedExecutor<infer U>
     ? Awaited<U>
     : T extends Lazy<infer U> | Static<infer U>
     ? Accessor<Awaited<U>>
+    : T extends AdaptedExecutor<infer A, infer U>
+    ? (...args: A) => Promise<Awaited<U>>
     : never;
 
   export interface Scope {
