@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.43](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.42...@pumped-fn/next@0.5.43) (2025-06-24)
+
+
+### Features
+
+* added prepare and adapt to makes the utilities adapting to framework easier ([1f394db](https://github.com/pumped-fn/pumped-fn/commit/1f394dbc1be39e6d58ffa229a65c92ded9ddf901))
+* **core:** added resolves api for better QoL ([b4923ab](https://github.com/pumped-fn/pumped-fn/commit/b4923ab770faa30e96003770947446944866eb7c))
+
 ## [0.5.42](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.41...@pumped-fn/next@0.5.42) (2025-06-17)
 
 ## [0.5.41](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.39...@pumped-fn/next@0.5.41) (2025-05-23)
