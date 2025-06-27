@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.44](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.43...@pumped-fn/next@0.5.44) (2025-06-27)
+
+
+### Features
+
+* **core:** added event listening for resolve, update and dispose ([238001b](https://github.com/pumped-fn/pumped-fn/commit/238001b2d972fd1d48d5f7abc98d85a5495c1306))
+
 ## [0.5.43](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.42...@pumped-fn/next@0.5.43) (2025-06-24)
 
 
