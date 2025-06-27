@@ -28,6 +28,12 @@ class Scope implements Core.Scope {
   private cache: Map<UE, CacheEntry> = new Map();
   private cleanups = new Map<UE, Set<Core.Cleanup>>();
   private onUpdates = new Map<UE, Set<OnUpdateFn | UE>>();
+  private onEvents = {
+    change: new Set<Core.ChangeCallback>(),
+    release: new Set<Core.ReleaseCallback>(),
+  } as const;
+
+  private middlewares: Core.Middleware[] = [];
 
   constructor(...presets: Core.Preset<unknown>[]) {
     for (const preset of presets) {
@@ -183,13 +189,23 @@ class Scope implements Core.Scope {
       const promise = new Promise((resolve, reject) => {
         this["~resolveDependencies"](requestor.dependencies, requestor)
           .then((dependencies) => factory(dependencies as any, controller))
-          .then((result) => {
+          .then(async (result) => {
+            let current = result;
+
+            const events = this.onEvents.change;
+            for (const event of events) {
+              const updated = event("resolve", requestor, current, this);
+              if (updated !== undefined && updated.executor === requestor) {
+                current = updated.value;
+              }
+            }
+
             this.cache.set(requestor, {
               accessor,
-              value: { kind: "resolved", value: result },
+              value: { kind: "resolved", value: current },
             });
 
-            resolve(result);
+            resolve(current);
           })
           .catch((error) => {
             this.cache.set(requestor, {
@@ -283,19 +299,27 @@ class Scope implements Core.Scope {
     this["~triggerCleanup"](e);
     const accessor = this["~makeAccessor"](e);
 
+    let value: T | undefined;
+
     if (typeof u === "function") {
       const fn = u as (current: T) => T;
-      const n = fn(accessor.get() as T);
-      this.cache.set(e, {
-        accessor,
-        value: { kind: "resolved", value: n },
-      });
+      value = fn(accessor.get() as T);
     } else {
-      this.cache.set(e, {
-        accessor,
-        value: { kind: "resolved", value: u },
-      });
+      value = u;
     }
+
+    const events = this.onEvents.change;
+    for (const event of events) {
+      const updated = event("update", e, value, this);
+      if (updated !== undefined && e === updated.executor) {
+        value = updated.value as any;
+      }
+    }
+
+    this.cache.set(e, {
+      accessor,
+      value: { kind: "resolved", value },
+    });
 
     await this["~triggerUpdate"](e);
   }
@@ -309,6 +333,10 @@ class Scope implements Core.Scope {
     }
 
     await this["~triggerCleanup"](e);
+    const events = this.onEvents.release;
+    for (const event of events) {
+      await event("release", e, this);
+    }
 
     const ou = this.onUpdates.get(e);
     if (ou) {
@@ -326,6 +354,12 @@ class Scope implements Core.Scope {
 
   async dispose(): Promise<void> {
     this["~ensureNotDisposed"]();
+
+    const disposeEvents = this.middlewares.map(
+      (m) => m.dispose?.(this) ?? Promise.resolve()
+    );
+    await Promise.all(disposeEvents);
+
     const currents = this.cache.keys();
     for (const current of currents) {
       await this.release(current, true);
@@ -334,6 +368,9 @@ class Scope implements Core.Scope {
     this.disposed = true;
     this.cache.clear();
     this.cleanups.clear();
+    this.onUpdates.clear();
+    this.onEvents.change.clear();
+    this.onEvents.release.clear();
   }
 
   onUpdate<T>(
@@ -358,8 +395,44 @@ class Scope implements Core.Scope {
       }
     };
   }
+
+  onChange(callback: Core.ChangeCallback): Core.Cleanup {
+    this["~ensureNotDisposed"]();
+
+    this.onEvents["change"].add(callback as any);
+    return () => {
+      this["~ensureNotDisposed"]();
+      this.onEvents["change"].delete(callback as any);
+    };
+  }
+
+  onRelease(cb: Core.ReleaseCallback): Core.Cleanup {
+    this["~ensureNotDisposed"]();
+
+    this.onEvents["release"].add(cb);
+    return () => {
+      this["~ensureNotDisposed"]();
+      this.onEvents["release"].delete(cb);
+    };
+  }
+
+  use(middleware: Core.Middleware): Core.Cleanup {
+    this["~ensureNotDisposed"]();
+    this.middlewares.push(middleware);
+
+    middleware.init?.(this);
+
+    return () => {
+      this["~ensureNotDisposed"]();
+      this.middlewares = this.middlewares.filter((m) => m !== middleware);
+    };
+  }
 }
 
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope {
   return new Scope(...presets);
+}
+
+export function middleware(m: Core.Middleware): Core.Middleware {
+  return m;
 }

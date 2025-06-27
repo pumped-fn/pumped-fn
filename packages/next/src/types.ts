@@ -184,6 +184,28 @@ export declare namespace Core {
     ? (...args: A) => Promise<Awaited<U>>
     : never;
 
+  export type Event = "resolve" | "update" | "release";
+  export type Replacer = Preset<unknown>;
+  type EventCallbackResult = void | Replacer;
+
+  export type ChangeCallback = (
+    event: "resolve" | "update",
+    executor: Executor<unknown>,
+    resolved: unknown,
+    scope: Scope
+  ) => EventCallbackResult;
+
+  export type ReleaseCallback = (
+    event: "release",
+    executor: Executor<unknown>,
+    scope: Scope
+  ) => void | Promise<void>;
+
+  export type Middleware = {
+    init?: (scope: Scope) => void | Promise<void>;
+    dispose?: (scope: Scope) => void | Promise<void>;
+  };
+
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
 
@@ -203,6 +225,10 @@ export declare namespace Core {
       executor: Executor<T>,
       callback: (accessor: Accessor<T>) => void
     ): Cleanup;
-    // onRelease<T>(executor: Executor<T>, callback: () => void): () => void;
+
+    onChange(cb: ChangeCallback): Cleanup;
+    onRelease(cb: ReleaseCallback): Cleanup;
+
+    use(middleware: Middleware): Cleanup;
   }
 }

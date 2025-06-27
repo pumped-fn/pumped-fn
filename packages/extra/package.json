@@ -50,6 +50,11 @@
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
       "require": "./dist/server.cjs"
+    },
+    "./implicit": {
+      "types": "./dist/implicit.d.ts",
+      "import": "./dist/implicit.js",
+      "require": "./dist/implicit.cjs"
     }
   },
   "release-it": {
