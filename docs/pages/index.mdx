@@ -1,0 +1,74 @@
+# Pumped Functions
+
+A modern TypeScript functional programming library that provides **container-based dependency injection** and **reactive programming patterns**. Built with type safety and developer experience in mind.
+
+## Why Pumped Functions?
+
+- **🔧 Container-based DI**: Elegant dependency injection without the complexity
+- **⚡ Reactive Programming**: Built-in reactivity with automatic dependency tracking
+- **🎯 Type Safety**: Full TypeScript support with excellent inference
+- **🔄 React Integration**: Seamless React hooks and components
+- **📦 Modular Design**: Use only what you need
+- **🧪 Testing-First**: Comprehensive testing utilities included
+
+## Key Features
+
+### Executors
+Executors are the core building blocks - containers that hold values and define how dependencies are resolved.
+
+```typescript
+import { exec } from '@pumped-fn/core-next';
+
+// Simple executor
+const greeting = exec(() => 'Hello World!');
+
+// Executor with dependencies
+const userGreeting = exec((name: string) => `Hello ${name}!`, name);
+```
+
+### Reactive Programming
+Built-in reactivity that automatically tracks dependencies and updates when they change.
+
+```typescript
+const counter = exec(() => ({ count: 0 }));
+const doubled = exec((state) => state.count * 2, counter.reactive);
+```
+
+### React Integration
+Seamless integration with React components using hooks and providers.
+
+```typescript
+import { useResolves, ScopeProvider } from '@pumped-fn/react';
+
+function App() {
+  const [greeting, count] = useResolves(greeting, counter);
+  return <div>{greeting} - Count: {count.count}</div>;
+}
+```
+
+## Quick Start
+
+Get started in minutes with our comprehensive guides:
+
+- [Installation](/getting-started/installation) - Setup and installation
+- [Quick Start](/getting-started/quick-start) - Your first Pumped Functions app
+- [Core Concepts](/core-concepts/executors) - Understanding executors and scopes
+- [React Integration](/react/overview) - Using with React applications
+
+## Package Overview
+
+| Package | Description | Version |
+|---------|-------------|---------|
+| `@pumped-fn/core-next` | Core library with executors and scopes | ![npm](https://img.shields.io/npm/v/@pumped-fn/core-next) |
+| `@pumped-fn/react` | React bindings and hooks | ![npm](https://img.shields.io/npm/v/@pumped-fn/react) |
+| `@pumped-fn/extra` | Additional full-stack utilities | ![npm](https://img.shields.io/npm/v/@pumped-fn/extra) |
+
+## Community & Support
+
+- **GitHub**: [pumped-fn/pumped-fn](https://github.com/pumped-fn/pumped-fn)
+- **Issues**: [Report bugs and feature requests](https://github.com/pumped-fn/pumped-fn/issues)
+- **Discussions**: [Community discussions](https://github.com/pumped-fn/pumped-fn/discussions)
+
+## Next Steps
+
+Ready to dive in? Start with our [installation guide](/getting-started/installation) or explore [core concepts](/core-concepts/executors) to understand the fundamentals.

@@ -1,0 +1,1021 @@
+# Counter App Example
+
+A comprehensive counter application demonstrating core Pumped Functions concepts including state management, reactive programming, and React integration.
+
+## Overview
+
+This example showcases:
+- Basic state management with executors
+- Reactive derived state
+- React hooks integration
+- Multiple counter instances
+- Persistence with localStorage
+- Testing strategies
+
+## Basic Counter
+
+Let's start with a simple counter:
+
+```typescript
+// src/executors/counter.ts
+import { exec } from '@pumped-fn/core-next';
+
+export interface CounterState {
+  count: number;
+  step: number;
+}
+
+// Core counter state
+export const counterState = exec((): CounterState => ({
+  count: 0,
+  step: 1,
+}));
+
+// Derived state - counter display text
+export const counterDisplay = exec(
+  (state: CounterState) => `Count: ${state.count}`,
+  counterState.reactive
+);
+
+// Derived state - is even/odd
+export const isEven = exec(
+  (state: CounterState) => state.count % 2 === 0,
+  counterState.reactive
+);
+```
+
+## Action Creators
+
+Create actions to modify the counter state:
+
+```typescript
+// src/executors/actions.ts
+import { exec } from '@pumped-fn/core-next';
+import { CounterState } from './counter';
+
+// Action: Increment counter
+export const increment = exec(
+  () => (state: CounterState): CounterState => ({
+    ...state,
+    count: state.count + state.step,
+  })
+);
+
+// Action: Decrement counter
+export const decrement = exec(
+  () => (state: CounterState): CounterState => ({
+    ...state,
+    count: state.count - state.step,
+  })
+);
+
+// Action: Reset counter
+export const reset = exec(
+  () => (state: CounterState): CounterState => ({
+    ...state,
+    count: 0,
+  })
+);
+
+// Action: Set step size
+export const setStep = exec(
+  (step: number) => (state: CounterState): CounterState => ({
+    ...state,
+    step,
+  })
+);
+
+// Action: Set count directly
+export const setCount = exec(
+  (count: number) => (state: CounterState): CounterState => ({
+    ...state,
+    count,
+  })
+);
+```
+
+## React Components
+
+### Basic Counter Component
+
+```typescript
+// src/components/Counter.tsx
+import React from 'react';
+import { useResolves, useUpdate } from '@pumped-fn/react';
+import { counterState, counterDisplay, isEven } from '../executors/counter';
+import { increment, decrement, reset } from '../executors/actions';
+
+export function Counter() {
+  const [state, display, even] = useResolves(counterState, counterDisplay, isEven);
+  const updateCounter = useUpdate(counterState);
+
+  const handleIncrement = () => {
+    updateCounter(increment());
+  };
+
+  const handleDecrement = () => {
+    updateCounter(decrement());
+  };
+
+  const handleReset = () => {
+    updateCounter(reset());
+  };
+
+  return (
+    <div className="counter">
+      <h2>{display}</h2>
+      <p className={even ? 'even' : 'odd'}>
+        {even ? 'Even' : 'Odd'}
+      </p>
+      
+      <div className="controls">
+        <button onClick={handleDecrement}>-</button>
+        <button onClick={handleReset}>Reset</button>
+        <button onClick={handleIncrement}>+</button>
+      </div>
+      
+      <div className="step-control">
+        <label>
+          Step size: 
+          <input
+            type="number"
+            value={state.step}
+            onChange={(e) => updateCounter(setStep(parseInt(e.target.value) || 1))}
+            min="1"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+```
+
+### Advanced Counter with Statistics
+
+```typescript
+// src/executors/stats.ts
+import { exec } from '@pumped-fn/core-next';
+import { counterState } from './counter';
+
+export interface CounterStats {
+  totalIncrements: number;
+  totalDecrements: number;
+  maxValue: number;
+  minValue: number;
+  operations: string[];
+}
+
+export const counterStats = exec((): CounterStats => ({
+  totalIncrements: 0,
+  totalDecrements: 0,
+  maxValue: 0,
+  minValue: 0,
+  operations: [],
+}));
+
+// Track statistics when counter changes
+export const statsUpdater = exec(
+  (state: CounterState, stats: CounterStats) => {
+    // This would be called by actions to update stats
+    return stats;
+  },
+  [counterState.reactive, counterStats.reactive]
+);
+```
+
+```typescript
+// src/components/CounterWithStats.tsx
+import React from 'react';
+import { useResolves, useUpdate } from '@pumped-fn/react';
+import { counterState } from '../executors/counter';
+import { counterStats } from '../executors/stats';
+
+export function CounterWithStats() {
+  const [state, stats] = useResolves(counterState, counterStats);
+  const updateCounter = useUpdate(counterState);
+  const updateStats = useUpdate(counterStats);
+
+  const incrementWithStats = () => {
+    const newCount = state.count + state.step;
+    updateCounter(current => ({ ...current, count: newCount }));
+    updateStats(current => ({
+      ...current,
+      totalIncrements: current.totalIncrements + 1,
+      maxValue: Math.max(current.maxValue, newCount),
+      operations: [...current.operations, `+${state.step} → ${newCount}`],
+    }));
+  };
+
+  const decrementWithStats = () => {
+    const newCount = state.count - state.step;
+    updateCounter(current => ({ ...current, count: newCount }));
+    updateStats(current => ({
+      ...current,
+      totalDecrements: current.totalDecrements + 1,
+      minValue: Math.min(current.minValue, newCount),
+      operations: [...current.operations, `-${state.step} → ${newCount}`],
+    }));
+  };
+
+  return (
+    <div className="counter-with-stats">
+      <div className="counter-display">
+        <h2>Count: {state.count}</h2>
+        <div className="controls">
+          <button onClick={decrementWithStats}>-{state.step}</button>
+          <button onClick={incrementWithStats}>+{state.step}</button>
+        </div>
+      </div>
+      
+      <div className="stats">
+        <h3>Statistics</h3>
+        <ul>
+          <li>Increments: {stats.totalIncrements}</li>
+          <li>Decrements: {stats.totalDecrements}</li>
+          <li>Max Value: {stats.maxValue}</li>
+          <li>Min Value: {stats.minValue}</li>
+        </ul>
+        
+        <div className="operations">
+          <h4>Recent Operations</h4>
+          <ul>
+            {stats.operations.slice(-5).map((op, index) => (
+              <li key={index}>{op}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Multiple Counter Instances
+
+Create a system for managing multiple counters:
+
+```typescript
+// src/executors/multiCounter.ts
+import { exec } from '@pumped-fn/core-next';
+
+export interface Counter {
+  id: string;
+  name: string;
+  count: number;
+  step: number;
+}
+
+export interface MultiCounterState {
+  counters: Counter[];
+  activeCounterId: string | null;
+}
+
+export const multiCounterState = exec((): MultiCounterState => ({
+  counters: [],
+  activeCounterId: null,
+}));
+
+// Derived state - active counter
+export const activeCounter = exec(
+  (state: MultiCounterState): Counter | null => {
+    return state.counters.find(c => c.id === state.activeCounterId) || null;
+  },
+  multiCounterState.reactive
+);
+
+// Derived state - counter totals
+export const counterTotals = exec(
+  (state: MultiCounterState) => ({
+    totalCount: state.counters.reduce((sum, c) => sum + c.count, 0),
+    averageCount: state.counters.length > 0 
+      ? state.counters.reduce((sum, c) => sum + c.count, 0) / state.counters.length 
+      : 0,
+    maxCount: Math.max(...state.counters.map(c => c.count), 0),
+    minCount: Math.min(...state.counters.map(c => c.count), 0),
+  }),
+  multiCounterState.reactive
+);
+```
+
+```typescript
+// src/components/MultiCounterManager.tsx
+import React, { useState } from 'react';
+import { useResolves, useUpdate } from '@pumped-fn/react';
+import { multiCounterState, activeCounter, counterTotals } from '../executors/multiCounter';
+
+export function MultiCounterManager() {
+  const [state, active, totals] = useResolves(multiCounterState, activeCounter, counterTotals);
+  const updateState = useUpdate(multiCounterState);
+  const [newCounterName, setNewCounterName] = useState('');
+
+  const addCounter = () => {
+    if (!newCounterName.trim()) return;
+    
+    const newCounter = {
+      id: crypto.randomUUID(),
+      name: newCounterName.trim(),
+      count: 0,
+      step: 1,
+    };
+
+    updateState(current => ({
+      ...current,
+      counters: [...current.counters, newCounter],
+      activeCounterId: newCounter.id,
+    }));
+
+    setNewCounterName('');
+  };
+
+  const removeCounter = (id: string) => {
+    updateState(current => ({
+      counters: current.counters.filter(c => c.id !== id),
+      activeCounterId: current.activeCounterId === id ? null : current.activeCounterId,
+    }));
+  };
+
+  const updateCounter = (id: string, updates: Partial<Counter>) => {
+    updateState(current => ({
+      ...current,
+      counters: current.counters.map(c =>
+        c.id === id ? { ...c, ...updates } : c
+      ),
+    }));
+  };
+
+  const setActiveCounter = (id: string) => {
+    updateState(current => ({
+      ...current,
+      activeCounterId: id,
+    }));
+  };
+
+  return (
+    <div className="multi-counter-manager">
+      <div className="header">
+        <h2>Multi-Counter Manager</h2>
+        
+        <div className="add-counter">
+          <input
+            type="text"
+            value={newCounterName}
+            onChange={(e) => setNewCounterName(e.target.value)}
+            placeholder="Counter name"
+            onKeyPress={(e) => e.key === 'Enter' && addCounter()}
+          />
+          <button onClick={addCounter}>Add Counter</button>
+        </div>
+      </div>
+
+      <div className="totals">
+        <h3>Totals</h3>
+        <div className="totals-grid">
+          <div>Total: {totals.totalCount}</div>
+          <div>Average: {totals.averageCount.toFixed(1)}</div>
+          <div>Max: {totals.maxCount}</div>
+          <div>Min: {totals.minCount}</div>
+        </div>
+      </div>
+
+      <div className="counters-grid">
+        <div className="counter-list">
+          <h3>Counters</h3>
+          {state.counters.map(counter => (
+            <div
+              key={counter.id}
+              className={`counter-item ${counter.id === state.activeCounterId ? 'active' : ''}`}
+              onClick={() => setActiveCounter(counter.id)}
+            >
+              <div className="counter-info">
+                <strong>{counter.name}</strong>
+                <span>Count: {counter.count}</span>
+              </div>
+              <div className="counter-controls">
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  updateCounter(counter.id, { count: counter.count - counter.step });
+                }}>
+                  -
+                </button>
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  updateCounter(counter.id, { count: counter.count + counter.step });
+                }}>
+                  +
+                </button>
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  removeCounter(counter.id);
+                }}>
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="active-counter">
+          {active ? (
+            <div>
+              <h3>Active Counter: {active.name}</h3>
+              <div className="counter-detail">
+                <div className="count-display">
+                  <h1>{active.count}</h1>
+                </div>
+                <div className="controls">
+                  <button onClick={() => updateCounter(active.id, { count: active.count - active.step })}>
+                    -{active.step}
+                  </button>
+                  <button onClick={() => updateCounter(active.id, { count: 0 })}>
+                    Reset
+                  </button>
+                  <button onClick={() => updateCounter(active.id, { count: active.count + active.step })}>
+                    +{active.step}
+                  </button>
+                </div>
+                <div className="step-control">
+                  <label>
+                    Step: 
+                    <input
+                      type="number"
+                      value={active.step}
+                      onChange={(e) => updateCounter(active.id, { step: parseInt(e.target.value) || 1 })}
+                      min="1"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="no-active">
+              <p>Select a counter to edit</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Persistence
+
+Add localStorage persistence:
+
+```typescript
+// src/executors/persistence.ts
+import { exec } from '@pumped-fn/core-next';
+import { CounterState } from './counter';
+import { MultiCounterState } from './multiCounter';
+
+const STORAGE_KEYS = {
+  counter: 'pumped-counter',
+  multiCounter: 'pumped-multi-counter',
+};
+
+// Load counter state from localStorage
+export const loadCounterState = exec((): CounterState => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.counter);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (error) {
+    console.warn('Failed to load counter state:', error);
+  }
+  return { count: 0, step: 1 };
+});
+
+// Save counter state to localStorage
+export const saveCounterState = exec(
+  (state: CounterState) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.counter, JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save counter state:', error);
+    }
+  }
+);
+
+// Load multi-counter state
+export const loadMultiCounterState = exec((): MultiCounterState => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.multiCounter);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (error) {
+    console.warn('Failed to load multi-counter state:', error);
+  }
+  return { counters: [], activeCounterId: null };
+});
+
+// Save multi-counter state
+export const saveMultiCounterState = exec(
+  (state: MultiCounterState) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.multiCounter, JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save multi-counter state:', error);
+    }
+  }
+);
+```
+
+Update the counter executors to use persistence:
+
+```typescript
+// src/executors/counter.ts (updated)
+import { exec } from '@pumped-fn/core-next';
+import { loadCounterState, saveCounterState } from './persistence';
+
+export interface CounterState {
+  count: number;
+  step: number;
+}
+
+// Core counter state with persistence
+export const counterState = exec(
+  (initialState: CounterState): CounterState => initialState,
+  loadCounterState
+);
+
+// Auto-save when state changes
+export const counterPersistence = exec(
+  (state: CounterState) => {
+    saveCounterState(state);
+    return state;
+  },
+  counterState.reactive
+);
+
+// Rest of the executors remain the same...
+```
+
+## Main Application
+
+Put it all together:
+
+```typescript
+// src/App.tsx
+import React from 'react';
+import { ScopeProvider, Effect } from '@pumped-fn/react';
+import { Counter } from './components/Counter';
+import { CounterWithStats } from './components/CounterWithStats';
+import { MultiCounterManager } from './components/MultiCounterManager';
+import { counterPersistence } from './executors/counter';
+import './App.css';
+
+function App() {
+  return (
+    <ScopeProvider>
+      <Effect e={[counterPersistence]} />
+      <div className="app">
+        <header>
+          <h1>Counter Examples</h1>
+        </header>
+        
+        <main>
+          <section>
+            <h2>Basic Counter</h2>
+            <Counter />
+          </section>
+          
+          <section>
+            <h2>Counter with Statistics</h2>
+            <CounterWithStats />
+          </section>
+          
+          <section>
+            <h2>Multi-Counter Manager</h2>
+            <MultiCounterManager />
+          </section>
+        </main>
+      </div>
+    </ScopeProvider>
+  );
+}
+
+export default App;
+```
+
+## Styling
+
+Add some CSS to make it look good:
+
+```css
+/* src/App.css */
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.app header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.app section {
+  margin-bottom: 40px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.counter {
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.counter h2 {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+.counter .even {
+  color: #007bff;
+}
+
+.counter .odd {
+  color: #dc3545;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.controls button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.controls button:hover {
+  background: #f8f9fa;
+}
+
+.step-control {
+  margin-top: 20px;
+}
+
+.step-control input {
+  margin-left: 10px;
+  padding: 5px;
+  width: 60px;
+}
+
+.counter-with-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.stats ul {
+  list-style: none;
+  padding: 0;
+}
+
+.stats li {
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.multi-counter-manager {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.add-counter {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.add-counter input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.counters-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.counter-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 5px;
+}
+
+.counter-item:hover {
+  background: #f8f9fa;
+}
+
+.counter-item.active {
+  border-color: #007bff;
+  background: #e3f2fd;
+}
+
+.counter-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.counter-controls button {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: white;
+  cursor: pointer;
+}
+
+.count-display h1 {
+  font-size: 3em;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.no-active {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+```
+
+## Testing
+
+Comprehensive tests for the counter application:
+
+```typescript
+// src/__tests__/counter.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createScope } from '@pumped-fn/core-next';
+import { counterState, counterDisplay, isEven } from '../executors/counter';
+import { increment, decrement, reset, setStep } from '../executors/actions';
+
+describe('Counter', () => {
+  let scope: Scope;
+
+  beforeEach(() => {
+    scope = createScope();
+  });
+
+  it('should have initial state', () => {
+    const state = scope.resolve(counterState);
+    expect(state).toEqual({ count: 0, step: 1 });
+  });
+
+  it('should increment count', () => {
+    scope.update(counterState, increment());
+    const state = scope.resolve(counterState);
+    expect(state.count).toBe(1);
+  });
+
+  it('should decrement count', () => {
+    scope.update(counterState, decrement());
+    const state = scope.resolve(counterState);
+    expect(state.count).toBe(-1);
+  });
+
+  it('should reset count', () => {
+    scope.update(counterState, increment());
+    scope.update(counterState, increment());
+    scope.update(counterState, reset());
+    
+    const state = scope.resolve(counterState);
+    expect(state.count).toBe(0);
+  });
+
+  it('should update step size', () => {
+    scope.update(counterState, setStep(5));
+    scope.update(counterState, increment());
+    
+    const state = scope.resolve(counterState);
+    expect(state.count).toBe(5);
+  });
+
+  it('should update display text reactively', () => {
+    const initialDisplay = scope.resolve(counterDisplay);
+    expect(initialDisplay).toBe('Count: 0');
+
+    scope.update(counterState, increment());
+    const updatedDisplay = scope.resolve(counterDisplay);
+    expect(updatedDisplay).toBe('Count: 1');
+  });
+
+  it('should determine even/odd correctly', () => {
+    expect(scope.resolve(isEven)).toBe(true); // 0 is even
+
+    scope.update(counterState, increment());
+    expect(scope.resolve(isEven)).toBe(false); // 1 is odd
+
+    scope.update(counterState, increment());
+    expect(scope.resolve(isEven)).toBe(true); // 2 is even
+  });
+});
+```
+
+```typescript
+// src/__tests__/multiCounter.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createScope } from '@pumped-fn/core-next';
+import { multiCounterState, activeCounter, counterTotals } from '../executors/multiCounter';
+
+describe('MultiCounter', () => {
+  let scope: Scope;
+
+  beforeEach(() => {
+    scope = createScope();
+  });
+
+  it('should start with empty state', () => {
+    const state = scope.resolve(multiCounterState);
+    expect(state).toEqual({
+      counters: [],
+      activeCounterId: null,
+    });
+  });
+
+  it('should add counters', () => {
+    const newCounter = {
+      id: '1',
+      name: 'Counter 1',
+      count: 0,
+      step: 1,
+    };
+
+    scope.update(multiCounterState, current => ({
+      ...current,
+      counters: [...current.counters, newCounter],
+    }));
+
+    const state = scope.resolve(multiCounterState);
+    expect(state.counters).toHaveLength(1);
+    expect(state.counters[0]).toEqual(newCounter);
+  });
+
+  it('should calculate totals correctly', () => {
+    const counters = [
+      { id: '1', name: 'Counter 1', count: 5, step: 1 },
+      { id: '2', name: 'Counter 2', count: 10, step: 1 },
+      { id: '3', name: 'Counter 3', count: 15, step: 1 },
+    ];
+
+    scope.update(multiCounterState, current => ({
+      ...current,
+      counters,
+    }));
+
+    const totals = scope.resolve(counterTotals);
+    expect(totals.totalCount).toBe(30);
+    expect(totals.averageCount).toBe(10);
+    expect(totals.maxCount).toBe(15);
+    expect(totals.minCount).toBe(5);
+  });
+
+  it('should track active counter', () => {
+    const counters = [
+      { id: '1', name: 'Counter 1', count: 5, step: 1 },
+      { id: '2', name: 'Counter 2', count: 10, step: 1 },
+    ];
+
+    scope.update(multiCounterState, current => ({
+      counters,
+      activeCounterId: '2',
+    }));
+
+    const active = scope.resolve(activeCounter);
+    expect(active).toEqual(counters[1]);
+  });
+});
+```
+
+## React Component Tests
+
+```typescript
+// src/__tests__/Counter.test.tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ScopeProvider } from '@pumped-fn/react';
+import { Counter } from '../components/Counter';
+
+describe('Counter Component', () => {
+  it('should render initial state', () => {
+    render(
+      <ScopeProvider>
+        <Counter />
+      </ScopeProvider>
+    );
+
+    expect(screen.getByText('Count: 0')).toBeInTheDocument();
+    expect(screen.getByText('Even')).toBeInTheDocument();
+  });
+
+  it('should increment when + button is clicked', async () => {
+    const user = userEvent.setup();
+    
+    render(
+      <ScopeProvider>
+        <Counter />
+      </ScopeProvider>
+    );
+
+    await user.click(screen.getByText('+'));
+    expect(screen.getByText('Count: 1')).toBeInTheDocument();
+    expect(screen.getByText('Odd')).toBeInTheDocument();
+  });
+
+  it('should update step size', async () => {
+    const user = userEvent.setup();
+    
+    render(
+      <ScopeProvider>
+        <Counter />
+      </ScopeProvider>
+    );
+
+    const stepInput = screen.getByDisplayValue('1');
+    await user.clear(stepInput);
+    await user.type(stepInput, '5');
+
+    await user.click(screen.getByText('+'));
+    expect(screen.getByText('Count: 5')).toBeInTheDocument();
+  });
+});
+```
+
+## Key Patterns Demonstrated
+
+This counter example showcases several important patterns:
+
+### 1. State Management
+- Single source of truth with executors
+- Immutable state updates
+- Clear action creators
+
+### 2. Reactive Programming
+- Derived state that updates automatically
+- Reactive chains for complex calculations
+- Efficient re-rendering in React
+
+### 3. Modular Architecture
+- Separate concerns (state, actions, components)
+- Reusable executors
+- Clean component interfaces
+
+### 4. Persistence
+- localStorage integration
+- Automatic state saving
+- Error handling for storage operations
+
+### 5. Testing
+- Unit tests for executors
+- Integration tests for components
+- Comprehensive test coverage
+
+## Running the Example
+
+To run this example:
+
+1. Create a new React project
+2. Install dependencies: `pnpm add @pumped-fn/core-next @pumped-fn/react`
+3. Copy the code from this example
+4. Run `pnpm start`
+
+## Next Steps
+
+This counter example provides a solid foundation. You can extend it with:
+
+- Real-time synchronization across tabs
+- Undo/redo functionality
+- Counter themes and customization
+- Export/import counter configurations
+- Advanced animations and transitions
+
+The patterns shown here scale to much larger applications while maintaining simplicity and testability.

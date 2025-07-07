@@ -1,0 +1,746 @@
+# Your First App
+
+Build a complete todo application with Pumped Functions and React. This tutorial will teach you real-world patterns and best practices.
+
+## What We'll Build
+
+A todo application with:
+- Add, complete, and remove todos
+- Filter by completion status
+- Real-time updates across components
+- Persistent state
+- Type-safe implementation
+
+## Project Setup
+
+First, create a new React project and install dependencies:
+
+```bash
+npx create-react-app my-todo-app --template typescript
+cd my-todo-app
+pnpm add @pumped-fn/core-next @pumped-fn/react
+```
+
+## Define the Data Model
+
+Start by defining the types and core data structures:
+
+```typescript
+// src/types.ts
+export interface Todo {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: Date;
+}
+
+export type FilterType = 'all' | 'active' | 'completed';
+
+export interface TodoState {
+  todos: Todo[];
+  filter: FilterType;
+}
+```
+
+## Create the Core Executors
+
+Create executors to manage the application state:
+
+```typescript
+// src/executors/todos.ts
+import { exec } from '@pumped-fn/core-next';
+import { Todo, TodoState, FilterType } from '../types';
+
+// Core state executor
+export const todoState = exec((): TodoState => ({
+  todos: [],
+  filter: 'all',
+}));
+
+// Derived state - filtered todos
+export const filteredTodos = exec(
+  (state: TodoState): Todo[] => {
+    switch (state.filter) {
+      case 'active':
+        return state.todos.filter(todo => !todo.completed);
+      case 'completed':
+        return state.todos.filter(todo => todo.completed);
+      default:
+        return state.todos;
+    }
+  },
+  todoState.reactive
+);
+
+// Derived state - todo counts
+export const todoStats = exec(
+  (state: TodoState) => {
+    const total = state.todos.length;
+    const completed = state.todos.filter(t => t.completed).length;
+    const active = total - completed;
+    
+    return { total, completed, active };
+  },
+  todoState.reactive
+);
+```
+
+## Create Action Executors
+
+Create executors for actions that modify the state:
+
+```typescript
+// src/executors/actions.ts
+import { exec } from '@pumped-fn/core-next';
+import { Todo, TodoState, FilterType } from '../types';
+import { todoState } from './todos';
+
+// Action: Add a new todo
+export const addTodo = exec(
+  (text: string) => (state: TodoState): TodoState => ({
+    ...state,
+    todos: [
+      ...state.todos,
+      {
+        id: crypto.randomUUID(),
+        text,
+        completed: false,
+        createdAt: new Date(),
+      },
+    ],
+  }),
+  [/* no dependencies - pure action */]
+);
+
+// Action: Toggle todo completion
+export const toggleTodo = exec(
+  (id: string) => (state: TodoState): TodoState => ({
+    ...state,
+    todos: state.todos.map(todo =>
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    ),
+  }),
+  [/* no dependencies - pure action */]
+);
+
+// Action: Remove todo
+export const removeTodo = exec(
+  (id: string) => (state: TodoState): TodoState => ({
+    ...state,
+    todos: state.todos.filter(todo => todo.id !== id),
+  }),
+  [/* no dependencies - pure action */]
+);
+
+// Action: Set filter
+export const setFilter = exec(
+  (filter: FilterType) => (state: TodoState): TodoState => ({
+    ...state,
+    filter,
+  }),
+  [/* no dependencies - pure action */]
+);
+
+// Action: Clear completed todos
+export const clearCompleted = exec(
+  () => (state: TodoState): TodoState => ({
+    ...state,
+    todos: state.todos.filter(todo => !todo.completed),
+  }),
+  [/* no dependencies - pure action */]
+);
+```
+
+## Create React Components
+
+### Main App Component
+
+```typescript
+// src/App.tsx
+import React from 'react';
+import { ScopeProvider } from '@pumped-fn/react';
+import { TodoList } from './components/TodoList';
+import { TodoForm } from './components/TodoForm';
+import { TodoFilters } from './components/TodoFilters';
+import { TodoStats } from './components/TodoStats';
+import './App.css';
+
+function App() {
+  return (
+    <ScopeProvider>
+      <div className="app">
+        <header className="app-header">
+          <h1>Todo App</h1>
+          <TodoStats />
+        </header>
+        
+        <main className="app-main">
+          <TodoForm />
+          <TodoFilters />
+          <TodoList />
+        </main>
+      </div>
+    </ScopeProvider>
+  );
+}
+
+export default App;
+```
+
+### Todo Form Component
+
+```typescript
+// src/components/TodoForm.tsx
+import React, { useState } from 'react';
+import { useUpdate } from '@pumped-fn/react';
+import { todoState } from '../executors/todos';
+import { addTodo } from '../executors/actions';
+
+export function TodoForm() {
+  const [text, setText] = useState('');
+  const updateTodoState = useUpdate(todoState);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (text.trim()) {
+      updateTodoState(addTodo(text.trim()));
+      setText('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="todo-form">
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="What needs to be done?"
+        className="todo-input"
+      />
+      <button type="submit" disabled={!text.trim()}>
+        Add Todo
+      </button>
+    </form>
+  );
+}
+```
+
+### Todo List Component
+
+```typescript
+// src/components/TodoList.tsx
+import React from 'react';
+import { useResolves, useUpdate } from '@pumped-fn/react';
+import { filteredTodos, todoState } from '../executors/todos';
+import { toggleTodo, removeTodo } from '../executors/actions';
+import { TodoItem } from './TodoItem';
+
+export function TodoList() {
+  const [todos] = useResolves(filteredTodos);
+  const updateTodoState = useUpdate(todoState);
+
+  const handleToggle = (id: string) => {
+    updateTodoState(toggleTodo(id));
+  };
+
+  const handleRemove = (id: string) => {
+    updateTodoState(removeTodo(id));
+  };
+
+  if (todos.length === 0) {
+    return (
+      <div className="empty-state">
+        <p>No todos yet. Add one above!</p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="todo-list">
+      {todos.map(todo => (
+        <TodoItem
+          key={todo.id}
+          todo={todo}
+          onToggle={handleToggle}
+          onRemove={handleRemove}
+        />
+      ))}
+    </ul>
+  );
+}
+```
+
+### Todo Item Component
+
+```typescript
+// src/components/TodoItem.tsx
+import React from 'react';
+import { Todo } from '../types';
+
+interface TodoItemProps {
+  todo: Todo;
+  onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
+}
+
+export function TodoItem({ todo, onToggle, onRemove }: TodoItemProps) {
+  return (
+    <li className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+      <label className="todo-label">
+        <input
+          type="checkbox"
+          checked={todo.completed}
+          onChange={() => onToggle(todo.id)}
+        />
+        <span className="todo-text">{todo.text}</span>
+      </label>
+      
+      <button
+        onClick={() => onRemove(todo.id)}
+        className="todo-remove"
+        aria-label="Remove todo"
+      >
+        ×
+      </button>
+    </li>
+  );
+}
+```
+
+### Filter Component
+
+```typescript
+// src/components/TodoFilters.tsx
+import React from 'react';
+import { useResolves, useUpdate } from '@pumped-fn/react';
+import { todoState } from '../executors/todos';
+import { setFilter, clearCompleted } from '../executors/actions';
+import { FilterType } from '../types';
+
+export function TodoFilters() {
+  const [state] = useResolves(todoState);
+  const updateTodoState = useUpdate(todoState);
+
+  const handleFilterChange = (filter: FilterType) => {
+    updateTodoState(setFilter(filter));
+  };
+
+  const handleClearCompleted = () => {
+    updateTodoState(clearCompleted());
+  };
+
+  const hasCompleted = state.todos.some(todo => todo.completed);
+
+  return (
+    <div className="todo-filters">
+      <div className="filter-buttons">
+        {(['all', 'active', 'completed'] as FilterType[]).map(filter => (
+          <button
+            key={filter}
+            onClick={() => handleFilterChange(filter)}
+            className={`filter-button ${state.filter === filter ? 'active' : ''}`}
+          >
+            {filter.charAt(0).toUpperCase() + filter.slice(1)}
+          </button>
+        ))}
+      </div>
+      
+      {hasCompleted && (
+        <button
+          onClick={handleClearCompleted}
+          className="clear-completed"
+        >
+          Clear Completed
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### Stats Component
+
+```typescript
+// src/components/TodoStats.tsx
+import React from 'react';
+import { useResolves } from '@pumped-fn/react';
+import { todoStats } from '../executors/todos';
+
+export function TodoStats() {
+  const [stats] = useResolves(todoStats);
+
+  if (stats.total === 0) {
+    return null;
+  }
+
+  return (
+    <div className="todo-stats">
+      <span className="stat">
+        <strong>{stats.active}</strong> active
+      </span>
+      <span className="stat">
+        <strong>{stats.completed}</strong> completed
+      </span>
+      <span className="stat">
+        <strong>{stats.total}</strong> total
+      </span>
+    </div>
+  );
+}
+```
+
+## Add Persistence
+
+Make the todos persist across browser sessions:
+
+```typescript
+// src/executors/persistence.ts
+import { exec } from '@pumped-fn/core-next';
+import { TodoState } from '../types';
+
+const STORAGE_KEY = 'pumped-fn-todos';
+
+// Executor to load initial state from localStorage
+export const loadInitialState = exec((): TodoState => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Convert date strings back to Date objects
+      return {
+        ...parsed,
+        todos: parsed.todos.map((todo: any) => ({
+          ...todo,
+          createdAt: new Date(todo.createdAt),
+        })),
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to load todos from localStorage:', error);
+  }
+  
+  return {
+    todos: [],
+    filter: 'all',
+  };
+});
+
+// Executor to save state to localStorage
+export const saveState = exec(
+  (state: TodoState) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save todos to localStorage:', error);
+    }
+  },
+  [/* no dependencies - side effect */]
+);
+```
+
+Update the todo state executor to use persistence:
+
+```typescript
+// src/executors/todos.ts (updated)
+import { exec } from '@pumped-fn/core-next';
+import { Todo, TodoState, FilterType } from '../types';
+import { loadInitialState, saveState } from './persistence';
+
+// Core state executor with persistence
+export const todoState = exec(
+  (initialState: TodoState): TodoState => initialState,
+  loadInitialState
+);
+
+// Add a side effect to save state on changes
+export const persistTodos = exec(
+  (state: TodoState) => {
+    saveState(state);
+    return state;
+  },
+  todoState.reactive
+);
+
+// ... rest of the executors remain the same
+```
+
+Add the persistence effect to your App component:
+
+```typescript
+// src/App.tsx (updated)
+import React from 'react';
+import { ScopeProvider } from '@pumped-fn/react';
+import { Effect } from '@pumped-fn/react';
+import { persistTodos } from './executors/todos';
+// ... other imports
+
+function App() {
+  return (
+    <ScopeProvider>
+      <Effect e={[persistTodos]} />
+      <div className="app">
+        {/* ... rest of your app */}
+      </div>
+    </ScopeProvider>
+  );
+}
+```
+
+## Add Styling
+
+Add some CSS to make it look good:
+
+```css
+/* src/App.css */
+.app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.app-header h1 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.todo-stats {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.todo-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.todo-input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.todo-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.todo-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.filter-button {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.filter-button.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.clear-completed {
+  padding: 5px 10px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.todo-list {
+  list-style: none;
+  padding: 0;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #eee;
+  margin-bottom: 5px;
+  border-radius: 4px;
+}
+
+.todo-item.completed {
+  opacity: 0.6;
+}
+
+.todo-label {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  cursor: pointer;
+}
+
+.todo-text {
+  margin-left: 10px;
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+}
+
+.todo-remove {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #dc3545;
+  padding: 5px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+```
+
+## Testing Your App
+
+Create tests for your executors:
+
+```typescript
+// src/__tests__/todos.test.ts
+import { describe, it, expect } from 'vitest';
+import { createScope } from '@pumped-fn/core-next';
+import { todoState, filteredTodos, todoStats } from '../executors/todos';
+import { addTodo, toggleTodo, setFilter } from '../executors/actions';
+
+describe('Todo App', () => {
+  it('should add todos', () => {
+    const scope = createScope();
+    
+    // Add a todo
+    scope.update(todoState, addTodo('Learn Pumped Functions'));
+    
+    const state = scope.resolve(todoState);
+    expect(state.todos).toHaveLength(1);
+    expect(state.todos[0].text).toBe('Learn Pumped Functions');
+    expect(state.todos[0].completed).toBe(false);
+  });
+
+  it('should toggle todos', () => {
+    const scope = createScope();
+    
+    // Add and toggle a todo
+    scope.update(todoState, addTodo('Test todo'));
+    const state = scope.resolve(todoState);
+    const todoId = state.todos[0].id;
+    
+    scope.update(todoState, toggleTodo(todoId));
+    
+    const updatedState = scope.resolve(todoState);
+    expect(updatedState.todos[0].completed).toBe(true);
+  });
+
+  it('should filter todos', () => {
+    const scope = createScope();
+    
+    // Add some todos
+    scope.update(todoState, addTodo('Active todo'));
+    scope.update(todoState, addTodo('Completed todo'));
+    
+    const state = scope.resolve(todoState);
+    const completedTodoId = state.todos[1].id;
+    
+    // Complete one todo
+    scope.update(todoState, toggleTodo(completedTodoId));
+    
+    // Test active filter
+    scope.update(todoState, setFilter('active'));
+    const activeTodos = scope.resolve(filteredTodos);
+    expect(activeTodos).toHaveLength(1);
+    expect(activeTodos[0].text).toBe('Active todo');
+    
+    // Test completed filter
+    scope.update(todoState, setFilter('completed'));
+    const completedTodos = scope.resolve(filteredTodos);
+    expect(completedTodos).toHaveLength(1);
+    expect(completedTodos[0].text).toBe('Completed todo');
+  });
+
+  it('should calculate stats', () => {
+    const scope = createScope();
+    
+    // Add some todos
+    scope.update(todoState, addTodo('Todo 1'));
+    scope.update(todoState, addTodo('Todo 2'));
+    scope.update(todoState, addTodo('Todo 3'));
+    
+    const state = scope.resolve(todoState);
+    const todoId = state.todos[0].id;
+    
+    // Complete one todo
+    scope.update(todoState, toggleTodo(todoId));
+    
+    const stats = scope.resolve(todoStats);
+    expect(stats.total).toBe(3);
+    expect(stats.completed).toBe(1);
+    expect(stats.active).toBe(2);
+  });
+});
+```
+
+## Run Your App
+
+Start the development server:
+
+```bash
+pnpm start
+```
+
+Your todo app is now running with:
+- ✅ Reactive state management
+- ✅ Type-safe operations
+- ✅ Persistent storage
+- ✅ Filtered views
+- ✅ Real-time updates
+- ✅ Comprehensive testing
+
+## Key Patterns You've Learned
+
+1. **State Management**: Using executors for centralized state
+2. **Derived State**: Computing values from other executors reactively
+3. **Actions**: Pure functions that return state updaters
+4. **React Integration**: Using hooks to connect executors to components
+5. **Side Effects**: Handling persistence and other side effects
+6. **Testing**: Writing tests for executor-based applications
+
+## Next Steps
+
+Now that you've built your first app, explore:
+
+- [Core Concepts](/core-concepts/executors) - Deep dive into advanced patterns
+- [React Integration](/react/overview) - More React-specific features
+- [Testing](/testing/overview) - Advanced testing strategies
+- [Examples](/examples/counter) - More example applications
+
+Congratulations! You've built a complete application with Pumped Functions. The patterns you've learned here will scale to much larger applications.

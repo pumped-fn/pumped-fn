@@ -1,0 +1,180 @@
+# Installation
+
+Get started with Pumped Functions by installing the core package and any additional packages you need.
+
+## Requirements
+
+- **Node.js 18+**: Pumped Functions requires Node.js version 18 or higher
+- **TypeScript**: While not required, TypeScript is highly recommended for the best experience
+
+## Package Manager
+
+Pumped Functions works with all major package managers:
+
+**pnpm:**
+```bash
+pnpm add @pumped-fn/core-next
+```
+
+**npm:**
+```bash
+npm install @pumped-fn/core-next
+```
+
+**yarn:**
+```bash
+yarn add @pumped-fn/core-next
+```
+
+## Core Package
+
+The core package provides all the fundamental functionality:
+
+```bash
+# Core library with executors, scopes, and reactive programming
+pnpm add @pumped-fn/core-next
+```
+
+**What's included:**
+- Executors (containers for values and dependencies)
+- Scopes (resolution contexts)
+- Reactive programming utilities
+- Meta system for type validation
+- Helper functions and utilities
+
+## React Integration
+
+For React applications, install the React bindings:
+
+**pnpm:**
+```bash
+pnpm add @pumped-fn/react
+```
+
+**npm:**
+```bash
+npm install @pumped-fn/react
+```
+
+**yarn:**
+```bash
+yarn add @pumped-fn/react
+```
+
+**What's included:**
+- React hooks (`useResolves`, `useResolve`, `useUpdate`)
+- React components (`ScopeProvider`, `Resolves`, `Reselect`)
+- Automatic reactivity with React's concurrent features
+- Server-side rendering support
+
+## Additional Utilities
+
+For full-stack applications, consider the extra utilities:
+
+**pnpm:**
+```bash
+pnpm add @pumped-fn/extra
+```
+
+**npm:**
+```bash
+npm install @pumped-fn/extra
+```
+
+**yarn:**
+```bash
+yarn add @pumped-fn/extra
+```
+
+## Development Setup
+
+For development, you might want to install additional tools:
+
+**pnpm:**
+```bash
+# TypeScript (if not already installed)
+pnpm add -D typescript
+
+# Testing utilities
+pnpm add -D vitest @testing-library/react @testing-library/jest-dom
+```
+
+**npm:**
+```bash
+# TypeScript (if not already installed)
+npm install -D typescript
+
+# Testing utilities
+npm install -D vitest @testing-library/react @testing-library/jest-dom
+```
+
+**yarn:**
+```bash
+# TypeScript (if not already installed)
+yarn add -D typescript
+
+# Testing utilities
+yarn add -D vitest @testing-library/react @testing-library/jest-dom
+```
+
+## TypeScript Configuration
+
+For the best TypeScript experience, ensure your `tsconfig.json` includes:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+## Verification
+
+Verify your installation by creating a simple test:
+
+```typescript
+import { exec, createScope } from '@pumped-fn/core-next';
+
+// Create a simple executor
+const greeting = exec(() => 'Hello from Pumped Functions!');
+
+// Create a scope and resolve the executor
+const scope = createScope();
+const result = scope.resolve(greeting);
+
+console.log(result); // "Hello from Pumped Functions!"
+```
+
+## Next Steps
+
+Now that you have Pumped Functions installed, continue with:
+
+- [Quick Start](/getting-started/quick-start) - Learn the basics in 5 minutes
+- [Your First App](/getting-started/first-app) - Build a complete application
+- [Core Concepts](/core-concepts/executors) - Deep dive into executors and scopes
+
+## Troubleshooting
+
+### Common Issues
+
+**Module not found errors:**
+- Ensure you're using Node.js 18+
+- Check that your package manager installed the dependencies correctly
+- Verify your TypeScript configuration supports ES modules
+
+**Type errors:**
+- Make sure TypeScript is configured with `strict: true`
+- Install type definitions for React if using the React package
+- Check that your `moduleResolution` is set to `"bundler"` or `"node"`
+
+**Need help?** Check our [GitHub issues](https://github.com/pumped-fn/pumped-fn/issues) or start a [discussion](https://github.com/pumped-fn/pumped-fn/discussions).

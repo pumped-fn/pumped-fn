@@ -1,0 +1,886 @@
+# Interactive Testing
+
+Interactive testing focuses on testing user interactions, complex workflows, and real-world scenarios. This guide covers testing strategies for user interactions, multi-step workflows, and integration scenarios.
+
+## User Interaction Testing
+
+### Basic User Events
+
+Test simple user interactions:
+
+```typescript
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { exec } from '@pumped-fn/core-next';
+import { ScopeProvider } from '@pumped-fn/react';
+
+function LoginForm() {
+  const [authState] = useResolves(authStateExecutor);
+  const updateAuth = useUpdate(authStateExecutor);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    
+    updateAuth({ email, password, status: 'authenticating' });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="email" type="email" placeholder="Email" />
+      <input name="password" type="password" placeholder="Password" />
+      <button type="submit">Login</button>
+      {authState.status === 'authenticating' && <p>Logging in...</p>}
+    </form>
+  );
+}
+
+describe('LoginForm', () => {
+  it('should handle user login flow', async () => {
+    const user = userEvent.setup();
+    const authStateExecutor = exec(() => ({
+      email: '',
+      password: '',
+      status: 'idle',
+    }));
+
+    render(
+      <ScopeProvider>
+        <LoginForm />
+      </ScopeProvider>
+    );
+
+    // User types email
+    await user.type(screen.getByPlaceholderText('Email'), 'user@example.com');
+    
+    // User types password
+    await user.type(screen.getByPlaceholderText('Password'), 'password123');
+    
+    // User clicks login
+    await user.click(screen.getByRole('button', { name: 'Login' }));
+    
+    // Should show loading state
+    expect(screen.getByText('Logging in...')).toBeInTheDocument();
+  });
+});
+```
+
+### Complex Form Interactions
+
+Test multi-step forms and validation:
+
+```typescript
+function UserRegistrationForm() {
+  const [formData] = useResolves(formDataExecutor);
+  const [validation] = useResolves(validationExecutor);
+  const updateForm = useUpdate(formDataExecutor);
+
+  const handleFieldChange = (field: string, value: string) => {
+    updateForm(current => ({ ...current, [field]: value }));
+  };
+
+  return (
+    <form>
+      <div>
+        <input
+          name="firstName"
+          placeholder="First Name"
+          value={formData.firstName}
+          onChange={(e) => handleFieldChange('firstName', e.target.value)}
+        />
+        {validation.firstName && (
+          <span className="error">{validation.firstName}</span>
+        )}
+      </div>
+      
+      <div>
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={(e) => handleFieldChange('email', e.target.value)}
+        />
+        {validation.email && (
+          <span className="error">{validation.email}</span>
+        )}
+      </div>
+      
+      <div>
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          value={formData.password}
+          onChange={(e) => handleFieldChange('password', e.target.value)}
+        />
+        {validation.password && (
+          <span className="error">{validation.password}</span>
+        )}
+      </div>
+      
+      <button type="submit" disabled={!validation.isValid}>
+        Register
+      </button>
+    </form>
+  );
+}
+
+describe('UserRegistrationForm', () => {
+  it('should validate form fields as user types', async () => {
+    const user = userEvent.setup();
+    
+    const formDataExecutor = exec(() => ({
+      firstName: '',
+      email: '',
+      password: '',
+    }));
+
+    const validationExecutor = exec(
+      (data) => {
+        const errors: any = {};
+        
+        if (!data.firstName) errors.firstName = 'First name is required';
+        if (!data.email) errors.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+          errors.email = 'Invalid email format';
+        }
+        if (!data.password) errors.password = 'Password is required';
+        else if (data.password.length < 8) {
+          errors.password = 'Password must be at least 8 characters';
+        }
+        
+        return {
+          ...errors,
+          isValid: Object.keys(errors).length === 0,
+        };
+      },
+      formDataExecutor.reactive
+    );
+
+    render(
+      <ScopeProvider>
+        <UserRegistrationForm />
+      </ScopeProvider>
+    );
+
+    // Initially, submit should be disabled
+    expect(screen.getByRole('button', { name: 'Register' })).toBeDisabled();
+
+    // Type invalid email
+    await user.type(screen.getByPlaceholderText('Email'), 'invalid-email');
+    expect(screen.getByText('Invalid email format')).toBeInTheDocument();
+
+    // Type short password
+    await user.type(screen.getByPlaceholderText('Password'), 'short');
+    expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
+
+    // Fill in valid data
+    await user.type(screen.getByPlaceholderText('First Name'), 'John');
+    await user.clear(screen.getByPlaceholderText('Email'));
+    await user.type(screen.getByPlaceholderText('Email'), 'john@example.com');
+    await user.clear(screen.getByPlaceholderText('Password'));
+    await user.type(screen.getByPlaceholderText('Password'), 'password123');
+
+    // Submit should now be enabled
+    expect(screen.getByRole('button', { name: 'Register' })).not.toBeDisabled();
+  });
+});
+```
+
+## Multi-Step Workflows
+
+### Wizard/Stepper Components
+
+Test multi-step workflows:
+
+```typescript
+function RegistrationWizard() {
+  const [currentStep] = useResolves(currentStepExecutor);
+  const [wizardData] = useResolves(wizardDataExecutor);
+  const updateStep = useUpdate(currentStepExecutor);
+  const updateData = useUpdate(wizardDataExecutor);
+
+  const nextStep = () => {
+    updateStep(current => Math.min(current + 1, 3));
+  };
+
+  const prevStep = () => {
+    updateStep(current => Math.max(current - 1, 1));
+  };
+
+  return (
+    <div>
+      <div className="step-indicator">
+        Step {currentStep} of 3
+      </div>
+      
+      {currentStep === 1 && (
+        <PersonalInfoStep 
+          data={wizardData.personalInfo}
+          onUpdate={(data) => updateData(current => ({ 
+            ...current, 
+            personalInfo: data 
+          }))}
+        />
+      )}
+      
+      {currentStep === 2 && (
+        <ContactInfoStep 
+          data={wizardData.contactInfo}
+          onUpdate={(data) => updateData(current => ({ 
+            ...current, 
+            contactInfo: data 
+          }))}
+        />
+      )}
+      
+      {currentStep === 3 && (
+        <ReviewStep data={wizardData} />
+      )}
+      
+      <div className="navigation">
+        {currentStep > 1 && (
+          <button onClick={prevStep}>Previous</button>
+        )}
+        {currentStep < 3 && (
+          <button onClick={nextStep}>Next</button>
+        )}
+        {currentStep === 3 && (
+          <button onClick={() => console.log('Submit')}>Submit</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+describe('RegistrationWizard', () => {
+  it('should navigate through wizard steps', async () => {
+    const user = userEvent.setup();
+    
+    const currentStepExecutor = exec(() => 1);
+    const wizardDataExecutor = exec(() => ({
+      personalInfo: { firstName: '', lastName: '' },
+      contactInfo: { email: '', phone: '' },
+    }));
+
+    render(
+      <ScopeProvider>
+        <RegistrationWizard />
+      </ScopeProvider>
+    );
+
+    // Should start at step 1
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+    
+    // Should show personal info step
+    expect(screen.getByText('Personal Information')).toBeInTheDocument();
+    
+    // Click next
+    await user.click(screen.getByText('Next'));
+    
+    // Should move to step 2
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Contact Information')).toBeInTheDocument();
+    
+    // Click next again
+    await user.click(screen.getByText('Next'));
+    
+    // Should move to step 3
+    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Review')).toBeInTheDocument();
+    
+    // Should show submit button
+    expect(screen.getByText('Submit')).toBeInTheDocument();
+    
+    // Click previous
+    await user.click(screen.getByText('Previous'));
+    
+    // Should go back to step 2
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+  });
+});
+```
+
+### Shopping Cart Workflow
+
+Test e-commerce workflows:
+
+```typescript
+function ShoppingCart() {
+  const [cart] = useResolves(cartExecutor);
+  const [products] = useResolves(productsExecutor);
+  const updateCart = useUpdate(cartExecutor);
+
+  const addToCart = (product: Product) => {
+    updateCart(current => ({
+      ...current,
+      items: [...current.items, { ...product, quantity: 1 }],
+    }));
+  };
+
+  const removeFromCart = (productId: string) => {
+    updateCart(current => ({
+      ...current,
+      items: current.items.filter(item => item.id !== productId),
+    }));
+  };
+
+  const updateQuantity = (productId: string, quantity: number) => {
+    updateCart(current => ({
+      ...current,
+      items: current.items.map(item =>
+        item.id === productId ? { ...item, quantity } : item
+      ),
+    }));
+  };
+
+  return (
+    <div>
+      <div className="products">
+        {products.map(product => (
+          <div key={product.id} className="product">
+            <h3>{product.name}</h3>
+            <p>${product.price}</p>
+            <button onClick={() => addToCart(product)}>
+              Add to Cart
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="cart">
+        <h2>Cart ({cart.items.length})</h2>
+        {cart.items.map(item => (
+          <div key={item.id} className="cart-item">
+            <span>{item.name}</span>
+            <input
+              type="number"
+              value={item.quantity}
+              onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
+            />
+            <button onClick={() => removeFromCart(item.id)}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <div className="total">
+          Total: ${cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+describe('ShoppingCart', () => {
+  it('should handle complete shopping workflow', async () => {
+    const user = userEvent.setup();
+    
+    const productsExecutor = exec(() => [
+      { id: '1', name: 'Laptop', price: 999 },
+      { id: '2', name: 'Mouse', price: 25 },
+    ]);
+
+    const cartExecutor = exec(() => ({
+      items: [],
+      total: 0,
+    }));
+
+    render(
+      <ScopeProvider>
+        <ShoppingCart />
+      </ScopeProvider>
+    );
+
+    // Initially empty cart
+    expect(screen.getByText('Cart (0)')).toBeInTheDocument();
+    expect(screen.getByText('Total: $0')).toBeInTheDocument();
+
+    // Add laptop to cart
+    await user.click(screen.getByText('Add to Cart'));
+    expect(screen.getByText('Cart (1)')).toBeInTheDocument();
+    expect(screen.getByText('Total: $999')).toBeInTheDocument();
+
+    // Add mouse to cart
+    const addButtons = screen.getAllByText('Add to Cart');
+    await user.click(addButtons[1]);
+    expect(screen.getByText('Cart (2)')).toBeInTheDocument();
+    expect(screen.getByText('Total: $1024')).toBeInTheDocument();
+
+    // Update laptop quantity
+    const quantityInput = screen.getByDisplayValue('1');
+    await user.clear(quantityInput);
+    await user.type(quantityInput, '2');
+    expect(screen.getByText('Total: $2023')).toBeInTheDocument();
+
+    // Remove mouse from cart
+    const removeButtons = screen.getAllByText('Remove');
+    await user.click(removeButtons[1]);
+    expect(screen.getByText('Cart (1)')).toBeInTheDocument();
+    expect(screen.getByText('Total: $1998')).toBeInTheDocument();
+  });
+});
+```
+
+## Real-Time Updates
+
+### WebSocket Integration
+
+Test real-time updates:
+
+```typescript
+function ChatRoom() {
+  const [messages] = useResolves(messagesExecutor);
+  const [currentUser] = useResolves(currentUserExecutor);
+  const updateMessages = useUpdate(messagesExecutor);
+
+  const sendMessage = (text: string) => {
+    const newMessage = {
+      id: Date.now().toString(),
+      text,
+      author: currentUser.name,
+      timestamp: new Date(),
+    };
+    
+    updateMessages(current => [...current, newMessage]);
+  };
+
+  return (
+    <div>
+      <div className="messages">
+        {messages.map(message => (
+          <div key={message.id} className="message">
+            <strong>{message.author}:</strong> {message.text}
+          </div>
+        ))}
+      </div>
+      
+      <MessageInput onSend={sendMessage} />
+    </div>
+  );
+}
+
+describe('ChatRoom', () => {
+  it('should handle real-time message updates', async () => {
+    const user = userEvent.setup();
+    
+    const messagesExecutor = exec(() => [
+      { id: '1', text: 'Hello!', author: 'Alice', timestamp: new Date() },
+    ]);
+
+    const currentUserExecutor = exec(() => ({
+      name: 'Bob',
+      id: '2',
+    }));
+
+    const { scope } = renderWithScope(<ChatRoom />);
+
+    // Should show existing message
+    expect(screen.getByText('Alice: Hello!')).toBeInTheDocument();
+
+    // Send new message
+    await user.type(screen.getByPlaceholderText('Type a message...'), 'Hi there!');
+    await user.click(screen.getByText('Send'));
+
+    // Should show new message
+    expect(screen.getByText('Bob: Hi there!')).toBeInTheDocument();
+
+    // Simulate receiving message from another user
+    scope.update(messagesExecutor, current => [
+      ...current,
+      { id: '3', text: 'How are you?', author: 'Charlie', timestamp: new Date() },
+    ]);
+
+    expect(screen.getByText('Charlie: How are you?')).toBeInTheDocument();
+  });
+});
+```
+
+## Integration Testing
+
+### Full Application Flow
+
+Test complete user journeys:
+
+```typescript
+function App() {
+  return (
+    <ScopeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<Profile />} />
+        </Routes>
+      </Router>
+    </ScopeProvider>
+  );
+}
+
+describe('App Integration', () => {
+  it('should handle complete user authentication flow', async () => {
+    const user = userEvent.setup();
+    
+    render(<App />);
+
+    // Start at home page
+    expect(screen.getByText('Welcome')).toBeInTheDocument();
+
+    // Click login
+    await user.click(screen.getByText('Login'));
+    
+    // Should navigate to login page
+    expect(screen.getByText('Sign In')).toBeInTheDocument();
+
+    // Fill in credentials
+    await user.type(screen.getByPlaceholderText('Email'), 'user@example.com');
+    await user.type(screen.getByPlaceholderText('Password'), 'password123');
+    
+    // Submit form
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    // Should navigate to dashboard
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    });
+
+    // Click profile
+    await user.click(screen.getByText('Profile'));
+    
+    // Should show profile page
+    expect(screen.getByText('User Profile')).toBeInTheDocument();
+  });
+});
+```
+
+### API Integration
+
+Test API interactions:
+
+```typescript
+function UserManagement() {
+  const [users] = useResolves(usersExecutor);
+  const [loading] = useResolves(loadingExecutor);
+  const updateUsers = useUpdate(usersExecutor);
+  const updateLoading = useUpdate(loadingExecutor);
+
+  const loadUsers = async () => {
+    updateLoading(true);
+    try {
+      const response = await fetch('/api/users');
+      const users = await response.json();
+      updateUsers(users);
+    } finally {
+      updateLoading(false);
+    }
+  };
+
+  const createUser = async (userData: any) => {
+    updateLoading(true);
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      const newUser = await response.json();
+      updateUsers(current => [...current, newUser]);
+    } finally {
+      updateLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={loadUsers}>Load Users</button>
+      <CreateUserForm onSubmit={createUser} />
+      
+      {loading && <p>Loading...</p>}
+      
+      <div className="users">
+        {users.map(user => (
+          <div key={user.id} className="user">
+            {user.name} ({user.email})
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+describe('UserManagement API Integration', () => {
+  beforeEach(() => {
+    // Setup MSW or similar for API mocking
+    server.use(
+      rest.get('/api/users', (req, res, ctx) => {
+        return res(ctx.json([
+          { id: 1, name: 'John', email: 'john@example.com' },
+          { id: 2, name: 'Jane', email: 'jane@example.com' },
+        ]));
+      }),
+      rest.post('/api/users', (req, res, ctx) => {
+        return res(ctx.json({ id: 3, ...req.body }));
+      })
+    );
+  });
+
+  it('should load and create users', async () => {
+    const user = userEvent.setup();
+    
+    const usersExecutor = exec(() => []);
+    const loadingExecutor = exec(() => false);
+
+    render(
+      <ScopeProvider>
+        <UserManagement />
+      </ScopeProvider>
+    );
+
+    // Load users
+    await user.click(screen.getByText('Load Users'));
+    
+    // Should show loading
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    
+    // Should load users
+    await waitFor(() => {
+      expect(screen.getByText('John (john@example.com)')).toBeInTheDocument();
+      expect(screen.getByText('Jane (jane@example.com)')).toBeInTheDocument();
+    });
+
+    // Create new user
+    await user.type(screen.getByPlaceholderText('Name'), 'Bob');
+    await user.type(screen.getByPlaceholderText('Email'), 'bob@example.com');
+    await user.click(screen.getByText('Create User'));
+
+    // Should show new user
+    await waitFor(() => {
+      expect(screen.getByText('Bob (bob@example.com)')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+## Performance Testing
+
+### Interaction Performance
+
+Test performance of user interactions:
+
+```typescript
+describe('Performance', () => {
+  it('should handle rapid user interactions efficiently', async () => {
+    const user = userEvent.setup();
+    
+    const counterExecutor = exec(() => ({ count: 0 }));
+    
+    render(
+      <ScopeProvider>
+        <Counter />
+      </ScopeProvider>
+    );
+
+    const incrementButton = screen.getByText('Increment');
+    
+    // Measure performance of rapid clicks
+    const start = performance.now();
+    
+    // Rapidly click 100 times
+    for (let i = 0; i < 100; i++) {
+      await user.click(incrementButton);
+    }
+    
+    const end = performance.now();
+    const duration = end - start;
+    
+    // Should handle 100 clicks in reasonable time
+    expect(duration).toBeLessThan(1000); // Less than 1 second
+    expect(screen.getByText('Count: 100')).toBeInTheDocument();
+  });
+});
+```
+
+## Error Handling
+
+### User Error Scenarios
+
+Test error handling in user workflows:
+
+```typescript
+function FileUpload() {
+  const [uploadState] = useResolves(uploadStateExecutor);
+  const updateUpload = useUpdate(uploadStateExecutor);
+
+  const handleFileUpload = async (file: File) => {
+    updateUpload({ status: 'uploading', error: null });
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const result = await response.json();
+      updateUpload({ status: 'success', result, error: null });
+    } catch (error) {
+      updateUpload({ status: 'error', error: error.message });
+    }
+  };
+
+  return (
+    <div>
+      <input
+        type="file"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileUpload(file);
+        }}
+      />
+      
+      {uploadState.status === 'uploading' && <p>Uploading...</p>}
+      {uploadState.status === 'success' && <p>Upload successful!</p>}
+      {uploadState.status === 'error' && (
+        <p className="error">Error: {uploadState.error}</p>
+      )}
+    </div>
+  );
+}
+
+describe('FileUpload Error Handling', () => {
+  it('should handle upload errors gracefully', async () => {
+    const user = userEvent.setup();
+    
+    // Mock failed upload
+    server.use(
+      rest.post('/api/upload', (req, res, ctx) => {
+        return res(ctx.status(500), ctx.json({ error: 'Server error' }));
+      })
+    );
+
+    const uploadStateExecutor = exec(() => ({
+      status: 'idle',
+      error: null,
+      result: null,
+    }));
+
+    render(
+      <ScopeProvider>
+        <FileUpload />
+      </ScopeProvider>
+    );
+
+    // Create a test file
+    const file = new File(['test content'], 'test.txt', { type: 'text/plain' });
+    
+    // Upload file
+    const fileInput = screen.getByLabelText('file');
+    await user.upload(fileInput, file);
+
+    // Should show uploading state
+    expect(screen.getByText('Uploading...')).toBeInTheDocument();
+
+    // Should show error message
+    await waitFor(() => {
+      expect(screen.getByText('Error: Upload failed')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+## Best Practices
+
+### 1. Test User Journeys
+
+Focus on complete user workflows:
+
+```typescript
+describe('User Registration Journey', () => {
+  it('should handle complete registration flow', async () => {
+    // Test the entire flow from start to finish
+    const user = userEvent.setup();
+    
+    render(<App />);
+    
+    // Navigate to registration
+    await user.click(screen.getByText('Sign Up'));
+    
+    // Fill registration form
+    await user.type(screen.getByPlaceholderText('Name'), 'John Doe');
+    await user.type(screen.getByPlaceholderText('Email'), 'john@example.com');
+    await user.type(screen.getByPlaceholderText('Password'), 'password123');
+    
+    // Submit form
+    await user.click(screen.getByText('Register'));
+    
+    // Verify success
+    await waitFor(() => {
+      expect(screen.getByText('Registration successful!')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### 2. Test Error Scenarios
+
+Don't forget to test error cases:
+
+```typescript
+describe('Error Scenarios', () => {
+  it('should handle network errors', async () => {
+    // Mock network failure
+    server.use(
+      rest.post('/api/login', (req, res, ctx) => {
+        return res.networkError('Network error');
+      })
+    );
+
+    // Test error handling
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    
+    await user.type(screen.getByPlaceholderText('Email'), 'test@example.com');
+    await user.type(screen.getByPlaceholderText('Password'), 'password');
+    await user.click(screen.getByText('Login'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('Network error occurred')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### 3. Test Accessibility
+
+Include accessibility testing:
+
+```typescript
+import { axe, toHaveNoViolations } from 'jest-axe';
+
+expect.extend(toHaveNoViolations);
+
+describe('Accessibility', () => {
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<App />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+```
+
+## Next Steps
+
+- [Testing Overview](/testing/overview) - Back to testing overview
+- [Testing Executors](/testing/testing-executors) - Executor-specific testing
+- [Testing React Components](/testing/testing-react) - Component testing patterns
+
+Interactive testing ensures your application works correctly in real-world scenarios. By testing complete user workflows, you can catch integration issues and ensure a smooth user experience.
