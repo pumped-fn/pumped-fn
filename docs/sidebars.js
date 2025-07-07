@@ -26,6 +26,17 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Testing',
+      items: [
+        'testing/overview',
+        'testing/testing-executors',
+        'testing/testing-react',
+        'testing/testing-utilities',
+        'testing/interactive-testing',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Examples',
       items: [
         'examples/counter',
