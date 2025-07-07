@@ -1,8 +1,5 @@
 name: Deploy Documentation
 
-permissions:
-  contents: write
-
 on:
   push:
     branches: [main]
@@ -13,7 +10,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
     steps:
