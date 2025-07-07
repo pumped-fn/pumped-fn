@@ -27,10 +27,7 @@ const config = {
           sidebarPath: './sidebars.js',
           editUrl: 'https://github.com/pumped-fn/pumped-fn/tree/main/docs/',
         },
-        blog: {
-          showReadingTime: true,
-          editUrl: 'https://github.com/pumped-fn/pumped-fn/tree/main/docs/',
-        },
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -56,11 +53,6 @@ const config = {
           label: 'Docs',
         },
         {
-          to: '/blog',
-          label: 'Blog',
-          position: 'left'
-        },
-        {
           href: 'https://github.com/pumped-fn/pumped-fn',
           label: 'GitHub',
           position: 'right',
@@ -79,11 +71,11 @@ const config = {
             },
             {
               label: 'Core Concepts',
-              to: '/docs/core-concepts',
+              to: '/docs/core-concepts/executors',
             },
             {
               label: 'React Integration',
-              to: '/docs/react',
+              to: '/docs/react/overview',
             },
           ],
         },
@@ -104,8 +96,8 @@ const config = {
           title: 'More',
           items: [
             {
-              label: 'Blog',
-              to: '/blog',
+              label: 'Examples',
+              to: '/docs/examples/counter',
             },
             {
               label: 'NPM',

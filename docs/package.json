@@ -2,6 +2,7 @@
   "name": "pumped-fn-docs",
   "version": "1.0.0",
   "description": "React-friendly documentation site for pumped-fn library",
+  "packageManager": "pnpm@10.12.4",
   "scripts": {
     "start": "docusaurus start",
     "build": "docusaurus build",
