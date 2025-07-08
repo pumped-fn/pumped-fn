@@ -39,6 +39,11 @@ jobs:
           cd docs
           NODE_ENV=production pnpm build
 
+      - name: Build search
+        run: |
+          cd docs
+          pnpm build:search
+
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v3
