@@ -5,10 +5,10 @@
   "packageManager": "pnpm@10.12.4",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "export": "next build && next export",
-    "build:search": "pagefind --site .next/server/app --output-path public/_pagefind"
+    "build:next": "next build",
+    "build:search": "pagefind --site .next/server/app --output-path out/_pagefind",
+    "build": "pnpm build:next && pnpm build:search",
+    "start": "bunx serve out"
   },
   "dependencies": {
     "@types/mdx": "^2.0.13",
