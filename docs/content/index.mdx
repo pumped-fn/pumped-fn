@@ -17,21 +17,21 @@ A modern TypeScript functional programming library that provides **container-bas
 Executors are the core building blocks - containers that hold values and define how dependencies are resolved.
 
 ```typescript
-import { exec } from '@pumped-fn/core-next';
+import { provide } from '@pumped-fn/core-next';
 
 // Simple executor
-const greeting = exec(() => 'Hello World!');
+const greeting = provide(() => 'Hello World!');
 
 // Executor with dependencies
-const userGreeting = exec((name: string) => `Hello ${name}!`, name);
+const userGreeting = provide((name: string) => `Hello ${name}!`, name);
 ```
 
 ### Reactive Programming
 Built-in reactivity that automatically tracks dependencies and updates when they change.
 
 ```typescript
-const counter = exec(() => ({ count: 0 }));
-const doubled = exec((state) => state.count * 2, counter.reactive);
+const counter = provide(() => ({ count: 0 }));
+const doubled = provide((state) => state.count * 2, counter.reactive);
 ```
 
 ### React Integration

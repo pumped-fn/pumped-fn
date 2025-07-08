@@ -1,6 +1,7 @@
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 import { Banner, Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
+import Image from "next/image";
 import "nextra-theme-docs/style.css";
 
 export const metadata = {
@@ -10,11 +11,19 @@ export const metadata = {
 
 const navbar = (
   <Navbar
-    logo={<b>pumped-fn</b>}
+    logo={
+      <>
+        <Image
+          src="/ms-icon-150x150.png"
+          alt="Pumped Logo"
+          width={48}
+          height={48}
+        />
+      </>
+    }
     // ... Your additional navbar options
   />
 );
-const footer = <Footer>MIT {new Date().getFullYear()} © Nextra.</Footer>;
 
 export default async function RootLayout({ children }) {
   return (
@@ -26,19 +35,91 @@ export default async function RootLayout({ children }) {
       // Suggested by `next-themes` package https://github.com/pacocoursey/next-themes#with-app
       suppressHydrationWarning
     >
-      <Head
-      // ... Your additional head options
-      >
-        {/* Your additional tags should be passed as `children` of `<Head>` element */}
+      <Head>
+        <link
+          rel="apple-touch-icon"
+          sizes="57x57"
+          href="/apple-icon-57x57.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="60x60"
+          href="/apple-icon-60x60.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="72x72"
+          href="/apple-icon-72x72.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="76x76"
+          href="/apple-icon-76x76.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="114x114"
+          href="/apple-icon-114x114.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="120x120"
+          href="/apple-icon-120x120.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="144x144"
+          href="/apple-icon-144x144.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="152x152"
+          href="/apple-icon-152x152.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/apple-icon-180x180.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="192x192"
+          href="/android-icon-192x192.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/favicon-32x32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="96x96"
+          href="/favicon-96x96.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/favicon-16x16.png"
+        />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="msapplication-TileColor" content="#ffffff" />
+        <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
+        <meta name="theme-color" content="#ffffff"></meta>
       </Head>
       <body>
         <Layout
           navbar={navbar}
-          pageMap={await getPageMap()}
-          footer={footer}
+          pageMap={await getPageMap("/pumped-fn")}
           editLink={false}
           feedback={{
             content: "",
+          }}
+          sidebar={{
+            defaultOpen: true,
           }}
           // ... Your additional layout options
         >
