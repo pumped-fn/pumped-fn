@@ -4,7 +4,7 @@
   "description": "Nextra documentation site for pumped-fn library",
   "packageManager": "pnpm@10.12.4",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "export": "next build && next export",
