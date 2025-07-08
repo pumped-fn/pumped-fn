@@ -105,7 +105,7 @@ export default async function RootLayout({ children }) {
           sizes="16x16"
           href="/pumped-fn/favicon-16x16.png"
         />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/pumped-fn/manifest.json" />
         <meta name="msapplication-TileColor" content="#ffffff" />
         <meta
           name="msapplication-TileImage"
@@ -116,7 +116,7 @@ export default async function RootLayout({ children }) {
       <body>
         <Layout
           navbar={navbar}
-          pageMap={await getPageMap("/pumped-fn")}
+          pageMap={await getPageMap()}
           editLink={false}
           feedback={{
             content: "",
