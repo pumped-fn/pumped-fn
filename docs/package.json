@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "export": "next build && next export",
-    "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind"
+    "build:search": "pagefind --site .next/server/app --output-path public/_pagefind"
   },
   "dependencies": {
     "@types/mdx": "^2.0.13",
