@@ -1,8 +1,6 @@
 import nextra from 'nextra';
 
-const withNextra = nextra({
-  contentDirBasePath: '/pumped-fn'
-});
+const withNextra = nextra({});
 
 export default withNextra({
   images: {
@@ -10,4 +8,5 @@ export default withNextra({
   },
   output: 'export',
   cleanDistDir: true,
+  basePath: '/pumped-fn',
 });
