@@ -1,7 +1,6 @@
-import { Footer, Layout, Navbar } from "nextra-theme-docs";
-import { Banner, Head } from "nextra/components";
+import { Layout, Navbar } from "nextra-theme-docs";
+import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
-import Image from "next/image";
 import "nextra-theme-docs/style.css";
 
 export const metadata = {
@@ -13,7 +12,7 @@ const navbar = (
   <Navbar
     logo={
       <>
-        <Image
+        <img
           src="/pumped-fn/ms-icon-150x150.png"
           alt="Pumped Logo"
           width={48}
