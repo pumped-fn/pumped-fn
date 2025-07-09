@@ -1,6 +1,16 @@
 import nextra from 'nextra';
 
-const withNextra = nextra({});
+const withNextra = nextra({
+  mdxOptions: {
+    rehypePrettyCodeOptions: {
+      theme: {
+        light: 'github-light',
+        dark: 'github-dark'
+      },
+      defaultShowCopyCode: true
+    }
+  }
+});
 
 export default withNextra({
   images: {

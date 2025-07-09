@@ -1,0 +1,395 @@
+# Testing Strategies: Testing Made Trivial
+
+**The Core Problem**: Backend testing is notorious for complexity - mocking dependencies, setting up test data, isolating tests, handling async operations. Traditional approaches lead to brittle tests, slow test suites, and complex setup/teardown logic.
+
+**The Insight**: Scope-based testing eliminates most testing complexity. Create scope, preset assumptions, test, dispose. Every test is isolated, fast, and focused.
+
+## Where Traditional Testing Falls Apart
+
+```typescript
+// Traditional: Complex test setup
+describe('OrderService', () => {
+  let mockDb: jest.Mocked<Database>;
+  let mockEmailService: jest.Mocked<EmailService>;
+  let mockLogger: jest.Mocked<Logger>;
+  let mockPaymentService: jest.Mocked<PaymentService>;
+  let orderService: OrderService;
+  
+  beforeEach(async () => {
+    // Mock everything manually
+    mockDb = {
+      orders: {
+        create: jest.fn(),
+        findById: jest.fn(),
+        update: jest.fn()
+      },
+      users: {
+        findById: jest.fn()
+      }
+    } as any;
+    
+    mockEmailService = {
+      sendOrderConfirmation: jest.fn()
+    } as any;
+    
+    mockLogger = {
+      info: jest.fn(),
+      error: jest.fn()
+    } as any;
+    
+    mockPaymentService = {
+      processPayment: jest.fn()
+    } as any;
+    
+    // Wire everything manually
+    orderService = new OrderService(mockDb, mockEmailService, mockLogger, mockPaymentService);
+  });
+  
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+  
+  it('creates order successfully', async () => {
+    // Setup mocks for this specific test
+    mockDb.users.findById.mockResolvedValue({ id: '1', email: 'test@example.com' });
+    mockDb.orders.create.mockResolvedValue({ id: 'order-1', userId: '1' });
+    mockPaymentService.processPayment.mockResolvedValue({ success: true });
+    
+    const result = await orderService.createOrder({
+      userId: '1',
+      items: [{ id: 'item-1', quantity: 1 }]
+    });
+    
+    expect(result.id).toBe('order-1');
+    expect(mockEmailService.sendOrderConfirmation).toHaveBeenCalled();
+  });
+  
+  // 50 more lines of similar mock setup for each test...
+});
+```
+
+## Scope-Based Testing Excellence
+
+```typescript
+import { provide, derive, createScope, preset } from '@pumped-fn/core-next';
+
+// Define your application services normally
+const database = provide(() => new Database());
+const emailService = provide(() => new EmailService());
+const paymentService = provide(() => new PaymentService());
+const logger = provide(() => new Logger());
+
+const orderService = derive(
+  { db: database, email: emailService, payment: paymentService, logger },
+  ({ db, email, payment, logger }) => new OrderService(db, email, payment, logger)
+);
+
+describe('OrderService', () => {
+  it('creates order successfully', async () => {
+    // Only mock what you need to control
+    const mockDb = {
+      users: { findById: async () => ({ id: '1', email: 'test@example.com' }) },
+      orders: { create: async (order: any) => ({ ...order, id: 'order-1' }) }
+    };
+    
+    const scope = createScope(
+      preset(database, mockDb)
+      // Real email service, real payment service, real logger
+    );
+    
+    const service = await scope.resolve(orderService);
+    const result = await service.createOrder({
+      userId: '1',
+      items: [{ id: 'item-1', quantity: 1 }]
+    });
+    
+    expect(result.id).toBe('order-1');
+    // Test complete - scope dies, everything resets
+  });
+
+  it('handles payment failure gracefully', async () => {
+    const failingPayment = {
+      processPayment: async () => { throw new Error('Payment failed'); }
+    };
+    
+    const scope = createScope(
+      preset(paymentService, failingPayment)
+      // Everything else runs normally
+    );
+    
+    const service = await scope.resolve(orderService);
+    
+    await expect(service.createOrder({ userId: '1', items: [] }))
+      .rejects.toThrow('Payment failed');
+  });
+});
+```
+
+## Testing Strategy Patterns
+
+### Integration Testing
+```typescript
+describe('Order Workflow Integration', () => {
+  it('handles complete order lifecycle', async () => {
+    // Use real database, mock external services
+    const scope = createScope(
+      preset(paymentService, new MockPaymentService()),
+      preset(emailService, new MockEmailService())
+      // Real database, real logging, real business logic
+    );
+    
+    const service = await scope.resolve(orderService);
+    const user = await scope.resolve(userService);
+    
+    // Real integration test with minimal mocking
+    const createdUser = await user.createUser({ email: 'test@example.com' });
+    const order = await service.createOrder({
+      userId: createdUser.id,
+      items: [{ id: 'item-1', quantity: 2 }]
+    });
+    
+    expect(order.status).toBe('confirmed');
+    expect(order.userId).toBe(createdUser.id);
+  });
+});
+```
+
+### Unit Testing with Surgical Mocking
+```typescript
+describe('OrderService Business Logic', () => {
+  it('calculates tax correctly', async () => {
+    const scope = createScope(
+      // Only mock the tax service for predictable results
+      preset(taxService, {
+        calculateTax: (amount: number) => amount * 0.08
+      })
+    );
+    
+    const service = await scope.resolve(orderService);
+    const order = await service.calculateOrderTotal({
+      items: [{ price: 100, quantity: 2 }]
+    });
+    
+    expect(order.subtotal).toBe(200);
+    expect(order.tax).toBe(16);
+    expect(order.total).toBe(216);
+  });
+
+  it('applies discount codes correctly', async () => {
+    const scope = createScope(
+      preset(discountService, {
+        validateDiscount: async (code: string) => ({ valid: true, percentage: 10 })
+      })
+    );
+    
+    const service = await scope.resolve(orderService);
+    const order = await service.applyDiscount('SAVE10', { subtotal: 100 });
+    
+    expect(order.discount).toBe(10);
+    expect(order.total).toBe(90);
+  });
+});
+```
+
+### Parallel Test Execution
+```typescript
+describe('Concurrent User Operations', () => {
+  it('handles multiple users simultaneously', async () => {
+    const users = [
+      { id: '1', email: 'user1@example.com' },
+      { id: '2', email: 'user2@example.com' },
+      { id: '3', email: 'user3@example.com' }
+    ];
+    
+    // Create separate scopes for each user
+    const scopes = users.map(user => createScope(
+      preset(currentUser, user),
+      preset(requestId, `req-${user.id}`)
+    ));
+    
+    // Run all operations in parallel
+    const results = await Promise.all(
+      scopes.map(scope => scope.resolve(orderService))
+        .map((servicePromise, i) => 
+          servicePromise.then(service => 
+            service.createOrder({ items: [{ id: `item-${i}` }] })
+          )
+        )
+    );
+    
+    // Each operation completed independently
+    expect(results).toHaveLength(3);
+    expect(results.map(r => r.userId)).toEqual(['1', '2', '3']);
+    
+    // Cleanup all scopes
+    await Promise.all(scopes.map(scope => scope.dispose()));
+  });
+});
+```
+
+### Error Scenario Testing
+```typescript
+describe('Error Handling', () => {
+  it('handles database connection failure', async () => {
+    const failingDb = {
+      connect: async () => { throw new Error('Connection failed'); }
+    };
+    
+    const scope = createScope(
+      preset(database, failingDb)
+    );
+    
+    await expect(scope.resolve(orderService))
+      .rejects.toThrow('Connection failed');
+  });
+
+  it('handles partial service failures', async () => {
+    const scope = createScope(
+      preset(emailService, {
+        sendOrderConfirmation: async () => { throw new Error('Email service down'); }
+      })
+    );
+    
+    const service = await scope.resolve(orderService);
+    
+    // Order should still be created even if email fails
+    const order = await service.createOrder({ userId: '1', items: [] });
+    expect(order.id).toBeDefined();
+    expect(order.emailSent).toBe(false);
+  });
+});
+```
+
+### Performance Testing
+```typescript
+describe('Performance', () => {
+  it('handles high throughput', async () => {
+    const scope = createScope(
+      // Use fast in-memory implementations
+      preset(database, new InMemoryDatabase()),
+      preset(cache, new InMemoryCache())
+    );
+    
+    const service = await scope.resolve(orderService);
+    
+    const start = Date.now();
+    const promises = Array.from({ length: 1000 }, (_, i) =>
+      service.createOrder({ userId: `user-${i}`, items: [] })
+    );
+    
+    const results = await Promise.all(promises);
+    const duration = Date.now() - start;
+    
+    expect(results).toHaveLength(1000);
+    expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
+  });
+});
+```
+
+### Time-Based Testing
+```typescript
+describe('Time-Sensitive Operations', () => {
+  it('handles order expiration correctly', async () => {
+    const fixedTime = new Date('2024-01-01T12:00:00Z');
+    
+    const scope = createScope(
+      preset(currentTime, fixedTime)
+    );
+    
+    const service = await scope.resolve(orderService);
+    const order = await service.createOrder({ 
+      userId: '1', 
+      items: [], 
+      expiresIn: 3600 // 1 hour
+    });
+    
+    expect(order.expiresAt).toEqual(new Date('2024-01-01T13:00:00Z'));
+  });
+
+  it('handles timezone conversions', async () => {
+    const scope = createScope(
+      preset(userTimezone, 'America/New_York'),
+      preset(currentTime, new Date('2024-01-01T17:00:00Z')) // 12 PM EST
+    );
+    
+    const service = await scope.resolve(schedulingService);
+    const meeting = await service.scheduleDelivery({ time: '2:00 PM' });
+    
+    expect(meeting.utcTime).toEqual(new Date('2024-01-01T19:00:00Z'));
+  });
+});
+```
+
+## Advanced Testing Patterns
+
+### Test Data Builders
+```typescript
+const createTestUser = (overrides = {}) => ({
+  id: 'test-user-1',
+  email: 'test@example.com',
+  name: 'Test User',
+  ...overrides
+});
+
+const createTestOrder = (overrides = {}) => ({
+  id: 'test-order-1',
+  userId: 'test-user-1',
+  items: [{ id: 'item-1', quantity: 1, price: 100 }],
+  status: 'pending',
+  ...overrides
+});
+
+describe('Order Validation', () => {
+  it('validates user permissions', async () => {
+    const adminUser = createTestUser({ role: 'admin' });
+    const regularUser = createTestUser({ role: 'user' });
+    
+    const adminScope = createScope(preset(currentUser, adminUser));
+    const userScope = createScope(preset(currentUser, regularUser));
+    
+    const [adminService, userService] = await Promise.all([
+      adminScope.resolve(orderService),
+      userScope.resolve(orderService)
+    ]);
+    
+    // Admin can view all orders
+    const allOrders = await adminService.getAllOrders();
+    expect(allOrders).toBeDefined();
+    
+    // Regular user cannot
+    await expect(userService.getAllOrders()).rejects.toThrow('Insufficient permissions');
+  });
+});
+```
+
+### Snapshot Testing
+```typescript
+describe('Order Export', () => {
+  it('exports order data correctly', async () => {
+    const scope = createScope(
+      preset(currentTime, new Date('2024-01-01T12:00:00Z')),
+      preset(currentUser, createTestUser())
+    );
+    
+    const service = await scope.resolve(orderService);
+    const order = await service.createOrder(createTestOrder());
+    const exported = await service.exportOrder(order.id);
+    
+    expect(exported).toMatchSnapshot();
+  });
+});
+```
+
+## Testing Strategy Benefits
+
+🎯 **Minimal Mocking**: Only mock what you need to control  
+⚡ **Perfect Isolation**: Each test runs in its own universe  
+🔥 **Parallel Execution**: Tests run concurrently without interference  
+🚀 **Fast Setup**: No complex beforeEach/afterEach logic  
+💎 **Real Integration**: Test real business logic with surgical mocking  
+
+**Real-World Impact**: Faster test suites, fewer brittle tests, easier debugging, better test coverage. Your test code becomes as clean as your application code.
+
+## What's Next?
+
+Testing mastered! Let's explore [error handling and resilience](/patterns/error-handling) - building bulletproof applications with graceful failure handling.

@@ -1,0 +1,242 @@
+# Try Pumped Functions Right Now! 🚀
+
+No installation needed. Everything runs in your browser. Pick an example and start coding!
+
+## Example 1: Basic Counter
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-counter?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '600px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Counter Example"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### 🎯 Challenge
+Can you add a "Reset" button that sets the counter back to 0? 
+
+<details>
+<summary>💡 Show Hint</summary>
+
+Add this to the controller:
+```typescript
+reset: () => ctl.update(0)
+```
+</details>
+
+---
+
+## Example 2: Todo App with Filters
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-todo?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '700px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Todo Example"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### 🎯 Challenge
+Can you add a "Clear Completed" button that removes all completed todos?
+
+<details>
+<summary>💡 Show Hint</summary>
+
+Add this to the todoController:
+```typescript
+clearCompleted: () => ctl.update(todos => 
+  todos.filter(todo => !todo.completed)
+)
+```
+</details>
+
+---
+
+## Example 3: Theme Switcher with Persistence
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-theme?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '600px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Theme Example"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### 🎯 Challenge
+Can you add a third theme option called "auto" that follows system preferences?
+
+---
+
+## Example 4: Form with Validation
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-form?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '700px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Form Example"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### 🎯 Challenge
+Can you add password strength validation (weak/medium/strong)?
+
+---
+
+## Example 5: Real-Time Search
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-search?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '650px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Search Example"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### 🎯 Challenge
+Can you add search history that shows the last 5 searches?
+
+---
+
+## Build Your Own!
+
+Ready to build something from scratch? Start with this template:
+
+<iframe
+  src="https://stackblitz.com/edit/pumped-functions-starter?embed=1&file=src/App.tsx&hideExplorer=1&theme=dark"
+  style={{
+    width: '100%',
+    height: '700px',
+    border: '0',
+    borderRadius: '8px',
+    overflow: 'hidden'
+  }}
+  title="Pumped Functions Starter Template"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+
+### Ideas to Build:
+- 🛒 Shopping cart with totals
+- ⏲️ Pomodoro timer
+- 📝 Markdown editor with preview
+- 🎮 Simple game state
+- 📊 Dashboard with filters
+
+## Compare with Other Libraries
+
+Want to see the same app built with different libraries?
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginTop: '2rem'}}>
+
+<a href="https://stackblitz.com/edit/pumped-vs-redux" target="_blank" style={{
+  display: 'block',
+  padding: '1rem',
+  border: '2px solid #3b82f6',
+  borderRadius: '0.5rem',
+  textDecoration: 'none',
+  textAlign: 'center'
+}}>
+  <h4 style={{margin: '0 0 0.5rem 0'}}>Pumped vs Redux</h4>
+  <p style={{margin: 0, fontSize: '0.9rem', color: '#666'}}>See the code reduction</p>
+</a>
+
+<a href="https://stackblitz.com/edit/pumped-vs-zustand" target="_blank" style={{
+  display: 'block',
+  padding: '1rem',
+  border: '2px solid #10b981',
+  borderRadius: '0.5rem',
+  textDecoration: 'none',
+  textAlign: 'center'
+}}>
+  <h4 style={{margin: '0 0 0.5rem 0'}}>Pumped vs Zustand</h4>
+  <p style={{margin: 0, fontSize: '0.9rem', color: '#666'}}>Compare simplicity</p>
+</a>
+
+<a href="https://stackblitz.com/edit/pumped-vs-context" target="_blank" style={{
+  display: 'block',
+  padding: '1rem',
+  border: '2px solid #8b5cf6',
+  borderRadius: '0.5rem',
+  textDecoration: 'none',
+  textAlign: 'center'
+}}>
+  <h4 style={{margin: '0 0 0.5rem 0'}}>Pumped vs Context API</h4>
+  <p style={{margin: 0, fontSize: '0.9rem', color: '#666'}}>Better performance</p>
+</a>
+
+<a href="https://stackblitz.com/edit/pumped-all-examples" target="_blank" style={{
+  display: 'block',
+  padding: '1rem',
+  border: '2px solid #f59e0b',
+  borderRadius: '0.5rem',
+  textDecoration: 'none',
+  textAlign: 'center'
+}}>
+  <h4 style={{margin: '0 0 0.5rem 0'}}>All Examples</h4>
+  <p style={{margin: 0, fontSize: '0.9rem', color: '#666'}}>Side-by-side comparison</p>
+</a>
+
+</div>
+
+## What's Next?
+
+Now that you've played with Pumped Functions:
+
+1. **[Install locally](/install)** - `npm install @pumped-fn/core-next`
+2. **[Read the quickstart](/quickstart)** - Build your first real app
+3. **[Learn concepts](/concepts)** - Understand the mental model
+4. **[Join Discord](https://discord.gg/pumped)** - Get help from the community
+
+## Share Your Creation!
+
+Built something cool? Share it with us!
+
+<div style={{textAlign: 'center', marginTop: '2rem'}}>
+  <a href="https://twitter.com/intent/tweet?text=I%20just%20tried%20@pumpedfn%20and%20built%20this%20in%205%20minutes!&url=YOUR_STACKBLITZ_URL" target="_blank" style={{
+    display: 'inline-block',
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#1da1f2',
+    color: 'white',
+    borderRadius: '0.5rem',
+    textDecoration: 'none',
+    fontWeight: 'bold'
+  }}>
+    Tweet Your Demo
+  </a>
+</div>
+
+---
+
+<p style={{textAlign: 'center', marginTop: '3rem', color: '#666'}}>
+  💡 <strong>Pro Tip:</strong> All these examples are editable! Fork any of them to start your own project.
+</p>

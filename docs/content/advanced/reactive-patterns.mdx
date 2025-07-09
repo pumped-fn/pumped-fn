@@ -1,0 +1,511 @@
+# Reactive Patterns: Living Backend Systems
+
+**The Problem**: Modern backends need to adapt in real-time - configuration changes from ops teams, feature flags from product managers, load-based scaling decisions, external API rate limits. Traditional systems require restarts or complex event handling to respond to changes.
+
+**The Solution**: Reactive executors create living systems that automatically adapt to changing conditions while maintaining consistency and type safety.
+
+## Live Configuration Management
+
+### Problem: Configuration Changes Without Downtime
+```typescript
+// Traditional: Restart required for config changes
+class PaymentService {
+  constructor() {
+    this.rateLimitPerMinute = process.env.PAYMENT_RATE_LIMIT || 100;
+    this.timeout = process.env.PAYMENT_TIMEOUT || 30000;
+    // Config frozen at startup time
+  }
+}
+
+// Want to change rate limit during high traffic? Restart the service!
+// Need to adjust timeout for a flaky external API? Downtime!
+```
+
+### Solution: Reactive Configuration Updates
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Configuration that polls remote config service
+const remoteConfig = provide(async () => {
+  const response = await fetch('/api/config/payment-service');
+  return response.json();
+});
+
+// Set up periodic config refresh
+const configRefresher = derive(remoteConfig, (config, controller) => {
+  const interval = setInterval(async () => {
+    try {
+      const newConfig = await fetch('/api/config/payment-service').then(r => r.json());
+      
+      // Only update if config actually changed
+      if (JSON.stringify(newConfig) !== JSON.stringify(config)) {
+        console.log('Configuration changed, updating services...');
+        await scope.update(remoteConfig, newConfig);
+      }
+    } catch (error) {
+      console.error('Failed to fetch config update:', error);
+    }
+  }, 30000); // Check every 30 seconds
+  
+  controller.cleanup(() => clearInterval(interval));
+  return config;
+});
+
+// Services that automatically adapt to config changes
+const paymentService = derive(remoteConfig.reactive, (config) => {
+  console.log(`Payment service reconfiguring: rate=${config.rateLimitPerMinute}, timeout=${config.timeout}`);
+  return new PaymentService({
+    rateLimitPerMinute: config.rateLimitPerMinute,
+    timeout: config.timeout,
+    retryAttempts: config.retryAttempts
+  });
+});
+
+const orderService = derive(
+  [paymentService.reactive, remoteConfig.reactive],
+  ([payment, config]) => {
+    console.log('Order service updating with new payment service and config');
+    return new OrderService(payment, {
+      orderTimeout: config.orderTimeout,
+      requirePaymentVerification: config.requirePaymentVerification
+    });
+  }
+);
+
+// Start the system
+const scope = createScope();
+await scope.resolve(configRefresher); // Start config polling
+const orders = await scope.resolve(orderService);
+
+// Now configuration changes automatically propagate:
+// 1. Remote config service updates payment config
+// 2. configRefresher detects the change
+// 3. paymentService rebuilds with new config
+// 4. orderService rebuilds with new payment service
+// 5. All without restarting the application!
+```
+
+## Feature Flag Orchestration
+
+### Problem: Runtime Behavior Changes
+```typescript
+// Traditional: Feature flags scattered throughout code
+class RecommendationService {
+  getRecommendations(userId: string) {
+    if (process.env.USE_ML_RECOMMENDATIONS === 'true') {
+      return this.mlRecommendations.getRecommendations(userId);
+    } else {
+      return this.simpleRecommendations.getRecommendations(userId);
+    }
+  }
+  
+  // Changing flags requires code deploys and restarts
+  // A/B testing is complex and error-prone
+  // Rolling back features means another deployment
+}
+```
+
+### Solution: Reactive Feature Flag System
+```typescript
+// Feature flag configuration that updates in real-time
+const featureFlags = provide(async () => {
+  const flags = await fetch('/api/feature-flags').then(r => r.json());
+  return flags;
+});
+
+// Periodic flag refresh
+const flagRefresher = derive(featureFlags, (flags, controller) => {
+  const interval = setInterval(async () => {
+    try {
+      const newFlags = await fetch('/api/feature-flags').then(r => r.json());
+      if (JSON.stringify(newFlags) !== JSON.stringify(flags)) {
+        console.log('Feature flags updated:', newFlags);
+        await scope.update(featureFlags, newFlags);
+      }
+    } catch (error) {
+      console.error('Failed to refresh feature flags:', error);
+    }
+  }, 10000); // Check every 10 seconds
+  
+  controller.cleanup(() => clearInterval(interval));
+  return flags;
+});
+
+// Services that change behavior based on feature flags
+const recommendationEngine = derive(featureFlags.reactive, (flags) => {
+  if (flags.useAdvancedML) {
+    console.log('Switching to advanced ML recommendation engine');
+    return new AdvancedMLRecommendationEngine();
+  } else if (flags.useBasicML) {
+    console.log('Switching to basic ML recommendation engine');
+    return new BasicMLRecommendationEngine();
+  } else {
+    console.log('Switching to rule-based recommendation engine');
+    return new RuleBasedRecommendationEngine();
+  }
+});
+
+const searchService = derive(featureFlags.reactive, (flags) => {
+  const config = {
+    enableFuzzySearch: flags.enableFuzzySearch,
+    maxResults: flags.searchMaxResults || 50,
+    enablePersonalization: flags.enablePersonalizedSearch
+  };
+  console.log('Search service updating with flags:', config);
+  return new SearchService(config);
+});
+
+const userInterface = derive(
+  [recommendationEngine.reactive, searchService.reactive, featureFlags.reactive],
+  ([recommendations, search, flags]) => {
+    return new UserInterface({
+      recommendations,
+      search,
+      showAdvancedFilters: flags.showAdvancedFilters,
+      enableRealTimeUpdates: flags.enableRealTimeUpdates
+    });
+  }
+);
+
+// Real-time feature flag updates
+const scope = createScope();
+await scope.resolve(flagRefresher); // Start flag polling
+const ui = await scope.resolve(userInterface);
+
+// Now you can toggle features instantly:
+// - Product manager enables advanced ML → recommendation engine switches
+// - A/B test changes search config → search service reconfigures  
+// - Emergency rollback disables feature → services adapt immediately
+```
+
+## Adaptive Resource Scaling
+
+### Problem: Static Resource Allocation
+```typescript
+// Traditional: Fixed connection pools and resource limits
+class DatabaseService {
+  constructor() {
+    this.connectionPool = new Pool({ max: 10 }); // Fixed at startup
+    this.queryTimeout = 30000; // Never changes
+  }
+  
+  // High traffic? Too bad, you get 10 connections
+  // Low traffic? Waste 10 connections anyway
+}
+```
+
+### Solution: Load-Adaptive Resources
+```typescript
+// System metrics that change over time
+const systemMetrics = provide(async () => {
+  const metrics = await Promise.all([
+    fetch('/metrics/cpu').then(r => r.json()),
+    fetch('/metrics/memory').then(r => r.json()),
+    fetch('/metrics/active-connections').then(r => r.json())
+  ]);
+  
+  return {
+    cpuUsage: metrics[0].usage,
+    memoryUsage: metrics[1].usage,
+    activeConnections: metrics[2].count,
+    timestamp: Date.now()
+  };
+});
+
+// Periodic metrics collection
+const metricsCollector = derive(systemMetrics, (metrics, controller) => {
+  const interval = setInterval(async () => {
+    try {
+      const newMetrics = await Promise.all([
+        fetch('/metrics/cpu').then(r => r.json()),
+        fetch('/metrics/memory').then(r => r.json()),
+        fetch('/metrics/active-connections').then(r => r.json())
+      ]);
+      
+      const updated = {
+        cpuUsage: newMetrics[0].usage,
+        memoryUsage: newMetrics[1].usage,
+        activeConnections: newMetrics[2].count,
+        timestamp: Date.now()
+      };
+      
+      await scope.update(systemMetrics, updated);
+    } catch (error) {
+      console.error('Failed to collect metrics:', error);
+    }
+  }, 5000); // Collect every 5 seconds
+  
+  controller.cleanup(() => clearInterval(interval));
+  return metrics;
+});
+
+// Database service that adapts to load
+const adaptiveDatabaseService = derive(
+  [systemMetrics.reactive, baseConfig],
+  ([metrics, config], controller) => {
+    // Calculate optimal connection pool size based on load
+    const baseConnections = config.database.minConnections || 5;
+    const maxConnections = config.database.maxConnections || 50;
+    
+    let optimalConnections = baseConnections;
+    
+    // Scale up if CPU/memory usage is high but we have capacity
+    if (metrics.cpuUsage > 70 && metrics.memoryUsage < 80) {
+      optimalConnections = Math.min(maxConnections, baseConnections * 2);
+    }
+    // Scale down if usage is low
+    else if (metrics.cpuUsage < 30 && metrics.memoryUsage < 50) {
+      optimalConnections = Math.max(baseConnections, Math.floor(optimalConnections * 0.7));
+    }
+    
+    console.log(`Adaptive DB: CPU=${metrics.cpuUsage}%, Memory=${metrics.memoryUsage}%, Connections=${optimalConnections}`);
+    
+    const pool = new Pool({
+      max: optimalConnections,
+      idleTimeoutMillis: metrics.cpuUsage > 80 ? 10000 : 30000 // Faster cleanup under load
+    });
+    
+    controller.cleanup(async () => {
+      console.log('Closing adaptive database pool');
+      await pool.end();
+    });
+    
+    return new DatabaseService(pool);
+  }
+);
+
+// Cache service that adapts memory usage
+const adaptiveCacheService = derive(
+  [systemMetrics.reactive, baseConfig],
+  ([metrics, config]) => {
+    const baseMemoryLimit = config.cache.baseMemoryMB || 100;
+    let memoryLimit = baseMemoryLimit;
+    
+    // Reduce cache size if memory pressure is high
+    if (metrics.memoryUsage > 85) {
+      memoryLimit = Math.floor(baseMemoryLimit * 0.5);
+    } else if (metrics.memoryUsage < 60) {
+      memoryLimit = Math.floor(baseMemoryLimit * 1.5);
+    }
+    
+    console.log(`Adaptive Cache: Memory usage=${metrics.memoryUsage}%, Cache limit=${memoryLimit}MB`);
+    
+    return new CacheService({
+      maxMemoryMB: memoryLimit,
+      evictionPolicy: metrics.memoryUsage > 80 ? 'aggressive' : 'normal'
+    });
+  }
+);
+
+// Start adaptive system
+const scope = createScope();
+await scope.resolve(metricsCollector); // Start metrics collection
+
+// System now automatically adapts:
+// - High load → more database connections, reduced cache
+// - Low load → fewer connections, increased cache
+// - Memory pressure → aggressive cache eviction
+// - All without manual intervention!
+```
+
+## Real-Time Health Adaptation
+
+### Problem: Services Continue Running When Unhealthy
+```typescript
+// Traditional: Services run regardless of health
+class EmailService {
+  async sendEmail(email: Email) {
+    try {
+      return await this.externalEmailAPI.send(email);
+    } catch (error) {
+      // Service keeps trying even if external API is down for hours
+      throw error;
+    }
+  }
+}
+```
+
+### Solution: Health-Aware Service Behavior
+```typescript
+// Health monitoring that tracks external dependencies
+const externalApiHealth = provide(async () => {
+  const checks = await Promise.all([
+    checkEmailServiceHealth(),
+    checkPaymentServiceHealth(),
+    checkNotificationServiceHealth()
+  ]);
+  
+  return {
+    emailService: checks[0],
+    paymentService: checks[1],
+    notificationService: checks[2],
+    lastCheck: Date.now()
+  };
+});
+
+// Periodic health checks
+const healthMonitor = derive(externalApiHealth, (health, controller) => {
+  const interval = setInterval(async () => {
+    try {
+      const checks = await Promise.all([
+        checkEmailServiceHealth(),
+        checkPaymentServiceHealth(),
+        checkNotificationServiceHealth()
+      ]);
+      
+      const newHealth = {
+        emailService: checks[0],
+        paymentService: checks[1],
+        notificationService: checks[2],
+        lastCheck: Date.now()
+      };
+      
+      await scope.update(externalApiHealth, newHealth);
+    } catch (error) {
+      console.error('Health check failed:', error);
+    }
+  }, 15000); // Check every 15 seconds
+  
+  controller.cleanup(() => clearInterval(interval));
+  return health;
+});
+
+// Email service that adapts behavior based on health
+const healthAwareEmailService = derive(
+  [externalApiHealth.reactive, queueService],
+  ([health, queue]) => {
+    if (health.emailService.status === 'healthy') {
+      console.log('Email service healthy - direct sending enabled');
+      return new DirectEmailService();
+    } else if (health.emailService.status === 'degraded') {
+      console.log('Email service degraded - using fallback with retry');
+      return new RetryEmailService({
+        maxRetries: 5,
+        backoffMs: 2000
+      });
+    } else {
+      console.log('Email service unhealthy - queueing emails for later');
+      return new QueuedEmailService(queue);
+    }
+  }
+);
+
+// Payment service with circuit breaker behavior
+const healthAwarePaymentService = derive(
+  [externalApiHealth.reactive, fallbackPaymentService],
+  ([health, fallback]) => {
+    if (health.paymentService.status === 'healthy') {
+      console.log('Payment service healthy - normal processing');
+      return new PrimaryPaymentService();
+    } else if (health.paymentService.status === 'degraded') {
+      console.log('Payment service degraded - using fallback');
+      return fallback;
+    } else {
+      console.log('Payment service down - payments disabled');
+      return new DisabledPaymentService('Payment service temporarily unavailable');
+    }
+  }
+);
+
+// Order service that adapts to overall system health
+const healthAwareOrderService = derive(
+  [healthAwareEmailService.reactive, healthAwarePaymentService.reactive, externalApiHealth.reactive],
+  ([email, payment, health]) => {
+    const systemHealthy = Object.values(health).every(h => h.status !== 'down');
+    
+    console.log(`Order service adapting - system healthy: ${systemHealthy}`);
+    
+    if (systemHealthy) {
+      return new FullOrderService(email, payment);
+    } else {
+      return new DegradedOrderService(email, payment, {
+        allowPartialOrders: true,
+        queueFailedOperations: true
+      });
+    }
+  }
+);
+
+// Start health-aware system
+const scope = createScope();
+await scope.resolve(healthMonitor); // Start health monitoring
+
+// System now adapts to external service health:
+// - Email API down → emails queued instead of failed
+// - Payment API degraded → fallback payment processor used
+// - Multiple services down → system enters degraded mode
+// - Services recover → system automatically returns to normal operation
+```
+
+## Testing Reactive Systems
+
+```typescript
+describe('Reactive Configuration System', () => {
+  it('updates services when config changes', async () => {
+    const initialConfig = { rateLimitPerMinute: 100, timeout: 30000 };
+    const updatedConfig = { rateLimitPerMinute: 200, timeout: 45000 };
+    
+    const scope = createScope(
+      preset(remoteConfig, initialConfig)
+    );
+    
+    const payment1 = await scope.resolve(paymentService);
+    expect(payment1.rateLimitPerMinute).toBe(100);
+    
+    // Simulate config change
+    await scope.update(remoteConfig, updatedConfig);
+    
+    const payment2 = await scope.resolve(paymentService);
+    expect(payment2.rateLimitPerMinute).toBe(200);
+    expect(payment2).not.toBe(payment1); // New service instance
+  });
+
+  it('adapts resources based on load metrics', async () => {
+    const lowLoad = { cpuUsage: 20, memoryUsage: 40, activeConnections: 5 };
+    const highLoad = { cpuUsage: 80, memoryUsage: 70, activeConnections: 45 };
+    
+    const scope = createScope(
+      preset(systemMetrics, lowLoad)
+    );
+    
+    const db1 = await scope.resolve(adaptiveDatabaseService);
+    expect(db1.connectionPool.max).toBeLessThan(20);
+    
+    await scope.update(systemMetrics, highLoad);
+    
+    const db2 = await scope.resolve(adaptiveDatabaseService);
+    expect(db2.connectionPool.max).toBeGreaterThan(20);
+  });
+
+  it('switches service behavior based on health', async () => {
+    const healthyState = { emailService: { status: 'healthy' } };
+    const unhealthyState = { emailService: { status: 'down' } };
+    
+    const scope = createScope(
+      preset(externalApiHealth, healthyState)
+    );
+    
+    const email1 = await scope.resolve(healthAwareEmailService);
+    expect(email1.constructor.name).toBe('DirectEmailService');
+    
+    await scope.update(externalApiHealth, unhealthyState);
+    
+    const email2 = await scope.resolve(healthAwareEmailService);
+    expect(email2.constructor.name).toBe('QueuedEmailService');
+  });
+});
+```
+
+## Reactive System Benefits
+
+🎯 **Zero Downtime Updates**: Configuration and behavior changes without restarts  
+⚡ **Automatic Adaptation**: Services respond to changing conditions automatically  
+🔥 **Operational Excellence**: Systems that heal and optimize themselves  
+🚀 **Real-time Control**: Instant feature flags, A/B tests, and emergency rollbacks  
+💎 **Consistent State**: All changes propagate through the dependency graph safely  
+
+**Real-World Impact**: Operations teams can tune systems in real-time, product teams can test features instantly, and your backend automatically adapts to changing conditions while maintaining consistency and type safety.
+
+## What's Next?
+
+Reactive patterns mastered! These techniques enable truly dynamic backend systems. Next, explore [execution modes](/advanced/execution-modes) to understand when and how to use lazy, static, and reactive executors for optimal performance and resource management.

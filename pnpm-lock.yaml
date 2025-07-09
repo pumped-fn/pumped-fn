@@ -47,6 +47,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      twoslash:
+        specifier: ^0.3.2
+        version: 0.3.2(typescript@5.8.3)
     devDependencies:
       '@types/node':
         specifier: ^20.19.4
@@ -4463,10 +4466,18 @@ packages:
   twoslash-protocol@0.2.12:
     resolution: {integrity: sha512-5qZLXVYfZ9ABdjqbvPc4RWMr7PrpPaaDSeaYY55vl/w1j6H6kzsWK/urAEIXlzYlyrFmyz1UbwIt+AA0ck+wbg==}
 
+  twoslash-protocol@0.3.2:
+    resolution: {integrity: sha512-lWIL1dGcMr7cywSLSn8ufCoeyPab3bIwPE6DmAlQYQSMjJUgzzRvSz/LsQ179eNJafRghYDlIgF2v7pmsjV3Ww==}
+
   twoslash@0.2.12:
     resolution: {integrity: sha512-tEHPASMqi7kqwfJbkk7hc/4EhlrKCSLcur+TcvYki3vhIfaRMXnXjaYFgXpoZRbT6GdprD4tGuVBEmTpUgLBsw==}
     peerDependencies:
       typescript: '*'
+
+  twoslash@0.3.2:
+    resolution: {integrity: sha512-TB+ja888uMKhbng8HzpTHm+JfxIWbngIHPy4nKEt2N93MFjpqmkqn8ppnPhIKj4kDnrohEsiogMF7T1gMY06rw==}
+    peerDependencies:
+      typescript: ^5.5.0
 
   type-detect@4.1.0:
     resolution: {integrity: sha512-Acylog8/luQ8L7il+geoSxhEkazvkslg7PSNKOX59mbB9cOveP5aq9h74Y7YU8yDpJwetzQQrfIwtf4Wp4LKcw==}
@@ -9794,10 +9805,20 @@ snapshots:
 
   twoslash-protocol@0.2.12: {}
 
+  twoslash-protocol@0.3.2: {}
+
   twoslash@0.2.12(typescript@5.8.3):
     dependencies:
       '@typescript/vfs': 1.6.1(typescript@5.8.3)
       twoslash-protocol: 0.2.12
+      typescript: 5.8.3
+    transitivePeerDependencies:
+      - supports-color
+
+  twoslash@0.3.2(typescript@5.8.3):
+    dependencies:
+      '@typescript/vfs': 1.6.1(typescript@5.8.3)
+      twoslash-protocol: 0.3.2
       typescript: 5.8.3
     transitivePeerDependencies:
       - supports-color

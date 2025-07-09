@@ -4,20 +4,23 @@
   "description": "Nextra documentation site for pumped-fn library",
   "packageManager": "pnpm@10.12.4",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build:next": "next build",
     "build:search": "pagefind --site .next/server/app --output-path out/_pagefind",
     "build": "pnpm build:next && pnpm build:search",
     "start": "bunx serve out"
   },
   "dependencies": {
+    "@shikijs/twoslash": "^3.7.0",
     "@types/mdx": "^2.0.13",
     "mdx": "^0.3.1",
     "next": "^15.3.5",
     "nextra": "^4.2.17",
     "nextra-theme-docs": "^4.2.17",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "shiki": "^3.7.0",
+    "twoslash": "^0.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.19.4",

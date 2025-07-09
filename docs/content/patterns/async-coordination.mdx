@@ -1,0 +1,300 @@
+# Async Coordination: When Composition Breaks Down
+
+**The Core Problem**: JavaScript composition works beautifully for sync operations. But introduce async dependencies and everything falls apart. You end up with manual Promise coordination, nested awaits, and complex dependency management.
+
+**The Insight**: Async DAGs solve this by letting you declare dependencies naturally while handling the coordination automatically.
+
+## Where Async Composition Breaks
+
+```typescript
+// Simple sync composition - works perfectly
+const greet = (name: string) => `Hello, ${name}`;
+const shout = (text: string) => text.toUpperCase();
+const addExclamation = (text: string) => `${text}!`;
+
+const compose = (name: string) => addExclamation(shout(greet(name)));
+// Beautiful, clear, testable
+
+// Now add async - everything breaks down
+async function asyncCompose(userId: string) {
+  const user = await fetchUser(userId);           // Must wait
+  const profile = await fetchProfile(user.id);   // Must wait for user
+  const settings = await fetchSettings(user.id); // Could be parallel with profile...
+  const theme = await fetchTheme(settings.themeId); // Must wait for settings
+  
+  // Manual coordination - where's the elegance?
+  // Which operations can be parallel?
+  // How do you add caching without rewriting everything?
+}
+```
+
+## Async DAG: Composition That Actually Works
+
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Declare async dependencies like sync composition
+const user = derive(userId, async (id) => fetchUser(id));
+const profile = derive(user, async (user) => fetchProfile(user.id));
+const settings = derive(user, async (user) => fetchSettings(user.id));
+const theme = derive(settings, async (settings) => fetchTheme(settings.themeId));
+
+// Compose everything naturally
+const dashboard = derive(
+  { user, profile, settings, theme },
+  async ({ user, profile, settings, theme }) => ({
+    welcome: `Welcome back, ${user.name}`,
+    avatar: profile.avatarUrl,
+    darkMode: theme.isDark,
+    preferences: settings
+  })
+);
+
+// One resolve, automatic coordination
+const scope = createScope();
+const result = await scope.resolve(dashboard);
+// ↑ DAG automatically runs profile + settings in parallel
+//   theme waits for settings
+//   dashboard waits for everything
+```
+
+## Simple Examples That Show the Power
+
+### API Response Composition
+```typescript
+// Traditional: Manual coordination mess
+async function getProductPage(productId: string) {
+  const product = await fetchProduct(productId);
+  const [reviews, related] = await Promise.all([
+    fetchReviews(productId),
+    fetchRelated(product.categoryId) // Depends on product!
+  ]);
+  const seller = await fetchSeller(product.sellerId); // Also depends on product!
+  return { product, reviews, related, seller };
+}
+
+// DAG: Natural composition
+const product = derive(productId, (id) => fetchProduct(id));
+const reviews = derive(productId, (id) => fetchReviews(id));
+const related = derive(product, (p) => fetchRelated(p.categoryId));
+const seller = derive(product, (p) => fetchSeller(p.sellerId));
+
+const productPage = derive({ product, reviews, related, seller }, (data) => data);
+// ↑ DAG runs reviews immediately, related + seller after product loads
+```
+
+### Database Query Composition  
+```typescript
+// Traditional: Complex orchestration
+async function getUserDashboard(userId: string) {
+  const user = await db.users.findById(userId);
+  const [posts, followers] = await Promise.all([
+    db.posts.findByAuthor(userId),
+    db.follows.findFollowers(userId)
+  ]);
+  const stats = await calculateStats(posts); // Depends on posts
+  return { user, posts, followers, stats };
+}
+
+// DAG: Clear dependencies
+const user = derive(userId, (id) => db.users.findById(id));
+const posts = derive(userId, (id) => db.posts.findByAuthor(id));
+const followers = derive(userId, (id) => db.follows.findFollowers(id));
+const stats = derive(posts, (posts) => calculateStats(posts));
+
+const dashboard = derive({ user, posts, followers, stats }, (data) => data);
+// ↑ user, posts, followers run in parallel; stats waits for posts
+```
+
+## Advanced Async Patterns
+
+### Pattern 1: Async with Caching
+
+```typescript
+// Cache async results within a scope
+const cachedUserData = derive(userId, async (id) => {
+  console.log(`Fetching user ${id}`);
+  const response = await fetch(`/api/users/${id}`);
+  return response.json();
+});
+
+const scope = createScope();
+const user1 = await scope.resolve(cachedUserData); // Fetches from API
+const user2 = await scope.resolve(cachedUserData); // Returns cached value
+// ↑ "Fetching user" logs only once
+```
+
+### Pattern 2: Async Error Handling
+
+```typescript
+// Centralized error handling for async operations
+const safeUserData = derive(userId, async (id) => {
+  try {
+    const response = await fetch(`/api/users/${id}`);
+    if (!response.ok) {
+      throw new Error(`User fetch failed: ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    // Log and re-throw with context
+    console.error(`Failed to fetch user ${id}:`, error);
+    throw new Error(`User service unavailable for ${id}`);
+  }
+});
+
+// Graceful fallbacks
+const userWithFallback = derive(safeUserData, async (userPromise) => {
+  try {
+    return await userPromise;
+  } catch {
+    return { id: 'guest', name: 'Guest User', role: 'visitor' };
+  }
+});
+```
+
+### Pattern 3: Async Timeout Management
+
+```typescript
+// Timeout wrapper for slow operations
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+    )
+  ]);
+};
+
+const timedUserData = derive(userId, async (id) => {
+  return withTimeout(
+    fetch(`/api/users/${id}`).then(r => r.json()),
+    5000 // 5 second timeout
+  );
+});
+```
+
+### Pattern 4: Conditional Async Loading
+
+```typescript
+// Load data based on conditions
+const userRole = derive(userData, (user) => user.role);
+
+const adminDashboard = derive(
+  [userRole, userData],
+  async ([role, user]) => {
+    if (role !== 'admin') return null;
+    
+    // Only fetch admin data if user is admin
+    const response = await fetch(`/api/admin/dashboard/${user.id}`);
+    return response.json();
+  }
+);
+// ↑ Core.Executor<Promise<AdminDashboard | null>>
+
+// Premium features loaded only for premium users
+const premiumFeatures = derive(
+  userData,
+  async (user) => {
+    if (!user.isPremium) return { enabled: false };
+    
+    const response = await fetch(`/api/premium/features/${user.id}`);
+    return response.json();
+  }
+);
+```
+
+## Testing Async Coordination
+
+```typescript
+describe('User Session Loading', () => {
+  it('loads complete session successfully', async () => {
+    const mockUser = { id: '123', orgId: 'org-1', roleId: 'admin' };
+    const mockOrg = { id: 'org-1', name: 'ACME Corp' };
+    
+    const scope = createScope(
+      preset(userData, Promise.resolve(mockUser)),
+      preset(organizationData, Promise.resolve(mockOrg)),
+      preset(userPermissions, Promise.resolve(['read', 'write', 'admin'])),
+      preset(userPreferences, Promise.resolve({ theme: 'dark' }))
+    );
+    
+    const session = await scope.resolve(userSession);
+    expect(session.user).toEqual(mockUser);
+    expect(session.org).toEqual(mockOrg);
+    expect(session.permissions).toContain('admin');
+  });
+
+  it('handles API failures gracefully', async () => {
+    const scope = createScope(
+      preset(userData, Promise.reject(new Error('Network error')))
+    );
+    
+    await expect(scope.resolve(userSession)).rejects.toThrow('Network error');
+  });
+
+  it('respects timeouts', async () => {
+    const slowPromise = new Promise(() => {}); // Never resolves
+    
+    const scope = createScope(
+      preset(userData, slowPromise)
+    );
+    
+    await expect(
+      scope.resolve(timedUserData)
+    ).rejects.toThrow('Timeout after 5000ms');
+  });
+
+  it('loads admin data only for admins', async () => {
+    const regularUser = { id: '123', role: 'user' };
+    const adminUser = { id: '456', role: 'admin' };
+    
+    const regularScope = createScope(
+      preset(userData, Promise.resolve(regularUser))
+    );
+    const adminScope = createScope(
+      preset(userData, Promise.resolve(adminUser))
+    );
+    
+    const regularDashboard = await regularScope.resolve(adminDashboard);
+    const adminDashboardData = await adminScope.resolve(adminDashboard);
+    
+    expect(regularDashboard).toBeNull();
+    expect(adminDashboardData).toBeDefined();
+  });
+});
+```
+
+## Async Coordination Benefits
+
+🎯 **Automatic Ordering**: DAG determines optimal execution order  
+⚡ **Maximum Parallelization**: Independent operations run simultaneously  
+🔥 **Built-in Caching**: Async results cached within scope  
+🚀 **Error Boundaries**: Centralized error handling  
+💎 **Type Safety**: Full async type inference  
+🛡️ **Testable**: Mock any async operation with presets  
+
+**Real-World Impact**: No more manual Promise coordination, no more race conditions, no more "which operation failed?" debugging. Your async code becomes declarative - define what depends on what, let Pumped Functions handle the how.
+
+## Performance Comparison
+
+```typescript
+// Traditional: Sequential execution
+const user = await fetchUser(id);                    // 100ms
+const org = await fetchOrganization(user.orgId);    // 100ms
+const perms = await fetchPermissions(user.roleId);  // 100ms
+const prefs = await fetchPreferences(id);           // 100ms
+// Total: 400ms sequential
+
+// Pumped-Fn: Automatic parallelization
+const session = await scope.resolve(userSession);
+// Execution timeline:
+// 0ms:   userId resolves
+// 0ms:   userData + userPreferences start (parallel)
+// 100ms: userData completes, organizationData + userPermissions start (parallel)
+// 200ms: Everything complete
+// Total: 200ms with automatic parallelization
+```
+
+## What's Next?
+
+Async coordination mastered! Let's tackle another backend essential: [resource lifecycle management](/patterns/resource-lifecycle) - ensuring connections, files, and resources are properly cleaned up.

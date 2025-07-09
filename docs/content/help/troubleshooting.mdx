@@ -1,0 +1,337 @@
+# Troubleshooting Guide 🔧
+
+Don't panic! Here are solutions to the most common issues beginners face.
+
+## "My Component Isn't Updating!" 
+
+### Problem
+You update the state but your React component doesn't re-render.
+
+### Common Causes & Solutions
+
+**1. Forgot to use `.reactive`**
+```typescript
+// ❌ Wrong - component won't update
+const [count] = useResolves(counter); 
+
+// ✅ Correct - component will update
+const [count] = useResolves(counter.reactive);
+```
+
+**2. Mutating state instead of returning new value**
+```typescript
+// ❌ Wrong - mutating array
+controller.update(items => {
+  items.push(newItem); // Don't mutate!
+  return items;
+});
+
+// ✅ Correct - return new array
+controller.update(items => [...items, newItem]);
+```
+
+**3. Missing ScopeProvider**
+```typescript
+// ❌ Wrong - no provider
+function App() {
+  return <Counter />;
+}
+
+// ✅ Correct - wrapped in provider
+function App() {
+  return (
+    <ScopeProvider>
+      <Counter />
+    </ScopeProvider>
+  );
+}
+```
+
+## "Cannot read properties of undefined"
+
+### Problem
+Getting undefined errors when accessing state.
+
+### Common Causes & Solutions
+
+**1. Trying to use executor directly**
+```typescript
+// ❌ Wrong - executors aren't values
+console.log(counter.value); // undefined!
+
+// ✅ Correct - must resolve first
+const value = await scope.resolve(counter);
+console.log(value);
+```
+
+**2. Forgot to resolve in React**
+```typescript
+// ❌ Wrong - using executor directly
+function Counter() {
+  return <div>{counter}</div>; // [object Object]
+}
+
+// ✅ Correct - use useResolves
+function Counter() {
+  const [count] = useResolves(counter.reactive);
+  return <div>{count}</div>;
+}
+```
+
+## "Executor is not resolved"
+
+### Problem
+Getting "Executor is not resolved" error.
+
+### Common Causes & Solutions
+
+**1. Using `.get()` before resolving**
+```typescript
+// ❌ Wrong - not resolved yet
+const controller = derive(counter.static, (ctl) => ({
+  double: () => {
+    const value = ctl.get(); // Error!
+    return value * 2;
+  }
+}));
+
+// ✅ Correct - resolve first or use update
+const controller = derive(counter.static, (ctl) => ({
+  double: () => ctl.update(n => n * 2)
+}));
+```
+
+**2. Accessing lazy executor too early**
+```typescript
+// ❌ Wrong - lazy isn't resolved
+const [lazy] = useResolves(expensive.lazy);
+console.log(lazy.get()); // Error!
+
+// ✅ Correct - check if resolved first
+const [lazy] = useResolves(expensive.lazy);
+if (lazy.lookup()?.kind === 'resolved') {
+  console.log(lazy.get());
+}
+```
+
+## "Maximum update depth exceeded"
+
+### Problem
+Getting infinite loop errors.
+
+### Common Causes & Solutions
+
+**1. Updating in render**
+```typescript
+// ❌ Wrong - updating during render
+function Counter() {
+  const [count, controller] = useResolves(counter.reactive, counterController);
+  controller.increment(); // Infinite loop!
+  return <div>{count}</div>;
+}
+
+// ✅ Correct - update in event handler or effect
+function Counter() {
+  const [count, controller] = useResolves(counter.reactive, counterController);
+  
+  useEffect(() => {
+    controller.increment();
+  }, []); // Only on mount
+  
+  return <div>{count}</div>;
+}
+```
+
+**2. Circular dependencies**
+```typescript
+// ❌ Wrong - A depends on B, B depends on A
+const a = derive(b.reactive, (b) => b + 1);
+const b = derive(a.reactive, (a) => a + 1); // Circular!
+
+// ✅ Correct - break the cycle
+const a = provide(() => 1);
+const b = derive(a.reactive, (a) => a + 1);
+```
+
+## "Tests are failing"
+
+### Problem
+Tests that work in the browser fail in tests.
+
+### Common Causes & Solutions
+
+**1. Forgot to dispose scope**
+```typescript
+// ❌ Wrong - leaking scope
+test('counter increments', async () => {
+  const scope = createScope();
+  // ... test code
+  // Forgot to dispose!
+});
+
+// ✅ Correct - always dispose
+test('counter increments', async () => {
+  const scope = createScope();
+  try {
+    // ... test code
+  } finally {
+    await scope.dispose();
+  }
+});
+```
+
+**2. Not waiting for async operations**
+```typescript
+// ❌ Wrong - not waiting
+test('updates state', () => {
+  controller.update(5);
+  expect(value).toBe(5); // Might still be old value!
+});
+
+// ✅ Correct - await updates
+test('updates state', async () => {
+  await controller.update(5);
+  const value = await scope.resolve(counter);
+  expect(value).toBe(5);
+});
+```
+
+## "TypeScript errors"
+
+### Common Type Issues
+
+**1. Generic type inference**
+```typescript
+// ❌ Wrong - TypeScript can't infer
+const items = provide(() => []); // unknown[]
+
+// ✅ Correct - specify type
+const items = provide(() => [] as Item[]);
+// or
+const items = provide((): Item[] => []);
+```
+
+**2. Controller parameter types**
+```typescript
+// ❌ Wrong - no types for parameters
+const controller = derive(user.static, (ctl) => ({
+  update: (data) => ctl.update(data) // 'data' is any
+}));
+
+// ✅ Correct - add types
+const controller = derive(user.static, (ctl) => ({
+  update: (data: UserData) => ctl.update(data)
+}));
+```
+
+## Performance Issues
+
+### Problem
+App feels slow or laggy.
+
+### Solutions
+
+**1. Too many reactive dependencies**
+```typescript
+// ❌ Wrong - everything is reactive
+const computed = derive(
+  [a.reactive, b.reactive, c.reactive, d.reactive],
+  ([a, b, c, d]) => expensive(a, b, c, d)
+);
+
+// ✅ Better - only reactive where needed
+const computed = derive(
+  [a.reactive, b], // Only a is reactive
+  ([a, b]) => expensive(a, b)
+);
+```
+
+**2. Large derived computations**
+```typescript
+// ❌ Wrong - filtering large array on every update
+const filtered = derive(
+  bigList.reactive,
+  (list) => list.filter(complexFilter) // Runs on every update
+);
+
+// ✅ Better - memoize or paginate
+const filtered = derive(
+  bigList.reactive,
+  (list) => useMemo(() => list.filter(complexFilter), [list])
+);
+```
+
+## Common Error Messages
+
+### "useScope must be used within a ScopeProvider"
+**Fix**: Wrap your app in `<ScopeProvider>`
+
+### "Scope is disposed"
+**Fix**: You're trying to use a scope after calling `dispose()`
+
+### "Cannot update a readonly property"
+**Fix**: Use the controller's update methods, not direct assignment
+
+### "Expected 0 arguments, but got 1"
+**Fix**: Check if your factory function expects parameters
+
+## Quick Debugging Tips
+
+1. **Check the Console First**
+   - Pumped Functions has helpful error messages
+   - Look for the stack trace
+
+2. **Use Console Logs**
+   ```typescript
+   const controller = derive(state.static, (ctl) => ({
+     update: (value) => {
+       console.log('Updating to:', value);
+       ctl.update(value);
+     }
+   }));
+   ```
+
+3. **Check Your Imports**
+   ```typescript
+   // Make sure you're importing from the right package
+   import { provide, derive } from '@pumped-fn/core-next';
+   import { useResolves } from '@pumped-fn/react';
+   ```
+
+4. **Verify Scope Creation**
+   ```typescript
+   // Add logging to verify scope is created
+   const scope = createScope();
+   console.log('Scope created:', scope);
+   ```
+
+## Still Stuck?
+
+### 1. Check the Examples
+- Look at the [working examples](/examples) in the docs
+- Compare your code with the examples
+
+### 2. Ask for Help
+- 💬 [Discord Community](https://discord.gg/...) - Get help fast!
+- 🐛 [GitHub Issues](https://github.com/...) - Report bugs
+- 🐦 [Twitter](https://twitter.com/...) - Quick questions
+
+### 3. Common Fixes That Work
+- Restart your dev server
+- Clear your browser cache
+- Delete `node_modules` and reinstall
+- Check you're using the latest version
+
+## Error Prevention Checklist
+
+Before you run into issues:
+
+- [ ] Always use `.reactive` for values that should trigger updates
+- [ ] Always dispose scopes in tests
+- [ ] Never mutate state directly
+- [ ] Always await async operations
+- [ ] Wrap your React app in `ScopeProvider`
+- [ ] Use TypeScript for better error catching
+- [ ] Keep executors simple and focused
+
+Remember: Everyone gets stuck sometimes. The community is here to help! 🤝

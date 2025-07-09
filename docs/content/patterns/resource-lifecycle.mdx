@@ -1,0 +1,322 @@
+# Resource Lifecycle Management: Never Leak Again
+
+**The Core Problem**: Backend applications manage resources - database connections, file handles, network sockets, timers. Traditional approaches rely on manual cleanup, leading to memory leaks, connection exhaustion, and hard-to-debug resource issues.
+
+**The Insight**: Automatic resource lifecycle management through cleanup controllers eliminates manual teardown and prevents resource leaks.
+
+## Where Resource Management Fails
+
+```typescript
+// Traditional: Manual cleanup hell
+class UserService {
+  private dbConnection: Database;
+  private fileWatcher: FileWatcher;
+  private timer: NodeJS.Timer;
+
+  constructor() {
+    this.dbConnection = new Database();
+    this.fileWatcher = new FileWatcher('/config');
+    this.timer = setInterval(() => this.cleanup(), 60000);
+  }
+
+  // Who calls this? When? What if it throws?
+  async destroy() {
+    await this.dbConnection.close();
+    this.fileWatcher.stop();
+    clearInterval(this.timer);
+    // Hope nothing was forgotten...
+  }
+}
+
+// In practice:
+const service = new UserService();
+// Service created, resources allocated...
+// Application shuts down or service replaced
+// Resources still allocated! Memory leak!
+```
+
+## Automatic Resource Lifecycle
+
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Resources with automatic cleanup
+const database = derive(config, (config, controller) => {
+  const db = new Database(config);
+  controller.cleanup(() => {
+    console.log('Closing database connection');
+    return db.close();
+  });
+  return db;
+});
+
+const fileWatcher = derive(config, (config, controller) => {
+  const watcher = new FileWatcher(config.watchPath);
+  controller.cleanup(() => {
+    console.log('Stopping file watcher');
+    watcher.stop();
+  });
+  return watcher;
+});
+
+const backgroundTimer = provide((controller) => {
+  const timer = setInterval(() => performMaintenance(), 60000);
+  controller.cleanup(() => {
+    console.log('Clearing background timer');
+    clearInterval(timer);
+  });
+  return timer;
+});
+
+const userService = derive(
+  { db: database, watcher: fileWatcher, timer: backgroundTimer },
+  ({ db, watcher, timer }) => new UserService(db, watcher, timer)
+);
+
+// Usage with automatic cleanup
+const scope = createScope();
+const service = await scope.resolve(userService);
+// ... use service ...
+await scope.dispose(); 
+// ↑ All cleanup functions called automatically in reverse order
+```
+
+## Real-World Resource Patterns
+
+### Database Connection Management
+```typescript
+const dbPool = derive(dbConfig, (config, controller) => {
+  const pool = new Pool({
+    host: config.host,
+    port: config.port,
+    max: config.maxConnections
+  });
+  
+  controller.cleanup(async () => {
+    console.log('Draining database pool...');
+    await pool.end();
+  });
+  
+  return pool;
+});
+
+const userRepository = derive(dbPool, (pool) => {
+  return new UserRepository(pool);
+});
+
+// Connection pool automatically closes when scope disposes
+```
+
+### File System Resources
+```typescript
+const logFile = derive(logConfig, (config, controller) => {
+  const stream = fs.createWriteStream(config.logPath, { flags: 'a' });
+  
+  controller.cleanup(() => {
+    return new Promise((resolve) => {
+      stream.end(() => {
+        console.log('Log file closed');
+        resolve();
+      });
+    });
+  });
+  
+  return stream;
+});
+
+const logger = derive(logFile, (stream) => {
+  return new FileLogger(stream);
+});
+```
+
+### HTTP Server Lifecycle
+```typescript
+const httpServer = derive(
+  [app, serverConfig],
+  ([app, config], controller) => {
+    const server = app.listen(config.port, config.host);
+    
+    controller.cleanup(() => {
+      return new Promise((resolve, reject) => {
+        console.log('Shutting down HTTP server...');
+        server.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+    
+    return server;
+  }
+);
+```
+
+### Redis Connection with Reconnection
+```typescript
+const redisClient = derive(redisConfig, (config, controller) => {
+  const client = redis.createClient(config);
+  
+  client.on('error', (err) => {
+    console.error('Redis error:', err);
+  });
+  
+  controller.cleanup(async () => {
+    console.log('Disconnecting from Redis...');
+    await client.disconnect();
+  });
+  
+  return client;
+});
+```
+
+## Cleanup Order and Dependencies
+
+```typescript
+// Cleanup happens in reverse dependency order
+const database = derive(config, (config, controller) => {
+  const db = new Database(config);
+  controller.cleanup(() => db.close());
+  return db;
+});
+
+const cache = derive(config, (config, controller) => {
+  const cache = new RedisCache(config);
+  controller.cleanup(() => cache.disconnect());
+  return cache;
+});
+
+const userService = derive([database, cache], ([db, cache], controller) => {
+  const service = new UserService(db, cache);
+  controller.cleanup(() => service.saveState());
+  return service;
+});
+
+// When scope.dispose() is called:
+// 1. userService.saveState() - save state first
+// 2. cache.disconnect() - close cache
+// 3. db.close() - close database last
+// ↑ Reverse dependency order ensures clean shutdown
+```
+
+## Testing Resource Cleanup
+
+```typescript
+describe('Resource Management', () => {
+  it('cleans up resources automatically', async () => {
+    const mockDb = { close: jest.fn() };
+    const mockCache = { disconnect: jest.fn() };
+    
+    const scope = createScope(
+      preset(database, mockDb),
+      preset(cache, mockCache)
+    );
+    
+    const service = await scope.resolve(userService);
+    expect(service).toBeDefined();
+    
+    await scope.dispose();
+    
+    expect(mockDb.close).toHaveBeenCalled();
+    expect(mockCache.disconnect).toHaveBeenCalled();
+  });
+
+  it('handles cleanup errors gracefully', async () => {
+    const failingResource = derive(config, (config, controller) => {
+      controller.cleanup(() => {
+        throw new Error('Cleanup failed');
+      });
+      return {};
+    });
+    
+    const scope = createScope();
+    await scope.resolve(failingResource);
+    
+    // Dispose shouldn't throw even if cleanup fails
+    await expect(scope.dispose()).resolves.not.toThrow();
+  });
+
+  it('cleans up in correct order', async () => {
+    const cleanupOrder: string[] = [];
+    
+    const first = provide((controller) => {
+      controller.cleanup(() => cleanupOrder.push('first'));
+      return 'first';
+    });
+    
+    const second = derive(first, (_, controller) => {
+      controller.cleanup(() => cleanupOrder.push('second'));
+      return 'second';
+    });
+    
+    const scope = createScope();
+    await scope.resolve(second);
+    await scope.dispose();
+    
+    expect(cleanupOrder).toEqual(['second', 'first']);
+  });
+});
+```
+
+## Advanced Cleanup Patterns
+
+### Graceful Shutdown with Timeout
+```typescript
+const webServer = derive(app, (app, controller) => {
+  const server = app.listen(3000);
+  
+  controller.cleanup(() => {
+    return Promise.race([
+      // Graceful shutdown
+      new Promise((resolve) => {
+        server.close(resolve);
+      }),
+      // Force shutdown after 30 seconds
+      new Promise((resolve) => {
+        setTimeout(() => {
+          console.log('Force closing server...');
+          server.destroy();
+          resolve();
+        }, 30000);
+      })
+    ]);
+  });
+  
+  return server;
+});
+```
+
+### Resource Health Monitoring
+```typescript
+const monitoredDatabase = derive(dbConfig, (config, controller) => {
+  const db = new Database(config);
+  
+  const healthCheck = setInterval(async () => {
+    try {
+      await db.ping();
+    } catch (error) {
+      console.error('Database health check failed:', error);
+    }
+  }, 30000);
+  
+  controller.cleanup(async () => {
+    clearInterval(healthCheck);
+    await db.close();
+  });
+  
+  return db;
+});
+```
+
+## Resource Lifecycle Benefits
+
+🎯 **Automatic Cleanup**: Resources cleaned up when scope disposes  
+⚡ **Correct Order**: Cleanup happens in reverse dependency order  
+🔥 **Error Safe**: Cleanup continues even if individual cleanups fail  
+🚀 **Testing Friendly**: Easy to verify cleanup behavior  
+💎 **No Leaks**: Impossible to forget cleanup registration  
+
+**Real-World Impact**: No more memory leaks, no more hanging connections, no more manual cleanup coordination. Your application startup and shutdown becomes reliable and predictable.
+
+## What's Next?
+
+Resource lifecycle mastered! Let's explore [service initialization](/patterns/service-initialization) - managing complex startup dependencies and graceful application lifecycle.

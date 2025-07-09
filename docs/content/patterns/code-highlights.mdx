@@ -1,0 +1,111 @@
+# Core Code Patterns to Emphasize
+
+## 1. The Executor Definition Pattern
+```typescript
+// Always show the type inference
+const config = provide(() => ({ port: 3000 }));
+// ↑ Core.Executor<{port: number}>
+
+const service = derive(config, (config) => new Service(config));
+// ↑ Core.Executor<Service>
+```
+
+## 2. The Scope Testing Pattern
+```typescript
+// The holy trinity of testing
+const scope = createScope(
+  preset(hardToTest, predictableValue)  // Only preset what's unpredictable
+);
+const result = await scope.resolve(executor);
+// Scope dies, everything resets
+```
+
+## 3. The Dependency Composition Pattern
+```typescript
+// Show all three dependency styles
+derive(single, (single) => {});                    // Single
+derive([a, b, c], ([a, b, c]) => {});             // Array (ordered)
+derive({ a, b, c }, ({ a, b, c }) => {});         // Object (named)
+```
+
+## 4. The DAG Resolution Pattern
+```typescript
+// Touch one node, get the entire graph
+const deeplyNested = derive(...);
+const scope = createScope();
+const result = await scope.resolve(deeplyNested);
+// ↑ Entire dependency chain resolves automatically
+```
+
+## 5. The Parallel Testing Pattern
+```typescript
+// Multiple scopes = parallel universes
+const [result1, result2, result3] = await Promise.all([
+  scope1.resolve(executor),
+  scope2.resolve(executor),
+  scope3.resolve(executor)
+]);
+// No interference, complete isolation
+```
+
+## 6. The Configuration Pattern
+```typescript
+// Environment-aware configuration
+const config = derive(environment, (env) => {
+  if (env === 'production') return prodConfig;
+  if (env === 'test') return testConfig;
+  return devConfig;
+});
+```
+
+## 7. The Cleanup Pattern
+```typescript
+const resource = derive(config, (config, controller) => {
+  const conn = new Connection(config);
+  controller.cleanup(() => conn.close());  // Automatic cleanup
+  return conn;
+});
+```
+
+## 8. The Type Safety Pattern
+```typescript
+// Always emphasize the type flow
+const userRepo = provide(() => new UserRepository());
+// ↑ Core.Executor<UserRepository>
+
+const userCount = derive(userRepo, (repo) => repo.count());
+// ↑ Core.Executor<() => Promise<number>>
+// TypeScript knows everything!
+```
+
+## 9. The Preset Override Pattern
+```typescript
+// Show surgical testing precision
+const scope = createScope(
+  preset(database, mockDb),      // Only mock the database
+  preset(timestamp, 123456)      // Only fix the timestamp
+  // Everything else runs normally
+);
+```
+
+## 10. The Error Handling Pattern
+```typescript
+// Validation and errors in executors
+const config = derive(environment, (env) => {
+  if (env === 'production' && !process.env.API_KEY) {
+    throw new Error('API_KEY required in production');
+  }
+  return { apiKey: process.env.API_KEY || 'dev-key' };
+});
+```
+
+## Key Emphasis Points
+
+1. **Type annotations** - Always show what TypeScript infers
+2. **Comments** - Explain what's happening at each step
+3. **Comparisons** - Show traditional way vs Pumped way
+4. **Real examples** - Database, config, services, not foo/bar
+5. **Testing focus** - Every pattern should show testing benefits
+6. **Isolation** - Emphasize scope independence
+7. **Simplicity** - Show how little code is needed
+8. **Benefits** - Comment on what problems this solves
