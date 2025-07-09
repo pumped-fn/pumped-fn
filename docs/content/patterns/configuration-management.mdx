@@ -1,0 +1,262 @@
+# Configuration Management: No More Config Hell
+
+**Problem**: Your app needs different configs for dev/staging/prod, environment variables, feature flags, and secrets. Traditional approaches lead to global state, hard-to-test code, and configuration scattered everywhere.
+
+**Pumped-Fn Solution**: Centralized config executors that adapt to any environment while keeping your code testable and clean.
+
+## The Traditional Configuration Nightmare
+
+```typescript
+// Scattered config access throughout your codebase
+class DatabaseService {
+  constructor() {
+    this.host = process.env.DB_HOST || 'localhost';
+    this.port = parseInt(process.env.DB_PORT || '5432');
+    this.ssl = process.env.NODE_ENV === 'production';
+  }
+}
+
+class EmailService {
+  constructor() {
+    this.apiKey = process.env.SENDGRID_API_KEY; // What if this is undefined?
+    this.fromEmail = process.env.FROM_EMAIL || 'noreply@example.com';
+  }
+}
+
+// Testing? Good luck mocking process.env everywhere
+// Different environments? Hope you set all the right variables
+// Configuration validation? Manual checks in every service
+```
+
+## The Pumped-Fn Pattern: Centralized Configuration
+
+### Step 1: Define Configuration Executors
+
+```typescript
+import { provide, derive } from '@pumped-fn/core-next';
+
+// Environment detection
+const environment = provide(() => process.env.NODE_ENV || 'development');
+
+// Base configuration
+const databaseConfig = derive(environment, (env) => ({
+  host: process.env.DB_HOST || (env === 'production' ? 'prod-db' : 'localhost'),
+  port: parseInt(process.env.DB_PORT || '5432'),
+  ssl: env === 'production',
+  poolSize: env === 'production' ? 20 : 5,
+  timeout: env === 'production' ? 30000 : 5000
+}));
+
+const emailConfig = derive(environment, (env) => {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (env === 'production' && !apiKey) {
+    throw new Error('SENDGRID_API_KEY is required in production');
+  }
+  
+  return {
+    apiKey: apiKey || 'test-key',
+    fromEmail: process.env.FROM_EMAIL || 'noreply@example.com',
+    enabled: env !== 'test' // Disable email in tests
+  };
+});
+
+// Feature flags
+const featureFlags = derive(environment, (env) => ({
+  newUserFlow: process.env.FEATURE_NEW_USER_FLOW === 'true',
+  advancedAnalytics: env === 'production',
+  debugMode: env === 'development'
+}));
+```
+
+### Step 2: Use Configuration in Services
+
+```typescript
+// Services receive config through dependency injection
+const databaseService = derive(databaseConfig, (config) => {
+  return new DatabaseService(config);
+});
+
+const emailService = derive(emailConfig, (config) => {
+  return new EmailService(config);
+});
+
+const userService = derive(
+  { db: databaseService, email: emailService, features: featureFlags },
+  ({ db, email, features }) => {
+    return new UserService(db, email, features);
+  }
+);
+```
+
+### Step 3: Environment-Specific Execution
+
+```typescript
+// Production
+const prodScope = createScope();
+const prodUserService = await prodScope.resolve(userService);
+// ↑ Gets production database config, real email service, production features
+
+// Development  
+const devScope = createScope(
+  preset(environment, 'development')
+);
+const devUserService = await devScope.resolve(userService);
+// ↑ Gets localhost database, test email, debug features
+
+// Testing with specific config
+const testScope = createScope(
+  preset(databaseConfig, { host: 'test-db', port: 5433, ssl: false }),
+  preset(emailConfig, { apiKey: 'test', fromEmail: 'test@test.com', enabled: false })
+);
+const testUserService = await testScope.resolve(userService);
+// ↑ Specific test configuration, email disabled
+```
+
+## Advanced Configuration Patterns
+
+### Pattern 1: Hierarchical Configuration
+
+```typescript
+// Base config that other configs depend on
+const appConfig = provide(() => ({
+  name: 'MyApp',
+  version: '1.0.0',
+  region: process.env.AWS_REGION || 'us-east-1'
+}));
+
+// Redis config depends on app config
+const redisConfig = derive([appConfig, environment], ([app, env]) => ({
+  host: `${app.region}-redis.${env}.amazonaws.com`,
+  port: 6379,
+  keyPrefix: `${app.name}:${env}:`,
+  ttl: env === 'production' ? 3600 : 300
+}));
+
+// Cache service uses Redis config
+const cacheService = derive(redisConfig, (config) => {
+  return new RedisCache(config);
+});
+```
+
+### Pattern 2: Secret Management
+
+```typescript
+// Secrets loaded from secure storage
+const secrets = derive(environment, async (env) => {
+  if (env === 'production') {
+    // Load from AWS Secrets Manager, HashiCorp Vault, etc.
+    return await loadSecretsFromVault();
+  } else {
+    // Use local secrets or defaults for dev/test
+    return {
+      dbPassword: 'dev-password',
+      jwtSecret: 'dev-jwt-secret',
+      apiKeys: { stripe: 'test-key' }
+    };
+  }
+});
+
+const databaseConfigWithSecrets = derive(
+  [databaseConfig, secrets],
+  ([dbConfig, secrets]) => ({
+    ...dbConfig,
+    password: secrets.dbPassword
+  })
+);
+```
+
+### Pattern 3: Dynamic Configuration Updates
+
+```typescript
+// Configuration that can be updated at runtime
+const dynamicConfig = provide(() => ({ 
+  maxRequestsPerMinute: 100,
+  enableNewFeature: false 
+}));
+
+const rateLimiter = derive(dynamicConfig, (config) => {
+  return new RateLimiter(config.maxRequestsPerMinute);
+});
+
+// Update configuration at runtime using controller pattern
+const configController = derive(dynamicConfig.static, (configCtl) => ({
+  updateRateLimits: (maxRequestsPerMinute: number) => 
+    configCtl.update(current => ({ ...current, maxRequestsPerMinute })),
+  
+  toggleFeature: (feature: string, enabled: boolean) => 
+    configCtl.update(current => ({ ...current, [feature]: enabled })),
+  
+  applyConfigPatch: (patch: Partial<typeof dynamicConfig>) => 
+    configCtl.update(current => ({ ...current, ...patch }))
+}));
+
+const scope = createScope();
+const controller = await scope.resolve(configController);
+
+// Type-safe configuration updates
+await controller.updateRateLimits(200);
+await controller.toggleFeature('enableNewFeature', true);
+// All dependent services get the new config automatically
+```
+
+## Testing Configuration Scenarios
+
+```typescript
+describe('UserService Configuration', () => {
+  it('works in production mode', async () => {
+    const scope = createScope(
+      preset(environment, 'production'),
+      preset(process.env, { 
+        DB_HOST: 'prod-db.amazonaws.com',
+        SENDGRID_API_KEY: 'real-key'
+      })
+    );
+    
+    const service = await scope.resolve(userService);
+    expect(service.database.ssl).toBe(true);
+    expect(service.email.enabled).toBe(true);
+  });
+
+  it('handles missing secrets in development', async () => {
+    const scope = createScope(
+      preset(environment, 'development')
+    );
+    
+    const service = await scope.resolve(userService);
+    expect(service.email.apiKey).toBe('test-key');
+  });
+
+  it('throws on missing production secrets', async () => {
+    const scope = createScope(
+      preset(environment, 'production'),
+      preset(process.env, {}) // No SENDGRID_API_KEY
+    );
+    
+    await expect(scope.resolve(emailConfig)).rejects.toThrow('SENDGRID_API_KEY is required');
+  });
+
+  it('disables email in test environment', async () => {
+    const scope = createScope(
+      preset(environment, 'test')
+    );
+    
+    const service = await scope.resolve(userService);
+    expect(service.email.enabled).toBe(false);
+  });
+});
+```
+
+## Configuration Management Benefits
+
+🎯 **Centralized**: All configuration logic in one place  
+⚡ **Environment-Aware**: Automatic adaptation based on environment  
+🔥 **Validation**: Early validation with clear error messages  
+🚀 **Testable**: Easy to test different configuration scenarios  
+💎 **Type-Safe**: Full TypeScript support for configuration shapes  
+🛡️ **Secret-Safe**: Secure secret management patterns  
+
+**Real-World Impact**: No more scattered `process.env` calls, no more missing environment variables in production, no more untestable configuration code. Your configuration becomes declarative, validated, and completely testable.
+
+## What's Next?
+
+Configuration solved! Let's tackle another backend nightmare: [async coordination](/patterns/async-coordination) - handling complex async dependencies without callback hell or Promise.all() madness.

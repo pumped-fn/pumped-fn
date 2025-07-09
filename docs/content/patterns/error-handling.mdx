@@ -1,0 +1,403 @@
+# Error Handling & Resilience: Bulletproof Applications
+
+**The Core Problem**: Backend applications fail in complex ways - network timeouts, service dependencies, validation errors, resource exhaustion. Traditional error handling scatters try-catch blocks everywhere, leading to inconsistent error responses and difficult debugging.
+
+**The Insight**: Centralized error boundaries in the dependency graph create consistent, debuggable, and resilient applications. Handle errors where they make sense, not where they occur.
+
+## Where Error Handling Gets Chaotic
+
+```typescript
+// Traditional: Error handling scattered everywhere
+class OrderService {
+  async createOrder(data: OrderData) {
+    try {
+      const user = await this.userService.getUser(data.userId);
+    } catch (error) {
+      // Log here? Rethrow? Transform?
+      console.error('User fetch failed', error);
+      throw new Error('User not found');
+    }
+    
+    try {
+      const payment = await this.paymentService.processPayment(data.payment);
+    } catch (error) {
+      // Different error handling logic
+      if (error.code === 'INSUFFICIENT_FUNDS') {
+        throw new Error('Payment declined');
+      }
+      // What about network errors? Timeouts?
+      throw error;
+    }
+    
+    try {
+      const order = await this.database.orders.create({
+        userId: user.id,
+        paymentId: payment.id,
+        items: data.items
+      });
+    } catch (error) {
+      // Rollback payment? Log? Alert?
+      console.error('Order creation failed', error);
+      throw new Error('Order creation failed');
+    }
+    
+    // More try-catch blocks...
+  }
+}
+```
+
+## Centralized Error Boundaries
+
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Error-aware services with centralized handling
+const userService = derive(database, (db) => ({
+  async getUser(id: string) {
+    try {
+      const user = await db.users.findById(id);
+      if (!user) {
+        throw new AppError('USER_NOT_FOUND', `User ${id} not found`);
+      }
+      return user;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('USER_SERVICE_ERROR', 'Failed to fetch user', error);
+    }
+  }
+}));
+
+const paymentService = derive([config, logger], ([config, logger]) => ({
+  async processPayment(paymentData: PaymentData) {
+    try {
+      const result = await externalPaymentAPI.charge(paymentData);
+      return result;
+    } catch (error) {
+      logger.error('Payment processing failed', { paymentData, error });
+      
+      if (error.code === 'insufficient_funds') {
+        throw new AppError('PAYMENT_DECLINED', 'Insufficient funds');
+      }
+      if (error.code === 'network_timeout') {
+        throw new AppError('PAYMENT_TIMEOUT', 'Payment service unavailable');
+      }
+      
+      throw new AppError('PAYMENT_ERROR', 'Payment processing failed', error);
+    }
+  }
+}));
+
+// High-level service with business logic error handling
+const orderService = derive(
+  { users: userService, payment: paymentService, db: database, logger },
+  ({ users, payment, db, logger }) => ({
+    async createOrder(data: OrderData) {
+      const context = { orderId: generateId(), userId: data.userId };
+      logger.info('Creating order', context);
+      
+      try {
+        // Let individual services handle their domain errors
+        const user = await users.getUser(data.userId);
+        const paymentResult = await payment.processPayment(data.payment);
+        
+        const order = await db.orders.create({
+          id: context.orderId,
+          userId: user.id,
+          paymentId: paymentResult.id,
+          items: data.items,
+          status: 'confirmed'
+        });
+        
+        logger.info('Order created successfully', { ...context, orderId: order.id });
+        return order;
+        
+      } catch (error) {
+        logger.error('Order creation failed', { ...context, error });
+        
+        // Business logic error handling
+        if (error instanceof AppError) {
+          throw error; // Re-throw domain errors
+        }
+        
+        // Unexpected errors become internal errors
+        throw new AppError('ORDER_CREATION_FAILED', 'Failed to create order', error);
+      }
+    }
+  })
+);
+```
+
+## Resilience Patterns
+
+### Retry with Exponential Backoff
+```typescript
+const resilientApiClient = derive(config, (config) => {
+  const client = new ApiClient(config.apiUrl);
+  
+  return {
+    async makeRequest(endpoint: string, retries = 3) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await client.get(endpoint);
+        } catch (error) {
+          if (attempt === retries) {
+            throw new AppError('API_REQUEST_FAILED', `Failed after ${retries} retries`, error);
+          }
+          
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+  };
+});
+```
+
+### Circuit Breaker Pattern
+```typescript
+const circuitBreakerState = provide(() => ({
+  failures: 0,
+  lastFailureTime: null,
+  state: 'CLOSED' // CLOSED, OPEN, HALF_OPEN
+}));
+
+const protectedPaymentService = derive(
+  [paymentService, circuitBreakerState],
+  ([payment, state]) => ({
+    async processPayment(data: PaymentData) {
+      const FAILURE_THRESHOLD = 5;
+      const TIMEOUT = 60000; // 1 minute
+      
+      // Check circuit breaker state
+      if (state.state === 'OPEN') {
+        if (Date.now() - state.lastFailureTime < TIMEOUT) {
+          throw new AppError('CIRCUIT_OPEN', 'Payment service circuit is open');
+        }
+        state.state = 'HALF_OPEN';
+      }
+      
+      try {
+        const result = await payment.processPayment(data);
+        
+        // Success - reset circuit
+        state.failures = 0;
+        state.state = 'CLOSED';
+        
+        return result;
+      } catch (error) {
+        state.failures++;
+        state.lastFailureTime = Date.now();
+        
+        if (state.failures >= FAILURE_THRESHOLD) {
+          state.state = 'OPEN';
+        }
+        
+        throw error;
+      }
+    }
+  })
+);
+```
+
+### Fallback Strategies
+```typescript
+const recommendationService = derive(
+  [primaryRecommendationAPI, fallbackRecommendationAPI, logger],
+  ([primary, fallback, logger]) => ({
+    async getRecommendations(userId: string) {
+      try {
+        return await primary.getRecommendations(userId);
+      } catch (error) {
+        logger.warn('Primary recommendation service failed, using fallback', { userId, error });
+        
+        try {
+          return await fallback.getRecommendations(userId);
+        } catch (fallbackError) {
+          logger.error('Both recommendation services failed', { userId, error, fallbackError });
+          
+          // Graceful degradation - return popular items
+          return {
+            recommendations: await this.getPopularItems(),
+            source: 'popular_fallback'
+          };
+        }
+      }
+    }
+  })
+);
+```
+
+### Timeout Management
+```typescript
+const timeoutWrapper = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new AppError('TIMEOUT', `Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+};
+
+const timedOrderService = derive(orderService, (orders) => ({
+  async createOrder(data: OrderData) {
+    return timeoutWrapper(orders.createOrder(data), 30000); // 30 second timeout
+  }
+}));
+```
+
+## Error Context and Debugging
+
+### Structured Error Information
+```typescript
+class AppError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public cause?: Error,
+    public context?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+  
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      context: this.context,
+      cause: this.cause?.message,
+      stack: this.stack
+    };
+  }
+}
+
+const contextualOrderService = derive(
+  [orderService, requestId, currentUser],
+  ([orders, reqId, user]) => ({
+    async createOrder(data: OrderData) {
+      try {
+        return await orders.createOrder(data);
+      } catch (error) {
+        throw new AppError(
+          error.code || 'ORDER_ERROR',
+          error.message,
+          error,
+          {
+            requestId: reqId,
+            userId: user?.id,
+            orderData: data,
+            timestamp: new Date().toISOString()
+          }
+        );
+      }
+    }
+  })
+);
+```
+
+### Error Aggregation and Reporting
+```typescript
+const errorReporter = derive([logger, config], ([logger, config]) => ({
+  async reportError(error: AppError, context: any) {
+    const errorReport = {
+      ...error.toJSON(),
+      environment: config.environment,
+      service: 'order-service',
+      ...context
+    };
+    
+    // Log locally
+    logger.error('Application error', errorReport);
+    
+    // Report to external service in production
+    if (config.environment === 'production') {
+      try {
+        await externalErrorService.report(errorReport);
+      } catch (reportingError) {
+        logger.error('Failed to report error', reportingError);
+      }
+    }
+  }
+}));
+```
+
+## Testing Error Scenarios
+
+```typescript
+describe('Error Handling', () => {
+  it('handles user service failures gracefully', async () => {
+    const failingUserService = {
+      getUser: async () => { throw new Error('Database connection lost'); }
+    };
+    
+    const scope = createScope(
+      preset(userService, failingUserService)
+    );
+    
+    const orders = await scope.resolve(orderService);
+    
+    await expect(orders.createOrder({ userId: '1', items: [] }))
+      .rejects.toThrow('USER_SERVICE_ERROR');
+  });
+
+  it('retries failed API calls', async () => {
+    let attempts = 0;
+    const flakyApi = {
+      makeRequest: async () => {
+        attempts++;
+        if (attempts < 3) {
+          throw new Error('Network error');
+        }
+        return { success: true };
+      }
+    };
+    
+    const scope = createScope(
+      preset(apiClient, flakyApi)
+    );
+    
+    const client = await scope.resolve(resilientApiClient);
+    const result = await client.makeRequest('/test');
+    
+    expect(result.success).toBe(true);
+    expect(attempts).toBe(3);
+  });
+
+  it('implements circuit breaker correctly', async () => {
+    const alwaysFailingService = {
+      processPayment: async () => { throw new Error('Service down'); }
+    };
+    
+    const scope = createScope(
+      preset(paymentService, alwaysFailingService)
+    );
+    
+    const protected = await scope.resolve(protectedPaymentService);
+    
+    // First 5 failures
+    for (let i = 0; i < 5; i++) {
+      await expect(protected.processPayment({})).rejects.toThrow();
+    }
+    
+    // 6th call should fail with circuit open
+    await expect(protected.processPayment({}))
+      .rejects.toThrow('CIRCUIT_OPEN');
+  });
+});
+```
+
+## Error Handling Benefits
+
+🎯 **Centralized Logic**: Error handling concentrated in meaningful boundaries  
+⚡ **Consistent Responses**: Structured error format across all services  
+🔥 **Rich Context**: Full error context for debugging  
+🚀 **Resilience Patterns**: Built-in retry, circuit breaker, fallback strategies  
+💎 **Testable**: Easy to test error scenarios with scopes  
+
+**Real-World Impact**: Fewer production incidents, faster debugging, graceful degradation under load, consistent error experience for users.
+
+## What's Next?
+
+Error resilience achieved! Let's explore [caching patterns](/patterns/caching-patterns) - optimizing performance with intelligent caching strategies.

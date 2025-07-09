@@ -18,11 +18,12 @@ A scope is a simple facility created using `createScope`
 - `scope#accessor(executor)` will return a Core.Accessor which can help to `get`, `resolve`, `lookup` or `subscribe` 
 
 ## Executor
-Executor is the container. Executor has certain methods letting you declare its as dependencies in a various way
-- as it is, will return the value, without being interactive
-- reactive, will return the accessor, and resolve the value if it's yet resolved
-- lazy, will return the accessor, without resolving it
-- static, will resolve to the value
+Executor is the container. Executor has different access modes for use as dependencies:
+
+- **Default**: Returns the resolved value (non-reactive)
+- **`.reactive`**: Returns the resolved value and subscribes to future updates
+- **`.lazy`**: Returns an accessor without resolving the executor (deferred resolution)
+- **`.static`**: Returns an accessor with the executor resolved (controller pattern)
 
 ## Usage
 
@@ -37,11 +38,51 @@ const derivedValue = derive([counter], ([counter]) => { /* code */ })
 
 ```typescript
 // container can also be reactive, the factory function will be recalled as those dependencies change
-
 const derivedValue = derive(counter.reactive, (counter) => /* this code will be called whenever counter got updated */)
 
 // to update counter
 scope.update(counter, /* new value */)
+```
+
+### Controller Pattern with `.static`
+
+The `.static` mode provides access to the executor's controller, allowing you to create services that can update state:
+
+```typescript
+const counter = provide(() => 0)
+
+// Create a controller service using .static
+const counterController = derive(counter.static, (counterCtl) => ({
+  increment: () => counterCtl.update(current => current + 1),
+  decrement: () => counterCtl.update(current => current - 1),
+  reset: () => counterCtl.update(0),
+  setValue: (value: number) => counterCtl.update(value)
+}))
+
+// Usage - no need to access scope directly
+const controller = await scope.resolve(counterController)
+await controller.increment()  // Updates counter through its controller
+```
+
+### Lazy Resolution with `.lazy`
+
+The `.lazy` mode provides access to the executor's accessor without resolving it, useful for deferred execution:
+
+```typescript
+const expensiveComputation = provide(() => {
+  console.log('Computing expensive value...')
+  return performExpensiveCalculation()
+})
+
+// Get lazy accessor - computation hasn't run yet
+const lazyService = derive(expensiveComputation.lazy, (lazyCtl) => ({
+  getResult: () => lazyCtl.resolve(), // Only compute when explicitly called
+  isResolved: () => lazyCtl.lookup()?.kind === 'resolved'
+}))
+
+const service = await scope.resolve(lazyService)
+console.log(service.isResolved()) // false - not computed yet
+const result = await service.getResult() // Now computation runs
 ```
 
 ```typescript

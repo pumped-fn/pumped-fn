@@ -1,0 +1,225 @@
+# Scopes: Testing Made Easy
+
+**Executors are just containers - nothing executes until you create a scope.** This changes everything about testing. Want to test with different assumptions? Create a scope, set your assumptions, test, throw away the scope. Everything resets automatically.
+
+## The Testing Revolution
+
+Here's the pattern that eliminates testing pain:
+
+```typescript
+// Step 1: Define your executors (just containers, nothing executes)
+const currentTime = provide(() => new Date());
+const config = provide(() => ({ timezone: 'UTC', format: '24h' }));
+const timeFormatter = derive([currentTime, config], ([time, config]) => {
+  return new TimeFormatter(time, config);
+});
+
+// Step 2: Test with different assumptions
+describe('TimeFormatter', () => {
+  it('formats morning time correctly', async () => {
+    // Create scope with assumptions
+    const scope = createScope(
+      preset(currentTime, new Date('2024-01-01T09:30:00Z')), // Assume it's 9:30 AM
+      preset(config, { timezone: 'EST', format: '12h' })      // Assume EST, 12h format
+    );
+    
+    // Test expectation
+    const formatter = await scope.resolve(timeFormatter);
+    expect(formatter.format()).toBe('4:30 AM EST');
+    
+    // Scope dies, everything resets automatically
+  });
+
+  it('formats evening time correctly', async () => {
+    // New scope, different assumptions
+    const scope = createScope(
+      preset(currentTime, new Date('2024-01-01T21:15:00Z')), // Assume it's 9:15 PM
+      preset(config, { timezone: 'PST', format: '24h' })      // Assume PST, 24h format
+    );
+    
+    const formatter = await scope.resolve(timeFormatter);
+    expect(formatter.format()).toBe('13:15 PST');
+    
+    // Another scope dies, clean slate again
+  });
+});
+```
+
+## Why This Testing Pattern is Revolutionary
+
+### No More Setup/Teardown Hell
+```typescript
+// Traditional testing
+describe('UserService', () => {
+  let mockDb: Database;
+  let userService: UserService;
+  
+  beforeEach(() => {
+    mockDb = new MockDatabase();
+    userService = new UserService(mockDb);
+  });
+  
+  afterEach(() => {
+    mockDb.cleanup();
+  });
+  
+  // 50 lines of setup for 5 lines of test...
+});
+
+// Executor testing
+describe('UserService', () => {
+  it('creates user correctly', async () => {
+    const scope = createScope(preset(database, new MockDatabase()));
+    const service = await scope.resolve(userService);
+    // Test and done - scope dies automatically
+  });
+});
+```
+
+### Assume Only What You Need
+```typescript
+// Your complex application
+const randomId = provide(() => Math.random().toString(36));
+const timestamp = provide(() => Date.now());
+const config = provide(() => loadConfigFromFile());
+const database = derive(config, (config) => new Database(config));
+const userService = derive([database, randomId, timestamp], ([db, id, time]) => {
+  return new UserService(db, id, time);
+});
+
+// Test only assumes what's hard to test
+it('creates user with predictable ID', async () => {
+  const scope = createScope(
+    preset(randomId, 'user123'),  // Only assume random ID
+    preset(timestamp, 1640995200) // Only assume timestamp
+    // Let config and database resolve normally
+  );
+  
+  const service = await scope.resolve(userService);
+  const user = await service.createUser({ name: 'John' });
+  
+  expect(user.id).toBe('user123');
+  expect(user.createdAt).toBe(1640995200);
+});
+```
+
+## Scope Superpowers
+
+### 🎯 Superpower #1: Perfect Isolation
+Each scope is its own bubble:
+
+```typescript
+// Production scope
+const prodScope = createScope(
+  preset(config, { env: 'production', db: 'postgres://prod' })
+);
+
+// Test scope  
+const testScope = createScope(
+  preset(config, { env: 'test', db: 'postgres://test' })
+);
+
+// Development scope
+const devScope = createScope(
+  preset(config, { env: 'development', db: 'postgres://dev' })
+);
+
+// All three can run simultaneously without interference
+const [prodUsers, testUsers, devUsers] = await Promise.all([
+  prodScope.resolve(userService),
+  testScope.resolve(userService),
+  devScope.resolve(userService)
+]);
+
+// Each gets its own database connection, its own config, its own everything
+```
+
+### ⚡ Superpower #2: Smart Caching
+Scopes remember what they've computed:
+
+```typescript
+const scope = createScope();
+
+// First resolution - everything computes
+const users1 = await scope.resolve(userService);
+// ↑ Executes: config → database → userService
+
+// Second resolution - instant return
+const users2 = await scope.resolve(userService);
+// ↑ Returns cached userService immediately
+
+// Even requesting a dependency returns cached version
+const db = await scope.resolve(database);
+// ↑ Returns cached database (already computed for userService)
+
+console.log(users1 === users2); // true - exact same instance
+console.log(users1 === users2 && db === users1.database); // true - shared dependency
+```
+
+### 🔥 Superpower #3: Automatic Cleanup
+Scopes manage the entire lifecycle:
+
+```typescript
+const databaseExecutor = derive(config, (config, controller) => {
+  const db = new Database(config);
+  
+  // Register cleanup - scope calls this automatically
+  controller.cleanup(() => {
+    console.log('Closing database connection');
+    db.close();
+  });
+  
+  return db;
+});
+
+const scope = createScope();
+const db = await scope.resolve(databaseExecutor);
+
+// When you're done, cleanup everything
+await scope.dispose();
+// ↑ Automatically calls db.close() and any other registered cleanups
+// No memory leaks, no lingering connections, no manual teardown
+```
+
+### 🚀 Superpower #4: Preset Injection
+Override specific executors for testing or configuration:
+
+```typescript
+// Your normal executors
+const apiUrl = provide(() => 'https://api.production.com');
+const httpClient = derive(apiUrl, (url) => new HttpClient(url));
+const userService = derive(httpClient, (client) => new UserService(client));
+
+// Production scope - uses real API
+const prodScope = createScope();
+const prodUsers = await prodScope.resolve(userService);
+
+// Test scope - override just the API URL
+const testScope = createScope(
+  preset(apiUrl, 'https://api.test.com')
+);
+const testUsers = await testScope.resolve(userService);
+// ↑ Real HttpClient, real UserService, test API URL
+
+// Mock scope - override the HTTP client entirely  
+const mockScope = createScope(
+  preset(httpClient, new MockHttpClient())
+);
+const mockUsers = await mockScope.resolve(userService);
+// ↑ Real UserService, mock HTTP client
+```
+
+
+## The Scope Advantage
+
+🎯 **Complete Isolation**: Each scope is its own universe - zero interference  
+⚡ **Automatic Caching**: Computed once, used everywhere within the scope  
+🔥 **Lifecycle Management**: Automatic cleanup prevents memory leaks  
+🚀 **Surgical Overrides**: Change only what you need for testing/config  
+💎 **Parallel Execution**: Run multiple scopes simultaneously without conflicts  
+
+**For Backend Developers**: Scopes eliminate global state, enable true parallel testing, and provide automatic resource management. Your integration tests become isolated, your microservices become composable, and your memory management becomes automatic.
+
+## What's Next?
+
+Now that you understand executors and scopes, let's explore [dependencies](/building-blocks/dependencies) - the patterns for connecting your executors together elegantly.

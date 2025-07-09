@@ -1,0 +1,451 @@
+# Caching Patterns: Performance Without Complexity
+
+**The Core Problem**: Backend applications need caching for performance, but traditional caching leads to cache invalidation complexity, stale data issues, and difficult testing. Manual cache management becomes a maintenance nightmare.
+
+**The Insight**: Scope-based caching provides automatic cache boundaries, natural invalidation, and testing simplicity. Cache lifetimes align with business logic, not technical implementation.
+
+## Where Caching Gets Complex
+
+```typescript
+// Traditional: Manual cache management nightmare
+class UserService {
+  private cache = new Map();
+  
+  async getUser(id: string) {
+    // Check cache
+    const cacheKey = `user:${id}`;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+    
+    // Fetch from database
+    const user = await this.database.users.findById(id);
+    
+    // Cache with TTL? Invalidation strategy? Memory limits?
+    this.cache.set(cacheKey, user);
+    
+    return user;
+  }
+  
+  async updateUser(id: string, data: any) {
+    const user = await this.database.users.update(id, data);
+    
+    // Manual invalidation - easy to forget!
+    this.cache.delete(`user:${id}`);
+    // What about related caches? User preferences? Orders?
+    
+    return user;
+  }
+  
+  // Who clears the cache? When? How do you test with cached vs fresh data?
+}
+```
+
+## Scope-Based Caching Excellence
+
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Application-level cache (shared across requests)
+const globalCache = provide(() => new Map());
+
+// Request-level cache (fresh per request)
+const requestCache = provide(() => new Map());
+
+// Cached user service with automatic scope-based invalidation
+const userService = derive([database, globalCache], ([db, cache]) => ({
+  async getUser(id: string) {
+    const cacheKey = `user:${id}`;
+    
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey);
+    }
+    
+    const user = await db.users.findById(id);
+    cache.set(cacheKey, user);
+    
+    return user;
+  },
+  
+  async updateUser(id: string, data: any) {
+    const user = await db.users.update(id, data);
+    
+    // Simple invalidation - just clear the cache entry
+    cache.delete(`user:${id}`);
+    
+    return user;
+  }
+}));
+
+// Request-scoped caching for expensive computations
+const userAnalytics = derive(
+  [userService, requestCache],
+  ([users, cache]) => ({
+    async getUserAnalytics(userId: string) {
+      const cacheKey = `analytics:${userId}`;
+      
+      if (cache.has(cacheKey)) {
+        return cache.get(cacheKey);
+      }
+      
+      // Expensive computation
+      const user = await users.getUser(userId);
+      const analytics = await this.computeAnalytics(user);
+      
+      // Cached for this request only
+      cache.set(cacheKey, analytics);
+      
+      return analytics;
+    }
+  })
+);
+
+// Usage with automatic cache boundaries
+const appScope = createScope(); // Global cache persists
+const user1 = await appScope.resolve(userService);
+
+const requestScope1 = createScope(); // Fresh request cache
+const analytics1 = await requestScope1.resolve(userAnalytics);
+await requestScope1.dispose(); // Request cache cleared automatically
+
+const requestScope2 = createScope(); // New request, fresh cache
+const analytics2 = await requestScope2.resolve(userAnalytics);
+```
+
+## Multi-Level Caching Strategies
+
+### Application + Request Level Caching
+```typescript
+const productService = derive(
+  [database, globalCache, requestCache],
+  ([db, globalCache, requestCache]) => ({
+    async getProduct(id: string) {
+      // Level 1: Request cache (fastest)
+      const requestKey = `product:${id}`;
+      if (requestCache.has(requestKey)) {
+        return requestCache.get(requestKey);
+      }
+      
+      // Level 2: Global cache (shared across requests)
+      const globalKey = `product:${id}`;
+      if (globalCache.has(globalKey)) {
+        const product = globalCache.get(globalKey);
+        requestCache.set(requestKey, product); // Populate request cache
+        return product;
+      }
+      
+      // Level 3: Database (slowest)
+      const product = await db.products.findById(id);
+      
+      // Populate both caches
+      globalCache.set(globalKey, product);
+      requestCache.set(requestKey, product);
+      
+      return product;
+    }
+  })
+);
+```
+
+### Time-Based Cache Invalidation
+```typescript
+const timedCache = provide(() => new Map());
+
+const userPreferences = derive([database, timedCache], ([db, cache]) => ({
+  async getUserPreferences(userId: string) {
+    const cacheKey = `preferences:${userId}`;
+    const cached = cache.get(cacheKey);
+    
+    // Check if cache entry is still valid (5 minute TTL)
+    if (cached && (Date.now() - cached.timestamp) < 300000) {
+      return cached.data;
+    }
+    
+    const preferences = await db.userPreferences.findByUserId(userId);
+    
+    cache.set(cacheKey, {
+      data: preferences,
+      timestamp: Date.now()
+    });
+    
+    return preferences;
+  }
+}));
+```
+
+### Computed Value Caching
+```typescript
+const expensiveCalculations = derive(
+  [userService, orderService, globalCache],
+  ([users, orders, cache]) => ({
+    async getUserLifetimeValue(userId: string) {
+      const cacheKey = `ltv:${userId}`;
+      
+      if (cache.has(cacheKey)) {
+        return cache.get(cacheKey);
+      }
+      
+      // Expensive computation involving multiple services
+      const user = await users.getUser(userId);
+      const userOrders = await orders.getOrdersByUser(userId);
+      
+      const ltv = this.calculateLifetimeValue(user, userOrders);
+      
+      // Cache for 1 hour
+      cache.set(cacheKey, {
+        value: ltv,
+        expiresAt: Date.now() + 3600000
+      });
+      
+      return ltv;
+    }
+  })
+);
+```
+
+### Cache Dependency Invalidation
+```typescript
+const smartCache = provide(() => ({
+  data: new Map(),
+  dependencies: new Map() // Track what depends on what
+}));
+
+const userServiceWithDependencies = derive([database, smartCache], ([db, cache]) => ({
+  async getUser(id: string) {
+    const cacheKey = `user:${id}`;
+    
+    if (cache.data.has(cacheKey)) {
+      return cache.data.get(cacheKey);
+    }
+    
+    const user = await db.users.findById(id);
+    cache.data.set(cacheKey, user);
+    
+    return user;
+  },
+  
+  async updateUser(id: string, data: any) {
+    const user = await db.users.update(id, data);
+    
+    // Invalidate user cache
+    cache.data.delete(`user:${id}`);
+    
+    // Invalidate dependent caches
+    const dependents = cache.dependencies.get(`user:${id}`) || [];
+    dependents.forEach(key => cache.data.delete(key));
+    
+    return user;
+  }
+}));
+
+const orderService = derive([database, userServiceWithDependencies, smartCache], ([db, users, cache]) => ({
+  async getOrdersForUser(userId: string) {
+    const cacheKey = `user_orders:${userId}`;
+    
+    if (cache.data.has(cacheKey)) {
+      return cache.data.get(cacheKey);
+    }
+    
+    const orders = await db.orders.findByUserId(userId);
+    cache.data.set(cacheKey, orders);
+    
+    // Register dependency: if user changes, invalidate user orders
+    const deps = cache.dependencies.get(`user:${userId}`) || [];
+    deps.push(cacheKey);
+    cache.dependencies.set(`user:${userId}`, deps);
+    
+    return orders;
+  }
+}));
+```
+
+## Cache Testing Strategies
+
+### Testing Cache Behavior
+```typescript
+describe('Caching Behavior', () => {
+  it('caches user data correctly', async () => {
+    const mockDb = {
+      users: {
+        findById: jest.fn().mockResolvedValue({ id: '1', name: 'John' })
+      }
+    };
+    
+    const scope = createScope(
+      preset(database, mockDb)
+    );
+    
+    const users = await scope.resolve(userService);
+    
+    // First call hits database
+    const user1 = await users.getUser('1');
+    expect(mockDb.users.findById).toHaveBeenCalledTimes(1);
+    
+    // Second call uses cache
+    const user2 = await users.getUser('1');
+    expect(mockDb.users.findById).toHaveBeenCalledTimes(1);
+    expect(user1).toBe(user2);
+  });
+
+  it('invalidates cache on update', async () => {
+    const mockDb = {
+      users: {
+        findById: jest.fn().mockResolvedValue({ id: '1', name: 'John' }),
+        update: jest.fn().mockResolvedValue({ id: '1', name: 'Jane' })
+      }
+    };
+    
+    const scope = createScope(
+      preset(database, mockDb)
+    );
+    
+    const users = await scope.resolve(userService);
+    
+    // Cache user
+    await users.getUser('1');
+    expect(mockDb.users.findById).toHaveBeenCalledTimes(1);
+    
+    // Update user (should invalidate cache)
+    await users.updateUser('1', { name: 'Jane' });
+    
+    // Next get should hit database again
+    await users.getUser('1');
+    expect(mockDb.users.findById).toHaveBeenCalledTimes(2);
+  });
+
+  it('provides request-level cache isolation', async () => {
+    const scope1 = createScope();
+    const scope2 = createScope();
+    
+    const [analytics1, analytics2] = await Promise.all([
+      scope1.resolve(userAnalytics),
+      scope2.resolve(userAnalytics)
+    ]);
+    
+    // Each request gets its own cache
+    await analytics1.getUserAnalytics('1');
+    await analytics2.getUserAnalytics('1');
+    
+    // Caches are independent
+    expect(analytics1 !== analytics2).toBe(true);
+    
+    await Promise.all([scope1.dispose(), scope2.dispose()]);
+  });
+});
+```
+
+### Performance Testing with Cache
+```typescript
+describe('Cache Performance', () => {
+  it('improves response times significantly', async () => {
+    const slowDb = {
+      users: {
+        findById: async (id: string) => {
+          // Simulate slow database
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return { id, name: 'User' };
+        }
+      }
+    };
+    
+    const scope = createScope(
+      preset(database, slowDb)
+    );
+    
+    const users = await scope.resolve(userService);
+    
+    // First call is slow
+    const start1 = Date.now();
+    await users.getUser('1');
+    const duration1 = Date.now() - start1;
+    
+    // Second call is fast (cached)
+    const start2 = Date.now();
+    await users.getUser('1');
+    const duration2 = Date.now() - start2;
+    
+    expect(duration1).toBeGreaterThan(90);
+    expect(duration2).toBeLessThan(10);
+  });
+});
+```
+
+## Advanced Caching Patterns
+
+### Cache Warming
+```typescript
+const cacheWarmer = derive([userService, productService], ([users, products]) => ({
+  async warmPopularData() {
+    const popularUserIds = ['1', '2', '3']; // From analytics
+    const popularProductIds = ['p1', 'p2', 'p3'];
+    
+    // Warm caches in parallel
+    await Promise.all([
+      ...popularUserIds.map(id => users.getUser(id)),
+      ...popularProductIds.map(id => products.getProduct(id))
+    ]);
+    
+    console.log('Cache warming completed');
+  }
+}));
+
+// Run during application startup
+const scope = createScope();
+const warmer = await scope.resolve(cacheWarmer);
+await warmer.warmPopularData();
+```
+
+### Memory-Aware Caching
+```typescript
+const boundedCache = provide(() => {
+  const cache = new Map();
+  const MAX_SIZE = 1000;
+  
+  return {
+    get: (key: string) => cache.get(key),
+    set: (key: string, value: any) => {
+      if (cache.size >= MAX_SIZE) {
+        // Remove oldest entry (LRU-style)
+        const firstKey = cache.keys().next().value;
+        cache.delete(firstKey);
+      }
+      cache.set(key, value);
+    },
+    delete: (key: string) => cache.delete(key),
+    clear: () => cache.clear()
+  };
+});
+```
+
+## Caching Benefits
+
+🎯 **Automatic Boundaries**: Cache lifetimes align with scope lifetimes  
+⚡ **Natural Invalidation**: Scope disposal clears related caches automatically  
+🔥 **Multi-Level Strategy**: Request, application, and persistent caching layers  
+🚀 **Testing Simplicity**: Easy to test cached vs non-cached behavior  
+💎 **Performance Gains**: Dramatic response time improvements with minimal complexity  
+
+**Real-World Impact**: Faster response times, reduced database load, simpler cache management, predictable memory usage, easier performance optimization.
+
+## Patterns Complete!
+
+You now have comprehensive patterns for building robust backend applications:
+
+✅ **Configuration Management** - Environment-aware, validated configs  
+✅ **Async Coordination** - DAG-based async composition  
+✅ **Resource Lifecycle** - Automatic cleanup and resource management  
+✅ **Service Initialization** - Declarative startup sequences  
+✅ **Request-Scoped Services** - Perfect request isolation  
+✅ **Testing Strategies** - Scope-based testing excellence  
+✅ **Error Handling** - Centralized error boundaries and resilience  
+✅ **Caching Patterns** - Performance without complexity  
+
+## What's Next?
+
+Ready for advanced techniques? Explore [advanced patterns](/advanced/introduction) for Day 2 operations, including:
+
+- **[Reactive Patterns](/advanced/reactive-patterns)** - Live configuration management, adaptive scaling, and health-aware systems
+- **Execution Modes** - Mastering lazy, static, and reactive executors for optimal performance
+- **Production Patterns** - Observability, debugging, and operational excellence
+
+These patterns provide a complete foundation - the advanced section takes you to production-grade systems that adapt and scale automatically.

@@ -1,0 +1,244 @@
+# Executors: Supercharged Variables
+
+**Forget everything you know about variables.** Executors are variables that grew up, hit the gym, and learned dependency injection. They're not just containers - they're **smart containers** that know exactly what they need and when they need it.
+
+## The Dependency Hell They Obliterate
+
+Your typical day: playing connect-the-dots with dependencies like it's 2005:
+
+```typescript
+// Welcome to dependency spaghetti 🍝
+const config = new Config();
+const logger = new Logger(config);
+const database = new Database(config, logger);
+const userService = new UserService(database, logger);
+const emailService = new EmailService(config, logger);
+const notificationService = new NotificationService(userService, emailService);
+
+// Want to change config? Hope you like refactoring...
+// Want to test? Good luck mocking this mess
+// Want to add caching? Time to rewrite everything
+```
+
+## Enter the Executors: Dependency Destruction Mode
+
+Watch complexity evaporate:
+
+```typescript
+import { provide, derive, createScope } from '@pumped-fn/core-next';
+
+// Declare your intentions, don't micromanage
+const config = provide(() => new Config());
+const logger = derive(config, (config) => new Logger(config));
+const database = derive([config, logger], ([config, logger]) => new Database(config, logger));
+const userService = derive([database, logger], ([database, logger]) => new UserService(database, logger));
+
+// ONE LINE to rule them all
+const scope = createScope();
+const users = await scope.resolve(userService);
+// ↑ Everything resolves in perfect order, automatically cached, fully typed
+```
+
+**What just happened?** Executors handled dependency resolution, lazy evaluation, caching, and type inference while you wrote declarative code that actually makes sense.
+
+## The Executor Arsenal: Two Weapons
+
+### 1. Providers (`provide`) - The Foundation Builders
+These create value from thin air (well, from functions):
+
+```typescript
+const config = provide(() => ({ port: 3000, host: 'localhost' }));
+// ↑ Core.Executor<{port: number, host: string}> - Zero dependencies, maximum power
+
+const timestamp = provide(() => Date.now());
+// ↑ Core.Executor<number> - Fresh timestamp on demand
+
+const randomId = provide(() => Math.random().toString(36));
+// ↑ Core.Executor<string> - Unique ID generator that TypeScript fully understands
+```
+
+### 2. Derivers (`derive`) - The Dependency Wranglers
+These compose executors like a boss:
+
+```typescript
+// Single dependency
+const greeting = derive(config, (config) => `Server running on ${config.host}:${config.port}`);
+
+// Multiple dependencies (array)
+const server = derive([config, logger], ([config, logger]) => {
+  logger.info(`Starting server on ${config.host}:${config.port}`);
+  return new Server(config);
+});
+
+// Multiple dependencies (object)
+const dashboard = derive(
+  { config, logger, timestamp },
+  ({ config, logger, timestamp }) => ({
+    serverInfo: `${config.host}:${config.port}`,
+    startTime: timestamp,
+    status: 'running'
+  })
+);
+```
+
+## The Superpowers: What Makes Executors Unstoppable
+
+### 🎯 Superpower #1: Dependency DAG (Directed Acyclic Graph)
+Your dependencies form a smart graph that prevents circular madness:
+
+```typescript
+// This creates a dependency graph automatically
+const config = provide(() => ({ db: 'postgres://...', port: 3000 }));
+const logger = derive(config, (config) => new Logger(config));
+const database = derive([config, logger], ([config, logger]) => new Database(config, logger));
+const userRepo = derive([database, logger], ([db, logger]) => new UserRepository(db, logger));
+const emailService = derive([config, logger], ([config, logger]) => new EmailService(config, logger));
+const notificationService = derive([userRepo, emailService], ([users, email]) => new NotificationService(users, email));
+
+// The DAG looks like:
+//     config
+//    /   |   \
+// logger  |    \
+//   |     |     emailService
+//   |  database    |
+//   |     |        |
+//   |  userRepo    |
+//    \    |       /
+//     notificationService
+```
+
+### ⚡ Superpower #2: Smart Resolution - "Touch One, Get Everything"
+Point anywhere in the graph, get exactly what you need:
+
+```typescript
+const scope = createScope();
+
+// Want notifications? Just ask for it
+const notifications = await scope.resolve(notificationService);
+// ↑ Automatically resolves: config → logger → database → userRepo
+//                          config → logger → emailService
+//                          userRepo + emailService → notificationService
+
+// Want just the database? No problem
+const db = await scope.resolve(database);
+// ↑ Only resolves: config → logger → database (skips everything else)
+
+// No manual wiring, no "resolve this first, then that"
+// The DAG figures out the minimal path automatically
+```
+
+### 🔥 Superpower #3: Isolated Execution - Parallel Testing Paradise
+Each scope is its own universe:
+
+```typescript
+// Traditional way: Global state nightmare
+let globalConfig = new Config();
+let globalLogger = new Logger(globalConfig);
+// Tests step on each other, need complex setup/teardown
+
+// Executor way: Complete isolation
+const scope1 = createScope(preset(config, { env: 'test', db: 'test1' }));
+const scope2 = createScope(preset(config, { env: 'prod', db: 'prod1' }));
+const scope3 = createScope(preset(config, { env: 'dev', db: 'local' }));
+
+// Run all tests in parallel - zero interference
+const [testResult, prodResult, devResult] = await Promise.all([
+  scope1.resolve(notificationService),
+  scope2.resolve(notificationService), 
+  scope3.resolve(notificationService)
+]);
+
+// Each scope gets its own dependency tree, own config, own everything
+// No shared state, no teardown, no test pollution
+```
+
+
+## Executor Access Modes
+
+Executors provide different access modes when used as dependencies, each designed for specific use cases:
+
+### Default Mode: Direct Value Access
+```typescript
+const config = provide(() => ({ theme: 'light', language: 'en' }));
+const ui = derive(config, (config) => {
+  // config is the resolved value: { theme: 'light', language: 'en' }
+  return new UIRenderer(config);
+});
+```
+
+### `.reactive` Mode: Live Updates
+```typescript
+const settings = provide(() => ({ volume: 50 }));
+const audioPlayer = derive(settings.reactive, (settings) => {
+  // Automatically rebuilds when settings change
+  return new AudioPlayer(settings.volume);
+});
+```
+
+### `.static` Mode: Controller Pattern
+```typescript
+const counter = provide(() => 0);
+const counterController = derive(counter.static, (counterCtl) => ({
+  // counterCtl is an Accessor<number> with update methods
+  increment: () => counterCtl.update(current => current + 1),
+  decrement: () => counterCtl.update(current => current - 1),
+  reset: () => counterCtl.update(0)
+}));
+```
+
+### `.lazy` Mode: Deferred Resolution
+```typescript
+const expensiveData = provide(() => performExpensiveCalculation());
+const dataManager = derive(expensiveData.lazy, (lazyData) => ({
+  // lazyData is an Accessor<T> that hasn't resolved yet
+  isLoaded: () => lazyData.lookup()?.kind === 'resolved',
+  load: () => lazyData.resolve(), // Triggers computation only when called
+  get: () => lazyData.get() // Throws if not resolved
+}));
+```
+
+**When to use each mode:**
+- **Default**: When you need the value and don't need updates
+- **`.reactive`**: When you need to rebuild when dependencies change
+- **`.static`**: When you need to control/update the executor from within another executor
+- **`.lazy`**: When you need deferred execution or optional loading
+
+## Type Safety Throughout
+
+Executors maintain perfect TypeScript inference:
+
+```typescript
+const user = provide(() => ({ name: 'John', age: 30, active: true }));
+// ↑ Core.Executor<{name: string, age: number, active: boolean}>
+
+const userInfo = derive(user, (user) => {
+  // TypeScript knows user has name, age, active
+  return `${user.name} (${user.age}) - ${user.active ? 'Active' : 'Inactive'}`;
+});
+// ↑ Core.Executor<string>
+
+const userStats = derive(
+  { user, timestamp: provide(() => Date.now()) },
+  ({ user, timestamp }) => ({
+    // TypeScript knows the exact shape of both user and timestamp
+    displayName: user.name,
+    isAdult: user.age >= 18,
+    lastSeen: timestamp
+  })
+);
+// ↑ Core.Executor<{displayName: string, isAdult: boolean, lastSeen: number}>
+```
+
+## The Executor Advantage: Why This Changes Everything
+
+🎯 **DAG-Powered Resolution**: Smart dependency graphs that prevent circular hell  
+⚡ **Surgical Execution**: Touch one node, get exactly what you need automatically  
+🔥 **Isolated Execution**: Each scope is its own universe - parallel testing paradise  
+🚀 **Zero Configuration**: No DI containers, no decorators, no XML  
+💎 **Type-Safe Throughout**: Full TypeScript inference across the entire graph  
+
+**For Backend Developers**: This eliminates service locator patterns, manual dependency wiring, and global state pollution. Your application architecture becomes declarative, your tests run in parallel without interference, and your refactoring becomes fearless.
+
+## What's Next?
+
+Now that you understand executors, let's explore [scopes](/building-blocks/scopes) - the execution contexts that bring executors to life.

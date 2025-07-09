@@ -22,6 +22,10 @@ The library is built around these core concepts:
 - **Reactive Programming**: Executors can be reactive, triggering updates when dependencies change
 - **Meta System**: Decorative information system using StandardSchema for type enforcement
 
+## Core APIs
+- Those are core APIs used in the Pumped Functions library
+- Shapes are important to use
+
 ## Common Commands
 
 ### Development
@@ -157,3 +161,7 @@ node dist/cli.js export ./examples/react/src/ graph.png --format png --theme dar
 - **Validation**: Detects circular dependencies, orphaned nodes, and complexity metrics
 - **Theming**: Multiple Mermaid themes (default, dark, forest, neutral)
 - **Programmatic API**: Can be used as a library in other applications
+
+## Testing Notes
+
+- This is how we utilize preset to test
