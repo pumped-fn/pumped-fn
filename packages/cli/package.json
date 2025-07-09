@@ -1,0 +1,32 @@
+{
+  "name": "@pumped-fn/cli",
+  "version": "0.1.0",
+  "description": "CLI tool for analyzing and visualizing pumped-fn dependency graphs",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "pumped-dag": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/node": "^22.0.0",
+    "commander": "^12.0.0",
+    "typescript": "^5.8.3",
+    "mermaid": "^11.0.0",
+    "chalk": "^5.0.0",
+    "ora": "^8.0.0",
+    "puppeteer": "^23.0.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "vitest": "^2.0.0"
+  },
+  "keywords": ["pumped-fn", "dependency-graph", "visualization", "cli"],
+  "license": "MIT"
+}
