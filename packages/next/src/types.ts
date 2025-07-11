@@ -87,12 +87,19 @@ export declare namespace Meta {
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
+  export type GeneratorOutput<Y, T> = T | Promise<T> | Generator<Y, T> | AsyncGenerator<Y, T>;
 
   export type NoDependencyFn<T> = (scope: Controller) => Output<T>;
   export type DependentFn<T, D> = (
     dependencies: D,
     scope: Controller
   ) => Output<T>;
+  
+  export type NoDependencyGeneratorFn<Y, T> = (scope: Controller) => GeneratorOutput<Y, T>;
+  export type DependentGeneratorFn<Y, T, D> = (
+    dependencies: D,
+    scope: Controller
+  ) => GeneratorOutput<Y, T>;
   export type RecordLike = Record<string, unknown>;
   export type UExecutor = BaseExecutor<unknown>;
 

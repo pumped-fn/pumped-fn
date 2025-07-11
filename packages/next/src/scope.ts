@@ -6,6 +6,11 @@ import {
   isExecutor,
 } from "./executor";
 import { Core } from "./types";
+import {
+  isGenerator,
+  isAsyncGenerator,
+  collectFromGenerator,
+} from "./generator-utils";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -191,6 +196,12 @@ class Scope implements Core.Scope {
           .then((dependencies) => factory(dependencies as any, controller))
           .then(async (result) => {
             let current = result;
+            
+            // Handle generator results
+            if (isGenerator(result) || isAsyncGenerator(result)) {
+              const { returned } = await collectFromGenerator(result);
+              current = returned;
+            }
 
             const events = this.onEvents.change;
             for (const event of events) {
