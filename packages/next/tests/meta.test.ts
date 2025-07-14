@@ -1,6 +1,6 @@
 import { vi, test, expect } from "vitest";
 import { meta, getValue, findValue, findValues } from "../src/meta";
-import { provide } from "../src";
+import { custom, provide } from "../src";
 
 test("basic", async () => {
   const fn = vi.fn();

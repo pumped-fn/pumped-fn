@@ -87,15 +87,21 @@ export declare namespace Meta {
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
-  export type GeneratorOutput<Y, T> = T | Promise<T> | Generator<Y, T> | AsyncGenerator<Y, T>;
+  export type GeneratorOutput<Y, T> =
+    | T
+    | Promise<T>
+    | Generator<Y, T>
+    | AsyncGenerator<Y, T>;
 
   export type NoDependencyFn<T> = (scope: Controller) => Output<T>;
   export type DependentFn<T, D> = (
     dependencies: D,
     scope: Controller
   ) => Output<T>;
-  
-  export type NoDependencyGeneratorFn<Y, T> = (scope: Controller) => GeneratorOutput<Y, T>;
+
+  export type NoDependencyGeneratorFn<Y, T> = (
+    scope: Controller
+  ) => GeneratorOutput<Y, T>;
   export type DependentGeneratorFn<Y, T, D> = (
     dependencies: D,
     scope: Controller
@@ -213,10 +219,13 @@ export declare namespace Core {
     dispose?: (scope: Scope) => void | Promise<void>;
   };
 
+  export interface Pod
+    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> {}
+
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
 
-    resolve<T>(executor: Core.Executor<T>): Promise<T>;
+    resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promise<Accessor<T>>;
 
     update<T>(
@@ -237,5 +246,8 @@ export declare namespace Core {
     onRelease(cb: ReleaseCallback): Cleanup;
 
     use(middleware: Middleware): Cleanup;
+
+    pod(...presets: Preset<unknown>[]): Pod;
+    disposePod(scope: Pod): Promise<void>;
   }
 }
