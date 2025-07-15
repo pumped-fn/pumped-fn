@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/core-next",
-  "version": "0.5.44",
+  "version": "0.5.45",
   "description": "Enhanced function utilities for TypeScript",
   "type": "module",
   "main": "./dist/index.js",

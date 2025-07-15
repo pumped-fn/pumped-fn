@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.45](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.44...@pumped-fn/next@0.5.45) (2025-07-15)
+
+
+### Features
+
+* added podscope ([4591aaa](https://github.com/pumped-fn/pumped-fn/commit/4591aaa5e5683738b942b256e991154223cb7ffc))
+* **extra:** added the new flow API (WIP) ([0ecc8bd](https://github.com/pumped-fn/pumped-fn/commit/0ecc8bdd0a2d22efdff6d31a0374aa79f742a75c))
+
 ## [0.5.44](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.43...@pumped-fn/next@0.5.44) (2025-06-27)
 
 
