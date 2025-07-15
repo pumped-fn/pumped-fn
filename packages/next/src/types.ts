@@ -267,12 +267,12 @@ export namespace Flow {
 
   export type Controller = {
     execute: <Input, Output>(
-      input: Flow<Input, Output> & { context: ExecutionContext},
+      input: Flow<Input, Output>,
       param: Input,
       opt?: ExecuteOpt
     ) => Promise<Output>
     safeExecute: <Input, Output>(
-      input: Flow<Input, Output> & { context: ExecutionContext},
+      input: Flow<Input, Output>,
       param: Input,
       opt?: ExecuteOpt
     ) => Promise<Result<Output>>;
@@ -280,28 +280,34 @@ export namespace Flow {
 
   export type NoDependencyFlowFn<Input, Output> = (
     input: Input,
-    controller: Controller
+    context: Controller & { context: ExecutionContext }
   ) => Output | Promise<Output>;
 
   export type DependentFlowFn<D, Input, Output> = (
     dependency: D,
     input: Input,
-    controller: Controller
+    context: Controller & { context: ExecutionContext }
   ) => Output | Promise<Output>
 
   export type FlowPlugin = {}
 
   export type Flow<Input, Output> = {
     execution: NoDependencyFlowFn<Input, Output>;
-    input: StandardSchemaV1<Input>
+  } & Config & Schema<Input, Output>
+
+  export type Schema<Input, Output> = {
+    input: StandardSchemaV1<Input>;
     output: StandardSchemaV1<Output>;
-    plugins: FlowPlugin[]
   }
 
-  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> & {
-    input: StandardSchemaV1<Input>
-    output: StandardSchemaV1<Output>;
-  };
+  export type Config = {
+    name?: string
+    description?: string
+    plugins?: FlowPlugin[]
+    metas?: Meta.Meta[]
+  }
+
+  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> & Config & Schema<Input, Output>
 
   export type Metrics = {
     flowName?: string;

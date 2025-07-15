@@ -107,6 +107,90 @@ const scope = createScope(assumedValue, assumedValue1...)
 
 ```
 
+# Flow API
+
+Flow is a higher-level abstraction built on top of executors that provides:
+- Input/output validation using StandardSchema
+- Error handling with typed error classes
+- Execution context and controller for nested flows
+- Plugin system for extensibility
+
+```typescript
+import { provideFlow, deriveFlow, execute, FlowError, type Flow } from "@pumped-fn/core-next"
+
+// Creating a simple flow without dependencies
+const simpleFlow = provideFlow({
+  name: "simpleFlow",
+  input: schema<{ value: number }>(), // StandardSchema validation
+  output: schema<{ result: number }>(),
+}, async (input, controller) => {
+  return { result: input.value * 2 }
+})
+
+// Creating a flow with dependencies
+const complexFlow = deriveFlow({
+  name: "complexFlow", 
+  dependencies: { db, logger }, // Regular executors as dependencies
+  input: schema<{ userId: string }>(),
+  output: schema<{ user: User }>(),
+}, async ({ db, logger }, input, controller) => {
+  logger.info(`Fetching user ${input.userId}`)
+  
+  // Execute nested flows with validation
+  const result = await controller.execute(findUserFlow, { id: input.userId })
+  
+  // Or use safeExecute for error handling
+  const safeResult = await controller.safeExecute(updateUserFlow, { ...input })
+  if (safeResult.kind === 'error') {
+    throw safeResult.error
+  }
+  
+  return { user: safeResult.value }
+})
+
+// Executing flows
+const scope = createScope()
+const { context, result } = await execute(complexFlow, { userId: "123" }, {
+  scope, // Optional: reuse existing scope
+  presets: [preset(logger, mockLogger)], // Optional: override dependencies
+})
+
+if (result.kind === 'success') {
+  console.log(result.value) // Typed output
+} else {
+  console.error(result.error) // FlowError with type and details
+}
+
+// Error handling
+try {
+  await execute(flow, input)
+} catch (error) {
+  if (error instanceof FlowError) {
+    switch (error.type) {
+      case 'validation': // Input/output validation failed
+      case 'execution':  // Flow execution failed
+      case 'dependency': // Dependency resolution failed
+      case 'timeout':    // Execution timed out
+    }
+  }
+}
+
+// Flow types
+type Flow.Controller = {
+  context: Flow.ExecutionContext // Shared data across execution
+  execute: <I, O>(flow: Flow<I, O>, input: I) => Promise<O>
+  safeExecute: <I, O>(flow: Flow<I, O>, input: I) => Promise<Flow.Result<O>>
+}
+
+type Flow.Result<T> = 
+  | { kind: 'success', value: T }
+  | { kind: 'error', error: unknown }
+
+type Flow.ExecutionContext = {
+  data: Record<string, any> // Mutable context data
+}
+```
+
 # Usage with react
 ```tsx
 import { Suspense } from "react"

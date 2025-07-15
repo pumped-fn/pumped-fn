@@ -4,25 +4,15 @@ import { createScope } from "./scope";
 import { validate } from "./ssch";
 
 export function provideFlow<Input, Output>(
-  config: {
-    input: StandardSchemaV1<Input>,
-    output: StandardSchemaV1<Output>,
-    plugins?: Flow.FlowPlugin[],
-    metas?: Meta.Meta[]
-  },
+  config: Flow.Config & Flow.Schema<Input, Output>,
   handler: Flow.NoDependencyFlowFn<Input, Output>,
 ): Flow.Executor<Input, Output> {
   const executor: Flow.Executor<Input, Output> = coreProvide(() => ({
     execution: handler,
-    input: config.input,
-    output: config.output,
-    plugins: config.plugins || [],
+    ...config
   }), ...config.metas || []) as any
 
-  Object.assign(executor, {
-    input: config.input,
-    output: config.output,
-  })
+  Object.assign(executor, {...config})
 
   return executor
 }
@@ -34,17 +24,13 @@ export function deriveFlow<
   Input,
   Output
 >(
-  config: {
+  { dependencies, ...config }: {
     dependencies: { [K in keyof D]: D[K] },
-    input: StandardSchemaV1<Input>,
-    output: StandardSchemaV1<Output>,
-    plugins?: Flow.FlowPlugin[],
-    metas?: Meta.Meta[]
-  },
+  } & Flow.Config & Flow.Schema<Input, Output>,
   handler: Flow.DependentFlowFn<{ [K in keyof D]: Core.InferOutput<D[K]> }, Input, Output>,
 ): Flow.Executor<Input, Output> {
   const executor: Flow.Executor<Input, Output> = coreDerive(
-    config.dependencies as any,
+    dependencies as any,
     ((dependencies: unknown): Flow.Flow<Input, Output> => {
       return {
         execution: (input, controller) => handler(dependencies as any, input, controller),
@@ -57,8 +43,7 @@ export function deriveFlow<
   ) as any;
 
   Object.assign(executor, {
-    input: config.input,
-    output: config.output,
+    ...config
   });
 
   return executor
@@ -81,27 +66,27 @@ export type FlowErrorType = typeof FlowErrorCode[keyof typeof FlowErrorCode];
 export class FlowError extends Error {
   type: FlowErrorType;
   details?: any;
-  
+
   constructor(message: string, type: FlowErrorType, details?: any) {
     super(message);
     this.name = 'FlowError';
     this.type = type;
     this.details = details;
   }
-  
+
   // Helper functions to create specific error types
   static validation(message: string, details?: any): FlowError {
     return new FlowError(message, FlowErrorCode.VALIDATION, details);
   }
-  
+
   static timeout(message: string = 'Operation timed out', details?: any): FlowError {
     return new FlowError(message, FlowErrorCode.TIMEOUT, details);
   }
-  
+
   static execution(message: string, details?: any): FlowError {
     return new FlowError(message, FlowErrorCode.EXECUTION, details);
   }
-  
+
   static dependency(message: string, details?: any): FlowError {
     return new FlowError(message, FlowErrorCode.DEPENDENCY, details);
   }
@@ -124,7 +109,8 @@ export async function execute<Input, Output>(
     data: {}
   }
 
-  const controller: Flow.Controller = {
+  const controller: Flow.Controller & { context: Flow.ExecutionContext } = {
+    context: context,
     safeExecute: async ({ execution, input, output }, param, opts) => {
       let validatedInput = param
 
