@@ -150,3 +150,9 @@ export function preset<T>(
     executor,
   };
 }
+
+export function placeholder<V>(...metas: Meta.Meta<unknown>[]): Core.Executor<V> {
+  return provide<V>(() => {
+    throw new Error("Placeholder executor cannot be resolved");
+  }, ...metas);
+}

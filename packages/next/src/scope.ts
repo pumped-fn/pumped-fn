@@ -5,7 +5,14 @@ import {
   isMainExecutor,
   isExecutor,
 } from "./executor";
-import { Core } from "./types";
+import { Core, Meta } from "./types";
+import {
+  isGenerator,
+  isAsyncGenerator,
+  collectFromGenerator,
+} from "./generator-utils";
+import { meta } from "./meta";
+import { custom } from "./ssch";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -23,20 +30,26 @@ function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
   return e as Core.Executor<unknown>;
 }
 
-class Scope implements Core.Scope {
-  private disposed: boolean = false;
-  private cache: Map<UE, CacheEntry> = new Map();
-  private cleanups = new Map<UE, Set<Core.Cleanup>>();
-  private onUpdates = new Map<UE, Set<OnUpdateFn | UE>>();
-  private onEvents = {
+class BaseScope implements Core.Scope {
+  protected disposed: boolean = false;
+  protected cache: Map<UE, CacheEntry> = new Map();
+  protected cleanups = new Map<UE, Set<Core.Cleanup>>();
+  protected onUpdates = new Map<UE, Set<OnUpdateFn | UE>>();
+  protected onEvents = {
     change: new Set<Core.ChangeCallback>(),
     release: new Set<Core.ReleaseCallback>(),
   } as const;
+  protected isPod: boolean;
+  private isDisposing = false;
 
-  private middlewares: Core.Middleware[] = [];
+  protected middlewares: Core.Middleware[] = [];
 
-  constructor(...presets: Core.Preset<unknown>[]) {
-    for (const preset of presets) {
+  constructor(options: {
+    initialValues: Core.Preset<unknown>[];
+    pod: boolean;
+  }) {
+    this.isPod = options.pod;
+    for (const preset of options.initialValues) {
       const accessor = this["~makeAccessor"](preset.executor);
 
       this.cache.set(preset.executor, {
@@ -46,7 +59,7 @@ class Scope implements Core.Scope {
     }
   }
 
-  private async "~triggerCleanup"(e: UE): Promise<void> {
+  protected async "~triggerCleanup"(e: UE): Promise<void> {
     const cs = this.cleanups.get(e);
     if (cs) {
       for (const c of Array.from(cs.values()).reverse()) {
@@ -55,7 +68,7 @@ class Scope implements Core.Scope {
     }
   }
 
-  private async "~triggerUpdate"(e: UE): Promise<void> {
+  protected async "~triggerUpdate"(e: UE): Promise<void> {
     const ce = this.cache.get(e);
     if (!ce) {
       throw new Error("Executor is not yet resolved");
@@ -82,11 +95,19 @@ class Scope implements Core.Scope {
     }
   }
 
-  private async "~resolveExecutor"(
+  protected async "~resolveExecutor"(
     ie: Core.UExecutor,
     ref: UE
   ): Promise<unknown> {
     const e = getExecutor(ie);
+    const isPodOnly = podOnlyMeta.find(e);
+
+    if (!this.isPod && isPodOnly) {
+      throw new Error(
+        "Pod-only executors cannot be resolved in the main scope"
+      );
+    }
+
     const a = this["~makeAccessor"](e);
 
     if (isLazyExecutor(ie)) {
@@ -107,7 +128,7 @@ class Scope implements Core.Scope {
     return a.get();
   }
 
-  private async "~resolveDependencies"(
+  protected async "~resolveDependencies"(
     ie:
       | undefined
       | Core.UExecutor
@@ -140,17 +161,23 @@ class Scope implements Core.Scope {
     return r;
   }
 
-  private "~ensureNotDisposed"(): void {
+  protected "~ensureNotDisposed"(): void {
     if (this.disposed) {
       throw new Error("Scope is disposed");
     }
   }
 
-  private "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
+  protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
     const requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
         : (e as UE);
+
+    if (podOnlyMeta.find(requestor) && this.isPod === false) {
+      throw new Error(
+        "Cannot resolve pod-only executor outside of a pod scope"
+      );
+    }
 
     const cachedAccessor = this.cache.get(requestor);
     if (cachedAccessor) {
@@ -191,6 +218,12 @@ class Scope implements Core.Scope {
           .then((dependencies) => factory(dependencies as any, controller))
           .then(async (result) => {
             let current = result;
+
+            // Handle generator results
+            if (isGenerator(result) || isAsyncGenerator(result)) {
+              const { returned } = await collectFromGenerator(result);
+              current = returned;
+            }
 
             const events = this.onEvents.change;
             for (const event of events) {
@@ -276,6 +309,7 @@ class Scope implements Core.Scope {
     force: boolean = false
   ): Promise<T> {
     this["~ensureNotDisposed"]();
+
     const accessor = this["~makeAccessor"](executor);
     await accessor.resolve(force);
     return accessor.get() as T;
@@ -295,6 +329,10 @@ class Scope implements Core.Scope {
     e: Core.Executor<T>,
     u: T | ((current: T) => T)
   ): Promise<void> {
+    if (this.isDisposing) {
+      return;
+    }
+
     this["~ensureNotDisposed"]();
     this["~triggerCleanup"](e);
     const accessor = this["~makeAccessor"](e);
@@ -354,6 +392,11 @@ class Scope implements Core.Scope {
 
   async dispose(): Promise<void> {
     this["~ensureNotDisposed"]();
+    this.isDisposing = true;
+
+    for (const pod of this.pods) {
+      await this.disposePod(pod);
+    }
 
     const disposeEvents = this.middlewares.map(
       (m) => m.dispose?.(this) ?? Promise.resolve()
@@ -378,6 +421,9 @@ class Scope implements Core.Scope {
     cb: (a: Core.Accessor<T>) => void | Promise<void>
   ): Core.Cleanup {
     this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register update callback on a disposing scope");
+    }
 
     const ou = this.onUpdates.get(e) ?? new Set();
     this.onUpdates.set(e, ou);
@@ -398,6 +444,9 @@ class Scope implements Core.Scope {
 
   onChange(callback: Core.ChangeCallback): Core.Cleanup {
     this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register update callback on a disposing scope");
+    }
 
     this.onEvents["change"].add(callback as any);
     return () => {
@@ -408,6 +457,9 @@ class Scope implements Core.Scope {
 
   onRelease(cb: Core.ReleaseCallback): Core.Cleanup {
     this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register update callback on a disposing scope");
+    }
 
     this.onEvents["release"].add(cb);
     return () => {
@@ -418,6 +470,10 @@ class Scope implements Core.Scope {
 
   use(middleware: Core.Middleware): Core.Cleanup {
     this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register update callback on a disposing scope");
+    }
+
     this.middlewares.push(middleware);
 
     middleware.init?.(this);
@@ -427,12 +483,104 @@ class Scope implements Core.Scope {
       this.middlewares = this.middlewares.filter((m) => m !== middleware);
     };
   }
+
+  private pods: Set<Core.Pod> = new Set();
+
+  pod(...preset: Core.Preset<unknown>[]): Core.Pod {
+    this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register update callback on a disposing scope");
+    }
+
+    const pod = new Pod(this, ...preset);
+    this.pods.add(pod);
+    return pod;
+  }
+
+  async disposePod(pod: Core.Pod): Promise<void> {
+    this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      return;
+    }
+
+    await pod.dispose();
+    this.pods.delete(pod);
+  }
 }
 
+const podOnlyMeta: Meta.MetaFn<boolean> = meta(
+  "pumped-fn/space-only",
+  custom<boolean>()
+);
+
+export const podOnly: Meta.Meta<boolean> = podOnlyMeta(true);
+
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope {
-  return new Scope(...presets);
+  return new BaseScope({
+    pod: false,
+    initialValues: presets,
+  });
 }
 
 export function middleware(m: Core.Middleware): Core.Middleware {
   return m;
+}
+
+class Pod extends BaseScope implements Core.Pod {
+  private parentScope: BaseScope;
+
+  constructor(scope: BaseScope, ...presets: Core.Preset<unknown>[]) {
+    super({
+      pod: true,
+      initialValues: presets,
+    });
+    this.parentScope = scope;
+  }
+
+  async resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T> {
+    const isPodOnly = podOnlyMeta.find(executor);
+
+    if (isPodOnly) {
+      return super.resolve(executor, force);
+    }
+
+    const accessor = this["~makeAccessor"](executor);
+    if (accessor.lookup()) {
+      return accessor.get() as T;
+    }
+
+    const value = await this.parentScope.resolve(executor, force);
+    this["cache"].set(executor, {
+      accessor,
+      value: { kind: "resolved", value },
+    });
+
+    return value;
+  }
+
+  protected async "~resolveExecutor"(
+    ie: Core.UExecutor,
+    ref: UE
+  ): Promise<unknown> {
+    if (isReactiveExecutor(ie)) {
+      throw new Error("Reactive executors cannot be used in pod");
+    }
+
+    const isPodOnly = podOnlyMeta.find(ie);
+
+    if (isPodOnly) {
+      return super["~resolveExecutor"](ie, ref);
+    } else {
+      const t = getExecutor(ie);
+      const value = await this.parentScope["~resolveExecutor"](ie, ref);
+      const currentAccessor = this["~makeAccessor"](t);
+
+      this.cache.set(t, {
+        accessor: currentAccessor,
+        value: { kind: "resolved", value },
+      });
+
+      return value;
+    }
+  }
 }
