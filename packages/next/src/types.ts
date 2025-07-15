@@ -123,10 +123,10 @@ export declare namespace Core {
     [executorSymbol]: Kind;
     factory: NoDependencyFn<T> | DependentFn<T, unknown> | undefined;
     dependencies:
-      | undefined
-      | UExecutor
-      | Array<UExecutor>
-      | Record<string, UExecutor>;
+    | undefined
+    | UExecutor
+    | Array<UExecutor>
+    | Record<string, UExecutor>;
   }
 
   export interface Executor<T> extends BaseExecutor<T> {
@@ -220,7 +220,7 @@ export declare namespace Core {
   };
 
   export interface Pod
-    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> {}
+    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> { }
 
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
@@ -250,4 +250,92 @@ export declare namespace Core {
     pod(...presets: Preset<unknown>[]): Pod;
     disposePod(scope: Pod): Promise<void>;
   }
+}
+
+export namespace Flow {
+
+  export type Context = {}
+
+  export type ExecutionPlugin = {}
+  export type ExecuteOpt = {
+    scope?: Core.Scope
+    name?: string
+    description?: string
+    plugins?: ExecutionPlugin[]
+    presets?: Core.Preset<unknown>[]
+  }
+
+  export type Controller = {
+    execute: <Input, Output>(
+      input: Flow<Input, Output> & { context: ExecutionContext},
+      param: Input,
+      opt?: ExecuteOpt
+    ) => Promise<Output>
+    safeExecute: <Input, Output>(
+      input: Flow<Input, Output> & { context: ExecutionContext},
+      param: Input,
+      opt?: ExecuteOpt
+    ) => Promise<Result<Output>>;
+  }
+
+  export type NoDependencyFlowFn<Input, Output> = (
+    input: Input,
+    controller: Controller
+  ) => Output | Promise<Output>;
+
+  export type DependentFlowFn<D, Input, Output> = (
+    dependency: D,
+    input: Input,
+    controller: Controller
+  ) => Output | Promise<Output>
+
+  export type FlowPlugin = {}
+
+  export type Flow<Input, Output> = {
+    execution: NoDependencyFlowFn<Input, Output>;
+    input: StandardSchemaV1<Input>
+    output: StandardSchemaV1<Output>;
+    plugins: FlowPlugin[]
+  }
+
+  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> & {
+    input: StandardSchemaV1<Input>
+    output: StandardSchemaV1<Output>;
+  };
+
+  export type Metrics = {
+    flowName?: string;
+    startTime: number;
+    endTime?: number;
+    duration?: number;
+    status: "pending" | "success" | "error" | "timeout" | "cancelled";
+    error?: unknown;
+    attempts?: number;
+    retryDelays?: number[];
+    inputSize?: number;
+    outputSize?: number;
+    timeout?: number;
+  };
+
+  export type ExecutionStats = {
+    id: string;
+    flowName?: string;
+    parentId?: string;
+    metrics: Metrics;
+    children: ExecutionStats[];
+  };
+
+  export type ExecutionContext = {
+    data: Record<string, any>;
+  };
+
+  export type Success<T> = { kind: "success"; value: T };
+  export type Error = { kind: "error"; error: unknown };
+
+  export type Result<T> = Success<T> | Error;
+
+  export type ExecutionResult<Output> = {
+    context: ExecutionContext;
+    result: Result<Output>;
+  };
 }
