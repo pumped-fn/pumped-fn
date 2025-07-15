@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.46](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.45...@pumped-fn/next@0.5.46) (2025-07-15)
+
 ## [0.5.45](https://github.com/pumped-fn/pumped-fn/compare/@pumped-fn/next@0.5.44...@pumped-fn/next@0.5.45) (2025-07-15)
 
 
