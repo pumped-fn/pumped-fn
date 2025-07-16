@@ -1,6 +1,7 @@
 # Usage
+
 ```typescript
-import { provide, derive, createScope, resolves, type Core } from "@pumped-fn/core-next"
+import { provide, derive, createScope, resolves, type Core, name } from "@pumped-fn/core-next"
 //                                     ^? type Core has definition of Core types, like Executor, Accessor, Scope
 
 /**
@@ -26,13 +27,13 @@ type Controller = {
 
 /** Patterns **/
 
-const value = provide(() => /** value goes here **/)
+const value = provide(() => /** value goes here **/, ... /** metas can be added freely, for example name('value') */)
 //    ^? Core.Executor<infered value type>
 const value = provide((ctl) => /** value goes here **/)
 //                     ^? Core.Controller (as defined up there)
 //    ^? Core.Executor<infered value type>
 
-const derivedValue = derive(value, value => /** derived logic goes here **/)
+const derivedValue = derive(value, value => /** derived logic goes here **/, ... /** metas can be added freely, for example name('value') */)
 //    ^? Core.Executor<infered derivedValue type>
 //                                 ^? resolved value, not the Core.Executor
 
@@ -107,91 +108,42 @@ const scope = createScope(assumedValue, assumedValue1...)
 
 ```
 
-# Flow API
+# Standard schema
 
-Flow is a higher-level abstraction built on top of executors that provides:
-- Input/output validation using StandardSchema
-- Error handling with typed error classes
-- Execution context and controller for nested flows
-- Plugin system for extensibility
+Standardschema [https://github.com/standard-schema/standard-schema] is a standardize validation/type declaration supporting integration with various libraries, for example zod, arktypes, valibot etc
 
 ```typescript
-import { provideFlow, deriveFlow, execute, FlowError, type Flow } from "@pumped-fn/core-next"
+import { custom, validate } from "@pumped-fn/core-next";
 
-// Creating a simple flow without dependencies
-const simpleFlow = provideFlow({
-  name: "simpleFlow",
-  input: schema<{ value: number }>(), // StandardSchema validation
-  output: schema<{ result: number }>(),
-}, async (input, controller) => {
-  return { result: input.value * 2 }
-})
+const stringType = custom<string>(); // custom doesn't do anything, similar to custom of zod. It just helps storing type
 
-// Creating a flow with dependencies
-const complexFlow = deriveFlow({
-  name: "complexFlow", 
-  dependencies: { db, logger }, // Regular executors as dependencies
-  input: schema<{ userId: string }>(),
-  output: schema<{ user: User }>(),
-}, async ({ db, logger }, input, controller) => {
-  logger.info(`Fetching user ${input.userId}`)
-  
-  // Execute nested flows with validation
-  const result = await controller.execute(findUserFlow, { id: input.userId })
-  
-  // Or use safeExecute for error handling
-  const safeResult = await controller.safeExecute(updateUserFlow, { ...input })
-  if (safeResult.kind === 'error') {
-    throw safeResult.error
-  }
-  
-  return { user: safeResult.value }
-})
+const validatedString = validate(stringType, "abc"); // type checking will kick in automatically. On validation cases, error will be thrown on failure
+```
 
-// Executing flows
-const scope = createScope()
-const { context, result } = await execute(complexFlow, { userId: "123" }, {
-  scope, // Optional: reuse existing scope
-  presets: [preset(logger, mockLogger)], // Optional: override dependencies
-})
+# Advanced
 
-if (result.kind === 'success') {
-  console.log(result.value) // Typed output
-} else {
-  console.error(result.error) // FlowError with type and details
-}
+## Using pod
 
-// Error handling
-try {
-  await execute(flow, input)
-} catch (error) {
-  if (error instanceof FlowError) {
-    switch (error.type) {
-      case 'validation': // Input/output validation failed
-      case 'execution':  // Flow execution failed
-      case 'dependency': // Dependency resolution failed
-      case 'timeout':    // Execution timed out
-    }
-  }
-}
+Pod is a subscope, deriving from a main scope. Purposely built for flow execution, where it'll hold execution value, like request, tracing etc. While the scope hold long running value like database connection etc
 
-// Flow types
-type Flow.Controller = {
-  context: Flow.ExecutionContext // Shared data across execution
-  execute: <I, O>(flow: Flow<I, O>, input: I) => Promise<O>
-  safeExecute: <I, O>(flow: Flow<I, O>, input: I) => Promise<Flow.Result<O>>
-}
+```typescript
+import { placeholder, createScope, podOnly } from "@pumped-fn/core-next"
+//                                 ^? Meta.MetaFn that will be read by scope. This resouce will only resolve in pod
 
-type Flow.Result<T> = 
-  | { kind: 'success', value: T }
-  | { kind: 'error', error: unknown }
+const requestHolder = placeholder<Request>(podOnly) // the value on resolved will throw error. Only use with presetting. It gives type infering and referencing
 
-type Flow.ExecutionContext = {
-  data: Record<string, any> // Mutable context data
-}
+const dependingOnRequest = derive(requestHolder, request => /* do something with request*/, podOnly)
+/***
+ * At the moment, only resource marked with podOnly be resolved in pod, literally (so nothing in DAG will be resolved in pod automatically). Other resources will be resolved in the scope and then be copied over to pod. As such, disposing a pod will not clean resource in use, however, it'll leave residue in the scope, though, that's the design decision to make those resources reusable by default
+ **/
+
+// within request handle
+const pod = scope.pod(preset(requestHolder, request /* coming from request handler */))
+
 ```
 
 # Usage with react
+
 ```tsx
 import { Suspense } from "react"
 import { ScopeProvider, useResolves, useResolve, Resolves, Reselect } from "@pumped-fn/react"
@@ -209,6 +161,7 @@ const resolved = useResolves(value, anotherValue, elseValue.reactive)
 
 // slice of data
 // requires stable selector
+// useResolve will automatically resolve the executor. Dispose scope or release an executor must be done manually, otherwise, the rerendering kicks in and it'll cause infinite loop
 const resolved = useResolve(value, (resolvedValue) => { /** subset **/})
 
 const resolved = useResolve(value.reactive, (resolvedValue) => { /** subset **/}) // this'll rerender on change
@@ -237,3 +190,55 @@ const controller = userResolves(...)
 // Use similar testing strategy as in [# Usage]. Feed the scope to the ScopeProvider, can control by interacting on screen or via scope
 
 ```
+
+# Usage patterns on backend
+
+## Placeholder common used services
+
+- common use foundational services like logging, monitoring can be done via exposing service placeholder (like logger)
+- explicit typing what's the service looks like
+- requires preset on the scope, otherwise the startup will be failed
+
+## Integration with other services (like db, redis, etc) or any services require certain level of configuration (file generation, cache etc)
+
+- create config using placeholder, typing what's needed for the config of the service
+- derive the config, use zod to verify and adding default values
+- expose client-like, interact-points depending on service
+- normally integrating with other services doesn't require testing. Those'll be tested on higher level like reusable services
+- adding resource cleanup as needed
+- use `name` meta to add meaningful name for debugging
+
+## Logic-like, business logic-like
+
+- derive only needed services
+- rather use function closure over class, class' constructor cannot do async/await
+- normally those services that changes to database, fulfilling certain logics are all required to be tested
+
+## Integrating with framework
+
+1. major glueing should happen within a main function. The main function should take care
+
+- creation of scope and those presets. If it is needed to separate the concern between startingup and operational, use 2 scopes instead of one.
+- the startingup scope should be able to resolve values that's needed to start server (for example)
+- resolve the main executor and catch all operational going with it
+- listen to signals, errors to handle graceful exit
+- set the timeout in case of too slow startup
+
+2. use `resolves(scope, ...)` to resolve values. keep the result as `resolved` or `r` so variable naming will not be duplicated
+3. use zod to share type where applicable
+
+# Usage patterns on frontend
+
+## Live outside of framework lifecycle
+
+Given the @pumped-fn/core-next is reactive on its own. Majority of frontend work can be done outside of react. That'll eliminate waterfall
+
+1. explain the required logic using executors, each should reflect the data dependencies need and its meaning. For example, a path required authentication, we'll organize at least as of following
+
+- endpoint configurations (incase of proxying, paths/domains can be different)
+- authentication action
+- current state of authentication. This will be changed based on the status of authentication action/chronical ping to see if the state of authentication has changed
+
+2. frontend just need to render based on the state of those resolved executors. changes are going to be done via controllers
+3. test can be done by setup scopes, providers, presets and a tree of components, or by testing executors (given most of logics are in executors)
+4. For built-in APIs like fetch, Date etc, cookie, always wrap the using functionalities using `provide`. As such, we don't need any fancy tool to execute tests. A scope and preset should be sufficient

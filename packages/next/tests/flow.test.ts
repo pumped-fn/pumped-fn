@@ -62,7 +62,7 @@ describe("flow test", () => {
     if (!userSvc.find(input.username)) {
       ctx.execute(createUser, { name: input.username });
     }
-    
+
     return auth.login(input.username, input.password);
   })
 
@@ -90,7 +90,7 @@ describe("flow test", () => {
     }, async ({ auth, getUserFlow }, input, controller) => {
       const authResult = auth.login(input.username, input.password);
       const user = await controller.execute(getUserFlow, { userId: authResult.userId });
-      
+
       return {
         user,
         token: authResult.token
@@ -99,12 +99,12 @@ describe("flow test", () => {
 
     const scope = createScope();
     const { result } = await execute(loginFlow, { username: "user", password: "pass" }, { scope });
-    
+
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.value.token).toBe("abc123");
     }
-    
+
     await scope.dispose();
   });
 
@@ -121,7 +121,7 @@ describe("flow test", () => {
     });
 
     const { result } = await execute(errorFlow, { shouldFail: true });
-    
+
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
       expect(result.error).toBeInstanceOf(FlowError);
@@ -138,22 +138,6 @@ describe("flow test", () => {
       return { result: `fallback-${input.value}` };
     });
 
-    const mainFlow = deriveFlow({
-      name: "mainFlow",
-      dependencies: { errorFlow: errorFlow, fallbackFlow },
-      input: custom<{ value: string }>(),
-      output: custom<{ result: string }>(),
-    }, async ({ errorFlow, fallbackFlow }, input, controller) => {
-      const result = await controller.safeExecute(errorFlow, { shouldFail: true });
-      
-      if (result.kind === "error") {
-        const fallbackResult = await controller.execute(fallbackFlow, { value: input.value });
-        return fallbackResult;
-      }
-      
-      return result.value;
-    });
-
     const errorFlow = provideFlow({
       name: "errorFlow",
       input: custom<{ shouldFail: boolean }>(),
@@ -162,8 +146,24 @@ describe("flow test", () => {
       throw new Error("Always fails");
     });
 
+    const mainFlow = deriveFlow({
+      name: "mainFlow",
+      dependencies: { errorFlow: errorFlow, fallbackFlow },
+      input: custom<{ value: string }>(),
+      output: custom<{ result: string }>(),
+    }, async ({ errorFlow, fallbackFlow }, input, controller) => {
+      const result = await controller.safeExecute(errorFlow, { shouldFail: true });
+
+      if (result.kind === "error") {
+        const fallbackResult = await controller.execute(fallbackFlow, { value: input.value });
+        return fallbackResult;
+      }
+
+      return result.value;
+    });
+
     const { result } = await execute(mainFlow, { value: "test" });
-    
+
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.value.result).toBe("fallback-test");
@@ -172,7 +172,7 @@ describe("flow test", () => {
 
   test("execution with presets", async () => {
     const configFlow = provide(() => ({ apiUrl: "https://api.example.com" }));
-    
+
     const apiFlow = deriveFlow({
       name: "apiFlow",
       dependencies: { config: configFlow },
@@ -186,7 +186,7 @@ describe("flow test", () => {
     const { result } = await execute(apiFlow, { endpoint: "/users" }, {
       presets: [mockConfig]
     });
-    
+
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.value.url).toBe("https://mock.api.com/users");
@@ -223,7 +223,7 @@ describe("flow test", () => {
     });
 
     const { result } = await execute(orchestratorFlow, { data: "test-value" });
-    
+
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.value.retrieved).toBe("test-value");
