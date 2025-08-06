@@ -1,0 +1,131 @@
+/* Custom styles for VitePress theme */
+
+/* Ensure proper spacing and typography */
+.vp-doc .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.vp-doc .feature-card {
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.vp-doc .feature-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.vp-doc .feature-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.vp-doc .feature-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc .feature-description {
+  color: var(--vp-c-text-2);
+  line-height: 1.6;
+}
+
+/* Code comparison styles */
+.vp-doc .code-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .vp-doc .code-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vp-doc .code-comparison-card {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-border);
+}
+
+.vp-doc .code-comparison-header {
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.vp-doc .code-comparison-before .code-comparison-header {
+  background: #fef2f2;
+  color: #dc2626;
+  border-bottom: 1px solid #fecaca;
+}
+
+.vp-doc .code-comparison-after .code-comparison-header {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-bottom: 1px solid #bbf7d0;
+}
+
+.vp-doc .code-comparison-content {
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+.vp-doc .code-comparison-before .code-comparison-content {
+  background: #fef2f2;
+}
+
+.vp-doc .code-comparison-after .code-comparison-content {
+  background: #f0fdf4;
+}
+
+/* Comparison table styles */
+.vp-doc .comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  display: block;
+  white-space: nowrap;
+}
+
+.vp-doc .comparison-table thead,
+.vp-doc .comparison-table tbody,
+.vp-doc .comparison-table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.vp-doc .comparison-table th,
+.vp-doc .comparison-table td {
+  border: 1px solid var(--vp-c-border);
+  padding: 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.vp-doc .comparison-table th {
+  background: var(--vp-c-bg-soft);
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc .comparison-table tr:nth-child(even) {
+  background: var(--vp-c-bg-soft);
+}
+
+.vp-doc .comparison-table .highlight {
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}

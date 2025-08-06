@@ -6,37 +6,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a monorepo for the Pumped Functions library, a TypeScript functional programming library providing container-based dependency injection and reactive programming patterns.
 
-### Key Packages
-- `packages/next/` - Core library (`@pumped-fn/core-next`) - Main functional utilities including executors, scopes, and reactive programming
-- `packages/react/` - React bindings (`@pumped-fn/react`) - React hooks and components for using Pumped Functions
-- `packages/extra/` - Additional utilities (`@pumped-fn/extra`) - Full-stack application utilities with client/server exports
-- `packages/cli/` - CLI tool (`@pumped-fn/cli`) - Command-line tool for analyzing and visualizing dependency graphs
-- `docs/` - Docusaurus documentation site
-- `examples/react/` - React example application demonstrating usage
+### Critical Directory Structure
+```
+/
+├── packages/
+│   ├── next/          - Core library (@pumped-fn/core-next) [📋 packages/next/CLAUDE.md]
+│   ├── react/         - React bindings (@pumped-fn/react) [📋 packages/react/CLAUDE.md]
+│   ├── extra/         - Full-stack utilities (@pumped-fn/extra) [📋 packages/extra/CLAUDE.md]
+│   └── cli/           - CLI tool (@pumped-fn/cli) [📋 packages/cli/CLAUDE.md]
+├── docs/              - Documentation site [📋 docs/CLAUDE.md]
+├── examples/          - Usage examples [📋 examples/CLAUDE.md]
+└── tests/             - Cross-package integration tests
+```
 
-### Architecture Overview
+**📋 Legend**: [📋 path/CLAUDE.md] indicates detailed technical context is available in that file.
 
-The library is built around these core concepts:
-- **Executors**: Containers that hold values and define how dependencies are resolved
-- **Scopes**: Lazy resolution contexts that manage executor lifecycles
-- **Reactive Programming**: Executors can be reactive, triggering updates when dependencies change
-- **Meta System**: Decorative information system using StandardSchema for type enforcement
+### When to Use Sub-CLAUDE.md Files
 
-## Core APIs
-- Those are core APIs used in the Pumped Functions library
-- Shapes are important to use
+- **packages/next/CLAUDE.md**: Working with core executors, scopes, dependency resolution, reactive patterns
+- **packages/react/CLAUDE.md**: React hooks, components, integration patterns, React-specific state management  
+- **packages/extra/CLAUDE.md**: Full-stack patterns, client/server utilities, API definitions, telemetry
+- **packages/cli/CLAUDE.md**: AST analysis, dependency graph visualization, CLI commands, image generation
+- **docs/CLAUDE.md**: Documentation structure, content organization, Next.js documentation site
+- **examples/CLAUDE.md**: Example applications, usage patterns, demo implementations
+
+### Core Architecture Concepts
+
+- **Executors**: Containers holding values with dependency resolution (`provide`, `derive`)
+- **Scopes**: Lazy resolution contexts managing executor lifecycles (`createScope`)
+- **Reactive Programming**: Executors trigger updates when dependencies change (`.reactive`)
+- **Meta System**: Type-safe decorative information using StandardSchema (`meta()`)
+- **Container Types**: Static, Lazy, Reactive executor variants
+
+## Quick Reference - Common APIs
+
+### Core Executors (`@pumped-fn/core-next`)
+- `provide(factory, ...metas)` - Create executor with no dependencies
+- `derive(deps, factory, ...metas)` - Create executor with dependencies
+- `createScope(...presets)` - Create resolution scope
+- `executor.reactive` - Get reactive variant of executor
+- `executor.lazy` - Get lazy variant of executor
+- `executor.static` - Get static variant of executor
+
+### React Integration (`@pumped-fn/react`)
+- `useResolves(...executors)` - Resolve multiple executors in React
+- `useResolve(executor, selector)` - Resolve with selector function
+- `useUpdate(executor)` - Get update function for executor
+- `ScopeProvider` - Provide scope context to React tree
+- `<Resolves e={executors}>{values => ...}</Resolves>` - Render prop component
+
+### Full-Stack Utilities (`@pumped-fn/extra`)
+- `define.api(spec)` - Define API with input/output schemas
+- Client/server utilities for RPC patterns
+- Telemetry and logging utilities
 
 ## Common Commands
 
-### Development
+### Development Workflow
 ```bash
 # Install dependencies
 pnpm install
 
-# Build all packages
+# Build all packages (order matters - core first)
 pnpm build
 
-# Run tests across all packages
+# Run tests across all packages  
 pnpm test
 
 # Type check all packages
@@ -49,119 +83,74 @@ npx biome format --write .
 pnpm verify
 ```
 
-### Working with Individual Packages
+### Package-Specific Commands
 ```bash
+# Work with individual packages
+cd packages/{next|react|extra|cli}
+
 # Build specific package
-cd packages/next && pnpm build
-cd packages/react && pnpm build
-cd packages/extra && pnpm build
-cd packages/cli && pnpm build
+pnpm build
 
-# Test specific package
-cd packages/next && pnpm test
-cd packages/react && pnpm test
-cd packages/extra && pnpm test
-cd packages/cli && pnpm test
+# Test with watch mode
+pnpm test:watch
 
-# Watch mode testing
-cd packages/next && pnpm test:watch
-cd packages/react && pnpm test:watch
-cd packages/extra && pnpm test:watch
-cd packages/cli && pnpm test:watch
+# Run specific package tests
+pnpm test
 ```
 
-### Documentation
+### Documentation & Release
 ```bash
-# Run docs locally
+# Documentation development
 pnpm docs:dev
 
-# Build docs
-pnpm docs:build
+# Release processes  
+pnpm release:patch  # Patch version bump
+pnpm release:minor  # Minor version bump
 ```
 
-### Release Process
-```bash
-# Patch release for both core and react
-pnpm release:patch
+## Technical Standards
 
-# Minor release for both core and react
-pnpm release:minor
-```
+### Testing Framework
+- **Vitest** across all packages with consistent configuration
+- **@testing-library/react** for React component testing  
+- Tests in `tests/` or `test/` directories within each package
+- Use `pnpm test` from root or `pnpm test:watch` for individual packages
 
-## Testing
+### Code Standards
+- **TypeScript**: Strict settings, ESM modules throughout
+- **Biome**: Code formatting (linting disabled)
+- **Node 18+**: Minimum runtime requirement
+- **Functional Programming**: Core design philosophy
+- **StandardSchema**: Type validation in meta system
 
-- Uses **Vitest** for testing across all packages
-- React package uses **@testing-library/react** for component testing
-- Tests are located in `tests/` or `test/` directories within each package
-- Run `pnpm test` from root to run all tests, or `pnpm test:watch` for individual packages
+### File Conventions
+- `src/index.ts` - Main package exports
+- `src/types.ts` - Core type definitions
+- `tests/*.test.ts` - Test files using Vitest
+- `package.json` - Contains build/test scripts per package
 
-## Code Standards
+## Documentation Strategy
 
-- **TypeScript**: All packages use TypeScript with strict settings
-- **Biome**: Code formatting and linting (linter currently disabled)
-- **ESM**: All packages use ES modules
-- **Node 18+**: Required runtime version
-- The library emphasizes functional programming patterns and type safety
-- Meta system integration requires StandardSchema-compatible validation libraries
+### Content Plan Tracking
+**IMPORTANT**: Documentation redesign is in progress based on developer relations expert feedback.
 
-## Key Files to Understand
+Current status tracked in: **`.claude_artifacts/content_plan.md`**
 
-- `packages/next/src/executor.ts` - Core executor implementation
-- `packages/next/src/scope.ts` - Scope management and resolution
-- `packages/next/src/meta.ts` - Meta system for decorative information
-- `packages/react/src/index.tsx` - React hooks and bindings
-- `packages/extra/src/` - Additional utilities for full-stack development
-- `packages/cli/src/ast-analyzer.ts` - TypeScript AST analysis for dependency graph extraction
-- `packages/cli/src/cli.ts` - Main CLI interface and commands
-- `packages/cli/src/mermaid-generator.ts` - Mermaid diagram generation
-- `packages/cli/src/image-generator.ts` - Image export functionality using Puppeteer
+**Key Issues Identified**:
+- Documentation suffers from "does everything" syndrome
+- Information overload prevents developer adoption
+- No clear competitive positioning or value proposition
+- Need to focus on single primary use case
 
-## CLI Package (@pumped-fn/cli)
+**When working on documentation**:
+1. ✅ Check `.claude_artifacts/content_plan.md` for current priorities
+2. ✅ Follow progressive disclosure principles (simple → complex)
+3. ✅ Focus on single use case (dependency injection OR reactive state, not both)
+4. ✅ Include competitive comparisons and address adoption barriers
+5. ✅ Update checkboxes in content plan as work progresses
 
-The CLI package provides tools for analyzing and visualizing pumped-fn dependency graphs.
-
-### CLI Commands
-
-```bash
-# Analyze dependency graph with TUI output
-pumped-dag analyze [path]
-
-# Generate image exports
-pumped-dag export [path] <output-file> --format <png|jpg|svg|pdf|webp>
-
-# Validate dependency graph for issues
-pumped-dag validate [path]
-
-# Show dependency graph statistics
-pumped-dag stats [path]
-```
-
-### CLI Development
-
-```bash
-# Build CLI
-cd packages/cli && pnpm build
-
-# Test CLI locally
-node dist/cli.js analyze ./examples/react/src/
-
-# Run CLI tests
-cd packages/cli && pnpm test
-
-# Generate test images
-node dist/cli.js export ./examples/react/src/ graph.png --format png --theme dark
-```
-
-### CLI Features
-
-- **AST Analysis**: Uses TypeScript compiler API to analyze source code
-- **Multiple Output Formats**: TUI, Mermaid, HTML, JSON, PNG, JPG, SVG, PDF, WebP
-- **Image Generation**: High-quality image export using Puppeteer and Mermaid
-- **Complex Graph Support**: Handles sophisticated dependency patterns with cross-references
-- **Validation**: Detects circular dependencies, orphaned nodes, and complexity metrics
-- **Theming**: Multiple Mermaid themes (default, dark, forest, neutral)
-- **Programmatic API**: Can be used as a library in other applications
-
-## Testing Notes
-
-- This is how we utilize preset to test
+**Next Major Updates**:
+- Hero section rewrite with concrete problem/solution
+- Choose primary use case focus (DI vs reactive state)
+- Create comparison page vs existing solutions
+- Add FAQ addressing developer concerns

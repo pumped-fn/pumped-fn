@@ -27,7 +27,15 @@
       "esbuild": "^0.25.0",
       "@babel/runtime": "^7.26.10",
       "@babel/helpers": "^7.26.10"
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "puppeteer"
+    ],
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "esbuild",
+      "sharp"
+    ]
   },
   "dependencies": {
     "release-it": "^18.1.2"
