@@ -43,14 +43,11 @@ export default defineConfig({
 
     sidebar: [
       { text: "Getting started", link: "/" },
-      { text: "Advanced", link: "/advanced" },
+      // { text: "Advanced", link: "/advanced" },
       { text: "Integration", link: "/integration" },
-      { text: "Testing", link: "/testing" },
-      { text: "API", link: "/api" },
-      { text: "LLM", link: "/llm.md" },
-      // { text: "Overview", link: "/" },
-      // { text: "Quick Start", link: "/getting-started/quickstart" },
-      // { text: "Examples", link: "/show-me-code" },
+      // { text: "Testing", link: "/testing" },
+      // { text: "API", link: "/api" },
+      // { text: "LLM", link: "/llm.md" },
     ],
 
     socialLinks: [
