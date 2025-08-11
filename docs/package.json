@@ -9,11 +9,8 @@
     "preview": "vitepress preview",
     "serve": "vitepress serve"
   },
-  "dependencies": {
-    "@pumped-fn/core-next": "^0.5.47",
-    "@pumped-fn/react": "^0.5.16"
-  },
   "devDependencies": {
+    "@pumped-fn/core-next": "^0.5.47",
     "@types/node": "^20.19.4",
     "typescript": "^5.8.3",
     "vitepress": "^1.0.0",

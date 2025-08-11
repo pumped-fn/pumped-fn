@@ -135,6 +135,12 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Act secrets file
+.secrets
+
+# Act artifacts
+.act/
 # Logs
 logs
 *.log
@@ -271,3 +277,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Act secrets file
+.secrets
+
+# Act artifacts
+.act/

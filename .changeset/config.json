@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "lagz0ne/pumped-fn-wp"
+    }
+  ],
+  "commit": false,
+  "fixed": [],
+  "linked": [
+    ["@pumped-fn/core-next", "@pumped-fn/react", "@pumped-fn/extra", "@pumped-fn/cli"]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": ["docs", "examples/*"],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  }
+}

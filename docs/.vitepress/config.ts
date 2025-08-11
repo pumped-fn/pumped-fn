@@ -2,8 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Pumped Functions",
-  description:
-    "TypeScript functional programming library with container-based dependency injection and reactive programming patterns",
+  description: "functions on steroid",
   base: "/pumped-fn/",
 
   head: [
@@ -40,13 +39,15 @@ export default defineConfig({
   themeConfig: {
     logo: "/ms-icon-70x70.png",
 
-    nav: [
-      { text: "Guide", link: "/getting-started/quickstart" },
-      { text: "Examples", link: "/show-me-code" },
-      { text: "FAQ", link: "/faq" },
-    ],
+    nav: [],
 
     sidebar: [
+      { text: "Getting started", link: "/" },
+      { text: "Advanced", link: "/advanced" },
+      { text: "Integration", link: "/integration" },
+      { text: "Testing", link: "/testing" },
+      { text: "API", link: "/api" },
+      { text: "LLM", link: "/llm.md" },
       // { text: "Overview", link: "/" },
       // { text: "Quick Start", link: "/getting-started/quickstart" },
       // { text: "Examples", link: "/show-me-code" },

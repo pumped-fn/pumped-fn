@@ -1,0 +1,14 @@
+# Act configuration for local GitHub Actions testing
+# https://github.com/nektos/act
+
+# Default runner image
+--platform ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Reuse containers between runs for faster testing
+--reuse
+
+# Set default secrets file location (create .secrets file locally)
+# --secret-file .secrets
+
+# Enable verbose output for debugging
+# --verbose

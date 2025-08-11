@@ -7,19 +7,25 @@
     "typecheck": "pnpm -r typecheck",
     "docs:dev": "cd docs && pnpm dev",
     "docs:build": "cd docs && NODE_ENV=production pnpm build",
-    "changelog:core": "cd packages/core && npx conventional-changelog -p angular -i CHANGELOG.md -s",
-    "changelog:react": "cd packages/react && npx conventional-changelog -p angular -i CHANGELOG.md -s",
-    "release:core": "cd packages/core && npm version",
-    "release:react": "cd packages/react && npm version",
-    "publish:core": "cd packages/core && npm publish --access public",
-    "publish:react": "cd packages/react && npm publish --access public",
     "verify": "pnpm build && pnpm test && pnpm typecheck",
-    "release:minor": "pnpm verify && pnpm changelog:core && pnpm changelog:react && pnpm release:core minor && pnpm release:react minor && pnpm publish:core && pnpm publish:react",
-    "release:patch": "pnpm verify && pnpm changelog:core && pnpm changelog:react && pnpm release:core patch && pnpm release:react patch && pnpm publish:core && pnpm publish:react"
+    "format": "ultracite format",
+    "format:check": "ultracite lint",
+    "lint": "ultracite lint --fix",
+    "lint:check": "ultracite lint",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "pnpm build && changeset publish",
+    "changeset:status": "changeset status --verbose",
+    "release": "pnpm verify && pnpm changeset:publish",
+    "test:ci": "act -j test",
+    "test:release": "act -j release --secret-file .secrets",
+    "test:docs": "act -j build -W .github/workflows/deploy-docs.yml"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "typescript": "^5.8.3"
+    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/cli": "^2.29.5",
+    "typescript": "^5.8.3",
+    "ultracite": "^5.1.2"
   },
   "license": "MIT",
   "pnpm": {
@@ -32,12 +38,9 @@
       "puppeteer"
     ],
     "onlyBuiltDependencies": [
-      "@biomejs/biome",
+      "ultracite",
       "esbuild",
       "sharp"
     ]
-  },
-  "dependencies": {
-    "release-it": "^18.1.2"
   }
 }
