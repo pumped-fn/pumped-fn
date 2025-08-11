@@ -100,14 +100,6 @@ class BaseScope implements Core.Scope {
     ref: UE
   ): Promise<unknown> {
     const e = getExecutor(ie);
-    const isPodOnly = podOnlyMeta.find(e);
-
-    if (!this.isPod && isPodOnly) {
-      throw new Error(
-        "Pod-only executors cannot be resolved in the main scope"
-      );
-    }
-
     const a = this["~makeAccessor"](e);
 
     if (isLazyExecutor(ie)) {
@@ -172,12 +164,6 @@ class BaseScope implements Core.Scope {
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
         : (e as UE);
-
-    if (podOnlyMeta.find(requestor) && this.isPod === false) {
-      throw new Error(
-        "Cannot resolve pod-only executor outside of a pod scope"
-      );
-    }
 
     const cachedAccessor = this.cache.get(requestor);
     if (cachedAccessor) {
@@ -508,13 +494,6 @@ class BaseScope implements Core.Scope {
   }
 }
 
-const podOnlyMeta: Meta.MetaFn<boolean> = meta(
-  "pumped-fn/space-only",
-  custom<boolean>()
-);
-
-export const podOnly: Meta.Meta<boolean> = podOnlyMeta(true);
-
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope {
   return new BaseScope({
     pod: false,
@@ -537,25 +516,40 @@ class Pod extends BaseScope implements Core.Pod {
     this.parentScope = scope;
   }
 
+  /**
+   * Expect to resolve everything in pod. Unless it's already resolved in the main
+   * @param executor
+   * @param force
+   * @returns
+   */
   async resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T> {
-    const isPodOnly = podOnlyMeta.find(executor);
-
-    if (isPodOnly) {
+    if (this.cache.has(executor)) {
       return super.resolve(executor, force);
     }
 
-    const accessor = this["~makeAccessor"](executor);
-    if (accessor.lookup()) {
-      return accessor.get() as T;
+    if (this.parentScope["cache"].has(executor)) {
+      const { value } = this.parentScope["cache"].get(executor)!;
+      const accessor = super["~makeAccessor"](executor);
+
+      this["cache"].set(executor, {
+        accessor,
+        value,
+      });
+
+      if (value.kind === "rejected") {
+        throw value.error;
+      }
+
+      if (value.kind === "resolved") {
+        return value.value as T;
+      }
+
+      if (value.kind === "pending") {
+        return (await value.promise) as T;
+      }
     }
 
-    const value = await this.parentScope.resolve(executor, force);
-    this["cache"].set(executor, {
-      accessor,
-      value: { kind: "resolved", value },
-    });
-
-    return value;
+    return await super.resolve(executor, force);
   }
 
   protected async "~resolveExecutor"(
@@ -566,21 +560,17 @@ class Pod extends BaseScope implements Core.Pod {
       throw new Error("Reactive executors cannot be used in pod");
     }
 
-    const isPodOnly = podOnlyMeta.find(ie);
+    const t = getExecutor(ie);
+    const a = this["~makeAccessor"](t);
 
-    if (isPodOnly) {
-      return super["~resolveExecutor"](ie, ref);
-    } else {
-      const t = getExecutor(ie);
-      const value = await this.parentScope["~resolveExecutor"](ie, ref);
-      const currentAccessor = this["~makeAccessor"](t);
-
-      this.cache.set(t, {
-        accessor: currentAccessor,
-        value: { kind: "resolved", value },
+    if (this.parentScope["cache"].has(t)) {
+      const { value } = this.parentScope["cache"].get(t)!;
+      this["cache"].set(t, {
+        accessor: a,
+        value,
       });
-
-      return value;
     }
+
+    return await super["~resolveExecutor"](ie, ref);
   }
 }

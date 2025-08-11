@@ -1,69 +1,71 @@
-import { vi, describe, it, expect, test } from "vitest";
-import {
-  createScope,
-  podOnly,
-  provide,
-  derive,
-  placeholder,
-  preset,
-  meta,
-  custom,
-} from "../src";
-
-const debug = meta("debug", custom<string>());
+import { vi, describe, it, expect, test, beforeEach } from "vitest";
+import { createScope, provide, derive, meta, custom } from "../src";
+import { flow } from "../src";
 
 describe("pod scope", () => {
-  test("shared value will be copied", async () => {
-    const mainScope = createScope();
+  const valueFn = vi.fn();
+  const factoredFn = vi.fn();
 
-    let seed = 0;
-    let nonshared = 0;
-
-    const sharedValue = provide(() => seed++);
-    const derivedSharedValue = derive(
-      [sharedValue],
-      ([value]) => value + nonshared++
-    );
-
-    const pod1 = mainScope.pod();
-    const pod2 = mainScope.pod();
-
-    await pod1.resolve(sharedValue);
-    await pod2.resolve(sharedValue);
-
-    expect(seed).toBe(1);
-
-    await pod1.resolve(derivedSharedValue);
-    await pod2.resolve(derivedSharedValue);
-
-    expect(nonshared).toBe(1);
+  const value = provide(() => {
+    valueFn("first");
+    return 1;
   });
-});
 
-test("pod value will be isolated", async () => {
-  let shared = 0;
-  let nonshared = 0;
+  const derived = derive(value, (v) => v + 1);
+  const factored = provide(() => {
+    factoredFn("factored");
+    return 2;
+  });
 
-  const placeholderValue = placeholder<number>(podOnly, debug("placeholder"));
-  const mainScope = createScope();
-  const sharedValue = provide(() => ++shared, debug("sharedValue"));
-  const next = derive(
-    [sharedValue, placeholderValue],
-    ([sharedValue, placeholderValue]) =>
-      sharedValue + nonshared++ + placeholderValue,
-    podOnly,
-    debug("next ")
+  const subFlow = flow.derive(
+    {
+      dependencies: [derived],
+      input: custom<number>(),
+      output: custom<number>(),
+    },
+    async ([derived], input) => {
+      return input + derived;
+    }
   );
 
-  const pod1 = mainScope.pod(preset(placeholderValue, 1));
-  const pod2 = mainScope.pod(preset(placeholderValue, 2));
+  const mainFlow = flow.derive(
+    {
+      dependencies: [subFlow, factored],
+      input: custom<number>(),
+      output: custom<number>(),
+    },
+    async ([subFlow, factored], input, ctl) => {
+      return await ctl.execute(subFlow, input * factored);
+    }
+  );
 
-  const v1 = await pod1.resolve(next);
-  const v2 = await pod2.resolve(next);
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
 
-  expect(shared).toBe(1);
-  expect(nonshared).toBe(2);
+  test("scope is isolated till it's resolved for the first time", async () => {
+    let result = await flow.execute(mainFlow, 3);
+    expect(result.result).toEqual({ kind: "success", value: 8 });
 
-  expect(v1).toBe(2);
-  expect(v2).toBe(4);
+    result = await flow.execute(mainFlow, 3);
+
+    expect(valueFn).toHaveBeenCalledTimes(2);
+    expect(factoredFn).toHaveBeenCalledTimes(2);
+  });
+
+  test("value will be shared if it's already resolved", async () => {
+    const scope = createScope();
+
+    await scope.resolve(derived);
+
+    let result = await flow.execute(mainFlow, 3, { scope });
+    expect(result.result).toEqual({ kind: "success", value: 8 });
+    expect(valueFn).toHaveBeenCalledTimes(1);
+    expect(factoredFn).toHaveBeenCalledTimes(1);
+
+    result = await flow.execute(mainFlow, 3, { scope });
+    expect(result.result).toEqual({ kind: "success", value: 8 });
+    expect(valueFn).toHaveBeenCalledTimes(1);
+    expect(factoredFn).toHaveBeenCalledTimes(2);
+  });
 });

@@ -1,66 +1,78 @@
-import type { Core, Flow, Meta, StandardSchemaV1 } from "./types";
+import type { Core, Flow } from "./types";
 import { provide as coreProvide, derive as coreDerive } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
 
-export function provideFlow<Input, Output>(
+function provideFlow<Input, Output>(
   config: Flow.Config & Flow.Schema<Input, Output>,
-  handler: Flow.NoDependencyFlowFn<Input, Output>,
+  handler: Flow.NoDependencyFlowFn<Input, Output>
 ): Flow.Executor<Input, Output> {
-  const executor: Flow.Executor<Input, Output> = coreProvide(() => ({
-    execution: handler,
-    ...config
-  }), ...config.metas || []) as any
+  const executor: Flow.Executor<Input, Output> = coreProvide(
+    () => ({
+      execution: handler,
+      ...config,
+    }),
+    ...(config.metas || [])
+  ) as any;
 
-  Object.assign(executor, {...config})
+  Object.assign(executor, { ...config });
 
-  return executor
+  return executor;
 }
 
 export function deriveFlow<
   D extends
-  | ReadonlyArray<Core.BaseExecutor<unknown>>
-  | Record<string, Core.BaseExecutor<unknown>>,
+    | ReadonlyArray<Core.BaseExecutor<unknown>>
+    | Record<string, Core.BaseExecutor<unknown>>,
   Input,
   Output
 >(
-  { dependencies, ...config }: {
-    dependencies: { [K in keyof D]: D[K] },
-  } & Flow.Config & Flow.Schema<Input, Output>,
-  handler: Flow.DependentFlowFn<{ [K in keyof D]: Core.InferOutput<D[K]> }, Input, Output>,
+  {
+    dependencies,
+    ...config
+  }: {
+    dependencies: { [K in keyof D]: D[K] };
+  } & Flow.Config &
+    Flow.Schema<Input, Output>,
+  handler: Flow.DependentFlowFn<
+    { [K in keyof D]: Core.InferOutput<D[K]> },
+    Input,
+    Output
+  >
 ): Flow.Executor<Input, Output> {
   const executor: Flow.Executor<Input, Output> = coreDerive(
     dependencies as any,
     ((dependencies: unknown): Flow.Flow<Input, Output> => {
       return {
-        execution: (input, controller) => handler(dependencies as any, input, controller),
+        execution: (input, controller) =>
+          handler(dependencies as any, input, controller),
         input: config.input,
         output: config.output,
         plugins: config.plugins || [],
-      }
+      };
     }) as any,
-    ...config.metas || []
+    ...(config.metas || [])
   ) as any;
 
   Object.assign(executor, {
-    ...config
+    ...config,
   });
 
-  return executor
+  return executor;
 }
 
 // Error codes as constants instead of enum
 export const FlowErrorCode = {
-  VALIDATION: 'validation',
-  TIMEOUT: 'timeout',
-  EXECUTION: 'execution',
-  DEPENDENCY: 'dependency',
-  PLUGIN: 'plugin',
-  SCOPE: 'scope',
-  UNKNOWN: 'unknown'
+  VALIDATION: "validation",
+  TIMEOUT: "timeout",
+  EXECUTION: "execution",
+  DEPENDENCY: "dependency",
+  PLUGIN: "plugin",
+  SCOPE: "scope",
+  UNKNOWN: "unknown",
 } as const;
 
-export type FlowErrorType = typeof FlowErrorCode[keyof typeof FlowErrorCode];
+export type FlowErrorType = (typeof FlowErrorCode)[keyof typeof FlowErrorCode];
 
 // Single error class with type parameter
 export class FlowError extends Error {
@@ -69,7 +81,7 @@ export class FlowError extends Error {
 
   constructor(message: string, type: FlowErrorType, details?: any) {
     super(message);
-    this.name = 'FlowError';
+    this.name = "FlowError";
     this.type = type;
     this.details = details;
   }
@@ -79,7 +91,10 @@ export class FlowError extends Error {
     return new FlowError(message, FlowErrorCode.VALIDATION, details);
   }
 
-  static timeout(message: string = 'Operation timed out', details?: any): FlowError {
+  static timeout(
+    message: string = "Operation timed out",
+    details?: any
+  ): FlowError {
     return new FlowError(message, FlowErrorCode.TIMEOUT, details);
   }
 
@@ -92,66 +107,99 @@ export class FlowError extends Error {
   }
 }
 
-export async function execute<Input, Output>(
+async function execute<Input, Output>(
   executor: Flow.Executor<Input, Output>,
   input: Input,
   opt?: Flow.ExecuteOpt
 ): Promise<Flow.ExecutionResult<Output>> {
-  let selfControl = !!opt?.scope
-  const scope = opt?.scope || createScope()
+  let selfControl = opt?.scope === undefined;
+  const scope = opt?.scope || createScope();
 
-  const pod = scope.pod(...opt?.presets || []);
+  const pod = scope.pod(...(opt?.presets || []));
 
-  const flow = await pod.resolve(executor)
-    .catch(error => { throw FlowError.dependency(`Failed to resolve executor: ${error.message}`, { cause: error }); });
+  const flow = await pod.resolve(executor).catch((error) => {
+    throw FlowError.dependency(`Failed to resolve executor: ${error.message}`, {
+      cause: error,
+    });
+  });
 
   const context: Flow.ExecutionContext = {
-    data: {}
-  }
+    data: {},
+  };
 
   const controller: Flow.Controller & { context: Flow.ExecutionContext } = {
     context: context,
     safeExecute: async ({ execution, input, output }, param, opts) => {
-      let validatedInput = param
+      let validatedInput = param;
 
       try {
         validatedInput = validate(input, param);
       } catch (error) {
-        const wrappedError = FlowError.validation(`Input validation failed:`, { cause: error });
-        return { kind: 'error', error: wrappedError };
+        const wrappedError = FlowError.validation(`Input validation failed:`, {
+          cause: error,
+        });
+        return { kind: "error", error: wrappedError };
       }
 
       try {
-        const result = await execution(validatedInput, controller)
-        return { kind: 'success', value: result }
+        const result = await execution(validatedInput, controller);
+        return { kind: "success", value: result };
       } catch (error) {
-        const wrappedError = FlowError.execution(`Flow execution failed:`, { cause: error });
-        return { kind: 'error', error: wrappedError };
+        const wrappedError = FlowError.execution(`Flow execution failed:`, {
+          cause: error,
+        });
+        return { kind: "error", error: wrappedError };
       }
     },
     execute: async (context, param, opts) => {
       const result = await controller.safeExecute(context, param, opts);
 
-      if (result.kind === 'error') {
+      if (result.kind === "error") {
         throw result.error;
       }
 
-      return result.value
-    }
-  }
+      return result.value;
+    },
+  };
 
-  const initialContext = Object.assign({}, flow, { context })
+  const initialContext = Object.assign({}, flow, { context });
 
-  const executionResult = await controller.safeExecute(initialContext, input, opt)
+  const executionResult = await controller.safeExecute(
+    initialContext,
+    input,
+    opt
+  );
 
   if (selfControl) {
     await scope.dispose();
   } else {
-    await scope.disposePod(pod)
+    await scope.disposePod(pod);
   }
 
   return {
     context: initialContext.context,
     result: executionResult,
-  }
+  };
 }
+
+export const flow: {
+  provide: typeof provideFlow;
+  derive: typeof deriveFlow;
+  execute: typeof execute;
+  FlowError: typeof FlowError;
+  FlowErrorCode: {
+    readonly VALIDATION: "validation";
+    readonly TIMEOUT: "timeout";
+    readonly EXECUTION: "execution";
+    readonly DEPENDENCY: "dependency";
+    readonly PLUGIN: "plugin";
+    readonly SCOPE: "scope";
+    readonly UNKNOWN: "unknown";
+  };
+} = {
+  provide: provideFlow,
+  derive: deriveFlow,
+  execute: execute,
+  FlowError: FlowError,
+  FlowErrorCode: FlowErrorCode,
+};

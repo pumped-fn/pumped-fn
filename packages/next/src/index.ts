@@ -11,4 +11,7 @@ export * from "./helpers";
 export * from "./generator-utils";
 export * from "./flow";
 
-export const name: Meta.MetaFn<string> = meta("pumped-fn/name", custom<string>());
+export const name: Meta.MetaFn<string> = meta(
+  "pumped-fn/name",
+  custom<string>()
+);
