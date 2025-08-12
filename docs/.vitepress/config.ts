@@ -48,6 +48,7 @@ export default withMermaid(
       sidebar: [
         { text: "Getting started", link: "/" },
         { text: "How does it work", link: "/how-does-it-work" },
+        { text: "Testings", link: "/testings" },
         {
           text: "API",
           items: [
