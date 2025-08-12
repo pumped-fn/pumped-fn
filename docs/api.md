@@ -1,19 +1,3 @@
-# introduction
-
-`@pumped-fn/core-next` tried its best to stay on very low amount of APIs, it makes programming fun, ease on importing and also LLM-friendly
-
-## primitives
-
-### executors
-
-Executor is the atom of `pumped-fn`. At its heart, it's measely an object to be used as a reference. It contains the factory function, dependencies and metas
-
-Executor has a few references used as signal the scope to treat the graph of dependencies slightly differently
-
-- `lazy` is a representation of an Executor at the Scope. It gives you the access to the Accessor. It fuels conditional dependency, lazy evalution
-- `reactive` is a Reactive indicator of an Executor at the Scope. When a value depending on a reactive variation, whenever the main Executor got updated, the factory will be triggered
-- `static` is a static representation of an Executor at the Scope. On resol
-
 ## creation
 
 There are very few way creating
@@ -87,6 +71,36 @@ type Controller = Core.Controller
 //   ^^^^^^^^^^
 ```
 
+#### accessing variations
+
+```ts twoslash
+import { provide, derive } from "@pumped-fn/core-next";
+
+const value = provide(() => 0);
+
+const derivedValue = derive(
+  [value.lazy, value.static, value.reactive],
+  ([accessor, value, anotherAccessor]) => {}
+);
+```
+
+#### presetting
+
+An executor can be "assumed" to be a specific value, on scope resolving that particular executor, if the scope recognized there's an assumed value, it'll resolved with the "assumed" value instead of triggering the original factory
+
+```ts twoslash
+import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
+
+const value = provide(() => 0);
+
+const assumedValue = preset(value, 1);
+const scope = createScope(assumedValue);
+
+const resolvedValue = await scope.resolve(value); // will be 1
+```
+
+Preset is the technique built-in pumped-fn to use in testing and building middleware
+
 ## scope
 
 Scope is the unit that in charge of resolving the graph of dependencies, bring value to life (an escape hatch)
@@ -129,7 +143,13 @@ resolvedValue = await scope.resolve(value);
 //  1
 ```
 
-Updating requires the executor to be resolved upfront, via direct resolve or as a part of the graph
+- Updating requires the executor to be resolved upfront, via direct resolve or as a part of the graph
+
+On update, the following mechanism happen
+
+- cleanups got called
+- The .reactive dependencies got triggered
+- factory function is called
 
 #### scope.release
 
@@ -147,3 +167,47 @@ await scope.release(value);
 
 // will also release derivedValue
 ```
+
+#### scope.accessor
+
+Retrieve the singleton of an executor respresentative in a scope
+
+```ts twoslash
+// @noErrors
+import { provide, createScope, type Core } from "@pumped-fn/core-next";
+const value = provide(() => 0);
+
+const scope = createScope();
+// ---cut---
+
+const valueAccessor = scope.accessor(value);
+
+const getValue = valueAccessor.get(); // retrieve value. Will throw error if executor is yet resolved
+const maybeValue = valueAccessor.lookup();
+const resolvedValue = await valueAccessor.resolve();
+typeof valueAccessor['
+//                    ^|
+
+
+```
+
+#### scope.dispose
+
+```ts twoslash
+// @noErrors
+import { provide, createScope, type Core } from "@pumped-fn/core-next";
+const value = provide((ctl) => {
+  // acquire connection
+
+  ctl.cleanup(() => {
+    /** cleanup logic */
+  });
+
+  return 0;
+});
+
+const scope = createScope();
+await scope.dispose();
+```
+
+Dispose will cleanup all resources resolved in the scope, also mark the scope as `disposed`. Disposed scope will not be able to do anything afteward
