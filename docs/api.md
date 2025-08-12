@@ -85,29 +85,6 @@ const derivedUsingObject = derive(
 
 type Controller = Core.Controller
 //   ^^^^^^^^^^
-
-```
-
-#### using variations
-
-```ts twoslash
-import { provide, derive } from "@pumped-fn/core-next";
-
-const value = provide(() => "string");
-const derived = derive(value, (value) => {
-  /* */
-});
-
-const valueUpdator = derive();
-
-const valuePrinter = derive(value.reactive, (value) => console.log(value));
-
-const derivedUsingObject = derive(
-  { value, otherValue },
-  ({ value, otherValue }) => {
-    /* */
-  }
-);
 ```
 
 ## scope
@@ -121,6 +98,8 @@ import { createScope } from "@pumped-fn/core-next";
 #### createScope
 
 ```ts twoslash
+import { createScope } from "@pumped-fn/core-next";
+// ---cut---
 const scope = createScope();
 ```
 
