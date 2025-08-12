@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/extra",
   "version": "0.5.24",
+  "private": true,
   "description": "Utilities to build full stack application using @pumped-fn/core",
   "keywords": [
     "pumped-fn",
