@@ -1,4 +1,6 @@
 import { defineConfig } from "vitepress";
+import { transformerTwoslash } from "@shikijs/vitepress-twoslash";
+import { createFileSystemTypesCache } from "@shikijs/vitepress-twoslash/cache-fs";
 
 export default defineConfig({
   title: "Pumped Functions",
@@ -45,6 +47,10 @@ export default defineConfig({
       { text: "Getting started", link: "/" },
       // { text: "Advanced", link: "/advanced" },
       { text: "Integration", link: "/integration" },
+      {
+        text: "API",
+        items: [{ text: "creation", link: "/api#creation" }],
+      },
       // { text: "Testing", link: "/testing" },
       // { text: "API", link: "/api" },
       // { text: "LLM", link: "/llm.md" },
@@ -70,6 +76,10 @@ export default defineConfig({
       dark: "github-dark",
     },
     codeTransformers: [
+      transformerTwoslash({
+        typesCache: createFileSystemTypesCache(),
+      }),
+
       // Add twoslash support if needed
     ],
   },

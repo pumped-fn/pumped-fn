@@ -1,5 +1,5 @@
 {
-  "name": "pumped-fn-docs",
+  "name": "docs",
   "version": "1.0.0",
   "description": "VitePress documentation site for pumped-fn library",
   "packageManager": "pnpm@10.12.4",
@@ -12,9 +12,14 @@
   "devDependencies": {
     "@pumped-fn/core-next": "^0.5.47",
     "@types/node": "^20.19.4",
+    "typedoc": "^0.28.10",
+    "typedoc-github-theme": "^0.3.0",
     "typescript": "^5.8.3",
     "vitepress": "^1.0.0",
     "vue": "^3.4.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@shikijs/vitepress-twoslash": "^3.9.2"
+  }
 }

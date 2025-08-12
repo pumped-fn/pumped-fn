@@ -3,18 +3,18 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "lagz0ne/pumped-fn-wp"
+      "repo": "pumped-fn/pumped-fn"
     }
   ],
   "commit": false,
   "fixed": [],
   "linked": [
-    ["@pumped-fn/core-next", "@pumped-fn/react", "@pumped-fn/extra", "@pumped-fn/cli"]
+    ["@pumped-fn/core-next", "@pumped-fn/react"]
   ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["docs", "examples/*"],
+  "ignore": ["docs"],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true
   }

@@ -36,7 +36,7 @@ $ bun add @pumped-fn/core-next
 
 ::: code-group
 
-<<< @/code/1-minute.ts#snippet{ ts:line-numbers} [1 minute]
-<<< @/code/5-minutes.ts#snippet{29,34 ts:line-numbers} [5 minutes]
-<<< @/code/10-minutes.ts#snippet{53,75,55-60 ts:line-numbers} [10 minutes]
+<<< @/code/1-minute.ts#snippet{ts:line-numbers twoslash} [1 minute]
+<<< @/code/5-minutes.ts#snippet{29,34 ts:line-numbers twoslash} [5 minutes]
+<<< @/code/10-minutes.ts#snippet{53,75,55-60 ts:line-numbers twoslash} [10 minutes]
 :::

@@ -1,6 +1,7 @@
 import { provide, derive } from "@pumped-fn/core-next";
 
 export const config = provide(() => ({
+  //         ^^^^^
   server: {
     port: 3000,
     host: "localhost",
@@ -12,10 +13,15 @@ export const config = provide(() => ({
 }));
 
 export const logger = derive(config, (config) => {
+  //                                  ^^^^^^
   /** logger implementation */
+  return (message: string) => {
+    console.log(`[${config.logger.defaultLevel}] ${message}`);
+  };
 });
 
 export const connection = derive({ logger, config }, ({ logger, config }) => {
+  //                                                    ^^^^^^  ^^^^^^
   /** connection implementation */
 });
 
