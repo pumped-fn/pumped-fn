@@ -33,8 +33,6 @@ TypeScript DI/reactive programming library. Function-based architecture, lazy ev
 ```typescript
 provide(factory, ...metas); // No dependencies
 derive(deps, factory, ...metas); // With dependencies
-derive([dep1, dep2, dep3], factory, ...metas); // With dependencies array. Factory will receive [resolved1, resolved2, resolved3]
-derive({ dep1, dep2, dep3 }, factory, ...metas); // With dependencies object. Factory will receive { dep1: resolved1, dep2: resolved2, dep3: resolved 3}
 preset(executor, value); // Override value
 placeholder<T>(); // Throws if resolved
 resolves(...executors); // Batch resolution helper
@@ -253,6 +251,33 @@ test("user registration flow", async () => {
 await Promise.all([test1WithScope(), test2WithScope(), test3WithScope()]); // No interference between tests
 ```
 
+## Real-World Integration
+
+### Framework Integration (Hono.js)
+
+```typescript
+// Shared executors module
+const database = provide(async () => {
+  const db = await connect(process.env.DATABASE_URL);
+  return db;
+});
+
+const authService = derive(database, createAuthService);
+
+// Hono app with DI
+app.use("*", async (c, next) => {
+  c.scope = createScope();
+  await next();
+  await c.scope.dispose();
+});
+
+app.post("/api/login", async (c) => {
+  const auth = await c.scope.resolve(authService);
+  const result = await auth.login(await c.req.json());
+  return c.json(result);
+});
+```
+
 ### State Management Pattern
 
 ```typescript
@@ -419,3 +444,7 @@ await scope.resolve(exec); scope.update(exec, val); // Resolve first
 derive(deps, async () => new Database()) // Async for side effects
 derive(serviceGroup, ([a, b, c]) => ...) // Group related deps
 ```
+
+---
+
+**v2.0 Key**: Executors for DI. Variants inline only. Functions over classes. Graph testing over units. Flows for workflows. Meta for introspection. Middleware for cross-cutting. Resolve before update.

@@ -20,6 +20,15 @@ Scope is a container. Each scope is isolated, and has its own lifecycle, and can
 
 Scope only know about the Executors which `resolve` by it, as such the dependency graph is local to a scope.
 
+### middleware
+
+Middleware provides a powerful event-driven system for intercepting and modifying the executor resolution pipeline. It operates through event hooks that are triggered during resolution, update, and release operations.
+
+The middleware system consists of:
+- **Middleware Interface**: `init` and `dispose` lifecycle hooks
+- **Event Callbacks**: `onChange` for resolve/update events, `onRelease` for cleanup
+- **Value Transformation**: Return `preset()` to override resolved/updated values
+
 ## resolution flow
 
 ### standard resolution
@@ -306,6 +315,129 @@ sequenceDiagram
         Scope->>Cache: store(executor, value)
         Scope-->>Client: return value
     end
+```
+
+## middleware flow
+
+### middleware interception during resolution
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Scope
+    participant Middleware
+    participant Factory
+    participant Cache
+    participant Events
+    
+    Client->>+Scope: resolve(executor)
+    Scope->>Factory: execute(dependencies)
+    Factory-->>Scope: computedValue
+    
+    Note over Scope,Events: Middleware Interception Point
+    
+    Scope->>Events: trigger onChange listeners
+    
+    loop For each onChange listener
+        Events->>+Middleware: onChange("resolve", executor, value, scope)
+        
+        alt Middleware transforms value
+            Middleware-->>-Events: preset(executor, transformedValue)
+            Events->>Scope: updateValue(transformedValue)
+        else No transformation
+            Middleware-->>Events: void
+        end
+    end
+    
+    Scope->>Cache: store(executor, finalValue)
+    Scope-->>-Client: return finalValue
+```
+
+### middleware during update propagation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Scope
+    participant Middleware
+    participant Cache
+    participant ReactiveQueue
+    
+    Client->>+Scope: update(executor, newValue)
+    
+    Note over Scope,Middleware: Pre-update middleware
+    
+    Scope->>Middleware: onChange("update", executor, newValue, scope)
+    
+    alt Middleware transforms value
+        Middleware-->>Scope: preset(executor, transformedValue)
+        Scope->>Scope: use transformedValue
+    else No transformation
+        Middleware-->>Scope: void
+        Scope->>Scope: use newValue
+    end
+    
+    Scope->>Cache: store(executor, finalValue)
+    
+    Scope->>ReactiveQueue: findReactiveDependents(executor)
+    ReactiveQueue-->>Scope: [dependent1, dependent2]
+    
+    loop For each reactive dependent
+        Scope->>Scope: resolve(dependent, force=true)
+        Note over Scope: Middleware also intercepts these
+    end
+    
+    Scope-->>-Client: updateComplete
+```
+
+### middleware lifecycle management
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Scope
+    participant MiddlewareStack
+    participant Middleware1
+    participant Middleware2
+    
+    Note over Client,Middleware2: Registration Phase
+    
+    Client->>+Scope: use(middleware1)
+    Scope->>MiddlewareStack: register(middleware1)
+    Scope->>Middleware1: init(scope)
+    Middleware1->>Scope: setup event listeners
+    Scope-->>Client: cleanup1
+    
+    Client->>Scope: use(middleware2)
+    Scope->>MiddlewareStack: register(middleware2)
+    Scope->>Middleware2: init(scope)
+    Middleware2->>Scope: setup event listeners
+    Scope-->>-Client: cleanup2
+    
+    Note over Client,Middleware2: Active Phase
+    
+    loop During scope lifetime
+        Client->>Scope: resolve/update operations
+        Scope->>MiddlewareStack: trigger events
+        MiddlewareStack->>Middleware1: event callback
+        MiddlewareStack->>Middleware2: event callback
+    end
+    
+    Note over Client,Middleware2: Disposal Phase
+    
+    Client->>+Scope: dispose()
+    
+    Scope->>Middleware1: dispose(scope)
+    Middleware1-->>Scope: cleanup complete
+    
+    Scope->>Middleware2: dispose(scope)
+    Middleware2-->>Scope: cleanup complete
+    
+    Scope->>MiddlewareStack: clear()
+    Scope-->>-Client: disposed
 ```
 
 ### lifecycle

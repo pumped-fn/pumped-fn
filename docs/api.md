@@ -211,3 +211,247 @@ await scope.dispose();
 ```
 
 Dispose will cleanup all resources resolved in the scope, also mark the scope as `disposed`. Disposed scope will not be able to do anything afteward
+
+## middleware
+
+Middleware provides cross-cutting concerns without modifying core logic. It can intercept resolution, updates, and releases.
+
+#### scope.use
+
+Register middleware to intercept scope operations:
+
+```ts twoslash
+import { createScope, middleware } from "@pumped-fn/core-next";
+
+const scope = createScope();
+
+const cleanup = scope.use(middleware({
+  init: (scope) => {
+    // Called when middleware is registered
+  },
+  dispose: async (scope) => {
+    // Called when scope is disposed
+  }
+}));
+```
+
+#### scope.onChange
+
+Intercept resolution and update events:
+
+```ts twoslash
+import { createScope, preset, provide } from "@pumped-fn/core-next";
+
+const scope = createScope();
+const value = provide(() => "original");
+
+scope.onChange((event, executor, value, scope) => {
+  if (event === "resolve") {
+    console.log("Resolved:", value);
+  }
+  if (event === "update") {
+    console.log("Updated:", value);
+  }
+  // Return preset() to transform the value
+  if (value === "transform-me") {
+    return preset(executor, "transformed");
+  }
+});
+```
+
+#### scope.onRelease
+
+Handle executor cleanup:
+
+```ts twoslash
+import { createScope, provide } from "@pumped-fn/core-next";
+
+const scope = createScope();
+const connection = provide(() => ({ id: "db-1" }));
+
+scope.onRelease(async (event, executor, scope) => {
+  // Cleanup when executor is released
+  console.log("Releasing executor");
+});
+```
+
+#### practical middleware examples
+
+```ts twoslash
+import { createScope, middleware, provide, derive, preset } from "@pumped-fn/core-next";
+
+// Analytics middleware
+const analytics = middleware({
+  init: (scope) => {
+    scope.onChange((event, executor, value) => {
+      if (event === "resolve") {
+        // Track resolution metrics
+      }
+    });
+  }
+});
+
+// Value sanitizer
+const sanitizer = middleware({
+  init: (scope) => {
+    scope.onChange((event, executor, value, scope) => {
+      if (typeof value === "string" && value.includes("unsafe")) {
+        return preset(executor, value.replace("unsafe", "safe"));
+      }
+    });
+  }
+});
+
+const scope = createScope();
+scope.use(analytics);
+scope.use(sanitizer);
+```
+
+## meta
+
+Meta provides type-safe decorative information attached to executors. It uses StandardSchema for validation and integrates seamlessly with middleware for runtime inspection.
+
+#### creating meta functions
+
+```ts twoslash
+import { meta, custom } from "@pumped-fn/core-next";
+
+// Create a meta function with a schema
+const name = meta("service-name", custom<string>());
+const port = meta("port", custom<number>());
+const config = meta("config", custom<{ url: string; timeout: number }>());
+```
+
+#### attaching meta to executors
+
+```ts twoslash
+import { provide, derive, meta, custom } from "@pumped-fn/core-next";
+
+const name = meta("name", custom<string>());
+const priority = meta("priority", custom<number>());
+
+// Attach meta during creation
+const database = provide(
+  () => ({ connection: "postgres://..." }),
+  name("database"),
+  priority(1)
+);
+
+// Multiple metas
+const cache = provide(
+  () => new Map(),
+  name("cache"),
+  priority(2)
+);
+```
+
+#### accessing meta values
+
+```ts twoslash
+import { provide, meta, custom } from "@pumped-fn/core-next";
+
+const name = meta("name", custom<string>());
+const service = provide(() => {}, name("auth"));
+
+// Get meta value from executor
+const serviceName = name.get(service); // "auth"
+
+// Find first matching meta
+const maybeName = name.find(service); // "auth" | undefined
+
+// Get all matching metas (executors can have multiple of same type)
+const allNames = name.some(service); // string[]
+```
+
+#### meta with middleware
+
+```ts twoslash
+import { createScope, middleware, provide, meta, custom } from "@pumped-fn/core-next";
+
+const name = meta("name", custom<string>());
+const metrics = meta("metrics", custom<boolean>());
+
+// Middleware that uses meta for conditional logic
+const metricsMiddleware = middleware({
+  init: (scope) => {
+    scope.onChange((event, executor, value) => {
+      // Check if executor has metrics enabled
+      if (metrics.find(executor)) {
+        const serviceName = name.get(executor) ?? "unknown";
+        console.log(`[${serviceName}] ${event}:`, value);
+      }
+    });
+  }
+});
+
+const api = provide(
+  () => ({ endpoint: "/api" }),
+  name("api-service"),
+  metrics(true) // Enable metrics for this executor
+);
+
+const internal = provide(
+  () => ({ data: "internal" }),
+  name("internal-service")
+  // No metrics meta - won't be tracked
+);
+```
+
+#### meta accessor integration
+
+```ts twoslash
+import { createScope, provide, meta, custom } from "@pumped-fn/core-next";
+
+const description = meta("description", custom<string>());
+const service = provide(() => "service", description("Main service"));
+
+const scope = createScope();
+const accessor = scope.accessor(service);
+
+// Accessor includes metas
+const desc = description.find(accessor); // "Main service"
+```
+
+#### practical meta patterns
+
+```ts twoslash
+import { provide, derive, meta, custom, createScope, middleware } from "@pumped-fn/core-next";
+
+// Version tracking
+const version = meta("version", custom<string>());
+
+// Deprecation warnings
+const deprecated = meta("deprecated", custom<{ since: string; alternative?: string }>());
+
+// Service classification
+const tier = meta("tier", custom<"critical" | "standard" | "low">());
+
+// Deprecation middleware
+const deprecationWarning = middleware({
+  init: (scope) => {
+    scope.onChange((event, executor) => {
+      const deprecation = deprecated.find(executor);
+      if (deprecation && event === "resolve") {
+        console.warn(
+          `Deprecated since ${deprecation.since}`,
+          deprecation.alternative ? `Use ${deprecation.alternative} instead` : ""
+        );
+      }
+    });
+  }
+});
+
+// Usage
+const oldApi = provide(
+  () => ({ v1: true }),
+  version("1.0.0"),
+  deprecated({ since: "2.0.0", alternative: "newApi" }),
+  tier("low")
+);
+
+const newApi = provide(
+  () => ({ v2: true }),
+  version("2.0.0"),
+  tier("critical")
+);
+```

@@ -54,13 +54,14 @@ export default withMermaid(
           items: [
             { text: "creation", link: "/api#creation" },
             { text: "scope", link: "/api#scope" },
+            { text: "middleware", link: "/api#middleware" },
+            { text: "meta", link: "/api#meta" },
           ],
         },
         {
           text: "LLM",
           link: "/llm",
         },
-        { text: "Integration", link: "/integration" },
         // { text: "Testing", link: "/testing" },
         // { text: "API", link: "/api" },
         // { text: "LLM", link: "/llm.md" },
