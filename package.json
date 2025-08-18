@@ -23,9 +23,9 @@
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
-    "@changesets/cli": "^2.29.5",
-    "typescript": "^5.8.3",
-    "ultracite": "^5.1.2"
+    "@changesets/cli": "^2.29.6",
+    "typescript": "^5.9.2",
+    "ultracite": "^5.2.4"
   },
   "license": "MIT",
   "pnpm": {
