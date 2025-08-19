@@ -3,7 +3,7 @@ import {
   type Meta,
   type StandardSchemaV1,
   meta,
-  middleware,
+  plugin,
   preset,
 } from "@pumped-fn/core-next";
 
@@ -348,7 +348,7 @@ function createTelemetryProxy<T>(
 
 // Main telemetry API
 export const telemetry = {
-  middleware: (config: Telemetry.Config = {}): Core.Middleware => {
+  middleware: (config: Telemetry.Config = {}): Core.Plugin => {
     const defaultConfig: Required<Telemetry.Config> = {
       enabled: config.enabled ?? true,
       adapter: config.adapter ?? telemetry.console(),
@@ -373,7 +373,7 @@ export const telemetry = {
     };
 
     if (!defaultConfig.enabled) {
-      return middleware({
+      return plugin({
         init: () => {},
         dispose: async () => {},
       });
@@ -382,7 +382,7 @@ export const telemetry = {
     const context = new TelemetryContext(defaultConfig, defaultConfig.adapter);
     let flushInterval: NodeJS.Timeout | undefined;
 
-    return middleware({
+    return plugin({
       init: (scope) => {
         // Set up batching if enabled
         if (defaultConfig.batching.enabled) {
