@@ -212,7 +212,7 @@ export declare namespace Core {
     executor: Executor<unknown>,
     resolved: unknown,
     scope: Scope
-  ) => EventCallbackResult;
+  ) => EventCallbackResult | Promise<EventCallbackResult>;
 
   export type ReleaseCallback = (
     event: "release",

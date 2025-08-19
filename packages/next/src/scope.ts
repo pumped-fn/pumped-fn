@@ -218,7 +218,7 @@ class BaseScope implements Core.Scope {
 
             const events = this.onEvents.change;
             for (const event of events) {
-              const updated = event("resolve", requestor, current, this);
+              const updated = await event("resolve", requestor, current, this);
               if (updated !== undefined && updated.executor === requestor) {
                 current = updated.value;
               }
@@ -342,7 +342,7 @@ class BaseScope implements Core.Scope {
 
     const events = this.onEvents.change;
     for (const event of events) {
-      const updated = event("update", e, value, this);
+      const updated = await event("update", e, value, this);
       if (updated !== undefined && e === updated.executor) {
         value = updated.value as any;
       }
