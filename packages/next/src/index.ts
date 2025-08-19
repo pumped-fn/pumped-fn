@@ -15,3 +15,5 @@ export const name: Meta.MetaFn<string> = meta(
 	"pumped-fn/name",
 	custom<string>(),
 );
+
+export * as plugins from "./plugins"

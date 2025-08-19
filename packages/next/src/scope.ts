@@ -4,15 +4,14 @@ import {
   isStaticExecutor,
   isMainExecutor,
   isExecutor,
+  isPreset,
 } from "./executor";
-import { Core, Meta } from "./types";
+import { Core } from "./types";
 import {
   isGenerator,
   isAsyncGenerator,
   collectFromGenerator,
 } from "./generator-utils";
-import { meta } from "./meta";
-import { custom } from "./ssch";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -42,21 +41,27 @@ class BaseScope implements Core.Scope {
   protected isPod: boolean;
   private isDisposing = false;
 
-  protected middlewares: Core.Middleware[] = [];
+  protected plugins: Core.Plugin[] = [];
+  protected registry: Core.Executor<unknown>[] = [];
 
-  constructor(options: {
-    initialValues: Core.Preset<unknown>[];
-    pod: boolean;
-  }) {
-    this.isPod = options.pod;
-    for (const preset of options.initialValues) {
-      const accessor = this["~makeAccessor"](preset.executor);
-
-      this.cache.set(preset.executor, {
-        accessor,
-        value: { kind: "resolved", value: preset.value },
-      });
+  constructor(options?: ScopeOption) {
+    this.isPod = options?.pod || false;
+    if (options?.registry) {
+      this.registry = [...options.registry]
     }
+
+    if (options?.initialValues) {
+      for (const preset of options.initialValues) {
+        this.set(preset.executor, preset.value);
+      }
+    }
+
+    if (options?.plugins) {
+      for (const plugin of options.plugins) {
+        this.use(plugin);
+      }
+    }
+
   }
 
   protected async "~triggerCleanup"(e: UE): Promise<void> {
@@ -278,6 +283,9 @@ class BaseScope implements Core.Scope {
       update: (updateFn: unknown | ((current: unknown) => unknown)) => {
         return this.update(requestor, updateFn);
       },
+      set: async (value): Promise<void> => {
+        return this.update(requestor, value)
+      },
       subscribe: (cb: (value: unknown) => void) => {
         this["~ensureNotDisposed"]();
         return this.onUpdate(requestor, cb);
@@ -348,6 +356,10 @@ class BaseScope implements Core.Scope {
     await this["~triggerUpdate"](e);
   }
 
+  async set<T>(e: Core.Executor<T>, value: T): Promise<void> {
+    return this.update(e, value)
+  }
+
   async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
     this["~ensureNotDisposed"]();
 
@@ -384,7 +396,7 @@ class BaseScope implements Core.Scope {
       await this.disposePod(pod);
     }
 
-    const disposeEvents = this.middlewares.map(
+    const disposeEvents = this.plugins.map(
       (m) => m.dispose?.(this) ?? Promise.resolve()
     );
     await Promise.all(disposeEvents);
@@ -454,19 +466,18 @@ class BaseScope implements Core.Scope {
     };
   }
 
-  use(middleware: Core.Middleware): Core.Cleanup {
+  use(plugin: Core.Plugin): Core.Cleanup {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    this.middlewares.push(middleware);
-
-    middleware.init?.(this);
+    this.plugins.push(plugin);
+    plugin.init?.(this, { registry: this.registry });
 
     return () => {
       this["~ensureNotDisposed"]();
-      this.middlewares = this.middlewares.filter((m) => m !== middleware);
+      this.plugins = this.plugins.filter((m) => m !== plugin);
     };
   }
 
@@ -478,7 +489,7 @@ class BaseScope implements Core.Scope {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    const pod = new Pod(this, ...preset);
+    const pod = new Pod(this, { initialValues: preset });
     this.pods.add(pod);
     return pod;
   }
@@ -494,25 +505,47 @@ class BaseScope implements Core.Scope {
   }
 }
 
-export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope {
+export type ScopeOption = {
+  pod?: boolean
+  initialValues?: Core.Preset<unknown>[]
+  registry?: Core.Executor<unknown>[]
+  plugins?: Core.Plugin[]
+}
+
+export function createScope(): Core.Scope
+export function createScope(opt: ScopeOption): Core.Scope
+
+/**
+ * @deprecated
+ * 
+ * Use the version with ScopeOption instead
+ * @param presets 
+ */
+export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope;
+
+export function createScope(...opt: [ScopeOption | undefined] | Core.Preset<unknown>[]): Core.Scope {
+  if (opt.at(0) === undefined) {
+    return new BaseScope()
+  }
+
+  if (opt.length === 1 && !isPreset(opt[0])) {
+    return new BaseScope(opt[0]);
+  }
+
   return new BaseScope({
-    pod: false,
-    initialValues: presets,
+    initialValues: opt as Core.Preset<unknown>[],
   });
 }
 
-export function middleware(m: Core.Middleware): Core.Middleware {
+export function plugin(m: Core.Plugin): Core.Plugin {
   return m;
 }
 
 class Pod extends BaseScope implements Core.Pod {
   private parentScope: BaseScope;
 
-  constructor(scope: BaseScope, ...presets: Core.Preset<unknown>[]) {
-    super({
-      pod: true,
-      initialValues: presets,
-    });
+  constructor(scope: BaseScope, option?: ScopeOption) {
+    super(option);
     this.parentScope = scope;
   }
 

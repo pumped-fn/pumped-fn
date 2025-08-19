@@ -1,5 +1,5 @@
 import { describe, it, expect, test } from "vitest";
-import { createScope, middleware, preset, provide } from "../src";
+import { createScope, plugin, preset, provide } from "../src";
 
 describe("lifecycle test", async () => {
   test("explains how middleware works", async () => {
@@ -13,7 +13,7 @@ describe("lifecycle test", async () => {
     const anotherValue = provide(() => "Hello, World!");
 
     const analysisCount = () => {
-      return middleware({
+      return plugin({
         init: (scope) => {
           scope.onChange((event, executor, value, scope) => {
             if (event === "resolve") {

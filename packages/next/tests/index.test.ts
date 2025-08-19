@@ -3,6 +3,7 @@ import { provide, derive, preset } from "../src/executor";
 import { createScope } from "../src/scope";
 import { meta } from "../src/meta";
 import { custom } from "../src/ssch";
+import { Core } from "../src";
 
 const name = meta("name", custom<string>());
 
@@ -227,3 +228,37 @@ test("same promise with different resolves", async () => {
   expect(anotherAccessor).toBe(accessor);
   expect(anotherAccessor.resolve()).toBe(accessor.resolve());
 });
+
+test("update without resolving", async () => {
+  const counter = provide(() => 0)
+  const scope = createScope()
+
+  await scope.set(counter, 2)
+})
+
+test("test scope option", async () => {
+  const eagerMeta = meta('eagerLoad', custom<boolean>())
+  const eagerLoadPlugin: Core.Plugin = {
+    init: async (scope, { registry }) => {
+      for (const executor of registry) {
+        if (eagerMeta.find(executor)) {
+          await scope.resolve(executor);
+        }
+      }
+    }
+  }
+
+  const counter = provide(() => 0)
+  const fn = vi.fn((count: number) => count + 1)
+  const plus = derive(counter, (count) => fn(count), eagerMeta(true))
+
+  createScope({
+    initialValues: [preset(counter, 2)],
+    plugins: [eagerLoadPlugin],
+    registry: [plus]
+  })
+
+  setTimeout(() => {
+    expect(fn).toHaveBeenCalledWith(2)
+  }, 0)
+})

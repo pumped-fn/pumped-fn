@@ -83,6 +83,11 @@ export declare namespace Meta {
     find: (source: MetaContainer | Meta[] | undefined) => V | undefined;
     get: (source: MetaContainer | Meta[] | undefined) => V;
   }
+
+  export interface DefaultMetaFn<V> extends MetaFn<V> {
+    (value?: V): Meta<V>
+    defaultValue: V
+  }
 }
 
 export declare namespace Core {
@@ -177,6 +182,7 @@ export declare namespace Core {
     resolve(force?: boolean): Promise<T>;
     release(soft?: boolean): Promise<void>;
     update(updateFn: T | ((current: T) => T)): Promise<void>;
+    set(value: T): Promise<void>;
     subscribe(callback: (value: T) => void): Cleanup;
   }
 
@@ -214,8 +220,8 @@ export declare namespace Core {
     scope: Scope
   ) => void | Promise<void>;
 
-  export type Middleware = {
-    init?: (scope: Scope) => void | Promise<void>;
+  export type Plugin = {
+    init?: (scope: Scope, initialOpt: { registry: Core.Executor<unknown>[]}) => void | Promise<void>;
     dispose?: (scope: Scope) => void | Promise<void>;
   };
 
@@ -232,6 +238,7 @@ export declare namespace Core {
       executor: Executor<T>,
       updateFn: T | ((current: T) => T)
     ): Promise<void>;
+    set<T>(executor: Executor<T>, value: T): Promise<void>;
 
     release(executor: Executor<any>, soft?: boolean): Promise<void>;
 
@@ -245,7 +252,7 @@ export declare namespace Core {
     onChange(cb: ChangeCallback): Cleanup;
     onRelease(cb: ReleaseCallback): Cleanup;
 
-    use(middleware: Middleware): Cleanup;
+    use(middleware: Plugin): Cleanup;
 
     pod(...presets: Preset<unknown>[]): Pod;
     disposePod(scope: Pod): Promise<void>;

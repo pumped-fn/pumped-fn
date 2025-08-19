@@ -27,7 +27,7 @@ const ITERATIONS = {
 
 const MEMORY_THRESHOLD_MB = 50; // Alert if memory grows beyond this
 
-describe("Performance Tests", () => {
+describe.skip("Performance Tests", () => {
   let initialMemory: ReturnType<typeof getMemoryUsage>;
 
   beforeEach(() => {

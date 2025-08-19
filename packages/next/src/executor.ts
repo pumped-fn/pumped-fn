@@ -101,6 +101,15 @@ export function isExecutor<T>(input: unknown): input is Core.BaseExecutor<T> {
   return typeof input === "object" && input !== null && executorSymbol in input;
 }
 
+export function isPreset(input: unknown): input is Core.Preset<unknown> {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    executorSymbol in input &&
+    (input as Core.Preset<unknown>)[executorSymbol] === "preset"
+  );
+}
+
 export function provide<T>(
   factory: Core.NoDependencyFn<T>,
   ...metas: Meta.Meta[]
