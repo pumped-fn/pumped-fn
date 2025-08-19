@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "VitePress documentation site for pumped-fn library",
   "packageManager": "pnpm@10.12.4",
+  "private": true,
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
