@@ -17,16 +17,16 @@
     "typedoc-github-theme": "^0.3.0",
     "typescript": "^5.9.2",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.18"
+    "vue": "^3.5.19"
   },
   "type": "module",
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.1",
-    "@shikijs/vitepress-twoslash": "^3.9.2",
+    "@shikijs/vitepress-twoslash": "^3.11.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
     "dayjs": "^1.11.13",
-    "mermaid": "^11.9.0",
+    "mermaid": "^11.10.0",
     "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
