@@ -1,7 +1,7 @@
 import { Core, executorSymbol, Meta } from "./types";
 import type { Escapable } from "./helpers";
 
-function createExecutor<T>(
+export function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
   dependencies:
     | undefined
@@ -117,31 +117,9 @@ export function provide<T>(
   return createExecutor(factory, undefined, metas);
 }
 
-export function derive<T, D extends Core.BaseExecutor<unknown>>(
-  dependencies: D,
-  factory: Core.DependentFn<T, Core.InferOutput<D>>,
-  ...metas: Meta.Meta[]
-): Core.Executor<T>;
-
-export function derive<
-  T,
-  D extends
-    | ReadonlyArray<Core.BaseExecutor<unknown>>
-    | Record<string, Core.BaseExecutor<unknown>>
->(
-  dependencies: { [K in keyof D]: D[K] },
-  factory: Core.DependentFn<T, { [K in keyof D]: Core.InferOutput<D[K]> }>,
-  ...metas: Meta.Meta[]
-): Core.Executor<T>;
-
-export function derive<T, D>(
-  pdependencies:
-    | Core.BaseExecutor<D>
-    | Array<Core.BaseExecutor<D>>
-    | Record<string, Core.BaseExecutor<unknown>>,
-  pfactory:
-    | Core.DependentFn<T, Core.InferOutput<D>>
-    | Core.DependentFn<T, { [K in keyof D]: Core.InferOutput<D[K]> }>,
+export function derive<T, D extends Core.DependencyLike>(
+  pdependencies: D,
+  pfactory: Core.DependentFn<T, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): Core.Executor<T> {
   return createExecutor(pfactory as any, pdependencies, metas);

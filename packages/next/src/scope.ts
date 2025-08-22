@@ -298,6 +298,12 @@ class BaseScope implements Core.Scope {
     return this["~makeAccessor"](executor) as Core.Accessor<T>;
   }
 
+  entries(): Array<[UE, Core.Accessor<unknown>]> {
+    return Array.from(this.cache.entries()).map(([executor, entry]) => {
+      return [executor, entry.accessor];
+    });
+  }
+
   async resolve<T>(
     executor: Core.Executor<T>,
     force: boolean = false

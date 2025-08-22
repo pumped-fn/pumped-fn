@@ -35,3 +35,11 @@ test("basic", async () => {
   expect(findValue(e, name)).toBe("test");
   expect(findValues(e, name)).toEqual(["test"]);
 });
+
+test("meta should work with void as well", async () => {
+  const voidMeta = meta(Symbol(), custom<void>())
+  const e = provide(() => null, voidMeta())
+
+  expect(voidMeta.find(e), 'can void be void?').not.toBeUndefined
+
+})

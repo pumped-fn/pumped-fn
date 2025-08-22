@@ -1,4 +1,4 @@
-import { flow, provide, createScope, custom, preset, FlowError } from "../src";
+import { flow, provide, createScope, custom, preset, FlowError, FlowErrorCode } from "../src";
 import { vi, test, describe, expect } from "vitest";
 
 describe("flow test", () => {
@@ -150,7 +150,7 @@ describe("flow test", () => {
 
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
-      expect(result.error).toBeInstanceOf(flow.FlowError);
+      expect(result.error).toBeInstanceOf(FlowError);
       expect((result.error as FlowError).type).toBe("execution");
     }
   });
@@ -239,56 +239,73 @@ describe("flow test", () => {
     }
   });
 
-  test("context sharing between flows", async () => {
-    const contextFlow = flow.provide(
+  test("context nesting and isolation between flows", async () => {
+    // Define child flow first
+    const childFlow = flow.provide(
       {
-        name: "contextFlow",
-        input: custom<{ key: string; value: string }>(),
-        output: custom<{ stored: boolean }>(),
+        name: "childFlow",
+        input: custom<{ childValue: string }>(),
+        output: custom<{ result: string; inheritedValue?: string; ownValue: string }>(),
       },
       async (input, controller) => {
-        controller.context.data[input.key] = input.value;
-        return { stored: true };
+        // Child should inherit parent's data via Map copy
+        const inheritedValue = controller.context.data.get('parentValue'); // Read from parent
+        const inheritedLevel = controller.context.data.get('level');        // Read from parent
+        
+        // Child sets its own data (overrides parent if same key)
+        controller.context.data.set('childValue', input.childValue);
+        controller.context.data.set('level', 'child');  // Overrides parent's level
+        
+        return { 
+          result: `child:${input.childValue}, inherited:${inheritedValue}, parentLevel:${inheritedLevel}`,
+          inheritedValue,
+          ownValue: controller.context.data.get('level')
+        };
       }
     );
 
-    const readContextFlow = flow.provide(
+    // Define parent flow with child as dependency
+    const parentFlow = flow.derive(
       {
-        name: "readContextFlow",
-        input: custom<{ key: string }>(),
-        output: custom<{ value: string | undefined }>(),
+        name: "parentFlow",
+        dependencies: { childFlow },
+        input: custom<{ value: string }>(),
+        output: custom<{ parentData: string; childData: any; parentLevelAfter: string }>(),
       },
-      async (input, controller) => {
-        return { value: controller.context.data[input.key] };
+      async ({ childFlow }, input, controller) => {
+        // Set data in parent context
+        controller.context.data.set('parentValue', input.value);
+        controller.context.data.set('level', 'parent');
+        
+        // Execute child flow - it's already resolved
+        const childResult = await controller.execute(childFlow, { childValue: "nested" });
+        
+        // Parent context should not be polluted by child's modifications
+        expect(controller.context.data.get('childValue')).toBeUndefined();
+        expect(controller.context.data.get('level')).toBe("parent"); // Not affected by child's override
+        
+        return {
+          parentData: controller.context.data.get('parentValue'),
+          childData: childResult,
+          parentLevelAfter: controller.context.data.get('level')
+        };
       }
     );
 
-    const orchestratorFlow = flow.derive(
-      {
-        name: "orchestratorFlow",
-        dependencies: { contextFlow, readContextFlow },
-        input: custom<{ data: string }>(),
-        output: custom<{ retrieved: string | undefined }>(),
-      },
-      async ({ contextFlow, readContextFlow }, input, controller) => {
-        await controller.execute(contextFlow, {
-          key: "myData",
-          value: input.data,
-        });
-        const result = await controller.execute(readContextFlow, {
-          key: "myData",
-        });
-        return { retrieved: result.value };
-      }
-    );
-
-    const { result } = await flow.execute(orchestratorFlow, {
-      data: "test-value",
-    });
-
+    const { result } = await flow.execute(parentFlow, { value: "root" });
+    
+    if (result.kind === "error") {
+      console.error("Test failed with error:", result.error);
+    }
+    
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
-      expect(result.value.retrieved).toBe("test-value");
+      expect(result.value.parentData).toBe("root");
+      expect(result.value.childData.result).toBe("child:nested, inherited:root, parentLevel:parent");
+      expect(result.value.childData.inheritedValue).toBe("root");
+      expect(result.value.childData.ownValue).toBe("child");
+      expect(result.value.parentLevelAfter).toBe("parent");
     }
   });
+
 });

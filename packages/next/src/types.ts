@@ -101,7 +101,7 @@ export declare namespace Core {
   export type NoDependencyFn<T> = (scope: Controller) => Output<T>;
   export type DependentFn<T, D> = (
     dependencies: D,
-    scope: Controller
+    scope: Controller,
   ) => Output<T>;
 
   export type NoDependencyGeneratorFn<Y, T> = (
@@ -201,6 +201,8 @@ export declare namespace Core {
     ? Accessor<Awaited<U>>
     : T extends AdaptedExecutor<infer A, infer U>
     ? (...args: A) => Promise<Awaited<U>>
+    : T extends Array<Core.BaseExecutor<unknown>> | Record<string, Core.BaseExecutor<unknown>>
+    ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
 
   export type Event = "resolve" | "update" | "release";
@@ -225,11 +227,14 @@ export declare namespace Core {
     dispose?: (scope: Scope) => void | Promise<void>;
   };
 
+  export type DependencyLike = Core.BaseExecutor<unknown> | Core.BaseExecutor<unknown>[] | Record<string, Core.BaseExecutor<unknown>>;
+
   export interface Pod
     extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> { }
 
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
+    entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
 
     resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promise<Accessor<T>>;
@@ -268,7 +273,7 @@ export namespace Flow {
     scope?: Core.Scope
     name?: string
     description?: string
-    plugins?: ExecutionPlugin[]
+    plugins?: FlowPlugin[]
     presets?: Core.Preset<unknown>[]
   }
 
@@ -296,7 +301,13 @@ export namespace Flow {
     context: Controller & { context: ExecutionContext }
   ) => Output | Promise<Output>
 
-  export type FlowPlugin = {}
+  export type FlowPlugin = {
+    name: string;
+    wrap<T>(
+      context: ExecutionContext,
+      execute: () => Promise<T>
+    ): Promise<T>;
+  }
 
   export type Flow<Input, Output> = {
     execution: NoDependencyFlowFn<Input, Output>;
@@ -316,30 +327,12 @@ export namespace Flow {
 
   export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> & Config & Schema<Input, Output>
 
-  export type Metrics = {
-    flowName?: string;
-    startTime: number;
-    endTime?: number;
-    duration?: number;
-    status: "pending" | "success" | "error" | "timeout" | "cancelled";
-    error?: unknown;
-    attempts?: number;
-    retryDelays?: number[];
-    inputSize?: number;
-    outputSize?: number;
-    timeout?: number;
-  };
-
-  export type ExecutionStats = {
-    id: string;
-    flowName?: string;
-    parentId?: string;
-    metrics: Metrics;
-    children: ExecutionStats[];
-  };
-
-  export type ExecutionContext = {
-    data: Record<string, any>;
+  export type ExecutionContext<Input = any, Output = any> = {
+    data: Map<unknown, unknown>;
+    parent?: ExecutionContext;
+    scope: Core.Scope;
+    plugins: FlowPlugin[];
+    flow: Flow<Input, Output>;  // The flow being executed
   };
 
   export type Success<T> = { kind: "success"; value: T };
@@ -351,4 +344,9 @@ export namespace Flow {
     context: ExecutionContext;
     result: Result<Output>;
   };
+}
+
+export namespace Multi {
+  export type Key = unknown
+  export type MultiExecutor<T, K> = Core.Executor<(k: K) => Promise<T>>
 }
