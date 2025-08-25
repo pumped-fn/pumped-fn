@@ -6,7 +6,7 @@ export function createExecutor<T>(
   dependencies:
     | undefined
     | Core.UExecutor
-    | Array<Core.UExecutor>
+    | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>,
   metas: Meta.Meta[] | undefined
 ): Core.Executor<T> {
@@ -118,11 +118,11 @@ export function provide<T>(
 }
 
 export function derive<T, D extends Core.DependencyLike>(
-  pdependencies: D,
+  pdependencies: { [K in keyof D]: D[K] },
   pfactory: Core.DependentFn<T, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): Core.Executor<T> {
-  return createExecutor(pfactory as any, pdependencies, metas);
+  return createExecutor(pfactory as any, pdependencies as any, metas);
 }
 
 export function preset<T>(
@@ -138,7 +138,9 @@ export function preset<T>(
   };
 }
 
-export function placeholder<V>(...metas: Meta.Meta<unknown>[]): Core.Executor<V> {
+export function placeholder<V>(
+  ...metas: Meta.Meta<unknown>[]
+): Core.Executor<V> {
   return provide<V>(() => {
     throw new Error("Placeholder executor cannot be resolved");
   }, ...metas);

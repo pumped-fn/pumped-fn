@@ -1,30 +1,31 @@
 /** facilities to add multiple instances (key set) */
-import { createExecutor } from "./executor"
+import { createExecutor } from "./executor";
 import { meta } from "./meta";
 import { custom, validate } from "./ssch";
-import { Core, Meta } from "./types"
+import { Core, Meta } from "./types";
 import { type StandardSchemaV1 } from "./types";
 
-type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> & ((key: K) => Core.Executor<T>) & {
-  release: (scope: Core.Scope) => Promise<void>
-  id: Meta.MetaFn<unknown>
-}
+type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> &
+  ((key: K) => Core.Executor<T>) & {
+    release: (scope: Core.Scope) => Promise<void>;
+    id: Meta.MetaFn<unknown>;
+  };
 
 export type DependentFn<T, K, D> = (
   dependencies: D,
   key: K,
-  scope: Core.Controller,
+  scope: Core.Controller
 ) => Core.Output<T>;
 
 type Option<K> = {
-  keySchema: StandardSchemaV1<K>,
+  keySchema: StandardSchemaV1<K>;
   /** Key transform will be used to store and retrieve */
-  keyTransform?: (key: K) => unknown
-}
+  keyTransform?: (key: K) => unknown;
+};
 
 type DeriveOption<K, D extends Core.DependencyLike> = Option<K> & {
-  dependencies: D
-}
+  dependencies: D;
+};
 
 function createMultiExecutor<T, K>(
   option: Option<K>,
@@ -35,7 +36,9 @@ function createMultiExecutor<T, K>(
 ): MultiExecutor<T, K> {
   const processKey = (key: K) => {
     const validatedKey = validate(option.keySchema, key);
-    const transformedKey = option.keyTransform ? option.keyTransform(validatedKey) : validatedKey;
+    const transformedKey = option.keyTransform
+      ? option.keyTransform(validatedKey)
+      : validatedKey;
     return { validatedKey, transformedKey };
   };
 
@@ -54,9 +57,12 @@ function createMultiExecutor<T, K>(
         if (!executor) {
           executor = newProvider(key);
         }
-        return ctl.scope.accessor(executor)
+        return ctl.scope.accessor(executor);
       };
-    }, undefined, providerMetas);
+    },
+    undefined,
+    providerMetas
+  );
 
   const multiExecutor: MultiExecutor<T, K> = ((key: K) => {
     const { transformedKey } = processKey(key);
@@ -65,14 +71,14 @@ function createMultiExecutor<T, K>(
 
   Object.assign(multiExecutor, provider);
   multiExecutor.release = async (scope: Core.Scope) => {
-    const entries = scope.entries()
+    const entries = scope.entries();
     for (const [executor] of entries) {
       const check = poolId.some ? poolId.some(executor) : poolId.find(executor);
       if (check && (Array.isArray(check) ? check.length > 0 : check)) {
         await scope.release(executor);
       }
     }
-  }
+  };
   multiExecutor.id = poolId as any;
 
   return multiExecutor;
@@ -83,7 +89,7 @@ export function provide<T, K>(
   valueFn: (key: K, controller: Core.Controller) => T | Promise<T>,
   ...metas: Meta.Meta[]
 ): MultiExecutor<T, K> {
-  const poolId = meta(Symbol(), custom<undefined>())
+  const poolId = meta(Symbol(), custom<undefined>());
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
@@ -95,15 +101,18 @@ export function provide<T, K>(
     );
   };
 
-  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [poolId(undefined), ...metas]);
+  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [
+    poolId(undefined),
+    ...metas,
+  ]);
 }
 
 export function derive<T, K, D extends Core.DependencyLike>(
-  option: DeriveOption<K, D>,
+  option: DeriveOption<K, Core.Destructed<D>>,
   valueFn: DependentFn<T, K, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): MultiExecutor<T, K> {
-  const poolId = meta(Symbol(), custom<void>())
+  const poolId = meta(Symbol(), custom<void>());
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {

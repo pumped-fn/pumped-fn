@@ -85,8 +85,8 @@ export declare namespace Meta {
   }
 
   export interface DefaultMetaFn<V> extends MetaFn<V> {
-    (value?: V): Meta<V>
-    defaultValue: V
+    (value?: V): Meta<V>;
+    defaultValue: V;
   }
 }
 
@@ -101,7 +101,7 @@ export declare namespace Core {
   export type NoDependencyFn<T> = (scope: Controller) => Output<T>;
   export type DependentFn<T, D> = (
     dependencies: D,
-    scope: Controller,
+    scope: Controller
   ) => Output<T>;
 
   export type NoDependencyGeneratorFn<Y, T> = (
@@ -128,10 +128,10 @@ export declare namespace Core {
     [executorSymbol]: Kind;
     factory: NoDependencyFn<T> | DependentFn<T, unknown> | undefined;
     dependencies:
-    | undefined
-    | UExecutor
-    | Array<UExecutor>
-    | Record<string, UExecutor>;
+      | undefined
+      | UExecutor
+      | Array<UExecutor>
+      | Record<string, UExecutor>;
   }
 
   export interface Executor<T> extends BaseExecutor<T> {
@@ -201,9 +201,14 @@ export declare namespace Core {
     ? Accessor<Awaited<U>>
     : T extends AdaptedExecutor<infer A, infer U>
     ? (...args: A) => Promise<Awaited<U>>
-    : T extends Array<Core.BaseExecutor<unknown>> | Record<string, Core.BaseExecutor<unknown>>
+    : T extends
+        | ReadonlyArray<Core.BaseExecutor<unknown>>
+        | Record<string, Core.BaseExecutor<unknown>>
     ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
+
+  type K = InferOutput<[Core.Executor<string>, Core.Executor<number>]>;
+  //     ^?
 
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;
@@ -223,14 +228,29 @@ export declare namespace Core {
   ) => void | Promise<void>;
 
   export type Plugin = {
-    init?: (scope: Scope, initialOpt: { registry: Core.Executor<unknown>[]}) => void | Promise<void>;
+    init?: (
+      scope: Scope,
+      initialOpt: { registry: Core.Executor<unknown>[] }
+    ) => void | Promise<void>;
     dispose?: (scope: Scope) => void | Promise<void>;
   };
 
-  export type DependencyLike = Core.BaseExecutor<unknown> | Core.BaseExecutor<unknown>[] | Record<string, Core.BaseExecutor<unknown>>;
+  export type SingleDependencyLike = Core.BaseExecutor<unknown>;
+
+  export type MultiDependencyLike =
+    | ReadonlyArray<Core.BaseExecutor<unknown>>
+    | Record<string, Core.BaseExecutor<unknown>>;
+
+  export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
+  export type Destructed<T extends DependencyLike> =
+    T extends SingleDependencyLike
+      ? T
+      : {
+          [K in keyof T]: T[K];
+        };
 
   export interface Pod
-    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> { }
+    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> {}
 
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
@@ -265,30 +285,29 @@ export declare namespace Core {
 }
 
 export namespace Flow {
+  export type Context = {};
 
-  export type Context = {}
-
-  export type ExecutionPlugin = {}
+  export type ExecutionPlugin = {};
   export type ExecuteOpt = {
-    scope?: Core.Scope
-    name?: string
-    description?: string
-    plugins?: FlowPlugin[]
-    presets?: Core.Preset<unknown>[]
-  }
+    scope?: Core.Scope;
+    name?: string;
+    description?: string;
+    plugins?: FlowPlugin[];
+    presets?: Core.Preset<unknown>[];
+  };
 
   export type Controller = {
     execute: <Input, Output>(
       input: Flow<Input, Output>,
       param: Input,
       opt?: ExecuteOpt
-    ) => Promise<Output>
+    ) => Promise<Output>;
     safeExecute: <Input, Output>(
       input: Flow<Input, Output>,
       param: Input,
       opt?: ExecuteOpt
     ) => Promise<Result<Output>>;
-  }
+  };
 
   export type NoDependencyFlowFn<Input, Output> = (
     input: Input,
@@ -299,40 +318,40 @@ export namespace Flow {
     dependency: D,
     input: Input,
     context: Controller & { context: ExecutionContext }
-  ) => Output | Promise<Output>
+  ) => Output | Promise<Output>;
 
   export type FlowPlugin = {
     name: string;
-    wrap<T>(
-      context: ExecutionContext,
-      execute: () => Promise<T>
-    ): Promise<T>;
-  }
+    wrap<T>(context: ExecutionContext, execute: () => Promise<T>): Promise<T>;
+  };
 
   export type Flow<Input, Output> = {
     execution: NoDependencyFlowFn<Input, Output>;
-  } & Config & Schema<Input, Output>
+  } & Config &
+    Schema<Input, Output>;
 
   export type Schema<Input, Output> = {
     input: StandardSchemaV1<Input>;
     output: StandardSchemaV1<Output>;
-  }
+  };
 
   export type Config = {
-    name?: string
-    description?: string
-    plugins?: FlowPlugin[]
-    metas?: Meta.Meta[]
-  }
+    name?: string;
+    description?: string;
+    plugins?: FlowPlugin[];
+    metas?: Meta.Meta[];
+  };
 
-  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> & Config & Schema<Input, Output>
+  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> &
+    Config &
+    Schema<Input, Output>;
 
   export type ExecutionContext<Input = any, Output = any> = {
     data: Map<unknown, unknown>;
     parent?: ExecutionContext;
     scope: Core.Scope;
     plugins: FlowPlugin[];
-    flow: Flow<Input, Output>;  // The flow being executed
+    flow: Flow<Input, Output>; // The flow being executed
   };
 
   export type Success<T> = { kind: "success"; value: T };
@@ -347,6 +366,6 @@ export namespace Flow {
 }
 
 export namespace Multi {
-  export type Key = unknown
-  export type MultiExecutor<T, K> = Core.Executor<(k: K) => Promise<T>>
+  export type Key = unknown;
+  export type MultiExecutor<T, K> = Core.Executor<(k: K) => Promise<T>>;
 }
