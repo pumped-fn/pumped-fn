@@ -119,6 +119,7 @@ export declare namespace Core {
   export type Controller = {
     cleanup: (cleanup: Cleanup) => void;
     release: () => Promise<void>;
+    reload: () => Promise<void>;
     scope: Scope;
   };
 

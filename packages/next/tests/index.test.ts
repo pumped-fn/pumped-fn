@@ -230,14 +230,14 @@ test("same promise with different resolves", async () => {
 });
 
 test("update without resolving", async () => {
-  const counter = provide(() => 0)
-  const scope = createScope()
+  const counter = provide(() => 0);
+  const scope = createScope();
 
-  await scope.set(counter, 2)
-})
+  await scope.set(counter, 2);
+});
 
 test("test scope option", async () => {
-  const eagerMeta = meta('eagerLoad', custom<boolean>())
+  const eagerMeta = meta("eagerLoad", custom<boolean>());
   const eagerLoadPlugin: Core.Plugin = {
     init: async (scope, { registry }) => {
       for (const executor of registry) {
@@ -245,20 +245,46 @@ test("test scope option", async () => {
           await scope.resolve(executor);
         }
       }
-    }
-  }
+    },
+  };
 
-  const counter = provide(() => 0)
-  const fn = vi.fn((count: number) => count + 1)
-  const plus = derive(counter, (count) => fn(count), eagerMeta(true))
+  const counter = provide(() => 0);
+  const fn = vi.fn((count: number) => count + 1);
+  const plus = derive(counter, (count) => fn(count), eagerMeta(true));
 
   createScope({
     initialValues: [preset(counter, 2)],
     plugins: [eagerLoadPlugin],
-    registry: [plus]
-  })
+    registry: [plus],
+  });
 
   setTimeout(() => {
-    expect(fn).toHaveBeenCalledWith(2)
-  }, 0)
-})
+    expect(fn).toHaveBeenCalledWith(2);
+  }, 0);
+});
+
+test("provider can control itself", async () => {
+  const value = provide(() => 0);
+  const fn = vi.fn();
+  const derivedValue = derive(value, (value, ctl) => {
+    fn();
+    const timeout = setTimeout(() => {
+      ctl.reload();
+    }, 100);
+
+    ctl.cleanup(() => {
+      clearTimeout(timeout);
+    });
+
+    return value + 1;
+  });
+
+  const scope = createScope();
+
+  let firstValue = await scope.resolve(derivedValue);
+  expect(firstValue).toBe(1);
+  expect(fn).toBeCalledTimes(1);
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(fn).toBeCalledTimes(2);
+});

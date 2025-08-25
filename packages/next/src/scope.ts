@@ -47,7 +47,7 @@ class BaseScope implements Core.Scope {
   constructor(options?: ScopeOption) {
     this.isPod = options?.pod || false;
     if (options?.registry) {
-      this.registry = [...options.registry]
+      this.registry = [...options.registry];
     }
 
     if (options?.initialValues) {
@@ -61,7 +61,6 @@ class BaseScope implements Core.Scope {
         this.use(plugin);
       }
     }
-
   }
 
   protected async "~triggerCleanup"(e: UE): Promise<void> {
@@ -185,6 +184,9 @@ class BaseScope implements Core.Scope {
         currentSet.add(cleanup);
       },
       release: async () => this.release(requestor),
+      reload: async () => {
+        await this.resolve(requestor, true);
+      },
       scope: this,
     };
 
@@ -284,7 +286,7 @@ class BaseScope implements Core.Scope {
         return this.update(requestor, updateFn);
       },
       set: async (value): Promise<void> => {
-        return this.update(requestor, value)
+        return this.update(requestor, value);
       },
       subscribe: (cb: (value: unknown) => void) => {
         this["~ensureNotDisposed"]();
@@ -363,7 +365,7 @@ class BaseScope implements Core.Scope {
   }
 
   async set<T>(e: Core.Executor<T>, value: T): Promise<void> {
-    return this.update(e, value)
+    return this.update(e, value);
   }
 
   async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
@@ -512,26 +514,28 @@ class BaseScope implements Core.Scope {
 }
 
 export type ScopeOption = {
-  pod?: boolean
-  initialValues?: Core.Preset<unknown>[]
-  registry?: Core.Executor<unknown>[]
-  plugins?: Core.Plugin[]
-}
+  pod?: boolean;
+  initialValues?: Core.Preset<unknown>[];
+  registry?: Core.Executor<unknown>[];
+  plugins?: Core.Plugin[];
+};
 
-export function createScope(): Core.Scope
-export function createScope(opt: ScopeOption): Core.Scope
+export function createScope(): Core.Scope;
+export function createScope(opt: ScopeOption): Core.Scope;
 
 /**
  * @deprecated
- * 
+ *
  * Use the version with ScopeOption instead
- * @param presets 
+ * @param presets
  */
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope;
 
-export function createScope(...opt: [ScopeOption | undefined] | Core.Preset<unknown>[]): Core.Scope {
+export function createScope(
+  ...opt: [ScopeOption | undefined] | Core.Preset<unknown>[]
+): Core.Scope {
   if (opt.at(0) === undefined) {
-    return new BaseScope()
+    return new BaseScope();
   }
 
   if (opt.length === 1 && !isPreset(opt[0])) {
