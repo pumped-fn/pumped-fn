@@ -1,4 +1,12 @@
-import { flow, provide, createScope, custom, preset, FlowError, FlowErrorCode } from "../src";
+import {
+  flow,
+  provide,
+  createScope,
+  custom,
+  preset,
+  FlowError,
+  FlowErrorCode,
+} from "../src";
 import { vi, test, describe, expect } from "vitest";
 
 describe("flow test", () => {
@@ -245,21 +253,27 @@ describe("flow test", () => {
       {
         name: "childFlow",
         input: custom<{ childValue: string }>(),
-        output: custom<{ result: string; inheritedValue?: string; ownValue: string }>(),
+        output: custom<{
+          result: string;
+          inheritedValue?: string;
+          ownValue: string;
+        }>(),
       },
       async (input, controller) => {
         // Child should inherit parent's data via Map copy
-        const inheritedValue = controller.context.data.get('parentValue'); // Read from parent
-        const inheritedLevel = controller.context.data.get('level');        // Read from parent
-        
+        const inheritedValue = controller.context.data.get(
+          "parentValue"
+        ) as any;
+        const inheritedLevel = controller.context.data.get("level") as any; // Read from parent
+
         // Child sets its own data (overrides parent if same key)
-        controller.context.data.set('childValue', input.childValue);
-        controller.context.data.set('level', 'child');  // Overrides parent's level
-        
-        return { 
+        controller.context.data.set("childValue", input.childValue);
+        controller.context.data.set("level", "child"); // Overrides parent's level
+
+        return {
           result: `child:${input.childValue}, inherited:${inheritedValue}, parentLevel:${inheritedLevel}`,
           inheritedValue,
-          ownValue: controller.context.data.get('level')
+          ownValue: controller.context.data.get("level") as any,
         };
       }
     );
@@ -270,42 +284,49 @@ describe("flow test", () => {
         name: "parentFlow",
         dependencies: { childFlow },
         input: custom<{ value: string }>(),
-        output: custom<{ parentData: string; childData: any; parentLevelAfter: string }>(),
+        output: custom<{
+          parentData: string;
+          childData: any;
+          parentLevelAfter: string;
+        }>(),
       },
       async ({ childFlow }, input, controller) => {
         // Set data in parent context
-        controller.context.data.set('parentValue', input.value);
-        controller.context.data.set('level', 'parent');
-        
+        controller.context.data.set("parentValue", input.value);
+        controller.context.data.set("level", "parent");
+
         // Execute child flow - it's already resolved
-        const childResult = await controller.execute(childFlow, { childValue: "nested" });
-        
+        const childResult = await controller.execute(childFlow, {
+          childValue: "nested",
+        });
+
         // Parent context should not be polluted by child's modifications
-        expect(controller.context.data.get('childValue')).toBeUndefined();
-        expect(controller.context.data.get('level')).toBe("parent"); // Not affected by child's override
-        
+        expect(controller.context.data.get("childValue")).toBeUndefined();
+        expect(controller.context.data.get("level")).toBe("parent"); // Not affected by child's override
+
         return {
-          parentData: controller.context.data.get('parentValue'),
-          childData: childResult,
-          parentLevelAfter: controller.context.data.get('level')
+          parentData: controller.context.data.get("parentValue"),
+          childData: childResult as any,
+          parentLevelAfter: controller.context.data.get("level"),
         };
       }
     );
 
     const { result } = await flow.execute(parentFlow, { value: "root" });
-    
+
     if (result.kind === "error") {
       console.error("Test failed with error:", result.error);
     }
-    
+
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.value.parentData).toBe("root");
-      expect(result.value.childData.result).toBe("child:nested, inherited:root, parentLevel:parent");
+      expect(result.value.childData.result).toBe(
+        "child:nested, inherited:root, parentLevel:parent"
+      );
       expect(result.value.childData.inheritedValue).toBe("root");
       expect(result.value.childData.ownValue).toBe("child");
       expect(result.value.parentLevelAfter).toBe("parent");
     }
   });
-
 });

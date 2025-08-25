@@ -30,7 +30,7 @@ export function derive<D extends Core.DependencyLike, Input, Output>(
     dependencies,
     ...config
   }: {
-    dependencies: Core.Destructed<D>;
+    dependencies: { [K in keyof D]: D[K] };
   } & Flow.Config &
     Flow.Schema<Input, Output>,
   handler: Flow.DependentFlowFn<Core.InferOutput<D>, Input, Output>

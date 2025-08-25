@@ -34,9 +34,17 @@ test("multi dervie should work", async () => {
   const seed = base.provide(() => 0);
   const math = base.derive(seed, (seed) => seed + 1);
 
+  const anotherMulti = multi.derive(
+    { keySchema: custom<string>(), dependencies: math },
+    async (math) => ({ log: () => {} })
+  );
+
   const derviedLogger = multi.derive(
-    { keySchema: custom<string>(), dependencies: [seed, math] },
-    ([seed, math], key) => seed + key
+    {
+      keySchema: custom<string>(),
+      dependencies: [seed, anotherMulti("hello")],
+    },
+    ([seed, anotherMulti], key) => seed + key
   );
 
   const scope = createScope();

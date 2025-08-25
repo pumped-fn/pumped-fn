@@ -23,7 +23,7 @@ type Option<K> = {
   keyTransform?: (key: K) => unknown;
 };
 
-type DeriveOption<K, D extends Core.DependencyLike> = Option<K> & {
+type DeriveOption<K, D> = Option<K> & {
   dependencies: D;
 };
 
@@ -108,7 +108,7 @@ export function provide<T, K>(
 }
 
 export function derive<T, K, D extends Core.DependencyLike>(
-  option: DeriveOption<K, Core.Destructed<D>>,
+  option: DeriveOption<K, { [K in keyof D]: D[K] }>,
   valueFn: DependentFn<T, K, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): MultiExecutor<T, K> {
@@ -119,7 +119,7 @@ export function derive<T, K, D extends Core.DependencyLike>(
     const validatedKey = validate(option.keySchema, key);
     return createExecutor(
       (dependencies, ctl) => valueFn(dependencies as any, validatedKey, ctl),
-      option.dependencies,
+      option.dependencies as any,
       metas
     );
   };
