@@ -3,7 +3,7 @@ import { validate } from "./ssch";
 
 export interface DataStore {
   get(key: unknown): unknown;
-  set(key: unknown, value: unknown): unknown;
+  set(key: unknown, value: unknown): unknown | void;
 }
 
 export interface DataAccessor<T> {
@@ -11,17 +11,18 @@ export interface DataAccessor<T> {
   get(store: DataStore): T;
   find(store: DataStore): T | undefined;
   set(store: DataStore, value: T): void;
+  preset(value: T): [symbol, T];
 }
 
-export const dataAccessor = <T>(
+export const data = <T>(
   key: string | symbol,
   schema: StandardSchemaV1<T>
 ): DataAccessor<T> => {
-  const _key = typeof key === 'string' ? Symbol(key) : key;
-  
+  const _key = typeof key === "string" ? Symbol(key) : key;
+
   return {
     key: _key,
-    
+
     get(store: DataStore): T {
       const value = store.get(_key);
       if (value === undefined) {
@@ -30,19 +31,23 @@ export const dataAccessor = <T>(
 
       return validate(schema, value);
     },
-    
+
     find(store: DataStore): T | undefined {
       const maybeValue = store.get(_key);
       if (maybeValue) {
-        return validate(schema, maybeValue)
+        return validate(schema, maybeValue);
       }
 
-      return undefined
+      return undefined;
     },
-    
+
     set(store: DataStore, value: T): void {
       const validated = validate(schema, value);
       store.set(_key, validated);
-    }
+    },
+
+    preset(value: T): [symbol, T] {
+      return [_key, value];
+    },
   };
 };

@@ -1,13 +1,5 @@
-import {
-  flow,
-  provide,
-  createScope,
-  custom,
-  preset,
-  FlowError,
-  FlowErrorCode,
-} from "../src";
-import { vi, test, describe, expect } from "vitest";
+import { flow, provide, createScope, custom, preset, FlowError } from "../src";
+import { test, describe, expect } from "vitest";
 
 describe("flow test", () => {
   const auth = provide(() => ({
@@ -159,7 +151,6 @@ describe("flow test", () => {
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
       expect(result.error).toBeInstanceOf(FlowError);
-      expect((result.error as FlowError).type).toBe("execution");
     }
   });
 

@@ -2,6 +2,21 @@ import type { Core, Flow } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
+import type { DataAccessor } from "./data-accessor";
+
+
+export function createInitialContext<T extends Record<string, unknown>>(
+  initializers: {
+    [K in keyof T]: { accessor: DataAccessor<T[K]>; value: T[K] }
+  }
+): Flow.ContextData {
+  const context = new Map();
+  for (const [_, config] of Object.entries(initializers)) {
+    const { accessor, value } = config as { accessor: DataAccessor<unknown>; value: unknown };
+    context.set(accessor.key, value);
+  }
+  return context;
+}
 
 export function provide<Input, Output>(
   config: Flow.Config & Flow.Schema<Input, Output>,
@@ -13,7 +28,7 @@ export function provide<Input, Output>(
       input: config.input,
       output: config.output,
       plugins: config.plugins || [],
-      metas: config.metas || [], // Include metas in the resolved flow
+      metas: config.metas || [],
       name: config.name,
       description: config.description,
     }),
@@ -41,7 +56,7 @@ export function derive<D extends Core.DependencyLike, Input, Output>(
       input: config.input,
       output: config.output,
       plugins: config.plugins || [],
-      metas: config.metas || [], // Include metas in the resolved flow
+      metas: config.metas || [],
       name: config.name,
       description: config.description,
     }),
@@ -53,96 +68,57 @@ export function derive<D extends Core.DependencyLike, Input, Output>(
   return executor;
 }
 
-// Error codes as constants instead of enum
-export const FlowErrorCode = {
-  VALIDATION: "validation",
-  TIMEOUT: "timeout",
-  EXECUTION: "execution",
-  DEPENDENCY: "dependency",
-  PLUGIN: "plugin",
-  SCOPE: "scope",
-  UNKNOWN: "unknown",
-} as const;
-
-export type FlowErrorType = (typeof FlowErrorCode)[keyof typeof FlowErrorCode];
-
-// Single error class with type parameter
 export class FlowError extends Error {
-  type: FlowErrorType;
-  details?: any;
-
-  constructor(message: string, type: FlowErrorType, details?: any) {
+  constructor(message: string, public details?: any) {
     super(message);
     this.name = "FlowError";
-    this.type = type;
-    this.details = details;
-  }
-
-  // Helper functions to create specific error types
-  static validation(message: string, details?: any): FlowError {
-    return new FlowError(message, FlowErrorCode.VALIDATION, details);
-  }
-
-  static timeout(
-    message: string = "Operation timed out",
-    details?: any
-  ): FlowError {
-    return new FlowError(message, FlowErrorCode.TIMEOUT, details);
-  }
-
-  static execution(message: string, details?: any): FlowError {
-    return new FlowError(message, FlowErrorCode.EXECUTION, details);
-  }
-
-  static dependency(message: string, details?: any): FlowError {
-    return new FlowError(message, FlowErrorCode.DEPENDENCY, details);
   }
 }
 
 function createController(context: Flow.ExecutionContext): Flow.Controller & {
-  context: Flow.ExecutionContext & {
-    get(key: any): any;
-    set(key: any, value: any): void;
-    has(key: any): boolean;
-  };
+  context: Flow.ExecutionContext;
 } {
-  // Add context helper methods
-  const contextWithHelpers = Object.assign(context, {
-    get(key: any): any {
-      return context.data.get(key);
-    },
-    set(key: any, value: any): void {
-      context.data.set(key, value);
-    },
-    has(key: any): boolean {
-      return context.data.has(key);
-    },
-  });
-
-  const controller: Flow.Controller & { context: typeof contextWithHelpers } = {
-    context: contextWithHelpers,
+  const controller: Flow.Controller & { context: Flow.ExecutionContext } = {
+    context,
     safeExecute: async (flowDef, param, opts) => {
       try {
-        const validatedInput = validate(flowDef.input, param);
+        let resolvedFlow: Flow.Flow<any, any>;
+        if ('execution' in flowDef && typeof flowDef.execution === 'function') {
+          resolvedFlow = flowDef as Flow.Flow<any, any>;
+        } else if (context.scope) {
+          resolvedFlow = await context.scope.pod().resolve(flowDef as any);
+        } else {
+          throw new FlowError("Cannot resolve executor without a scope");
+        }
+        
+        const validatedInput = validate(resolvedFlow.input, param);
 
-        // Always create child controller for nested executions
-        // Copy parent's data to child (Map doesn't support prototype chain for get/set)
         const childData = new Map(context.data);
+        
+        if (opts?.initialContext) {
+          for (const [key, value] of opts.initialContext) {
+            childData.set(key, value);
+          }
+        }
 
         const childContext: Flow.ExecutionContext = {
           data: childData,
           parent: context,
           scope: context.scope,
-          plugins: [...context.plugins, ...(opts?.plugins || [])], // Merge plugins from opts
-          flow: flowDef, // Store the flow being executed
+          plugins: [...context.plugins, ...(opts?.plugins || [])],
+          flow: resolvedFlow,
+          get(key: unknown): unknown {
+            return childData.get(key);
+          },
+          set(key: unknown, value: unknown): unknown | void {
+            return childData.set(key, value);
+          },
         };
         const childController = createController(childContext);
 
-        // Wrap execution with all plugins (including opts plugins)
         let execution = async () =>
-          flowDef.execution(validatedInput, childController);
+          resolvedFlow.execution(validatedInput, childController);
 
-        // Apply plugins in reverse order (last plugin is innermost)
         for (let i = childContext.plugins.length - 1; i >= 0; i--) {
           const plugin = childContext.plugins[i];
           const prevExecution = execution;
@@ -152,23 +128,12 @@ function createController(context: Flow.ExecutionContext): Flow.Controller & {
         const result = await execution();
         return { kind: "success", value: result };
       } catch (error) {
-        if (error instanceof FlowError) {
-          return { kind: "error", error };
-        }
-
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        const errorType = errorMessage.includes("validation")
-          ? FlowErrorCode.VALIDATION
-          : FlowErrorCode.EXECUTION;
-
-        const wrappedError = new FlowError(
-          errorType === FlowErrorCode.VALIDATION
-            ? "Input validation failed"
-            : "Flow execution failed",
-          errorType,
-          { cause: error }
-        );
+        const wrappedError = error instanceof FlowError 
+          ? error 
+          : new FlowError(
+              error instanceof Error ? error.message : "Flow execution failed",
+              { cause: error }
+            );
         return { kind: "error", error: wrappedError };
       }
     },
@@ -198,29 +163,34 @@ export async function execute<Input, Output>(
     flow = await pod.resolve(executor);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    throw FlowError.dependency(`Failed to resolve executor: ${errorMessage}`, {
+    throw new FlowError(`Failed to resolve executor: ${errorMessage}`, {
       cause: error,
     });
   }
 
+  const contextData = opt?.initialContext || new Map();
   const context: Flow.ExecutionContext = {
-    data: new Map(),
+    data: contextData,
+    parent: undefined,
     scope,
     plugins: opt?.plugins || [],
-    flow, // Store the flow being executed
+    flow,
+    get(key: unknown): unknown {
+      return contextData.get(key);
+    },
+    set(key: unknown, value: unknown): unknown | void {
+      return contextData.set(key, value);
+    },
   };
   const controller = createController(context);
   const flowWithContext = { ...flow, context };
 
-  // Execute root flow directly with the root controller (no child context)
   let executionResult: Flow.Result<Output>;
   try {
     const validatedInput = validate(flow.input, input);
 
-    // Wrap root execution with plugins
     let execution = async () => flow.execution(validatedInput, controller);
 
-    // Apply plugins in reverse order (last plugin is innermost)
     for (let i = context.plugins.length - 1; i >= 0; i--) {
       const plugin = context.plugins[i];
       const prevExecution = execution;
@@ -230,24 +200,13 @@ export async function execute<Input, Output>(
     const result = await execution();
     executionResult = { kind: "success", value: result };
   } catch (error) {
-    if (error instanceof FlowError) {
-      executionResult = { kind: "error", error };
-    } else {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorType = errorMessage.includes("validation")
-        ? FlowErrorCode.VALIDATION
-        : FlowErrorCode.EXECUTION;
-
-      const wrappedError = new FlowError(
-        errorType === FlowErrorCode.VALIDATION
-          ? "Input validation failed"
-          : "Flow execution failed",
-        errorType,
-        { cause: error }
-      );
-      executionResult = { kind: "error", error: wrappedError };
-    }
+    const wrappedError = error instanceof FlowError 
+      ? error 
+      : new FlowError(
+          error instanceof Error ? error.message : "Flow execution failed",
+          { cause: error }
+        );
+    executionResult = { kind: "error", error: wrappedError };
   }
 
   if (isOwnScope) {

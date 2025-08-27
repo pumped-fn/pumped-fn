@@ -1,4 +1,5 @@
 import { AdaptedExecutor, PreparedExecutor } from "./helpers";
+import type { DataStore } from "./data-accessor";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -286,15 +287,15 @@ export declare namespace Core {
 }
 
 export namespace Flow {
-  export type Context = {};
-
-  export type ExecutionPlugin = {};
+  export type ContextData = Map<unknown, unknown>;
+  
   export type ExecuteOpt = {
     scope?: Core.Scope;
     name?: string;
     description?: string;
     plugins?: FlowPlugin[];
     presets?: Core.Preset<unknown>[];
+    initialContext?: ContextData;
   };
 
   export type Controller = {
@@ -309,6 +310,7 @@ export namespace Flow {
       opt?: ExecuteOpt
     ) => Promise<Result<Output>>;
   };
+
 
   export type NoDependencyFlowFn<Input, Output> = (
     input: Input,
@@ -347,13 +349,13 @@ export namespace Flow {
     Config &
     Schema<Input, Output>;
 
-  export type ExecutionContext<Input = any, Output = any> = {
+  export interface ExecutionContext<Input = any, Output = any> extends DataStore {
     data: Map<unknown, unknown>;
     parent?: ExecutionContext;
     scope: Core.Scope;
     plugins: FlowPlugin[];
-    flow: Flow<Input, Output>; // The flow being executed
-  };
+    flow: Flow<Input, Output>;
+  }
 
   export type Success<T> = { kind: "success"; value: T };
   export type Error = { kind: "error"; error: unknown };
