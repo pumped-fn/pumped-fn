@@ -1,5 +1,5 @@
-import { flow, provide, createScope, custom, FlowError, dataAccessor } from "../src";
-import { vi, test, describe, expect } from "vitest";
+import { flow, custom, accessor } from "../src";
+import { test, describe, expect } from "vitest";
 import type { Flow } from "../src/types";
 
 describe("flow plugin system", () => {
@@ -35,25 +35,30 @@ describe("flow plugin system", () => {
 
   test("telemetry plugin tracks execution tree", async () => {
     const spans: MockSpan[] = [];
-    
+
     // Create typed data accessor for spans
-    const spanAccessor = dataAccessor<MockSpan>('telemetry.span', custom<MockSpan>());
+    const spanAccessor = accessor<MockSpan>(
+      "telemetry.span",
+      custom<MockSpan>()
+    );
 
     // Telemetry plugin that creates spans for each execution
     const telemetryPlugin: Flow.FlowPlugin = {
       name: "telemetry",
       async wrap(context, execute) {
         // Get parent span from parent context using accessor
-        const parentSpan = context.parent ? spanAccessor.find(context.parent.data) : undefined;
-        
+        const parentSpan = context.parent
+          ? spanAccessor.find(context.parent.data)
+          : undefined;
+
         // Create new span using flow name from context
         const flowName = context.flow?.name || "anonymous";
         const span = new MockSpan(flowName, parentSpan);
         spans.push(span);
-        
+
         // Store span in context for children using accessor
         spanAccessor.set(context.data, span);
-        
+
         try {
           const result = await execute();
           span.setStatus("ok");
@@ -64,7 +69,7 @@ describe("flow plugin system", () => {
         } finally {
           span.end();
         }
-      }
+      },
     };
 
     // Define test flows
@@ -87,8 +92,12 @@ describe("flow plugin system", () => {
         output: custom<{ result: number }>(),
       },
       async ({ childFlow }, input, controller) => {
-        const child1 = await controller.execute(childFlow, { value: input.num });
-        const child2 = await controller.execute(childFlow, { value: child1.doubled });
+        const child1 = await controller.execute(childFlow, {
+          value: input.num,
+        });
+        const child2 = await controller.execute(childFlow, {
+          value: child1.doubled,
+        });
         return { result: child2.doubled };
       }
     );
@@ -108,24 +117,24 @@ describe("flow plugin system", () => {
 
     // Verify telemetry spans were created
     expect(spans).toHaveLength(3); // parent + 2 children
-    
+
     const [rootSpan, child1Span, child2Span] = spans;
-    
+
     // Check span hierarchy
     expect(rootSpan.name).toBe("parentFlow");
     expect(rootSpan.parent).toBeUndefined();
-    
+
     expect(child1Span.name).toBe("childFlow");
     expect(child1Span.parent).toBe(rootSpan);
-    
+
     expect(child2Span.name).toBe("childFlow");
     expect(child2Span.parent).toBe(rootSpan);
-    
+
     // All spans should be completed
     expect(rootSpan.status).toBe("ok");
     expect(child1Span.status).toBe("ok");
     expect(child2Span.status).toBe("ok");
-    
+
     // All spans should have end times
     expect(rootSpan.endTime).toBeDefined();
     expect(child1Span.endTime).toBeDefined();
@@ -141,10 +150,10 @@ describe("flow plugin system", () => {
       name: "logging",
       async wrap(context, execute) {
         const flowName = context.flow?.name || "anonymous";
-        
+
         // Log start (without input since we don't have it yet)
         logs.push({ type: "start", flowName, data: null });
-        
+
         try {
           const result = await execute();
           logs.push({ type: "success", flowName, data: result });
@@ -153,7 +162,7 @@ describe("flow plugin system", () => {
           logs.push({ type: "error", flowName, data: error });
           throw error;
         }
-      }
+      },
     };
 
     const testFlow = flow.provide(
@@ -177,12 +186,12 @@ describe("flow plugin system", () => {
     expect(logs[0]).toEqual({
       type: "start",
       flowName: "testFlow",
-      data: null
+      data: null,
     });
     expect(logs[1]).toEqual({
       type: "success",
       flowName: "testFlow",
-      data: { response: "Echo: Hello" }
+      data: { response: "Echo: Hello" },
     });
   });
 
@@ -201,7 +210,7 @@ describe("flow plugin system", () => {
           executionOrder.push("plugin1:error");
           throw error;
         }
-      }
+      },
     };
 
     const plugin2: Flow.FlowPlugin = {
@@ -216,7 +225,7 @@ describe("flow plugin system", () => {
           executionOrder.push("plugin2:error");
           throw error;
         }
-      }
+      },
     };
 
     const testFlow = flow.provide(
@@ -239,7 +248,7 @@ describe("flow plugin system", () => {
       "plugin2:start",
       "flow:execute",
       "plugin2:end",
-      "plugin1:end"
+      "plugin1:end",
     ]);
   });
 
@@ -255,7 +264,7 @@ describe("flow plugin system", () => {
         } finally {
           cleanupOrder.push("cleanup");
         }
-      }
+      },
     };
 
     const errorFlow = flow.provide(
@@ -270,7 +279,11 @@ describe("flow plugin system", () => {
       }
     );
 
-    const { result } = await flow.execute(errorFlow, {}, { plugins: [cleanupPlugin] });
+    const { result } = await flow.execute(
+      errorFlow,
+      {},
+      { plugins: [cleanupPlugin] }
+    );
 
     expect(result.kind).toBe("error");
     expect(cleanupOrder).toEqual(["setup", "execute", "cleanup"]);
@@ -284,7 +297,7 @@ describe("flow plugin system", () => {
       async wrap(context, execute) {
         const flowName = context.flow?.name || "anonymous";
         const start = performance.now();
-        
+
         try {
           const result = await execute();
           timings[flowName] = performance.now() - start;
@@ -293,7 +306,7 @@ describe("flow plugin system", () => {
           timings[flowName] = performance.now() - start;
           throw error;
         }
-      }
+      },
     };
 
     const slowFlow = flow.provide(
@@ -303,7 +316,7 @@ describe("flow plugin system", () => {
         output: custom<{ done: boolean }>(),
       },
       async (input, controller) => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         return { done: true };
       }
     );
@@ -339,7 +352,7 @@ describe("flow plugin system", () => {
     expect(timings).toHaveProperty("parentFlow");
     expect(timings).toHaveProperty("slowFlow");
     expect(timings).toHaveProperty("fastFlow");
-    
+
     // Slow flow should take more time
     expect(timings.slowFlow).toBeGreaterThan(45); // At least 45ms
     expect(timings.fastFlow).toBeLessThan(10); // Should be very fast
@@ -348,9 +361,15 @@ describe("flow plugin system", () => {
 
   test("plugin can access and modify context data", async () => {
     // Create typed data accessors
-    const correlationAccessor = dataAccessor<string>('correlation.id', custom<string>());
-    const depthAccessor = dataAccessor<number>('correlation.depth', custom<number>());
-    
+    const correlationAccessor = accessor<string>(
+      "correlation.id",
+      custom<string>()
+    );
+    const depthAccessor = accessor<number>(
+      "correlation.depth",
+      custom<number>()
+    );
+
     const correlationPlugin: Flow.FlowPlugin = {
       name: "correlation",
       async wrap(context, execute) {
@@ -358,13 +377,15 @@ describe("flow plugin system", () => {
         if (!context.parent) {
           correlationAccessor.set(context.data, `trace-${Date.now()}`);
         }
-        
+
         // Add depth tracking
-        const parentDepth = context.parent ? (depthAccessor.find(context.parent.data) || 0) : 0;
+        const parentDepth = context.parent
+          ? depthAccessor.find(context.parent.data) || 0
+          : 0;
         depthAccessor.set(context.data, parentDepth + 1);
-        
+
         return execute();
-      }
+      },
     };
 
     let capturedCorrelationId: string | undefined;
@@ -377,11 +398,13 @@ describe("flow plugin system", () => {
         output: custom<{ correlationId: string; depth: number }>(),
       },
       async (input, controller) => {
-        capturedCorrelationId = correlationAccessor.find(controller.context.data);
+        capturedCorrelationId = correlationAccessor.find(
+          controller.context.data
+        );
         capturedDepth = depthAccessor.find(controller.context.data);
         return {
           correlationId: capturedCorrelationId,
-          depth: capturedDepth
+          depth: capturedDepth,
         };
       }
     );
@@ -410,7 +433,11 @@ describe("flow plugin system", () => {
       }
     );
 
-    const { result } = await flow.execute(rootFlow, {}, { plugins: [correlationPlugin] });
+    const { result } = await flow.execute(
+      rootFlow,
+      {},
+      { plugins: [correlationPlugin] }
+    );
 
     expect(result.kind).toBe("success");
     if (result.kind === "success") {

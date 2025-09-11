@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as flow from "../src/flow";
-import { data } from "../src/data-accessor";
+import { accessor } from "../src/accessor";
 import { custom } from "../src/ssch";
 
 describe("Flow Initial Context", () => {
@@ -94,7 +94,7 @@ describe("Flow Initial Context", () => {
   });
 
   it("should initialize context using data accessors", async () => {
-    const spanData = data(
+    const spanData = accessor(
       "rootSpan",
       custom<{
         traceId: string;
@@ -102,7 +102,7 @@ describe("Flow Initial Context", () => {
       }>()
     );
 
-    const userData = data(
+    const userData = accessor(
       "user",
       custom<{
         id: number;
@@ -150,7 +150,7 @@ describe("Flow Initial Context", () => {
   });
 
   it("should work with data accessor preset", async () => {
-    const tracingAccessor = data(
+    const tracingAccessor = accessor(
       "tracing",
       custom<{
         enabled: boolean;

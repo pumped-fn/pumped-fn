@@ -200,7 +200,7 @@ describe("flow test", () => {
       }
     );
 
-    const { result } = await flow.execute(mainFlow, { value: "test" },  { });
+    const { result } = await flow.execute(mainFlow, { value: "test" }, {});
 
     expect(result.kind).toBe("success");
     if (result.kind === "success") {

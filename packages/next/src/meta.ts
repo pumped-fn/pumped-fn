@@ -1,72 +1,63 @@
 import { validate } from "./ssch";
 import { metaSymbol, StandardSchemaV1, type Meta } from "./types";
 
+class MetaFunction<V> {
+  public readonly key: symbol;
+  public readonly schema: StandardSchemaV1<V>;
+  public readonly [metaSymbol] = true;
+
+  constructor(key: string | symbol, schema: StandardSchemaV1<V>) {
+    this.key = typeof key === "string" ? Symbol(key) : key;
+    this.schema = schema;
+  }
+
+  // Call signature - creates meta instance
+  __call(value: V): Meta.Meta<V> {
+    return {
+      [metaSymbol]: true,
+      key: this.key,
+      schema: this.schema,
+      value,
+    } as Meta.Meta<V>;
+  }
+
+  partial<D extends Partial<V>>(d: D): D {
+    return Object.assign({}, this.__call({} as V), d);
+  }
+
+  some(source: Meta.MetaContainer | Meta.Meta[] | undefined): V[] {
+    return findValues(source, this as unknown as Meta.MetaFn<unknown>) as V[];
+  }
+
+  find(source: Meta.MetaContainer | Meta.Meta[] | undefined): V | undefined {
+    return findValue(source, this as unknown as Meta.MetaFn<unknown>) as V | undefined;
+  }
+
+  get(source: Meta.MetaContainer | Meta.Meta[] | undefined): V {
+    return getValue(
+      findValue(source, this as unknown as Meta.MetaFn<unknown>) as Meta.Meta<V>
+    );
+  }
+}
+
 export const meta = <V>(
   key: string | symbol,
   schema: StandardSchemaV1<V>
 ): Meta.MetaFn<V> => {
-  const _key = typeof key === "string" ? Symbol(key) : key;
+  const metaFunc = new MetaFunction(key, schema);
+  
+  // Create callable function that delegates to the class
+  const fn = ((value: V) => metaFunc.__call(value)) as Meta.MetaFn<V>;
+  
+  // Copy properties from the class instance
+  Object.defineProperty(fn, 'key', { value: metaFunc.key, writable: false, configurable: false });
+  Object.defineProperty(fn, metaSymbol, { value: true, writable: false, configurable: false });
+  fn.partial = metaFunc.partial.bind(metaFunc);
+  fn.some = metaFunc.some.bind(metaFunc);
+  fn.find = metaFunc.find.bind(metaFunc);
+  fn.get = metaFunc.get.bind(metaFunc);
 
-  const fn = (value: V) =>
-    ({
-      [metaSymbol]: true,
-      key: _key,
-      schema,
-      value,
-    } as unknown as Meta.MetaFn<V>);
-
-  Object.defineProperty(fn, "key", {
-    value: _key,
-    configurable: false,
-    enumerable: false,
-    writable: false,
-  });
-
-  Object.defineProperty(fn, metaSymbol, {
-    value: true,
-    configurable: false,
-    enumerable: false,
-    writable: false,
-  });
-
-  Object.defineProperties(fn, {
-    partial: {
-      value: (d: Partial<V>) => {
-        return Object.assign({}, fn({} as V), d);
-      },
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    },
-    some: {
-      value: (source: Meta.MetaContainer | Meta.Meta[] | undefined) =>
-        findValues(source, fn as unknown as Meta.MetaFn<unknown>),
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    },
-    find: {
-      value: (source: Meta.MetaContainer | Meta.Meta[] | undefined) =>
-        findValue(source, fn as unknown as Meta.MetaFn<unknown>),
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    },
-    get: {
-      value: (source: Meta.MetaContainer | Meta.Meta[] | undefined) =>
-        getValue(
-          findValue(
-            source,
-            fn as unknown as Meta.MetaFn<unknown>
-          ) as Meta.Meta<V>
-        ),
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    },
-  });
-
-  return fn as any;
+  return fn;
 };
 
 export function getValue<V>(meta: Meta.Meta<V>): Awaited<V> {

@@ -8,6 +8,7 @@ import {
 } from "./executor";
 import { 
   Core, 
+  Meta,
   ExecutorResolutionError, 
   FactoryExecutionError, 
   DependencyResolutionError 
@@ -33,6 +34,273 @@ type CacheEntry = {
 
 type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
+
+class AccessorImpl implements Core.Accessor<unknown> {
+  public metas: Meta.Meta[] | undefined;
+  private scope: BaseScope;
+  private requestor: UE;
+  private currentPromise: Promise<unknown> | null = null;
+  public resolve: (force?: boolean) => Promise<unknown>;
+
+  constructor(scope: BaseScope, requestor: UE, metas: Meta.Meta[] | undefined) {
+    this.scope = scope;
+    this.requestor = requestor;
+    this.metas = metas;
+    
+    // Create bound resolve function to maintain promise identity
+    this.resolve = this.createResolveFunction();
+    
+    // Cache this accessor immediately
+    const existing = this.scope['cache'].get(requestor);
+    if (!existing || !existing.accessor) {
+      this.scope['cache'].set(requestor, {
+        accessor: this,
+        value: existing?.value || undefined as any
+      });
+    }
+  }
+
+  private createResolveFunction() {
+    return (force: boolean = false): Promise<unknown> => {
+      this.scope["~ensureNotDisposed"]();
+
+      const entry = this.scope['cache'].get(this.requestor);
+      const cached = entry?.value;
+
+      if (cached && !force) {
+        if (cached.kind === "resolved") {
+          return Promise.resolve(cached.value);
+        } else if (cached.kind === "rejected") {
+          throw cached.error;
+        } else {
+          return cached.promise;
+        }
+      }
+
+      if (this.currentPromise && !force) {
+        return this.currentPromise;
+      }
+
+      this.currentPromise = new Promise((resolve, reject) => {
+        const replacer = this.scope['initialValues'].find(
+          (item) => item.executor === this.requestor
+        );
+
+        let factory = this.requestor.factory;
+        let dependencies = this.requestor.dependencies;
+        if (replacer) {
+          const value = replacer.value;
+
+          if (!isExecutor(value)) {
+            return setTimeout(() => {
+              this.scope['cache'].set(this.requestor, {
+                accessor: this,
+                value: { kind: "resolved", value: replacer.value },
+              });
+              resolve(replacer.value);
+            }, 0);
+          }
+
+          factory = value.factory as any;
+          dependencies = value.dependencies;
+        }
+
+        const controller = this.createController();
+
+        this.scope["~resolveDependencies"](dependencies, this.requestor)
+          .then((dependencies) => {
+            try {
+              const factoryResult = factory(dependencies as any, controller);
+              
+              if (factoryResult instanceof Promise) {
+                return factoryResult.catch((asyncError) => {
+                  const executorName = getExecutorName(this.requestor);
+                  const dependencyChain = [executorName];
+                  
+                  const factoryError = createFactoryError(
+                    ErrorCodes.FACTORY_ASYNC_ERROR,
+                    executorName,
+                    dependencyChain,
+                    asyncError,
+                    {
+                      dependenciesResolved: dependencies !== undefined,
+                      factoryType: typeof factory,
+                      isAsyncFactory: true,
+                    }
+                  );
+                  
+                  throw factoryError;
+                });
+              }
+              
+              return factoryResult;
+            } catch (error) {
+              const executorName = getExecutorName(this.requestor);
+              const dependencyChain = [executorName];
+              
+              const factoryError = createFactoryError(
+                ErrorCodes.FACTORY_THREW_ERROR,
+                executorName,
+                dependencyChain,
+                error,
+                {
+                  dependenciesResolved: dependencies !== undefined,
+                  factoryType: typeof factory,
+                  isAsyncFactory: false,
+                }
+              );
+              
+              throw factoryError;
+            }
+          })
+          .then(async (result) => {
+            let current = result;
+
+            if (isGenerator(result) || isAsyncGenerator(result)) {
+              try {
+                const { returned } = await collectFromGenerator(result);
+                current = returned;
+              } catch (generatorError) {
+                const executorName = getExecutorName(this.requestor);
+                const dependencyChain = [executorName];
+                
+                const factoryError = createFactoryError(
+                  ErrorCodes.FACTORY_GENERATOR_ERROR,
+                  executorName,
+                  dependencyChain,
+                  generatorError,
+                  {
+                    generatorType: isGenerator(result) ? 'sync' : 'async',
+                    factoryType: typeof factory,
+                  }
+                );
+                
+                throw factoryError;
+              }
+            }
+
+            const events = this.scope['onEvents'].change;
+            for (const event of events) {
+              const updated = await event("resolve", this.requestor, current, this.scope);
+              if (updated !== undefined && updated.executor === this.requestor) {
+                current = updated.value;
+              }
+            }
+
+            this.scope['cache'].set(this.requestor, {
+              accessor: this,
+              value: { kind: "resolved", value: current },
+            });
+
+            this.currentPromise = null;
+            resolve(current);
+          })
+          .catch((error) => {
+            let enhancedError = error;
+            let errorContext = undefined;
+            
+            if (error?.context && error?.code) {
+              enhancedError = error;
+              errorContext = error.context;
+            } else {
+              const executorName = getExecutorName(this.requestor);
+              const dependencyChain = [executorName];
+              
+              enhancedError = createSystemError(
+                ErrorCodes.INTERNAL_RESOLUTION_ERROR,
+                executorName,
+                dependencyChain,
+                error,
+                {
+                  errorType: error?.constructor?.name || 'UnknownError',
+                  resolutionPhase: 'post-factory',
+                }
+              );
+              errorContext = enhancedError.context;
+            }
+
+            this.scope['cache'].set(this.requestor, {
+              accessor: this,
+              value: { 
+                kind: "rejected", 
+                error,
+                context: errorContext,
+                enhancedError: enhancedError
+              },
+            });
+
+            this.scope["~triggerError"](enhancedError, this.requestor);
+            this.currentPromise = null;
+            reject(enhancedError);
+          });
+      });
+
+      this.scope['cache'].set(this.requestor, {
+        accessor: this,
+        value: { kind: "pending", promise: this.currentPromise },
+      });
+
+      return this.currentPromise;
+    };
+  }
+
+  lookup(): undefined | Core.ResolveState<unknown> {
+    this.scope["~ensureNotDisposed"]();
+    const cacheEntry = this.scope['cache'].get(this.requestor);
+    if (!cacheEntry) {
+      return undefined;
+    }
+    return cacheEntry.value || undefined;
+  }
+
+  get(): unknown {
+    this.scope["~ensureNotDisposed"]();
+    const cacheEntry = this.scope['cache'].get(this.requestor)?.value;
+
+    if (!cacheEntry || cacheEntry.kind === "pending") {
+      throw new Error("Executor is not resolved");
+    }
+
+    if (cacheEntry.kind === "rejected") {
+      throw cacheEntry.enhancedError || cacheEntry.error;
+    }
+
+    return cacheEntry.value;
+  }
+
+
+  async release(soft: boolean = false): Promise<void> {
+    this.scope.release(this.requestor, soft);
+  }
+
+  async update(updateFn: unknown | ((current: unknown) => unknown)): Promise<void> {
+    return this.scope.update(this.requestor, updateFn);
+  }
+
+  async set(value: unknown): Promise<void> {
+    return this.scope.update(this.requestor, value);
+  }
+
+  subscribe(cb: (value: unknown) => void): Core.Cleanup {
+    this.scope["~ensureNotDisposed"]();
+    return this.scope.onUpdate(this.requestor, cb);
+  }
+
+  private createController(): Core.Controller {
+    return {
+      cleanup: (cleanup: Core.Cleanup) => {
+        const currentSet = this.scope['cleanups'].get(this.requestor) ?? new Set();
+        this.scope['cleanups'].set(this.requestor, currentSet);
+        currentSet.add(cleanup);
+      },
+      release: async () => this.scope.release(this.requestor),
+      reload: async () => {
+        await this.scope.resolve(this.requestor, true);
+      },
+      scope: this.scope,
+    };
+  }
+}
 
 function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
   if (isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)) {
@@ -224,253 +492,12 @@ class BaseScope implements Core.Scope {
         : (e as UE);
 
     const cachedAccessor = this.cache.get(requestor);
-    if (cachedAccessor) {
+    if (cachedAccessor && cachedAccessor.accessor) {
       return cachedAccessor.accessor;
     }
 
-    const accessor = {} as Core.Accessor<unknown>;
-
-    const controller = {
-      cleanup: (cleanup: Core.Cleanup) => {
-        const currentSet = this.cleanups.get(requestor) ?? new Set();
-        this.cleanups.set(requestor, currentSet);
-
-        currentSet.add(cleanup);
-      },
-      release: async () => this.release(requestor),
-      reload: async () => {
-        await this.resolve(requestor, true);
-      },
-      scope: this,
-    };
-
-    const resolve = (force: boolean): Promise<unknown> => {
-      this["~ensureNotDisposed"]();
-
-      const entry = this.cache.get(requestor)!;
-      const cached = entry?.value;
-
-      if (cached && !force) {
-        if (cached.kind === "resolved") {
-          return Promise.resolve(cached.value);
-        } else if (cached.kind === "rejected") {
-          throw cached.error;
-        } else {
-          return cached.promise;
-        }
-      }
-
-      const promise = new Promise((resolve, reject) => {
-        const replacer = this.initialValues.find(
-          (item) => item.executor === requestor
-        );
-
-        let factory = requestor.factory;
-        let dependencies = requestor.dependencies;
-        if (replacer) {
-          const value = replacer.value;
-
-          if (!isExecutor(value)) {
-            return setTimeout(() => {
-              this.cache.set(requestor, {
-                accessor,
-                value: { kind: "resolved", value: replacer.value },
-              });
-              resolve(replacer.value);
-            }, 0);
-          }
-
-          factory = value.factory as any;
-          dependencies = value.dependencies;
-        }
-
-        this["~resolveDependencies"](dependencies, requestor)
-          .then((dependencies) => {
-            // Enhanced factory function error handling
-            try {
-              const factoryResult = factory(dependencies as any, controller);
-              
-              // Handle async factory errors by wrapping the promise
-              if (factoryResult instanceof Promise) {
-                return factoryResult.catch((asyncError) => {
-                  const executorName = getExecutorName(requestor);
-                  const dependencyChain = [executorName]; // TODO: Build full chain from resolution stack
-                  
-                  const factoryError = createFactoryError(
-                    ErrorCodes.FACTORY_ASYNC_ERROR,
-                    executorName,
-                    dependencyChain,
-                    asyncError,
-                    {
-                      dependenciesResolved: dependencies !== undefined,
-                      factoryType: typeof factory,
-                      isAsyncFactory: true,
-                    }
-                  );
-                  
-                  throw factoryError;
-                });
-              }
-              
-              return factoryResult;
-            } catch (error) {
-              // Create enhanced factory execution error with context
-              const executorName = getExecutorName(requestor);
-              const dependencyChain = [executorName]; // TODO: Build full chain from resolution stack
-              
-              const factoryError = createFactoryError(
-                ErrorCodes.FACTORY_THREW_ERROR,
-                executorName,
-                dependencyChain,
-                error,
-                {
-                  dependenciesResolved: dependencies !== undefined,
-                  factoryType: typeof factory,
-                  isAsyncFactory: false,
-                }
-              );
-              
-              throw factoryError;
-            }
-          })
-          .then(async (result) => {
-            let current = result;
-
-            // Handle generator results with enhanced error handling
-            if (isGenerator(result) || isAsyncGenerator(result)) {
-              try {
-                const { returned } = await collectFromGenerator(result);
-                current = returned;
-              } catch (generatorError) {
-                const executorName = getExecutorName(requestor);
-                const dependencyChain = [executorName];
-                
-                const factoryError = createFactoryError(
-                  ErrorCodes.FACTORY_GENERATOR_ERROR,
-                  executorName,
-                  dependencyChain,
-                  generatorError,
-                  {
-                    generatorType: isGenerator(result) ? 'sync' : 'async',
-                    factoryType: typeof factory,
-                  }
-                );
-                
-                throw factoryError;
-              }
-            }
-
-            const events = this.onEvents.change;
-            for (const event of events) {
-              const updated = await event("resolve", requestor, current, this);
-              if (updated !== undefined && updated.executor === requestor) {
-                current = updated.value;
-              }
-            }
-
-            this.cache.set(requestor, {
-              accessor,
-              value: { kind: "resolved", value: current },
-            });
-
-            resolve(current);
-          })
-          .catch((error) => {
-            // Enhanced error storage with context
-            let enhancedError = error;
-            let errorContext = undefined;
-            
-            // If it's already an enhanced error, preserve it
-            if (error?.context && error?.code) {
-              enhancedError = error;
-              errorContext = error.context;
-            } else {
-              // Create enhanced error for non-factory errors (dependency resolution, etc.)
-              const executorName = getExecutorName(requestor);
-              const dependencyChain = [executorName];
-              
-              enhancedError = createSystemError(
-                ErrorCodes.INTERNAL_RESOLUTION_ERROR,
-                executorName,
-                dependencyChain,
-                error,
-                {
-                  errorType: error?.constructor?.name || 'UnknownError',
-                  resolutionPhase: 'post-factory',
-                }
-              );
-              errorContext = enhancedError.context;
-            }
-
-            this.cache.set(requestor, {
-              accessor,
-              value: { 
-                kind: "rejected", 
-                error,  // Keep original error for backward compatibility
-                context: errorContext,
-                enhancedError: enhancedError
-              },
-            });
-
-            // Trigger error callbacks
-            this["~triggerError"](enhancedError, requestor);
-
-            reject(enhancedError);
-          });
-      });
-
-      this.cache.set(requestor, {
-        accessor,
-        value: { kind: "pending", promise },
-      });
-
-      return promise;
-    };
-
-    return Object.assign(accessor, {
-      get: () => {
-        this["~ensureNotDisposed"]();
-
-        const cacheEntry = this.cache.get(requestor)?.value;
-
-        if (!cacheEntry || cacheEntry.kind === "pending") {
-          throw new Error("Executor is not resolved");
-        }
-
-        if (cacheEntry.kind === "rejected") {
-          // Throw enhanced error if available, fallback to original error for backward compatibility
-          throw cacheEntry.enhancedError || cacheEntry.error;
-        }
-
-        return cacheEntry.value;
-      },
-      lookup: () => {
-        this["~ensureNotDisposed"]();
-
-        const cacheEntry = this.cache.get(requestor);
-
-        if (!cacheEntry) {
-          return undefined;
-        }
-
-        return cacheEntry.value;
-      },
-      metas: e.metas,
-      resolve,
-      release: async (soft: boolean = false) => {
-        this.release(requestor, soft);
-      },
-      update: (updateFn: unknown | ((current: unknown) => unknown)) => {
-        return this.update(requestor, updateFn);
-      },
-      set: async (value): Promise<void> => {
-        return this.update(requestor, value);
-      },
-      subscribe: (cb: (value: unknown) => void) => {
-        this["~ensureNotDisposed"]();
-        return this.onUpdate(requestor, cb);
-      },
-    } satisfies Partial<Core.Accessor<unknown>>);
+    const accessor = new AccessorImpl(this, requestor, e.metas);
+    return accessor;
   }
 
   accessor<T>(executor: Core.Executor<T>): Core.Accessor<T> {

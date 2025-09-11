@@ -37,9 +37,8 @@ test("basic", async () => {
 });
 
 test("meta should work with void as well", async () => {
-  const voidMeta = meta(Symbol(), custom<void>())
-  const e = provide(() => null, voidMeta())
+  const voidMeta = meta(Symbol(), custom<void>());
+  const e = provide(() => null, voidMeta());
 
-  expect(voidMeta.find(e), 'can void be void?').not.toBeUndefined
-
-})
+  expect(voidMeta.find(e), "can void be void?").not.toBeUndefined;
+});

@@ -50,20 +50,34 @@ export type PreparedExecutor<T> = {
   escape: () => Core.Executor<T>;
 };
 
+class PreparedExecutorImpl<T> {
+  private scope: Core.Scope;
+  private executor: Core.Executor<T>;
+
+  constructor(scope: Core.Scope, executor: Core.Executor<T>) {
+    this.scope = scope;
+    this.executor = executor;
+  }
+
+  async __call(): Promise<Core.InferOutput<Core.Executor<T>>> {
+    return await this.scope.resolve(this.executor);
+  }
+
+  escape(): Core.Executor<T> {
+    return this.executor;
+  }
+}
+
 export function prepare<T>(
   scope: Core.Scope,
   executor: Core.Executor<T>
 ): PreparedExecutor<Core.InferOutput<Core.Executor<T>>> {
-  const fn: PreparedExecutor<Core.InferOutput<Core.Executor<T>>> =
-    (async () => {
-      return await scope.resolve(executor);
-    }) as any;
-
-  return Object.assign(fn, {
-    escape: () => {
-      return executor;
-    },
-  });
+  const impl = new PreparedExecutorImpl(scope, executor);
+  
+  const fn = (async () => impl.__call()) as any;
+  fn.escape = () => impl.escape();
+  
+  return fn;
 }
 
 export type AdaptedExecutor<A extends Array<unknown>, T> = {
@@ -71,18 +85,33 @@ export type AdaptedExecutor<A extends Array<unknown>, T> = {
   escape: () => Core.Executor<(...args: A) => Promise<Awaited<T>>>;
 };
 
+class AdaptedExecutorImpl<A extends Array<unknown>, T> {
+  private scope: Core.Scope;
+  private executor: Core.Executor<(...args: A) => Promise<T> | T>;
+
+  constructor(scope: Core.Scope, executor: Core.Executor<(...args: A) => Promise<T> | T>) {
+    this.scope = scope;
+    this.executor = executor;
+  }
+
+  async __call(...args: A): Promise<Awaited<T>> {
+    const fn = await this.scope.resolve(this.executor);
+    return await fn(...args);
+  }
+
+  escape(): Core.Executor<(...args: A) => Promise<Awaited<T>>> {
+    return this.executor as Core.Executor<(...args: A) => Promise<Awaited<T>>>;
+  }
+}
+
 export function adapt<A extends Array<unknown>, T>(
   scope: Core.Scope,
   executor: Core.Executor<(...args: A) => Promise<T> | T>
 ): AdaptedExecutor<A, T> {
-  const fn: AdaptedExecutor<A, T> = (async (...args: A) => {
-    const fn = await scope.resolve(executor);
-    return await fn(...args);
-  }) as any;
-
-  return Object.assign(fn, {
-    escape: () => {
-      return executor;
-    },
-  });
+  const impl = new AdaptedExecutorImpl(scope, executor);
+  
+  const fn = (async (...args: A) => impl.__call(...args)) as AdaptedExecutor<A, T>;
+  fn.escape = () => impl.escape();
+  
+  return fn;
 }

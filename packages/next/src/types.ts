@@ -1,5 +1,5 @@
 import { AdaptedExecutor, PreparedExecutor } from "./helpers";
-import type { DataStore } from "./data-accessor";
+import type { DataStore } from "./accessor";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -287,8 +287,6 @@ export declare namespace Core {
     ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
 
-  type K = InferOutput<[Core.Executor<string>, Core.Executor<number>]>;
-  //     ^?
 
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;

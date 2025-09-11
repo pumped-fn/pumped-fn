@@ -2,19 +2,19 @@ import type { Core, Flow } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
-import type { DataAccessor } from "./data-accessor";
+import type { Accessor } from "./accessor";
 import { ExecutorResolutionError, FactoryExecutionError } from "./types";
 import { ErrorCodes } from "./error-codes";
 
 export function createInitialContext<
   T extends Record<string, unknown>
 >(initializers: {
-  [K in keyof T]: { accessor: DataAccessor<T[K]>; value: T[K] };
+  [K in keyof T]: { accessor: Accessor<T[K]>; value: T[K] };
 }): Flow.ContextData {
   const context = new Map();
   for (const [_, config] of Object.entries(initializers)) {
     const { accessor, value } = config as {
-      accessor: DataAccessor<unknown>;
+      accessor: Accessor<unknown>;
       value: unknown;
     };
     context.set(accessor.key, value);
