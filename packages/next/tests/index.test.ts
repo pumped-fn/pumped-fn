@@ -288,3 +288,19 @@ test("provider can control itself", async () => {
   await new Promise((resolve) => setTimeout(resolve, 150));
   expect(fn).toBeCalledTimes(2);
 });
+
+test("preset should work with either value and other executor", async () => {
+  const value = provide(() => 0);
+
+  const fakeValue = provide(() => 1);
+  const derivedValue = derive(value, (value) => value * 2);
+
+  let scope = createScope(preset(value, fakeValue));
+  let resolvedValue = await scope.resolve(derivedValue);
+  expect(resolvedValue).toBe(2);
+  await scope.dispose();
+
+  scope = createScope(preset(value, 2));
+  resolvedValue = await scope.resolve(derivedValue);
+  expect(resolvedValue).toBe(4);
+});

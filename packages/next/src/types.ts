@@ -191,7 +191,7 @@ export declare namespace Core {
   export interface Preset<T> {
     [executorSymbol]: "preset";
     executor: Executor<T>;
-    value: T;
+    value: T | Executor<T>;
   }
 
   export type InferOutput<T> = T extends

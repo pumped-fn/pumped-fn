@@ -4,15 +4,17 @@ import { createScope } from "./scope";
 import { validate } from "./ssch";
 import type { DataAccessor } from "./data-accessor";
 
-
-export function createInitialContext<T extends Record<string, unknown>>(
-  initializers: {
-    [K in keyof T]: { accessor: DataAccessor<T[K]>; value: T[K] }
-  }
-): Flow.ContextData {
+export function createInitialContext<
+  T extends Record<string, unknown>
+>(initializers: {
+  [K in keyof T]: { accessor: DataAccessor<T[K]>; value: T[K] };
+}): Flow.ContextData {
   const context = new Map();
   for (const [_, config] of Object.entries(initializers)) {
-    const { accessor, value } = config as { accessor: DataAccessor<unknown>; value: unknown };
+    const { accessor, value } = config as {
+      accessor: DataAccessor<unknown>;
+      value: unknown;
+    };
     context.set(accessor.key, value);
   }
   return context;
@@ -75,7 +77,10 @@ export class FlowError extends Error {
   }
 }
 
-function createController(context: Flow.ExecutionContext): Flow.Controller & {
+function createController(
+  context: Flow.ExecutionContext,
+  opt: Flow.ExecuteOpt | undefined
+): Flow.Controller & {
   context: Flow.ExecutionContext;
 } {
   const controller: Flow.Controller & { context: Flow.ExecutionContext } = {
@@ -83,18 +88,18 @@ function createController(context: Flow.ExecutionContext): Flow.Controller & {
     safeExecute: async (flowDef, param, opts) => {
       try {
         let resolvedFlow: Flow.Flow<any, any>;
-        if ('execution' in flowDef && typeof flowDef.execution === 'function') {
+        if ("execution" in flowDef && typeof flowDef.execution === "function") {
           resolvedFlow = flowDef as Flow.Flow<any, any>;
         } else if (context.scope) {
           resolvedFlow = await context.scope.pod().resolve(flowDef as any);
         } else {
           throw new FlowError("Cannot resolve executor without a scope");
         }
-        
+
         const validatedInput = validate(resolvedFlow.input, param);
 
         const childData = new Map(context.data);
-        
+
         if (opts?.initialContext) {
           for (const [key, value] of opts.initialContext) {
             childData.set(key, value);
@@ -114,7 +119,7 @@ function createController(context: Flow.ExecutionContext): Flow.Controller & {
             return childData.set(key, value);
           },
         };
-        const childController = createController(childContext);
+        const childController = createController(childContext, opt);
 
         let execution = async () =>
           resolvedFlow.execution(validatedInput, childController);
@@ -128,12 +133,15 @@ function createController(context: Flow.ExecutionContext): Flow.Controller & {
         const result = await execution();
         return { kind: "success", value: result };
       } catch (error) {
-        const wrappedError = error instanceof FlowError 
-          ? error 
-          : new FlowError(
-              error instanceof Error ? error.message : "Flow execution failed",
-              { cause: error }
-            );
+        const wrappedError =
+          error instanceof FlowError
+            ? error
+            : new FlowError(
+                error instanceof Error
+                  ? error.message
+                  : "Flow execution failed",
+                { cause: error }
+              );
         return { kind: "error", error: wrappedError };
       }
     },
@@ -182,7 +190,7 @@ export async function execute<Input, Output>(
       return contextData.set(key, value);
     },
   };
-  const controller = createController(context);
+  const controller = createController(context, opt);
   const flowWithContext = { ...flow, context };
 
   let executionResult: Flow.Result<Output>;
@@ -200,12 +208,13 @@ export async function execute<Input, Output>(
     const result = await execution();
     executionResult = { kind: "success", value: result };
   } catch (error) {
-    const wrappedError = error instanceof FlowError 
-      ? error 
-      : new FlowError(
-          error instanceof Error ? error.message : "Flow execution failed",
-          { cause: error }
-        );
+    const wrappedError =
+      error instanceof FlowError
+        ? error
+        : new FlowError(
+            error instanceof Error ? error.message : "Flow execution failed",
+            { cause: error }
+          );
     executionResult = { kind: "error", error: wrappedError };
   }
 

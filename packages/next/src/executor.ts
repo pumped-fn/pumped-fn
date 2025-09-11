@@ -127,7 +127,7 @@ export function derive<T, D extends Core.DependencyLike>(
 
 export function preset<T>(
   e: Core.Executor<T> | Escapable<T>,
-  v: T
+  v: T | Core.Executor<T>
 ): Core.Preset<T> {
   const executor = isExecutor(e) ? e : e.escape();
 

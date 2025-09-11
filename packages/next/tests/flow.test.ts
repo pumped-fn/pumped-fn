@@ -53,7 +53,7 @@ describe("flow test", () => {
       input: custom<{ name: string }>(),
       output: custom<{ id: number; name: string }>(),
     },
-    async ([userSvc], input) => {
+    async ([userSvc], input, ctl) => {
       return userSvc.create(input.name);
     }
   );
@@ -200,7 +200,7 @@ describe("flow test", () => {
       }
     );
 
-    const { result } = await flow.execute(mainFlow, { value: "test" });
+    const { result } = await flow.execute(mainFlow, { value: "test" },  { });
 
     expect(result.kind).toBe("success");
     if (result.kind === "success") {

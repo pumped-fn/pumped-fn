@@ -43,6 +43,7 @@ class BaseScope implements Core.Scope {
 
   protected plugins: Core.Plugin[] = [];
   protected registry: Core.Executor<unknown>[] = [];
+  protected initialValues: Core.Preset<unknown>[] = [];
 
   constructor(options?: ScopeOption) {
     this.isPod = options?.pod || false;
@@ -51,9 +52,7 @@ class BaseScope implements Core.Scope {
     }
 
     if (options?.initialValues) {
-      for (const preset of options.initialValues) {
-        this.set(preset.executor, preset.value);
-      }
+      this.initialValues = options.initialValues;
     }
 
     if (options?.plugins) {
@@ -164,7 +163,7 @@ class BaseScope implements Core.Scope {
   }
 
   protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
-    const requestor =
+    let requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
         : (e as UE);
@@ -175,7 +174,7 @@ class BaseScope implements Core.Scope {
     }
 
     const accessor = {} as Core.Accessor<unknown>;
-    const factory = requestor.factory;
+
     const controller = {
       cleanup: (cleanup: Core.Cleanup) => {
         const currentSet = this.cleanups.get(requestor) ?? new Set();
@@ -207,7 +206,30 @@ class BaseScope implements Core.Scope {
       }
 
       const promise = new Promise((resolve, reject) => {
-        this["~resolveDependencies"](requestor.dependencies, requestor)
+        const replacer = this.initialValues.find(
+          (item) => item.executor === requestor
+        );
+
+        let factory = requestor.factory;
+        let dependencies = requestor.dependencies;
+        if (replacer) {
+          const value = replacer.value;
+
+          if (!isExecutor(value)) {
+            return setTimeout(() => {
+              this.cache.set(requestor, {
+                accessor,
+                value: { kind: "resolved", value: replacer.value },
+              });
+              resolve(replacer.value);
+            }, 0);
+          }
+
+          factory = value.factory as any;
+          dependencies = value.dependencies;
+        }
+
+        this["~resolveDependencies"](dependencies, requestor)
           .then((dependencies) => factory(dependencies as any, controller))
           .then(async (result) => {
             let current = result;
@@ -247,6 +269,7 @@ class BaseScope implements Core.Scope {
         accessor,
         value: { kind: "pending", promise },
       });
+
       return promise;
     };
 
