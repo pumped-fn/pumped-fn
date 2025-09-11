@@ -12,6 +12,14 @@ import {
   isAsyncGenerator,
   collectFromGenerator,
 } from "./generator-utils";
+import {
+  ErrorCodes,
+  createFactoryError,
+  createDependencyError,
+  createSystemError,
+  getExecutorName,
+  buildDependencyChain,
+} from "./error-codes";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -230,14 +238,79 @@ class BaseScope implements Core.Scope {
         }
 
         this["~resolveDependencies"](dependencies, requestor)
-          .then((dependencies) => factory(dependencies as any, controller))
+          .then((dependencies) => {
+            // Enhanced factory function error handling
+            try {
+              const factoryResult = factory(dependencies as any, controller);
+              
+              // Handle async factory errors by wrapping the promise
+              if (factoryResult instanceof Promise) {
+                return factoryResult.catch((asyncError) => {
+                  const executorName = getExecutorName(requestor);
+                  const dependencyChain = [executorName]; // TODO: Build full chain from resolution stack
+                  
+                  const factoryError = createFactoryError(
+                    ErrorCodes.FACTORY_ASYNC_ERROR,
+                    executorName,
+                    dependencyChain,
+                    asyncError,
+                    {
+                      dependenciesResolved: dependencies !== undefined,
+                      factoryType: typeof factory,
+                      isAsyncFactory: true,
+                    }
+                  );
+                  
+                  throw factoryError;
+                });
+              }
+              
+              return factoryResult;
+            } catch (error) {
+              // Create enhanced factory execution error with context
+              const executorName = getExecutorName(requestor);
+              const dependencyChain = [executorName]; // TODO: Build full chain from resolution stack
+              
+              const factoryError = createFactoryError(
+                ErrorCodes.FACTORY_THREW_ERROR,
+                executorName,
+                dependencyChain,
+                error,
+                {
+                  dependenciesResolved: dependencies !== undefined,
+                  factoryType: typeof factory,
+                  isAsyncFactory: false,
+                }
+              );
+              
+              throw factoryError;
+            }
+          })
           .then(async (result) => {
             let current = result;
 
-            // Handle generator results
+            // Handle generator results with enhanced error handling
             if (isGenerator(result) || isAsyncGenerator(result)) {
-              const { returned } = await collectFromGenerator(result);
-              current = returned;
+              try {
+                const { returned } = await collectFromGenerator(result);
+                current = returned;
+              } catch (generatorError) {
+                const executorName = getExecutorName(requestor);
+                const dependencyChain = [executorName];
+                
+                const factoryError = createFactoryError(
+                  ErrorCodes.FACTORY_GENERATOR_ERROR,
+                  executorName,
+                  dependencyChain,
+                  generatorError,
+                  {
+                    generatorType: isGenerator(result) ? 'sync' : 'async',
+                    factoryType: typeof factory,
+                  }
+                );
+                
+                throw factoryError;
+              }
             }
 
             const events = this.onEvents.change;
@@ -256,12 +329,43 @@ class BaseScope implements Core.Scope {
             resolve(current);
           })
           .catch((error) => {
+            // Enhanced error storage with context
+            let enhancedError = error;
+            let errorContext = undefined;
+            
+            // If it's already an enhanced error, preserve it
+            if (error?.context && error?.code) {
+              enhancedError = error;
+              errorContext = error.context;
+            } else {
+              // Create enhanced error for non-factory errors (dependency resolution, etc.)
+              const executorName = getExecutorName(requestor);
+              const dependencyChain = [executorName];
+              
+              enhancedError = createSystemError(
+                ErrorCodes.INTERNAL_RESOLUTION_ERROR,
+                executorName,
+                dependencyChain,
+                error,
+                {
+                  errorType: error?.constructor?.name || 'UnknownError',
+                  resolutionPhase: 'post-factory',
+                }
+              );
+              errorContext = enhancedError.context;
+            }
+
             this.cache.set(requestor, {
               accessor,
-              value: { kind: "rejected", error },
+              value: { 
+                kind: "rejected", 
+                error,  // Keep original error for backward compatibility
+                context: errorContext,
+                enhancedError: enhancedError
+              },
             });
 
-            reject(error);
+            reject(enhancedError);
           });
       });
 
@@ -284,7 +388,8 @@ class BaseScope implements Core.Scope {
         }
 
         if (cacheEntry.kind === "rejected") {
-          throw cacheEntry.error;
+          // Throw enhanced error if available, fallback to original error for backward compatibility
+          throw cacheEntry.enhancedError || cacheEntry.error;
         }
 
         return cacheEntry.value;

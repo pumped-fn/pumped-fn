@@ -3,6 +3,8 @@ import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
 import type { DataAccessor } from "./data-accessor";
+import { ExecutorResolutionError, FactoryExecutionError } from "./types";
+import { ErrorCodes } from "./error-codes";
 
 export function createInitialContext<
   T extends Record<string, unknown>
@@ -71,9 +73,52 @@ export function derive<D extends Core.DependencyLike, Input, Output>(
 }
 
 export class FlowError extends Error {
+  public readonly code: string;
+  public readonly category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR";
+
   constructor(message: string, public details?: any) {
     super(message);
+    // Manually set cause if provided (including falsy values like null)
+    if (details && "cause" in details) {
+      (this as any).cause = details.cause;
+    }
     this.name = "FlowError";
+
+    // Extract error information from enhanced errors if available
+    if (details?.enhancedError) {
+      this.code = details.errorCode || ErrorCodes.FLOW_EXECUTION_FAILED;
+      this.category = details.errorCategory || "USER_ERROR";
+    } else {
+      this.code = ErrorCodes.FLOW_EXECUTION_FAILED;
+      this.category = "USER_ERROR";
+    }
+  }
+
+  /**
+   * Get the original enhanced error if available
+   */
+  getEnhancedError():
+    | ExecutorResolutionError
+    | FactoryExecutionError
+    | undefined {
+    return this.details?.enhancedError;
+  }
+
+  /**
+   * Get the error context from enhanced error if available
+   */
+  getErrorContext(): unknown {
+    return this.details?.errorContext;
+  }
+
+  /**
+   * Get flow-specific context
+   */
+  getFlowContext(): { flowName?: string; flowDescription?: string } {
+    return {
+      flowName: this.details?.flowName as string | undefined,
+      flowDescription: this.details?.flowDescription as string | undefined,
+    };
   }
 }
 
@@ -170,10 +215,31 @@ export async function execute<Input, Output>(
   try {
     flow = await pod.resolve(executor);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new FlowError(`Failed to resolve executor: ${errorMessage}`, {
-      cause: error,
-    });
+    // Preserve enhanced error context if available
+    if (
+      error instanceof ExecutorResolutionError ||
+      error instanceof FactoryExecutionError
+    ) {
+      // Re-throw enhanced errors with additional flow context
+      throw new FlowError(`Flow execution failed: ${error.message}`, {
+        cause: error,
+        enhancedError: error,
+        errorCode: error.code,
+        errorCategory: error.category,
+        errorContext: error.context,
+        flowName: opt?.name,
+        flowDescription: opt?.description,
+      });
+    } else {
+      // Handle non-enhanced errors with basic wrapping
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new FlowError(`Failed to resolve executor: ${errorMessage}`, {
+        cause: error,
+        flowName: opt?.name,
+        flowDescription: opt?.description,
+      });
+    }
   }
 
   const contextData = opt?.initialContext || new Map();

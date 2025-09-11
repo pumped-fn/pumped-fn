@@ -64,6 +64,79 @@ export class SchemaError extends Error {
   }
 }
 
+export interface ErrorContext {
+  readonly executorName?: string;
+  readonly resolutionStage: "dependency-resolution" | "factory-execution" | "post-processing" | "validation";
+  readonly dependencyChain: string[];
+  readonly scopeId?: string;
+  readonly timestamp: number;
+  readonly additionalInfo?: Record<string, unknown>;
+}
+
+export class ExecutorResolutionError extends Error {
+  public readonly context: ErrorContext;
+  public readonly code: string;
+  public readonly category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR";
+
+  constructor(
+    message: string,
+    context: ErrorContext,
+    code: string,
+    category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR" = "USER_ERROR",
+    options?: { cause?: unknown }
+  ) {
+    super(message);
+    // Manually set cause if options provided
+    if (options && 'cause' in options) {
+      (this as any).cause = options.cause;
+    }
+    this.name = "ExecutorResolutionError";
+    this.context = context;
+    this.code = code;
+    this.category = category;
+  }
+}
+
+export class FactoryExecutionError extends ExecutorResolutionError {
+  constructor(
+    message: string,
+    context: Omit<ErrorContext, "resolutionStage">,
+    code: string,
+    options?: { cause?: unknown }
+  ) {
+    super(
+      message,
+      { ...context, resolutionStage: "factory-execution" },
+      code,
+      "USER_ERROR",
+      options
+    );
+    this.name = "FactoryExecutionError";
+  }
+}
+
+export class DependencyResolutionError extends ExecutorResolutionError {
+  public readonly missingDependency?: string;
+
+  constructor(
+    message: string,
+    context: Omit<ErrorContext, "resolutionStage">,
+    code: string,
+    missingDependency?: string,
+    options?: { cause?: unknown }
+  ) {
+    super(
+      message,
+      { ...context, resolutionStage: "dependency-resolution" },
+      code,
+      "USER_ERROR",
+      options
+    );
+    this.name = "DependencyResolutionError";
+    this.missingDependency = missingDependency;
+  }
+}
+
 export declare namespace Meta {
   export interface MetaContainer {
     metas: Meta[] | undefined;
@@ -170,7 +243,12 @@ export declare namespace Core {
 
   export type PendingState<T> = { kind: "pending"; promise: Promise<T> };
   export type ResolvedState<T> = { kind: "resolved"; value: T };
-  export type RejectedState = { kind: "rejected"; error: unknown };
+  export type RejectedState = { 
+    kind: "rejected"; 
+    error: unknown;
+    context?: ErrorContext;
+    enhancedError?: ExecutorResolutionError;
+  };
 
   export type ResolveState<T> =
     | PendingState<T>

@@ -24,6 +24,7 @@ export * from "./meta";
 export * from "./scope";
 export * from "./ssch";
 export * from "./types";
+export * from "./error-codes";
 
 export const name: Meta.MetaFn<string> = meta(
   "pumped-fn/name",
