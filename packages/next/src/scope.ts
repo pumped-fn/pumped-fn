@@ -6,7 +6,12 @@ import {
   isExecutor,
   isPreset,
 } from "./executor";
-import { Core } from "./types";
+import { 
+  Core, 
+  ExecutorResolutionError, 
+  FactoryExecutionError, 
+  DependencyResolutionError 
+} from "./types";
 import {
   isGenerator,
   isAsyncGenerator,
@@ -45,7 +50,9 @@ class BaseScope implements Core.Scope {
   protected onEvents = {
     change: new Set<Core.ChangeCallback>(),
     release: new Set<Core.ReleaseCallback>(),
+    error: new Set<Core.GlobalErrorCallback>(),
   } as const;
+  protected onErrors = new Map<UE, Set<Core.ErrorCallback<unknown>>>();
   protected isPod: boolean;
   private isDisposing = false;
 
@@ -101,6 +108,46 @@ class BaseScope implements Core.Scope {
           }
         } else {
           await t(ce.accessor);
+        }
+      }
+    }
+  }
+
+  protected async "~triggerError"(
+    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    executor: UE
+  ): Promise<void> {
+    // Trigger per-executor error callbacks
+    const executorCallbacks = this.onErrors.get(executor);
+    if (executorCallbacks) {
+      for (const callback of Array.from(executorCallbacks.values())) {
+        try {
+          await callback(error, executor, this);
+        } catch (callbackError) {
+          // Don't let callback errors break the error handling flow
+          console.error('Error in error callback:', callbackError);
+        }
+      }
+    }
+
+    // Trigger global error callbacks
+    for (const callback of Array.from(this.onEvents.error.values())) {
+      try {
+        await callback(error, executor, this);
+      } catch (callbackError) {
+        // Don't let callback errors break the error handling flow
+        console.error('Error in global error callback:', callbackError);
+      }
+    }
+
+    // Trigger plugin error handlers
+    for (const plugin of this.plugins) {
+      if (plugin.onError) {
+        try {
+          await plugin.onError(error, executor, this);
+        } catch (pluginError) {
+          // Don't let plugin errors break the error handling flow
+          console.error('Error in plugin error handler:', pluginError);
         }
       }
     }
@@ -365,6 +412,9 @@ class BaseScope implements Core.Scope {
               },
             });
 
+            // Trigger error callbacks
+            this["~triggerError"](enhancedError, requestor);
+
             reject(enhancedError);
           });
       });
@@ -548,6 +598,8 @@ class BaseScope implements Core.Scope {
     this.onUpdates.clear();
     this.onEvents.change.clear();
     this.onEvents.release.clear();
+    this.onEvents.error.clear();
+    this.onErrors.clear();
   }
 
   onUpdate<T>(
@@ -600,6 +652,48 @@ class BaseScope implements Core.Scope {
       this["~ensureNotDisposed"]();
       this.onEvents["release"].delete(cb);
     };
+  }
+
+  onError<T>(executor: Core.Executor<T>, callback: Core.ErrorCallback<T>): Core.Cleanup;
+  onError(callback: Core.GlobalErrorCallback): Core.Cleanup;
+  onError<T>(
+    executorOrCallback: Core.Executor<T> | Core.GlobalErrorCallback,
+    callback?: Core.ErrorCallback<T>
+  ): Core.Cleanup {
+    this["~ensureNotDisposed"]();
+    if (this.isDisposing) {
+      throw new Error("Cannot register error callback on a disposing scope");
+    }
+
+    // Global error handler
+    if (typeof executorOrCallback === 'function') {
+      this.onEvents["error"].add(executorOrCallback);
+      return () => {
+        this["~ensureNotDisposed"]();
+        this.onEvents["error"].delete(executorOrCallback);
+      };
+    }
+
+    // Per-executor error handler
+    if (callback) {
+      const executor = executorOrCallback;
+      const errorCallbacks = this.onErrors.get(executor) ?? new Set();
+      this.onErrors.set(executor, errorCallbacks);
+      errorCallbacks.add(callback as Core.ErrorCallback<unknown>);
+
+      return () => {
+        this["~ensureNotDisposed"]();
+        const callbacks = this.onErrors.get(executor);
+        if (callbacks) {
+          callbacks.delete(callback as Core.ErrorCallback<unknown>);
+          if (callbacks.size === 0) {
+            this.onErrors.delete(executor);
+          }
+        }
+      };
+    }
+
+    throw new Error("Invalid arguments for onError");
   }
 
   use(plugin: Core.Plugin): Core.Cleanup {

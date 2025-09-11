@@ -307,12 +307,25 @@ export declare namespace Core {
     scope: Scope
   ) => void | Promise<void>;
 
+  export type ErrorCallback<T = unknown> = (
+    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    executor: Executor<T>,
+    scope: Scope
+  ) => void | Promise<void>;
+
+  export type GlobalErrorCallback = (
+    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    executor: Executor<unknown>,
+    scope: Scope
+  ) => void | Promise<void>;
+
   export type Plugin = {
     init?: (
       scope: Scope,
       initialOpt: { registry: Core.Executor<unknown>[] }
     ) => void | Promise<void>;
     dispose?: (scope: Scope) => void | Promise<void>;
+    onError?: GlobalErrorCallback;
   };
 
   export type SingleDependencyLike = Core.BaseExecutor<unknown>;
@@ -356,6 +369,8 @@ export declare namespace Core {
 
     onChange(cb: ChangeCallback): Cleanup;
     onRelease(cb: ReleaseCallback): Cleanup;
+    onError<T>(executor: Executor<T>, callback: ErrorCallback<T>): Cleanup;
+    onError(callback: GlobalErrorCallback): Cleanup;
 
     use(middleware: Plugin): Cleanup;
 
