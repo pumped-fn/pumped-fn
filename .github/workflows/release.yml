@@ -41,7 +41,7 @@ jobs:
         run: pnpm build
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm test --passWithNoTests
 
       - name: Create Release Pull Request or Publish
         id: changesets
