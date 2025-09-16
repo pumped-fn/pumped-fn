@@ -2,4 +2,4 @@
 
 The doc below would support llm to craft dependency graph using @pumped-fn/core-next
 
-<<< @/../packages/next/README.md
+<<< @/../packages/llm/llm.md
