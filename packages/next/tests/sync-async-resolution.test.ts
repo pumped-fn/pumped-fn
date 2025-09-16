@@ -21,12 +21,10 @@ describe('Synchronous vs Asynchronous Resolution', () => {
         return `derived-${dep}`;
       });
 
-      // First resolution - should call the factory
       const result1 = await scope.resolve(derivedExecutor);
       expect(result1).toBe('derived-sync-value');
       expect(callCount).toBe(1);
       
-      // Second resolution - should use cache efficiently
       const result2 = await scope.resolve(derivedExecutor);
       expect(result2).toBe('derived-sync-value');
       expect(callCount).toBe(1); // Should not call factory again
@@ -102,7 +100,6 @@ describe('Synchronous vs Asynchronous Resolution', () => {
 
   describe('Performance Comparison', () => {
     it('should be faster for synchronous-only dependency chains', async () => {
-      // Create a chain of sync dependencies
       let current = provide(() => 0);
       
       for (let i = 1; i <= 100; i++) {
@@ -118,10 +115,7 @@ describe('Synchronous vs Asynchronous Resolution', () => {
       const endTime = process.hrtime.bigint();
       const durationMs = Number(endTime - startTime) / 1000000;
       
-      console.log(`Sync chain resolution: ${durationMs.toFixed(2)}ms for 1000 iterations`);
-      console.log(`Average: ${(durationMs / 1000).toFixed(4)}ms per resolution`);
       
-      // Should be significantly faster than mixed async chains
       expect(durationMs).toBeLessThan(100); // Should complete in under 100ms
     });
 
@@ -139,8 +133,6 @@ describe('Synchronous vs Asynchronous Resolution', () => {
       const endTime = process.hrtime.bigint();
       
       const durationMs = Number(endTime - startTime) / 1000000;
-      
-      console.log(`Large sync array resolution: ${durationMs.toFixed(2)}ms`);
       
       expect(result).toBe(499500); // Sum of 0 to 999
       expect(durationMs).toBeLessThan(50); // Should be very fast

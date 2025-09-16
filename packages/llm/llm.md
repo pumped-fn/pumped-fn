@@ -4,359 +4,271 @@
 
 ---
 
-## 🧠 CORE MENTAL MODEL
+## 🧠 CORE CONCEPT
 
 **pumped-fn = Dependency Injection + Reactive Programming**
 
-**3 Core Concepts:**
-- `Executor` = Container holding values with dependencies
-- `Scope` = Resolution context managing lifecycles
-- `.reactive` = Auto-update variant for pure transformations
+### The ONE Rule
+```
+.reactive = Pure functions only (no side effects)
+Everything else = Standard executors
+```
 
-**THE Critical Decision:**
-```
-Need factory to re-run when dependencies change?
-    ↓
-   NO → Standard executor
-    ↓
-   YES → Has side effects?
-    ↓        ↓
-   YES      NO
-    ↓        ↓
-  NEVER    .reactive
- reactive   (pure only)
-```
+### Decision Matrix
+| Need | Pattern | Use |
+|------|---------|-----|
+| No dependencies | `provide(() => value)` | Source data |
+| With dependencies + side effects | `derive([deps], factory)` | Resources, handlers |
+| With dependencies + pure transform | `derive([deps.reactive], pure)` | Display, calculations |
+| Programmatic updates | `.static` accessor | Controllers |
+| Fresh data in callbacks | `accessor.get()` | Event handlers, timers |
 
 **Flow:** Define → Resolve → Use → Dispose
-**Graph:** Source → Derived → App
 
 ---
 
-## ⚡ QUICK REFERENCE
+## ⚡ API REFERENCE
 
-### API Cheat Sheet
+### Core Operations
 ```typescript
-// Create Executors
-provide(() => value, name('source'))                    // No dependencies
-derive([dep1, dep2], ([a,b]) => result, name('derived')) // With dependencies
-createScope()                                            // Resolution context
+// Sources (no dependencies)
+provide(() => ({ count: 0 }), name('state'))
 
-// Access Variants
+// Derived (with dependencies)
+derive([dep1, dep2], ([a, b]) => a + b, name('sum'))
+
+// Controllers (for updates)
+derive(state.static, (accessor) => ({
+  increment: () => accessor.update(s => ({ count: s.count + 1 }))
+}), name('controller'))
+
+// Display (pure transformations)
+derive(state.reactive, (data) => ({
+  formatted: `Count: ${data.count}`
+}), name('display'))
+
+// Scope operations
+const scope = createScope()
+const result = await scope.resolve(executor)
+await scope.dispose()
+```
+
+### Access Patterns
+```typescript
 executor.reactive  // Auto-updates (pure functions only)
-executor.static    // Manual updates (returns Accessor<T>)
-
-// Scope Operations
-scope.resolve(executor)  // Get resolved value
-scope.dispose()          // Cleanup all resources
-
-// Static Access (for programmatic updates)
-accessor.get()              // Read current value
-accessor.update(newValue)   // Write new value
-```
-
-### Decision Tree
-```
-What does your factory do?
-
-📊 Transform data only?
-   (pure function, no side effects)
-   └── USE .reactive
-
-🔧 Setup resources?
-   Setup handlers?
-   Register cleanup?
-   One-time initialization?
-   └── USE standard (no .reactive)
-```
-
-### Anti-Pattern Quick Check
-```typescript
-// 🚫 RED FLAGS in .reactive factories:
-addEventListener()  // Side effect
-setInterval()      // Side effect
-ctl.cleanup()      // Runs on every change!
-fetch()           // Side effect
-console.log()     // Side effect
-
-// ✅ SAFE in .reactive factories:
-data.map()        // Pure transformation
-Math.round()      // Pure function
-{ key: value }    // Pure object creation
+executor.static    // Returns Accessor<T> for manual access
+accessor.get()     // Read current value (always fresh)
+accessor.update(v) // Write new value
 ```
 
 ---
 
-## 📋 ESSENTIAL PATTERNS
+## 📋 THREE CANONICAL PATTERNS
 
-### Pattern 1: State + Display (Most Common)
-*For counters, timers, data displays*
-
+### Pattern 1: State + Controller + Display (Most Common)
 ```typescript
-// State source (programmatic updates)
+// State source
 const state = provide(() => ({ count: 0 }), name('state'));
 
-// Controller for updates (side effects)
-const controller = derive(state.static, (accessor, ctl) => ({
+// Controller for updates
+const controller = derive(state.static, (accessor) => ({
   increment: () => accessor.update(s => ({ count: s.count + 1 })),
   reset: () => accessor.update({ count: 0 })
 }), name('controller'));
 
-// Display (pure transformation)
+// Display for pure transformation
 const display = derive(state.reactive, (data) => ({
   formatted: `Count: ${data.count}`
 }), name('display'));
 ```
 
 ### Pattern 2: Resource Management
-*For services, connections, timers*
-
 ```typescript
 const service = derive([config], ([cfg], ctl) => {
   const resource = createResource(cfg);
-  ctl.cleanup(() => resource.dispose()); // ✅ Cleanup once
+  ctl.cleanup(() => resource.dispose()); // ✅ Cleanup on disposal
   return resource;
 }, name('service'));
 ```
 
-### Pattern 3: App Coordinator
-*Wire everything together*
-
+### Pattern 3: Timer/Fresh Access
 ```typescript
-const app = derive([display, controller], ([ui, ctrl], ctl) => {
-  // ✅ One-time setup (no .reactive)
-  setupKeyBindings(ctrl);
-  ctl.cleanup(() => console.log("Goodbye!"));
+const timer = derive([source.static, renderer.static],
+  ([sourceAccessor, rendererAccessor], ctl) => {
+    const tick = () => {
+      sourceAccessor.update(new Date());        // Update source
+      rendererAccessor.get().render();          // Access fresh renderer
+    };
 
-  return {
-    render: () => console.log(ui.formatted),
-    ...ctrl
-  };
-}, name('app'));
+    const interval = setInterval(tick, 1000);
+    ctl.cleanup(() => clearInterval(interval));
+
+    tick(); // Initial run
+  }, name('timer'));
 ```
 
-### Core Types
+### Pattern 4: Reactive Auto-Update (Avoids Circular Dependencies)
 ```typescript
-interface Core.Scope {
-  resolve<T>(executor: Core.Executor<T>): Promise<T>
-  dispose(): Promise<void>
-}
+// Source that changes over time
+const dataSource = provide(() => initialValue, name('source'));
 
-interface Accessor<T> {
-  get(): T
-  update(value: T | ((current: T) => T)): void
-}
+// Component that reacts to changes automatically
+const consumer = derive([dataSource.reactive], ([data]) => {
+  // Automatically re-runs when dataSource updates
+  return processData(data);
+}, name('consumer'));
+
+// Updater that modifies source (separate from consumer)
+const updater = derive([dataSource.static], ([accessor], ctl) => {
+  const interval = setInterval(() => {
+    accessor.update(generateNewValue());
+  }, 1000);
+  ctl.cleanup(() => clearInterval(interval));
+  return { update: () => accessor.update(generateNewValue()) };
+}, name('updater'));
+
+// App coordination (all components resolved together)
+const app = derive([updater, consumer], ([update, result]) => ({
+  ...update,
+  result
+}), name('app'));
 ```
 
 ---
 
-## 🚫 ANTI-PATTERNS & TROUBLESHOOTING
+## 🚫 ANTI-PATTERNS TABLE
 
-### Top 5 Critical Mistakes
+| ❌ Wrong | ✅ Correct | Why Wrong |
+|----------|-----------|-----------|
+| `derive(deps.reactive, (data, ctl) => { console.log(data); ctl.cleanup(...); })` | `derive(deps, (data, ctl) => { console.log(data); ctl.cleanup(...); })` | Side effects in reactive factory re-run on every change |
+| `derive([renderer], ([render]) => { return { doWork: () => render.render() }; })` | `derive([renderer.static], ([renderAcc]) => { return { doWork: () => renderAcc.get().render() }; })` | Stale closure over initial value |
+| `setInterval(work, 1000); return { timer };` | `const timer = setInterval(work, 1000); ctl.cleanup(() => clearInterval(timer));` | Resource leak without cleanup |
+| Chain: `a.reactive → b.reactive → c.reactive` | Use common source: `source.reactive → [a, b, c]` | Cascading re-runs on every source change |
+| `ctl.cleanup()` in .reactive | `ctl.cleanup()` in standard | Cleanup runs on every dependency change |
+| Accessing unresolved executor: `derive([a.static], ([aAcc]) => { bAcc.get() })` where b depends on a | Reorganize dependencies or use `.reactive` for automatic propagation | Circular dependency causes "Executor is not resolved" error |
 
-#### ❌ #1: Side Effects in Reactive Factories
+---
+
+## 💡 COMPLETE EXAMPLE: Time Display TUI
+
 ```typescript
-// ❌ WRONG: Runs on every dependency change
-const app = derive([state.reactive], ([data], ctl) => {
-  addEventListener('click', handler);  // ❌ Re-registers on every update!
-  ctl.cleanup(() => {});              // ❌ Cleanup runs on every change!
-  return { data };
-});
+import { provide, derive, createScope, name } from "@pumped-fn/core-next";
 
-// ✅ CORRECT: One-time setup
-const app = derive([state], ([data], ctl) => {
-  addEventListener('click', handler);  // ✅ Runs once
-  ctl.cleanup(() => {});              // ✅ Cleanup on disposal only
-  return { data };
-});
-```
+// 1. Time source (programmatic updates)
+const timeSource = provide(() => new Date(), name("time-source"));
 
-#### ❌ #2: Stale State Access
-```typescript
-// ❌ WRONG: displayData never updates
-const renderer = derive([display], ([displayData], ctl) => ({
-  render: () => console.log(displayData.formatted)  // ❌ Stale data
-}));
+// 2. Config state
+const config = provide(() => ({
+  formatIndex: 0,
+  showHelp: false
+}), name("config"));
 
-// ✅ CORRECT: Fresh state access
-const renderer = derive([state.static], ([stateAccessor], ctl) => ({
-  render: () => {
-    const currentData = stateAccessor.get();  // ✅ Fresh data
-    console.log(formatData(currentData));
+// 3. Config controller
+const configController = derive(config.static, (accessor) => ({
+  cycleFormat: () => accessor.update(cfg => ({
+    ...cfg,
+    formatIndex: (cfg.formatIndex + 1) % 3
+  })),
+  toggleHelp: () => accessor.update(cfg => ({
+    ...cfg,
+    showHelp: !cfg.showHelp
+  }))
+}), name("config-controller"));
+
+// 4. Time display (pure transformation)
+const display = derive([timeSource.reactive, config.reactive],
+  ([time, cfg]) => {
+    const formats = ["24-hour", "12-hour", "ISO"];
+    const formatted = cfg.formatIndex === 0
+      ? time.toLocaleTimeString("en-GB", { hour12: false })
+      : cfg.formatIndex === 1
+      ? time.toLocaleTimeString("en-US", { hour12: true })
+      : time.toISOString().split('T')[1].split('.')[0];
+
+    const content = [
+      `Time: ${formatted}`,
+      `Format: ${formats[cfg.formatIndex]}`
+    ];
+
+    if (cfg.showHelp) {
+      content.push("", "f - cycle format", "h - toggle help", "q - quit");
+    }
+
+    return { rendered: content.join('\n') };
+  }, name("display"));
+
+// 5. Renderer (reactive display - auto-updates when display changes)
+const renderer = derive([display.reactive], ([displayData], ctl) => {
+  let lastOutput = "";
+
+  // Auto-render when display data changes
+  if (displayData.rendered !== lastOutput) {
+    process.stdout.write('\x1b[H\x1b[J'); // Home + clear
+    process.stdout.write(displayData.rendered);
+    lastOutput = displayData.rendered;
   }
-}));
-```
 
-#### ❌ #3: Unnecessary Pass-Through Executors
-```typescript
-// ❌ WRONG: Extra layer
-const timeDisplay = derive(time.reactive, t => t, name('time-display'));
-const ui = derive(timeDisplay.reactive, t => format(t), name('ui'));
+  ctl.cleanup(() => {
+    process.stdout.write('\x1b[?25h\n'); // Show cursor
+    console.log("Thanks!");
+  });
 
-// ✅ CORRECT: Direct dependency
-const ui = derive(time.reactive, t => format(t), name('ui'));
-```
+  return { data: displayData };
+}, name("renderer"));
 
-#### ❌ #4: Missing Cleanup
-```typescript
-// ❌ WRONG: Resource leak
-const service = derive([], () => {
-  const timer = setInterval(work, 1000);
-  return { timer };  // ❌ Never cleared
-});
-
-// ✅ CORRECT: Proper cleanup
-const service = derive([], (deps, ctl) => {
-  const timer = setInterval(work, 1000);
-  ctl.cleanup(() => clearInterval(timer));  // ✅ Cleanup registered
-  return { timer };
-});
-```
-
-#### ❌ #5: Wrong Pattern Choice
-```typescript
-// ❌ WRONG: Everything reactive
-const everything = derive([a.reactive, b.reactive, c.reactive], ...);
-
-// ✅ CORRECT: Match pattern to purpose
-const display = derive(state.reactive, s => format(s));     // Data transformation
-const controller = derive(state.static, accessor => ({ ... })); // Updates
-const app = derive([display, controller], ([ui, ctrl]) => { ... }); // Coordination
-```
-
-### Common Error Messages → Solutions
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "Factory re-executed unexpectedly" | Using `.reactive` with side effects | Remove `.reactive` or make factory pure |
-| "Memory leak detected" | Missing `ctl.cleanup()` | Add cleanup for resources |
-| "Stale data in render" | Non-reactive accessing old values | Use `.static` accessor or `.reactive` |
-| "Circular dependency" | Import cycles | Use callback patterns to break cycles |
-
----
-
-## 🔧 ADVANCED PATTERNS
-
-### TUI Application Patterns
-
-#### Flicker-Free Rendering
-```typescript
-// ❌ WRONG: Screen flickers
-const renderer = derive(display.reactive, (data, ctl) => {
-  process.stdout.write('\x1b[2J\x1b[H'); // ❌ Clears entire screen
-  console.log(data.render());
-  ctl.cleanup(() => console.log("Thanks!")); // ❌ Runs on every change!
-});
-
-// ✅ CORRECT: Smooth rendering
-const renderer = derive([state.static], ([stateAccessor], ctl) => {
-  let lastOutput = '';
-  let isInit = false;
-
-  const render = () => {
-    const currentState = stateAccessor.get();
-    const output = formatDisplay(currentState);
-
-    if (output !== lastOutput) {
-      if (!isInit) {
-        process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // Hide cursor, clear once
-        isInit = true;
-      }
-      process.stdout.write('\x1b[H'); // ✅ Move cursor, don't clear
-      process.stdout.write(output);
-      lastOutput = output;
+// 6. Input handler
+const inputHandler = derive([configController], ([ctrl], ctl) => {
+  const handleKey = (key: string) => {
+    switch (key) {
+      case 'f': ctrl.cycleFormat(); break;
+      case 'h': ctrl.toggleHelp(); break;
+      case 'q': case '\u0003': process.exit(0);
     }
   };
 
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.on('data', handleKey);
+
   ctl.cleanup(() => {
-    process.stdout.write('\x1b[?25h'); // ✅ Show cursor on exit
-    console.log('\nThanks for playing!');
+    process.stdin.removeListener('data', handleKey);
+    process.stdin.setRawMode(false);
   });
 
-  return { render };
-});
-```
+  return { handleKey };
+}, name("input-handler"));
 
-#### Breaking Circular Dependencies
-```typescript
-// ✅ Use callback patterns for game loops
-const gameLoop = derive([controller, state.static], ([ctrl, stateAccessor], ctl) => {
-  let interval: NodeJS.Timeout | null = null;
-
-  const start = (onRender?: () => void) => {
-    interval = setInterval(() => {
-      ctrl.tick();
-      onRender?.(); // ✅ Callback breaks import cycle
-    }, stateAccessor.get().speed);
+// 7. Timer (updates time source only - rendering happens automatically)
+const timer = derive([timeSource.static], ([timeAccessor], ctl) => {
+  const tick = () => {
+    timeAccessor.update(new Date());      // Update source, triggers reactive chain
   };
 
-  ctl.cleanup(() => {
-    if (interval) clearInterval(interval);
-  });
+  process.stdout.write('\x1b[?25l');      // Hide cursor
+  tick(); // Initial update
 
-  return { start };
-});
+  const interval = setInterval(tick, 1000);
+  ctl.cleanup(() => clearInterval(interval));
 
-// Wire in main app
-const app = derive([gameLoop, renderer], ([loop, render], ctl) => {
-  const startup = () => loop.start(() => render.render());
-  return { startup };
-});
-```
+  return { tick };
+}, name("timer"));
 
-### Performance Optimizations
+// 8. App coordinator (includes renderer to ensure it's resolved)
+const app = derive([timer, inputHandler, renderer], ([timerCtrl, input, display]) => ({
+  ...timerCtrl,
+  ...input,
+  display
+}), name("app"));
 
-#### Separate Static from Dynamic Data
-```typescript
-// ✅ Static data outside executors
-const GAME_CONFIG = {
-  maxScore: 1000,
-  levels: [...],
-  powerUps: [...]
-};
-
-// Only dynamic state in executors
-const gameState = provide(() => ({
-  score: 0,
-  level: 1,
-  playerPos: { x: 0, y: 0 }
-}), name('game-state'));
-
-// Reference static data directly
-const display = derive(gameState.reactive, (state) => ({
-  formatted: `Score: ${state.score}/${GAME_CONFIG.maxScore}`
-}), name('display'));
-```
-
-#### Avoid Pass-Through Executors
-```typescript
-// ❌ WRONG: Unnecessary layer
-const currentTime = derive(timeSource.reactive, t => t);
-const display = derive(currentTime.reactive, t => format(t));
-
-// ✅ CORRECT: Direct dependency
-const display = derive(timeSource.reactive, t => format(t));
-```
-
-### Main Function Best Practices
-
-```typescript
+// Main
 async function main() {
   const scope = createScope();
-
   try {
-    // Resolve only root executors
-    const app = await scope.resolve(appExecutor);
-
-    // Setup graceful shutdown
+    await scope.resolve(app);
     process.on('SIGINT', async () => {
-      console.log('\nShutting down...');
       await scope.dispose();
       process.exit(0);
     });
-
-    // Initialize
-    console.log('Application started!');
-
   } catch (error) {
     console.error('Error:', error);
     await scope.dispose();
@@ -369,175 +281,26 @@ main().catch(console.error);
 
 ---
 
-## 📝 APPLICATION TEMPLATES
+## 🛠️ TROUBLESHOOTING
 
-### Hello World (Counter App)
-*Perfect for learning the basics*
+| Error/Issue | Cause | Solution |
+|-------------|--------|----------|
+| "Factory re-executed unexpectedly" | Using `.reactive` with side effects | Remove `.reactive` or make factory pure |
+| "Memory leak detected" | Missing `ctl.cleanup()` | Add cleanup for all resources |
+| "Stale data in callbacks" | Using direct value instead of accessor | Use `accessor.get()` for fresh data |
+| "Cleanup runs too often" | `ctl.cleanup()` in `.reactive` factory | Move to standard executor |
+| "Executor is not resolved" | Accessing executor via `.get()` before it's resolved in dependency chain | Ensure proper dependency order or use `.reactive` for automatic updates |
+| Screen flickers/multiple renders | Clearing screen on every update | Use cursor positioning, check lastOutput |
 
-```typescript
-import { provide, derive, createScope, name } from '@pumped-fn/core-next';
+---
 
-// State
-const counter = provide(() => ({ count: 0 }), name('counter'));
-
-// Controller
-const controls = derive(counter.static, (accessor) => ({
-  increment: () => accessor.update(s => ({ count: s.count + 1 })),
-  decrement: () => accessor.update(s => ({ count: s.count - 1 })),
-  reset: () => accessor.update({ count: 0 })
-}), name('controls'));
-
-// Display
-const display = derive(counter.reactive, (state) => ({
-  formatted: `Count: ${state.count}`
-}), name('display'));
-
-// App
-const app = derive([display, controls], ([ui, ctrl]) => ({
-  render: () => console.log(ui.formatted),
-  ...ctrl
-}), name('app'));
-
-// Main
-async function main() {
-  const scope = createScope();
-  const { render, increment, decrement } = await scope.resolve(app);
-
-  render(); // Count: 0
-  increment();
-  render(); // Count: 1
-
-  await scope.dispose();
-}
-```
-
-### Real App (Todo List)
-*Production-ready pattern*
-
-```typescript
-// State
-const todos = provide(() => ({
-  items: [] as { id: number, text: string, done: boolean }[],
-  nextId: 1
-}), name('todos'));
-
-// Controller
-const todoControls = derive(todos.static, (accessor) => ({
-  add: (text: string) => accessor.update(s => ({
-    items: [...s.items, { id: s.nextId, text, done: false }],
-    nextId: s.nextId + 1
-  })),
-  toggle: (id: number) => accessor.update(s => ({
-    ...s,
-    items: s.items.map(item =>
-      item.id === id ? { ...item, done: !item.done } : item
-    )
-  })),
-  remove: (id: number) => accessor.update(s => ({
-    ...s,
-    items: s.items.filter(item => item.id !== id)
-  }))
-}), name('todo-controls'));
-
-// Display
-const todoDisplay = derive(todos.reactive, (state) => ({
-  summary: `${state.items.length} total, ${state.items.filter(t => !t.done).length} pending`,
-  list: state.items.map(item => `[${item.done ? 'x' : ' '}] ${item.text}`)
-}), name('todo-display'));
-
-// App
-const todoApp = derive([todoDisplay, todoControls], ([ui, ctrl], ctl) => {
-  // Setup any resources here
-  ctl.cleanup(() => console.log('Todo app shut down'));
-
-  return {
-    render: () => {
-      console.log(ui.summary);
-      ui.list.forEach(line => console.log(line));
-    },
-    ...ctrl
-  };
-}, name('todo-app'));
-```
-
-### TUI Game Template
-*For interactive terminal applications*
-
-```typescript
-// Game State
-const gameState = provide(() => ({
-  playerPos: { x: 5, y: 5 },
-  score: 0,
-  isRunning: false
-}), name('game-state'));
-
-// Controller
-const gameController = derive(gameState.static, (accessor) => ({
-  move: (dx: number, dy: number) => accessor.update(s => ({
-    ...s,
-    playerPos: { x: s.playerPos.x + dx, y: s.playerPos.y + dy },
-    score: s.score + 1
-  })),
-  start: () => accessor.update(s => ({ ...s, isRunning: true })),
-  stop: () => accessor.update(s => ({ ...s, isRunning: false }))
-}), name('game-controller'));
-
-// Renderer (uses fresh state access)
-const renderer = derive([gameState.static], ([stateAccessor], ctl) => {
-  const render = () => {
-    const state = stateAccessor.get();
-    process.stdout.write('\x1b[H'); // Move cursor to top
-    console.log(`Score: ${state.score}`);
-    console.log(`Player at (${state.playerPos.x}, ${state.playerPos.y})`);
-  };
-
-  ctl.cleanup(() => {
-    process.stdout.write('\x1b[?25h'); // Show cursor
-    console.log('\nGame Over!');
-  });
-
-  return { render };
-}, name('renderer'));
-
-// Game Loop (callback pattern)
-const gameLoop = derive([gameController, gameState.static], ([ctrl, stateAccessor], ctl) => {
-  let interval: NodeJS.Timeout | null = null;
-
-  const start = (onTick?: () => void) => {
-    interval = setInterval(() => {
-      const state = stateAccessor.get();
-      if (state.isRunning) {
-        onTick?.();
-      }
-    }, 100);
-  };
-
-  ctl.cleanup(() => {
-    if (interval) clearInterval(interval);
-  });
-
-  return { start };
-}, name('game-loop'));
-
-// Main Game App
-const game = derive([gameLoop, renderer, gameController], ([loop, render, ctrl], ctl) => {
-  const startup = () => {
-    process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // Hide cursor, clear screen
-    ctrl.start();
-    loop.start(() => render.render());
-  };
-
-  return { startup, ...ctrl };
-}, name('game'));
-```
-
-### Success Criteria Checklist
+## ✅ SUCCESS CHECKLIST
 
 - [ ] All executors use `name()` decorator
 - [ ] Controllers use `.static` for updates
-- [ ] Displays use `.reactive` for pure transformations
-- [ ] App coordinators avoid `.reactive`
-- [ ] Resources properly cleaned up with `ctl.cleanup()`
+- [ ] Pure transformations use `.reactive`
+- [ ] Fresh data accessed with `accessor.get()`
+- [ ] Resources cleaned up with `ctl.cleanup()`
 - [ ] Scope disposed on shutdown
+- [ ] No `.reactive` with side effects
 - [ ] TypeScript compiles without errors
-- [ ] No anti-patterns present

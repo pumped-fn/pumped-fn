@@ -1,88 +1,46 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import { createScope, provide, derive, plugin } from "../src";
 import { ExecutorResolutionError, FactoryExecutionError } from "../src/types";
+import { errorTestHelpers, MockExecutors, testSetup } from "./test-utils";
 
 describe("Error Handling", () => {
   describe("Global Error Callbacks", () => {
-    it("should trigger global error callback on factory error", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
+    test("triggers global error callback when executor factory throws", async () => {
+      const failingExecutor = MockExecutors.failing("Test error");
+      await errorTestHelpers.expectExecutorError(
+        failingExecutor,
+        FactoryExecutionError
+      );
+    });
 
-      scope.onError(errorCallback);
+    test("triggers error callbacks for both dependency and dependent executors", async () => {
+      const { failingExecutor, chainedExecutor } =
+        errorTestHelpers.createFailingChain("Dependency error");
+      const { scope, errorCallback } = testSetup.scopeWithErrorHandler();
 
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      await expect(scope.resolve(chainedExecutor)).rejects.toThrow();
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
-
-      expect(errorCallback).toHaveBeenCalledTimes(1);
-      expect(errorCallback).toHaveBeenCalledWith(
+      expect(errorCallback).toHaveBeenCalledTimes(2);
+      expect(errorCallback).toHaveBeenNthCalledWith(
+        1,
         expect.any(FactoryExecutionError),
         failingExecutor,
         scope
       );
-    });
-
-    it("should trigger global error callback on dependency resolution error", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
-
-      scope.onError(errorCallback);
-
-      const dependencyExecutor = provide(() => {
-        throw new Error("Dependency error");
-      });
-
-      const mainExecutor = derive(dependencyExecutor, (dep) => {
-        return `Using ${dep}`;
-      });
-
-      try {
-        await scope.resolve(mainExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
-
-      // Should be called twice - once for dependency error, once for main executor error
-      expect(errorCallback).toHaveBeenCalledTimes(2);
-
-      // First call should be for the dependency executor
-      expect(errorCallback).toHaveBeenNthCalledWith(
-        1,
-        expect.any(FactoryExecutionError),
-        dependencyExecutor,
-        scope
-      );
-
-      // Second call should be for the main executor with a system error
       expect(errorCallback).toHaveBeenNthCalledWith(
         2,
         expect.any(ExecutorResolutionError),
-        mainExecutor,
+        chainedExecutor,
         scope
       );
     });
 
-    it("should not trigger error callback on successful resolution", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
-
-      scope.onError(errorCallback);
-
+    test("bypasses error callbacks when executor resolves successfully", async () => {
       const successExecutor = provide(() => "success");
-
-      const result = await scope.resolve(successExecutor);
-
-      expect(result).toBe("success");
-      expect(errorCallback).not.toHaveBeenCalled();
+      await errorTestHelpers.expectNoErrorCallback(successExecutor, "success");
     });
 
-    it("should handle multiple global error callbacks", async () => {
+    test("invokes all registered global error callbacks for single error", async () => {
       const scope = createScope();
       const errorCallback1 = vi.fn();
       const errorCallback2 = vi.fn();
@@ -90,15 +48,9 @@ describe("Error Handling", () => {
       scope.onError(errorCallback1);
       scope.onError(errorCallback2);
 
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(errorCallback1).toHaveBeenCalledTimes(1);
       expect(errorCallback2).toHaveBeenCalledTimes(1);
@@ -106,21 +58,14 @@ describe("Error Handling", () => {
   });
 
   describe("Per-Executor Error Callbacks", () => {
-    it("should trigger per-executor error callback", async () => {
+    test("invokes callback only for specific executor that fails", async () => {
       const scope = createScope();
       const errorCallback = vi.fn();
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
       scope.onError(failingExecutor, errorCallback);
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(errorCallback).toHaveBeenCalledTimes(1);
       expect(errorCallback).toHaveBeenCalledWith(
@@ -130,49 +75,33 @@ describe("Error Handling", () => {
       );
     });
 
-    it("should only trigger callback for specific executor", async () => {
+    test("isolates error callbacks to prevent cross-executor triggering", async () => {
       const scope = createScope();
       const errorCallback1 = vi.fn();
       const errorCallback2 = vi.fn();
 
-      const executor1 = provide(() => {
-        throw new Error("Error 1");
-      });
-
-      const executor2 = provide(() => {
-        throw new Error("Error 2");
-      });
+      const executor1 = MockExecutors.failing("Error 1");
+      const executor2 = MockExecutors.failing("Error 2");
 
       scope.onError(executor1, errorCallback1);
       scope.onError(executor2, errorCallback2);
 
-      try {
-        await scope.resolve(executor1);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(executor1)).rejects.toThrow();
 
       expect(errorCallback1).toHaveBeenCalledTimes(1);
       expect(errorCallback2).not.toHaveBeenCalled();
     });
 
-    it("should handle multiple callbacks for same executor", async () => {
+    test("executes multiple callbacks registered for same failing executor", async () => {
       const scope = createScope();
       const errorCallback1 = vi.fn();
       const errorCallback2 = vi.fn();
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
       scope.onError(failingExecutor, errorCallback1);
       scope.onError(failingExecutor, errorCallback2);
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(errorCallback1).toHaveBeenCalledTimes(1);
       expect(errorCallback2).toHaveBeenCalledTimes(1);
@@ -180,25 +109,13 @@ describe("Error Handling", () => {
   });
 
   describe("Plugin Error Handlers", () => {
-    it("should trigger plugin error handler", async () => {
+    test("activates plugin error handlers during executor failure", async () => {
       const onError = vi.fn();
-      const errorPlugin = plugin({
-        onError,
-      });
+      const errorPlugin = { name: "error-plugin", ...plugin({ onError }) };
+      const scope = testSetup.scopeWithPlugins([errorPlugin]);
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      const scope = createScope({
-        plugins: [errorPlugin],
-      });
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
-
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
@@ -208,110 +125,73 @@ describe("Error Handling", () => {
       );
     });
 
-    it("should trigger multiple plugin error handlers", async () => {
+    test("coordinates error handling across multiple plugins", async () => {
       const onError1 = vi.fn();
       const onError2 = vi.fn();
+      const plugin1 = { name: "plugin1", ...plugin({ onError: onError1 }) };
+      const plugin2 = { name: "plugin2", ...plugin({ onError: onError2 }) };
+      const scope = testSetup.scopeWithPlugins([plugin1, plugin2]);
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      const plugin1 = plugin({ onError: onError1 });
-      const plugin2 = plugin({ onError: onError2 });
-
-      const scope = createScope({
-        plugins: [plugin1, plugin2],
-      });
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
-
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(onError1).toHaveBeenCalledTimes(1);
       expect(onError2).toHaveBeenCalledTimes(1);
     });
 
-    it("should not break error flow if plugin error handler throws", async () => {
+    test("preserves original error when plugin error handler throws", async () => {
       const onError = vi.fn().mockImplementation(() => {
         throw new Error("Plugin error");
       });
+      const errorPlugin = { name: "error-plugin", ...plugin({ onError }) };
+      const scope = testSetup.scopeWithPlugins([errorPlugin]);
+      const failingExecutor = MockExecutors.failing("Original error");
 
-      const errorPlugin = plugin({ onError });
-      const scope = createScope({
-        plugins: [errorPlugin],
-      });
-
-      const failingExecutor = provide(() => {
-        throw new Error("Original error");
-      });
-
-      // Should still throw the original error, not the plugin error
       await expect(scope.resolve(failingExecutor)).rejects.toThrow(
         "Original error"
       );
-
       expect(onError).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("Error Callback Cleanup", () => {
-    it("should remove global error callback when cleanup function is called", async () => {
+    test("removes global error callback when cleanup function is invoked", async () => {
       const scope = createScope();
       const errorCallback = vi.fn();
-
       const cleanup = scope.onError(errorCallback);
-      cleanup(); // Remove the callback
+      cleanup();
 
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(errorCallback).not.toHaveBeenCalled();
     });
 
-    it("should remove per-executor error callback when cleanup function is called", async () => {
+    test("removes per-executor error callback after cleanup invocation", async () => {
       const scope = createScope();
       const errorCallback = vi.fn();
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
       const cleanup = scope.onError(failingExecutor, errorCallback);
-      cleanup(); // Remove the callback
+      cleanup();
 
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(errorCallback).not.toHaveBeenCalled();
     });
 
-    it("should clear all error callbacks on scope dispose", async () => {
+    test("prevents new error callback registration after scope disposal", async () => {
       const scope = createScope();
       const globalCallback = vi.fn();
       const perExecutorCallback = vi.fn();
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
+      const failingExecutor = MockExecutors.failing("Test error");
 
       scope.onError(globalCallback);
       scope.onError(failingExecutor, perExecutorCallback);
 
       await scope.dispose();
 
-      // Should not be able to add callbacks after dispose
       expect(() => scope.onError(globalCallback)).toThrow("Scope is disposed");
       expect(() => scope.onError(failingExecutor, perExecutorCallback)).toThrow(
         "Scope is disposed"
@@ -319,22 +199,12 @@ describe("Error Handling", () => {
     });
   });
 
-  describe("Error Types", () => {
-    it("should provide FactoryExecutionError for factory errors", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
+  describe("Error Types and Context", () => {
+    test("wraps factory exceptions in FactoryExecutionError with metadata", async () => {
+      const { scope, errorCallback } = testSetup.scopeWithErrorHandler();
+      const failingExecutor = MockExecutors.failing("Factory error");
 
-      scope.onError(errorCallback);
-
-      const failingExecutor = provide(() => {
-        throw new Error("Factory error");
-      });
-
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       const [capturedError] = errorCallback.mock.calls[0];
       expect(capturedError).toBeInstanceOf(FactoryExecutionError);
@@ -342,66 +212,38 @@ describe("Error Handling", () => {
       expect(capturedError.context.resolutionStage).toBe("factory-execution");
     });
 
-    it("should provide error context information", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
+    test("includes comprehensive context metadata in error objects", async () => {
+      const { scope, errorCallback } = testSetup.scopeWithErrorHandler();
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      scope.onError(errorCallback);
-
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
-
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       const [capturedError] = errorCallback.mock.calls[0];
-      expect(capturedError.context).toMatchObject({
-        resolutionStage: "factory-execution",
-        dependencyChain: expect.any(Array),
-        timestamp: expect.any(Number),
-      });
+      expect(capturedError.context.resolutionStage).toBe("factory-execution");
+      expect(capturedError.context.dependencyChain).toEqual(expect.any(Array));
+      expect(capturedError.context.timestamp).toEqual(expect.any(Number));
     });
   });
 
   describe("Async Error Handling", () => {
-    it("should handle async error callbacks", async () => {
+    test("supports asynchronous error callback functions", async () => {
       const scope = createScope();
       const asyncErrorCallback = vi.fn().mockResolvedValue(undefined);
-
       scope.onError(asyncErrorCallback);
+      const failingExecutor = MockExecutors.failing("Test error");
 
-      const failingExecutor = provide(() => {
-        throw new Error("Test error");
-      });
-
-      try {
-        await scope.resolve(failingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(failingExecutor)).rejects.toThrow();
 
       expect(asyncErrorCallback).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle async factory errors", async () => {
-      const scope = createScope();
-      const errorCallback = vi.fn();
-
-      scope.onError(errorCallback);
-
+    test("catches and wraps errors from async factory functions", async () => {
+      const { scope, errorCallback } = testSetup.scopeWithErrorHandler();
       const asyncFailingExecutor = provide(async () => {
         throw new Error("Async error");
       });
 
-      try {
-        await scope.resolve(asyncFailingExecutor);
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(scope.resolve(asyncFailingExecutor)).rejects.toThrow();
 
       expect(errorCallback).toHaveBeenCalledTimes(1);
       const [capturedError] = errorCallback.mock.calls[0];

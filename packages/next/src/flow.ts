@@ -1,297 +1,275 @@
-import type { Core, Flow } from "./types";
+import type { Core, Flow, StandardSchemaV1 } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
-import type { Accessor } from "./accessor";
-import { ExecutorResolutionError, FactoryExecutionError } from "./types";
-import { ErrorCodes } from "./error-codes";
+import { DataStore, Accessor, accessor } from "./accessor";
+import { custom } from "./ssch";
 
-export function createInitialContext<
-  T extends Record<string, unknown>
->(initializers: {
-  [K in keyof T]: { accessor: Accessor<T[K]>; value: T[K] };
-}): Flow.ContextData {
-  const context = new Map();
-  for (const [_, config] of Object.entries(initializers)) {
-    const { accessor, value } = config as {
-      accessor: Accessor<unknown>;
-      value: unknown;
-    };
-    context.set(accessor.key, value);
-  }
-  return context;
+const ok = <S>(data: S): Flow.OK<S> => ({ type: "ok", data });
+const ko = <E>(data: E): Flow.KO<E> => ({ type: "ko", data });
+
+export interface FlowPlugin {
+  name: string;
+
+  init?(pod: Core.Pod, context: DataStore): void | Promise<void>;
+
+  wrap?<T>(
+    context: DataStore,
+    next: () => Promise<T>
+  ): Promise<T>;
+
+  dispose?(pod: Core.Pod): void | Promise<void>;
 }
 
-export function provide<Input, Output>(
-  config: Flow.Config & Flow.Schema<Input, Output>,
-  handler: Flow.NoDependencyFlowFn<Input, Output>
-): Flow.Executor<Input, Output> {
-  const executor = createExecutor(
-    (): Flow.Flow<Input, Output> => ({
-      execution: handler,
-      input: config.input,
-      output: config.output,
-      plugins: config.plugins || [],
-      metas: config.metas || [],
-      name: config.name,
-      description: config.description,
-    }),
-    undefined,
-    config.metas || []
-  ) as Flow.Executor<Input, Output>;
+export const FlowExecutionContext: {
+  depth: Accessor<number>;
+  flowName: Accessor<string | undefined>;
+  parentFlowName: Accessor<string | undefined>;
+  isParallel: Accessor<boolean>;
+} = {
+  depth: accessor('flow.depth', custom<number>(), 0),
+  flowName: accessor('flow.name', custom<string | undefined>()),
+  parentFlowName: accessor('flow.parentName', custom<string | undefined>()),
+  isParallel: accessor('flow.isParallel', custom<boolean>(), false)
+};
 
-  Object.assign(executor, config);
-  return executor;
-}
+class FlowDefinition<I, S, E> {
+  constructor(
+    public readonly name: string,
+    public readonly version: string,
+    public readonly input: StandardSchemaV1<I>,
+    public readonly success: StandardSchemaV1<S>,
+    public readonly error: StandardSchemaV1<E>
+  ) {}
 
-export function derive<D extends Core.DependencyLike, Input, Output>(
-  {
-    dependencies,
-    ...config
-  }: {
-    dependencies: { [K in keyof D]: D[K] };
-  } & Flow.Config &
-    Flow.Schema<Input, Output>,
-  handler: Flow.DependentFlowFn<Core.InferOutput<D>, Input, Output>
-): Flow.Executor<Input, Output> {
-  const executor = createExecutor(
-    (deps: unknown): Flow.Flow<Input, Output> => ({
-      execution: (input, controller) => handler(deps as any, input, controller),
-      input: config.input,
-      output: config.output,
-      plugins: config.plugins || [],
-      metas: config.metas || [],
-      name: config.name,
-      description: config.description,
-    }),
-    dependencies as any,
-    config.metas || []
-  ) as Flow.Executor<Input, Output>;
-
-  Object.assign(executor, config);
-  return executor;
-}
-
-export class FlowError extends Error {
-  public readonly code: string;
-  public readonly category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR";
-
-  constructor(message: string, public details?: any) {
-    super(message);
-    // Manually set cause if provided (including falsy values like null)
-    if (details && "cause" in details) {
-      (this as any).cause = details.cause;
-    }
-    this.name = "FlowError";
-
-    // Extract error information from enhanced errors if available
-    if (details?.enhancedError) {
-      this.code = details.errorCode || ErrorCodes.FLOW_EXECUTION_FAILED;
-      this.category = details.errorCategory || "USER_ERROR";
-    } else {
-      this.code = ErrorCodes.FLOW_EXECUTION_FAILED;
-      this.category = "USER_ERROR";
-    }
-  }
-
-  /**
-   * Get the original enhanced error if available
-   */
-  getEnhancedError():
-    | ExecutorResolutionError
-    | FactoryExecutionError
-    | undefined {
-    return this.details?.enhancedError;
-  }
-
-  /**
-   * Get the error context from enhanced error if available
-   */
-  getErrorContext(): unknown {
-    return this.details?.errorContext;
-  }
-
-  /**
-   * Get flow-specific context
-   */
-  getFlowContext(): { flowName?: string; flowDescription?: string } {
-    return {
-      flowName: this.details?.flowName as string | undefined,
-      flowDescription: this.details?.flowDescription as string | undefined,
-    };
-  }
-}
-
-function createController(
-  context: Flow.ExecutionContext,
-  opt: Flow.ExecuteOpt | undefined
-): Flow.Controller & {
-  context: Flow.ExecutionContext;
-} {
-  const controller: Flow.Controller & { context: Flow.ExecutionContext } = {
-    context,
-    safeExecute: async (flowDef, param, opts) => {
-      try {
-        let resolvedFlow: Flow.Flow<any, any>;
-        if ("execution" in flowDef && typeof flowDef.execution === "function") {
-          resolvedFlow = flowDef as Flow.Flow<any, any>;
-        } else if (context.scope) {
-          resolvedFlow = await context.scope.pod().resolve(flowDef as any);
-        } else {
-          throw new FlowError("Cannot resolve executor without a scope");
-        }
-
-        const validatedInput = validate(resolvedFlow.input, param);
-
-        const childData = new Map(context.data);
-
-        if (opts?.initialContext) {
-          for (const [key, value] of opts.initialContext) {
-            childData.set(key, value);
-          }
-        }
-
-        const childContext: Flow.ExecutionContext = {
-          data: childData,
-          parent: context,
-          scope: context.scope,
-          plugins: [...context.plugins, ...(opts?.plugins || [])],
-          flow: resolvedFlow,
-          get(key: unknown): unknown {
-            return childData.get(key);
-          },
-          set(key: unknown, value: unknown): unknown | void {
-            return childData.set(key, value);
-          },
+  provide(
+    handler: (
+      ctx: Flow.Context<I, S, E>,
+      input: I
+    ) => Promise<Flow.OutputLike<S, E>>
+  ): Core.Executor<Flow.NoDependencyHandler<I, S, E>> {
+    return createExecutor(
+      () => {
+        const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
+          return handler(ctx, ctx.input);
         };
-        const childController = createController(childContext, opt);
+        (flowHandler as any).def = this;
+        return flowHandler as Flow.NoDependencyHandler<I, S, E>;
+      },
+      undefined,
+      undefined
+    ) as Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+  }
 
-        let execution = async () =>
-          resolvedFlow.execution(validatedInput, childController);
-
-        for (let i = childContext.plugins.length - 1; i >= 0; i--) {
-          const plugin = childContext.plugins[i];
-          const prevExecution = execution;
-          execution = () => plugin.wrap(childContext, prevExecution);
-        }
-
-        const result = await execution();
-        return { kind: "success", value: result };
-      } catch (error) {
-        const wrappedError =
-          error instanceof FlowError
-            ? error
-            : new FlowError(
-                error instanceof Error
-                  ? error.message
-                  : "Flow execution failed",
-                { cause: error }
-              );
-        return { kind: "error", error: wrappedError };
-      }
-    },
-    execute: async (flowDef, param, opts) => {
-      const result = await controller.safeExecute(flowDef, param, opts);
-      if (result.kind === "error") {
-        throw result.error;
-      }
-      return result.value;
-    },
-  };
-
-  return controller;
+  derive<D extends Core.DependencyLike>(
+    dependencies: D,
+    handler: (
+      deps: Core.InferOutput<D>,
+      ctx: Flow.Context<I, S, E>,
+      input: I
+    ) => Promise<Flow.OutputLike<S, E>>
+  ): Core.Executor<Flow.DependentHandler<D, I, S, E>> {
+    return createExecutor(
+      (deps: unknown) => {
+        const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
+          return handler(deps as Core.InferOutput<D>, ctx, ctx.input);
+        };
+        (flowHandler as any).def = this;
+        return flowHandler as Flow.DependentHandler<D, I, S, E>;
+      },
+      dependencies as any,
+      undefined
+    ) as Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+  }
 }
 
-export async function execute<Input, Output>(
-  executor: Flow.Executor<Input, Output>,
-  input: Input,
-  opt?: Flow.ExecuteOpt
-): Promise<Flow.ExecutionResult<Output>> {
-  const isOwnScope = !opt?.scope;
-  const scope = opt?.scope || createScope();
-  const pod = scope.pod(...(opt?.presets || []));
+export function flow<I, S, E>(config: {
+  name: string;
+  version?: string;
+  input: StandardSchemaV1<I>;
+  success: StandardSchemaV1<S>;
+  error: StandardSchemaV1<E>;
+}): FlowDefinition<I, S, E> {
+  return new FlowDefinition(
+    config.name,
+    config.version || "1.0.0",
+    config.input,
+    config.success,
+    config.error
+  );
+}
 
-  let flow: Flow.Flow<Input, Output>;
-  try {
-    flow = await pod.resolve(executor);
-  } catch (error) {
-    // Preserve enhanced error context if available
-    if (
-      error instanceof ExecutorResolutionError ||
-      error instanceof FactoryExecutionError
-    ) {
-      // Re-throw enhanced errors with additional flow context
-      throw new FlowError(`Flow execution failed: ${error.message}`, {
-        cause: error,
-        enhancedError: error,
-        errorCode: error.code,
-        errorCategory: error.category,
-        errorContext: error.context,
-        flowName: opt?.name,
-        flowDescription: opt?.description,
-      });
-    } else {
-      // Handle non-enhanced errors with basic wrapping
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new FlowError(`Failed to resolve executor: ${errorMessage}`, {
-        cause: error,
-        flowName: opt?.name,
-        flowDescription: opt?.description,
-      });
-    }
+class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
+  private contextData = new Map<unknown, unknown>();
+
+  constructor(
+    public input: I,
+    public readonly pod: Core.Pod,
+    private plugins: FlowPlugin[],
+    private parent?: FlowContext<any, any, any>
+  ) {}
+
+  initializeExecutionContext(flowName: string, isParallel: boolean = false) {
+    const currentDepth = this.parent ? (FlowExecutionContext.depth.find(this.parent) || 0) + 1 : 0;
+    const parentFlowName = this.parent ? FlowExecutionContext.flowName.find(this.parent) : undefined;
+
+    FlowExecutionContext.depth.set(this, currentDepth);
+    FlowExecutionContext.flowName.set(this, flowName);
+    FlowExecutionContext.parentFlowName.set(this, parentFlowName);
+    FlowExecutionContext.isParallel.set(this, isParallel);
   }
 
-  const contextData = opt?.initialContext || new Map();
-  const context: Flow.ExecutionContext = {
-    data: contextData,
-    parent: undefined,
-    scope,
-    plugins: opt?.plugins || [],
-    flow,
-    get(key: unknown): unknown {
-      return contextData.get(key);
-    },
-    set(key: unknown, value: unknown): unknown | void {
-      return contextData.set(key, value);
-    },
+  ok = (data: S): Flow.OK<S> => ok(data);
+  ko = (data: E): Flow.KO<E> => ko(data);
+
+  get(key: unknown): unknown {
+    if (this.contextData.has(key)) {
+      return this.contextData.get(key);
+    }
+    return this.parent?.get(key);
+  }
+
+  set(key: unknown, value: unknown): unknown | undefined {
+    this.contextData.set(key, value);
+    return value;
+  }
+
+  output = (success: boolean, value: any): any => {
+    return success ? this.ok(value) : this.ko(value);
   };
-  const controller = createController(context, opt);
-  const flowWithContext = { ...flow, context };
 
-  let executionResult: Flow.Result<Output>;
-  try {
-    const validatedInput = validate(flow.input, input);
+  async execute<F extends Flow.UFlow>(
+    flow: F,
+    input: Flow.InferInput<F>
+  ): Promise<Awaited<Flow.InferOutput<F>>> {
+    const handler = await this.pod.resolve(flow);
 
-    let execution = async () => flow.execution(validatedInput, controller);
+    const childContext = new FlowContext<unknown, unknown, unknown>(
+      input,
+      this.pod,
+      this.plugins,
+      this
+    );
+    childContext.initializeExecutionContext(handler.def.name, false);
 
-    for (let i = context.plugins.length - 1; i >= 0; i--) {
-      const plugin = context.plugins[i];
-      const prevExecution = execution;
-      execution = () => plugin.wrap(context, prevExecution);
-    }
-
-    const result = await execution();
-    executionResult = { kind: "success", value: result };
-  } catch (error) {
-    const wrappedError =
-      error instanceof FlowError
-        ? error
-        : new FlowError(
-            error instanceof Error ? error.message : "Flow execution failed",
-            { cause: error }
-          );
-    executionResult = { kind: "error", error: wrappedError };
+    return (await this.executeWithPlugins(handler, childContext)) as any;
   }
 
-  if (isOwnScope) {
-    await scope.dispose();
-  } else {
+  async executeParallel<F extends Flow.UFlow>(
+    flows: Array<[F, Flow.InferInput<F>]>
+  ): Promise<Array<Awaited<Flow.InferOutput<F>>>> {
+    return Promise.all(
+      flows.map(async ([flow, input]) => {
+        const childContext = new FlowContext<unknown, unknown, unknown>(
+          input,
+          this.pod,
+          this.plugins,
+          this
+        );
+
+        const handler = await this.pod.resolve(flow);
+        childContext.initializeExecutionContext(handler.def.name, true);
+        return this.executeWithPlugins(handler, childContext);
+      })
+    ) as any;
+  }
+
+  private async executeWithPlugins<T>(
+    handler: any,
+    context: FlowContext<any, any, any>
+  ): Promise<T> {
+    const executeCore = async (): Promise<T> => handler(context);
+
+    let executor = executeCore;
+    for (const plugin of [...this.plugins].reverse()) {
+      if (plugin.wrap) {
+        const currentExecutor = executor;
+        executor = async () => plugin.wrap!(context, currentExecutor);
+      }
+    }
+
+    return executor();
+  }
+}
+
+export async function execute<I, S, E>(
+  flow: Core.Executor<
+    Flow.NoDependencyHandler<I, S, E> | Flow.DependentHandler<any, I, S, E>
+  >,
+  input: I,
+  options?: {
+    scope?: Core.Scope;
+    plugins?: FlowPlugin[];
+    initialContext?: Array<[Accessor<any>, any]> | Map<unknown, unknown>;
+    presets?: Core.Preset<unknown>[];
+  }
+): Promise<Flow.OutputLike<S, E>> {
+  const scope = options?.scope || createScope();
+  const shouldDisposeScope = !options?.scope;
+
+  const pod = scope.pod(...(options?.presets || []));
+
+  try {
+    const context = new FlowContext<I, S, E>(
+      input,
+      pod,
+      options?.plugins || []
+    );
+
+    if (options?.initialContext) {
+      if (Array.isArray(options.initialContext)) {
+        for (const [accessor, value] of options.initialContext) {
+          accessor.set(context, value);
+        }
+      } else if (options.initialContext instanceof Map) {
+        for (const [key, value] of options.initialContext) {
+          context.set(key, value);
+        }
+      }
+    }
+
+    for (const plugin of options?.plugins || []) {
+      await plugin.init?.(pod, context);
+    }
+
+
+    const executeCore = async () => {
+      const handler = await pod.resolve(flow);
+      const validated = validate(handler.def.input, input);
+      context.input = validated as I;
+
+      context.initializeExecutionContext(handler.def.name, false);
+
+      const result = await handler(context);
+
+      if (result.type === "ok") {
+        validate(handler.def.success, result.data);
+      } else {
+        validate(handler.def.error, result.data);
+      }
+
+      return result;
+    };
+
+    let executor = executeCore;
+    for (const plugin of [...(options?.plugins || [])].reverse()) {
+      if (plugin.wrap) {
+        const currentExecutor = executor;
+        executor = () => plugin.wrap!(context, currentExecutor);
+      }
+    }
+
+    return await executor();
+
+  } finally {
+    for (const plugin of options?.plugins || []) {
+      await plugin.dispose?.(pod);
+    }
+
     await scope.disposePod(pod);
-  }
 
-  return {
-    context: flowWithContext.context,
-    result: executionResult,
-  };
+    if (shouldDisposeScope) {
+      await scope.dispose();
+    }
+  }
 }

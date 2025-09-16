@@ -1,323 +1,267 @@
-import { flow, provide, createScope, custom, preset, FlowError } from "../src";
-import { test, describe, expect } from "vitest";
+import { describe, test, expect } from "vitest";
+import { flow, execute } from "../src/flow";
+import { custom } from "../src/ssch";
+import { testFlows, MockExecutors, scenarios } from "./test-utils";
 
-describe("flow test", () => {
-  const auth = provide(() => ({
-    login: (username: string, password: string) => {
-      if (username === "user" && password === "pass") {
-        return { userId: 1, token: "abc123" };
-      }
-      throw new Error("Invalid credentials");
-    },
-    logout: () => ({ success: true }),
-  }));
+describe("FlowV2", () => {
+  describe("flow definition and metadata", () => {
+    test("creates flow with correct name and default version", () => {
+      const testFlow = testFlows.basic("test.flow");
 
-  const userSvc = provide(() => {
-    const store = new Map<number, { id: number; name: string }>([
-      [1, { id: 1, name: "user" }],
-      [2, { id: 2, name: "admin" }],
-    ]);
-
-    return {
-      get: (userId: number) => {
-        if (store.has(userId)) {
-          return store.get(userId);
-        }
-
-        throw new Error("User not found");
-      },
-      find: (name: string) => {
-        for (const user of store.values()) {
-          if (user.name === name) {
-            return user;
-          }
-        }
-      },
-      list: () => {
-        return Array.from(store.values());
-      },
-      create: (name: string) => {
-        const id = store.size + 1;
-        const user = { id, name };
-        store.set(id, user);
-
-        return user;
-      },
-    };
-  });
-
-  const createUser = flow.derive(
-    {
-      name: "createUserFlow",
-      dependencies: [userSvc],
-      input: custom<{ name: string }>(),
-      output: custom<{ id: number; name: string }>(),
-    },
-    async ([userSvc], input, ctl) => {
-      return userSvc.create(input.name);
-    }
-  );
-
-  const signup = flow.derive(
-    {
-      name: "signupFlow",
-      dependencies: [auth, userSvc, createUser],
-      input: custom<{ username: string; password: string }>(),
-      output: custom<{ userId: number; token: string }>(),
-    },
-    async ([auth, userSvc, createUser], input, ctx) => {
-      if (!userSvc.find(input.username)) {
-        ctx.execute(createUser, { name: input.username });
-      }
-
-      return auth.login(input.username, input.password);
-    }
-  );
-
-  test("execution should work", async () => {
-    const { context, result } = await flow.execute(signup, {
-      username: "user",
-      password: "pass",
+      expect(testFlow.name).toBe("test.flow");
+      expect(testFlow.version).toBe("1.0.0");
     });
 
-    expect(result.kind).toBe("success");
-  });
-
-  test("nested flow execution", async () => {
-    const getUserFlow = flow.derive(
-      {
-        name: "getUserFlow",
-        dependencies: { userSvc },
-        input: custom<{ userId: number }>(),
-        output: custom<{ id: number; name: string }>(),
-      },
-      async ({ userSvc }, input) => {
-        return userSvc.get(input.userId);
-      }
-    );
-
-    const loginFlow = flow.derive(
-      {
-        name: "loginFlow",
-        dependencies: { auth, getUserFlow },
-        input: custom<{ username: string; password: string }>(),
-        output: custom<{ user: { id: number; name: string }; token: string }>(),
-      },
-      async ({ auth, getUserFlow }, input, controller) => {
-        const authResult = auth.login(input.username, input.password);
-        const user = await controller.execute(getUserFlow, {
-          userId: authResult.userId,
-        });
-
-        return {
-          user,
-          token: authResult.token,
-        };
-      }
-    );
-
-    const scope = createScope();
-    const { result } = await flow.execute(
-      loginFlow,
-      { username: "user", password: "pass" },
-      { scope }
-    );
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.value.token).toBe("abc123");
-    }
-
-    await scope.dispose();
-  });
-
-  test("error handling with FlowError", async () => {
-    const errorFlow = flow.provide(
-      {
-        name: "errorFlow",
-        input: custom<{ shouldFail: boolean }>(),
-        output: custom<{ message: string }>(),
-      },
-      async (input) => {
-        if (input.shouldFail) {
-          throw new Error("Operation failed");
-        }
-        return { message: "Success" };
-      }
-    );
-
-    const { result } = await flow.execute(errorFlow, { shouldFail: true });
-
-    expect(result.kind).toBe("error");
-    if (result.kind === "error") {
-      expect(result.error).toBeInstanceOf(FlowError);
-    }
-  });
-
-  test("safe execution with error recovery", async () => {
-    const fallbackFlow = flow.provide(
-      {
-        name: "fallbackFlow",
-        input: custom<{ value: string }>(),
-        output: custom<{ result: string }>(),
-      },
-      async (input) => {
-        return { result: `fallback-${input.value}` };
-      }
-    );
-
-    const errorFlow = flow.provide(
-      {
-        name: "errorFlow",
-        input: custom<{ shouldFail: boolean }>(),
-        output: custom<{ result: string }>(),
-      },
-      async () => {
-        throw new Error("Always fails");
-      }
-    );
-
-    const mainFlow = flow.derive(
-      {
-        name: "mainFlow",
-        dependencies: { errorFlow: errorFlow, fallbackFlow },
-        input: custom<{ value: string }>(),
-        output: custom<{ result: string }>(),
-      },
-      async ({ errorFlow, fallbackFlow }, input, controller) => {
-        const result = await controller.safeExecute(errorFlow, {
-          shouldFail: true,
-        });
-
-        if (result.kind === "error") {
-          const fallbackResult = await controller.execute(fallbackFlow, {
-            value: input.value,
-          });
-          return fallbackResult;
-        }
-
-        return result.value;
-      }
-    );
-
-    const { result } = await flow.execute(mainFlow, { value: "test" }, {});
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.value.result).toBe("fallback-test");
-    }
-  });
-
-  test("execution with presets", async () => {
-    const config = provide(() => ({ apiUrl: "https://api.example.com" }));
-
-    const apiFlow = flow.derive(
-      {
-        name: "apiFlow",
-        dependencies: { config: config },
-        input: custom<{ endpoint: string }>(),
-        output: custom<{ url: string }>(),
-      },
-      async ({ config }, input) => {
-        return { url: `${config.apiUrl}${input.endpoint}` };
-      }
-    );
-
-    const mockConfig = preset(config, { apiUrl: "https://mock.api.com" });
-    const { result } = await flow.execute(
-      apiFlow,
-      { endpoint: "/users" },
-      {
-        presets: [mockConfig],
-      }
-    );
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.value.url).toBe("https://mock.api.com/users");
-    }
-  });
-
-  test("context nesting and isolation between flows", async () => {
-    // Define child flow first
-    const childFlow = flow.provide(
-      {
-        name: "childFlow",
-        input: custom<{ childValue: string }>(),
-        output: custom<{
-          result: string;
-          inheritedValue?: string;
-          ownValue: string;
-        }>(),
-      },
-      async (input, controller) => {
-        // Child should inherit parent's data via Map copy
-        const inheritedValue = controller.context.data.get(
-          "parentValue"
-        ) as any;
-        const inheritedLevel = controller.context.data.get("level") as any; // Read from parent
-
-        // Child sets its own data (overrides parent if same key)
-        controller.context.data.set("childValue", input.childValue);
-        controller.context.data.set("level", "child"); // Overrides parent's level
-
-        return {
-          result: `child:${input.childValue}, inherited:${inheritedValue}, parentLevel:${inheritedLevel}`,
-          inheritedValue,
-          ownValue: controller.context.data.get("level") as any,
-        };
-      }
-    );
-
-    // Define parent flow with child as dependency
-    const parentFlow = flow.derive(
-      {
-        name: "parentFlow",
-        dependencies: { childFlow },
-        input: custom<{ value: string }>(),
-        output: custom<{
-          parentData: string;
-          childData: any;
-          parentLevelAfter: string;
-        }>(),
-      },
-      async ({ childFlow }, input, controller) => {
-        // Set data in parent context
-        controller.context.data.set("parentValue", input.value);
-        controller.context.data.set("level", "parent");
-
-        // Execute child flow - it's already resolved
-        const childResult = await controller.execute(childFlow, {
-          childValue: "nested",
-        });
-
-        // Parent context should not be polluted by child's modifications
-        expect(controller.context.data.get("childValue")).toBeUndefined();
-        expect(controller.context.data.get("level")).toBe("parent"); // Not affected by child's override
-
-        return {
-          parentData: controller.context.data.get("parentValue"),
-          childData: childResult as any,
-          parentLevelAfter: controller.context.data.get("level"),
-        };
-      }
-    );
-
-    const { result } = await flow.execute(parentFlow, { value: "root" });
-
-    if (result.kind === "error") {
-      console.error("Test failed with error:", result.error);
-    }
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.value.parentData).toBe("root");
-      expect(result.value.childData.result).toBe(
-        "child:nested, inherited:root, parentLevel:parent"
+    test("creates executable implementation from flow definition", async () => {
+      const greetFlow = testFlows.generic(
+        "greet",
+        custom<{ name: string }>(),
+        custom<{ message: string }>(),
+        custom<{ code: string }>()
       );
-      expect(result.value.childData.inheritedValue).toBe("root");
-      expect(result.value.childData.ownValue).toBe("child");
-      expect(result.value.parentLevelAfter).toBe("parent");
-    }
+
+      const greetImpl = greetFlow.provide(async (ctx, input) => {
+        return ctx.ok({ message: `Hello ${(input as any).name}` });
+      });
+
+      expect(greetImpl).toBeDefined();
+      expect(typeof greetImpl).toBe("object");
+    });
+
+    test.each(scenarios.mathOperations.slice(0, 1))(
+      "executes successful mathematical operation: $name yields $expected",
+      async ({ input, expected }) => {
+        const mathFlow = testFlows.math("math.add");
+        const addImpl = mathFlow.provide(async (ctx, input) => {
+          return ctx.ok({ result: input.a + input.b });
+        });
+
+        const result = await execute(addImpl, input);
+
+        expect(result.type).toBe("ok");
+        expect((result.data as any).result).toBe(expected);
+      }
+    );
+
+    test("handles business logic errors gracefully with ko result", async () => {
+      const divideFlow = testFlows.math("math.divide");
+      const divideImpl = divideFlow.provide(async (ctx, input) => {
+        if (input.b === 0) {
+          return ctx.ko({
+            code: "DIVIDE_BY_ZERO",
+            message: "Cannot divide by zero",
+          });
+        }
+        return ctx.ok({ result: input.a / input.b });
+      });
+
+      const result = await execute(divideImpl, { a: 10, b: 0 });
+
+      expect(result.type).toBe("ko");
+      expect((result.data as any).code).toBe("DIVIDE_BY_ZERO");
+      expect((result.data as any).message).toBe("Cannot divide by zero");
+    });
+  });
+
+  describe("dependency injection and composition", () => {
+    test.each(scenarios.userIds.slice(0, 1))(
+      "injects database and logger dependencies to retrieve user $userId",
+      async ({ userId, expectedName }) => {
+        const dbExecutor = MockExecutors.database();
+        const loggerExecutor = MockExecutors.logger();
+        const getUserFlow = testFlows.user("user.get");
+
+        const getUserImpl = getUserFlow.derive(
+          { db: dbExecutor, logger: loggerExecutor },
+          async ({ db, logger }, ctx, input) => {
+            logger.info("Getting user", { userId: input.userId });
+            const user = db.users.findById(input.userId);
+
+            if (!user) {
+              return ctx.ko({
+                code: "USER_NOT_FOUND",
+                message: "User not found",
+              });
+            }
+
+            return ctx.ok({ user });
+          }
+        );
+
+        const result = await execute(getUserImpl, { userId });
+
+        expect(result.type).toBe("ok");
+        expect((result.data as any).user.id).toBe(userId);
+        expect((result.data as any).user.name).toBe(expectedName);
+        expect((result.data as any).user.email).toBe(
+          `user${userId}@example.com`
+        );
+      }
+    );
+
+    test("transforms dependency errors into business errors", async () => {
+      const dbExecutor = MockExecutors.database();
+      const getUserFlow = testFlows.user("user.get.failing");
+
+      const getUserImpl = getUserFlow.derive(
+        { db: dbExecutor },
+        async ({ db }, ctx, input) => {
+          try {
+            const user = db.users.findById(input.userId);
+            if (input.userId === "invalid") {
+              throw new Error("Database connection failed");
+            }
+            return ctx.ok({ user });
+          } catch (error) {
+            return ctx.ko({
+              code: "DATABASE_ERROR",
+              message: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        }
+      );
+
+      const result = await execute(getUserImpl, { userId: "invalid" });
+
+      expect(result.type).toBe("ko");
+      expect((result.data as any).code).toBe("DATABASE_ERROR");
+      expect((result.data as any).message).toBe("Database connection failed");
+    });
+  });
+
+  describe("nested flow execution and context sharing", () => {
+    test("maintains context state across nested flow invocations", async () => {
+      const events: string[] = [];
+      const loggerExecutor = MockExecutors.logger(events);
+      const validateEmailFlow = testFlows.validation("validate.email");
+
+      const validateEmailImpl = validateEmailFlow.derive(
+        { logger: loggerExecutor },
+        async ({ logger }, ctx, input) => {
+          logger.info("Validating email", { email: (input as any).email });
+          logger.events.push(`validated:${(input as any).email}`);
+
+          const isValid =
+            (input as any).email.includes("@") &&
+            (input as any).email.includes(".");
+          return ctx.ok({ valid: isValid });
+        }
+      );
+
+      const registerUserFlow = testFlows.generic(
+        "user.register",
+        custom<{ email: string; name: string }>(),
+        custom<{ userId: string; message: string }>(),
+        custom<{ code: string; message: string }>()
+      );
+
+      const registerUserImpl = registerUserFlow.derive(
+        { logger: loggerExecutor },
+        async ({ logger }, ctx, input) => {
+          logger.info("Starting user registration", {
+            email: (input as any).email,
+          });
+          logger.events.push(`register:start:${(input as any).email}`);
+
+          const REQUEST_ID = Symbol("requestId");
+          ctx.set(REQUEST_ID, "req-123");
+
+          const emailValidation = await ctx.execute(validateEmailImpl, {
+            email: (input as any).email,
+          });
+
+          if (emailValidation.type === "ko") {
+            return ctx.ko({
+              code: "INVALID_EMAIL",
+              message: "Email validation failed",
+            });
+          }
+
+          if (!emailValidation.data.valid) {
+            return ctx.ko({
+              code: "INVALID_EMAIL",
+              message: "Email format is invalid",
+            });
+          }
+
+          logger.events.push(`register:success:${(input as any).email}`);
+          return ctx.ok({
+            userId: "user-456",
+            message: `User ${(input as any).name} registered successfully`,
+          });
+        }
+      );
+
+      const result = await execute(registerUserImpl, {
+        email: "test@example.com",
+        name: "John Doe",
+      });
+
+      expect(result.type).toBe("ok");
+      expect((result.data as any).userId).toBe("user-456");
+      expect((result.data as any).message).toContain("John Doe");
+      expect((result.data as any).message).toContain("registered successfully");
+    });
+
+    test("propagates validation errors from nested flows with context", async () => {
+      const validateAddressFlow = testFlows.generic(
+        "validate.address",
+        custom<{ address: string }>(),
+        custom<{ valid: boolean }>(),
+        custom<{ code: string; message: string }>()
+      );
+
+      const validateAddressImpl = validateAddressFlow.provide(
+        async (ctx, input) => {
+          if (!(input as any).address || (input as any).address.length < 5) {
+            return ctx.ko({
+              code: "INVALID_ADDRESS",
+              message: "Address too short",
+            });
+          }
+          return ctx.ok({ valid: true });
+        }
+      );
+
+      const createOrderFlow = testFlows.generic(
+        "order.create",
+        custom<{ address: string; items: string[] }>(),
+        custom<{ orderId: string }>(),
+        custom<{ code: string; message: string }>()
+      );
+
+      const loggerExecutor = MockExecutors.logger();
+      const createOrderImpl = createOrderFlow.derive(
+        { logger: loggerExecutor },
+        async ({ logger }, ctx, input) => {
+          logger.info("Creating order");
+
+          const addressValidation = await ctx.execute(validateAddressImpl, {
+            address: (input as any).address,
+          });
+
+          if (addressValidation.type === "ko") {
+            return ctx.ko({
+              code: "VALIDATION_FAILED",
+              message: `Order creation failed: ${
+                (addressValidation.data as any).message
+              }`,
+            });
+          }
+
+          return ctx.ok({ orderId: "order-789" });
+        }
+      );
+
+      const result = await execute(createOrderImpl, {
+        address: "123",
+        items: ["item1", "item2"],
+      });
+
+      expect(result.type).toBe("ko");
+      expect((result.data as any).code).toBe("VALIDATION_FAILED");
+      expect((result.data as any).message).toContain("Address too short");
+      expect((result.data as any).message).toContain("Order creation failed");
+    });
   });
 });

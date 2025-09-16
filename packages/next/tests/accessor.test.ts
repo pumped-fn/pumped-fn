@@ -1,10 +1,9 @@
-import { describe, test, expect } from "vitest";
+import { test, expect, describe } from "vitest";
 import { accessor } from "../src/accessor";
 import { custom } from "../src/ssch";
 import type { DataStore } from "../src/accessor";
 
 describe("accessor", () => {
-  // Create a simple DataStore implementation for testing
   const createStore = (): DataStore => {
     const data = new Map<unknown, unknown>();
     return {
@@ -74,7 +73,6 @@ describe("accessor", () => {
       const store = createStore();
       const stringAccessor = accessor("test", custom<string>(), "default");
 
-      // TypeScript compilation test - this should not cause type errors
       const value: string = stringAccessor.find(store);
       expect(value).toBe("default");
     });

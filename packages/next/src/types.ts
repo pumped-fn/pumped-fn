@@ -66,7 +66,11 @@ export class SchemaError extends Error {
 
 export interface ErrorContext {
   readonly executorName?: string;
-  readonly resolutionStage: "dependency-resolution" | "factory-execution" | "post-processing" | "validation";
+  readonly resolutionStage:
+    | "dependency-resolution"
+    | "factory-execution"
+    | "post-processing"
+    | "validation";
   readonly dependencyChain: string[];
   readonly scopeId?: string;
   readonly timestamp: number;
@@ -87,7 +91,7 @@ export class ExecutorResolutionError extends Error {
   ) {
     super(message);
     // Manually set cause if options provided
-    if (options && 'cause' in options) {
+    if (options && "cause" in options) {
       (this as any).cause = options.cause;
     }
     this.name = "ExecutorResolutionError";
@@ -243,8 +247,8 @@ export declare namespace Core {
 
   export type PendingState<T> = { kind: "pending"; promise: Promise<T> };
   export type ResolvedState<T> = { kind: "resolved"; value: T };
-  export type RejectedState = { 
-    kind: "rejected"; 
+  export type RejectedState = {
+    kind: "rejected";
     error: unknown;
     context?: ErrorContext;
     enhancedError?: ExecutorResolutionError;
@@ -287,7 +291,6 @@ export declare namespace Core {
     ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
 
-
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;
   type EventCallbackResult = void | Replacer;
@@ -306,13 +309,19 @@ export declare namespace Core {
   ) => void | Promise<void>;
 
   export type ErrorCallback<T = unknown> = (
-    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    error:
+      | ExecutorResolutionError
+      | FactoryExecutionError
+      | DependencyResolutionError,
     executor: Executor<T>,
     scope: Scope
   ) => void | Promise<void>;
 
   export type GlobalErrorCallback = (
-    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    error:
+      | ExecutorResolutionError
+      | FactoryExecutionError
+      | DependencyResolutionError,
     executor: Executor<unknown>,
     scope: Scope
   ) => void | Promise<void>;
@@ -379,7 +388,7 @@ export declare namespace Core {
 
 export namespace Flow {
   export type ContextData = Map<unknown, unknown>;
-  
+
   export type ExecuteOpt = {
     scope?: Core.Scope;
     name?: string;
@@ -401,7 +410,6 @@ export namespace Flow {
       opt?: ExecuteOpt
     ) => Promise<Result<Output>>;
   };
-
 
   export type NoDependencyFlowFn<Input, Output> = (
     input: Input,
@@ -440,7 +448,8 @@ export namespace Flow {
     Config &
     Schema<Input, Output>;
 
-  export interface ExecutionContext<Input = any, Output = any> extends DataStore {
+  export interface ExecutionContext<Input = any, Output = any>
+    extends DataStore {
     data: Map<unknown, unknown>;
     parent?: ExecutionContext;
     scope: Core.Scope;
@@ -457,6 +466,91 @@ export namespace Flow {
     context: ExecutionContext;
     result: Result<Output>;
   };
+}
+
+export namespace Flow {
+  export type OK<S> = { type: "ok"; data: S };
+  export type KO<E> = { type: "ko"; data: E };
+  export type OutputLike<S, E> = OK<S> | KO<E>;
+
+  export type Definition<I, S, E> = {
+    name: string;
+    input: StandardSchemaV1<I>;
+    success: StandardSchemaV1<S>;
+    error: StandardSchemaV1<E>;
+    version?: string;
+  };
+
+  export interface NoDependencyHandler<I, S, E> {
+    (ctx: Context<I, S, E>): OutputLike<S, E> | Promise<OutputLike<S, E>>;
+    def: Definition<I, S, E>;
+  }
+
+  export interface DependentHandler<D, I, S, E> {
+    (ctx: Context<I, S, E>): OutputLike<S, E> | Promise<OutputLike<S, E>>;
+    def: Definition<I, S, E>;
+  }
+
+  export type NoDependencyFlow<I, S, E> = Core.Executor<
+    NoDependencyHandler<I, S, E>
+  >;
+
+  export type DependentFlow<D, I, S, E> = Core.Executor<
+    DependentHandler<D, I, S, E>
+  >;
+
+  export type UFlow =
+    | Core.Executor<NoDependencyHandler<any, any, any>>
+    | Core.Executor<DependentHandler<any, any, any, any>>;
+
+  export type InferInput<F> = F extends NoDependencyFlow<infer I, any, any>
+    ? I
+    : F extends DependentFlow<any, infer I, any, any>
+    ? I
+    : never;
+
+  export type InferSuccess<F> = F extends NoDependencyFlow<any, infer S, any>
+    ? S
+    : F extends DependentFlow<any, any, infer S, any>
+    ? S
+    : never;
+
+  export type InferError<F> = F extends NoDependencyFlow<any, any, infer E>
+    ? E
+    : F extends DependentFlow<any, any, any, infer E>
+    ? E
+    : never;
+
+  export type InferOutput<F> = F extends NoDependencyFlow<any, infer S, infer E>
+    ? OK<S> | KO<E>
+    : F extends DependentFlow<any, any, infer S, infer E>
+    ? OK<S> | KO<E>
+    : never;
+
+  export type R<S, E> = {
+    ok: (value: S) => OK<S>;
+    ko: (value: E) => KO<E>;
+    output: (
+      ok: boolean,
+      value: typeof ok extends true ? S : E
+    ) => typeof ok extends true ? OK<S> : KO<E>;
+  };
+
+  export type Opt = {};
+
+  export type C = {
+    execute: <F extends UFlow>(
+      flow: F,
+      param: InferInput<F>,
+      opt?: Opt
+    ) => Promise<InferOutput<F>>;
+  };
+
+  export type Context<I, S, E> = DataStore &
+    R<S, E> &
+    C & {
+      input: I;
+    };
 }
 
 export namespace Multi {

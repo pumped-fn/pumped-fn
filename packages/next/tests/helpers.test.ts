@@ -2,23 +2,16 @@ import { createScope, derive, preset, provide } from "../src";
 import { adapt, prepare, resolves } from "../src/helpers";
 import { expect, test } from "vitest";
 
-test("resolves helper", async () => {
+test("resolves object and array structures containing executors", async () => {
   const scope = createScope();
-
   const a = provide(() => "A");
   const b = provide(() => "B");
   const c = provide(() => "C");
 
-  const obj = {
-    a,
-    b,
-    c,
-  };
-
+  const obj = { a, b, c };
   const arr = [a, b];
 
   const result = await resolves(scope, obj);
-
   expect(result).toEqual({
     a: "A",
     b: "B",
@@ -29,9 +22,8 @@ test("resolves helper", async () => {
   expect(result2).toEqual(["A", "B"]);
 });
 
-test("prepared and adapted helper", async () => {
+test("prepares executors for direct invocation and adapts function executors", async () => {
   const scope = createScope();
-
   const a = provide(() => "A");
   const b = derive(a, (a) => a + "B");
   const c = derive(b, (b) => (x: string) => b + x);

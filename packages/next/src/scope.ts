@@ -81,6 +81,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
         return this.currentPromise;
       }
 
+      // Add this executor to the resolution chain
+      this.scope["~addToResolutionChain"](this.requestor, this.requestor);
+
       this.currentPromise = new Promise((resolve, reject) => {
         const replacer = this.scope['initialValues'].find(
           (item) => item.executor === this.requestor
@@ -192,6 +195,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
               value: { kind: "resolved", value: current },
             });
 
+            // Clean up resolution chain
+            this.scope["~removeFromResolutionChain"](this.requestor);
             this.currentPromise = null;
             resolve(current);
           })
@@ -221,14 +226,16 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
             this.scope['cache'].set(this.requestor, {
               accessor: this,
-              value: { 
-                kind: "rejected", 
+              value: {
+                kind: "rejected",
                 error,
                 context: errorContext,
                 enhancedError: enhancedError
               },
             });
 
+            // Clean up resolution chain
+            this.scope["~removeFromResolutionChain"](this.requestor);
             this.scope["~triggerError"](enhancedError, this.requestor);
             this.currentPromise = null;
             reject(enhancedError);
@@ -324,6 +331,9 @@ class BaseScope implements Core.Scope {
   protected isPod: boolean;
   private isDisposing = false;
 
+  // Circular dependency detection
+  private resolutionChain: Map<UE, Set<UE>> = new Map();
+
   protected plugins: Core.Plugin[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
@@ -342,6 +352,46 @@ class BaseScope implements Core.Scope {
       for (const plugin of options.plugins) {
         this.use(plugin);
       }
+    }
+  }
+
+  protected "~checkCircularDependency"(executor: UE, resolvingExecutor: UE): void {
+    const currentChain = this.resolutionChain.get(resolvingExecutor);
+    if (currentChain && currentChain.has(executor)) {
+      // Build the dependency chain for the error - only include the unique chain
+      const chainArray = Array.from(currentChain);
+      const dependencyChain = buildDependencyChain(chainArray);
+
+      throw createDependencyError(
+        ErrorCodes.CIRCULAR_DEPENDENCY,
+        getExecutorName(executor),
+        dependencyChain,
+        getExecutorName(executor),
+        undefined,
+        {
+          circularPath: dependencyChain.join(' -> ') + ' -> ' + getExecutorName(executor),
+          detectedAt: getExecutorName(resolvingExecutor),
+        }
+      );
+    }
+  }
+
+  protected "~addToResolutionChain"(executor: UE, resolvingExecutor: UE): void {
+    const currentChain = this.resolutionChain.get(resolvingExecutor) || new Set();
+    currentChain.add(executor);
+    this.resolutionChain.set(resolvingExecutor, currentChain);
+  }
+
+  protected "~removeFromResolutionChain"(executor: UE): void {
+    this.resolutionChain.delete(executor);
+  }
+
+  protected "~propagateResolutionChain"(fromExecutor: UE, toExecutor: UE): void {
+    const fromChain = this.resolutionChain.get(fromExecutor);
+    if (fromChain) {
+      const newChain = new Set(fromChain);
+      newChain.add(fromExecutor);
+      this.resolutionChain.set(toExecutor, newChain);
     }
   }
 
@@ -426,6 +476,13 @@ class BaseScope implements Core.Scope {
     ref: UE
   ): Promise<unknown> {
     const e = getExecutor(ie);
+
+    // Check for circular dependency before creating accessor
+    this["~checkCircularDependency"](e, ref);
+
+    // Propagate resolution chain to this executor
+    this["~propagateResolutionChain"](ref, e);
+
     const a = this["~makeAccessor"](e);
 
     if (isLazyExecutor(ie)) {
@@ -627,6 +684,7 @@ class BaseScope implements Core.Scope {
     this.onEvents.release.clear();
     this.onEvents.error.clear();
     this.onErrors.clear();
+    this.resolutionChain.clear();
   }
 
   onUpdate<T>(
@@ -853,6 +911,13 @@ class Pod extends BaseScope implements Core.Pod {
     }
 
     const t = getExecutor(ie);
+
+    // Check for circular dependency before creating accessor (same as parent)
+    this["~checkCircularDependency"](t, ref);
+
+    // Propagate resolution chain to this executor
+    this["~propagateResolutionChain"](ref, t);
+
     const a = this["~makeAccessor"](t);
 
     if (this.parentScope["cache"].has(t)) {

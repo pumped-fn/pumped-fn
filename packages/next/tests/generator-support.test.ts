@@ -3,8 +3,6 @@ import { derive, provide, createScope } from "../src";
 
 describe("Generator Support", () => {
   it("should support sync generator functions", async () => {
-    const yields: number[] = [];
-
     const generatorExecutor = provide(function* () {
       yield 1;
       yield 2;
@@ -19,8 +17,6 @@ describe("Generator Support", () => {
   });
 
   it("should support async generator functions", async () => {
-    const yields: number[] = [];
-
     const asyncGeneratorExecutor = provide(async function* () {
       yield 1;
       yield await Promise.resolve(2);
@@ -136,22 +132,17 @@ describe("Generator Support", () => {
 
     const scope = createScope();
 
-    // Test with lazy directly
     const lazyAccessor = scope.accessor(generator);
 
-    // Should be unresolved initially
     expect(lazyAccessor.lookup()).toBeUndefined();
 
-    // Resolve and check result
     const result = await lazyAccessor.resolve();
     expect(result).toBe("lazy result");
 
-    // After resolution, lookup should return the resolved state
     const state = lazyAccessor.lookup();
     expect(state?.kind).toBe("resolved");
     expect(state?.kind === "resolved" && state.value).toBe("lazy result");
 
-    // get() should return the value
     expect(lazyAccessor.get()).toBe("lazy result");
   });
 });
