@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { flow, execute } from "../src/flow";
+import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
 import { testFlows, MockExecutors, scenarios } from "./test-utils";
 
@@ -20,7 +20,7 @@ describe("FlowV2", () => {
         custom<{ code: string }>()
       );
 
-      const greetImpl = greetFlow.provide(async (ctx, input) => {
+      const greetImpl = greetFlow.handler(async (ctx, input) => {
         return ctx.ok({ message: `Hello ${(input as any).name}` });
       });
 
@@ -32,11 +32,11 @@ describe("FlowV2", () => {
       "executes successful mathematical operation: $name yields $expected",
       async ({ input, expected }) => {
         const mathFlow = testFlows.math("math.add");
-        const addImpl = mathFlow.provide(async (ctx, input) => {
+        const addImpl = mathFlow.handler(async (ctx, input) => {
           return ctx.ok({ result: input.a + input.b });
         });
 
-        const result = await execute(addImpl, input);
+        const result = await flow.execute(addImpl, input);
 
         expect(result.type).toBe("ok");
         expect((result.data as any).result).toBe(expected);
@@ -45,7 +45,7 @@ describe("FlowV2", () => {
 
     test("handles business logic errors gracefully with ko result", async () => {
       const divideFlow = testFlows.math("math.divide");
-      const divideImpl = divideFlow.provide(async (ctx, input) => {
+      const divideImpl = divideFlow.handler(async (ctx, input) => {
         if (input.b === 0) {
           return ctx.ko({
             code: "DIVIDE_BY_ZERO",
@@ -55,7 +55,7 @@ describe("FlowV2", () => {
         return ctx.ok({ result: input.a / input.b });
       });
 
-      const result = await execute(divideImpl, { a: 10, b: 0 });
+      const result = await flow.execute(divideImpl, { a: 10, b: 0 });
 
       expect(result.type).toBe("ko");
       expect((result.data as any).code).toBe("DIVIDE_BY_ZERO");
@@ -71,7 +71,7 @@ describe("FlowV2", () => {
         const loggerExecutor = MockExecutors.logger();
         const getUserFlow = testFlows.user("user.get");
 
-        const getUserImpl = getUserFlow.derive(
+        const getUserImpl = getUserFlow.handler(
           { db: dbExecutor, logger: loggerExecutor },
           async ({ db, logger }, ctx, input) => {
             logger.info("Getting user", { userId: input.userId });
@@ -88,7 +88,7 @@ describe("FlowV2", () => {
           }
         );
 
-        const result = await execute(getUserImpl, { userId });
+        const result = await flow.execute(getUserImpl, { userId });
 
         expect(result.type).toBe("ok");
         expect((result.data as any).user.id).toBe(userId);
@@ -103,7 +103,7 @@ describe("FlowV2", () => {
       const dbExecutor = MockExecutors.database();
       const getUserFlow = testFlows.user("user.get.failing");
 
-      const getUserImpl = getUserFlow.derive(
+      const getUserImpl = getUserFlow.handler(
         { db: dbExecutor },
         async ({ db }, ctx, input) => {
           try {
@@ -121,7 +121,7 @@ describe("FlowV2", () => {
         }
       );
 
-      const result = await execute(getUserImpl, { userId: "invalid" });
+      const result = await flow.execute(getUserImpl, { userId: "invalid" });
 
       expect(result.type).toBe("ko");
       expect((result.data as any).code).toBe("DATABASE_ERROR");
@@ -135,7 +135,7 @@ describe("FlowV2", () => {
       const loggerExecutor = MockExecutors.logger(events);
       const validateEmailFlow = testFlows.validation("validate.email");
 
-      const validateEmailImpl = validateEmailFlow.derive(
+      const validateEmailImpl = validateEmailFlow.handler(
         { logger: loggerExecutor },
         async ({ logger }, ctx, input) => {
           logger.info("Validating email", { email: (input as any).email });
@@ -155,7 +155,7 @@ describe("FlowV2", () => {
         custom<{ code: string; message: string }>()
       );
 
-      const registerUserImpl = registerUserFlow.derive(
+      const registerUserImpl = registerUserFlow.handler(
         { logger: loggerExecutor },
         async ({ logger }, ctx, input) => {
           logger.info("Starting user registration", {
@@ -192,7 +192,7 @@ describe("FlowV2", () => {
         }
       );
 
-      const result = await execute(registerUserImpl, {
+      const result = await flow.execute(registerUserImpl, {
         email: "test@example.com",
         name: "John Doe",
       });
@@ -211,7 +211,7 @@ describe("FlowV2", () => {
         custom<{ code: string; message: string }>()
       );
 
-      const validateAddressImpl = validateAddressFlow.provide(
+      const validateAddressImpl = validateAddressFlow.handler(
         async (ctx, input) => {
           if (!(input as any).address || (input as any).address.length < 5) {
             return ctx.ko({
@@ -231,7 +231,7 @@ describe("FlowV2", () => {
       );
 
       const loggerExecutor = MockExecutors.logger();
-      const createOrderImpl = createOrderFlow.derive(
+      const createOrderImpl = createOrderFlow.handler(
         { logger: loggerExecutor },
         async ({ logger }, ctx, input) => {
           logger.info("Creating order");
@@ -253,7 +253,7 @@ describe("FlowV2", () => {
         }
       );
 
-      const result = await execute(createOrderImpl, {
+      const result = await flow.execute(createOrderImpl, {
         address: "123",
         items: ["item1", "item2"],
       });

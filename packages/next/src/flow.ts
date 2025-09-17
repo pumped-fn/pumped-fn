@@ -1,22 +1,25 @@
-import type { Core, Flow, StandardSchemaV1 } from "./types";
+import type { Core, Flow, Meta, StandardSchemaV1 } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
 import { DataStore, Accessor, accessor } from "./accessor";
 import { custom } from "./ssch";
+import { meta } from "./meta";
 
 const ok = <S>(data: S): Flow.OK<S> => ({ type: "ok", data });
 const ko = <E>(data: E): Flow.KO<E> => ({ type: "ko", data });
+
+const flowDefinitionMeta = meta<Flow.Definition<any, any, any>>(
+  "flow.definition",
+  custom<Flow.Definition<any, any, any>>()
+);
 
 export interface FlowPlugin {
   name: string;
 
   init?(pod: Core.Pod, context: DataStore): void | Promise<void>;
 
-  wrap?<T>(
-    context: DataStore,
-    next: () => Promise<T>
-  ): Promise<T>;
+  wrap?<T>(context: DataStore, next: () => Promise<T>): Promise<T>;
 
   dispose?(pod: Core.Pod): void | Promise<void>;
 }
@@ -27,10 +30,10 @@ export const FlowExecutionContext: {
   parentFlowName: Accessor<string | undefined>;
   isParallel: Accessor<boolean>;
 } = {
-  depth: accessor('flow.depth', custom<number>(), 0),
-  flowName: accessor('flow.name', custom<string | undefined>()),
-  parentFlowName: accessor('flow.parentName', custom<string | undefined>()),
-  isParallel: accessor('flow.isParallel', custom<boolean>(), false)
+  depth: accessor("flow.depth", custom<number>(), 0),
+  flowName: accessor("flow.name", custom<string | undefined>()),
+  parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
+  isParallel: accessor("flow.isParallel", custom<boolean>(), false),
 };
 
 class FlowDefinition<I, S, E> {
@@ -39,63 +42,82 @@ class FlowDefinition<I, S, E> {
     public readonly version: string,
     public readonly input: StandardSchemaV1<I>,
     public readonly success: StandardSchemaV1<S>,
-    public readonly error: StandardSchemaV1<E>
+    public readonly error: StandardSchemaV1<E>,
+    public readonly meta: Meta.Meta[] = []
   ) {}
 
-  provide(
-    handler: (
+  handler(
+    handlerFn: (
       ctx: Flow.Context<I, S, E>,
       input: I
     ) => Promise<Flow.OutputLike<S, E>>
-  ): Core.Executor<Flow.NoDependencyHandler<I, S, E>> {
-    return createExecutor(
-      () => {
-        const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
-          return handler(ctx, ctx.input);
-        };
-        (flowHandler as any).def = this;
-        return flowHandler as Flow.NoDependencyHandler<I, S, E>;
-      },
-      undefined,
-      undefined
-    ) as Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
-  }
-
-  derive<D extends Core.DependencyLike>(
+  ): Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+  handler<D extends Core.DependencyLike>(
     dependencies: D,
-    handler: (
+    handlerFn: (
       deps: Core.InferOutput<D>,
       ctx: Flow.Context<I, S, E>,
       input: I
     ) => Promise<Flow.OutputLike<S, E>>
-  ): Core.Executor<Flow.DependentHandler<D, I, S, E>> {
+  ): Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+  handler<D extends Core.DependencyLike>(
+    dependenciesOrHandler:
+      | D
+      | ((
+          ctx: Flow.Context<I, S, E>,
+          input: I
+        ) => Promise<Flow.OutputLike<S, E>>),
+    handlerFn?: (
+      deps: Core.InferOutput<D>,
+      ctx: Flow.Context<I, S, E>,
+      input: I
+    ) => Promise<Flow.OutputLike<S, E>>
+  ):
+    | Core.Executor<Flow.NoDependencyHandler<I, S, E>>
+    | Core.Executor<Flow.DependentHandler<D, I, S, E>> {
+    if (typeof dependenciesOrHandler === "function") {
+      const noDepsHandler = dependenciesOrHandler;
+      return createExecutor(
+        () => {
+          const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
+            return noDepsHandler(ctx, ctx.input);
+          };
+          return flowHandler as Flow.NoDependencyHandler<I, S, E>;
+        },
+        undefined,
+        [...this.meta, flowDefinitionMeta(this)]
+      ) as Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+    }
+    const dependencies = dependenciesOrHandler;
+    const dependentHandler = handlerFn!;
     return createExecutor(
       (deps: unknown) => {
         const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
-          return handler(deps as Core.InferOutput<D>, ctx, ctx.input);
+          return dependentHandler(deps as Core.InferOutput<D>, ctx, ctx.input);
         };
-        (flowHandler as any).def = this;
         return flowHandler as Flow.DependentHandler<D, I, S, E>;
       },
-      dependencies as any,
-      undefined
+      dependencies,
+      [...this.meta, flowDefinitionMeta(this)]
     ) as Core.Executor<Flow.DependentHandler<D, I, S, E>>;
   }
 }
 
-export function flow<I, S, E>(config: {
+function define<I, S, E>(config: {
   name: string;
   version?: string;
   input: StandardSchemaV1<I>;
   success: StandardSchemaV1<S>;
   error: StandardSchemaV1<E>;
+  meta?: Meta.Meta[];
 }): FlowDefinition<I, S, E> {
   return new FlowDefinition(
     config.name,
     config.version || "1.0.0",
     config.input,
     config.success,
-    config.error
+    config.error,
+    config.meta
   );
 }
 
@@ -110,8 +132,12 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   ) {}
 
   initializeExecutionContext(flowName: string, isParallel: boolean = false) {
-    const currentDepth = this.parent ? (FlowExecutionContext.depth.find(this.parent) || 0) + 1 : 0;
-    const parentFlowName = this.parent ? FlowExecutionContext.flowName.find(this.parent) : undefined;
+    const currentDepth = this.parent
+      ? (FlowExecutionContext.depth.find(this.parent) || 0) + 1
+      : 0;
+    const parentFlowName = this.parent
+      ? FlowExecutionContext.flowName.find(this.parent)
+      : undefined;
 
     FlowExecutionContext.depth.set(this, currentDepth);
     FlowExecutionContext.flowName.set(this, flowName);
@@ -143,6 +169,10 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     input: Flow.InferInput<F>
   ): Promise<Awaited<Flow.InferOutput<F>>> {
     const handler = await this.pod.resolve(flow);
+    const definition = flowDefinitionMeta.find(flow);
+    if (!definition) {
+      throw new Error("Flow definition not found in executor metadata");
+    }
 
     const childContext = new FlowContext<unknown, unknown, unknown>(
       input,
@@ -150,7 +180,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       this.plugins,
       this
     );
-    childContext.initializeExecutionContext(handler.def.name, false);
+    childContext.initializeExecutionContext(definition.name, false);
 
     return (await this.executeWithPlugins(handler, childContext)) as any;
   }
@@ -168,7 +198,11 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
         );
 
         const handler = await this.pod.resolve(flow);
-        childContext.initializeExecutionContext(handler.def.name, true);
+        const definition = flowDefinitionMeta.find(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+        childContext.initializeExecutionContext(definition.name, true);
         return this.executeWithPlugins(handler, childContext);
       })
     ) as any;
@@ -192,7 +226,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   }
 }
 
-export async function execute<I, S, E>(
+async function execute<I, S, E>(
   flow: Core.Executor<
     Flow.NoDependencyHandler<I, S, E> | Flow.DependentHandler<any, I, S, E>
   >,
@@ -232,20 +266,23 @@ export async function execute<I, S, E>(
       await plugin.init?.(pod, context);
     }
 
-
     const executeCore = async () => {
       const handler = await pod.resolve(flow);
-      const validated = validate(handler.def.input, input);
+      const definition = flowDefinitionMeta.find(flow);
+      if (!definition) {
+        throw new Error("Flow definition not found in executor metadata");
+      }
+      const validated = validate(definition.input, input);
       context.input = validated as I;
 
-      context.initializeExecutionContext(handler.def.name, false);
+      context.initializeExecutionContext(definition.name, false);
 
       const result = await handler(context);
 
       if (result.type === "ok") {
-        validate(handler.def.success, result.data);
+        validate(definition.success, result.data);
       } else {
-        validate(handler.def.error, result.data);
+        validate(definition.error, result.data);
       }
 
       return result;
@@ -260,7 +297,6 @@ export async function execute<I, S, E>(
     }
 
     return await executor();
-
   } finally {
     for (const plugin of options?.plugins || []) {
       await plugin.dispose?.(pod);
@@ -273,3 +309,54 @@ export async function execute<I, S, E>(
     }
   }
 }
+
+// Main flow function with namespace approach
+function flowImpl<I, S, E>(
+  definition: FlowDefinition<I, S, E>,
+  handler: (
+    ctx: Flow.Context<I, S, E>,
+    input: I
+  ) => Promise<Flow.OutputLike<S, E>>
+): Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+
+function flowImpl<I, S, E, D extends Core.DependencyLike>(
+  definition: FlowDefinition<I, S, E>,
+  dependencies: D,
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context<I, S, E>,
+    input: I
+  ) => Promise<Flow.OutputLike<S, E>>
+): Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+
+function flowImpl<I, S, E, D extends Core.DependencyLike>(
+  definition: FlowDefinition<I, S, E>,
+  dependenciesOrHandler:
+    | D
+    | ((
+        ctx: Flow.Context<I, S, E>,
+        input: I
+      ) => Promise<Flow.OutputLike<S, E>>),
+  handlerFn?: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context<I, S, E>,
+    input: I
+  ) => Promise<Flow.OutputLike<S, E>>
+):
+  | Core.Executor<Flow.NoDependencyHandler<I, S, E>>
+  | Core.Executor<Flow.DependentHandler<D, I, S, E>> {
+  if (typeof dependenciesOrHandler === "function") {
+    return definition.handler(dependenciesOrHandler);
+  } else {
+    return definition.handler(dependenciesOrHandler, handlerFn!);
+  }
+}
+
+// Create flow namespace object
+export const flow: typeof flowImpl & {
+  define: typeof define;
+  execute: typeof execute;
+} = Object.assign(flowImpl, {
+  define: define,
+  execute: execute
+});

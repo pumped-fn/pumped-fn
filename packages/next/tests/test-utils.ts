@@ -32,7 +32,7 @@ export namespace TestTypes {
 
 export const testFlows = {
   basic: (name: string) =>
-    flow({
+    flow.define({
       name,
       input: custom<TestTypes.BasicInput>(),
       success: custom<TestTypes.SuccessResult<string>>(),
@@ -40,7 +40,7 @@ export const testFlows = {
     }),
 
   math: (name: string) =>
-    flow({
+    flow.define({
       name,
       input: custom<TestTypes.MathInput>(),
       success: custom<TestTypes.SuccessResult<number>>(),
@@ -48,7 +48,7 @@ export const testFlows = {
     }),
 
   user: (name: string) =>
-    flow({
+    flow.define({
       name,
       input: custom<{ userId: string }>(),
       success: custom<{ user: TestTypes.User }>(),
@@ -56,7 +56,7 @@ export const testFlows = {
     }),
 
   validation: (name: string) =>
-    flow({
+    flow.define({
       name,
       input: custom<{ email: string }>(),
       success: custom<{ valid: boolean }>(),
@@ -69,7 +69,7 @@ export const testFlows = {
     success: any,
     error: any
   ) =>
-    flow({
+    flow.define({
       name,
       input,
       success,

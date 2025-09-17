@@ -544,6 +544,9 @@ export namespace Flow {
       param: InferInput<F>,
       opt?: Opt
     ) => Promise<InferOutput<F>>;
+    executeParallel: <F extends UFlow>(
+      flows: Array<[F, InferInput<F>]>
+    ) => Promise<Array<Awaited<InferOutput<F>>>>;
   };
 
   export type Context<I, S, E> = DataStore &
