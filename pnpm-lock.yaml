@@ -48,8 +48,8 @@ importers:
         version: 2.0.17(mermaid@11.9.0)(vitepress@1.6.4(@algolia/client-search@5.35.0)(@types/node@20.19.11)(@types/react@18.3.23)(postcss@8.5.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.43.1)(typescript@5.9.2))
     devDependencies:
       '@pumped-fn/core-next':
-        specifier: ^0.5.47
-        version: 0.5.47(typescript@5.9.2)
+        specifier: 0.5.58
+        version: 0.5.58
       '@types/node':
         specifier: ^20.19.11
         version: 20.19.11
@@ -634,8 +634,8 @@ packages:
   '@oxc-project/types@0.70.0':
     resolution: {integrity: sha512-ngyLUpUjO3dpqygSRQDx7nMx8+BmXbWOU4oIwTJFV2MVIDG7knIZwgdwXlQWLg3C3oxg1lS7ppMtPKqKFb7wzw==}
 
-  '@pumped-fn/core-next@0.5.47':
-    resolution: {integrity: sha512-TFKZVXLp/UftdJGfng9NxY6jSJ79CNZpnMO6lemdTca4y2VvaXnfOh1NWX/Epq8nX+jsisoAX8MKyo2EBSmk/Q==}
+  '@pumped-fn/core-next@0.5.58':
+    resolution: {integrity: sha512-vXDWbaEaxGbprL/LzrAF7iKkDCEkLwRFiY7WPFnTpzeJZtjVGPbXQP8g6cIuN+E+r31RaNqxwe3pOPeD7TYrtQ==}
     engines: {node: '>=18'}
 
   '@quansync/fs@0.1.5':
@@ -3367,19 +3367,7 @@ snapshots:
 
   '@oxc-project/types@0.70.0': {}
 
-  '@pumped-fn/core-next@0.5.47(typescript@5.9.2)':
-    dependencies:
-      tsdown: 0.11.13(typescript@5.9.2)
-    transitivePeerDependencies:
-      - '@oxc-project/runtime'
-      - '@typescript/native-preview'
-      - oxc-resolver
-      - publint
-      - supports-color
-      - typescript
-      - unplugin-lightningcss
-      - unplugin-unused
-      - vue-tsc
+  '@pumped-fn/core-next@0.5.58': {}
 
   '@quansync/fs@0.1.5':
     dependencies:
