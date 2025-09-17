@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
-import { flow, type FlowPlugin, FlowExecutionContext } from "../src/flow";
+import { flow, FlowExecutionContext } from "../src/flow";
+import type { Flow } from "../src/types";
 import { custom } from "../src/ssch";
 import { accessor } from "../src/accessor";
 
@@ -26,7 +27,7 @@ namespace ExecutionTree {
 }
 
 function createExecutionTracker(): {
-  plugin: FlowPlugin;
+  plugin: Flow.Plugin;
   getTree: () => ExecutionTree.Tree | null;
   visualize: () => string;
 } {
@@ -34,9 +35,17 @@ function createExecutionTracker(): {
   const nodeStack: string[] = [];
   let nodeCounter = 0;
 
-  const treeAccessor = accessor<ExecutionTree.Tree>("execution.tree", custom<ExecutionTree.Tree>());
+  const treeAccessor = accessor<ExecutionTree.Tree>(
+    "execution.tree",
+    custom<ExecutionTree.Tree>()
+  );
 
-  function createNode(name: string, type: ExecutionTree.Node["type"], depth: number, isParallel: boolean): ExecutionTree.Node {
+  function createNode(
+    name: string,
+    type: ExecutionTree.Node["type"],
+    depth: number,
+    isParallel: boolean
+  ): ExecutionTree.Node {
     return {
       id: `node-${++nodeCounter}`,
       name,
@@ -52,21 +61,27 @@ function createExecutionTracker(): {
 
   function visualizeNode(node: ExecutionTree.Node, indent = ""): string[] {
     const prefix = indent + (node.depth > 0 ? "├── " : "");
-    const typeIcon = node.type === "parallel" ? "⚡" : node.type === "race" ? "🏁" : "→";
-    const statusIcon = node.status === "success" ? "✅" : node.status === "error" ? "❌" : "⏳";
+    const typeIcon =
+      node.type === "parallel" ? "⚡" : node.type === "race" ? "🏁" : "→";
+    const statusIcon =
+      node.status === "success" ? "✅" : node.status === "error" ? "❌" : "⏳";
     const duration = node.duration ? ` (${node.duration}ms)` : "";
     const error = node.error ? ` [${node.error}]` : "";
 
-    const lines = [`${prefix}${typeIcon} ${node.name} ${statusIcon}${duration}${error}`];
+    const lines = [
+      `${prefix}${typeIcon} ${node.name} ${statusIcon}${duration}${error}`,
+    ];
 
     for (const child of node.children) {
-      lines.push(...visualizeNode(child, indent + (node.depth > 0 ? "│   " : "")));
+      lines.push(
+        ...visualizeNode(child, indent + (node.depth > 0 ? "│   " : ""))
+      );
     }
 
     return lines;
   }
 
-  const plugin: FlowPlugin = {
+  const plugin = flow.plugin({
     name: "execution-tracker",
 
     init(_pod, context) {
@@ -86,8 +101,15 @@ function createExecutionTracker(): {
       const depth = FlowExecutionContext.depth.find(context) || 0;
       const isParallel = FlowExecutionContext.isParallel.find(context) || false;
 
-      const nodeType: ExecutionTree.Node["type"] = isParallel ? "parallel" : "direct";
-      const node = createNode(flowName || "unknown", nodeType, depth, isParallel);
+      const nodeType: ExecutionTree.Node["type"] = isParallel
+        ? "parallel"
+        : "direct";
+      const node = createNode(
+        flowName || "unknown",
+        nodeType,
+        depth,
+        isParallel
+      );
 
       currentTree.allNodes.set(node.id, node);
 
@@ -126,7 +148,7 @@ function createExecutionTracker(): {
         nodeStack.pop();
       }
     },
-  };
+  });
 
   return {
     plugin,
@@ -173,22 +195,26 @@ describe("Flow Plugin Execution Tree Demonstration", () => {
     const masterFlow = flow.define({
       name: "master-orchestrator",
       input: custom<{ data: number[] }>(),
-      success: custom<{ processed: number[]; parallel: number[]; errors: string[] }>(),
+      success: custom<{
+        processed: number[];
+        parallel: number[];
+        errors: string[];
+      }>(),
       error: custom<{ message: string }>(),
     });
 
     const basicImpl = basicFlow.handler(async (ctx, input) => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return ctx.ok({ result: input.value * 2 });
     });
 
     const parallelImpl = parallelFlow.handler(async (ctx, input) => {
       const results = await ctx.executeParallel(
-        input.items.map(item => [basicImpl, { value: item }] as const)
+        input.items.map((item) => [basicImpl, { value: item }] as const)
       );
 
       return ctx.ok({
-        results: results.map((r: any) => r.type === "ok" ? r.data.result : 0)
+        results: results.map((r: any) => (r.type === "ok" ? r.data.result : 0)),
       });
     });
 
@@ -222,7 +248,7 @@ describe("Flow Plugin Execution Tree Demonstration", () => {
       }
 
       const parallelResult = await ctx.execute(parallelImpl, {
-        items: input.data.slice(2, 5)
+        items: input.data.slice(2, 5),
       });
 
       let parallel: number[] = [];
@@ -265,7 +291,10 @@ describe("Flow Plugin Execution Tree Demonstration", () => {
     if (result.type === "ok") {
       expect(result.data.processed).toEqual([2, 4]);
       expect(result.data.parallel).toEqual([6, 8, 10]);
-      expect(result.data.errors).toEqual(["Caught error flow failure", "Caught uncaught exception"]);
+      expect(result.data.errors).toEqual([
+        "Caught error flow failure",
+        "Caught uncaught exception",
+      ]);
     }
 
     const tree = tracker.getTree();
@@ -283,10 +312,18 @@ describe("Flow Plugin Execution Tree Demonstration", () => {
     console.log("\n🌳 Execution Tree:");
     console.log(visualization);
     console.log(`\n📊 Total nodes: ${tree!.allNodes.size}`);
-    console.log(`📈 Max depth: ${Math.max(...Array.from(tree!.allNodes.values()).map(n => n.depth))}`);
+    console.log(
+      `📈 Max depth: ${Math.max(
+        ...Array.from(tree!.allNodes.values()).map((n) => n.depth)
+      )}`
+    );
 
-    const successCount = Array.from(tree!.allNodes.values()).filter(n => n.status === "success").length;
-    const errorCount = Array.from(tree!.allNodes.values()).filter(n => n.status === "error").length;
+    const successCount = Array.from(tree!.allNodes.values()).filter(
+      (n) => n.status === "success"
+    ).length;
+    const errorCount = Array.from(tree!.allNodes.values()).filter(
+      (n) => n.status === "error"
+    ).length;
     console.log(`✅ Successful executions: ${successCount}`);
     console.log(`❌ Failed executions: ${errorCount}`);
   });

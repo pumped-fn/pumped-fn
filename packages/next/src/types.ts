@@ -469,8 +469,18 @@ export namespace Flow {
 }
 
 export namespace Flow {
-  export type OK<S> = { type: "ok"; data: S };
-  export type KO<E> = { type: "ko"; data: E };
+  export type OK<S> = {
+    type: "ok";
+    data: S;
+    isOk(): this is OK<S>;
+    isKo(): this is never;
+  };
+  export type KO<E> = {
+    type: "ko";
+    data: E;
+    isOk(): this is never;
+    isKo(): this is KO<E>;
+  };
   export type OutputLike<S, E> = OK<S> | KO<E>;
 
   export type Definition<I, S, E> = {
@@ -544,9 +554,16 @@ export namespace Flow {
       param: InferInput<F>,
       opt?: Opt
     ) => Promise<InferOutput<F>>;
-    executeParallel: <F extends UFlow>(
-      flows: Array<[F, InferInput<F>]>
-    ) => Promise<Array<Awaited<InferOutput<F>>>>;
+
+    executeParallel: <T extends ReadonlyArray<[UFlow, any]>>(
+      flows: T
+    ) => Promise<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends UFlow
+          ? Awaited<InferOutput<F>>
+          : never
+        : never;
+    }>;
   };
 
   export type Context<I, S, E> = DataStore &
@@ -554,6 +571,13 @@ export namespace Flow {
     C & {
       input: I;
     };
+
+  export interface Plugin {
+    name: string;
+    init?(pod: Core.Pod, context: DataStore): void | Promise<void>;
+    wrap?<T>(context: DataStore, next: () => Promise<T>): Promise<T>;
+    dispose?(pod: Core.Pod): void | Promise<void>;
+  }
 }
 
 export namespace Multi {

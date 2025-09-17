@@ -28,7 +28,8 @@ export * as multi from "./multi";
 export * from "./scope";
 export * from "./ssch";
 export * from "./types";
-export { flow, type FlowPlugin, FlowExecutionContext } from "./flow";
+export { flow, FlowExecutionContext } from "./flow";
+export type { Flow } from "./types";
 
 export const name: Meta.MetaFn<string> = meta(
   "pumped-fn/name",
