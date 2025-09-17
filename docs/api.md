@@ -221,11 +221,11 @@ Middleware provides cross-cutting concerns without modifying core logic. It can 
 Register middleware to intercept scope operations:
 
 ```ts twoslash
-import { createScope, middleware } from "@pumped-fn/core-next";
+import { createScope, plugin } from "@pumped-fn/core-next";
 
 const scope = createScope();
 
-const cleanup = scope.use(middleware({
+const cleanup = scope.use(plugin({
   init: (scope) => {
     // Called when middleware is registered
   },
@@ -240,6 +240,7 @@ const cleanup = scope.use(middleware({
 Intercept resolution and update events:
 
 ```ts twoslash
+// @errors: 7006
 import { createScope, preset, provide } from "@pumped-fn/core-next";
 
 const scope = createScope();
@@ -264,6 +265,7 @@ scope.onChange((event, executor, value, scope) => {
 Handle executor cleanup:
 
 ```ts twoslash
+// @errors: 7006
 import { createScope, provide } from "@pumped-fn/core-next";
 
 const scope = createScope();
@@ -278,10 +280,11 @@ scope.onRelease(async (event, executor, scope) => {
 #### practical middleware examples
 
 ```ts twoslash
-import { createScope, middleware, provide, derive, preset } from "@pumped-fn/core-next";
+// @errors: 7006
+import { createScope, plugin, provide, derive, preset } from "@pumped-fn/core-next";
 
 // Analytics middleware
-const analytics = middleware({
+const analytics = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value) => {
       if (event === "resolve") {
@@ -292,7 +295,7 @@ const analytics = middleware({
 });
 
 // Value sanitizer
-const sanitizer = middleware({
+const sanitizer = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value, scope) => {
       if (typeof value === "string" && value.includes("unsafe")) {
@@ -366,13 +369,14 @@ const allNames = name.some(service); // string[]
 #### meta with middleware
 
 ```ts twoslash
-import { createScope, middleware, provide, meta, custom } from "@pumped-fn/core-next";
+// @errors: 7006
+import { createScope, plugin, provide, meta, custom } from "@pumped-fn/core-next";
 
 const name = meta("name", custom<string>());
 const metrics = meta("metrics", custom<boolean>());
 
 // Middleware that uses meta for conditional logic
-const metricsMiddleware = middleware({
+const metricsMiddleware = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value) => {
       // Check if executor has metrics enabled
@@ -415,7 +419,8 @@ const desc = description.find(accessor); // "Main service"
 #### practical meta patterns
 
 ```ts twoslash
-import { provide, derive, meta, custom, createScope, middleware } from "@pumped-fn/core-next";
+// @errors: 7006
+import { provide, derive, meta, custom, createScope, plugin } from "@pumped-fn/core-next";
 
 // Version tracking
 const version = meta("version", custom<string>());
@@ -427,7 +432,7 @@ const deprecated = meta("deprecated", custom<{ since: string; alternative?: stri
 const tier = meta("tier", custom<"critical" | "standard" | "low">());
 
 // Deprecation middleware
-const deprecationWarning = middleware({
+const deprecationWarning = plugin({
   init: (scope) => {
     scope.onChange((event, executor) => {
       const deprecation = deprecated.find(executor);
