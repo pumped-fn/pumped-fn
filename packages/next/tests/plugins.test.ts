@@ -14,7 +14,6 @@ test('eager plugin triggers immediate execution of marked executors', async () =
     registry: [value]
   })
 
-  setTimeout(() => {
-    expect(fn).toHaveBeenCalledTimes(1)
-  }, 0)
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(fn).toHaveBeenCalledTimes(1)
 })
