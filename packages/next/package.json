@@ -15,12 +15,14 @@
   },
   "files": [
     "dist",
+    "docs",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && pnpm run copy-docs",
+    "copy-docs": "mkdir -p docs && cp -r ../llm/*.md docs/",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "typecheck": "tsc --noEmit",

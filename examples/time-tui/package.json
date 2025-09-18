@@ -6,8 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "test": "vitest"
+    "dev": "tsx src/index.ts"
   },
   "dependencies": {
     "@pumped-fn/core-next": "workspace:*"
