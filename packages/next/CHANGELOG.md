@@ -1,5 +1,13 @@
 # @pumped-fn/core-next
 
+## 0.5.62
+
+### Patch Changes
+
+- [`272106d`](https://github.com/pumped-fn/pumped-fn/commit/272106ded793db0ab7777ce7a17113c8aca1068a) Thanks [@lagz0ne](https://github.com/lagz0ne)! - added llm docs
+
+- [`e282097`](https://github.com/pumped-fn/pumped-fn/commit/e2820973ae51ade8441f1d22252b4efcc5875791) Thanks [@lagz0ne](https://github.com/lagz0ne)! - updated llm docs
+
 ## 0.5.61
 
 ### Patch Changes
