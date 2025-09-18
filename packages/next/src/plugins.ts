@@ -8,9 +8,8 @@ export const eager: {
 } = {
   meta: meta(Symbol.for('@pumped-fn/plugin/eager'), custom<boolean>()),
   plugin: (): Core.Plugin => ({
-    init(scope, { registry }) {
-
-      for (const executor of registry) {
+    init(scope) {
+      for (const executor of scope.registeredExecutors()) {
         const isEager = eager.meta.find(executor);
         if (isEager) {
           scope.resolve(executor)

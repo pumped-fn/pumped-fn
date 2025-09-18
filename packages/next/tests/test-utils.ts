@@ -148,7 +148,7 @@ export const PluginFactory = {
   contextCapture: (capturedContext: { current?: any } = {}) =>
     ({
       name: "context-capture",
-      async wrap(context: any, next: () => Promise<any>) {
+      async wrap(context: any, next: () => Promise<any>, execution: any) {
         capturedContext.current = context;
         return next();
       },
@@ -157,7 +157,7 @@ export const PluginFactory = {
   executionOrder: (execOrder: string[], pluginName: string) =>
     ({
       name: pluginName,
-      async wrap(context: any, next: () => Promise<any>) {
+      async wrap(context: any, next: () => Promise<any>, execution: any) {
         execOrder.push(`${pluginName}-before`);
         const result = await next();
         execOrder.push(`${pluginName}-after`);
@@ -174,7 +174,7 @@ export const PluginFactory = {
       async dispose(pod: any) {
         lifecycleCalls.push(`${pluginName}-dispose`);
       },
-      async wrap(context: any, next: () => Promise<any>) {
+      async wrap(context: any, next: () => Promise<any>, execution: any) {
         lifecycleCalls.push(`${pluginName}-wrap`);
         return next();
       },

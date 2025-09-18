@@ -121,7 +121,8 @@ describe("Error Handling", () => {
       expect(onError).toHaveBeenCalledWith(
         expect.any(FactoryExecutionError),
         failingExecutor,
-        scope
+        scope,
+        { stage: 'resolve' }
       );
     });
 

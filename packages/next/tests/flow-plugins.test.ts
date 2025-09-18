@@ -93,13 +93,13 @@ function createExecutionTracker(): {
       treeAccessor.set(context, tree);
     },
 
-    async wrap(context, next) {
+    async wrap(context, next, execution) {
       const currentTree = treeAccessor.find(context);
       if (!currentTree) return next();
 
-      let flowName = FlowExecutionContext.flowName.find(context);
-      const depth = FlowExecutionContext.depth.find(context) || 0;
-      const isParallel = FlowExecutionContext.isParallel.find(context) || false;
+      let flowName = execution.flowName;
+      const depth = execution.depth;
+      const isParallel = execution.isParallel;
 
       const nodeType: ExecutionTree.Node["type"] = isParallel
         ? "parallel"
@@ -129,7 +129,7 @@ function createExecutionTracker(): {
       try {
         const result = await next();
 
-        flowName = FlowExecutionContext.flowName.find(context);
+        flowName = execution.flowName;
         if (flowName && node.name === "unknown") {
           node.name = flowName;
         }

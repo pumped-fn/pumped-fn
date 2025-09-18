@@ -10,6 +10,63 @@ pumped-fn is a library to orchestrate dependency in graph. pumped-fn units are c
 
 With that, every single resolve is integrated and completed, and even better, the order is reserved in the order of declaration. That makes using this easy, only resolving the tip is required, no need to resolve all of dependencies
 
+## Core Definitions
+
+**Executor**: Unit holding dependencies and factory function. Reference for scope caching/resolution.
+
+**Scope**: Object from `createScope()` that resolves executors by recursively resolving dependencies first.
+
+**Resolving**: Process where scope detects dependencies, resolves them in order, passes results to factory.
+
+**Accessor**: Handle to executor's value with methods: `get()`, `update()`, `subscribe()`.
+
+**Pod**: Isolated sub-scope for flows. No reactive support. Disposed with parent or manually.
+
+## Reactive Updates
+
+### Trigger Conditions
+- `accessor.update(value)` on source
+- `scope.update(executor, value)`
+- NOT direct assignment
+
+### Subscription Rules
+- Created: Only when using `.reactive` in dependencies
+- Updates: Sequential and batched
+- Cleanup: Automatic on scope.dispose()
+- Performance: Each `.reactive` adds overhead
+
+### Example
+```typescript
+const source = provide(() => 0);
+const consumer = derive([source.reactive], ([val]) => val * 2);
+// consumer auto-updates when source changes via:
+await scope.update(source, 1);
+```
+
+## Lifecycle Timeline
+
+```
+1. createScope()
+2. scope.resolve(executor)
+   → Resolve dependencies recursively
+   → Call factory ONCE (singleton)
+   → Cache result
+3. On update:
+   → Run cleanup callbacks
+   → Re-execute factory
+   → Trigger reactive updates
+4. scope.dispose()
+   → Run all cleanups
+   → Clear cache
+   → Dispose pods
+```
+
+### Cleanup Timing
+- `ctl.cleanup()` runs on:
+  - Manual release
+  - Before re-resolve (on update)
+  - Scope disposal
+
 ### The ONE Rule
 
 ```
@@ -17,17 +74,19 @@ With that, every single resolve is integrated and completed, and even better, th
 Everything else = Standard executors
 ```
 
-### Decision Matrix
+## Decision Guide
 
-| Need                               | Pattern                         | Use                    |
-| ---------------------------------- | ------------------------------- | ---------------------- |
-| No dependencies                    | `provide(() => value)`          | Source data            |
-| With dependencies + side effects   | `derive([deps], factory)`       | Resources, handlers    |
-| With dependencies + pure transform | `derive([deps.reactive], pure)` | Display, calculations  |
-| Programmatic updates               | `.static` accessor              | Controllers            |
-| Fresh data in callbacks            | `accessor.get()`                | Event handlers, timers |
+| Scenario | Use | Example |
+|----------|-----|---------|
+| Config/constants | `provide()` | `provide(() => config)` |
+| Resources with cleanup | `derive() + ctl.cleanup()` | DB connections |
+| Auto-updating UI | `.reactive` (not in flows) | Display components |
+| Manual control | `.static` | Controllers |
+| Business logic | `flow.define()` | API handlers |
+| Testing | `preset() + initialValues` | Mock services |
+| Fresh value in callbacks | `accessor.get()` | Timers |
 
-**usage Flow:** Define → Resolve → Use → Dispose
+**Usage Flow:** Define → Resolve → Use → Dispose
 
 ## Naming
 
@@ -46,7 +105,7 @@ For example
 
 ```typescript
 // Sources (no dependencies)
-provide(() => ({ count: 0 }), name("state"));
+provide(() => ({ count: 0 }), name("state")); // name() is debug-only
 
 // Derived (with dependencies)
 derive([dep1, dep2], ([a, b]) => a + b, name("sum"));
@@ -82,6 +141,35 @@ executor.reactive; // Auto-updates (pure functions only)
 executor.static; // Returns Accessor<T> for manual access
 accessor.get(); // Read current value (always fresh)
 accessor.update(v); // Write new value
+```
+
+## Error Handling
+
+### Key Rules
+- Errors bubble up and fail entire resolution chain
+- No global handler - wrap `scope.resolve()` in try/catch
+- No built-in retry - implement via scope plugins
+- `force: true` re-executes, doesn't retry failures
+
+### Examples
+```typescript
+// Executor errors propagate
+const risky = derive([source], async ([data]) => {
+  try {
+    return await process(data);
+  } catch (e) {
+    // Log and rethrow or return default
+    throw new Error(`Processing failed: ${e.message}`);
+  }
+});
+
+// Handle at resolution
+try {
+  const result = await scope.resolve(risky);
+} catch (error) {
+  // Handle ExecutorResolutionError
+  console.error(error.dependencyChain);
+}
 ```
 
 ---
@@ -200,18 +288,31 @@ const app = derive(
 
 ---
 
-## 🚫 ANTI-PATTERNS TABLE
+## Common Mistakes
 
-| ❌ Wrong                                                                                             | ✅ Correct                                                                                           | Why Wrong                                                                               |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `derive(deps.reactive, (data, ctl) => { console.log(data); ctl.cleanup(...); })`                     | `derive(deps, (data, ctl) => { console.log(data); ctl.cleanup(...); })`                              | Side effects in reactive factory re-run on every change                                 |
-| `derive([renderer], ([render]) => { return { doWork: () => render.render() }; })`                    | `derive([renderer.static], ([renderAcc]) => { return { doWork: () => renderAcc.get().render() }; })` | Stale closure over initial value                                                        |
-| `setInterval(work, 1000); return { timer };`                                                         | `const timer = setInterval(work, 1000); ctl.cleanup(() => clearInterval(timer));`                    | Resource leak without cleanup                                                           |
-| Chain: `a.reactive → b.reactive → c.reactive`                                                        | Use common source: `source.reactive → [a, b, c]`                                                     | Cascading re-runs on every source change                                                |
-| `ctl.cleanup()` in .reactive                                                                         | `ctl.cleanup()` in standard                                                                          | Cleanup runs on every dependency change                                                 |
-| Accessing unresolved executor: `derive([a.static], ([aAcc]) => { bAcc.get() })` where b depends on a | Reorganize dependencies or use `.reactive` for automatic propagation                                 | Circular dependency causes "Executor is not resolved" error                             |
-| passing scope around, access scope in closure                                                        | access scope via ctl (parameter from factory fn) or via plugin                                       | that breaks the explicit natures of the code, make code coupling and way harder to test |
-| use derive to group set of services and then reexport those without doing anything                   | use only exact dependency that is needed                                                             | grouping will make testing very hard and meaningless                                    |
+- ❌ Side effects in `.reactive` → Re-runs on every change
+- ❌ Missing cleanup → Memory leaks
+- ❌ Direct value in callbacks → Use `accessor.get()` for fresh
+- ❌ Circular deps → Use common source pattern
+- ❌ Passing scope around → Use ctl parameter
+- ❌ Grouping services unnecessarily → Use exact dependencies needed
+
+---
+
+## Testing with Presets
+
+```typescript
+// Replace implementations for testing
+const testScope = createScope({
+  initialValues: [
+    preset(dbExecutor, mockDb),        // Replace with mock
+    preset(configExecutor, testConfig), // Override config
+  ]
+});
+
+// Original executors use test values
+const result = await testScope.resolve(appExecutor);
+```
 
 ---
 
@@ -381,30 +482,6 @@ main().catch(console.error);
 ```
 
 ---
-
-## 🛠️ TROUBLESHOOTING
-
-| Error/Issue                        | Cause                                                                    | Solution                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| "Factory re-executed unexpectedly" | Using `.reactive` with side effects                                      | Remove `.reactive` or make factory pure                                 |
-| "Memory leak detected"             | Missing `ctl.cleanup()`                                                  | Add cleanup for all resources                                           |
-| "Stale data in callbacks"          | Using direct value instead of accessor                                   | Use `accessor.get()` for fresh data                                     |
-| "Cleanup runs too often"           | `ctl.cleanup()` in `.reactive` factory                                   | Move to standard executor                                               |
-| "Executor is not resolved"         | Accessing executor via `.get()` before it's resolved in dependency chain | Ensure proper dependency order or use `.reactive` for automatic updates |
-| Screen flickers/multiple renders   | Clearing screen on every update                                          | Use cursor positioning, check lastOutput                                |
-
----
-
-## ✅ SUCCESS CHECKLIST
-
-- [ ] All executors use `name()` decorator
-- [ ] Controllers use `.static` for updates
-- [ ] Pure transformations use `.reactive`
-- [ ] Fresh data accessed with `accessor.get()`
-- [ ] Resources cleaned up with `ctl.cleanup()`
-- [ ] Scope disposed on shutdown
-- [ ] No `.reactive` with side effects
-- [ ] TypeScript compiles without errors
 
 # Coding style
 

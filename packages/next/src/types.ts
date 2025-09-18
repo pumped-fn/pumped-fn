@@ -326,13 +326,33 @@ export declare namespace Core {
     scope: Scope
   ) => void | Promise<void>;
 
+  export type WrapContext = {
+    operation: "resolve" | "update";
+    executor: Executor<unknown>;
+    scope: Scope;
+  };
+
   export type Plugin = {
-    init?: (
-      scope: Scope,
-      initialOpt: { registry: Core.Executor<unknown>[] }
-    ) => void | Promise<void>;
+    init?: (scope: Scope) => void | Promise<void>;
     dispose?: (scope: Scope) => void | Promise<void>;
-    onError?: GlobalErrorCallback;
+
+    wrap?(
+      next: () => Promise<unknown>,
+      context: WrapContext
+    ): Promise<unknown>;
+
+    onError?: (
+      error:
+        | ExecutorResolutionError
+        | FactoryExecutionError
+        | DependencyResolutionError,
+      executor: Executor<unknown>,
+      scope: Scope,
+      context: {
+        stage: "resolve" | "update" | "release";
+        attemptCount?: number;
+      }
+    ) => void | Promise<void>;
   };
 
   export type SingleDependencyLike = Core.BaseExecutor<unknown>;
@@ -350,11 +370,15 @@ export declare namespace Core {
         };
 
   export interface Pod
-    extends Omit<Core.Scope, "update" | "pod" | "disposePod" | "onChange"> {}
+    extends Omit<
+      Core.Scope,
+      "update" | "pod" | "disposePod" | "onChange" | "registeredExecutors"
+    > {}
 
   export interface Scope {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
     entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
+    registeredExecutors(): Core.Executor<unknown>[];
 
     resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promise<Accessor<T>>;
@@ -575,7 +599,16 @@ export namespace Flow {
   export interface Plugin {
     name: string;
     init?(pod: Core.Pod, context: DataStore): void | Promise<void>;
-    wrap?<T>(context: DataStore, next: () => Promise<T>): Promise<T>;
+    wrap?<T>(
+      context: DataStore,
+      next: () => Promise<T>,
+      execution: {
+        flowName: string | undefined;
+        depth: number;
+        isParallel: boolean;
+        parentFlowName: string | undefined;
+      }
+    ): Promise<T>;
     dispose?(pod: Core.Pod): void | Promise<void>;
   }
 }

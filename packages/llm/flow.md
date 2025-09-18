@@ -5,9 +5,20 @@ _Extension to pumped-fn for structured business logic flows with input/output va
 ## Core Concepts
 
 Flow consists Validated Business Logic + Dependency Injection + Context Management
-Flow makes use of standardschem v1 standard to declare different cases.
 
-library comes with `custom` which does no validation, just to retain the type, but implementation always can use zod or similar library where availables
+### Schema System
+Uses [standardschema v1](https://github.com/standard-schema/standard-schema) - a standard for validation libraries.
+
+```typescript
+// Type-only (no runtime validation)
+import { custom } from "@pumped-fn/core-next";
+const spec = { input: custom<MyType>() };
+
+// With runtime validation (zod example)
+import { z } from "zod";
+const schema = z.object({ email: z.string().email() });
+const spec = { input: schema };
+```
 
 ### Quick start
 
@@ -203,6 +214,25 @@ const tracingPlugin = flow.plugin({
   },
 });
 ```
+
+## Flow + Executor Integration
+
+### Execution Context
+```typescript
+// With scope: Uses scope.pod() (isolated, no reactive)
+const result = await flow.execute(handler, input, { scope });
+
+// Without scope: Creates temporary scope → pod → execute → dispose
+const result = await flow.execute(handler, input);
+```
+
+### Key Differences
+| Feature | Executors | Flows |
+|---------|-----------|-------|
+| Reactive | ✅ Supported | ❌ Not in pods |
+| Validation | Manual | Built-in schemas |
+| Context | Via scope | Via context param |
+| Error handling | Exceptions | Structured ok/ko |
 
 ## Key Rules
 

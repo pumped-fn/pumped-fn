@@ -233,7 +233,15 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     for (const plugin of [...this.plugins].reverse()) {
       if (plugin.wrap) {
         const currentExecutor = executor;
-        executor = async () => plugin.wrap!(context, currentExecutor);
+        executor = async () => {
+          const execution = {
+            flowName: FlowExecutionContext.flowName.find(context),
+            depth: FlowExecutionContext.depth.find(context) || 0,
+            isParallel: FlowExecutionContext.isParallel.find(context) || false,
+            parentFlowName: FlowExecutionContext.parentFlowName.find(context)
+          };
+          return plugin.wrap!(context, currentExecutor, execution);
+        };
       }
     }
 
@@ -303,11 +311,21 @@ async function execute<I, S, E>(
       return result;
     };
 
+    const definition = flowDefinitionMeta.find(flow);
+
     let executor = executeCore;
     for (const plugin of [...(options?.plugins || [])].reverse()) {
       if (plugin.wrap) {
         const currentExecutor = executor;
-        executor = () => plugin.wrap!(context, currentExecutor);
+        executor = () => {
+          const execution = {
+            flowName: definition?.name || FlowExecutionContext.flowName.find(context),
+            depth: FlowExecutionContext.depth.find(context) || 0,
+            isParallel: FlowExecutionContext.isParallel.find(context) || false,
+            parentFlowName: FlowExecutionContext.parentFlowName.find(context)
+          };
+          return plugin.wrap!(context, currentExecutor, execution);
+        };
       }
     }
 

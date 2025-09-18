@@ -239,8 +239,8 @@ test("update without resolving", async () => {
 test("test scope option", async () => {
   const eagerMeta = meta("eagerLoad", custom<boolean>());
   const eagerLoadPlugin: Core.Plugin = {
-    init: async (scope, { registry }) => {
-      for (const executor of registry) {
+    init: async (scope) => {
+      for (const executor of scope.registeredExecutors()) {
         if (eagerMeta.find(executor)) {
           await scope.resolve(executor);
         }

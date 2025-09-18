@@ -6,12 +6,12 @@ import {
   isExecutor,
   isPreset,
 } from "./executor";
-import { 
-  Core, 
+import {
+  Core,
   Meta,
-  ExecutorResolutionError, 
-  FactoryExecutionError, 
-  DependencyResolutionError 
+  ExecutorResolutionError,
+  FactoryExecutionError,
+  DependencyResolutionError,
 } from "./types";
 import {
   isGenerator,
@@ -46,16 +46,16 @@ class AccessorImpl implements Core.Accessor<unknown> {
     this.scope = scope;
     this.requestor = requestor;
     this.metas = metas;
-    
+
     // Create bound resolve function to maintain promise identity
     this.resolve = this.createResolveFunction();
-    
+
     // Cache this accessor immediately
-    const existing = this.scope['cache'].get(requestor);
+    const existing = this.scope["cache"].get(requestor);
     if (!existing || !existing.accessor) {
-      this.scope['cache'].set(requestor, {
+      this.scope["cache"].set(requestor, {
         accessor: this,
-        value: existing?.value || undefined as any
+        value: existing?.value || (undefined as any),
       });
     }
   }
@@ -64,7 +64,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     return (force: boolean = false): Promise<unknown> => {
       this.scope["~ensureNotDisposed"]();
 
-      const entry = this.scope['cache'].get(this.requestor);
+      const entry = this.scope["cache"].get(this.requestor);
       const cached = entry?.value;
 
       if (cached && !force) {
@@ -85,7 +85,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
       this.scope["~addToResolutionChain"](this.requestor, this.requestor);
 
       this.currentPromise = new Promise((resolve, reject) => {
-        const replacer = this.scope['initialValues'].find(
+        const replacer = this.scope["initialValues"].find(
           (item) => item.executor === this.requestor
         );
 
@@ -96,7 +96,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
           if (!isExecutor(value)) {
             return setTimeout(() => {
-              this.scope['cache'].set(this.requestor, {
+              this.scope["cache"].set(this.requestor, {
                 accessor: this,
                 value: { kind: "resolved", value: replacer.value },
               });
@@ -114,12 +114,12 @@ class AccessorImpl implements Core.Accessor<unknown> {
           .then((dependencies) => {
             try {
               const factoryResult = factory(dependencies as any, controller);
-              
+
               if (factoryResult instanceof Promise) {
                 return factoryResult.catch((asyncError) => {
                   const executorName = getExecutorName(this.requestor);
                   const dependencyChain = [executorName];
-                  
+
                   const factoryError = createFactoryError(
                     ErrorCodes.FACTORY_ASYNC_ERROR,
                     executorName,
@@ -131,16 +131,16 @@ class AccessorImpl implements Core.Accessor<unknown> {
                       isAsyncFactory: true,
                     }
                   );
-                  
+
                   throw factoryError;
                 });
               }
-              
+
               return factoryResult;
             } catch (error) {
               const executorName = getExecutorName(this.requestor);
               const dependencyChain = [executorName];
-              
+
               const factoryError = createFactoryError(
                 ErrorCodes.FACTORY_THREW_ERROR,
                 executorName,
@@ -152,7 +152,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
                   isAsyncFactory: false,
                 }
               );
-              
+
               throw factoryError;
             }
           })
@@ -166,31 +166,39 @@ class AccessorImpl implements Core.Accessor<unknown> {
               } catch (generatorError) {
                 const executorName = getExecutorName(this.requestor);
                 const dependencyChain = [executorName];
-                
+
                 const factoryError = createFactoryError(
                   ErrorCodes.FACTORY_GENERATOR_ERROR,
                   executorName,
                   dependencyChain,
                   generatorError,
                   {
-                    generatorType: isGenerator(result) ? 'sync' : 'async',
+                    generatorType: isGenerator(result) ? "sync" : "async",
                     factoryType: typeof factory,
                   }
                 );
-                
+
                 throw factoryError;
               }
             }
 
-            const events = this.scope['onEvents'].change;
+            const events = this.scope["onEvents"].change;
             for (const event of events) {
-              const updated = await event("resolve", this.requestor, current, this.scope);
-              if (updated !== undefined && updated.executor === this.requestor) {
+              const updated = await event(
+                "resolve",
+                this.requestor,
+                current,
+                this.scope
+              );
+              if (
+                updated !== undefined &&
+                updated.executor === this.requestor
+              ) {
                 current = updated.value;
               }
             }
 
-            this.scope['cache'].set(this.requestor, {
+            this.scope["cache"].set(this.requestor, {
               accessor: this,
               value: { kind: "resolved", value: current },
             });
@@ -203,34 +211,34 @@ class AccessorImpl implements Core.Accessor<unknown> {
           .catch((error) => {
             let enhancedError = error;
             let errorContext = undefined;
-            
+
             if (error?.context && error?.code) {
               enhancedError = error;
               errorContext = error.context;
             } else {
               const executorName = getExecutorName(this.requestor);
               const dependencyChain = [executorName];
-              
+
               enhancedError = createSystemError(
                 ErrorCodes.INTERNAL_RESOLUTION_ERROR,
                 executorName,
                 dependencyChain,
                 error,
                 {
-                  errorType: error?.constructor?.name || 'UnknownError',
-                  resolutionPhase: 'post-factory',
+                  errorType: error?.constructor?.name || "UnknownError",
+                  resolutionPhase: "post-factory",
                 }
               );
               errorContext = enhancedError.context;
             }
 
-            this.scope['cache'].set(this.requestor, {
+            this.scope["cache"].set(this.requestor, {
               accessor: this,
               value: {
                 kind: "rejected",
                 error,
                 context: errorContext,
-                enhancedError: enhancedError
+                enhancedError: enhancedError,
               },
             });
 
@@ -242,7 +250,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
           });
       });
 
-      this.scope['cache'].set(this.requestor, {
+      this.scope["cache"].set(this.requestor, {
         accessor: this,
         value: { kind: "pending", promise: this.currentPromise },
       });
@@ -253,7 +261,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   lookup(): undefined | Core.ResolveState<unknown> {
     this.scope["~ensureNotDisposed"]();
-    const cacheEntry = this.scope['cache'].get(this.requestor);
+    const cacheEntry = this.scope["cache"].get(this.requestor);
     if (!cacheEntry) {
       return undefined;
     }
@@ -262,7 +270,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   get(): unknown {
     this.scope["~ensureNotDisposed"]();
-    const cacheEntry = this.scope['cache'].get(this.requestor)?.value;
+    const cacheEntry = this.scope["cache"].get(this.requestor)?.value;
 
     if (!cacheEntry || cacheEntry.kind === "pending") {
       throw new Error("Executor is not resolved");
@@ -275,12 +283,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     return cacheEntry.value;
   }
 
-
   async release(soft: boolean = false): Promise<void> {
     this.scope.release(this.requestor, soft);
   }
 
-  async update(updateFn: unknown | ((current: unknown) => unknown)): Promise<void> {
+  async update(
+    updateFn: unknown | ((current: unknown) => unknown)
+  ): Promise<void> {
     return this.scope.update(this.requestor, updateFn);
   }
 
@@ -296,8 +305,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private createController(): Core.Controller {
     return {
       cleanup: (cleanup: Core.Cleanup) => {
-        const currentSet = this.scope['cleanups'].get(this.requestor) ?? new Set();
-        this.scope['cleanups'].set(this.requestor, currentSet);
+        const currentSet =
+          this.scope["cleanups"].get(this.requestor) ?? new Set();
+        this.scope["cleanups"].set(this.requestor, currentSet);
         currentSet.add(cleanup);
       },
       release: async () => this.scope.release(this.requestor),
@@ -355,7 +365,10 @@ class BaseScope implements Core.Scope {
     }
   }
 
-  protected "~checkCircularDependency"(executor: UE, resolvingExecutor: UE): void {
+  protected "~checkCircularDependency"(
+    executor: UE,
+    resolvingExecutor: UE
+  ): void {
     const currentChain = this.resolutionChain.get(resolvingExecutor);
     if (currentChain && currentChain.has(executor)) {
       // Build the dependency chain for the error - only include the unique chain
@@ -369,7 +382,8 @@ class BaseScope implements Core.Scope {
         getExecutorName(executor),
         undefined,
         {
-          circularPath: dependencyChain.join(' -> ') + ' -> ' + getExecutorName(executor),
+          circularPath:
+            dependencyChain.join(" -> ") + " -> " + getExecutorName(executor),
           detectedAt: getExecutorName(resolvingExecutor),
         }
       );
@@ -377,7 +391,8 @@ class BaseScope implements Core.Scope {
   }
 
   protected "~addToResolutionChain"(executor: UE, resolvingExecutor: UE): void {
-    const currentChain = this.resolutionChain.get(resolvingExecutor) || new Set();
+    const currentChain =
+      this.resolutionChain.get(resolvingExecutor) || new Set();
     currentChain.add(executor);
     this.resolutionChain.set(resolvingExecutor, currentChain);
   }
@@ -386,7 +401,10 @@ class BaseScope implements Core.Scope {
     this.resolutionChain.delete(executor);
   }
 
-  protected "~propagateResolutionChain"(fromExecutor: UE, toExecutor: UE): void {
+  protected "~propagateResolutionChain"(
+    fromExecutor: UE,
+    toExecutor: UE
+  ): void {
     const fromChain = this.resolutionChain.get(fromExecutor);
     if (fromChain) {
       const newChain = new Set(fromChain);
@@ -432,7 +450,10 @@ class BaseScope implements Core.Scope {
   }
 
   protected async "~triggerError"(
-    error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError,
+    error:
+      | ExecutorResolutionError
+      | FactoryExecutionError
+      | DependencyResolutionError,
     executor: UE
   ): Promise<void> {
     // Trigger per-executor error callbacks
@@ -443,7 +464,7 @@ class BaseScope implements Core.Scope {
           await callback(error, executor, this);
         } catch (callbackError) {
           // Don't let callback errors break the error handling flow
-          console.error('Error in error callback:', callbackError);
+          console.error("Error in error callback:", callbackError);
         }
       }
     }
@@ -454,7 +475,7 @@ class BaseScope implements Core.Scope {
         await callback(error, executor, this);
       } catch (callbackError) {
         // Don't let callback errors break the error handling flow
-        console.error('Error in global error callback:', callbackError);
+        console.error("Error in global error callback:", callbackError);
       }
     }
 
@@ -462,10 +483,10 @@ class BaseScope implements Core.Scope {
     for (const plugin of this.plugins) {
       if (plugin.onError) {
         try {
-          await plugin.onError(error, executor, this);
+          await plugin.onError(error, executor, this, { stage: "resolve" });
         } catch (pluginError) {
           // Don't let plugin errors break the error handling flow
-          console.error('Error in plugin error handler:', pluginError);
+          console.error("Error in plugin error handler:", pluginError);
         }
       }
     }
@@ -568,15 +589,39 @@ class BaseScope implements Core.Scope {
     });
   }
 
+  registeredExecutors(): Core.Executor<unknown>[] {
+    this["~ensureNotDisposed"]();
+    return [...this.registry];
+  }
+
   async resolve<T>(
     executor: Core.Executor<T>,
     force: boolean = false
   ): Promise<T> {
     this["~ensureNotDisposed"]();
 
-    const accessor = this["~makeAccessor"](executor);
-    await accessor.resolve(force);
-    return accessor.get() as T;
+    // Core resolve function
+    const coreResolve = async (): Promise<T> => {
+      const accessor = this["~makeAccessor"](executor);
+      await accessor.resolve(force);
+      return accessor.get() as T;
+    };
+
+    // Build plugin wrap chain (reverse order for proper composition)
+    let resolver = coreResolve;
+    for (const plugin of [...this.plugins].reverse()) {
+      if (plugin.wrap) {
+        const currentResolver = resolver;
+        resolver = () =>
+          plugin.wrap!(currentResolver, {
+            operation: "resolve",
+            executor,
+            scope: this,
+          }) as any;
+      }
+    }
+
+    return resolver();
   }
 
   async resolveAccessor<T>(
@@ -598,32 +643,56 @@ class BaseScope implements Core.Scope {
     }
 
     this["~ensureNotDisposed"]();
-    this["~triggerCleanup"](e);
-    const accessor = this["~makeAccessor"](e);
 
-    let value: T | undefined;
+    // Core update function
+    const coreUpdate = async (): Promise<void> => {
+      this["~triggerCleanup"](e);
+      const accessor = this["~makeAccessor"](e);
 
-    if (typeof u === "function") {
-      const fn = u as (current: T) => T;
-      value = fn(accessor.get() as T);
-    } else {
-      value = u;
-    }
+      let value: T | undefined;
 
-    const events = this.onEvents.change;
-    for (const event of events) {
-      const updated = await event("update", e, value, this);
-      if (updated !== undefined && e === updated.executor) {
-        value = updated.value as any;
+      if (typeof u === "function") {
+        const fn = u as (current: T) => T;
+        value = fn(accessor.get() as T);
+      } else {
+        value = u;
+      }
+
+      const events = this.onEvents.change;
+      for (const event of events) {
+        const updated = await event("update", e, value, this);
+        if (updated !== undefined && e === updated.executor) {
+          value = updated.value as any;
+        }
+      }
+
+      this.cache.set(e, {
+        accessor,
+        value: { kind: "resolved", value },
+      });
+
+      await this["~triggerUpdate"](e);
+    };
+
+    // Build plugin wrap chain (reverse order for proper composition)
+    let updater = async (): Promise<T> => {
+      await coreUpdate();
+      return this.accessor(e).get() as T;
+    };
+
+    for (const plugin of [...this.plugins].reverse()) {
+      if (plugin.wrap) {
+        const currentUpdater = updater;
+        updater = () =>
+          plugin.wrap!(currentUpdater, {
+            operation: "update",
+            executor: e,
+            scope: this,
+          }) as any;
       }
     }
 
-    this.cache.set(e, {
-      accessor,
-      value: { kind: "resolved", value },
-    });
-
-    await this["~triggerUpdate"](e);
+    await updater();
   }
 
   async set<T>(e: Core.Executor<T>, value: T): Promise<void> {
@@ -633,29 +702,34 @@ class BaseScope implements Core.Scope {
   async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
     this["~ensureNotDisposed"]();
 
-    const ce = this.cache.get(e);
-    if (!ce && !s) {
-      throw new Error("Executor is not yet resolved");
-    }
-
-    await this["~triggerCleanup"](e);
-    const events = this.onEvents.release;
-    for (const event of events) {
-      await event("release", e, this);
-    }
-
-    const ou = this.onUpdates.get(e);
-    if (ou) {
-      for (const t of Array.from(ou.values())) {
-        if (isMainExecutor(t)) {
-          await this.release(t, true);
-        }
+    // Core release function
+    const coreRelease = async (): Promise<void> => {
+      const ce = this.cache.get(e);
+      if (!ce && !s) {
+        throw new Error("Executor is not yet resolved");
       }
 
-      this.onUpdates.delete(e);
-    }
+      await this["~triggerCleanup"](e);
+      const events = this.onEvents.release;
+      for (const event of events) {
+        await event("release", e, this);
+      }
 
-    this.cache.delete(e);
+      const ou = this.onUpdates.get(e);
+      if (ou) {
+        for (const t of Array.from(ou.values())) {
+          if (isMainExecutor(t)) {
+            await this.release(t, true);
+          }
+        }
+
+        this.onUpdates.delete(e);
+      }
+
+      this.cache.delete(e);
+    };
+
+    return coreRelease();
   }
 
   async dispose(): Promise<void> {
@@ -739,7 +813,10 @@ class BaseScope implements Core.Scope {
     };
   }
 
-  onError<T>(executor: Core.Executor<T>, callback: Core.ErrorCallback<T>): Core.Cleanup;
+  onError<T>(
+    executor: Core.Executor<T>,
+    callback: Core.ErrorCallback<T>
+  ): Core.Cleanup;
   onError(callback: Core.GlobalErrorCallback): Core.Cleanup;
   onError<T>(
     executorOrCallback: Core.Executor<T> | Core.GlobalErrorCallback,
@@ -751,7 +828,7 @@ class BaseScope implements Core.Scope {
     }
 
     // Global error handler
-    if (typeof executorOrCallback === 'function') {
+    if (typeof executorOrCallback === "function") {
       this.onEvents["error"].add(executorOrCallback);
       return () => {
         this["~ensureNotDisposed"]();
@@ -788,7 +865,7 @@ class BaseScope implements Core.Scope {
     }
 
     this.plugins.push(plugin);
-    plugin.init?.(this, { registry: this.registry });
+    plugin.init?.(this);
 
     return () => {
       this["~ensureNotDisposed"]();
