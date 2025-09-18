@@ -1,42 +1,60 @@
-## creation
+## Graph Construction
 
-There are very few way creating
+Build dependency graphs by defining nodes and their relationships. Each node represents a value or service in your application.
 
 ```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 ```
 
-#### provide
+### Core Graph Building APIs
+
+#### provide - Graph Root Nodes
+
+Creates a graph node with no dependencies. These are typically configuration, constants, or root services.
 
 ```ts twoslash
 import { provide } from "@pumped-fn/core-next";
 
 // ---cut---
-const value = provide(() => "string");
+const config = provide(() => ({ apiUrl: "https://api.example.com" }));
+const database = provide(async () => ({ query: async () => [] }));
 ```
 
-#### derive
+**Use for**: Configuration, external connections, constants
+
+#### derive - Graph Dependency Nodes
+
+Creates a graph node that depends on other nodes. This is where you compose services and create derived values.
 
 ```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 
-const value = provide(() => "string");
-const otherValue = provide(() => 20);
+const config = provide(() => ({ apiUrl: "https://api.example.com", database: "db://localhost" }));
+const logger = provide(() => ({ log: (msg: string) => console.log(msg) }));
 
 // ---cut---
-const derived = derive(value, (value) => {
-  /* */
-});
-const derivedUsingArray = derive([value, otherValue], ([value, otherValue]) => {
-  /* */
-});
-const derivedUsingObject = derive(
-  { value, otherValue },
-  ({ value, otherValue }) => {
-    /* */
+// Single dependency
+const apiClient = derive(config, (cfg) => ({ url: cfg.apiUrl, fetch: () => Promise.resolve({}) }));
+
+// Multiple dependencies (array)
+const userService = derive([config, logger], ([cfg, log]) => ({
+  createUser: (data: any) => {
+    log.log("Creating user");
+    return { id: "123", ...data };
   }
+}));
+
+// Multiple dependencies (object - better for many deps)
+const application = derive(
+  { config, logger, userService: userService },
+  ({ config, logger, userService }) => ({
+    start: () => logger.log("App started"),
+    users: userService
+  })
 );
 ```
+
+**Use for**: Services, computed values, anything depending on other graph nodes
 
 #### accessing controller
 
@@ -71,61 +89,108 @@ type Controller = Core.Controller
 //   ^^^^^^^^^^
 ```
 
-#### accessing variations
+#### Graph Node Variations
+
+Control how dependencies are resolved using node variations:
 
 ```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 
-const value = provide(() => 0);
+const expensiveService = provide(() => ({ process: (data: any) => data }));
+const configValue = provide(() => ({ setting: 'value' }));
 
-const derivedValue = derive(
-  [value.lazy, value.static, value.reactive],
-  ([accessor, value, anotherAccessor]) => {}
+const smartService = derive(
+  [expensiveService.lazy, configValue.static, configValue.reactive],
+  ([lazyService, staticConfig, reactiveConfig]) => ({
+    // .lazy: resolve only when needed (conditional dependencies)
+    // .static: resolve dependencies but don't create reactive subscriptions
+    // .reactive: auto-update when configValue changes (reactive programming)
+    process: (data: any) => data
+  })
 );
 ```
 
-#### presetting
+**Variations**:
+- **`.lazy`**: Conditional resolution, performance optimization
+- **`.static`**: Break reactive chains, manual control
+- **`.reactive`**: Auto-updating derived values (pure functions only)
 
-An executor can be "assumed" to be a specific value, on scope resolving that particular executor, if the scope recognized there's an assumed value, it'll resolved with the "assumed" value instead of triggering the original factory
+#### preset - Graph Node Override
+
+Replace any graph node with a different value. This is the key to testing and environment configuration.
 
 ```ts twoslash
 import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
 
-const value = provide(() => 0);
+const config = provide(() => ({ dbUrl: 'prod-db://example.com' }));
+const database = derive([config], ([cfg]) => ({ url: cfg.dbUrl, query: () => [] }));
 
-const assumedValue = preset(value, 1);
-const scope = createScope(assumedValue);
+// Override config for testing
+const testConfigPreset = preset(config, { dbUrl: 'test-db://localhost' });
+const testScope = createScope(testConfigPreset);
 
-const resolvedValue = await scope.resolve(value); // will be 1
+// database will now use test config
+const testDb = await testScope.resolve(database);
 ```
 
-Preset is the technique built-in pumped-fn to use in testing and building middleware
+**Use for**: Testing, environment switching, dependency injection
 
-## scope
+## Graph Resolution
 
-Scope is the unit that in charge of resolving the graph of dependencies, bring value to life (an escape hatch)
+Scope is the execution environment that resolves your dependency graph. It handles topological sorting, caching, and lifecycle management.
 
 ```ts twoslash
 import { createScope } from "@pumped-fn/core-next";
 ```
 
-#### createScope
+#### createScope - Graph Execution Environment
+
+Create an isolated environment for resolving your dependency graph.
 
 ```ts twoslash
-import { createScope } from "@pumped-fn/core-next";
+import { createScope, preset, provide } from "@pumped-fn/core-next";
+
+const config = provide(() => ({ env: 'prod' }));
+const database = provide(() => ({ url: 'prod-db' }));
+
 // ---cut---
+// Basic scope
 const scope = createScope();
+
+// Scope with presets (testing/environment configuration)
+const testScope = createScope(
+  preset(config, { env: 'test' }),
+  preset(database, { url: 'test-db' })
+);
 ```
 
-#### scope.resolve
+#### scope.resolve - Execute the Graph
+
+Resolve any node in your dependency graph. The scope automatically resolves all dependencies in the correct order.
 
 ```ts twoslash
-import { provide, createScope } from "@pumped-fn/core-next";
-const value = provide(() => 0);
+import { provide, derive, createScope } from "@pumped-fn/core-next";
+
+const config = provide(() => ({ port: 3000, env: 'dev' }));
+const logger = derive([config], ([cfg]) => ({ log: (msg: string) => console.log(`[${cfg.env}] ${msg}`) }));
+const app = derive([config, logger], ([cfg, log]) => ({
+  start: () => log.log(`Server starting on port ${cfg.port}`)
+}));
+
 const scope = createScope();
 // ---cut---
-const resolvedValue = await scope.resolve(value);
+// Resolves entire dependency chain: config → logger → app
+const application = await scope.resolve(app);
+
+// Resolve multiple nodes individually
+const appInstance = await scope.resolve(app);
+const loggerInstance = await scope.resolve(logger);
 ```
+
+**Key Features**:
+- Automatic dependency ordering
+- Singleton caching (each node resolves once)
+- Parallel resolution where possible
 
 #### scope.update
 
@@ -212,13 +277,13 @@ await scope.dispose();
 
 Dispose will cleanup all resources resolved in the scope, also mark the scope as `disposed`. Disposed scope will not be able to do anything afteward
 
-## middleware
+## plugins
 
-Middleware provides cross-cutting concerns without modifying core logic. It can intercept resolution, updates, and releases.
+Plugins provide cross-cutting concerns without modifying core logic. They can intercept resolution, updates, and releases.
 
 #### scope.use
 
-Register middleware to intercept scope operations:
+Register plugins to intercept scope operations:
 
 ```ts twoslash
 import { createScope, plugin } from "@pumped-fn/core-next";
@@ -227,7 +292,7 @@ const scope = createScope();
 
 const cleanup = scope.use(plugin({
   init: (scope) => {
-    // Called when middleware is registered
+    // Called when plugin is registered
   },
   dispose: async (scope) => {
     // Called when scope is disposed
@@ -277,13 +342,13 @@ scope.onRelease(async (event, executor, scope) => {
 });
 ```
 
-#### practical middleware examples
+#### practical plugin examples
 
 ```ts twoslash
 // @errors: 7006
 import { createScope, plugin, provide, derive, preset } from "@pumped-fn/core-next";
 
-// Analytics middleware
+// Analytics plugin
 const analytics = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value) => {
@@ -366,7 +431,7 @@ const maybeName = name.find(service); // "auth" | undefined
 const allNames = name.some(service); // string[]
 ```
 
-#### meta with middleware
+#### meta with plugins
 
 ```ts twoslash
 // @errors: 7006
@@ -375,8 +440,8 @@ import { createScope, plugin, provide, meta, custom } from "@pumped-fn/core-next
 const name = meta("name", custom<string>());
 const metrics = meta("metrics", custom<boolean>());
 
-// Middleware that uses meta for conditional logic
-const metricsMiddleware = plugin({
+// Plugin that uses meta for conditional logic
+const metricsPlugin = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value) => {
       // Check if executor has metrics enabled
@@ -431,7 +496,7 @@ const deprecated = meta("deprecated", custom<{ since: string; alternative?: stri
 // Service classification
 const tier = meta("tier", custom<"critical" | "standard" | "low">());
 
-// Deprecation middleware
+// Deprecation plugin
 const deprecationWarning = plugin({
   init: (scope) => {
     scope.onChange((event, executor) => {

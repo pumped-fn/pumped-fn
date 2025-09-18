@@ -9,14 +9,14 @@ _Expert-level documentation for context engineering and component development_
 ### Core Library Documentation
 
 #### [**llm.md**](./llm.md) - Core Library Reference
-**Primary Context**: Graph-based dependency resolution system
-- Executor types and patterns
-- Scope management and lifecycle
-- Reactive updates system
-- Testing with presets
-- Error handling strategies
+**Primary Context**: Graph-based dependency resolution system that surpasses traditional DI
+- **Dependency Graph Orchestration**: Automatic resolution ordering vs manual wiring
+- **Graph Traversal Patterns**: Depth-first resolution with intelligent caching
+- **Reactive Graph Updates**: Updates propagate through dependency edges
+- **Graph Lifecycle Management**: Scope creation, resolution, and cleanup phases
+- **Testing with Graph Substitution**: Strategic preset injection into dependency nodes
 
-**Use When**: Understanding core concepts, implementing basic functionality, debugging issues
+**Use When**: Understanding graph-centric architecture, implementing dependency resolution, optimizing application structure
 
 #### [**flow.md**](./flow.md) - Business Logic Flows
 **Primary Context**: Structured business logic with validation
@@ -38,22 +38,22 @@ _Expert-level documentation for context engineering and component development_
 **Use When**: Building plugins, adding debugging information, configuration management
 
 #### [**authoring.md**](./authoring.md) - Component Creation Guide
-**Primary Context**: Reusable, configurable component patterns
-- Configuration variation using presets
-- Graph-based component design
-- Testing strategies for components
-- Export patterns and best practices
+**Primary Context**: Reusable, configurable component patterns via dependency graphs
+- **Graph Configuration Strategies**: Late binding and strategic injection points
+- **Multi-Environment Graph Variations**: Same structure, different configurations
+- **Component Graph Composition**: Building complex dependency hierarchies
+- **Graph-Based Testing**: Mock injection and configuration isolation
 
-**Use When**: Creating reusable libraries, designing component APIs, configuration management
+**Use When**: Building reusable component libraries, implementing configuration systems, creating testable architectures
 
 #### [**plugin.md**](./plugin.md) - Plugin Development
-**Primary Context**: Extending scope and flow functionality
-- Scope plugin patterns
-- Flow plugin patterns
-- Telemetry and debugging
-- Wrapping vs event patterns
+**Primary Context**: Extending dependency graph functionality and flow execution
+- **Graph-Aware Plugins**: Hook into dependency resolution lifecycle
+- **Graph Telemetry**: Monitor resolution performance and cache efficiency
+- **Graph Debugging**: Inspect dependency chains and resolution paths
+- **Graph Composition**: Plugin interaction with dependency hierarchies
 
-**Use When**: Adding cross-cutting concerns, building development tools, system monitoring
+**Use When**: Building observability tools, implementing cross-cutting concerns, creating development utilities
 
 ---
 

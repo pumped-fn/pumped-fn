@@ -4,11 +4,42 @@ _Optimized instruction set for AI models to build applications with @pumped-fn/c
 
 ---
 
-## 🧠 CORE CONCEPT
+## 🧠 CORE CONCEPT: Graph-Based Dependency Resolution
 
-pumped-fn is a library to orchestrate dependency in graph. pumped-fn units are called executor. Each executor retains its own dependency to other resources, and giving it to the scope, it'll resolve all required dependency by the graph prior to resolve the requestor. That's called resolve by graph.
+pumped-fn is a **dependency graph orchestration library** that fundamentally differs from traditional dependency injection frameworks.
 
-With that, every single resolve is integrated and completed, and even better, the order is reserved in the order of declaration. That makes using this easy, only resolving the tip is required, no need to resolve all of dependencies
+### The Graph Resolution Advantage
+
+**Traditional DI**: Manual dependency wiring with imperative resolution
+```typescript
+// Traditional approach - manual, error-prone
+const config = new ConfigService();
+const logger = new LoggerService(config);
+const db = new DatabaseService(config, logger);
+const userService = new UserService(db, logger); // Must wire manually
+```
+
+**pumped-fn**: Declarative dependency graph with automatic resolution
+```typescript
+// Graph approach - declarative, automatic
+const config = provide(() => configData);
+const logger = derive([config], ([cfg]) => new LoggerService(cfg));
+const db = derive([config, logger], ([cfg, log]) => new DatabaseService(cfg, log));
+const userService = derive([db, logger], ([db, log]) => new UserService(db, log));
+
+// Single resolve triggers entire graph resolution
+await scope.resolve(userService); // Automatically resolves: config → logger → db → userService
+```
+
+### Graph Resolution Properties
+
+1. **Automatic Dependency Ordering**: Dependencies resolved in declaration order, eliminating manual wiring
+2. **Complete Integration**: Single resolve operation handles entire dependency chain
+3. **Smart Caching**: Graph nodes cached and reused across resolution paths
+4. **Reactive Propagation**: Updates flow intelligently through dependency paths
+5. **Circular Detection**: Graph structure prevents circular dependencies at design time
+
+This graph-centric approach transforms dependency management from imperative wiring to declarative graph composition.
 
 ## Core Definitions
 
@@ -43,23 +74,35 @@ const consumer = derive([source.reactive], ([val]) => val * 2);
 await scope.update(source, 1);
 ```
 
-## Lifecycle Timeline
+## Lifecycle Timeline: Graph Traversal & Resolution
 
 ```
-1. createScope()
-2. scope.resolve(executor)
-   → Resolve dependencies recursively
-   → Call factory ONCE (singleton)
-   → Cache result
-3. On update:
-   → Run cleanup callbacks
-   → Re-execute factory
-   → Trigger reactive updates
-4. scope.dispose()
-   → Run all cleanups
-   → Clear cache
-   → Dispose pods
+1. createScope() → Initialize empty dependency graph cache
+
+2. scope.resolve(executor) → Graph Traversal Phase
+   ┌─ Analyze dependency graph for executor
+   ├─ Identify unresolved dependencies
+   ├─ Resolve dependencies recursively (depth-first)
+   │  ├─ config (leaf node) → resolved first
+   │  ├─ logger (depends on config) → resolved second
+   │  └─ userService (depends on config, logger) → resolved last
+   ├─ Call factory ONCE per executor (singleton)
+   └─ Cache results in graph nodes
+
+3. On update → Graph Propagation Phase
+   ├─ Run cleanup callbacks for affected nodes
+   ├─ Re-execute factories for updated nodes
+   ├─ Trigger reactive updates along graph edges
+   └─ Maintain graph consistency
+
+4. scope.dispose() → Graph Cleanup Phase
+   ├─ Traverse entire dependency graph
+   ├─ Run all cleanup callbacks (reverse dependency order)
+   ├─ Clear graph cache
+   └─ Dispose child pods
 ```
+
+**Graph Efficiency**: Only unresolved paths traversed, resolved nodes reused across multiple dependents.
 
 ### Cleanup Timing
 - `ctl.cleanup()` runs on:
@@ -246,7 +289,7 @@ const timer = derive(
 );
 ```
 
-### Pattern 4: Reactive Auto-Update (Avoids Circular Dependencies)
+### Pattern 4: Reactive Auto-Update (Graph-Based Circular Avoidance)
 
 ```typescript
 // Source that changes over time
@@ -284,6 +327,63 @@ const app = derive(
   }),
   name("app")
 );
+
+/*
+Dependency Graph Structure:
+dataSource (source)
+├─.reactive→ consumer (reads)
+└─.static──→ updater (writes)
+             └─app──→ [consumer, updater] (coordinates)
+
+Graph prevents circular dependencies by separating read/write access patterns.
+*/
+```
+
+### Pattern 5: Complex Graph Composition
+
+```typescript
+// Multi-layer dependency graph with shared resources
+const config = provide(() => ({ db: { host: "localhost" }, api: { timeout: 5000 } }), name("config"));
+
+// Shared infrastructure layer
+const logger = derive([config], ([cfg]) => createLogger(cfg.logLevel), name("logger"));
+const metrics = derive([logger], ([log]) => createMetrics(log), name("metrics"));
+
+// Data layer
+const database = derive([config, logger], ([cfg, log]) => createDB(cfg.db, log), name("database"));
+const cache = derive([config, metrics], ([cfg, met]) => createCache(cfg.cache, met), name("cache"));
+
+// Service layer (multiple services sharing infrastructure)
+const userService = derive([database, cache, logger], ([db, cache, log]) =>
+  createUserService({ db, cache, logger: log }), name("user-service"));
+
+const orderService = derive([database, cache, metrics], ([db, cache, met]) =>
+  createOrderService({ db, cache, metrics: met }), name("order-service"));
+
+// Application layer
+const api = derive([userService, orderService, metrics], ([users, orders, met]) =>
+  createAPI({ users, orders, metrics: met }), name("api"));
+
+/*
+Complex Dependency Graph:
+                    config
+                   /  |  \
+               logger  |  metrics
+                 /     |     \
+            database   |     cache
+              /  \     |    /  \
+       userService  \  |  /  orderService
+              \      \ | /      /
+               \      api      /
+                \    /  \    /
+                 [resolved together]
+
+Graph benefits:
+- Shared infrastructure automatically reused
+- Clear separation of concerns by layer
+- Optimal resolution order guaranteed
+- Easy testing with layer-specific mocks
+*/
 ```
 
 ---

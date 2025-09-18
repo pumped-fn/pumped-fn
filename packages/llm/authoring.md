@@ -2,16 +2,47 @@
 
 _Expert guide for creating reusable, configurable components using graph-based dependency resolution_
 
-## Core Authoring Principle
+## Core Authoring Principle: Graph-Based Configuration
 
-Components are designed around **configuration variation** through the graph resolution system. Since the graph doesn't resolve values until requested, configuration can be modified at the source using `preset` to override specific executors in the dependency chain.
+Components are designed around **configuration variation** through the dependency graph resolution system. The graph's lazy evaluation enables powerful configuration strategies impossible with traditional dependency injection.
 
-### The Configuration Strategy
+### The Graph Configuration Strategy
 
-1. **Graph Resolution**: Touching any node resolves the related part of the graph
-2. **Late Binding**: Values aren't resolved until explicitly requested by scope
-3. **Source Override**: Use `preset` to instruct scope to substitute values during resolution
-4. **Isolated Variations**: Each scope instance can have different configuration via `initialValues`
+1. **Lazy Graph Resolution**: Dependency graph remains unresolved until scope.resolve() is called
+2. **Strategic Injection Points**: Use `preset` to override specific graph nodes before resolution
+3. **Configuration Inheritance**: Child components inherit parent configurations through graph paths
+4. **Multi-Environment Graphs**: Same graph structure, different configurations per scope instance
+
+### Graph vs Traditional Configuration
+
+**Traditional DI Configuration**:
+```typescript
+// Manual configuration passing - rigid, imperative
+const config = { timeout: 5000 };
+const logger = new Logger(config);
+const db = new Database(config, logger);
+const service = new UserService(db, logger); // Fixed at construction
+```
+
+**Graph-Based Configuration**:
+```typescript
+// Declarative graph with configuration injection points
+const config = provide(() => ({ timeout: 5000 }));
+const logger = derive([config], ([cfg]) => new Logger(cfg));
+const db = derive([config, logger], ([cfg, log]) => new Database(cfg, log));
+const service = derive([db, logger], ([db, log]) => new UserService(db, log));
+
+// Configuration variation without changing graph structure
+const testScope = createScope({
+  initialValues: [preset(config, { timeout: 100 })] // Different config, same graph
+});
+```
+
+**Graph Configuration Benefits**:
+- **Flexible Substitution**: Replace any graph node without affecting structure
+- **Composition-Friendly**: Combine multiple configuration presets
+- **Type-Safe Overrides**: TypeScript ensures configuration compatibility
+- **Testability**: Easy mocking of any dependency layer
 
 ---
 

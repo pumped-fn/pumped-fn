@@ -47,15 +47,16 @@ export default withMermaid(
 
       sidebar: [
         { text: "Getting started", link: "/" },
+        { text: "Graph vs Traditional", link: "/graph-vs-traditional" },
         { text: "How does it work", link: "/how-does-it-work" },
         { text: "Testings", link: "/testings" },
         {
           text: "API",
           items: [
-            { text: "creation", link: "/api#creation" },
-            { text: "scope", link: "/api#scope" },
-            { text: "middleware", link: "/api#middleware" },
-            { text: "meta", link: "/api#meta" },
+            { text: "Graph Construction", link: "/api#graph-construction" },
+            { text: "Graph Resolution", link: "/api#graph-resolution" },
+            { text: "Plugins", link: "/api#plugins" },
+            { text: "Meta", link: "/api#meta" },
           ],
         },
         {
