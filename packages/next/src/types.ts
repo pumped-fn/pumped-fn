@@ -336,10 +336,7 @@ export declare namespace Core {
     init?: (scope: Scope) => void | Promise<void>;
     dispose?: (scope: Scope) => void | Promise<void>;
 
-    wrap?(
-      next: () => Promise<unknown>,
-      context: WrapContext
-    ): Promise<unknown>;
+    wrap?(next: () => Promise<unknown>, context: WrapContext): Promise<unknown>;
 
     onError?: (
       error:
@@ -411,88 +408,6 @@ export declare namespace Core {
 }
 
 export namespace Flow {
-  export type ContextData = Map<unknown, unknown>;
-
-  export type ExecuteOpt = {
-    scope?: Core.Scope;
-    name?: string;
-    description?: string;
-    plugins?: FlowPlugin[];
-    presets?: Core.Preset<unknown>[];
-    initialContext?: ContextData;
-  };
-
-  export type Controller = {
-    execute: <Input, Output>(
-      input: Flow<Input, Output>,
-      param: Input,
-      opt?: ExecuteOpt
-    ) => Promise<Output>;
-    safeExecute: <Input, Output>(
-      input: Flow<Input, Output>,
-      param: Input,
-      opt?: ExecuteOpt
-    ) => Promise<Result<Output>>;
-  };
-
-  export type NoDependencyFlowFn<Input, Output> = (
-    input: Input,
-    context: Controller & { context: ExecutionContext }
-  ) => Output | Promise<Output>;
-
-  export type DependentFlowFn<D, Input, Output> = (
-    dependency: D,
-    input: Input,
-    context: Controller & { context: ExecutionContext }
-  ) => Output | Promise<Output>;
-
-  export type FlowPlugin = {
-    name: string;
-    wrap<T>(context: ExecutionContext, execute: () => Promise<T>): Promise<T>;
-  };
-
-  export type Flow<Input, Output> = {
-    execution: NoDependencyFlowFn<Input, Output>;
-  } & Config &
-    Schema<Input, Output>;
-
-  export type Schema<Input, Output> = {
-    input: StandardSchemaV1<Input>;
-    output: StandardSchemaV1<Output>;
-  };
-
-  export type Config = {
-    name?: string;
-    description?: string;
-    plugins?: FlowPlugin[];
-    metas?: Meta.Meta[];
-  };
-
-  export type Executor<Input, Output> = Core.Executor<Flow<Input, Output>> &
-    Config &
-    Schema<Input, Output>;
-
-  export interface ExecutionContext<Input = any, Output = any>
-    extends DataStore {
-    data: Map<unknown, unknown>;
-    parent?: ExecutionContext;
-    scope: Core.Scope;
-    plugins: FlowPlugin[];
-    flow: Flow<Input, Output>;
-  }
-
-  export type Success<T> = { kind: "success"; value: T };
-  export type Error = { kind: "error"; error: unknown };
-
-  export type Result<T> = Success<T> | Error;
-
-  export type ExecutionResult<Output> = {
-    context: ExecutionContext;
-    result: Result<Output>;
-  };
-}
-
-export namespace Flow {
   export type OK<S> = {
     type: "ok";
     data: S;
@@ -513,7 +428,7 @@ export namespace Flow {
     success: StandardSchemaV1<S>;
     error: StandardSchemaV1<E>;
     version?: string;
-  };
+  } & Meta.MetaContainer;
 
   export interface NoDependencyHandler<I, S, E> {
     (ctx: Context<I, S, E>): OutputLike<S, E> | Promise<OutputLike<S, E>>;
@@ -561,6 +476,15 @@ export namespace Flow {
     ? OK<S> | KO<E>
     : never;
 
+  export type FnExecutor<I, O> = (input: I) => O | Promise<O>;
+
+  export type MultiFnExecutor<Args extends readonly unknown[], O> =
+    (...args: Args) => O | Promise<O>;
+
+  export type AnyFnExecutor<O = unknown> =
+    | FnExecutor<any, O>
+    | MultiFnExecutor<any[], O>;
+
   export type R<S, E> = {
     ok: (value: S) => OK<S>;
     ko: (value: E) => KO<E>;
@@ -573,21 +497,65 @@ export namespace Flow {
   export type Opt = {};
 
   export type C = {
-    execute: <F extends UFlow>(
-      flow: F,
-      param: InferInput<F>,
-      opt?: Opt
-    ) => Promise<InferOutput<F>>;
+    execute: {
+      <F extends UFlow>(
+        flow: F,
+        input: InferInput<F>,
+        opt?: Opt
+      ): Promise<InferOutput<F>>;
 
-    executeParallel: <T extends ReadonlyArray<[UFlow, any]>>(
-      flows: T
-    ) => Promise<{
-      [K in keyof T]: T[K] extends [infer F, any]
-        ? F extends UFlow
-          ? Awaited<InferOutput<F>>
-          : never
-        : never;
-    }>;
+      <I, O, E = unknown>(
+        fn: FnExecutor<I, O>,
+        input: I,
+        errorMapper?: (error: unknown) => E,
+        opt?: Opt
+      ): Promise<OK<O> | KO<E>>;
+
+      <Args extends readonly unknown[], O, E = unknown>(
+        fn: MultiFnExecutor<Args, O>,
+        args: Args,
+        errorMapper?: (error: unknown) => E,
+        opt?: Opt
+      ): Promise<OK<O> | KO<E>>;
+    };
+
+    executeParallel: {
+      <T extends ReadonlyArray<[UFlow, any]>>(
+        flows: T
+      ): Promise<{
+        [K in keyof T]: T[K] extends [infer F, any]
+          ? F extends UFlow
+            ? Awaited<InferOutput<F>>
+            : never
+          : never;
+      }>;
+
+      <T extends ReadonlyArray<[FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
+        items: T
+      ): Promise<{
+        [K in keyof T]: T[K] extends [infer F, any]
+          ? F extends FnExecutor<any, infer O>
+            ? OK<O> | KO<unknown>
+            : F extends MultiFnExecutor<any[], infer O>
+            ? OK<O> | KO<unknown>
+            : never
+          : never;
+      }>;
+
+      <T extends ReadonlyArray<[UFlow | FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
+        mixed: T
+      ): Promise<{
+        [K in keyof T]: T[K] extends [infer F, any]
+          ? F extends UFlow
+            ? Awaited<InferOutput<F>>
+            : F extends FnExecutor<any, infer O>
+            ? OK<O> | KO<unknown>
+            : F extends MultiFnExecutor<any[], infer O>
+            ? OK<O> | KO<unknown>
+            : never
+          : never;
+      }>;
+    };
   };
 
   export type Context<I, S, E> = DataStore &

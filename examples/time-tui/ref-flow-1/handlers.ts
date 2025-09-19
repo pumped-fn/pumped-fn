@@ -12,26 +12,52 @@ export const validateOrder = validateOrderFlow.handler(
   async ({ db, shipping, logger }, ctx, input) => {
     logger.info("Starting order validation", { customerId: input.customerId });
 
-    const customer = await db.findCustomer(input.customerId);
-    if (!customer) {
+    const customerResult = await ctx.execute(
+      async (customerId: string) => db.findCustomer(customerId),
+      input.customerId
+    );
+
+    if (customerResult.type === "ko") {
+      logger.error("Customer lookup failed", customerResult.data);
+      return ctx.ko({
+        code: "INVALID_CUSTOMER",
+        message: "Failed to lookup customer",
+        details: customerResult.data,
+      });
+    }
+
+    if (!customerResult.data) {
       return ctx.ko({
         code: "INVALID_CUSTOMER",
         message: `Customer ${input.customerId} not found`,
       });
     }
 
-    if (customer.status === "suspended") {
+    if (customerResult.data.status === "suspended") {
       return ctx.ko({
         code: "INVALID_CUSTOMER",
         message: "Customer account is suspended",
       });
     }
 
-    const addressValidation = await shipping.validateAddress(input.shipping);
-    if (!addressValidation.valid) {
+    const addressResult = await ctx.execute(
+      async (address: typeof input.shipping) => shipping.validateAddress(address),
+      input.shipping
+    );
+
+    if (addressResult.type === "ko") {
+      logger.error("Address validation failed", addressResult.data);
       return ctx.ko({
         code: "INVALID_ADDRESS",
-        message: addressValidation.error || "Invalid shipping address",
+        message: "Address validation service failed",
+        details: addressResult.data,
+      });
+    }
+
+    if (!addressResult.data.valid) {
+      return ctx.ko({
+        code: "INVALID_ADDRESS",
+        message: addressResult.data.error || "Invalid shipping address",
       });
     }
 
@@ -39,7 +65,21 @@ export const validateOrder = validateOrderFlow.handler(
     let totalWithTax = 0;
 
     for (const item of input.items) {
-      const inventory = await db.checkInventory(item.productId);
+      const inventoryResult = await ctx.execute(
+        async (productId: string) => db.checkInventory(productId),
+        item.productId
+      );
+
+      if (inventoryResult.type === "ko") {
+        logger.error("Inventory check failed", { productId: item.productId, error: inventoryResult.data });
+        return ctx.ko({
+          code: "INSUFFICIENT_INVENTORY",
+          message: `Failed to check inventory for product ${item.productId}`,
+          details: inventoryResult.data,
+        });
+      }
+
+      const inventory = inventoryResult.data;
       if (inventory.available < item.quantity) {
         return ctx.ko({
           code: "INSUFFICIENT_INVENTORY",
@@ -68,12 +108,25 @@ export const processPayment = processPaymentFlow.handler(
   async ({ payment, logger }, ctx, input) => {
     logger.info("Processing payment", { amount: input.amount, method: input.method });
 
-    const result = await payment.processPayment({
-      amount: input.amount,
-      method: input.method,
-      token: input.token,
-    });
+    const paymentResult = await ctx.execute(
+      async (paymentData: { amount: number; method: string; token: string }) =>
+        payment.processPayment(paymentData),
+      {
+        amount: input.amount,
+        method: input.method,
+        token: input.token,
+      }
+    );
 
+    if (paymentResult.type === "ko") {
+      logger.error("Payment service failed", paymentResult.data);
+      return ctx.ko({
+        code: "PAYMENT_DECLINED",
+        message: paymentResult.data instanceof Error ? paymentResult.data.message : "Payment service error",
+      });
+    }
+
+    const result = paymentResult.data;
     if ("error" in result) {
       logger.error("Payment failed", result);
       return ctx.ko({
@@ -98,8 +151,20 @@ export const updateInventory = updateInventoryFlow.handler(
   async ({ db, logger }, ctx, input) => {
     logger.info("Updating inventory", { orderId: input.orderId, itemCount: input.items.length });
 
-    const reserved = await db.reserveItems(input.items);
-    if (!reserved) {
+    const reservationResult = await ctx.execute(
+      async (items: typeof input.items) => db.reserveItems(items),
+      input.items
+    );
+
+    if (reservationResult.type === "ko") {
+      logger.error("Inventory reservation service failed", reservationResult.data);
+      return ctx.ko({
+        code: "RESERVATION_FAILED",
+        message: reservationResult.data instanceof Error ? reservationResult.data.message : "Inventory service error",
+      });
+    }
+
+    if (!reservationResult.data) {
       return ctx.ko({
         code: "RESERVATION_FAILED",
         message: "Failed to reserve inventory items",
@@ -130,31 +195,40 @@ export const sendNotifications = sendNotificationsFlow.handler(
   async ({ notification, logger }, ctx, input) => {
     logger.info("Sending notifications", { orderId: input.orderId, customerId: input.customerId });
 
-    const [emailResult, smsResult, webhookResult] = await Promise.all([
-      notification.sendEmail(input.customerId),
-      notification.sendSMS(input.customerId),
-      notification.sendWebhook(),
+    const [emailResult, smsResult, webhookResult] = await ctx.executeParallel([
+      [async (customerId: string) => notification.sendEmail(customerId), input.customerId],
+      [async (customerId: string) => notification.sendSMS(customerId), input.customerId],
+      [async () => notification.sendWebhook(), undefined]
     ]);
 
     const sent: Array<"email" | "sms" | "webhook"> = [];
     const failures: Array<{ channel: string; error: string }> = [];
 
-    if (emailResult.success) {
+    if (emailResult.type === "ok" && emailResult.data.success) {
       sent.push("email");
     } else {
-      failures.push({ channel: "email", error: emailResult.error || "Unknown error" });
+      const error = emailResult.type === "ko"
+        ? "Service error"
+        : emailResult.data.error || "Unknown error";
+      failures.push({ channel: "email", error });
     }
 
-    if (smsResult.success) {
+    if (smsResult.type === "ok" && smsResult.data.success) {
       sent.push("sms");
     } else {
-      failures.push({ channel: "sms", error: smsResult.error || "Unknown error" });
+      const error = smsResult.type === "ko"
+        ? "Service error"
+        : smsResult.data.error || "Unknown error";
+      failures.push({ channel: "sms", error });
     }
 
-    if (webhookResult.success) {
+    if (webhookResult.type === "ok" && webhookResult.data.success) {
       sent.push("webhook");
     } else {
-      failures.push({ channel: "webhook", error: webhookResult.error || "Unknown error" });
+      const error = webhookResult.type === "ko"
+        ? "Service error"
+        : webhookResult.data.error || "Unknown error";
+      failures.push({ channel: "webhook", error });
     }
 
     if (sent.length === 0) {
@@ -205,8 +279,21 @@ export const processOrder = processOrderFlow.handler(
       });
     }
 
-    const orderId = await db.createOrder();
+    const orderResult = await ctx.execute(
+      async () => db.createOrder(),
+      undefined
+    );
 
+    if (orderResult.type === "ko") {
+      logger.error("Order creation failed", orderResult.data);
+      return ctx.ko({
+        code: "SYSTEM",
+        message: "Failed to create order",
+        details: orderResult.data,
+      });
+    }
+
+    const orderId = orderResult.data;
     ctx.set("orderId", orderId);
 
     const inventoryResult = await ctx.execute(updateInventory, {
@@ -223,16 +310,44 @@ export const processOrder = processOrderFlow.handler(
       });
     }
 
-    const trackingNumber = shipping.generateTrackingNumber();
-    const shippingInfo = await shipping.calculateShipping(input.items, input.shipping);
+    const shippingResult = await ctx.executeParallel([
+      [async () => shipping.generateTrackingNumber(), undefined],
+      [async (items: typeof input.items, address: typeof input.shipping) =>
+        shipping.calculateShipping(items, address), [input.items, input.shipping]]
+    ]);
+
+    if (shippingResult[0].type === "ko") {
+      logger.error("Tracking number generation failed", shippingResult[0].data);
+      return ctx.ko({
+        code: "SYSTEM",
+        message: "Failed to generate tracking number",
+        details: shippingResult[0].data,
+      });
+    }
+
+    if (shippingResult[1].type === "ko") {
+      logger.error("Shipping calculation failed", shippingResult[1].data);
+      return ctx.ko({
+        code: "SYSTEM",
+        message: "Failed to calculate shipping",
+        details: shippingResult[1].data,
+      });
+    }
+
+    const trackingNumber = shippingResult[0].data;
+    const shippingInfo = shippingResult[1].data;
     const estimatedDelivery = new Date();
-    estimatedDelivery.setDate(estimatedDelivery.getDate() + shippingInfo.estimatedDays);
+    if (typeof shippingInfo === 'object' && shippingInfo && 'estimatedDays' in shippingInfo) {
+      estimatedDelivery.setDate(estimatedDelivery.getDate() + shippingInfo.estimatedDays);
+    } else {
+      estimatedDelivery.setDate(estimatedDelivery.getDate() + 7); // fallback
+    }
 
     const notificationResult = await ctx.execute(sendNotifications, {
       orderId,
       customerId: input.customerId,
       total: validationResult.data.totalWithTax,
-      trackingNumber,
+      trackingNumber: typeof trackingNumber === 'string' ? trackingNumber : 'TRK123',
     });
 
     if (notificationResult.type === "ko") {
@@ -245,7 +360,7 @@ export const processOrder = processOrderFlow.handler(
       orderId,
       total: validationResult.data.totalWithTax,
       estimatedDelivery,
-      trackingNumber,
+      trackingNumber: typeof trackingNumber === 'string' ? trackingNumber : 'TRK123',
     });
   }
 );

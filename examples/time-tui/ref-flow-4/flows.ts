@@ -93,32 +93,65 @@ const validateOrderSpec = flow.define({
 const validateOrderFlow = validateOrderSpec.handler(
   { db, shipping },
   async ({ db, shipping }, ctx, input) => {
-    const customerValid = await db.validateCustomer(input.customerId);
-    if (!customerValid) {
+    const customerResult = await ctx.execute(
+      async (customerId: string) => db.validateCustomer(customerId),
+      input.customerId
+    );
+
+    if (customerResult.type === "ko") {
+      return ctx.ko({
+        code: "INVALID_CUSTOMER",
+        message: "Customer validation service failed",
+      });
+    }
+
+    if (!customerResult.data) {
       return ctx.ko({
         code: "INVALID_CUSTOMER",
         message: "Customer account is invalid",
       });
     }
 
-    const addressValid = await shipping.validateAddress(input.shipping);
-    if (!addressValid) {
+    const addressResult = await ctx.execute(
+      async (address: typeof input.shipping) => shipping.validateAddress(address),
+      input.shipping
+    );
+
+    if (addressResult.type === "ko") {
+      return ctx.ko({
+        code: "INVALID_ADDRESS",
+        message: "Address validation service failed",
+      });
+    }
+
+    if (!addressResult.data) {
       return ctx.ko({
         code: "INVALID_ADDRESS",
         message: "Shipping address is invalid",
       });
     }
 
-    const inventoryCheck = await db.checkInventory(input.items);
-    if (!inventoryCheck.available) {
+    const inventoryResult = await ctx.execute(
+      async (items: typeof input.items) => db.checkInventory(items),
+      input.items
+    );
+
+    if (inventoryResult.type === "ko") {
       return ctx.ko({
         code: "INSUFFICIENT_INVENTORY",
-        message: "Items not available",
-        details: inventoryCheck.unavailable,
+        message: "Inventory check service failed",
       });
     }
 
-    const total = inventoryCheck.items.reduce(
+    if (!inventoryResult.data.available) {
+      return ctx.ko({
+        code: "INSUFFICIENT_INVENTORY",
+        message: "Items not available",
+        details: inventoryResult.data.unavailable,
+      });
+    }
+
+    const total = inventoryResult.data.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
@@ -332,14 +365,33 @@ const processOrder = processOrderSpec.handler(
       });
     }
 
-    const trackingNumber = await db.generateTrackingNumber(orderId);
-    const estimatedDelivery = await db.calculateDelivery(input.shipping);
+    const shippingResult = await ctx.executeParallel([
+      [async (orderId: string) => db.generateTrackingNumber(orderId), orderId],
+      [async (shipping: typeof input.shipping) => db.calculateDelivery(shipping), input.shipping]
+    ]);
 
-    await db.markOrderCompleted(orderId, {
-      transactionId: payment.data.transactionId,
-      trackingNumber,
-      estimatedDelivery,
-    });
+    if (shippingResult[0].type === "ko" || shippingResult[1].type === "ko") {
+      return ctx.ko({
+        code: "SHIPPING_ERROR",
+        message: "Failed to generate shipping information",
+      });
+    }
+
+    const trackingNumber = shippingResult[0].data;
+    const estimatedDelivery = shippingResult[1].data;
+
+    const completionResult = await ctx.execute(
+      async (orderId: string, details: any) => db.markOrderCompleted(orderId, details),
+      [orderId, {
+        transactionId: payment.data.transactionId,
+        trackingNumber,
+        estimatedDelivery,
+      }]
+    );
+
+    if (completionResult.type === "ko") {
+      logger.error("Failed to mark order as completed", completionResult.data);
+    }
 
     const notifications = await ctx.execute(sendNotificationsFlow, {
       orderId,

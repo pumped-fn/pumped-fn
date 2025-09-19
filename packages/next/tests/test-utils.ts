@@ -1,8 +1,8 @@
 import { vi, expect } from "vitest";
-import { flow, type FlowPlugin } from "../src/flow";
+import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
 import { createExecutor } from "../src/executor";
-import { createScope, provide, derive } from "../src";
+import { createScope, provide, derive, type Flow } from "../src";
 
 export namespace TestTypes {
   export interface User {
@@ -152,7 +152,7 @@ export const PluginFactory = {
         capturedContext.current = context;
         return next();
       },
-    } as FlowPlugin),
+    } as Flow.Plugin),
 
   executionOrder: (execOrder: string[], pluginName: string) =>
     ({
@@ -163,7 +163,7 @@ export const PluginFactory = {
         execOrder.push(`${pluginName}-after`);
         return result;
       },
-    } as FlowPlugin),
+    } as Flow.Plugin),
 
   lifecycle: (lifecycleCalls: string[], pluginName: string) =>
     ({
@@ -178,7 +178,7 @@ export const PluginFactory = {
         lifecycleCalls.push(`${pluginName}-wrap`);
         return next();
       },
-    } as FlowPlugin),
+    } as Flow.Plugin),
 };
 
 export const errorTestHelpers = {

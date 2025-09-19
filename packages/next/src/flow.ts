@@ -9,15 +9,23 @@ import { meta } from "./meta";
 const ok = <S>(data: S): Flow.OK<S> => ({
   type: "ok",
   data,
-  isOk(): this is Flow.OK<S> { return true; },
-  isKo(): this is never { return false; }
+  isOk(): this is Flow.OK<S> {
+    return true;
+  },
+  isKo(): this is never {
+    return false;
+  },
 });
 
 const ko = <E>(data: E): Flow.KO<E> => ({
   type: "ko",
   data,
-  isOk(): this is never { return false; },
-  isKo(): this is Flow.KO<E> { return true; }
+  isOk(): this is never {
+    return false;
+  },
+  isKo(): this is Flow.KO<E> {
+    return true;
+  },
 });
 
 const flowDefinitionMeta = meta<Flow.Definition<any, any, any>>(
@@ -44,7 +52,7 @@ class FlowDefinition<I, S, E> {
     public readonly input: StandardSchemaV1<I>,
     public readonly success: StandardSchemaV1<S>,
     public readonly error: StandardSchemaV1<E>,
-    public readonly meta: Meta.Meta[] = []
+    public readonly metas: Meta.Meta[] = []
   ) {}
 
   handler(
@@ -89,7 +97,7 @@ class FlowDefinition<I, S, E> {
           return flowHandler as Flow.NoDependencyHandler<I, S, E>;
         },
         undefined,
-        [...this.meta, flowDefinitionMeta(this)]
+        [...this.metas, flowDefinitionMeta(this)]
       ) as Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
     }
     const dependencies = dependenciesOrHandler;
@@ -102,7 +110,7 @@ class FlowDefinition<I, S, E> {
         return flowHandler as Flow.DependentHandler<D, I, S, E>;
       },
       dependencies as any,
-      [...this.meta, flowDefinitionMeta(this)]
+      [...this.metas, flowDefinitionMeta(this)]
     ) as Core.Executor<Flow.DependentHandler<D, I, S, E>>;
   }
 }
@@ -175,7 +183,55 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   async execute<F extends Flow.UFlow>(
     flow: F,
     input: Flow.InferInput<F>
-  ): Promise<Awaited<Flow.InferOutput<F>>> {
+  ): Promise<Awaited<Flow.InferOutput<F>>>;
+
+  async execute<I, O, E = unknown>(
+    fn: Flow.FnExecutor<I, O>,
+    input: I,
+    errorMapper?: (error: unknown) => E
+  ): Promise<Flow.OK<O> | Flow.KO<E>>;
+
+  async execute<Args extends readonly unknown[], O, E = unknown>(
+    fn: Flow.MultiFnExecutor<Args, O>,
+    args: Args,
+    errorMapper?: (error: unknown) => E
+  ): Promise<Flow.OK<O> | Flow.KO<E>>;
+
+  async execute(
+    flowOrFn: Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>,
+    input: any,
+    errorMapperOrOpt?: ((error: unknown) => any) | Flow.Opt,
+    opt?: Flow.Opt
+  ): Promise<any> {
+    // Handle parameter overloading
+    let errorMapper: ((error: unknown) => any) | undefined;
+    let actualOpt: Flow.Opt | undefined;
+
+    if (typeof errorMapperOrOpt === "function") {
+      // If it's a function, it's the error mapper
+      errorMapper = errorMapperOrOpt as (error: unknown) => any;
+      actualOpt = opt;
+    } else {
+      // Otherwise, it's the options
+      actualOpt = errorMapperOrOpt;
+    }
+
+    if (typeof flowOrFn === "function" && !flowDefinitionMeta.find(flowOrFn as any)) {
+      try {
+        let result: any;
+        if (Array.isArray(input)) {
+          result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(...input);
+        } else {
+          result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
+        }
+        return this.ok(result);
+      } catch (error) {
+        const mappedError = errorMapper ? errorMapper(error) : error;
+        return this.ko(mappedError as any);
+      }
+    }
+
+    const flow = flowOrFn as Flow.UFlow;
     const handler = await this.pod.resolve(flow);
     const definition = flowDefinitionMeta.find(flow);
     if (!definition) {
@@ -201,9 +257,54 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
         ? Awaited<Flow.InferOutput<F>>
         : never
       : never;
-  }> {
+  }>;
+
+  async executeParallel<T extends ReadonlyArray<[Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
+    items: T
+  ): Promise<{
+    [K in keyof T]: T[K] extends [infer F, any]
+      ? F extends Flow.FnExecutor<any, infer O>
+        ? Flow.OK<O> | Flow.KO<unknown>
+        : F extends Flow.MultiFnExecutor<any[], infer O>
+        ? Flow.OK<O> | Flow.KO<unknown>
+        : never
+      : never;
+  }>;
+
+  async executeParallel<T extends ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
+    mixed: T
+  ): Promise<{
+    [K in keyof T]: T[K] extends [infer F, any]
+      ? F extends Flow.UFlow
+        ? Awaited<Flow.InferOutput<F>>
+        : F extends Flow.FnExecutor<any, infer O>
+        ? Flow.OK<O> | Flow.KO<unknown>
+        : F extends Flow.MultiFnExecutor<any[], infer O>
+        ? Flow.OK<O> | Flow.KO<unknown>
+        : never
+      : never;
+  }>;
+
+  async executeParallel(
+    items: ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>
+  ): Promise<any> {
     const results = await Promise.all(
-      flows.map(async ([flow, input]) => {
+      items.map(async ([flowOrFn, input]) => {
+        if (typeof flowOrFn === "function" && !flowDefinitionMeta.find(flowOrFn as any)) {
+          try {
+            let result: any;
+            if (Array.isArray(input)) {
+              result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(...input);
+            } else {
+              result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
+            }
+            return this.ok(result);
+          } catch (error) {
+            return this.ko(error as any);
+          }
+        }
+
+        const flow = flowOrFn as Flow.UFlow;
         const childContext = new FlowContext<unknown, unknown, unknown>(
           input,
           this.pod,
@@ -238,7 +339,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
             flowName: FlowExecutionContext.flowName.find(context),
             depth: FlowExecutionContext.depth.find(context) || 0,
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
-            parentFlowName: FlowExecutionContext.parentFlowName.find(context)
+            parentFlowName: FlowExecutionContext.parentFlowName.find(context),
           };
           return plugin.wrap!(context, currentExecutor, execution);
         };
@@ -319,10 +420,11 @@ async function execute<I, S, E>(
         const currentExecutor = executor;
         executor = () => {
           const execution = {
-            flowName: definition?.name || FlowExecutionContext.flowName.find(context),
+            flowName:
+              definition?.name || FlowExecutionContext.flowName.find(context),
             depth: FlowExecutionContext.depth.find(context) || 0,
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
-            parentFlowName: FlowExecutionContext.parentFlowName.find(context)
+            parentFlowName: FlowExecutionContext.parentFlowName.find(context),
           };
           return plugin.wrap!(context, currentExecutor, execution);
         };

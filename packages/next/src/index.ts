@@ -37,3 +37,4 @@ export const name: Meta.MetaFn<string> = meta(
 );
 
 export * as plugins from "./plugins";
+export * as executes from "./executes";
