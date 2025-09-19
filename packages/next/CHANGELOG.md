@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.64
+
+### Patch Changes
+
+- [`d73cdd3`](https://github.com/pumped-fn/pumped-fn/commit/d73cdd3ef852d10e387daf76a36e68868346dd7a) Thanks [@lagz0ne](https://github.com/lagz0ne)! - fix: corrected pod behavior along with presets
+
 ## 0.5.63
 
 ### Patch Changes
