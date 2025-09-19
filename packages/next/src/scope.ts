@@ -47,10 +47,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
     this.requestor = requestor;
     this.metas = metas;
 
-    // Create bound resolve function to maintain promise identity
     this.resolve = this.createResolveFunction();
 
-    // Cache this accessor immediately
     const existing = this.scope["cache"].get(requestor);
     if (!existing || !existing.accessor) {
       this.scope["cache"].set(requestor, {
@@ -81,7 +79,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
         return this.currentPromise;
       }
 
-      // Add this executor to the resolution chain
       this.scope["~addToResolutionChain"](this.requestor, this.requestor);
 
       this.currentPromise = new Promise((resolve, reject) => {
@@ -203,7 +200,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
               value: { kind: "resolved", value: current },
             });
 
-            // Clean up resolution chain
             this.scope["~removeFromResolutionChain"](this.requestor);
             this.currentPromise = null;
             resolve(current);
@@ -242,7 +238,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
               },
             });
 
-            // Clean up resolution chain
             this.scope["~removeFromResolutionChain"](this.requestor);
             this.scope["~triggerError"](enhancedError, this.requestor);
             this.currentPromise = null;
@@ -341,7 +336,6 @@ class BaseScope implements Core.Scope {
   protected isPod: boolean;
   private isDisposing = false;
 
-  // Circular dependency detection
   private resolutionChain: Map<UE, Set<UE>> = new Map();
 
   protected plugins: Core.Plugin[] = [];
@@ -371,7 +365,6 @@ class BaseScope implements Core.Scope {
   ): void {
     const currentChain = this.resolutionChain.get(resolvingExecutor);
     if (currentChain && currentChain.has(executor)) {
-      // Build the dependency chain for the error - only include the unique chain
       const chainArray = Array.from(currentChain);
       const dependencyChain = buildDependencyChain(chainArray);
 
@@ -456,36 +449,30 @@ class BaseScope implements Core.Scope {
       | DependencyResolutionError,
     executor: UE
   ): Promise<void> {
-    // Trigger per-executor error callbacks
     const executorCallbacks = this.onErrors.get(executor);
     if (executorCallbacks) {
       for (const callback of Array.from(executorCallbacks.values())) {
         try {
           await callback(error, executor, this);
         } catch (callbackError) {
-          // Don't let callback errors break the error handling flow
           console.error("Error in error callback:", callbackError);
         }
       }
     }
 
-    // Trigger global error callbacks
     for (const callback of Array.from(this.onEvents.error.values())) {
       try {
         await callback(error, executor, this);
       } catch (callbackError) {
-        // Don't let callback errors break the error handling flow
         console.error("Error in global error callback:", callbackError);
       }
     }
 
-    // Trigger plugin error handlers
     for (const plugin of this.plugins) {
       if (plugin.onError) {
         try {
           await plugin.onError(error, executor, this, { stage: "resolve" });
         } catch (pluginError) {
-          // Don't let plugin errors break the error handling flow
           console.error("Error in plugin error handler:", pluginError);
         }
       }
@@ -498,10 +485,8 @@ class BaseScope implements Core.Scope {
   ): Promise<unknown> {
     const e = getExecutor(ie);
 
-    // Check for circular dependency before creating accessor
     this["~checkCircularDependency"](e, ref);
 
-    // Propagate resolution chain to this executor
     this["~propagateResolutionChain"](ref, e);
 
     const a = this["~makeAccessor"](e);
@@ -600,14 +585,12 @@ class BaseScope implements Core.Scope {
   ): Promise<T> {
     this["~ensureNotDisposed"]();
 
-    // Core resolve function
     const coreResolve = async (): Promise<T> => {
       const accessor = this["~makeAccessor"](executor);
       await accessor.resolve(force);
       return accessor.get() as T;
     };
 
-    // Build plugin wrap chain (reverse order for proper composition)
     let resolver = coreResolve;
     for (const plugin of [...this.plugins].reverse()) {
       if (plugin.wrap) {
@@ -644,7 +627,6 @@ class BaseScope implements Core.Scope {
 
     this["~ensureNotDisposed"]();
 
-    // Core update function
     const coreUpdate = async (): Promise<void> => {
       this["~triggerCleanup"](e);
       const accessor = this["~makeAccessor"](e);
@@ -674,7 +656,6 @@ class BaseScope implements Core.Scope {
       await this["~triggerUpdate"](e);
     };
 
-    // Build plugin wrap chain (reverse order for proper composition)
     let updater = async (): Promise<T> => {
       await coreUpdate();
       return this.accessor(e).get() as T;
@@ -702,7 +683,6 @@ class BaseScope implements Core.Scope {
   async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
     this["~ensureNotDisposed"]();
 
-    // Core release function
     const coreRelease = async (): Promise<void> => {
       const ce = this.cache.get(e);
       if (!ce && !s) {
@@ -827,7 +807,6 @@ class BaseScope implements Core.Scope {
       throw new Error("Cannot register error callback on a disposing scope");
     }
 
-    // Global error handler
     if (typeof executorOrCallback === "function") {
       this.onEvents["error"].add(executorOrCallback);
       return () => {
@@ -836,7 +815,6 @@ class BaseScope implements Core.Scope {
       };
     }
 
-    // Per-executor error handler
     if (callback) {
       const executor = executorOrCallback;
       const errorCallbacks = this.onErrors.get(executor) ?? new Set();
@@ -954,6 +932,18 @@ class Pod extends BaseScope implements Core.Pod {
       return super.resolve(executor, force);
     }
 
+    const replacer = this.initialValues.find(
+      (item) => item.executor === executor
+    );
+
+    if (replacer) {
+      return await super.resolve(executor, force);
+    }
+
+    if (this["~hasDependencyWithPreset"](executor)) {
+      return await super.resolve(executor, force);
+    }
+
     if (this.parentScope["cache"].has(executor)) {
       const { value } = this.parentScope["cache"].get(executor)!;
       const accessor = super["~makeAccessor"](executor);
@@ -979,6 +969,34 @@ class Pod extends BaseScope implements Core.Pod {
     return await super.resolve(executor, force);
   }
 
+  private "~hasDependencyWithPreset"(executor: Core.Executor<any>): boolean {
+    if (!executor.dependencies) return false;
+
+    const checkDependency = (dep: Core.UExecutor): boolean => {
+      const actualExecutor = getExecutor(dep);
+
+      const hasPreset = this.initialValues.some(
+        (item) => item.executor === actualExecutor
+      );
+      if (hasPreset) return true;
+
+      if (actualExecutor.dependencies) {
+        return this["~hasDependencyWithPreset"](actualExecutor);
+      }
+
+      return false;
+    };
+
+    const deps = executor.dependencies;
+    if (Array.isArray(deps)) {
+      return deps.some(checkDependency);
+    } else if (typeof deps === "object" && deps !== null) {
+      return Object.values(deps).some(checkDependency);
+    } else {
+      return checkDependency(deps);
+    }
+  }
+
   protected async "~resolveExecutor"(
     ie: Core.UExecutor,
     ref: UE
@@ -989,15 +1007,15 @@ class Pod extends BaseScope implements Core.Pod {
 
     const t = getExecutor(ie);
 
-    // Check for circular dependency before creating accessor (same as parent)
     this["~checkCircularDependency"](t, ref);
 
-    // Propagate resolution chain to this executor
     this["~propagateResolutionChain"](ref, t);
 
     const a = this["~makeAccessor"](t);
 
-    if (this.parentScope["cache"].has(t)) {
+    const replacer = this.initialValues.find((item) => item.executor === t);
+
+    if (!replacer && this.parentScope["cache"].has(t)) {
       const { value } = this.parentScope["cache"].get(t)!;
       this["cache"].set(t, {
         accessor: a,

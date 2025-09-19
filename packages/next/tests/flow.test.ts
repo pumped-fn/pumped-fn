@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
+import { accessor } from "../src/accessor";
 import { testFlows, MockExecutors, scenarios } from "./test-utils";
 
 describe("FlowV2", () => {
@@ -262,6 +263,93 @@ describe("FlowV2", () => {
       expect((result.data as any).code).toBe("VALIDATION_FAILED");
       expect((result.data as any).message).toContain("Address too short");
       expect((result.data as any).message).toContain("Order creation failed");
+    });
+  });
+
+  describe("flow execution options", () => {
+    test("executes with custom version", () => {
+      const customVersionFlow = flow.define({
+        name: "custom.version",
+        version: "2.1.0",
+        input: custom<{ value: number }>(),
+        success: custom<{ result: number }>(),
+        error: custom<{ message: string }>(),
+      });
+
+      expect(customVersionFlow.version).toBe("2.1.0");
+    });
+
+    test("executes with custom meta", async () => {
+      const metaFlow = flow.define({
+        name: "meta.test",
+        input: custom<{ value: number }>(),
+        success: custom<{ result: number }>(),
+        error: custom<{ message: string }>(),
+        meta: [{ type: "test-meta", data: "test-value" }],
+      });
+
+      const impl = metaFlow.handler(async (ctx, input) => {
+        return ctx.ok({ result: input.value });
+      });
+
+      const result = await flow.execute(impl, { value: 42 });
+      expect(result.type).toBe("ok");
+      expect((result.data as any).result).toBe(42);
+    });
+
+    test("executes with initialContext as Array", async () => {
+      const testAccessor = accessor("testKey", custom<string>());
+      const testFlow = testFlows.basic("context.array");
+      const impl = testFlow.handler(async (ctx, input) => {
+        const contextValue = testAccessor.get(ctx);
+        return ctx.ok({ result: contextValue });
+      });
+
+      const result = await flow.execute(impl, { value: 1 }, {
+        initialContext: [[testAccessor, "test-value"]]
+      });
+
+      expect(result.type).toBe("ok");
+      expect((result.data as any).result).toBe("test-value");
+    });
+
+    test("executes with initialContext as Map", async () => {
+      const testFlow = testFlows.basic("context.map");
+      const impl = testFlow.handler(async (ctx, input) => {
+        const contextValue = ctx.get("testKey");
+        return ctx.ok({ result: contextValue });
+      });
+
+      const contextMap = new Map([["testKey", "map-value"]]);
+      const result = await flow.execute(impl, { value: 1 }, {
+        initialContext: contextMap
+      });
+
+      expect(result.type).toBe("ok");
+      expect((result.data as any).result).toBe("map-value");
+    });
+
+    test("executes functions with error mapper", async () => {
+      const testFlow = testFlows.basic("error.mapper");
+      const impl = testFlow.handler(async (ctx, input) => {
+        const result = await ctx.execute(
+          (x: number) => {
+            if (x < 0) throw new Error("Negative value");
+            return x * 2;
+          },
+          -5,
+          (error) => ({ code: "MAPPED_ERROR", message: error instanceof Error ? error.message : "Unknown" })
+        );
+
+        expect(result.type).toBe("ko");
+        expect((result.data as any).code).toBe("MAPPED_ERROR");
+        expect((result.data as any).message).toBe("Negative value");
+
+        return ctx.ok({ result: input.value });
+      });
+
+      const result = await flow.execute(impl, { value: 1 });
+      expect(result.type).toBe("ok");
     });
   });
 });
