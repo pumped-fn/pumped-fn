@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.63
+
+### Patch Changes
+
+- [`f5bab28`](https://github.com/pumped-fn/pumped-fn/commit/f5bab28ba2b1e7fdb42f5f3eef55f39666c7f557) Thanks [@lagz0ne](https://github.com/lagz0ne)! - improved execute api of flow
+
 ## 0.5.62
 
 ### Patch Changes
