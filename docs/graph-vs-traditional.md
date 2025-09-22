@@ -6,52 +6,47 @@ Compare how graph resolution transforms common programming challenges.
 
 ### Traditional: Manual Wiring
 ```typescript
-// Complex initialization order requirements
-class UserService {
+class DataService {
   constructor() {
-    // Must initialize in correct order
-    this.config = { logLevel: 'info', db: 'db://prod', redis: 'redis://prod', email: 'smtp://prod' }
+    this.config = { logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }
     this.logger = { log: (msg: string) => console.log(`[${this.config.logLevel}] ${msg}`) }
     this.db = { save: async (data: any) => ({ id: '123', ...data }) }
     this.cache = { set: async (key: string, value: any) => true }
-    this.emailService = { sendWelcome: async (email: string) => true }
+    this.notifier = { send: async (message: string) => true }
   }
 
-  async createUser(userData) {
-    // All dependencies manually wired
-    const user = await this.db.save(userData)
-    await this.cache.set(`user:${user.id}`, user)
-    await this.emailService.sendWelcome(user.email)
-    this.logger.info('User created', user.id)
-    return user
+  async createEntity(entityData) {
+    const entity = await this.db.save(entityData)
+    await this.cache.set(`entity:${entity.id}`, entity)
+    await this.notifier.send(JSON.stringify(entity))
+    this.logger.info('Entity created', entity.id)
+    return entity
   }
 }
 ```
 
 ### Graph Resolution: Declare Dependencies
 ```typescript
-// Dependencies declared where needed
-const config = provide(() => ({ logLevel: 'info', db: 'db://prod', redis: 'redis://prod', email: 'smtp://prod' }))
+const config = provide(() => ({ logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }))
 const logger = derive([config], ([cfg]) => ({ log: (msg: string) => console.log(`[${cfg.logLevel}] ${msg}`) }))
 const db = derive([config, logger], ([cfg, log]) => ({ save: async (data: any) => ({ id: '123', ...data }) }))
 const cache = derive([config, logger], ([cfg, log]) => ({ set: async (key: string, value: any) => true }))
-const emailService = derive([config, logger], ([cfg, log]) => ({ sendWelcome: async (email: string) => true }))
+const notifier = derive([config, logger], ([cfg, log]) => ({ send: async (message: string) => true }))
 
-const userService = derive(
-  [db, cache, emailService, logger],
-  ([database, cache, email, log]) => ({
-    async createUser(userData) {
-      const user = await database.save(userData)
-      await cache.set(`user:${user.id}`, user)
-      await email.sendWelcome(user.email)
-      log.info('User created', user.id)
-      return user
+const dataService = derive(
+  [db, cache, notifier, logger],
+  ([database, cache, notify, log]) => ({
+    async createEntity(entityData) {
+      const entity = await database.save(entityData)
+      await cache.set(`entity:${entity.id}`, entity)
+      await notify.send(JSON.stringify(entity))
+      log.info('Entity created', entity.id)
+      return entity
     }
   })
 )
 
-// Automatic resolution in dependency order
-const service = await scope.resolve(userService)
+const service = await scope.resolve(dataService)
 ```
 
 **Benefits**:
@@ -109,12 +104,12 @@ const testScope = createScope(
 const mockScope = createScope(
   preset(db, { save: async () => ({ id: '123' }) }),
   preset(cache, { set: async () => true }),
-  preset(emailService, { sendWelcome: async () => true })
+  preset(notifier, { send: async () => true })
 )
 
 // Same code, different behavior
-const service = await testScope.resolve(userService)
-const result = await service.createUser({ name: 'Test' })
+const service = await testScope.resolve(dataService)
+const result = await service.createEntity({ name: 'Test' })
 ```
 
 **Benefits**:
@@ -230,31 +225,28 @@ const result = await scope.resolve(processor)
 ### Traditional: Ripple Effect Changes
 ```typescript
 // Adding new dependency requires changes everywhere
-class UserService {
-  constructor(db, cache, logger) { // Add audit parameter
+class DataService {
+  constructor(db, cache, logger) {
     this.db = db
     this.cache = cache
     this.logger = logger
-    // this.audit = audit // Need to update constructor
   }
 }
 
-// Must update all instantiation sites
-const userService = new UserService(db, cache, logger) // Add audit here
-const app = new Application(userService) // And here
-// ... and everywhere UserService is created
+const dataService = new DataService(db, cache, logger)
+const app = new Application(dataService)
 ```
 
 ### Graph Resolution: Isolated Changes
 ```typescript
 // Add new dependency at definition site only
-const userService = derive(
-  [db, cache, logger, auditService], // Just add to array
-  ([database, cache, log, audit]) => ({ // Add to parameters
-    async createUser(userData) {
-      const user = await database.save(userData)
-      await audit.logUserCreation(user) // Use new dependency
-      return user
+const dataService = derive(
+  [db, cache, logger, auditService],
+  ([database, cache, log, audit]) => ({
+    async createEntity(entityData) {
+      const entity = await database.save(entityData)
+      await audit.logEntityCreation(entity)
+      return entity
     }
   })
 )

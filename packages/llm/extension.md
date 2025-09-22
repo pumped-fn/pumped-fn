@@ -1,50 +1,54 @@
-# Plugin Development - @pumped-fn/core-next
+# Extension Development - @pumped-fn/core-next
 
-_Comprehensive guide for building plugins that extend scope and flow functionality_
+_Comprehensive guide for building extensions that extend scope and flow functionality_
 
 ## Core Concepts
 
-Plugins extend the library through two primary APIs:
+Extensions extend the library through a unified API that works across both scope and flow contexts:
 
-**Scope Plugins**: Extend executor resolution, dependency management, and reactive systems from [llm.md](./llm.md)
-**Flow Plugins**: Extend structured business logic and validation systems from [flow.md](./flow.md)
+**Scope Extensions**: Extend executor resolution, dependency management, and reactive systems from [llm.md](./llm.md)
+**Flow Extensions**: Extend structured business logic and validation systems from [flow.md](./flow.md)
 
 ### Key Principle
-Plugins access existing scope capabilities rather than duplicate them. The scope parameter in `plugin.init()` provides all lifecycle hooks needed for telemetry, debugging, and functionality expansion.
+Extensions access existing scope capabilities rather than duplicate them. The scope parameter in `extension.init()` provides all lifecycle hooks needed for telemetry, debugging, and functionality expansion.
 
 ---
 
-## Plugin APIs
+## Extension API
 
-### Scope Plugin
+### Unified Extension Interface
 ```typescript
-interface Core.Plugin {
-  init?: (scope: Core.Scope) => void | Promise<void>
-  dispose?: (scope: Core.Scope) => void | Promise<void>
-
-  // Single wrap method for both resolve and update operations
-  wrap?(
-    next: () => Promise<unknown>,
-    context: Core.WrapContext
-  ): Promise<unknown>
-
-  onError?: (error, executor, scope, context) => void | Promise<void>
-}
-
-interface Core.WrapContext {
-  operation: 'resolve' | 'update'
-  executor: Executor<unknown>
-  scope: Scope
-}
-```
-
-### Flow Plugin
-```typescript
-interface Flow.Plugin {
+interface Extension.Extension {
   name: string
-  init?: (pod: Core.Pod, context: DataStore) => void | Promise<void>
-  wrap?: <T>(context: DataStore, next: () => Promise<T>) => Promise<T>
-  dispose?: (pod: Core.Pod) => void | Promise<void>
+
+  // Scope lifecycle
+  init?(scope: Core.Scope): void | Promise<void>
+  dispose?(scope: Core.Scope): void | Promise<void>
+
+  // Pod lifecycle
+  initPod?(pod: Core.Pod, context: DataStore): void | Promise<void>
+  disposePod?(pod: Core.Pod): void | Promise<void>
+
+  // Operation wrapping
+  wrapResolve?(next: () => Promise<unknown>, context: ResolveContext): Promise<unknown>
+  wrapExecute?<T>(context: DataStore, next: () => Promise<T>, execution: ExecutionContext): Promise<T>
+
+  // Error handling
+  onError?(error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError, scope: Core.Scope): void
+  onPodError?(error: unknown, pod: Core.Pod, context: DataStore): void
+}
+
+interface Extension.ResolveContext {
+  operation: 'resolve' | 'update'
+  executor: Core.Executor<unknown>
+  scope: Core.Scope
+}
+
+interface Extension.ExecutionContext {
+  flowName: string | undefined
+  depth: number
+  isParallel: boolean
+  parentFlowName: string | undefined
 }
 ```
 
@@ -59,7 +63,7 @@ interface Flow.Plugin {
 
 ### Operation Wrapping vs Events
 
-The new wrap methods provide significant advantages over the traditional `onChange` event pattern:
+The wrap methods provide significant advantages over the traditional `onChange` event pattern:
 
 **Wrap Methods Benefits:**
 - **Single Function Scope**: Capture complete operation lifecycle in one function
@@ -67,7 +71,7 @@ The new wrap methods provide significant advantages over the traditional `onChan
 - **Error Handling**: Built-in try/catch around operations
 - **No State Management**: No need for separate Maps to track timing/state
 - **Type Safety**: Each wrap has specific context types
-- **Composition**: Multiple plugins naturally compose their wraps
+- **Composition**: Multiple extensions naturally compose their wraps
 
 **Old Event Pattern Issues:**
 ```typescript
@@ -87,7 +91,7 @@ scope.onChange((event, executor, value) => {
 **New Wrap Pattern:**
 ```typescript
 // ✅ Clean, single-function metrics
-async wrap(next, context) {
+async wrapResolve(next, context) {
   const start = Date.now()
   try {
     const result = await next()
@@ -104,20 +108,22 @@ async wrap(next, context) {
 
 ---
 
-## Essential Plugin Patterns
+## Essential Extension Patterns
 
 ### Pattern 1: Telemetry Collection
 
 ```typescript
 import { name } from '@pumped-fn/core-next'
 
-const telemetryPlugin = (): Core.Plugin => {
+const telemetryExtension = (): Extension.Extension => {
   const metrics = new Map()
   let cacheHits = 0
   let cacheMisses = 0
 
-  const plugin = {
-    async wrap(next, { operation, executor, scope }) {
+  const extension = {
+    name: 'telemetry',
+
+    async wrapResolve(next, { operation, executor, scope }) {
       const executorName = name.find(executor) || 'unnamed'
 
       if (operation === 'resolve') {
@@ -176,7 +182,7 @@ const telemetryPlugin = (): Core.Plugin => {
       }
     },
 
-    // Expose metrics as plugin methods
+    // Expose metrics as extension methods
     getMetrics() {
       return {
         cache: {
@@ -197,14 +203,14 @@ const telemetryPlugin = (): Core.Plugin => {
     }
   }
 
-  return plugin
+  return extension
 }
 
 // Usage:
-const telemetry = telemetryPlugin()
-scope.use(telemetry)
+const telemetry = telemetryExtension()
+scope.useExtension(telemetry)
 
-// Access metrics directly from plugin instance
+// Access metrics directly from extension instance
 console.log(telemetry.getMetrics())
 console.log(telemetry.getCacheStats())
 ```
@@ -214,7 +220,9 @@ console.log(telemetry.getCacheStats())
 ```typescript
 import { name } from '@pumped-fn/core-next'
 
-const devtoolsPlugin = (port = 9001): Core.Plugin => ({
+const devtoolsExtension = (port = 9001): Extension.Extension => ({
+  name: 'devtools',
+
   init(scope) {
     const wss = new WebSocketServer({ port })
     const clients = new Set()
@@ -277,29 +285,28 @@ const devtoolsPlugin = (port = 9001): Core.Plugin => ({
 ### Pattern 3: Flow Execution Tracing
 
 ```typescript
-const tracingPlugin = (): Flow.Plugin => ({
+const tracingExtension = (): Extension.Extension => ({
   name: 'execution-tracer',
 
-  init(pod, context) {
+  initPod(pod, context) {
     const traces = []
     context.set('traces', traces)
     context.set('currentSpan', null)
   },
 
-  async wrap(context, next) {
+  async wrapExecute(context, next, execution) {
     const traces = context.get('traces')
     const parentSpan = context.get('currentSpan')
 
-    const flowName = FlowExecutionContext.flowName.find(context) || 'unknown'
-    const depth = FlowExecutionContext.depth.find(context) || 0
-    const isParallel = FlowExecutionContext.isParallel.find(context) || false
+    const { flowName, depth, isParallel, parentFlowName } = execution
 
     const span = {
       id: `${Date.now()}-${Math.random()}`,
-      name: flowName,
+      name: flowName || 'unknown',
       startTime: performance.now(),
       depth,
       isParallel,
+      parentFlowName,
       parent: parentSpan?.id,
       children: [],
       status: 'running'
@@ -334,11 +341,13 @@ const tracingPlugin = (): Flow.Plugin => ({
 ### Pattern 4: Error Recovery & Retry
 
 ```typescript
-const retryPlugin = ({ maxRetries = 3, backoffMs = 1000 } = {}): Core.Plugin => {
+const retryExtension = ({ maxRetries = 3, backoffMs = 1000 } = {}): Extension.Extension => {
   const retryStats = new Map()
 
-  const plugin = {
-    async wrap(next, { operation, executor, scope }) {
+  const extension = {
+    name: 'retry',
+
+    async wrapResolve(next, { operation, executor, scope }) {
       // Only retry resolve operations, not updates
       if (operation !== 'resolve') {
         return next()
@@ -391,7 +400,7 @@ const retryPlugin = ({ maxRetries = 3, backoffMs = 1000 } = {}): Core.Plugin => 
     }
   }
 
-  return plugin
+  return extension
 }
 
 function isRetriableError(error: any): boolean {
@@ -401,8 +410,8 @@ function isRetriableError(error: any): boolean {
 }
 
 // Usage:
-const retry = retryPlugin({ maxRetries: 5, backoffMs: 500 })
-scope.use(retry)
+const retry = retryExtension({ maxRetries: 5, backoffMs: 500 })
+scope.useExtension(retry)
 
 // Check retry statistics
 console.log(retry.getRetryStats())
@@ -410,15 +419,15 @@ console.log(retry.getRetryStats())
 
 ---
 
-## Plugin Composition & Testing
+## Extension Composition & Testing
 
-### Combining Plugins
+### Combining Extensions
 ```typescript
 const scope = createScope({
-  plugins: [
-    telemetryPlugin(),
-    devtoolsPlugin(9001),
-    retryPlugin({ maxRetries: 5 })
+  extensions: [
+    telemetryExtension(),
+    devtoolsExtension(9001),
+    retryExtension({ maxRetries: 5 })
   ]
 })
 
@@ -430,9 +439,10 @@ scope.resolve(cacheExecutor)
 
 ### Testing Pattern
 ```typescript
-test('plugin tracks resolution timing', async () => {
+test('extension tracks resolution timing', async () => {
   let metrics: any
-  const testPlugin: Core.Plugin = {
+  const testExtension: Extension.Extension = {
+    name: 'test',
     init(scope) {
       scope.onChange((event, executor, value) => {
         if (event === 'resolve') {
@@ -442,7 +452,7 @@ test('plugin tracks resolution timing', async () => {
     }
   }
 
-  const scope = createScope({ plugins: [testPlugin] })
+  const scope = createScope({ extensions: [testExtension] })
   await scope.resolve(testExecutor)
 
   expect(metrics).toBeDefined()
@@ -452,26 +462,25 @@ test('plugin tracks resolution timing', async () => {
 
 ---
 
-## Flow Plugin Integration
+## Flow Extension Integration
 
-Flow plugins work within [Flow execution context](./flow.md#execution) and access [Flow lifecycle](./flow.md#lifecycle-timeline):
+Flow extensions work within [Flow execution context](./flow.md#execution) and access [Flow lifecycle](./flow.md#lifecycle-timeline):
 
 ```typescript
-const performancePlugin: Flow.Plugin = {
+const performanceExtension: Extension.Extension = {
   name: 'performance-monitor',
 
-  async wrap(context, next) {
+  async wrapExecute(context, next, execution) {
     const start = performance.now()
     const result = await next()
     const duration = performance.now() - start
 
     // Access flow context
-    const flowName = FlowExecutionContext.flowName.find(context)
-    const depth = FlowExecutionContext.depth.find(context)
+    const { flowName, depth, isParallel } = execution
 
     // Store metrics in context for parent flows
     const metrics = context.get('performance') || []
-    metrics.push({ flowName, depth, duration })
+    metrics.push({ flowName, depth, isParallel, duration })
     context.set('performance', metrics)
 
     return result
@@ -480,7 +489,7 @@ const performancePlugin: Flow.Plugin = {
 
 // Usage with flow execution
 const result = await flow.execute(handler, input, {
-  plugins: [performancePlugin]
+  extensions: [performanceExtension]
 })
 ```
 
@@ -491,14 +500,14 @@ const result = await flow.execute(handler, input, {
 ❌ **Don't duplicate scope functionality**
 ```typescript
 // Wrong - scope already provides onChange
-plugin: {
+extension: {
   onResolve: (executor, value) => {} // Redundant
 }
 ```
 
 ✅ **Use scope.onChange() instead**
 ```typescript
-plugin: {
+extension: {
   init(scope) {
     scope.onChange((event, executor, value) => {
       if (event === 'resolve') { /* handle */ }
@@ -520,7 +529,7 @@ init(scope) {
 ✅ **Use presets for testing/mocking**
 ```typescript
 const scope = createScope({
-  plugins: [myPlugin],
+  extensions: [myExtension],
   initialValues: [preset(executor, mockValue)]
 })
 ```
@@ -536,7 +545,7 @@ async init(scope) {
 ✅ **Initialize async resources later**
 ```typescript
 init(scope) {
-  fetchRemoteConfig().then(config => setupPlugin(scope, config))
+  fetchRemoteConfig().then(config => setupExtension(scope, config))
 }
 ```
 
@@ -548,7 +557,8 @@ init(scope) {
 ```typescript
 import { name } from '@pumped-fn/core-next'
 
-const stateTrackingPlugin: Core.Plugin = {
+const stateTrackingExtension: Extension.Extension = {
+  name: 'state-tracking',
   init(scope) {
     scope.onChange((event, executor, value) => {
       // Track state changes, controller actions, display updates
@@ -563,11 +573,11 @@ const stateTrackingPlugin: Core.Plugin = {
 
 ### With [Flow Execution](./flow.md#execution)
 ```typescript
-const flowAuditPlugin: Flow.Plugin = {
+const flowAuditExtension: Extension.Extension = {
   name: 'audit-trail',
 
-  async wrap(context, next) {
-    const flowName = FlowExecutionContext.flowName.find(context)
+  async wrapExecute(context, next, execution) {
+    const { flowName } = execution
     const input = context.input
 
     auditLog.record({ type: 'flow-start', flow: flowName, input })
@@ -593,95 +603,90 @@ export const productionTelemetry = (options: {
   metricsEndpoint?: string
   sampleRate?: number
   enableDevtools?: boolean
-}) => {
+}): Extension.Extension => {
   const { metricsEndpoint, sampleRate = 1.0, enableDevtools = false } = options
 
   return {
-    scope: (): Core.Plugin => ({
-      init(scope) {
-        const collector = new MetricsCollector(sampleRate)
+    name: 'production-telemetry',
 
-        // Resolution performance
-        scope.onChange(async (event, executor, value) => {
-          if (Math.random() <= sampleRate) {
-            collector.record('executor.event', {
-              event,
-              executor: name.find(executor) || 'unnamed',
-              timestamp: Date.now(),
-              memoryUsage: process.memoryUsage().heapUsed
-            })
-          }
-        })
+    init(scope) {
+      const collector = new MetricsCollector(sampleRate)
 
-        // Error tracking
-        scope.onError(async (error, executor) => {
-          collector.record('executor.error', {
+      // Resolution performance
+      scope.onChange(async (event, executor, value) => {
+        if (Math.random() <= sampleRate) {
+          collector.record('executor.event', {
+            event,
             executor: name.find(executor) || 'unnamed',
-            error: error.code || error.name,
-            message: error.message,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            memoryUsage: process.memoryUsage().heapUsed
           })
+        }
+      })
+
+      // Error tracking
+      scope.onError(async (error, scope) => {
+        collector.record('executor.error', {
+          error: error.code || error.name,
+          message: error.message,
+          timestamp: Date.now()
         })
+      })
 
-        // Periodic flush
-        if (metricsEndpoint) {
-          setInterval(() => {
-            collector.flush(metricsEndpoint)
-          }, 30000)
-        }
-
-        // DevTools integration
-        if (enableDevtools) {
-          setupDevtools(scope)
-        }
+      // Periodic flush
+      if (metricsEndpoint) {
+        setInterval(() => {
+          collector.flush(metricsEndpoint)
+        }, 30000)
       }
-    }),
 
-    flow: (): Flow.Plugin => ({
-      name: 'production-telemetry',
+      // DevTools integration
+      if (enableDevtools) {
+        setupDevtools(scope)
+      }
+    },
 
-      async wrap(context, next) {
-        const traceId = generateTraceId()
-        const flowName = FlowExecutionContext.flowName.find(context) || 'unknown'
+    async wrapExecute(context, next, execution) {
+      const traceId = generateTraceId()
+      const { flowName } = execution
 
-        context.set('traceId', traceId)
+      context.set('traceId', traceId)
 
-        const span = {
-          traceId,
-          flowName,
-          startTime: Date.now(),
-          parentSpan: context.get('parentSpan')
-        }
+      const span = {
+        traceId,
+        flowName,
+        startTime: Date.now(),
+        parentSpan: context.get('parentSpan')
+      }
 
-        try {
-          const result = await next()
+      try {
+        const result = await next()
 
-          if (metricsEndpoint && Math.random() <= sampleRate) {
-            sendMetric('flow.execution', {
-              ...span,
-              duration: Date.now() - span.startTime,
-              status: result?.type || 'unknown'
-            })
-          }
-
-          return result
-        } catch (error) {
-          sendMetric('flow.error', {
+        if (metricsEndpoint && Math.random() <= sampleRate) {
+          sendMetric('flow.execution', {
             ...span,
             duration: Date.now() - span.startTime,
-            error: error.message
+            status: result?.type || 'unknown'
           })
-          throw error
         }
+
+        return result
+      } catch (error) {
+        sendMetric('flow.error', {
+          ...span,
+          duration: Date.now() - span.startTime,
+          error: error.message
+        })
+        throw error
       }
-    })
+    }
   }
 }
 ```
 
 ---
 
-## Plugin Development Checklist
+## Extension Development Checklist
 
 ✅ **Design**
 - Uses existing scope/flow capabilities
@@ -692,19 +697,19 @@ export const productionTelemetry = (options: {
 ✅ **Implementation**
 - Non-blocking initialization
 - Proper cleanup in dispose
-- Error handling for plugin failures
+- Error handling for extension failures
 - Memory leak prevention
 
 ✅ **Integration**
 - Works with existing patterns
-- Composes well with other plugins
+- Composes well with other extensions
 - Respects executor lifecycle
 - Maintains reactive semantics
 
 ✅ **Testing**
-- Unit tests for plugin logic
+- Unit tests for extension logic
 - Integration tests with scope/flow
 - Performance impact testing
 - Error condition testing
 
-This plugin system enables comprehensive observability, debugging, and extensibility while maintaining the library's generic, dependency-injection focused core.
+This extension system enables comprehensive observability, debugging, and extensibility while maintaining the library's generic, dependency-injection focused core.

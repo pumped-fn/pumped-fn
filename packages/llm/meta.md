@@ -1,6 +1,6 @@
 # Meta System - @pumped-fn/core-next
 
-_Typed metadata decoration system for executors, flows, and plugins_
+_Typed metadata decoration system for executors, flows, and extensions_
 
 ## Core Concept
 
@@ -82,21 +82,22 @@ const userFlow = flow.define({
   error: errorSchema,
 }, apiMeta({ version: "v1", auth: true }));
 
-// Access in plugins
+// Access in extensions
 const apiConfig = apiMeta.find(flowDefinition);
 ```
 
-### With Plugins
+### With Extensions
 
 ```typescript
-// Plugin-specific meta
-const eager = meta(Symbol.for("@pumped-fn/plugin/eager"), custom<boolean>());
+// Extension-specific meta
+const eager = meta(Symbol.for("@pumped-fn/extension/eager"), custom<boolean>());
 
 // Mark executors
 const criticalService = provide(() => initService(), eager(true));
 
-// Plugin uses meta
-const eagerPlugin: Core.Plugin = {
+// Extension uses meta
+const eagerExtension: Extension.Extension = {
+  name: "eager",
   init(scope) {
     for (const [executor] of scope.entries()) {
       const isEager = eager.find(executor);
@@ -136,10 +137,10 @@ const createUserFlow = flow.define({
   route({ path: "/users", method: "POST", middleware: ["auth"] })
 );
 
-// Multi-purpose plugin using all meta
-const webPlugin: Flow.Plugin = {
+// Multi-purpose extension using all meta
+const webExtension: Extension.Extension = {
   name: "web-framework",
-  init(pod, context) {
+  initPod(pod, context) {
     const routeConfig = route.find(context);
     const authConfig = auth.find(context);
     const telemetryConfig = telemetry.find(context);
@@ -152,7 +153,7 @@ const webPlugin: Flow.Plugin = {
       });
     }
   },
-  wrap(context, next) {
+  wrapExecute(context, next, execution) {
     const config = telemetry.find(context);
     if (config && Math.random() < config.sampleRate) {
       return instrumentedNext(next, config.service);
@@ -167,7 +168,7 @@ const webPlugin: Flow.Plugin = {
 | Pattern | Meta Key | Use Case | Example Schema |
 |---------|----------|----------|----------------|
 | **Debugging** | `name` (built-in) | Identification | `custom<string>()` |
-| **Plugin Config** | String key | Feature flags | `custom<{ enabled: boolean; options: T }>()` |
+| **Extension Config** | String key | Feature flags | `custom<{ enabled: boolean; options: T }>()` |
 | **Flow Context** | Symbol key | Built-in tracking | `custom<{ depth: number; parent?: string }>()` |
 | **Domain Logic** | String key | Business rules | `custom<{ roles: string[]; permissions: string[] }>()` |
 
@@ -276,9 +277,9 @@ const tracingPlugin: Flow.Plugin = {
 const depth = meta(Symbol.for("flow.depth"), custom<number>());
 ```
 
-**Plugin Meta**: Use string keys with plugin namespaces
+**Extension Meta**: Use string keys with extension namespaces
 ```typescript
-const eager = meta("@pumped-fn/plugin/eager", custom<boolean>());
+const eager = meta("@pumped-fn/extension/eager", custom<boolean>());
 ```
 
 **Domain Meta**: Use descriptive string keys for application-specific meta

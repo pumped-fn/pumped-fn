@@ -2,18 +2,18 @@
 
 _Expert guide for creating reusable, configurable components using graph-based dependency resolution_
 
-## Core Authoring Principle: Graph-Based Configuration
+## Core Authoring Principle: Meta-Based Configuration
 
-Components are designed around **configuration variation** through the dependency graph resolution system. The graph's lazy evaluation enables powerful configuration strategies impossible with traditional dependency injection.
+Components are designed around **configuration variation** through meta-based scope configuration. The graph's lazy evaluation combined with meta-driven configuration enables powerful configuration strategies impossible with traditional dependency injection.
 
-### The Graph Configuration Strategy
+### The Meta Configuration Strategy
 
 1. **Lazy Graph Resolution**: Dependency graph remains unresolved until scope.resolve() is called
-2. **Strategic Injection Points**: Use `preset` to override specific graph nodes before resolution
-3. **Configuration Inheritance**: Child components inherit parent configurations through graph paths
-4. **Multi-Environment Graphs**: Same graph structure, different configurations per scope instance
+2. **Meta-Based Configuration**: Components export meta definitions; configuration applied to scope/pod
+3. **Configuration Inheritance**: Child pods inherit parent scope configurations and add their own
+4. **Multi-Environment Scopes**: Same component structure, different meta configurations per scope instance
 
-### Graph vs Traditional Configuration
+### Meta vs Traditional Configuration
 
 **Traditional DI Configuration**:
 ```typescript
@@ -24,49 +24,60 @@ const db = new Database(config, logger);
 const service = new UserService(db, logger); // Fixed at construction
 ```
 
-**Graph-Based Configuration**:
+**Meta-Based Configuration**:
 ```typescript
-// Declarative graph with configuration injection points
-const config = provide(() => ({ timeout: 5000 }));
-const logger = derive([config], ([cfg]) => new Logger(cfg));
-const db = derive([config, logger], ([cfg, log]) => new Database(cfg, log));
+// Declarative components with meta-driven configuration
+const dbConfigMeta = meta("db-config", custom<{ timeout: number }>());
+const logger = provide((ctl) => {
+  const config = dbConfigMeta.get(ctl.scope);
+  return new Logger(config);
+});
+const db = derive([logger], ([log], ctl) => {
+  const config = dbConfigMeta.get(ctl.scope);
+  return new Database(config, log);
+});
 const service = derive([db, logger], ([db, log]) => new UserService(db, log));
 
-// Configuration variation without changing graph structure
+// Configuration variation without changing component structure
 const testScope = createScope({
-  initialValues: [preset(config, { timeout: 100 })] // Different config, same graph
+  meta: [dbConfigMeta({ timeout: 100 })] // Different config, same components
 });
 ```
 
-**Graph Configuration Benefits**:
-- **Flexible Substitution**: Replace any graph node without affecting structure
-- **Composition-Friendly**: Combine multiple configuration presets
-- **Type-Safe Overrides**: TypeScript ensures configuration compatibility
-- **Testability**: Easy mocking of any dependency layer
+**Meta Configuration Benefits**:
+- **Scope-Level Configuration**: Configure entire component hierarchies at scope creation
+- **Composition-Friendly**: Combine multiple meta configurations
+- **Type-Safe Configuration**: TypeScript ensures meta schema compatibility
+- **Pod Inheritance**: Pods inherit scope meta and can add their own
 
 ---
 
 ## Essential APIs
 
-### Configuration Source
+### Meta Definition
 ```typescript
-const config = provide(() => ({ timeout: 5000, retries: 3 }), name("config"));
+const configMeta = meta("config", custom<{ timeout: number; retries: number }>());
 ```
 
-### Derived Resources
+### Configuration Access in Executors
 ```typescript
-const httpClient = derive([config], ([cfg]) => createClient(cfg), name("http-client"));
+const httpClient = provide((ctl) => {
+  const config = configMeta.get(ctl.scope);
+  return createClient(config);
+}, name("http-client"));
 ```
 
-### Configuration Variation
+### Meta Export
 ```typescript
-export const useCustomConfig = (): Core.Preset<Config> =>
-  preset(config, { timeout: 10000, retries: 1 });
+export const meta = {
+  config: configMeta
+};
+export const defaultConfig = configMeta({ timeout: 5000, retries: 3 });
 ```
 
 ### Scope Integration
 ```typescript
-const scope = createScope({ initialValues: [useCustomConfig()] });
+const scope = createScope({ meta: [configMeta({ timeout: 10000, retries: 1 })] });
 ```
 
 ---
@@ -76,16 +87,31 @@ const scope = createScope({ initialValues: [useCustomConfig()] });
 ### Complete Example: Multi-Service Component
 
 ```typescript
-// Configuration sources
-const dbConfig = provide(() => ({ host: "localhost", port: 5432, ssl: false, poolSize: 10 }), name("db-config"));
-const apiConfig = provide(() => ({ baseUrl: "http://localhost:3000", timeout: 5000 }), name("api-config"));
-const cacheConfig = provide(() => ({ ttl: 300, maxSize: 1000 }), name("cache-config"));
+// Meta definitions
+const dbConfigMeta = meta("db-config", custom<{ host: string; port: number; ssl: boolean; poolSize: number }>());
+const apiConfigMeta = meta("api-config", custom<{ baseUrl: string; timeout: number }>());
+const cacheConfigMeta = meta("cache-config", custom<{ ttl: number; maxSize: number }>());
 
 // Service hierarchy
-const logger = derive([dbConfig], ([db]) => createLogger(db.ssl ? "secure" : "basic"), name("logger"));
-const database = derive([dbConfig], ([config]) => createDatabase(config), name("database"));
-const cache = derive([cacheConfig, logger], ([cache, log]) => createCache({ ...cache, logger: log }), name("cache"));
-const httpClient = derive([apiConfig, logger], ([api, log]) => createHttpClient({ ...api, logger: log }), name("http-client"));
+const logger = provide((ctl) => {
+  const dbConfig = dbConfigMeta.get(ctl.scope);
+  return createLogger(dbConfig.ssl ? "secure" : "basic");
+}, name("logger"));
+
+const database = provide((ctl) => {
+  const config = dbConfigMeta.get(ctl.scope);
+  return createDatabase(config);
+}, name("database"));
+
+const cache = derive([logger], ([log], ctl) => {
+  const config = cacheConfigMeta.get(ctl.scope);
+  return createCache({ ...config, logger: log });
+}, name("cache"));
+
+const httpClient = derive([logger], ([log], ctl) => {
+  const config = apiConfigMeta.get(ctl.scope);
+  return createHttpClient({ ...config, logger: log });
+}, name("http-client"));
 
 const userService = derive(
   [database, cache, httpClient],
@@ -97,19 +123,34 @@ const userService = derive(
   name("user-service")
 );
 
-// Configuration variations
-export const presets = {
-  test: (): Core.Preset<unknown>[] => [
-    preset(dbConfig, { host: "test-db", port: 5433, ssl: true, poolSize: 5 }),
-    preset(apiConfig, { baseUrl: "http://mock-api:3000", timeout: 1000 }),
-    preset(cacheConfig, { ttl: 60, maxSize: 100 })
+// Meta exports and configurations
+export const meta = {
+  dbConfig: dbConfigMeta,
+  apiConfig: apiConfigMeta,
+  cacheConfig: cacheConfigMeta
+};
+
+export const configurations = {
+  test: (): Meta.Meta[] => [
+    dbConfigMeta({ host: "test-db", port: 5433, ssl: true, poolSize: 5 }),
+    apiConfigMeta({ baseUrl: "http://mock-api:3000", timeout: 1000 }),
+    cacheConfigMeta({ ttl: 60, maxSize: 100 })
   ],
-  production: (): Core.Preset<unknown>[] => [
-    preset(dbConfig, { host: "prod-cluster.example.com", ssl: true, poolSize: 50 }),
-    preset(apiConfig, { baseUrl: "https://api.example.com", timeout: 10000 }),
-    preset(cacheConfig, { ttl: 3600, maxSize: 10000 })
+  production: (): Meta.Meta[] => [
+    dbConfigMeta({ host: "prod-cluster.example.com", ssl: true, poolSize: 50 }),
+    apiConfigMeta({ baseUrl: "https://api.example.com", timeout: 10000 }),
+    cacheConfigMeta({ ttl: 3600, maxSize: 10000 })
   ],
-  mock: (): Core.Preset<unknown>[] => [
+  development: (): Meta.Meta[] => [
+    dbConfigMeta({ host: "localhost", port: 5432, ssl: false, poolSize: 10 }),
+    apiConfigMeta({ baseUrl: "http://localhost:3000", timeout: 5000 }),
+    cacheConfigMeta({ ttl: 300, maxSize: 1000 })
+  ]
+};
+
+// For testing with mocks, still use presets for executor replacement
+export const mockPresets = {
+  all: (): Core.Preset<unknown>[] => [
     preset(database, createMockDatabase()),
     preset(httpClient, createMockHttpClient()),
     preset(cache, createMockCache())
@@ -117,31 +158,50 @@ export const presets = {
 };
 
 // Usage
-const testScope = createScope({ initialValues: presets.test() });
-const prodScope = createScope({ initialValues: presets.production() });
+const testScope = createScope({ meta: configurations.test() });
+const prodScope = createScope({ meta: configurations.production() });
+
+// Mixed usage: meta for configuration, presets for mocks
+const mockTestScope = createScope({
+  meta: configurations.test(),
+  initialValues: mockPresets.all()
+});
 ```
 
 ### Configuration Pattern Variations
 
 | Pattern | Use Case | Example |
 |---------|----------|---------|
-| **Single Config** | Simple service configuration | `preset(config, { timeout: 5000 })` |
-| **Multi-Layer** | Complex app configuration | Multiple config executors with dependencies |
-| **Environment** | Runtime environment switching | `createEnvConfig({ dev: ..., prod: ... })` |
-| **Plugin-Based** | Extensible service enhancement | Service with `.use()` method for plugins |
-| **Factory** | Dynamic component creation | `createComponent(baseConfig)` function |
+| **Single Meta** | Simple service configuration | `configMeta({ timeout: 5000 })` |
+| **Multi-Meta** | Complex app configuration | Multiple meta definitions per scope |
+| **Environment** | Runtime environment switching | `createScope({ meta: envConfigs[env] })` |
+| **Pod-Based** | Request-scoped configuration | `scope.pod({ meta: [reqMeta(request)] })` |
+| **Factory** | Dynamic component creation | `createComponent(baseMetas)` function |
 
-### Environment-Aware Factory
+### Environment-Aware Configuration
 
 ```typescript
-const createEnvConfig = <T>(configs: { development: T; production: T; test: T }) =>
-  derive([environment], ([env]) => configs[env.name as keyof typeof configs] || configs.development);
+const environmentMeta = meta("environment", custom<"development" | "production" | "test">());
+const dbConfigMeta = meta("db-config", custom<{ host: string; pool: number }>());
 
-// Apply to any config type
-const databaseConfig = createEnvConfig({
-  development: { host: "localhost", pool: 5 },
-  production: { host: "prod-cluster", pool: 50 },
-  test: { host: "test-db", pool: 1 }
+const createEnvConfigs = (env: string): Meta.Meta[] => {
+  const configs = {
+    development: { host: "localhost", pool: 5 },
+    production: { host: "prod-cluster", pool: 50 },
+    test: { host: "test-db", pool: 1 }
+  };
+
+  return [
+    environmentMeta(env as any),
+    dbConfigMeta(configs[env] || configs.development)
+  ];
+};
+
+// Usage in executor
+const database = provide((ctl) => {
+  const config = dbConfigMeta.get(ctl.scope);
+  const env = environmentMeta.get(ctl.scope);
+  return createDatabase({ ...config, environment: env });
 });
 ```
 
@@ -153,14 +213,19 @@ const databaseConfig = createEnvConfig({
 
 ```typescript
 // Test helper with configuration isolation
-export const createTestScope = (env: 'test' | 'mock' = 'test', overrides: Core.Preset<unknown>[] = []) => {
-  const basePresets = env === 'mock' ? presets.mock() : presets.test();
-  return createScope({ initialValues: [...basePresets, ...overrides] });
+export const createTestScope = (env: 'test' | 'mock' = 'test', metaOverrides: Meta.Meta[] = []) => {
+  const baseMeta = configurations[env === 'mock' ? 'test' : env]();
+  const mockPresets = env === 'mock' ? mockPresets.all() : [];
+
+  return createScope({
+    meta: [...baseMeta, ...metaOverrides],
+    initialValues: mockPresets
+  });
 };
 
 // Test examples
 test("user service with test config", async () => {
-  const scope = createTestScope('test', [preset(dbConfig, { poolSize: 1 })]);
+  const scope = createTestScope('test', [dbConfigMeta({ poolSize: 1 })]);
   const service = await scope.resolve(userService);
   expect(service.findUser).toBeDefined();
 });
@@ -180,22 +245,24 @@ test("user service with mocks", async () => {
 ```typescript
 // Standard export
 export { userService as component } from "./executors";
-export { presets } from "./presets";
+export { meta, configurations, mockPresets } from "./configurations";
 export type { UserService, DbConfig } from "./types";
 
 // Namespace export
 export namespace UserManagement {
   export const service = userService;
-  export const presets = { test, production, mock };
+  export const meta = { dbConfig: dbConfigMeta, apiConfig: apiConfigMeta };
+  export const configurations = { test, production, development };
+  export const mockPresets = { all };
   export type Service = UserService;
 }
 
 // Factory pattern
-export const createUserComponent = (baseConfig: Partial<DbConfig> = {}) => ({
-  config: preset(dbConfig, { ...defaultDbConfig, ...baseConfig }),
+export const createUserComponent = (baseMeta: Meta.Meta[] = []) => ({
+  meta: { dbConfig: dbConfigMeta, apiConfig: apiConfigMeta },
   service: userService,
-  createScope: (additionalPresets: Core.Preset<unknown>[] = []) =>
-    createScope({ initialValues: [customConfig, ...additionalPresets] })
+  createScope: (additionalMeta: Meta.Meta[] = []) =>
+    createScope({ meta: [...baseMeta, ...additionalMeta] })
 });
 ```
 
@@ -204,25 +271,25 @@ export const createUserComponent = (baseConfig: Partial<DbConfig> = {}) => ({
 ## Best Practices
 
 ### Configuration Design
-- **Single Source**: One config executor per logical configuration unit
-- **Composition**: Derive complex configs from simpler ones
-- **Typing**: Use strong TypeScript types for all configurations
-- **Validation**: Validate configuration at the source, not in consumers
+- **Meta Definitions**: One meta definition per logical configuration unit
+- **Schema Validation**: Use StandardSchema for runtime validation
+- **Typing**: Use strong TypeScript types for all meta schemas
+- **Scope Configuration**: Configure at scope/pod level, not individual executors
 
-### Preset Creation
-- **Pure Functions**: Preset functions should be pure and side-effect free
-- **Descriptive Names**: Use clear, intention-revealing names for preset functions
-- **Type Safety**: Ensure presets maintain type compatibility
-- **Composition**: Design presets to be composable
+### Meta Creation
+- **Pure Functions**: Meta creation functions should be pure and side-effect free
+- **Descriptive Keys**: Use clear, intention-revealing keys for meta definitions
+- **Type Safety**: Ensure meta schemas maintain type compatibility
+- **Composition**: Design meta configurations to be composable
 
 ### Testing Patterns
 - **Isolation**: Each test should use its own scope
-- **Mock Strategy**: Create comprehensive mock presets for testing
-- **Configuration Variation**: Test components with different configurations
+- **Mixed Strategy**: Use meta for configuration, presets for mocks
+- **Configuration Variation**: Test components with different meta configurations
 - **Cleanup**: Always dispose scopes after tests
 
 ### Component Design
-- **Dependency Clarity**: Make dependencies explicit through executor parameters
+- **Configuration Access**: Access configuration via `ctl.scope` parameter
 - **Resource Management**: Use cleanup callbacks for resources requiring disposal
 - **Error Handling**: Let errors bubble up through the dependency chain
 - **Naming**: Use descriptive names with the `name()` meta for debugging
@@ -231,18 +298,20 @@ export const createUserComponent = (baseConfig: Partial<DbConfig> = {}) => ({
 
 ## Anti-Patterns
 
-### ❌ Direct Configuration Mutation
+### ❌ Direct Meta Mutation
 ```typescript
-// Don't modify config objects directly
-const config = await scope.resolve(dbConfig);
+// Don't modify meta values directly after scope creation
+const scope = createScope({ meta: [configMeta({ host: "localhost" })] });
+const config = configMeta.get(scope);
 config.host = "new-host"; // Breaks immutability
 ```
 
-### ❌ Scope Passing
+### ❌ Ignoring Controller Parameter
 ```typescript
-// Don't pass scope to executors
-const service = derive([config], ([cfg], ctl, scope) => {
-  // scope parameter is anti-pattern
+// Don't ignore the ctl parameter when you need configuration
+const service = provide(() => {
+  // Missing ctl parameter - can't access scope meta
+  return createService({ defaultConfig });
 });
 ```
 
@@ -271,21 +340,25 @@ const b = derive([a], ([a]) => a + 1); // Circular
 
 ### Definition Phase
 ```typescript
-// 1. Define configuration sources
-const config = provide(() => defaultConfig);
+// 1. Define meta schemas
+const configMeta = meta("config", custom<ConfigType>());
 
-// 2. Define derived resources
-const service = derive([config], ([cfg]) => createService(cfg));
+// 2. Define derived resources with configuration access
+const service = provide((ctl) => {
+  const config = configMeta.get(ctl.scope);
+  return createService(config);
+});
 
-// 3. Export component and variations
-export { service, config };
-export const useCustomConfig = () => preset(config, customValues);
+// 3. Export component and meta definitions
+export { service };
+export const meta = { config: configMeta };
+export const defaultConfig = configMeta(defaultValues);
 ```
 
 ### Usage Phase
 ```typescript
 // 1. Create scope with desired configuration
-const scope = createScope({ initialValues: [useCustomConfig()] });
+const scope = createScope({ meta: [configMeta(customValues)] });
 
 // 2. Resolve entry point
 const resolvedService = await scope.resolve(service);

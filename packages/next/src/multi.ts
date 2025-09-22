@@ -69,11 +69,7 @@ class MultiExecutorImpl<T, K> {
 
   providerFactory(ctl: Core.Controller) {
     return (key: K) => {
-      const { transformedKey } = this.processKey(key);
-      let executor = this.keyPool.get(transformedKey);
-      if (!executor) {
-        executor = this.newProvider(key);
-      }
+      const executor = this.__call(key);
       return ctl.scope.accessor(executor);
     };
   }
@@ -87,6 +83,15 @@ class MultiExecutorImpl<T, K> {
       }
     }
   }
+}
+
+function createValidatedExecutor<T, K>(
+  option: Option<K>,
+  key: K,
+  createExecutorFn: (validatedKey: K) => Core.Executor<T>
+): Core.Executor<T> {
+  const validatedKey = validate(option.keySchema, key);
+  return createExecutorFn(validatedKey);
 }
 
 function createMultiExecutor<T, K>(
@@ -122,11 +127,12 @@ export function provide<T, K>(
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
-    const validatedKey = validate(option.keySchema, key);
-    return createExecutor(
-      (ctl: Core.Controller) => valueFn(validatedKey, ctl),
-      undefined,
-      [poolId(undefined), ...metas]
+    return createValidatedExecutor(option, key, (validatedKey) =>
+      createExecutor(
+        (ctl: Core.Controller) => valueFn(validatedKey, ctl),
+        undefined,
+        [poolId(undefined), ...metas]
+      )
     );
   };
 
@@ -145,11 +151,12 @@ export function derive<T, K, D extends Core.DependencyLike>(
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
-    const validatedKey = validate(option.keySchema, key);
-    return createExecutor(
-      (dependencies, ctl) => valueFn(dependencies as any, validatedKey, ctl),
-      option.dependencies as any,
-      metas
+    return createValidatedExecutor(option, key, (validatedKey) =>
+      createExecutor(
+        (dependencies, ctl) => valueFn(dependencies as any, validatedKey, ctl),
+        option.dependencies as any,
+        metas
+      )
     );
   };
 

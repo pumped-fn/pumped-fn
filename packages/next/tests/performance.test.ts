@@ -226,9 +226,9 @@ describe.skip("Performance Tests", () => {
       const cleanupFns: (() => void)[] = [];
 
       for (let i = 0; i < ITERATIONS.MIDDLEWARE; i++) {
-        const cleanup = scope.use({
+        const cleanup = scope.useExtension({
+          name: `middleware-${i}`,
           init: () => {},
-          dispose: async () => {},
         });
         cleanupFns.push(cleanup);
       }

@@ -68,7 +68,6 @@ export async function collectFromGenerator<Y, T>(
 
     return { yielded, returned: returned! };
   } catch (error) {
-    // Ensure generator is closed on error
     await gen.return?.(undefined as any);
     throw error;
   }
@@ -101,7 +100,6 @@ export async function processGenerator<Y, T>(
     } while (true);
   } catch (error) {
     await handler.onError?.(error);
-    // Ensure generator is closed
     await gen.return?.(undefined as any);
     throw error;
   }

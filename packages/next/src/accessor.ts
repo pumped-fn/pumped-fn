@@ -51,10 +51,31 @@ function extractFromSource<T>(
 		return meta ? validate(schema, meta.value) : undefined;
 	}
 
-	// Meta.MetaContainer
 	const metas = source.metas ?? [];
 	const meta = metas.find((m) => m.key === key);
 	return meta ? validate(schema, meta.value) : undefined;
+}
+
+function validateAndSet<T>(
+	source: DataStore,
+	key: symbol,
+	schema: StandardSchemaV1<T>,
+	value: T
+): void {
+	if (!isDataStore(source)) {
+		throw new Error("set() can only be used with DataStore");
+	}
+	const validated = validate(schema, value);
+	source.set(key, validated);
+}
+
+function validateAndPreset<T>(
+	key: symbol,
+	schema: StandardSchemaV1<T>,
+	value: T
+): [symbol, T] {
+	const validated = validate(schema, value);
+	return [key, validated];
 }
 
 class AccessorImpl<T> implements Accessor<T> {
@@ -79,16 +100,11 @@ class AccessorImpl<T> implements Accessor<T> {
 	}
 
 	set(source: DataStore, value: T): void {
-		if (!isDataStore(source)) {
-			throw new Error("set() can only be used with DataStore");
-		}
-		const validated = validate(this.schema, value);
-		source.set(this.key, validated);
+		validateAndSet(source, this.key, this.schema, value);
 	}
 
 	preset(value: T): [symbol, T] {
-		const validated = validate(this.schema, value);
-		return [this.key, validated];
+		return validateAndPreset(this.key, this.schema, value);
 	}
 }
 
@@ -118,20 +134,14 @@ class AccessorWithDefaultImpl<T> implements AccessorWithDefault<T> {
 	}
 
 	set(source: DataStore, value: T): void {
-		if (!isDataStore(source)) {
-			throw new Error("set() can only be used with DataStore");
-		}
-		const validated = validate(this.schema, value);
-		source.set(this.key, validated);
+		validateAndSet(source, this.key, this.schema, value);
 	}
 
 	preset(value: T): [symbol, T] {
-		const validated = validate(this.schema, value);
-		return [this.key, validated];
+		return validateAndPreset(this.key, this.schema, value);
 	}
 }
 
-// Factory function overloads
 export function accessor<T>(
 	key: string | symbol,
 	schema: StandardSchemaV1<T>,

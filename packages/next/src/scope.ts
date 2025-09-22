@@ -8,6 +8,7 @@ import {
 } from "./executor";
 import {
   Core,
+  Extension,
   Meta,
   ExecutorResolutionError,
   FactoryExecutionError,
@@ -338,9 +339,10 @@ class BaseScope implements Core.Scope {
 
   private resolutionChain: Map<UE, Set<UE>> = new Map();
 
-  protected plugins: Core.Plugin[] = [];
+  protected extensions: Extension.Extension[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
+  public metas: Meta.Meta[] | undefined;
 
   constructor(options?: ScopeOption) {
     this.isPod = options?.pod || false;
@@ -352,10 +354,14 @@ class BaseScope implements Core.Scope {
       this.initialValues = options.initialValues;
     }
 
-    if (options?.plugins) {
-      for (const plugin of options.plugins) {
-        this.use(plugin);
+    if (options?.extensions) {
+      for (const extension of options.extensions) {
+        this.useExtension(extension);
       }
+    }
+
+    if (options?.meta) {
+      this.metas = options.meta;
     }
   }
 
@@ -468,12 +474,12 @@ class BaseScope implements Core.Scope {
       }
     }
 
-    for (const plugin of this.plugins) {
-      if (plugin.onError) {
+    for (const extension of this.extensions) {
+      if (extension.onError) {
         try {
-          await plugin.onError(error, executor, this, { stage: "resolve" });
-        } catch (pluginError) {
-          console.error("Error in plugin error handler:", pluginError);
+          extension.onError(error, this);
+        } catch (extensionError) {
+          console.error("Error in extension error handler:", extensionError);
         }
       }
     }
@@ -592,11 +598,12 @@ class BaseScope implements Core.Scope {
     };
 
     let resolver = coreResolve;
-    for (const plugin of [...this.plugins].reverse()) {
-      if (plugin.wrap) {
+
+    for (const extension of [...this.extensions].reverse()) {
+      if (extension.wrapResolve) {
         const currentResolver = resolver;
         resolver = () =>
-          plugin.wrap!(currentResolver, {
+          extension.wrapResolve!(currentResolver, {
             operation: "resolve",
             executor,
             scope: this,
@@ -661,11 +668,11 @@ class BaseScope implements Core.Scope {
       return this.accessor(e).get() as T;
     };
 
-    for (const plugin of [...this.plugins].reverse()) {
-      if (plugin.wrap) {
+    for (const extension of [...this.extensions].reverse()) {
+      if (extension.wrapResolve) {
         const currentUpdater = updater;
         updater = () =>
-          plugin.wrap!(currentUpdater, {
+          extension.wrapResolve!(currentUpdater, {
             operation: "update",
             executor: e,
             scope: this,
@@ -720,10 +727,10 @@ class BaseScope implements Core.Scope {
       await this.disposePod(pod);
     }
 
-    const disposeEvents = this.plugins.map(
-      (m) => m.dispose?.(this) ?? Promise.resolve()
+    const extensionDisposeEvents = this.extensions.map(
+      (ext) => ext.dispose?.(this) ?? Promise.resolve()
     );
-    await Promise.all(disposeEvents);
+    await Promise.all(extensionDisposeEvents);
 
     const currents = this.cache.keys();
     for (const current of currents) {
@@ -836,30 +843,47 @@ class BaseScope implements Core.Scope {
     throw new Error("Invalid arguments for onError");
   }
 
-  use(plugin: Core.Plugin): Core.Cleanup {
+
+  useExtension(extension: Extension.Extension): Core.Cleanup {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
-      throw new Error("Cannot register update callback on a disposing scope");
+      throw new Error("Cannot register extension on a disposing scope");
     }
 
-    this.plugins.push(plugin);
-    plugin.init?.(this);
+    this.extensions.push(extension);
+    extension.init?.(this);
 
     return () => {
       this["~ensureNotDisposed"]();
-      this.plugins = this.plugins.filter((m) => m !== plugin);
+      this.extensions = this.extensions.filter((e) => e !== extension);
     };
+  }
+
+  use(extension: Extension.Extension): Core.Cleanup {
+    return this.useExtension(extension);
   }
 
   private pods: Set<Core.Pod> = new Set();
 
-  pod(...preset: Core.Preset<unknown>[]): Core.Pod {
+  pod(...preset: Core.Preset<unknown>[]): Core.Pod;
+  pod(options: PodOption): Core.Pod;
+  pod(
+    ...args: Core.Preset<unknown>[] | [PodOption]
+  ): Core.Pod {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    const pod = new Pod(this, { initialValues: preset });
+    let podOptions: PodOption;
+
+    if (args.length === 1 && !isPreset(args[0])) {
+      podOptions = args[0] as PodOption;
+    } else {
+      podOptions = { initialValues: args as Core.Preset<unknown>[] };
+    }
+
+    const pod = new Pod(this, podOptions);
     this.pods.add(pod);
     return pod;
   }
@@ -879,18 +903,18 @@ export type ScopeOption = {
   pod?: boolean;
   initialValues?: Core.Preset<unknown>[];
   registry?: Core.Executor<unknown>[];
-  plugins?: Core.Plugin[];
+  extensions?: Extension.Extension[];
+  meta?: Meta.Meta[];
+};
+
+export type PodOption = {
+  initialValues?: Core.Preset<unknown>[];
+  extensions?: Extension.Extension[];
+  meta?: Meta.Meta[];
 };
 
 export function createScope(): Core.Scope;
 export function createScope(opt: ScopeOption): Core.Scope;
-
-/**
- * @deprecated
- *
- * Use the version with ScopeOption instead
- * @param presets
- */
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope;
 
 export function createScope(
@@ -909,24 +933,20 @@ export function createScope(
   });
 }
 
-export function plugin(m: Core.Plugin): Core.Plugin {
-  return m;
-}
 
 class Pod extends BaseScope implements Core.Pod {
   private parentScope: BaseScope;
 
-  constructor(scope: BaseScope, option?: ScopeOption) {
-    super(option);
+  constructor(scope: BaseScope, option?: PodOption) {
+    super({
+      pod: true,
+      initialValues: option?.initialValues,
+      extensions: option?.extensions ? [...(scope["extensions"] || []), ...option.extensions] : [...(scope["extensions"] || [])],
+      meta: option?.meta,
+    });
     this.parentScope = scope;
   }
 
-  /**
-   * Expect to resolve everything in pod. Unless it's already resolved in the main
-   * @param executor
-   * @param force
-   * @returns
-   */
   async resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T> {
     if (this.cache.has(executor)) {
       return super.resolve(executor, force);

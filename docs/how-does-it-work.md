@@ -99,18 +99,66 @@ Executor has a few references used as signal the scope to treat the graph of dep
 
 ### scope
 
-Scope is a container. Each scope is isolated, and has its own lifecycle, and can be applied using different plugins. An application can have as many scope as it wants, despite most of them actually requires only one
+Scope is the **graph actualizer** - the engine responsible for traversing and resolving dependency graphs. When you call `scope.resolve(executor)`, the scope:
 
-Scope only know about the Executors which `resolve` by it, as such the dependency graph is local to a scope.
+1. **Analyzes the dependency graph**: Recursively discovers all dependencies of the target executor
+2. **Determines resolution order**: Uses topological sorting to resolve dependencies in correct sequence
+3. **Caches resolved values**: Each executor resolves exactly once per scope, with results cached for reuse
+4. **Manages lifecycle**: Tracks resolved executors and handles cleanup on disposal
 
-### plugins
+Each scope is isolated with its own dependency graph cache and lifecycle. Applications typically use one long-running scope for shared resources, though multiple scopes are supported for specific use cases.
 
-Plugins provide a powerful event-driven system for intercepting and modifying the executor resolution pipeline. They operate through event hooks that are triggered during resolution, update, and release operations.
+**Key insight**: Scope transforms declarative dependency definitions into imperative resolution sequences, making dependency injection automatic rather than manual.
 
-The plugin system consists of:
-- **Plugin Interface**: `init` and `dispose` lifecycle hooks
+### pod
+
+Pod is an isolated sub-scope forked from a parent scope, designed for short-span operations like individual request handling or temporary computations. Pods inherit the parent scope's resolved values but maintain their own local cache. Changes within a pod don't affect the parent scope, ensuring isolation between concurrent operations.
+
+Key characteristics:
+- **Inheritance**: Copies resolved values from parent scope at creation time
+- **Isolation**: Local changes don't propagate back to parent scope
+- **Lifecycle**: Automatically disposed when operation completes or manually released
+- **Performance**: Avoids re-resolving already computed dependencies from parent
+
+### flow
+
+Flow is the unit that supports short-span operations with structured business logic. Each flow execution creates a pod (forked scope) and maintains a root context (map-like data structure). Flows can execute sub-flows recursively, with each sub-execution creating a forked version of the root context for data isolation.
+
+Relationship between concepts:
+- **Scope**: Long-running container for shared resources (database connections, services)
+- **Pod**: Short-lived fork of scope for isolated operations
+- **Flow**: Business logic execution unit that uses pods for dependency resolution
+
+### meta
+
+Meta is the decorative information system that allows attaching typed metadata to executors, scopes, pods, and flows. Meta serves multiple purposes:
+
+- **Executor decoration**: Attach configuration, debug information, or behavioral hints to executors
+- **Scope configuration**: Pass configuration to resources and extensions at scope level
+- **Pod/Flow configuration**: Configure execution behavior and pass data to extensions
+- **Extension integration**: Extensions can read meta information to modify behavior
+
+Meta uses a strongly-typed system where each piece of metadata is identified by a unique symbol or string key with associated type information.
+
+### preset
+
+Preset is the mechanism for overriding executor values, primarily used for testing and environment configuration. Presets allow you to:
+
+- **Replace implementations**: Substitute real services with mocks for testing
+- **Environment switching**: Use different configurations for development, testing, production
+- **Value injection**: Inject specific values into the dependency graph without changing code
+
+Presets are applied at scope creation time and affect the entire dependency graph resolution.
+
+### extensions
+
+Extensions provide a powerful event-driven system for intercepting and modifying the executor resolution pipeline. They operate through event hooks that are triggered during resolution, update, and release operations.
+
+The extension system consists of:
+- **Extension Interface**: `init` and `dispose` lifecycle hooks
 - **Event Callbacks**: `onChange` for resolve/update events, `onRelease` for cleanup
 - **Value Transformation**: Return `preset()` to override resolved/updated values
+- **Cross-cutting concerns**: Implement aspects like logging, metrics, transaction management across the entire graph
 
 ## resolution flow
 
@@ -400,36 +448,36 @@ sequenceDiagram
     end
 ```
 
-## middleware flow
+## extension flow
 
-### middleware interception during resolution
+### extension interception during resolution
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client
     participant Scope
-    participant Middleware
+    participant Extension
     participant Factory
     participant Cache
     participant Events
-    
+
     Client->>+Scope: resolve(executor)
     Scope->>Factory: execute(dependencies)
     Factory-->>Scope: computedValue
-    
-    Note over Scope,Events: Middleware Interception Point
-    
+
+    Note over Scope,Events: Extension Interception Point
+
     Scope->>Events: trigger onChange listeners
-    
+
     loop For each onChange listener
-        Events->>+Middleware: onChange("resolve", executor, value, scope)
-        
-        alt Middleware transforms value
-            Middleware-->>-Events: preset(executor, transformedValue)
+        Events->>+Extension: onChange("resolve", executor, value, scope)
+
+        alt Extension transforms value
+            Extension-->>-Events: preset(executor, transformedValue)
             Events->>Scope: updateValue(transformedValue)
         else No transformation
-            Middleware-->>Events: void
+            Extension-->>Events: void
         end
     end
     
@@ -437,28 +485,28 @@ sequenceDiagram
     Scope-->>-Client: return finalValue
 ```
 
-### middleware during update propagation
+### extension during update propagation
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client
     participant Scope
-    participant Middleware
+    participant Extension
     participant Cache
     participant ReactiveQueue
-    
+
     Client->>+Scope: update(executor, newValue)
-    
-    Note over Scope,Middleware: Pre-update middleware
-    
-    Scope->>Middleware: onChange("update", executor, newValue, scope)
-    
-    alt Middleware transforms value
-        Middleware-->>Scope: preset(executor, transformedValue)
+
+    Note over Scope,Extension: Pre-update extension
+
+    Scope->>Extension: onChange("update", executor, newValue, scope)
+
+    alt Extension transforms value
+        Extension-->>Scope: preset(executor, transformedValue)
         Scope->>Scope: use transformedValue
     else No transformation
-        Middleware-->>Scope: void
+        Extension-->>Scope: void
         Scope->>Scope: use newValue
     end
     
@@ -469,57 +517,57 @@ sequenceDiagram
     
     loop For each reactive dependent
         Scope->>Scope: resolve(dependent, force=true)
-        Note over Scope: Middleware also intercepts these
+        Note over Scope: Extension also intercepts these
     end
     
     Scope-->>-Client: updateComplete
 ```
 
-### middleware lifecycle management
+### extension lifecycle management
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client
     participant Scope
-    participant MiddlewareStack
-    participant Middleware1
-    participant Middleware2
-    
-    Note over Client,Middleware2: Registration Phase
-    
-    Client->>+Scope: use(middleware1)
-    Scope->>MiddlewareStack: register(middleware1)
-    Scope->>Middleware1: init(scope)
-    Middleware1->>Scope: setup event listeners
+    participant ExtensionStack
+    participant Extension1
+    participant Extension2
+
+    Note over Client,Extension2: Registration Phase
+
+    Client->>+Scope: use(extension1)
+    Scope->>ExtensionStack: register(extension1)
+    Scope->>Extension1: init(scope)
+    Extension1->>Scope: setup event listeners
     Scope-->>Client: cleanup1
-    
-    Client->>Scope: use(middleware2)
-    Scope->>MiddlewareStack: register(middleware2)
-    Scope->>Middleware2: init(scope)
-    Middleware2->>Scope: setup event listeners
+
+    Client->>Scope: use(extension2)
+    Scope->>ExtensionStack: register(extension2)
+    Scope->>Extension2: init(scope)
+    Extension2->>Scope: setup event listeners
     Scope-->>-Client: cleanup2
-    
-    Note over Client,Middleware2: Active Phase
-    
+
+    Note over Client,Extension2: Active Phase
+
     loop During scope lifetime
         Client->>Scope: resolve/update operations
-        Scope->>MiddlewareStack: trigger events
-        MiddlewareStack->>Middleware1: event callback
-        MiddlewareStack->>Middleware2: event callback
+        Scope->>ExtensionStack: trigger events
+        ExtensionStack->>Extension1: event callback
+        ExtensionStack->>Extension2: event callback
     end
-    
-    Note over Client,Middleware2: Disposal Phase
-    
+
+    Note over Client,Extension2: Disposal Phase
+
     Client->>+Scope: dispose()
-    
-    Scope->>Middleware1: dispose(scope)
-    Middleware1-->>Scope: cleanup complete
-    
-    Scope->>Middleware2: dispose(scope)
-    Middleware2-->>Scope: cleanup complete
-    
-    Scope->>MiddlewareStack: clear()
+
+    Scope->>Extension1: dispose(scope)
+    Extension1-->>Scope: cleanup complete
+
+    Scope->>Extension2: dispose(scope)
+    Extension2-->>Scope: cleanup complete
+
+    Scope->>ExtensionStack: clear()
     Scope-->>-Client: disposed
 ```
 

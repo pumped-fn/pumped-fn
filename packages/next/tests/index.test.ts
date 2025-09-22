@@ -3,7 +3,7 @@ import { provide, derive, preset } from "../src/executor";
 import { createScope } from "../src/scope";
 import { meta } from "../src/meta";
 import { custom } from "../src/ssch";
-import { Core } from "../src";
+import { type Extension } from "../src";
 
 const name = meta("name", custom<string>());
 
@@ -238,7 +238,8 @@ test("update without resolving", async () => {
 
 test("test scope option", async () => {
   const eagerMeta = meta("eagerLoad", custom<boolean>());
-  const eagerLoadPlugin: Core.Plugin = {
+  const eagerLoadExtension: Extension.Extension = {
+    name: "eager-load",
     init: async (scope) => {
       for (const executor of scope.registeredExecutors()) {
         if (eagerMeta.find(executor)) {
@@ -254,7 +255,7 @@ test("test scope option", async () => {
 
   createScope({
     initialValues: [preset(counter, 2)],
-    plugins: [eagerLoadPlugin],
+    extensions: [eagerLoadExtension],
     registry: [plus],
   });
 

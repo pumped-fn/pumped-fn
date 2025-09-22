@@ -11,7 +11,6 @@ class MetaFunction<V> {
     this.schema = schema;
   }
 
-  // Call signature - creates meta instance
   __call(value: V): Meta.Meta<V> {
     return {
       [metaSymbol]: true,
@@ -34,9 +33,11 @@ class MetaFunction<V> {
   }
 
   get(source: Meta.MetaContainer | Meta.Meta[] | undefined): V {
-    return getValue(
-      findValue(source, this as unknown as Meta.MetaFn<unknown>) as Meta.Meta<V>
-    );
+    const values = findValues(source, this as unknown as Meta.MetaFn<unknown>) as V[];
+    if (values.length === 0) {
+      throw new Error(`Meta value with key ${String(this.key)} not found`);
+    }
+    return values[0];
   }
 }
 
@@ -46,10 +47,8 @@ export const meta = <V>(
 ): Meta.MetaFn<V> => {
   const metaFunc = new MetaFunction(key, schema);
   
-  // Create callable function that delegates to the class
   const fn = ((value: V) => metaFunc.__call(value)) as Meta.MetaFn<V>;
   
-  // Copy properties from the class instance
   Object.defineProperty(fn, 'key', { value: metaFunc.key, writable: false, configurable: false });
   Object.defineProperty(fn, metaSymbol, { value: true, writable: false, configurable: false });
   fn.partial = metaFunc.partial.bind(metaFunc);

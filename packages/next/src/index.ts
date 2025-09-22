@@ -29,12 +29,9 @@ export * from "./scope";
 export * from "./ssch";
 export * from "./types";
 export { flow, FlowExecutionContext } from "./flow";
-export type { Flow } from "./types";
+export type { Extension } from "./types";
 
 export const name: Meta.MetaFn<string> = meta(
   "pumped-fn/name",
   custom<string>()
 );
-
-export * as plugins from "./plugins";
-export * as executes from "./executes";

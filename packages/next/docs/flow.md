@@ -192,26 +192,31 @@ const processOrder = orderFlow.handler(async (ctx, input) => {
 });
 ```
 
-## Plugin System
+## Extension Integration
 
 ```typescript
-import { flow } from "@pumped-fn/core-next";
+import type { Extension } from "@pumped-fn/core-next";
 
-const tracingPlugin = flow.plugin({
+const tracingExtension: Extension.Extension = {
   name: "tracing",
 
-  async init(pod, context) {
+  async initPod(pod, context) {
     context.set(TRACE_ID, generateTraceId());
   },
 
-  async wrap(context, next) {
+  async wrapExecute(context, next, execution) {
     const start = Date.now();
     try {
       return await next();
     } finally {
-      console.log(`Flow took ${Date.now() - start}ms`);
+      console.log(`Flow '${execution.flowName}' took ${Date.now() - start}ms`);
     }
   },
+};
+
+// Usage in flow execution
+const result = await flow.execute(handler, input, {
+  extensions: [tracingExtension]
 });
 ```
 

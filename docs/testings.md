@@ -23,36 +23,29 @@ One `preset()` can simulate entire environments. No mock framework needed.
 
 **Traditional Approach:**
 ```typescript
-// Mock everything individually
 mockFetch.mockResolvedValue(...)
 mockCache.mockImplementation(...)
 mockConfig.mockReturnValue(...)
 mockDatabase.mockResolvedValue(...)
-// Hope they work together correctly
 ```
 
 **Graph Approach:**
 ```typescript
-// Change the environment, everything adapts
 const scope = createScope(
   preset(env, 'test')
 )
-// Entire system configured for testing
 ```
 
 ## Testing Patterns
 
 ```typescript
-// Test different environments
 const prodScope = createScope(preset(env, 'production'))
 const testScope = createScope(preset(env, 'test'))
 
-// Test failure scenarios  
 const failScope = createScope(
   preset(httpClient, { get: async () => { throw error } })
 )
 
-// Test with specific data
 const dataScope = createScope(
   preset(database, { users: testData })
 )

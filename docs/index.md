@@ -6,7 +6,6 @@ Resolve your entire application with a single function call. No wiring, no initi
 
 **Traditional Code**: Wire dependencies manually, manage initialization order, debug complex setups
 ```javascript
-// Traditional approach - manual wiring nightmare
 const config = { logLevel: 'info', database: 'db://prod', redis: 'redis://prod' }
 const logger = { log: (msg) => console.log(`[${config.logLevel}] ${msg}`) }
 const db = { query: () => [], url: config.database }
@@ -16,11 +15,10 @@ const api = { start: () => logger.log('API started') }
 
 **Graph Resolution**: Define relationships, resolve automatically
 ```javascript
-// Graph approach - define once, resolve anywhere
 const app = derive([db, cache, logger], ([db, cache, log]) => ({
   start: () => log.log('API started with all dependencies')
 }))
-await scope.resolve(app) // Everything resolves in correct order
+await scope.resolve(app)
 ```
 
 **Benefits**:

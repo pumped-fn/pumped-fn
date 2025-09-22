@@ -2,7 +2,7 @@ import { vi, expect } from "vitest";
 import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
 import { createExecutor } from "../src/executor";
-import { createScope, provide, derive, type Flow } from "../src";
+import { createScope, provide, derive, type Extension } from "../src";
 
 export namespace TestTypes {
   export interface User {
@@ -144,41 +144,47 @@ export const MockExecutors = {
     ),
 };
 
-export const PluginFactory = {
+export const ExtensionFactory = {
   contextCapture: (capturedContext: { current?: any } = {}) =>
     ({
       name: "context-capture",
-      async wrap(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
         capturedContext.current = context;
         return next();
       },
-    } as Flow.Plugin),
+    } as Extension.Extension),
 
-  executionOrder: (execOrder: string[], pluginName: string) =>
+  executionOrder: (execOrder: string[], extensionName: string) =>
     ({
-      name: pluginName,
-      async wrap(context: any, next: () => Promise<any>, execution: any) {
-        execOrder.push(`${pluginName}-before`);
+      name: extensionName,
+      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+        execOrder.push(`${extensionName}-before`);
         const result = await next();
-        execOrder.push(`${pluginName}-after`);
+        execOrder.push(`${extensionName}-after`);
         return result;
       },
-    } as Flow.Plugin),
+    } as Extension.Extension),
 
-  lifecycle: (lifecycleCalls: string[], pluginName: string) =>
+  lifecycle: (lifecycleCalls: string[], extensionName: string) =>
     ({
-      name: pluginName,
-      async init(pod: any, context: any) {
-        lifecycleCalls.push(`${pluginName}-init`);
+      name: extensionName,
+      async initPod(pod: any, context: any) {
+        lifecycleCalls.push(`${extensionName}-init`);
       },
-      async dispose(pod: any) {
-        lifecycleCalls.push(`${pluginName}-dispose`);
+      async disposePod(pod: any) {
+        lifecycleCalls.push(`${extensionName}-dispose`);
       },
-      async wrap(context: any, next: () => Promise<any>, execution: any) {
-        lifecycleCalls.push(`${pluginName}-wrap`);
+      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+        lifecycleCalls.push(`${extensionName}-wrap`);
         return next();
       },
-    } as Flow.Plugin),
+    } as Extension.Extension),
+
+  errorHandler: (onError: any, extensionName = "error-extension") =>
+    ({
+      name: extensionName,
+      onError,
+    } as Extension.Extension),
 };
 
 export const errorTestHelpers = {
@@ -262,8 +268,8 @@ export const testSetup = {
     return { scope, errorCallback };
   },
 
-  scopeWithPlugins: (plugins: any[]) =>
-    createScope({ plugins: plugins as any } as any),
+  scopeWithExtensions: (extensions: Extension.Extension[]) =>
+    createScope({ extensions }),
 
   expectFlowResult: (result: any, type: "ok" | "ko", data?: any) => {
     expect(result.type).toBe(type);

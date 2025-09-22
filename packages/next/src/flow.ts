@@ -1,4 +1,4 @@
-import type { Core, Flow, Meta, StandardSchemaV1 } from "./types";
+import type { Core, Extension, Flow, Meta, StandardSchemaV1 } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
@@ -17,9 +17,10 @@ const ok = <S>(data: S): Flow.OK<S> => ({
   },
 });
 
-const ko = <E>(data: E): Flow.KO<E> => ({
+const ko = <E>(data: E, options?: { cause?: unknown }): Flow.KO<E> => ({
   type: "ko",
   data,
+  cause: options?.cause,
   isOk(): this is never {
     return false;
   },
@@ -143,7 +144,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   constructor(
     public input: I,
     public readonly pod: Core.Pod,
-    private plugins: Flow.Plugin[],
+    private extensions: Extension.Extension[],
     private parent?: FlowContext<any, any, any>
   ) {}
 
@@ -162,7 +163,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   }
 
   ok = (data: S): Flow.OK<S> => ok(data);
-  ko = (data: E): Flow.KO<E> => ko(data);
+  ko = (data: E, options?: { cause?: unknown }): Flow.KO<E> => ko(data, options);
 
   get(key: unknown): unknown {
     if (this.contextData.has(key)) {
@@ -203,16 +204,13 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     errorMapperOrOpt?: ((error: unknown) => any) | Flow.Opt,
     opt?: Flow.Opt
   ): Promise<any> {
-    // Handle parameter overloading
     let errorMapper: ((error: unknown) => any) | undefined;
     let actualOpt: Flow.Opt | undefined;
 
     if (typeof errorMapperOrOpt === "function") {
-      // If it's a function, it's the error mapper
       errorMapper = errorMapperOrOpt as (error: unknown) => any;
       actualOpt = opt;
     } else {
-      // Otherwise, it's the options
       actualOpt = errorMapperOrOpt;
     }
 
@@ -227,7 +225,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
         return this.ok(result);
       } catch (error) {
         const mappedError = errorMapper ? errorMapper(error) : error;
-        return this.ko(mappedError as any);
+        return this.ko(mappedError as any, { cause: error });
       }
     }
 
@@ -241,27 +239,29 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     const childContext = new FlowContext<unknown, unknown, unknown>(
       input,
       this.pod,
-      this.plugins,
+      this.extensions,
       this
     );
     childContext.initializeExecutionContext(definition.name, false);
 
-    return (await this.executeWithPlugins(handler, childContext)) as any;
+    return (await this.executeWithExtensions(handler, childContext)) as any;
   }
 
   async executeParallel<T extends ReadonlyArray<[Flow.UFlow, any]>>(
-    flows: T
-  ): Promise<{
+    flows: T,
+    options?: Flow.ParallelExecutionOptions
+  ): Promise<Flow.ParallelExecutionResult<{
     [K in keyof T]: T[K] extends [infer F, any]
       ? F extends Flow.UFlow
         ? Awaited<Flow.InferOutput<F>>
         : never
       : never;
-  }>;
+  }>>;
 
   async executeParallel<T extends ReadonlyArray<[Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
-    items: T
-  ): Promise<{
+    items: T,
+    options?: Flow.ParallelExecutionOptions
+  ): Promise<Flow.ParallelExecutionResult<{
     [K in keyof T]: T[K] extends [infer F, any]
       ? F extends Flow.FnExecutor<any, infer O>
         ? Flow.OK<O> | Flow.KO<unknown>
@@ -269,11 +269,12 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
         ? Flow.OK<O> | Flow.KO<unknown>
         : never
       : never;
-  }>;
+  }>>;
 
   async executeParallel<T extends ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
-    mixed: T
-  ): Promise<{
+    mixed: T,
+    options?: Flow.ParallelExecutionOptions
+  ): Promise<Flow.ParallelExecutionResult<{
     [K in keyof T]: T[K] extends [infer F, any]
       ? F extends Flow.UFlow
         ? Awaited<Flow.InferOutput<F>>
@@ -283,56 +284,122 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
         ? Flow.OK<O> | Flow.KO<unknown>
         : never
       : never;
-  }>;
+  }>>;
 
   async executeParallel(
-    items: ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>
+    items: ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>,
+    options?: Flow.ParallelExecutionOptions
   ): Promise<any> {
-    const results = await Promise.all(
-      items.map(async ([flowOrFn, input]) => {
+    const failureMode = options?.failureMode || "continue";
+    const errorMapper = options?.errorMapper;
+    const onItemComplete = options?.onItemComplete;
+
+    const executeItem = async (item: [Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any], index: number) => {
+      const [flowOrFn, input] = item;
+
+      try {
+        let result: any;
+
         if (typeof flowOrFn === "function" && !flowDefinitionMeta.find(flowOrFn as any)) {
           try {
-            let result: any;
             if (Array.isArray(input)) {
               result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(...input);
             } else {
               result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
             }
-            return this.ok(result);
+            result = this.ok(result);
           } catch (error) {
-            return this.ko(error as any);
+            const mappedError = errorMapper ? errorMapper(error, index) : error;
+            result = this.ko(mappedError as any, { cause: error });
           }
+        } else {
+          const flow = flowOrFn as Flow.UFlow;
+          const childContext = new FlowContext<unknown, unknown, unknown>(
+            input,
+            this.pod,
+            this.extensions,
+            this
+          );
+
+          const handler = await this.pod.resolve(flow);
+          const definition = flowDefinitionMeta.find(flow);
+          if (!definition) {
+            throw new Error("Flow definition not found in executor metadata");
+          }
+          childContext.initializeExecutionContext(definition.name, true);
+          result = await this.executeWithExtensions(handler, childContext);
         }
 
-        const flow = flowOrFn as Flow.UFlow;
-        const childContext = new FlowContext<unknown, unknown, unknown>(
-          input,
-          this.pod,
-          this.plugins,
-          this
-        );
+        onItemComplete?.(result, index);
+        return result;
+      } catch (error) {
+        const mappedError = errorMapper ? errorMapper(error, index) : error;
+        const koResult = this.ko(mappedError as any, { cause: error });
+        onItemComplete?.(koResult, index);
+        return koResult;
+      }
+    };
 
-        const handler = await this.pod.resolve(flow);
-        const definition = flowDefinitionMeta.find(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
+    let results: any[];
+
+    if (failureMode === "fail-fast") {
+      results = [];
+      for (let i = 0; i < items.length; i++) {
+        const result = await executeItem(items[i], i);
+        results.push(result);
+        if (result.type === "ko") {
+          break;
         }
-        childContext.initializeExecutionContext(definition.name, true);
-        return this.executeWithPlugins(handler, childContext);
-      })
-    );
-    return results as any;
+      }
+    } else {
+      results = await Promise.all(
+        items.map((item, index) => executeItem(item, index))
+      );
+    }
+
+    const total = failureMode === "fail-fast" ? results.length : items.length;
+    const succeeded = results.filter(r => r.type === "ok").length;
+    const failed = results.filter(r => r.type === "ko").length;
+
+    let resultType: "all-ok" | "partial" | "all-ko";
+    if (failed === 0) {
+      resultType = "all-ok";
+    } else if (succeeded === 0) {
+      resultType = "all-ko";
+    } else {
+      resultType = "partial";
+    }
+
+    if (failureMode === "fail-all" && failed > 0) {
+      const causes = results.filter(r => r.type === "ko").map(r => r.cause || r.data);
+      throw this.ko({
+        type: "parallel-execution-failed",
+        message: `${failed} out of ${total} parallel executions failed`,
+        individualResults: results,
+        causes
+      } as any, { cause: causes });
+    }
+
+    return {
+      type: resultType,
+      results: results as any,
+      stats: {
+        total,
+        succeeded,
+        failed
+      }
+    };
   }
 
-  private async executeWithPlugins<T>(
+  private async executeWithExtensions<T>(
     handler: any,
     context: FlowContext<any, any, any>
   ): Promise<T> {
     const executeCore = async (): Promise<T> => handler(context);
 
     let executor = executeCore;
-    for (const plugin of [...this.plugins].reverse()) {
-      if (plugin.wrap) {
+    for (const extension of [...this.extensions].reverse()) {
+      if (extension.wrapExecute) {
         const currentExecutor = executor;
         executor = async () => {
           const execution = {
@@ -341,7 +408,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
             parentFlowName: FlowExecutionContext.parentFlowName.find(context),
           };
-          return plugin.wrap!(context, currentExecutor, execution);
+          return extension.wrapExecute!(context, currentExecutor, execution);
         };
       }
     }
@@ -357,7 +424,7 @@ async function execute<I, S, E>(
   input: I,
   options?: {
     scope?: Core.Scope;
-    plugins?: Flow.Plugin[];
+    extensions?: Extension.Extension[];
     initialContext?: Array<[Accessor<any>, any]> | Map<unknown, unknown>;
     presets?: Core.Preset<unknown>[];
   }
@@ -365,13 +432,13 @@ async function execute<I, S, E>(
   const scope = options?.scope || createScope();
   const shouldDisposeScope = !options?.scope;
 
-  const pod = scope.pod(...(options?.presets || []));
+  const pod = scope.pod({ initialValues: options?.presets });
 
   try {
     const context = new FlowContext<I, S, E>(
       input,
       pod,
-      options?.plugins || []
+      options?.extensions || []
     );
 
     if (options?.initialContext) {
@@ -386,8 +453,8 @@ async function execute<I, S, E>(
       }
     }
 
-    for (const plugin of options?.plugins || []) {
-      await plugin.init?.(pod, context);
+    for (const extension of options?.extensions || []) {
+      await extension.initPod?.(pod, context);
     }
 
     const executeCore = async () => {
@@ -415,8 +482,8 @@ async function execute<I, S, E>(
     const definition = flowDefinitionMeta.find(flow);
 
     let executor = executeCore;
-    for (const plugin of [...(options?.plugins || [])].reverse()) {
-      if (plugin.wrap) {
+    for (const extension of [...(options?.extensions || [])].reverse()) {
+      if (extension.wrapExecute) {
         const currentExecutor = executor;
         executor = () => {
           const execution = {
@@ -426,15 +493,15 @@ async function execute<I, S, E>(
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
             parentFlowName: FlowExecutionContext.parentFlowName.find(context),
           };
-          return plugin.wrap!(context, currentExecutor, execution);
+          return extension.wrapExecute!(context, currentExecutor, execution);
         };
       }
     }
 
     return await executor();
   } finally {
-    for (const plugin of options?.plugins || []) {
-      await plugin.dispose?.(pod);
+    for (const extension of options?.extensions || []) {
+      await extension.disposePod?.(pod);
     }
 
     await scope.disposePod(pod);
@@ -445,7 +512,6 @@ async function execute<I, S, E>(
   }
 }
 
-// Main flow function with namespace approach
 function flowImpl<I, S, E>(
   definition: DefineConfig<I, S, E>,
   handler: (
@@ -489,17 +555,16 @@ function flowImpl<I, S, E, D extends Core.DependencyLike>(
   }
 }
 
-function definePlugin(plugin: Flow.Plugin): Flow.Plugin {
-  return plugin;
+function defineExtension(extension: Extension.Extension): Extension.Extension {
+  return extension;
 }
 
-// Create flow namespace object
 export const flow: typeof flowImpl & {
   define: typeof define;
   execute: typeof execute;
-  plugin: typeof definePlugin;
+  extension: typeof defineExtension;
 } = Object.assign(flowImpl, {
   define: define,
   execute: execute,
-  plugin: definePlugin,
+  extension: defineExtension,
 });

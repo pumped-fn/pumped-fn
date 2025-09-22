@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
-import { createScope, provide, derive, plugin } from "../src";
+import { createScope, provide, derive } from "../src";
 import { ExecutorResolutionError, FactoryExecutionError } from "../src/types";
-import { errorTestHelpers, MockExecutors, testSetup } from "./test-utils";
+import { errorTestHelpers, MockExecutors, testSetup, ExtensionFactory } from "./test-utils";
 
 describe("Error Handling", () => {
   describe("Global Error Callbacks", () => {
@@ -108,11 +108,11 @@ describe("Error Handling", () => {
     });
   });
 
-  describe("Plugin Error Handlers", () => {
-    test("activates plugin error handlers during executor failure", async () => {
+  describe("Extension Error Handlers", () => {
+    test("activates extension error handlers during executor failure", async () => {
       const onError = vi.fn();
-      const errorPlugin = { name: "error-plugin", ...plugin({ onError }) };
-      const scope = testSetup.scopeWithPlugins([errorPlugin]);
+      const errorExtension = ExtensionFactory.errorHandler(onError, "error-extension");
+      const scope = testSetup.scopeWithExtensions([errorExtension]);
       const failingExecutor = MockExecutors.failing("Test error");
 
       await expect(scope.resolve(failingExecutor)).rejects.toThrow();
@@ -120,18 +120,16 @@ describe("Error Handling", () => {
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
         expect.any(FactoryExecutionError),
-        failingExecutor,
-        scope,
-        { stage: 'resolve' }
+        scope
       );
     });
 
-    test("coordinates error handling across multiple plugins", async () => {
+    test("coordinates error handling across multiple extensions", async () => {
       const onError1 = vi.fn();
       const onError2 = vi.fn();
-      const plugin1 = { name: "plugin1", ...plugin({ onError: onError1 }) };
-      const plugin2 = { name: "plugin2", ...plugin({ onError: onError2 }) };
-      const scope = testSetup.scopeWithPlugins([plugin1, plugin2]);
+      const extension1 = ExtensionFactory.errorHandler(onError1, "extension1");
+      const extension2 = ExtensionFactory.errorHandler(onError2, "extension2");
+      const scope = testSetup.scopeWithExtensions([extension1, extension2]);
       const failingExecutor = MockExecutors.failing("Test error");
 
       await expect(scope.resolve(failingExecutor)).rejects.toThrow();
@@ -140,12 +138,12 @@ describe("Error Handling", () => {
       expect(onError2).toHaveBeenCalledTimes(1);
     });
 
-    test("preserves original error when plugin error handler throws", async () => {
+    test("preserves original error when extension error handler throws", async () => {
       const onError = vi.fn().mockImplementation(() => {
-        throw new Error("Plugin error");
+        throw new Error("Extension error");
       });
-      const errorPlugin = { name: "error-plugin", ...plugin({ onError }) };
-      const scope = testSetup.scopeWithPlugins([errorPlugin]);
+      const errorExtension = ExtensionFactory.errorHandler(onError, "error-extension");
+      const scope = testSetup.scopeWithExtensions([errorExtension]);
       const failingExecutor = MockExecutors.failing("Original error");
 
       await expect(scope.resolve(failingExecutor)).rejects.toThrow(

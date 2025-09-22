@@ -46,12 +46,12 @@ _Expert-level documentation for context engineering and component development_
 
 **Use When**: Building reusable component libraries, implementing configuration systems, creating testable architectures
 
-#### [**plugin.md**](./plugin.md) - Plugin Development
+#### [**extension.md**](./extension.md) - Extension Development
 **Primary Context**: Extending dependency graph functionality and flow execution
-- **Graph-Aware Plugins**: Hook into dependency resolution lifecycle
+- **Graph-Aware Extensions**: Hook into dependency resolution lifecycle
 - **Graph Telemetry**: Monitor resolution performance and cache efficiency
 - **Graph Debugging**: Inspect dependency chains and resolution paths
-- **Graph Composition**: Plugin interaction with dependency hierarchies
+- **Graph Composition**: Extension interaction with dependency hierarchies
 
 **Use When**: Building observability tools, implementing cross-cutting concerns, creating development utilities
 
@@ -64,10 +64,10 @@ _Expert-level documentation for context engineering and component development_
 | Task | Primary Document | Supporting Documents | Context Size |
 |------|------------------|---------------------|----------------|
 | **Build Applications** | [llm.md](./llm.md) | authoring.md | High (497 lines) |
-| **Business Logic** | [flow.md](./flow.md) | llm.md, plugin.md | Medium (252 lines) |
+| **Business Logic** | [flow.md](./flow.md) | llm.md, extension.md | Medium (252 lines) |
 | **Reusable Components** | [authoring.md](./authoring.md) | llm.md, meta.md | High (400+ lines) |
-| **Plugin Development** | [plugin.md](./plugin.md) | llm.md, meta.md | Medium (200+ lines) |
-| **Metadata Systems** | [meta.md](./meta.md) | plugin.md | Medium (411 lines) |
+| **Extension Development** | [extension.md](./extension.md) | llm.md, meta.md | Medium (200+ lines) |
+| **Metadata Systems** | [meta.md](./meta.md) | extension.md | Medium (411 lines) |
 
 **Loading Strategy**: Start with primary document for deep context, then add supporting documents only when needed for cross-system integration.
 
@@ -90,11 +90,11 @@ ctx.ok(data), ctx.ko(error), ctx.execute(subflow, input)
 // Meta (meta.md)
 meta(key, schema), meta.find(source), meta.get(source)
 
-// Plugins (plugin.md)
-Core.Plugin: { wrap(next, context) => Promise<T> }, Flow.Plugin: { name, wrap, init }
+// Extensions (extension.md)
+Extension.Extension: { name, wrapResolve, wrapExecute, init, initPod }
 
 // Authoring (authoring.md)
-preset(config, values), createScope({ initialValues: [...presets] })
+meta(key, schema), createScope({ meta: [...metas] }), configMeta.get(ctl.scope)
 ```
 
 ### Common Task Mapping
@@ -102,12 +102,12 @@ preset(config, values), createScope({ initialValues: [...presets] })
 | Task | Primary Document | Supporting Documents |
 |------|------------------|---------------------|
 | Create app structure | llm.md | authoring.md |
-| Build API handlers | flow.md | llm.md, plugin.md |
+| Build API handlers | flow.md | llm.md, extension.md |
 | Design reusable components | authoring.md | llm.md, meta.md |
-| Add monitoring/logging | plugin.md | meta.md |
+| Add monitoring/logging | extension.md | meta.md |
 | Configure for different environments | authoring.md | llm.md |
 | Test business logic | flow.md | authoring.md |
-| Debug dependency issues | llm.md | plugin.md |
+| Debug dependency issues | llm.md | extension.md |
 | Create custom validation | flow.md | meta.md |
 
 ---
@@ -135,8 +135,8 @@ preset(config, values), createScope({ initialValues: [...presets] })
 
 ## Document Relationships
 
-**Document Dependencies**: llm.md (core) → flow.md, authoring.md, plugin.md → meta.md (cross-cutting)
+**Document Dependencies**: llm.md (core) → flow.md, authoring.md, extension.md → meta.md (cross-cutting)
 
-**Integration Points**: authoring.md uses llm.md presets; plugin.md extends flow.md; meta.md decorates all types
+**Integration Points**: authoring.md uses llm.md executors with meta.md configuration; extension.md extends flow.md; meta.md decorates all types
 
 This index ensures optimal context loading while maintaining expert-level depth across all pumped-fn development scenarios.
