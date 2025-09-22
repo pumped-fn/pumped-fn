@@ -1,5 +1,12 @@
 # time-tui-example
 
+## 1.0.7
+
+### Patch Changes
+
+- Updated dependencies [[`4d87548`](https://github.com/pumped-fn/pumped-fn/commit/4d87548a3eaad1ad0cf5b90e96a078434900e5d9)]:
+  - @pumped-fn/core-next@0.5.65
+
 ## 1.0.6
 
 ### Patch Changes

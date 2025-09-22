@@ -1,5 +1,14 @@
 # @pumped-fn/core-next
 
+## 0.5.65
+
+### Patch Changes
+
+- [`4d87548`](https://github.com/pumped-fn/pumped-fn/commit/4d87548a3eaad1ad0cf5b90e96a078434900e5d9) Thanks [@lagz0ne](https://github.com/lagz0ne)! - - feat: changed plugin to extension, unified the API for both scope and plugin
+  - feat: made scope and pod to be MetaContainer. As such, executors and flows can read meta from scope, that'll be the way to configure
+  - chore: cleanup tests, reduce amount of test bloats
+  - chore: removed placeholder, prepare and adapt
+
 ## 0.5.64
 
 ### Patch Changes
