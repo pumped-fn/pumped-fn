@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.66
+
+### Patch Changes
+
+- [`1d3e85b`](https://github.com/pumped-fn/pumped-fn/commit/1d3e85ba3ea2aff508634d30aff3647be40784aa) Thanks [@lagz0ne](https://github.com/lagz0ne)! - expose executor reference to extension on pod resolve, so extension can extract the config from that
+
 ## 0.5.65
 
 ### Patch Changes
