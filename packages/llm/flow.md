@@ -239,6 +239,202 @@ const result = await flow.execute(handler, input);
 | Context | Via scope | Via context param |
 | Error handling | Exceptions | Structured ok/ko |
 
+## DataAccessor Integration
+
+**Recommended**: Use DataAccessor for all Map-like context data access in flows. FlowContext implements DataStore, making accessors the type-safe way to manage execution context.
+
+### Built-in Flow Context Accessors
+
+```typescript
+// Built-in execution context (from flow.ts)
+export const FlowExecutionContext = {
+  depth: accessor("flow.depth", custom<number>(), 0),
+  flowName: accessor("flow.name", custom<string | undefined>()),
+  parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
+  isParallel: accessor("flow.isParallel", custom<boolean>(), false),
+};
+
+// Usage in extensions
+const tracingExtension: Extension.Extension = {
+  name: "tracing",
+
+  async wrapExecute(context, next, execution) {
+    const depth = FlowExecutionContext.depth.find(context);
+    const flowName = FlowExecutionContext.flowName.find(context);
+    const isParallel = FlowExecutionContext.isParallel.find(context);
+
+    const indent = "  ".repeat(depth);
+    const marker = isParallel ? "∥" : "→";
+    console.log(`${indent}${marker} ${flowName}`);
+
+    return await next();
+  }
+};
+```
+
+### Type-Safe Context Management
+
+```typescript
+import { accessor, custom } from "@pumped-fn/core-next";
+
+// Define context accessors for your domain
+const RequestContext = {
+  TRACE_ID: accessor("trace.id", custom<string>()),
+  USER_ID: accessor("user.id", custom<string>()),
+  SESSION_ID: accessor("session.id", custom<string>()),
+  REQUEST_TIME: accessor("request.time", custom<number>(), Date.now),
+  CORRELATION_ID: accessor("correlation.id", custom<string>())
+};
+
+const processUserFlow = flow.define({
+  name: "user.process",
+  input: custom<{ userId: string; action: string }>(),
+  success: custom<{ result: string; processed: boolean }>(),
+  error: custom<{ code: string; message: string }>()
+});
+
+const handler = processUserFlow.handler(
+  { userService: userServiceExecutor },
+  async ({ userService }, ctx, input) => {
+    // Type-safe context access (no any types)
+    const traceId = RequestContext.TRACE_ID.get(ctx); // throws if missing
+    const userId = RequestContext.USER_ID.find(ctx); // undefined if missing
+    const requestTime = RequestContext.REQUEST_TIME.find(ctx); // uses default
+
+    // Set context for downstream flows
+    RequestContext.USER_ID.set(ctx, input.userId);
+    RequestContext.CORRELATION_ID.set(ctx, `${traceId}-${Date.now()}`);
+
+    // Process with type-safe context
+    const result = await userService.process(input.userId, input.action);
+
+    return ctx.ok({
+      result: result.data,
+      processed: true
+    });
+  }
+);
+```
+
+### Context Inheritance Patterns
+
+```typescript
+// Parent flow sets global context
+const parentFlow = flow.handler(async (ctx, input) => {
+  // Set parent-level context
+  RequestContext.TRACE_ID.set(ctx, `trace-${Date.now()}`);
+  RequestContext.SESSION_ID.set(ctx, input.sessionId);
+
+  // Execute child flow - inherits parent context
+  const childResult = await ctx.execute(childFlowHandler, {
+    data: input.payload
+  });
+
+  return childResult;
+});
+
+// Child flow accesses inherited context + sets its own
+const childFlowHandler = childFlow.handler(async (ctx, input) => {
+  // Access parent context (automatic inheritance)
+  const traceId = RequestContext.TRACE_ID.get(ctx); // From parent
+  const sessionId = RequestContext.SESSION_ID.get(ctx); // From parent
+
+  // Set child-specific context (isolated from parent)
+  const ChildContext = {
+    OPERATION_ID: accessor("operation.id", custom<string>())
+  };
+
+  ChildContext.OPERATION_ID.set(ctx, `${traceId}-child`);
+
+  // Child modifications don't affect parent context
+  return ctx.ok({ processed: input.data });
+});
+```
+
+### Testing with Accessor Presets
+
+```typescript
+describe("Flow Context Management", () => {
+  test("handles context inheritance correctly", async () => {
+    // Setup test context using accessor presets
+    const initialContext = [
+      RequestContext.TRACE_ID.preset("test-trace-123"),
+      RequestContext.USER_ID.preset("user-456"),
+      RequestContext.REQUEST_TIME.preset(1640995200000)
+    ];
+
+    const result = await flow.execute(handler, input, {
+      initialContext
+    });
+
+    expect(result.type).toBe("ok");
+
+    // Context state is predictable and type-safe
+    expect(RequestContext.TRACE_ID.get(testContext)).toBe("test-trace-123");
+  });
+
+  test("uses defaults when context missing", () => {
+    const emptyContext = new Map();
+
+    // AccessorWithDefault provides safe defaults
+    const requestTime = RequestContext.REQUEST_TIME.find(emptyContext);
+    expect(typeof requestTime).toBe("number");
+
+    // Regular accessor returns undefined for missing values
+    const traceId = RequestContext.TRACE_ID.find(emptyContext);
+    expect(traceId).toBeUndefined();
+  });
+});
+```
+
+### Extension Data Management
+
+```typescript
+// Extensions use accessors for cross-execution state
+const MetricsAccessors = {
+  EXECUTION_COUNT: accessor(
+    Symbol.for("metrics.execution.count"),
+    custom<number>(),
+    0
+  ),
+  TOTAL_DURATION: accessor(
+    Symbol.for("metrics.total.duration"),
+    custom<number>(),
+    0
+  ),
+  ERROR_COUNT: accessor(
+    Symbol.for("metrics.error.count"),
+    custom<number>(),
+    0
+  )
+};
+
+const metricsExtension: Extension.Extension = {
+  name: "metrics",
+
+  async wrapExecute(context, next, execution) {
+    const start = Date.now();
+
+    // Type-safe metrics access with defaults
+    const execCount = MetricsAccessors.EXECUTION_COUNT.find(context);
+    MetricsAccessors.EXECUTION_COUNT.set(context, execCount + 1);
+
+    try {
+      const result = await next();
+
+      const duration = Date.now() - start;
+      const totalDuration = MetricsAccessors.TOTAL_DURATION.find(context);
+      MetricsAccessors.TOTAL_DURATION.set(context, totalDuration + duration);
+
+      return result;
+    } catch (error) {
+      const errorCount = MetricsAccessors.ERROR_COUNT.find(context);
+      MetricsAccessors.ERROR_COUNT.set(context, errorCount + 1);
+      throw error;
+    }
+  }
+};
+
 ## Key Rules
 
 1. **Input/Output Validation**: All inputs are validated against schemas before handler execution
@@ -246,6 +442,7 @@ const result = await flow.execute(handler, input);
 3. **Dependency Injection**: Dependencies resolved before handler execution
 4. **Context Isolation**: Each flow execution has isolated context (child contexts inherit from parent)
 5. **Type Safety**: Full TypeScript inference for inputs, outputs, and dependencies
+6. **Context Data Access**: Use DataAccessor for all Map-like context data - provides type safety, validation, and defaults
 
 ## Flow coding styles
 

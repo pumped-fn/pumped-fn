@@ -593,6 +593,7 @@ export namespace Extension {
     depth: number;
     isParallel: boolean;
     parentFlowName: string | undefined;
+    flow: Flow.UFlow
   }
 }
 

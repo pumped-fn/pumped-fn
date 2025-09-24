@@ -163,7 +163,8 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   }
 
   ok = (data: S): Flow.OK<S> => ok(data);
-  ko = (data: E, options?: { cause?: unknown }): Flow.KO<E> => ko(data, options);
+  ko = (data: E, options?: { cause?: unknown }): Flow.KO<E> =>
+    ko(data, options);
 
   get(key: unknown): unknown {
     if (this.contextData.has(key)) {
@@ -199,7 +200,10 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
   ): Promise<Flow.OK<O> | Flow.KO<E>>;
 
   async execute(
-    flowOrFn: Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>,
+    flowOrFn:
+      | Flow.UFlow
+      | Flow.FnExecutor<any, any>
+      | Flow.MultiFnExecutor<any[], any>,
     input: any,
     errorMapperOrOpt?: ((error: unknown) => any) | Flow.Opt,
     opt?: Flow.Opt
@@ -214,11 +218,16 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       actualOpt = errorMapperOrOpt;
     }
 
-    if (typeof flowOrFn === "function" && !flowDefinitionMeta.find(flowOrFn as any)) {
+    if (
+      typeof flowOrFn === "function" &&
+      !flowDefinitionMeta.find(flowOrFn as any)
+    ) {
       try {
         let result: any;
         if (Array.isArray(input)) {
-          result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(...input);
+          result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(
+            ...input
+          );
         } else {
           result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
         }
@@ -244,66 +253,115 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     );
     childContext.initializeExecutionContext(definition.name, false);
 
-    return (await this.executeWithExtensions(handler, childContext)) as any;
+    return (await this.executeWithExtensions(
+      handler,
+      childContext,
+      flow
+    )) as any;
   }
 
   async executeParallel<T extends ReadonlyArray<[Flow.UFlow, any]>>(
     flows: T,
     options?: Flow.ParallelExecutionOptions
-  ): Promise<Flow.ParallelExecutionResult<{
-    [K in keyof T]: T[K] extends [infer F, any]
-      ? F extends Flow.UFlow
-        ? Awaited<Flow.InferOutput<F>>
-        : never
-      : never;
-  }>>;
+  ): Promise<
+    Flow.ParallelExecutionResult<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends Flow.UFlow
+          ? Awaited<Flow.InferOutput<F>>
+          : never
+        : never;
+    }>
+  >;
 
-  async executeParallel<T extends ReadonlyArray<[Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
+  async executeParallel<
+    T extends ReadonlyArray<
+      [Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]
+    >
+  >(
     items: T,
     options?: Flow.ParallelExecutionOptions
-  ): Promise<Flow.ParallelExecutionResult<{
-    [K in keyof T]: T[K] extends [infer F, any]
-      ? F extends Flow.FnExecutor<any, infer O>
-        ? Flow.OK<O> | Flow.KO<unknown>
-        : F extends Flow.MultiFnExecutor<any[], infer O>
-        ? Flow.OK<O> | Flow.KO<unknown>
-        : never
-      : never;
-  }>>;
+  ): Promise<
+    Flow.ParallelExecutionResult<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends Flow.FnExecutor<any, infer O>
+          ? Flow.OK<O> | Flow.KO<unknown>
+          : F extends Flow.MultiFnExecutor<any[], infer O>
+          ? Flow.OK<O> | Flow.KO<unknown>
+          : never
+        : never;
+    }>
+  >;
 
-  async executeParallel<T extends ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>>(
+  async executeParallel<
+    T extends ReadonlyArray<
+      [
+        (
+          | Flow.UFlow
+          | Flow.FnExecutor<any, any>
+          | Flow.MultiFnExecutor<any[], any>
+        ),
+        any
+      ]
+    >
+  >(
     mixed: T,
     options?: Flow.ParallelExecutionOptions
-  ): Promise<Flow.ParallelExecutionResult<{
-    [K in keyof T]: T[K] extends [infer F, any]
-      ? F extends Flow.UFlow
-        ? Awaited<Flow.InferOutput<F>>
-        : F extends Flow.FnExecutor<any, infer O>
-        ? Flow.OK<O> | Flow.KO<unknown>
-        : F extends Flow.MultiFnExecutor<any[], infer O>
-        ? Flow.OK<O> | Flow.KO<unknown>
-        : never
-      : never;
-  }>>;
+  ): Promise<
+    Flow.ParallelExecutionResult<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends Flow.UFlow
+          ? Awaited<Flow.InferOutput<F>>
+          : F extends Flow.FnExecutor<any, infer O>
+          ? Flow.OK<O> | Flow.KO<unknown>
+          : F extends Flow.MultiFnExecutor<any[], infer O>
+          ? Flow.OK<O> | Flow.KO<unknown>
+          : never
+        : never;
+    }>
+  >;
 
   async executeParallel(
-    items: ReadonlyArray<[Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]>,
+    items: ReadonlyArray<
+      [
+        (
+          | Flow.UFlow
+          | Flow.FnExecutor<any, any>
+          | Flow.MultiFnExecutor<any[], any>
+        ),
+        any
+      ]
+    >,
     options?: Flow.ParallelExecutionOptions
   ): Promise<any> {
     const failureMode = options?.failureMode || "continue";
     const errorMapper = options?.errorMapper;
     const onItemComplete = options?.onItemComplete;
 
-    const executeItem = async (item: [Flow.UFlow | Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any], index: number) => {
+    const executeItem = async (
+      item: [
+        (
+          | Flow.UFlow
+          | Flow.FnExecutor<any, any>
+          | Flow.MultiFnExecutor<any[], any>
+        ),
+        any
+      ],
+      index: number
+    ) => {
       const [flowOrFn, input] = item;
 
       try {
         let result: any;
 
-        if (typeof flowOrFn === "function" && !flowDefinitionMeta.find(flowOrFn as any)) {
+        if (
+          typeof flowOrFn === "function" &&
+          !flowDefinitionMeta.find(flowOrFn as any)
+        ) {
           try {
             if (Array.isArray(input)) {
-              result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(...input);
+              result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(
+                ...input
+              );
             } else {
               result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
             }
@@ -327,7 +385,11 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
             throw new Error("Flow definition not found in executor metadata");
           }
           childContext.initializeExecutionContext(definition.name, true);
-          result = await this.executeWithExtensions(handler, childContext);
+          result = await this.executeWithExtensions(
+            handler,
+            childContext,
+            flow
+          );
         }
 
         onItemComplete?.(result, index);
@@ -358,8 +420,8 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     }
 
     const total = failureMode === "fail-fast" ? results.length : items.length;
-    const succeeded = results.filter(r => r.type === "ok").length;
-    const failed = results.filter(r => r.type === "ko").length;
+    const succeeded = results.filter((r) => r.type === "ok").length;
+    const failed = results.filter((r) => r.type === "ko").length;
 
     let resultType: "all-ok" | "partial" | "all-ko";
     if (failed === 0) {
@@ -371,13 +433,18 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     }
 
     if (failureMode === "fail-all" && failed > 0) {
-      const causes = results.filter(r => r.type === "ko").map(r => r.cause || r.data);
-      throw this.ko({
-        type: "parallel-execution-failed",
-        message: `${failed} out of ${total} parallel executions failed`,
-        individualResults: results,
-        causes
-      } as any, { cause: causes });
+      const causes = results
+        .filter((r) => r.type === "ko")
+        .map((r) => r.cause || r.data);
+      throw this.ko(
+        {
+          type: "parallel-execution-failed",
+          message: `${failed} out of ${total} parallel executions failed`,
+          individualResults: results,
+          causes,
+        } as any,
+        { cause: causes }
+      );
     }
 
     return {
@@ -386,14 +453,15 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       stats: {
         total,
         succeeded,
-        failed
-      }
+        failed,
+      },
     };
   }
 
   private async executeWithExtensions<T>(
     handler: any,
-    context: FlowContext<any, any, any>
+    context: FlowContext<any, any, any>,
+    flow: Flow.UFlow
   ): Promise<T> {
     const executeCore = async (): Promise<T> => handler(context);
 
@@ -402,13 +470,13 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       if (extension.wrapExecute) {
         const currentExecutor = executor;
         executor = async () => {
-          const execution = {
+          return extension.wrapExecute!(context, currentExecutor, {
             flowName: FlowExecutionContext.flowName.find(context),
             depth: FlowExecutionContext.depth.find(context) || 0,
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
             parentFlowName: FlowExecutionContext.parentFlowName.find(context),
-          };
-          return extension.wrapExecute!(context, currentExecutor, execution);
+            flow,
+          });
         };
       }
     }
@@ -486,14 +554,14 @@ async function execute<I, S, E>(
       if (extension.wrapExecute) {
         const currentExecutor = executor;
         executor = () => {
-          const execution = {
+          return extension.wrapExecute!(context, currentExecutor, {
             flowName:
               definition?.name || FlowExecutionContext.flowName.find(context),
             depth: FlowExecutionContext.depth.find(context) || 0,
             isParallel: FlowExecutionContext.isParallel.find(context) || false,
             parentFlowName: FlowExecutionContext.parentFlowName.find(context),
-          };
-          return extension.wrapExecute!(context, currentExecutor, execution);
+            flow,
+          });
         };
       }
     }

@@ -89,3 +89,29 @@ const result = await scope.resolve(application)
 - **Easy Refactoring**: Change dependencies without touching consumers
 - **Composable Design**: Mix and match components across projects
 - **Type Safety**: Full TypeScript support with inference
+
+## Documentation
+
+### Core Library
+- [**API Reference**](./api.md) - Complete API documentation for graph construction, resolution, plugins, meta, and flows
+- [**Testing**](./testings.md) - Graph-based testing strategies with preset power
+- [**How It Works**](./how-does-it-work.md) - Deep dive into graph resolution mechanics
+- [**Graph vs Traditional**](./graph-vs-traditional.md) - Comparison with traditional dependency injection
+
+### Advanced Guides
+- [**Flow API**](./flow.md) - Structured business logic with validation and context management
+- [**DataAccessor**](./accessor.md) - Type-safe data access for Map-like structures with validation
+- [**Extensions**](./extensions.md) - Build cross-cutting functionality with unified extension API
+- [**Component Authoring**](./authoring.md) - Create reusable components with meta-based configuration
+- [**Meta System**](./meta.md) - Type-safe metadata decoration for extensibility
+
+### Quick Navigation
+| I want to... | Go to |
+|--------------|-------|
+| **Start building apps** | [API Reference](./api.md) → Graph Construction |
+| **Add business logic** | [Flow API](./flow.md) → Patterns |
+| **Manage context data** | [DataAccessor](./accessor.md) → Integration with Flows |
+| **Build reusable components** | [Component Authoring](./authoring.md) → Meta Configuration |
+| **Add monitoring/logging** | [Extensions](./extensions.md) → Extension Patterns |
+| **Test my application** | [Testing](./testings.md) → Graph Testing |
+| **Understand the concepts** | [How It Works](./how-does-it-work.md) |

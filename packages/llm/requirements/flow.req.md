@@ -108,3 +108,10 @@ type OrderError = {
 - Context propagates through all nested flows
 - Error transformations maintain business context
 - Dependencies are properly injected and typed
+
+### Implementation suggestions
+
+- For database, use sqlite that comes with bun (use context7 as needed to learn about)
+- For sms, webhook sending, isolate the process by using enqueue (to send) and dequeue (to process)
+- Application must be production ready, as such, it'll require integration with telemetry, use "Opentelemetry javascript" on context7 to integrate
+- use vitest to write and run test. use context7 to learn how
