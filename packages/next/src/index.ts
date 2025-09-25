@@ -2,7 +2,17 @@ export type { Accessor } from "./types";
 export { accessor } from "./accessor";
 export * as errors from "./error-codes";
 
-export { provide, derive, preset } from "./executor";
+export {
+  provide,
+  derive,
+  preset,
+  isExecutor,
+  isLazyExecutor,
+  isMainExecutor,
+  isPreset,
+  isReactiveExecutor,
+  isStaticExecutor,
+} from "./executor";
 
 export { resolves } from "./helpers";
 

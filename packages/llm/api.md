@@ -28,7 +28,12 @@ executor.{lazy|reactive|static} // lazy: on-demand, reactive: triggers updates, 
 
 ### Type Guards
 ```typescript
-is{Executor|MainExecutor|LazyExecutor|ReactiveExecutor|StaticExecutor|Preset}(input: unknown): boolean
+isExecutor<T>(input: unknown): input is Core.BaseExecutor<T>
+isMainExecutor(executor: unknown): executor is Core.Executor<unknown>
+isLazyExecutor(executor: Core.BaseExecutor<unknown>): executor is Core.Lazy<unknown>
+isReactiveExecutor(executor: Core.BaseExecutor<unknown>): executor is Core.Reactive<unknown>
+isStaticExecutor(executor: Core.BaseExecutor<unknown>): executor is Core.Static<unknown>
+isPreset(input: unknown): input is Core.Preset<unknown>
 ```
 
 ---
