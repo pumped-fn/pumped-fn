@@ -40,6 +40,14 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Copy docs to packages/next
+        run: |
+          mkdir -p packages/next/docs
+          cp -r llm/*.md packages/next/docs/
+          if [ -d "llm/patterns" ]; then
+            cp -r llm/patterns packages/next/docs/
+          fi
+
       - name: Run tests
         run: pnpm test --passWithNoTests
 

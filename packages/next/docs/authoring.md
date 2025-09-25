@@ -1,1 +1,0 @@
-../../llm/authoring.md
