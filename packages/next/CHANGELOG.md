@@ -1,5 +1,13 @@
 # @pumped-fn/core-next
 
+## 0.5.67
+
+### Patch Changes
+
+- [`ab870ee`](https://github.com/pumped-fn/pumped-fn/commit/ab870ee31e3d3c8565b02498566208b096cc991c) Thanks [@lagz0ne](https://github.com/lagz0ne)! - chore: bring back is\* api
+
+- [`e5d33df`](https://github.com/pumped-fn/pumped-fn/commit/e5d33dfe593d9a7057c59bffa5553839cec0d9f0) Thanks [@lagz0ne](https://github.com/lagz0ne)! - improve the flow aapi
+
 ## 0.5.66
 
 ### Patch Changes
