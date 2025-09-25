@@ -2,11 +2,19 @@
 
 _Comprehensive guide for building extensions that extend scope and flow functionality_
 
+**Important**: Always refer to [api.md](./api.md) for actual API signatures and available methods. Do not make assumptions about APIs.
+
 ## Core Concepts
 
-Extensions extend the library through a unified API that works across both scope and flow contexts:
+Extensions (also called plugins) add cross-cutting functionality to existing operations through a unified API that works across both scope and flow contexts:
 
-**Scope Extensions**: Extend executor resolution, dependency management, and reactive systems from [llm.md](./llm.md)
+**Cross-cutting Concerns**: Operations that span multiple components
+- Opening transactions per pod
+- Logging all executions
+- Performance monitoring
+- Error tracking
+
+**Scope Extensions**: Extend executor resolution, dependency management, and reactive systems from [core.md](./core.md)
 **Flow Extensions**: Extend structured business logic and validation systems from [flow.md](./flow.md)
 
 ### Key Principle
@@ -59,7 +67,7 @@ interface Extension.ExecutionContext {
 - `scope.entries()` - Inspect cache state
 - `scope.registeredExecutors()` - Access all registered executors
 - `scope.accessor(executor)` - Direct executor access
-- Full reactive system integration from [Reactive Updates](./llm.md#reactive-updates)
+- Full reactive system integration from [Reactive Updates](./core.md#reactive-updates)
 
 ### Operation Wrapping vs Events
 
@@ -553,7 +561,7 @@ init(scope) {
 
 ## Integration with Core Patterns
 
-### With [State + Controller + Display Pattern](./llm.md#pattern-1-state--controller--display-most-common)
+### With [State + Controller + Display Pattern](./core.md#pattern-1-state--controller--display-most-common)
 ```typescript
 import { name } from '@pumped-fn/core-next'
 
@@ -711,5 +719,389 @@ export const productionTelemetry = (options: {
 - Integration tests with scope/flow
 - Performance impact testing
 - Error condition testing
+
+## Complete Production Telemetry Extension
+
+```typescript
+import { Extension, createScope, provide, derive, flow, accessor, name } from "@pumped-fn/core-next"
+import * as errors from "@pumped-fn/core-next"
+
+interface TelemetryData {
+  executorMetrics: Map<string, ExecutorMetrics>
+  flowMetrics: Map<string, FlowMetrics>
+  systemMetrics: SystemMetrics
+  errorLog: ErrorEntry[]
+}
+
+interface ExecutorMetrics {
+  name: string
+  resolveCount: number
+  updateCount: number
+  errorCount: number
+  totalDuration: number
+  averageDuration: number
+  lastResolvedAt?: Date
+  cacheHitRate: number
+  dependencies: string[]
+}
+
+interface FlowMetrics {
+  name: string
+  executionCount: number
+  successCount: number
+  errorCount: number
+  averageDuration: number
+  parallelExecutions: number
+  maxDepth: number
+}
+
+interface SystemMetrics {
+  startTime: Date
+  totalOperations: number
+  activeExecutors: number
+  memoryUsage: NodeJS.MemoryUsage
+  cacheSize: number
+  errorRate: number
+}
+
+interface ErrorEntry {
+  timestamp: Date
+  executor?: string
+  flow?: string
+  error: Error
+  context: any
+  stack?: string[]
+}
+
+const productionTelemetryExtension = (config?: {
+  enableProfiling?: boolean
+  samplingRate?: number
+  maxErrorLogSize?: number
+  exportInterval?: number
+  exportEndpoint?: string
+}): Extension.Extension & { getTelemetry(): TelemetryData } => {
+  const options = {
+    enableProfiling: config?.enableProfiling ?? true,
+    samplingRate: config?.samplingRate ?? 1.0,
+    maxErrorLogSize: config?.maxErrorLogSize ?? 100,
+    exportInterval: config?.exportInterval ?? 60000,
+    exportEndpoint: config?.exportEndpoint
+  }
+
+  const telemetryData: TelemetryData = {
+    executorMetrics: new Map(),
+    flowMetrics: new Map(),
+    systemMetrics: {
+      startTime: new Date(),
+      totalOperations: 0,
+      activeExecutors: 0,
+      memoryUsage: process.memoryUsage(),
+      cacheSize: 0,
+      errorRate: 0
+    },
+    errorLog: []
+  }
+
+  let exportTimer: NodeJS.Timer | null = null
+  let operationTimer = new Map<string, number>()
+
+  const shouldSample = () => Math.random() < options.samplingRate
+
+  const recordExecutorMetric = (
+    executorName: string,
+    operation: string,
+    duration: number,
+    success: boolean
+  ) => {
+    let metrics = telemetryData.executorMetrics.get(executorName)
+    if (!metrics) {
+      metrics = {
+        name: executorName,
+        resolveCount: 0,
+        updateCount: 0,
+        errorCount: 0,
+        totalDuration: 0,
+        averageDuration: 0,
+        cacheHitRate: 0,
+        dependencies: []
+      }
+      telemetryData.executorMetrics.set(executorName, metrics)
+    }
+
+    if (operation === 'resolve') {
+      metrics.resolveCount++
+      metrics.lastResolvedAt = new Date()
+    } else if (operation === 'update') {
+      metrics.updateCount++
+    }
+
+    if (!success) {
+      metrics.errorCount++
+    }
+
+    metrics.totalDuration += duration
+    const totalOps = metrics.resolveCount + metrics.updateCount
+    metrics.averageDuration = metrics.totalDuration / totalOps
+
+    telemetryData.systemMetrics.totalOperations++
+  }
+
+  const recordFlowMetric = (
+    flowName: string,
+    duration: number,
+    success: boolean,
+    depth: number,
+    isParallel: boolean
+  ) => {
+    let metrics = telemetryData.flowMetrics.get(flowName)
+    if (!metrics) {
+      metrics = {
+        name: flowName,
+        executionCount: 0,
+        successCount: 0,
+        errorCount: 0,
+        averageDuration: 0,
+        parallelExecutions: 0,
+        maxDepth: 0
+      }
+      telemetryData.flowMetrics.set(flowName, metrics)
+    }
+
+    metrics.executionCount++
+    if (success) {
+      metrics.successCount++
+    } else {
+      metrics.errorCount++
+    }
+
+    if (isParallel) {
+      metrics.parallelExecutions++
+    }
+
+    metrics.maxDepth = Math.max(metrics.maxDepth, depth)
+    metrics.averageDuration =
+      (metrics.averageDuration * (metrics.executionCount - 1) + duration) / metrics.executionCount
+  }
+
+  const logError = (error: Error, context: any) => {
+    if (telemetryData.errorLog.length >= options.maxErrorLogSize) {
+      telemetryData.errorLog.shift() // Remove oldest
+    }
+
+    const entry: ErrorEntry = {
+      timestamp: new Date(),
+      error,
+      context,
+      stack: error instanceof errors.DependencyResolutionError
+        ? errors.buildDependencyChain(error.resolutionStack)
+        : undefined
+    }
+
+    if (context.executor) {
+      entry.executor = errors.getExecutorName(context.executor)
+    }
+    if (context.flowName) {
+      entry.flow = context.flowName
+    }
+
+    telemetryData.errorLog.push(entry)
+
+    // Update error rate
+    const totalOps = telemetryData.systemMetrics.totalOperations
+    const totalErrors = telemetryData.errorLog.length
+    telemetryData.systemMetrics.errorRate = totalErrors / totalOps
+  }
+
+  const exportTelemetry = async () => {
+    if (!options.exportEndpoint) return
+
+    try {
+      telemetryData.systemMetrics.memoryUsage = process.memoryUsage()
+      telemetryData.systemMetrics.activeExecutors = telemetryData.executorMetrics.size
+
+      const payload = {
+        timestamp: new Date(),
+        duration: Date.now() - telemetryData.systemMetrics.startTime.getTime(),
+        metrics: {
+          executors: Array.from(telemetryData.executorMetrics.values()),
+          flows: Array.from(telemetryData.flowMetrics.values()),
+          system: telemetryData.systemMetrics,
+          recentErrors: telemetryData.errorLog.slice(-10)
+        }
+      }
+
+      await fetch(options.exportEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      console.log(`Telemetry exported: ${telemetryData.executorMetrics.size} executors, ${telemetryData.flowMetrics.size} flows`)
+    } catch (error) {
+      console.error('Failed to export telemetry:', error)
+    }
+  }
+
+  const extension: Extension.Extension & { getTelemetry(): TelemetryData } = {
+    name: 'production-telemetry',
+
+    async init(scope) {
+      console.log('Production telemetry initialized')
+
+      // Start export timer
+      if (options.exportEndpoint) {
+        exportTimer = setInterval(exportTelemetry, options.exportInterval)
+      }
+
+      // Monitor scope events
+      scope.onChange((event, executor, value) => {
+        if (!shouldSample()) return
+
+        const executorName = name.find(executor) || 'unnamed'
+        const metrics = telemetryData.executorMetrics.get(executorName)
+
+        if (event === 'resolve' && metrics) {
+          const accessor = scope.accessor(executor)
+          const hadCache = !!accessor.lookup()
+          if (hadCache && metrics.resolveCount > 0) {
+            metrics.cacheHitRate =
+              (metrics.cacheHitRate * (metrics.resolveCount - 1) + 1) / metrics.resolveCount
+          }
+        }
+      })
+
+      scope.onError((error, executor) => {
+        logError(error, { executor, operation: 'resolve' })
+      })
+    },
+
+    async wrapResolve(next, { operation, executor, scope }) {
+      if (!shouldSample() && operation === 'resolve') {
+        return next()
+      }
+
+      const executorName = name.find(executor) || 'unnamed'
+      const operationId = `${executorName}-${operation}-${Date.now()}`
+
+      if (options.enableProfiling) {
+        operationTimer.set(operationId, performance.now())
+      }
+
+      try {
+        const result = await next()
+
+        if (options.enableProfiling) {
+          const duration = performance.now() - operationTimer.get(operationId)!
+          operationTimer.delete(operationId)
+          recordExecutorMetric(executorName, operation, duration, true)
+        }
+
+        return result
+      } catch (error) {
+        if (options.enableProfiling) {
+          const duration = performance.now() - operationTimer.get(operationId)!
+          operationTimer.delete(operationId)
+          recordExecutorMetric(executorName, operation, duration, false)
+        }
+
+        logError(error as Error, { executor, operation })
+        throw error
+      }
+    },
+
+    async wrapExecute(context, next, execution) {
+      if (!shouldSample()) {
+        return next()
+      }
+
+      const startTime = performance.now()
+
+      try {
+        const result = await next()
+        const duration = performance.now() - startTime
+
+        recordFlowMetric(
+          execution.flowName || 'unnamed',
+          duration,
+          true,
+          execution.depth,
+          execution.isParallel
+        )
+
+        return result
+      } catch (error) {
+        const duration = performance.now() - startTime
+
+        recordFlowMetric(
+          execution.flowName || 'unnamed',
+          duration,
+          false,
+          execution.depth,
+          execution.isParallel
+        )
+
+        logError(error as Error, {
+          flowName: execution.flowName,
+          depth: execution.depth,
+          isParallel: execution.isParallel
+        })
+
+        throw error
+      }
+    },
+
+    async dispose(scope) {
+      // Final export before shutdown
+      await exportTelemetry()
+
+      // Clear timer
+      if (exportTimer) {
+        clearInterval(exportTimer)
+      }
+
+      // Clear operation timers
+      operationTimer.clear()
+
+      console.log('Production telemetry disposed')
+      console.log('Final metrics:', {
+        totalOperations: telemetryData.systemMetrics.totalOperations,
+        errorRate: telemetryData.systemMetrics.errorRate,
+        executorCount: telemetryData.executorMetrics.size,
+        flowCount: telemetryData.flowMetrics.size
+      })
+    },
+
+    getTelemetry() {
+      return telemetryData
+    }
+  }
+
+  return extension
+}
+
+// Usage in production
+const telemetry = productionTelemetryExtension({
+  enableProfiling: true,
+  samplingRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  exportEndpoint: process.env.TELEMETRY_ENDPOINT,
+  exportInterval: 60000
+})
+
+const scope = createScope({
+  extensions: [telemetry]
+})
+
+// Access telemetry data programmatically
+setInterval(() => {
+  const data = telemetry.getTelemetry()
+  console.log('Current telemetry:', {
+    executors: data.executorMetrics.size,
+    flows: data.flowMetrics.size,
+    errors: data.errorLog.length,
+    errorRate: `${(data.systemMetrics.errorRate * 100).toFixed(2)}%`,
+    memoryUsage: `${Math.round(data.systemMetrics.memoryUsage.heapUsed / 1024 / 1024)}MB`
+  })
+}, 10000)
+```
 
 This extension system enables comprehensive observability, debugging, and extensibility while maintaining the library's generic, dependency-injection focused core.

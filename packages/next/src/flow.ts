@@ -2,7 +2,8 @@ import type { Core, Extension, Flow, Meta, StandardSchemaV1 } from "./types";
 import { createExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
-import { type DataStore, Accessor, accessor } from "./accessor";
+import { accessor } from "./accessor";
+import type { Accessor } from "./types";
 import { custom } from "./ssch";
 import { meta } from "./meta";
 
@@ -35,10 +36,10 @@ const flowDefinitionMeta = meta<Flow.Definition<any, any, any>>(
 );
 
 export const FlowExecutionContext: {
-  depth: Accessor<number>;
-  flowName: Accessor<string | undefined>;
-  parentFlowName: Accessor<string | undefined>;
-  isParallel: Accessor<boolean>;
+  depth: Accessor.AccessorWithDefault<number>;
+  flowName: Accessor.Accessor<string | undefined>;
+  parentFlowName: Accessor.Accessor<string | undefined>;
+  isParallel: Accessor.AccessorWithDefault<boolean>;
 } = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
@@ -138,7 +139,9 @@ function define<I, S, E>(
   );
 }
 
-class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
+class FlowContext<I, S, E>
+  implements Flow.Context<I, S, E>, Accessor.DataStore
+{
   private contextData = new Map<unknown, unknown>();
 
   constructor(
@@ -260,25 +263,12 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     )) as any;
   }
 
-  async executeParallel<T extends ReadonlyArray<[Flow.UFlow, any]>>(
-    flows: T,
-    options?: Flow.ParallelExecutionOptions
-  ): Promise<
-    Flow.ParallelExecutionResult<{
-      [K in keyof T]: T[K] extends [infer F, any]
-        ? F extends Flow.UFlow
-          ? Awaited<Flow.InferOutput<F>>
-          : never
-        : never;
-    }>
-  >;
-
   async executeParallel<
     T extends ReadonlyArray<
       [Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]
     >
   >(
-    items: T,
+    items: { [K in keyof T]: T[K] },
     options?: Flow.ParallelExecutionOptions
   ): Promise<
     Flow.ParallelExecutionResult<{
@@ -287,6 +277,19 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
           ? Flow.OK<O> | Flow.KO<unknown>
           : F extends Flow.MultiFnExecutor<any[], infer O>
           ? Flow.OK<O> | Flow.KO<unknown>
+          : never
+        : never;
+    }>
+  >;
+
+  async executeParallel<T extends ReadonlyArray<[Flow.UFlow, any]>>(
+    flows: { [K in keyof T]: T[K] },
+    options?: Flow.ParallelExecutionOptions
+  ): Promise<
+    Flow.ParallelExecutionResult<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends Flow.UFlow
+          ? Awaited<Flow.InferOutput<F>>
           : never
         : never;
     }>
@@ -304,7 +307,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       ]
     >
   >(
-    mixed: T,
+    mixed: { [K in keyof T]: T[K] },
     options?: Flow.ParallelExecutionOptions
   ): Promise<
     Flow.ParallelExecutionResult<{
@@ -333,7 +336,7 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
     >,
     options?: Flow.ParallelExecutionOptions
   ): Promise<any> {
-    const failureMode = options?.failureMode || "continue";
+    const mode = options?.mode || "all-settled";
     const errorMapper = options?.errorMapper;
     const onItemComplete = options?.onItemComplete;
 
@@ -404,7 +407,14 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
 
     let results: any[];
 
-    if (failureMode === "fail-fast") {
+    if (mode === "race") {
+      const promises = items.map((item, index) =>
+        executeItem(item, index).then((result) => ({ result, index }))
+      );
+      const { result, index } = await Promise.race(promises);
+      results = [result];
+      onItemComplete?.(result, index);
+    } else if (mode === "all") {
       results = [];
       for (let i = 0; i < items.length; i++) {
         const result = await executeItem(items[i], i);
@@ -419,7 +429,8 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       );
     }
 
-    const total = failureMode === "fail-fast" ? results.length : items.length;
+    const total =
+      mode === "all" || mode === "race" ? results.length : items.length;
     const succeeded = results.filter((r) => r.type === "ok").length;
     const failed = results.filter((r) => r.type === "ko").length;
 
@@ -430,21 +441,6 @@ class FlowContext<I, S, E> implements Flow.Context<I, S, E>, DataStore {
       resultType = "all-ko";
     } else {
       resultType = "partial";
-    }
-
-    if (failureMode === "fail-all" && failed > 0) {
-      const causes = results
-        .filter((r) => r.type === "ko")
-        .map((r) => r.cause || r.data);
-      throw this.ko(
-        {
-          type: "parallel-execution-failed",
-          message: `${failed} out of ${total} parallel executions failed`,
-          individualResults: results,
-          causes,
-        } as any,
-        { cause: causes }
-      );
     }
 
     return {
@@ -493,7 +489,9 @@ async function execute<I, S, E>(
   options?: {
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
-    initialContext?: Array<[Accessor<any>, any]> | Map<unknown, unknown>;
+    initialContext?:
+      | Array<[Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]>
+      | Map<unknown, unknown>;
     presets?: Core.Preset<unknown>[];
   }
 ): Promise<Flow.OutputLike<S, E>> {

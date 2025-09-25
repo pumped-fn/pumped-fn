@@ -71,7 +71,6 @@ describe("Core Functionality", () => {
       const executorA = createExecutor(() => 1, undefined, []);
       const executorB = createExecutor(() => 1, undefined, []);
 
-      // Set up circular dependency manually
       (executorA as any).dependencies = { b: executorB };
       (executorB as any).dependencies = { a: executorA };
       (executorA as any).factory = (deps: { b: number }) => deps.b + 1;
@@ -143,7 +142,6 @@ describe("Core Functionality", () => {
       await scope.resolve(executor);
       await scope.dispose();
 
-      // Disposal completed without errors
       expect(true).toBe(true);
     });
   });

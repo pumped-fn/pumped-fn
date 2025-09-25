@@ -1,184 +1,139 @@
-# @pumped-fn/core-next Documentation Index
+# @pumped-fn/core-next Documentation
 
-_Expert-level documentation for context engineering and component development_
+_Graph-based dependency injection and orchestration for TypeScript applications_
 
----
+## 🚀 Quick Start
 
-# Coding style to strictly follow
-- strictly no type of any. Type casting is normally caused by missing of some type definitions. Design the type in layers so that won't happen
-- *ALWAYS* make sure typecheck passed. If there's no typecheck instruction, install typescript in the closest package.json as dev dependency and run `<package manager to detect> tsc --noEmit`
-- *ALWAYS* make typecheck passed for both code and tests. Need to inspect the tsconfig.json upfront to understand of the file coverages
-- *ALWAYS* ignore extension import for .ts and .js
-- Strictly no comments in code. Make the name of variables meaningful so it won't impact the readability
-- *ALWAYS* put testability in mind on composing code. Focus on integration layers so we will not be overwhelmed by too small components
-- *ALWAYS* wrap nodesdk/browser usage in `provide` and extract only the material that we actually use. For example, `fetch` is built-in, wrapping fetch into provide and reexporting it gives us ability to mock by using `preset`. Or `node:fs` is node sdk library, but we use very limited amount of fs, as such, it's easier to wrap and expose the function that we used, rather than everything
-
-## Document Organization
-
-### Core Library Documentation
-
-#### [**api.md**](./api.md) - Complete API Reference
-**Primary Context**: Comprehensive API surface for LLM discovery
-- **All Public APIs**: Complete listing of exported functions, classes, and types
-- **Type Signatures**: Full type definitions for all APIs
-- **Import Paths**: Exact module imports for each API
-- **Quick Discovery**: Task-based and pattern-based API lookup
-- **Error System**: All error classes and utilities
-- **Extension Points**: Complete extension interface documentation
-
-**Use When**: Discovering available APIs, understanding type signatures, finding specific functions, API-first development
-
-#### [**llm.md**](./llm.md) - Core Library Reference
-**Primary Context**: Graph-based dependency resolution system that surpasses traditional DI
-- **Dependency Graph Orchestration**: Automatic resolution ordering vs manual wiring
-- **Graph Traversal Patterns**: Depth-first resolution with intelligent caching
-- **Reactive Graph Updates**: Updates propagate through dependency edges
-- **Graph Lifecycle Management**: Scope creation, resolution, and cleanup phases
-- **Testing with Graph Substitution**: Strategic preset injection into dependency nodes
-
-**Use When**: Understanding graph-centric architecture, implementing dependency resolution, optimizing application structure
-
-#### [**flow.md**](./flow.md) - Business Logic Flows
-**Primary Context**: Structured business logic with validation
-- Input/output validation using StandardSchema
-- Flow definition and handlers
-- Context management and execution
-- Nested and parallel flow patterns
-- Extension integration
-
-**Use When**: Implementing business processes, API handlers, validation-heavy operations
-
-#### [**meta.md**](./meta.md) - Metadata System
-**Primary Context**: Typed metadata decoration without logic inference
-- Meta creation and query patterns
-- Integration with executors and flows
-- Extension configuration via meta
-- Domain-specific metadata design
-
-**Use When**: Building plugins, adding debugging information, configuration management
-
-#### [**accessor.md**](./accessor.md) - Type-Safe Data Access
-**Primary Context**: Type-safe key-value storage with schema validation
-- DataStore pattern for Map-like structures
-- Integration with Flow contexts and Meta containers
-- Schema validation on read/write operations
-- Default value support with AccessorWithDefault
-- Symbol-based key management for conflict avoidance
-
-**Use When**: Managing context data, flow execution state, extension data storage, configuration access, Map-like data structures
-
-#### [**authoring.md**](./authoring.md) - Reusable services/reusable components
-**Primary Context**: Reusable, configurable component patterns via dependency graphs
-- **Graph Configuration Strategies**: Late binding and strategic injection points
-- **Multi-Environment Graph Variations**: Same structure, different configurations
-- **Component Graph Composition**: Building complex dependency hierarchies
-- **Graph-Based Testing**: Mock injection and configuration isolation
-
-**Use When**: Building reusable component, services libraries, implementing configuration systems, creating testable architectures
-
-#### [**extension.md**](./extension.md) - Extension Development
-**Primary Context**: Extending dependency graph functionality and flow execution
-- **Graph-Aware Extensions**: Hook into dependency resolution lifecycle
-- **Graph Telemetry**: Monitor resolution performance and cache efficiency
-- **Graph Debugging**: Inspect dependency chains and resolution paths
-- **Graph Composition**: Extension interaction with dependency hierarchies
-
-**Use When**: Needs cross-cut, repeatable use, verbosity cut, sysmatic enforcement component, non user-input like component (like healthcheck, devtools, observability etc), those components should not impact how user write the business units
-
----
-
-## Context Navigation Strategy
-
-### Context Loading Strategy
-
-| Task | Primary Document | Supporting Documents | Context Size |
-|------|------------------|---------------------|----------------|
-| **API Discovery** | [api.md](./api.md) | - | High (600+ lines) |
-| **Build Applications** | [llm.md](./llm.md) | authoring.md, api.md | High (497 lines) |
-| **Business Logic** | [flow.md](./flow.md) | llm.md, extension.md, accessor.md, api.md | Medium (252 lines) |
-| **Reusable Components** | [authoring.md](./authoring.md) | llm.md, meta.md, api.md | High (400+ lines) |
-| **Extension Development** | [extension.md](./extension.md) | llm.md, meta.md, accessor.md, api.md | Medium (200+ lines) |
-| **Metadata Systems** | [meta.md](./meta.md) | extension.md, accessor.md, api.md | Medium (411 lines) |
-| **Data Access** | [accessor.md](./accessor.md) | flow.md, meta.md, api.md | High (450+ lines) |
-
-**Loading Strategy**: Start with primary document for deep context, then add supporting documents only when needed for cross-system integration.
-
----
-
-## Quick Reference Maps
-
-### API Quick Access
-
-**For comprehensive API documentation with all type signatures and imports, see [api.md](./api.md)**
-
-#### Quick Reference
 ```typescript
-// Core (llm.md)
-provide(() => value), derive([deps], ([d]) => result), createScope(), preset(executor, value)
-executor.reactive, executor.static, scope.resolve(), scope.update(), scope.dispose()
+import { provide, derive, createScope } from "@pumped-fn/core-next";
 
-// Flows (flow.md)
-flow.define({ input, success, error }), flow.handler(deps, handler), flow.execute()
-ctx.ok(data), ctx.ko(error), ctx.execute(subflow, input)
+// Define nodes in dependency graph
+const config = provide(() => ({ port: 3000 }));
+const server = derive([config], ([cfg]) => startServer(cfg.port));
 
-// Meta (meta.md)
-meta(key, schema), meta.find(source), meta.get(source)
-
-// Accessor (accessor.md)
-accessor(key, schema), accessor(key, schema, default), accessor.get(source), accessor.set(source, value)
-accessor.find(source), accessor.preset(value)
-
-// Extensions (extension.md)
-Extension.Extension: { name, wrapResolve, wrapExecute, init, initPod }
-
-// Authoring (authoring.md)
-meta(key, schema), createScope({ meta: [...metas] }), configMeta.get(ctl.scope)
+// Resolve graph and run application
+const scope = createScope();
+await scope.resolve(server); // Automatically resolves config first
 ```
 
-### Common Task Mapping
+## 📚 Documentation Structure
 
-| Task | Primary Document | Supporting Documents |
-|------|------------------|---------------------|
-| Discover all APIs | api.md | - |
-| Find specific function | api.md | relevant concept doc |
-| Create app structure | llm.md | authoring.md, api.md |
-| Build API handlers | flow.md | llm.md, extension.md, accessor.md, api.md |
-| Design reusable components | authoring.md | llm.md, meta.md, api.md |
-| Add monitoring/logging | extension.md | meta.md, accessor.md, api.md |
-| Configure for different environments | authoring.md | llm.md, api.md |
-| Test business logic | flow.md | authoring.md, accessor.md, api.md |
-| Debug dependency issues | llm.md | extension.md, api.md |
-| Create custom validation | flow.md | meta.md, api.md |
-| Manage context data | accessor.md | flow.md, extension.md, api.md |
-| Access Map-like data structures | accessor.md | flow.md, api.md |
+### Getting Started
 
----
+#### [**concepts.md**](./concepts.md) - Core Concepts
+Foundation for understanding pumped-fn's dependency graph architecture
+- Dependency graph theory and visualization
+- Core building blocks (Executors, Flows, Meta, Accessor)
+- Graph resolution lifecycle
+- Architecture patterns
 
-## Context Engineering Guidelines
+#### [**api.md**](./api.md) - API Reference
+- Complete function signatures and type definitions
+- Import paths and module exports
+- Available methods and properties
 
-### Single Document Context (Recommended)
-**When to use**: Understanding specific concepts, implementing focused features
-**Benefits**: Deep context, no cognitive load from other concepts
-**Strategy**: Load one document fully, refer to index for cross-references
+### Building Applications
 
-### Multi-Document Context (Advanced)
-**When to use**: Complex integrations, full-stack implementations
-**Benefits**: Complete understanding across subsystems
-**Strategy**: Load related documents in sequence, starting with primary context
+#### [**configuration.md**](./configuration.md) - Configuration Management
+Managing configuration from userland to library components
+- Reading from environment, files, CLI
+- Transforming to type-safe meta configuration
+- Injecting via scope
+- Environment-specific configurations
 
-### Reference Context (Expert)
-**When to use**: API lookups, pattern verification, debugging
-**Benefits**: Quick access to specific information
-**Strategy**: Use quick reference maps and targeted document sections
+#### [**testing.md**](./testing.md) - Testing Strategies
+Graph-aware testing patterns
+- Unit testing with presets
+- Integration testing approaches
+- Configuration testing
+- Mock strategies and utilities
 
-**Context Tips**: Start narrow with task-specific document → Add supporting docs only for integration → Use index to prevent overflow
+#### [**troubleshooting.md**](./troubleshooting.md) - Troubleshooting Guide
+Common issues and solutions
+- Graph resolution errors
+- Reactive update issues
+- Memory management
+- Performance optimization
 
----
+### Core Library
 
-## Document Relationships
+#### [**core.md**](./core.md) - Core Dependency System
+Core dependency graph system and reactive patterns
+- Graph traversal and resolution
+- Reactive updates and subscriptions
+- Scope and pod lifecycle
+- Controller patterns
 
-**Document Dependencies**: api.md (reference) + llm.md (core) → flow.md, authoring.md, extension.md → meta.md (cross-cutting)
+#### [**flow.md**](./flow.md) - Business Logic
+Structured business flows with validation
+- Flow definition and handlers
+- Context management
+- Nested and parallel execution
+- Input/output validation
 
-**Integration Points**: api.md provides complete reference; authoring.md uses llm.md executors with meta.md configuration; extension.md extends flow.md; meta.md decorates all types
+#### [**meta.md**](./meta.md) - Metadata System
+Type-safe component decoration
+- Meta creation and queries
+- Component configuration
+- Extension integration
 
-This index ensures optimal context loading while maintaining expert-level depth across all pumped-fn development scenarios.
+#### [**accessor.md**](./accessor.md) - Data Access
+Type-safe runtime data management
+- DataStore patterns
+- Context data access
+- Default value support
+
+#### [**authoring.md**](./authoring.md) - Component Authoring
+Building reusable, configurable components
+- Meta-based configuration
+- Multi-environment support
+- Component composition
+
+#### [**extension.md**](./extension.md) - Extensions
+Extending framework functionality
+- Lifecycle hooks
+- Telemetry and monitoring
+- Cross-cutting concerns
+
+### Examples
+
+#### [**patterns/examples.md**](./patterns/examples.md) - Production Examples
+Complete working implementations
+- Order processing with error handling
+- Database service patterns
+- Telemetry integration
+- Application bootstrap
+- Testing setups
+
+## 🧭 Quick Navigation
+
+### By Task
+
+| Task | Start With | Also See |
+|------|------------|----------|
+| **New to pumped-fn** | [concepts.md](./concepts.md) | [api.md](./api.md) |
+| **Setting up configuration** | [configuration.md](./configuration.md) | [meta.md](./meta.md) |
+| **Writing tests** | [testing.md](./testing.md) | [configuration.md](./configuration.md) |
+| **Building services** | [authoring.md](./authoring.md) | [core.md](./core.md) |
+| **Implementing business logic** | [flow.md](./flow.md) | [accessor.md](./accessor.md) |
+| **Adding monitoring** | [extension.md](./extension.md) | [meta.md](./meta.md) |
+| **Looking up APIs** | [api.md](./api.md) | - |
+
+### By Architecture Pattern
+
+| Pattern | Documents |
+|---------|-----------|
+| **Dependency Injection** | [concepts.md](./concepts.md), [core.md](./core.md) |
+| **Configuration Management** | [configuration.md](./configuration.md), [meta.md](./meta.md) |
+| **Testing & Mocking** | [testing.md](./testing.md) |
+| **Reactive Updates** | [core.md](./core.md) |
+| **Business Flows** | [flow.md](./flow.md) |
+| **Cross-cutting Concerns** | [extension.md](./extension.md) |
+
+## 🎯 Core Principles
+
+1. **Graph Resolution** - Dependencies form a directed acyclic graph, resolved automatically
+2. **Lazy Evaluation** - Nodes execute only when needed
+3. **Type Safety** - Full TypeScript inference throughout
+4. **Testability** - Easy mocking via presets
+5. **No Comments** - Code should be self-documenting through clear naming

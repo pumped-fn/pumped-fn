@@ -1,10 +1,62 @@
 # Flow API - @pumped-fn/core-next
 
-_Extension to pumped-fn for structured business logic flows with input/output validation_
+_Structured business logic flows with input/output validation_
+
+**Important**: Always refer to [api.md](./api.md) for actual API signatures and available methods.
 
 ## Core Concepts
 
 Flow consists Validated Business Logic + Dependency Injection + Context Management
+
+## Designing a flow
+A flow is a composed of steps, processing in a specific order. A flow must own its outputs, not only happy case but also all of its edge cases, as such, it'll be normal to wrap around some executions into flow's error specific.
+
+Flow has access to input as well as a context. While it's easy to use Context for all type of data, those are defined for different purposes. Input should be sufficient to process the business flow. Context, on the other hand should be used to store information to support aspect oriented needs.
+
+For example, a flow about hotel booking, input will look like
+- an user information (who's booking)
+- booking details (whereabout, dates, detail requirement etc)
+
+in the context, information will be like
+- ips, devices where the request happen
+- database transaction to guarantee consistency
+- trace id of the request
+
+### Context Architecture
+
+Flows are the unit for short-span operations. Each flow maintains:
+- **Root Context**: Map-like data structure for flow-specific data
+- **Context Forking**: Sub-flows receive forked version of parent context
+- **Execution Control**: Parent flow controls all sub-executions
+- **Isolation**: Each flow can store its own data while inheriting parent data
+
+Sub-flows can execute in sequential or parallel mode, with context organized accordingly:
+```typescript
+// Sequential: Context flows through each step
+const result1 = await ctx.execute(flow1, input1);
+const result2 = await ctx.execute(flow2, input2);
+
+// Parallel: Each gets isolated forked context
+const results = await ctx.executeParallel([
+  [flow1, input1],
+  [flow2, input2]
+]);
+
+// Handle parallel results
+if (results.type === 'all-success') {
+  // All flows succeeded
+  const [output1, output2] = results.data;
+} else {
+  // Some flows may have failed
+  results.data.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      console.log(`Flow ${index} result:`, result.value);
+    } else {
+      console.error(`Flow ${index} failed:`, result.reason);
+    }
+  });
+}
+```
 
 ### Schema System
 Uses [standardschema v1](https://github.com/standard-schema/standard-schema) - a standard for validation libraries.
@@ -86,55 +138,87 @@ if (result.isOk()) {
   console.log(result.data.code);
 }
 
-// With scope and plugins
+// With scope and extensions
 const result = await flow.execute(handler, input, {
   scope: myScope,
-  plugins: [loggingPlugin, tracingPlugin],
+  extensions: [loggingExtension, tracingExtension],
   initialContext: [[contextKey, contextValue]],
 });
 ```
 
 ## Patterns
 
-### 1. Simple Flow
+### 1. Simple Flow with Validation and Logging
 
 ```typescript
 const calcFlow = flow.define({
   name: "calc.add",
-  input: schema<{ a: number; b: number }>(),
-  success: schema<{ result: number }>(),
-  error: schema<{ code: string }>(),
+  input: custom<{ a: number; b: number }>(),
+  success: custom<{ result: number }>(),
+  error: custom<{ code: string; message: string }>(),
 });
 
-const calc = calcFlow.handler(async (ctx, input) => {
-  if (isNaN(input.a) || isNaN(input.b)) {
-    return ctx.ko({ code: "INVALID_INPUT" });
-  }
-  return ctx.ok({ result: input.a + input.b });
+const calc = calcFlow.handler(
+  { logger },
+  async ({ logger }, ctx, input) => {
+    const log = logger.child({ flow: "calc.add" });
+
+    if (isNaN(input.a) || isNaN(input.b)) {
+      log.warn("Invalid input received", { input });
+      return ctx.ko({
+        code: "INVALID_INPUT",
+        message: "Both inputs must be valid numbers"
+      });
+    }
+
+    const result = input.a + input.b;
+    log.info("Calculation completed", { result });
+    return ctx.ok({ result });
 });
 ```
 
-### 2. Flow with Dependencies
+### 2. Flow with Dependencies and Error Handling
 
 ```typescript
 const userFlow = flow.define({
   name: "user.get",
-  input: schema<{ userId: string }>(),
-  success: schema<{ user: User }>(),
-  error: schema<{ code: string; message: string }>(),
+  input: custom<{ userId: string }>(),
+  success: custom<{ user: User }>(),
+  error: custom<{ code: string; message: string; details?: any }>(),
 });
 
 const getUser = userFlow.handler(
-  { db: dbExecutor },
-  async ({ db }, ctx, input) => {
-    const user = await db.findUser(input.userId);
-    if (!user) {
+  { db: dbExecutor, logger },
+  async ({ db, logger }, ctx, input) => {
+    const log = logger.child({
+      flow: "user.get",
+      userId: input.userId,
+      traceId: ctx.get("traceId")
+    });
+
+    log.debug("Fetching user from database");
+
+    try {
+      const user = await db.findUser(input.userId);
+
+      if (!user) {
+        log.warn("User not found", { userId: input.userId });
+        return ctx.ko({
+          code: "USER_NOT_FOUND",
+          message: `User ${input.userId} not found`,
+        });
+      }
+
+      log.info("User retrieved successfully");
+      return ctx.ok({ user });
+    } catch (error) {
+      log.error("Database error", { error });
       return ctx.ko({
-        code: "USER_NOT_FOUND",
-        message: `User ${input.userId} not found`,
+        code: "DB_ERROR",
+        message: "Failed to retrieve user",
+        details: error
       });
     }
-    return ctx.ok({ user });
   }
 );
 ```
@@ -444,10 +528,9 @@ const metricsExtension: Extension.Extension = {
 5. **Type Safety**: Full TypeScript inference for inputs, outputs, and dependencies
 6. **Context Data Access**: Use DataAccessor for all Map-like context data - provides type safety, validation, and defaults
 
-## Flow coding styles
+## Flow Patterns
 
-External facing flow (normally the composing one closer to the entrypoint) meant to be explicit, the spec is likely to be shared with client for RPC. Those flows go with this style: definition -> handler separately. This normally applies to main business process. Prefer using flow.define -> `.handler`
-
-Internal facing flow (normally the step in the other flow) meant to be implicit, the spec is unlikely to be used anywhere but the current environment. Prefer using flow(def, handler) or flow(def, dependency, handler)
-
-Common standardSchemas are meant to be reusable and composable
+### External vs Internal Flows
+- **External flows**: Use `flow.define()` → `.handler()` for main business processes
+- **Internal flows**: Use inline `flow(def, handler)` for sub-flows
+- StandardSchemas should be reusable and composable

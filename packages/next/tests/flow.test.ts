@@ -304,9 +304,13 @@ describe("FlowV2", () => {
         return ctx.ok({ result: contextValue });
       });
 
-      const result = await flow.execute(impl, { message: "test" }, {
-        initialContext: [[testAccessor, "test-value"]]
-      });
+      const result = await flow.execute(
+        impl,
+        { message: "test" },
+        {
+          initialContext: [[testAccessor, "test-value"]],
+        }
+      );
 
       expect(result.type).toBe("ok");
       expect((result.data as any).result).toBe("test-value");
@@ -320,9 +324,13 @@ describe("FlowV2", () => {
       });
 
       const contextMap = new Map([["testKey", "map-value"]]);
-      const result = await flow.execute(impl, { message: "test" }, {
-        initialContext: contextMap
-      });
+      const result = await flow.execute(
+        impl,
+        { message: "test" },
+        {
+          initialContext: contextMap,
+        }
+      );
 
       expect(result.type).toBe("ok");
       expect((result.data as any).result).toBe("map-value");
@@ -337,7 +345,10 @@ describe("FlowV2", () => {
             return x * 2;
           },
           -5,
-          (error) => ({ code: "MAPPED_ERROR", message: error instanceof Error ? error.message : "Unknown" })
+          (error) => ({
+            code: "MAPPED_ERROR",
+            message: error instanceof Error ? error.message : "Unknown",
+          })
         );
 
         expect(result.type).toBe("ko");
@@ -359,13 +370,16 @@ describe("Flow KO Cause Tracking", () => {
       name: "test.cause",
       input: custom<{ shouldFail: boolean }>(),
       success: custom<{ message: string }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
       if (input.shouldFail) {
         const originalError = new Error("Database connection failed");
-        return ctx.ko({ error: "Business logic error" }, { cause: originalError });
+        return ctx.ko(
+          { error: "Business logic error" },
+          { cause: originalError }
+        );
       }
       return ctx.ok({ message: "success" });
     });
@@ -376,7 +390,9 @@ describe("Flow KO Cause Tracking", () => {
     if (result.type === "ko") {
       expect(result.data.error).toBe("Business logic error");
       expect(result.cause).toBeInstanceOf(Error);
-      expect((result.cause as Error).message).toBe("Database connection failed");
+      expect((result.cause as Error).message).toBe(
+        "Database connection failed"
+      );
     }
   });
 
@@ -385,7 +401,7 @@ describe("Flow KO Cause Tracking", () => {
       name: "inner.flow",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ code: string }>()
+      error: custom<{ code: string }>(),
     });
 
     const innerImpl = innerFlow.handler(async (ctx, input) => {
@@ -400,7 +416,7 @@ describe("Flow KO Cause Tracking", () => {
       name: "outer.flow",
       input: custom<{ data: number }>(),
       success: custom<{ final: number }>(),
-      error: custom<{ message: string }>()
+      error: custom<{ message: string }>(),
     });
 
     const outerImpl = outerFlow.handler(async (ctx, input) => {
@@ -424,7 +440,9 @@ describe("Flow KO Cause Tracking", () => {
       expect(innerKoResult.type).toBe("ko");
       expect(innerKoResult.data.code).toBe("INVALID_VALUE");
       expect(innerKoResult.cause).toBeInstanceOf(Error);
-      expect((innerKoResult.cause as Error).message).toBe("Database constraint violation");
+      expect((innerKoResult.cause as Error).message).toBe(
+        "Database constraint violation"
+      );
     }
   });
 
@@ -433,7 +451,7 @@ describe("Flow KO Cause Tracking", () => {
       name: "test.function",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
@@ -470,14 +488,14 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "test.parallel",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
       const parallelResult = await ctx.executeParallel([
-        [(x: number) => x + 1, input.message],
+        [(x: string) => x + 1, input.message],
         [(x: number) => x * 2, input.message],
-        [(x: number) => x - 1, input.message]
+        [(x: number) => x - 1, input.message],
       ]);
 
       expect(parallelResult.type).toBe("all-ok");
@@ -503,17 +521,20 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "test.partial",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
       const parallelResult = await ctx.executeParallel([
         [(x: number) => x + 1, input.message],
-        [(x: number) => {
-          if (x > 5) throw new Error("Too big");
-          return x * 2;
-        }, input.message],
-        [(x: number) => x - 1, input.message]
+        [
+          (x: number) => {
+            if (x > 5) throw new Error("Too big");
+            return x * 2;
+          },
+          input.message,
+        ],
+        [(x: number) => x - 1, input.message],
       ]);
 
       expect(parallelResult.type).toBe("partial");
@@ -525,7 +546,9 @@ describe("Flow Parallel Execution with Result Type", () => {
       expect(parallelResult.results[1].type).toBe("ko");
       if (parallelResult.results[1].type === "ko") {
         expect(parallelResult.results[1].cause).toBeInstanceOf(Error);
-        expect((parallelResult.results[1].cause as Error).message).toBe("Too big");
+        expect((parallelResult.results[1].cause as Error).message).toBe(
+          "Too big"
+        );
       }
       expect(parallelResult.results[2].type).toBe("ok");
 
@@ -535,23 +558,29 @@ describe("Flow Parallel Execution with Result Type", () => {
     await flow.execute(impl, { message: 10 });
   });
 
-  test("executeParallel with fail-fast mode stops on first failure", async () => {
+  test("executeParallel with all mode stops on first failure", async () => {
     const testFlow = flow.define({
       name: "test.fail.fast",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
-      const parallelResult = await ctx.executeParallel([
-        [(x: number) => {
-          if (x > 5) throw new Error("First error");
-          return x + 1;
-        }, input.message],
-        [(x: number) => x * 2, input.message],
-        [(x: number) => x - 1, input.message]
-      ], { failureMode: "fail-fast" });
+      const parallelResult = await ctx.executeParallel(
+        [
+          [
+            (x: number) => {
+              if (x > 5) throw new Error("First error");
+              return x + 1;
+            },
+            input.message,
+          ],
+          [(x: number) => x * 2, input.message],
+          [(x: number) => x - 1, input.message],
+        ],
+        { mode: "all" }
+      );
 
       expect(parallelResult.stats.total).toBe(1);
       expect(parallelResult.stats.succeeded).toBe(0);
@@ -565,34 +594,36 @@ describe("Flow Parallel Execution with Result Type", () => {
     await flow.execute(impl, { message: 10 });
   });
 
-  test("executeParallel with fail-all mode throws aggregated error", async () => {
+  test("executeParallel with all-settled mode returns all results including failures", async () => {
     const testFlow = flow.define({
       name: "test.fail.all",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
-      try {
-        await ctx.executeParallel([
+      const parallelResult = await ctx.executeParallel(
+        [
           [(x: number) => x + 1, input.message],
-          [(x: number) => {
-            throw new Error("Intentional error");
-          }, input.message]
-        ], { failureMode: "fail-all" });
+          [
+            (x: number): string => {
+              throw new Error("Intentional error");
+            },
+            input.message,
+          ],
+        ],
+        { mode: "all-settled" }
+      );
 
-        return ctx.ko({ error: "Should not reach here" });
-      } catch (error: unknown) {
-        expect(error).toBeDefined();
-        const koError = error as any;
-        expect(koError.type).toBe("ko");
-        expect(koError.data.type).toBe("parallel-execution-failed");
-        expect(koError.data.individualResults).toHaveLength(2);
-        expect(koError.cause).toBeInstanceOf(Array);
+      expect(parallelResult.type).toBe("partial");
+      expect(parallelResult.results).toHaveLength(2);
+      expect(parallelResult.results[0].type).toBe("ok");
+      expect(parallelResult.results[1].type).toBe("ko");
+      expect(parallelResult.stats.succeeded).toBe(1);
+      expect(parallelResult.stats.failed).toBe(1);
 
-        return ctx.ok({ result: input.message });
-      }
+      return ctx.ok({ result: input.message });
     });
 
     await flow.execute(impl, { message: 10 });
@@ -603,26 +634,38 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "test.error.mapper",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
-      const parallelResult = await ctx.executeParallel([
-        [(x: number) => x + 1, input.message],
-        [(x: number) => {
-          throw new Error("Original error");
-        }, input.message]
-      ], {
-        errorMapper: (error, index) => ({
-          transformedError: `Error at index ${index}: ${(error as Error).message}`
-        })
-      });
+      const parallelResult = await ctx.executeParallel(
+        [
+          [(x: number) => x + 1, input.message],
+          [
+            (x: number) => {
+              throw new Error("Original error");
+            },
+            input.message,
+          ],
+        ],
+        {
+          errorMapper: (error, index) => ({
+            transformedError: `Error at index ${index}: ${
+              (error as Error).message
+            }`,
+          }),
+        }
+      );
 
       expect(parallelResult.results[1].type).toBe("ko");
       if (parallelResult.results[1].type === "ko") {
-        expect((parallelResult.results[1].data as any).transformedError).toBe("Error at index 1: Original error");
+        expect((parallelResult.results[1].data as any).transformedError).toBe(
+          "Error at index 1: Original error"
+        );
         expect(parallelResult.results[1].cause).toBeInstanceOf(Error);
-        expect((parallelResult.results[1].cause as Error).message).toBe("Original error");
+        expect((parallelResult.results[1].cause as Error).message).toBe(
+          "Original error"
+        );
       }
 
       return ctx.ok({ result: input.message });
@@ -636,20 +679,31 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "test.callback",
       input: custom<{ message: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const onItemComplete = vi.fn();
 
     const impl = testFlow.handler(async (ctx, input) => {
-      await ctx.executeParallel([
-        [(x: number) => x + 1, input.message],
-        [(x: number) => x * 2, input.message]
-      ], { onItemComplete });
+      await ctx.executeParallel(
+        [
+          [(x: number) => x + 1, input.message],
+          [(x: number) => x * 2, input.message],
+        ],
+        { onItemComplete }
+      );
 
       expect(onItemComplete).toHaveBeenCalledTimes(2);
-      expect(onItemComplete).toHaveBeenNthCalledWith(1, expect.objectContaining({ type: "ok" }), 0);
-      expect(onItemComplete).toHaveBeenNthCalledWith(2, expect.objectContaining({ type: "ok" }), 1);
+      expect(onItemComplete).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ type: "ok" }),
+        0
+      );
+      expect(onItemComplete).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ type: "ok" }),
+        1
+      );
 
       return ctx.ok({ result: input.message });
     });
@@ -662,7 +716,7 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "inner.flow",
       input: custom<{ x: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ code: string }>()
+      error: custom<{ code: string }>(),
     });
 
     const innerImpl = innerFlow.handler(async (ctx, input) => {
@@ -677,17 +731,20 @@ describe("Flow Parallel Execution with Result Type", () => {
       name: "test.flow.parallel",
       input: custom<{ values: number[] }>(),
       success: custom<{ results: number[] }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const impl = testFlow.handler(async (ctx, input) => {
       const parallelResult = await ctx.executeParallel([
         [innerImpl, { x: input.values[0] }],
-        [innerImpl, { x: input.values[1] }]
+        [innerImpl, { x: input.values[1] }],
       ]);
 
-      if (parallelResult.type === "partial" || parallelResult.type === "all-ko") {
-        const firstKo = parallelResult.results.find(r => r.type === "ko");
+      if (
+        parallelResult.type === "partial" ||
+        parallelResult.type === "all-ko"
+      ) {
+        const firstKo = parallelResult.results.find((r) => r.type === "ko");
         expect(firstKo?.cause).toBeInstanceOf(Error);
         expect((firstKo?.cause as Error).message).toBe("Database error");
       }
@@ -696,6 +753,169 @@ describe("Flow Parallel Execution with Result Type", () => {
     });
 
     await flow.execute(impl, { values: [5, -3] });
+  });
+
+  test("executeParallel maintains type discrimination and position", async () => {
+    const testFlow = flow.define({
+      name: "test.type.discrimination",
+      input: custom<{ value: number }>(),
+      success: custom<{ results: Array<string | number> }>(),
+      error: custom<{ error: string }>(),
+    });
+
+    const impl = testFlow.handler(async (ctx, input) => {
+      const parallelResult = await ctx.executeParallel([
+        [(x: number) => `string-${x}`, input.value],
+        [(x: number) => x * 2, input.value],
+        [(x: number) => x + 10, input.value],
+      ]);
+
+      const results: Array<string | number> = [];
+      for (let i = 0; i < parallelResult.results.length; i++) {
+        const result = parallelResult.results[i];
+        if (result.type === "ok") {
+          results.push(result.data);
+        }
+      }
+
+      expect(results[0]).toBe(`string-${input.value}`);
+      expect(results[1]).toBe(input.value * 2);
+      expect(results[2]).toBe(input.value + 10);
+
+      expect(parallelResult.type).toBe("all-ok");
+      expect(parallelResult.results.every((r) => r.type === "ok")).toBe(true);
+
+      return ctx.ok({ results });
+    });
+
+    await flow.execute(impl, { value: 5 });
+  });
+
+  test("executeParallel with race mode returns first completion", async () => {
+    const testFlow = flow.define({
+      name: "test.race.mode",
+      input: custom<{ message: number }>(),
+      success: custom<{ result: string }>(),
+      error: custom<{ error: string }>(),
+    });
+
+    const impl = testFlow.handler(async (ctx, input) => {
+      const parallelResult = await ctx.executeParallel(
+        [
+          [(x: number) => x + 1, input.message],
+          [
+            async (x: number) => {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              return x * 2;
+            },
+            input.message,
+          ],
+          [(x: number) => x - 1, input.message],
+        ],
+        { mode: "race" }
+      );
+
+      expect(parallelResult.results).toHaveLength(1);
+      expect(parallelResult.results[0].type).toBe("ok");
+      expect(parallelResult.stats.total).toBe(1);
+      expect(parallelResult.stats.succeeded).toBe(1);
+      expect(parallelResult.stats.failed).toBe(0);
+
+      return ctx.ok({ result: "race completed" });
+    });
+
+    await flow.execute(impl, { message: 5 });
+  });
+
+  test("executeParallel with race mode returns first error if it completes first", async () => {
+    const testFlow = flow.define({
+      name: "test.race.error",
+      input: custom<{ message: number }>(),
+      success: custom<{ result: string }>(),
+      error: custom<{ error: string }>(),
+    });
+
+    const impl = testFlow.handler(async (ctx, input) => {
+      const parallelResult = await ctx.executeParallel(
+        [
+          [
+            (x: number) => {
+              throw new Error("Fast error");
+            },
+            input.message,
+          ],
+          [
+            async (x: number) => {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              return x * 2;
+            },
+            input.message,
+          ],
+        ],
+        { mode: "race" }
+      );
+
+      expect(parallelResult.results).toHaveLength(1);
+      expect(parallelResult.results[0].type).toBe("ko");
+      expect(parallelResult.stats.total).toBe(1);
+      expect(parallelResult.stats.succeeded).toBe(0);
+      expect(parallelResult.stats.failed).toBe(1);
+
+      return ctx.ok({ result: "race error handled" });
+    });
+
+    await flow.execute(impl, { message: 5 });
+  });
+
+  test("executeParallel preserves position-based types", async () => {
+    const testFlow = flow.define({
+      name: "test.position.types",
+      input: custom<{ value: number }>(),
+      success: custom<{ results: Array<string | number | boolean> }>(),
+      error: custom<{ error: string }>(),
+    });
+
+    const impl = testFlow.handler(async (ctx, input) => {
+      const parallelResult = await ctx.executeParallel([
+        [(x: number): number => x + 1, input.value],
+        [(x: number): string => `val-${x}`, input.value],
+        [(x: number): boolean => x > 5, input.value],
+      ]);
+
+      expect(parallelResult.type).toBe("all-ok");
+      expect(parallelResult.results).toHaveLength(3);
+
+      const [first, second, third] = parallelResult.results;
+
+      expect(first.type).toBe("ok");
+      expect(second.type).toBe("ok");
+      expect(third.type).toBe("ok");
+
+      if (first.type === "ok") {
+        expect(first.data).toBe(input.value + 1);
+        const numVar: number = first.data;
+        expect(typeof first.data).toBe("number");
+        expect(numVar).toBe(input.value + 1);
+      }
+
+      if (second.type === "ok") {
+        expect(typeof second.data).toBe("string");
+        expect(second.data).toBe(`val-${input.value}`);
+        const strVar: string = second.data;
+        expect(strVar).toBe(`val-${input.value}`);
+      }
+
+      if (third.type === "ok") {
+        expect(typeof third.data).toBe("boolean");
+        expect(third.data).toBe(input.value > 5);
+        const boolVar: boolean = third.data;
+        expect(boolVar).toBe(input.value > 5);
+      }
+
+      return ctx.ok({ results: [first.data, second.data, third.data] as any });
+    });
+
+    await flow.execute(impl, { value: 7 });
   });
 });
 
@@ -714,19 +934,16 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
     expect(multiArgResult.type).toBe("ok");
     expect(multiArgResult.data).toBe(input.a + 10);
 
-    const errorResult = await ctx.execute(
-      (x: number) => {
-        throw new Error("Test error");
-      },
-      input.a
-    );
+    const errorResult = await ctx.execute((_: number) => {
+      throw new Error("Test error");
+    }, input.a);
     expect(errorResult.type).toBe("ko");
     expect(errorResult.data).toBeInstanceOf(Error);
 
     const parallelResults = await ctx.executeParallel([
       [(x: number) => x + 1, input.a],
       [(a: number, b: number) => a * b, [input.a, 2]],
-      [async (x: number) => x - 1, input.a]
+      [async (x: number) => x - 1, input.a],
     ]);
 
     expect(parallelResults.results[0].type).toBe("ok");
@@ -746,12 +963,9 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
 
   test("handles function errors gracefully", async () => {
     const errorHandler = basicFlow.handler(async (ctx, input) => {
-      const result = await ctx.execute(
-        (x: number) => {
-          throw new Error("Test error");
-        },
-        input.a
-      );
+      const result = await ctx.execute((_: number) => {
+        throw new Error("Test error");
+      }, input.a);
 
       expect(result.type).toBe("ko");
       expect(result.data).toBeInstanceOf(Error);
@@ -768,7 +982,7 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
       name: "mixed.test",
       input: custom<{ x: number }>(),
       success: custom<{ result: number }>(),
-      error: custom<{ error: string }>()
+      error: custom<{ error: string }>(),
     });
 
     const testFlowHandler = customFlow.handler(async (ctx, input) => {
@@ -779,7 +993,7 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
       const results = await ctx.executeParallel([
         [testFlowHandler, { x: input.a }],
         [(n: number) => n + 100, input.a],
-        [(a: number, b: number) => a - b, [input.a, 3]]
+        [(a: number, b: number) => a - b, [input.a, 3]],
       ]);
 
       expect(results.results[0].type).toBe("ok");
@@ -800,11 +1014,14 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
     const errorHandler = basicFlow.handler(async (ctx, input) => {
       const results = await ctx.executeParallel([
         [(x: number) => x * 2, input.a],
-        [(x: number) => {
-          if (x > 5) throw new Error("Too big");
-          return x;
-        }, input.a],
-        [(a: number, b: number) => a + b, [input.a, 1]]
+        [
+          (x: number) => {
+            if (x > 5) throw new Error("Too big");
+            return x;
+          },
+          input.a,
+        ],
+        [(a: number, b: number) => a + b, [input.a, 1]],
       ]);
 
       expect(results.results[0].type).toBe("ok");
@@ -831,21 +1048,33 @@ describe("Function Execution with ctx.execute and ctx.executeParallel", () => {
   test("executes complex nested parallel operations", async () => {
     const complexHandler = basicFlow.handler(async (ctx, input) => {
       const nestedResults = await ctx.executeParallel([
-        [async (x: number) => {
-          const innerParallel = await ctx.executeParallel([
-            [(n: number) => n + 1, x],
-            [(n: number) => n * 2, x]
-          ]);
-          return {
-            sum: (innerParallel.results[0].data as number) + (innerParallel.results[1].data as number),
-            average: ((innerParallel.results[0].data as number) + (innerParallel.results[1].data as number)) / 2
-          };
-        }, input.a]
+        [
+          async (x: number) => {
+            const innerParallel = await ctx.executeParallel([
+              [(n: number) => n + 1, x],
+              [(n: number) => n * 2, x],
+            ]);
+            return {
+              sum:
+                (innerParallel.results[0].data as number) +
+                (innerParallel.results[1].data as number),
+              average:
+                ((innerParallel.results[0].data as number) +
+                  (innerParallel.results[1].data as number)) /
+                2,
+            };
+          },
+          input.a,
+        ],
       ]);
 
       expect(nestedResults.results[0].type).toBe("ok");
-      expect((nestedResults.results[0].data as any).sum).toBe((input.a + 1) + (input.a * 2));
-      expect((nestedResults.results[0].data as any).average).toBe(((input.a + 1) + (input.a * 2)) / 2);
+      expect((nestedResults.results[0].data as any).sum).toBe(
+        input.a + 1 + input.a * 2
+      );
+      expect((nestedResults.results[0].data as any).average).toBe(
+        (input.a + 1 + input.a * 2) / 2
+      );
 
       return ctx.ok({ result: input.a });
     });

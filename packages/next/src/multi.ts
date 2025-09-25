@@ -1,41 +1,22 @@
-/** facilities to add multiple instances (key set) */
 import { createExecutor } from "./executor";
 import { meta } from "./meta";
 import { custom, validate } from "./ssch";
-import { Core, Meta } from "./types";
-import { type StandardSchemaV1 } from "./types";
-
-type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> &
-  ((key: K) => Core.Executor<T>) & {
-    release: (scope: Core.Scope) => Promise<void>;
-    id: Meta.MetaFn<unknown>;
-  };
-
-export type DependentFn<T, K, D> = (
-  dependencies: D,
-  key: K,
-  scope: Core.Controller
-) => Core.Output<T>;
-
-type Option<K> = {
-  keySchema: StandardSchemaV1<K>;
-  /** Key transform will be used to store and retrieve */
-  keyTransform?: (key: K) => unknown;
-};
-
-type DeriveOption<K, D> = Option<K> & {
-  dependencies: D;
-};
+import {
+  type Core,
+  type Meta,
+  type Multi,
+  type StandardSchemaV1,
+} from "./types";
 
 class MultiExecutorImpl<T, K> {
-  private option: Option<K>;
+  private option: Multi.Option<K>;
   private poolId: Meta.MetaFn<any>;
   private keyPool: Map<unknown, Core.Executor<T>>;
   private createNewExecutor: (key: K) => Core.Executor<T>;
   public id: Meta.MetaFn<any>;
 
   constructor(
-    option: Option<K>,
+    option: Multi.Option<K>,
     poolId: Meta.MetaFn<any>,
     keyPool: Map<unknown, Core.Executor<T>>,
     createNewExecutor: (key: K) => Core.Executor<T>
@@ -77,7 +58,9 @@ class MultiExecutorImpl<T, K> {
   async release(scope: Core.Scope): Promise<void> {
     const entries = scope.entries();
     for (const [executor] of entries) {
-      const check = this.poolId.some ? this.poolId.some(executor) : this.poolId.find(executor);
+      const check = this.poolId.some
+        ? this.poolId.some(executor)
+        : this.poolId.find(executor);
       if (check && (Array.isArray(check) ? check.length > 0 : check)) {
         await scope.release(executor);
       }
@@ -86,7 +69,7 @@ class MultiExecutorImpl<T, K> {
 }
 
 function createValidatedExecutor<T, K>(
-  option: Option<K>,
+  option: Multi.Option<K>,
   key: K,
   createExecutorFn: (validatedKey: K) => Core.Executor<T>
 ): Core.Executor<T> {
@@ -95,13 +78,18 @@ function createValidatedExecutor<T, K>(
 }
 
 function createMultiExecutor<T, K>(
-  option: Option<K>,
+  option: Multi.Option<K>,
   poolId: Meta.MetaFn<any>,
   keyPool: Map<unknown, Core.Executor<T>>,
   createNewExecutor: (key: K) => Core.Executor<T>,
   providerMetas: Meta.Meta[]
-): MultiExecutor<T, K> {
-  const impl = new MultiExecutorImpl(option, poolId, keyPool, createNewExecutor);
+): Multi.MultiExecutor<T, K> {
+  const impl = new MultiExecutorImpl(
+    option,
+    poolId,
+    keyPool,
+    createNewExecutor
+  );
 
   const provider = createExecutor(
     (ctl: Core.Controller) => impl.providerFactory(ctl),
@@ -109,7 +97,8 @@ function createMultiExecutor<T, K>(
     providerMetas
   );
 
-  const multiExecutor: MultiExecutor<T, K> = ((key: K) => impl.__call(key)) as any;
+  const multiExecutor: Multi.MultiExecutor<T, K> = ((key: K) =>
+    impl.__call(key)) as any;
 
   Object.assign(multiExecutor, provider);
   multiExecutor.release = (scope: Core.Scope) => impl.release(scope);
@@ -119,10 +108,10 @@ function createMultiExecutor<T, K>(
 }
 
 export function provide<T, K>(
-  option: Option<K>,
+  option: Multi.Option<K>,
   valueFn: (key: K, controller: Core.Controller) => T | Promise<T>,
   ...metas: Meta.Meta[]
-): MultiExecutor<T, K> {
+): Multi.MultiExecutor<T, K> {
   const poolId = meta(Symbol(), custom<undefined>());
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
@@ -143,10 +132,10 @@ export function provide<T, K>(
 }
 
 export function derive<T, K, D extends Core.DependencyLike>(
-  option: DeriveOption<K, { [K in keyof D]: D[K] }>,
-  valueFn: DependentFn<T, K, Core.InferOutput<D>>,
+  option: Multi.DeriveOption<K, { [K in keyof D]: D[K] }>,
+  valueFn: Multi.DependentFn<T, K, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
-): MultiExecutor<T, K> {
+): Multi.MultiExecutor<T, K> {
   const poolId = meta(Symbol(), custom<void>());
   const keyPool = new Map<unknown, Core.Executor<T>>();
 

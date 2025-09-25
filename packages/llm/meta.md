@@ -2,9 +2,20 @@
 
 _Typed metadata decoration system for executors, flows, and extensions_
 
+**Important**: Always refer to [api.md](./api.md) for actual API signatures and available methods. Do not make assumptions about APIs.
+
 ## Core Concept
 
 Meta provides typed metadata attachment without logic inference. Resources operate independently; meta decorates for extensibility.
+
+### Meta Application Targets
+
+Meta serves as decorative information for:
+- **Node Decoration**: Attach metadata to executors for identification, debugging, or extension hints
+- **Scope Configuration**: Pass configuration to resources and extensions at scope level
+- **Pod/Flow Configuration**: Pass configuration to executions and extensions at pod/flow level
+
+This separation allows the same components to work with different configurations without code changes.
 
 Uses [standardschema v1](https://github.com/standard-schema/standard-schema) for type-safe validation. If there's zod in the dependency, use it
 
@@ -246,10 +257,10 @@ const rawConfig = dbConfig.find(dbExecutor); // May be invalid
 
 ## Advanced Usage
 
-### Monitoring Plugin Pattern
+### Monitoring Extension Pattern
 
 ```typescript
-const telemetryPlugin: Core.Plugin = {
+const telemetryExtension: Extension.Extension = {
   init(scope) {
     const collector = new MetricsCollector();
     for (const [executor] of scope.entries()) {
@@ -281,8 +292,8 @@ export const FlowExecutionContext = {
   isParallel: accessor("flow.isParallel", custom<boolean>(), false),
 };
 
-// Usage in plugins
-const tracingPlugin: Flow.Plugin = {
+// Usage in extensions
+const tracingExtension: Extension.Extension = {
   wrap(context, next) {
     const depth = FlowExecutionContext.depth.find(context) || 0;
     const flowName = FlowExecutionContext.flowName.find(context);
@@ -394,7 +405,7 @@ const contextValidationExtension: Extension.Extension = {
 
 - Component API documentation
 - Static configuration values
-- Plugin markers and hints
+- Extension markers and hints
 - Version information
 - Capability declarations
 

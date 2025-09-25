@@ -13,20 +13,9 @@ import {
   ExecutorResolutionError,
   FactoryExecutionError,
   DependencyResolutionError,
+  ErrorContext,
 } from "./types";
-import {
-  isGenerator,
-  isAsyncGenerator,
-  collectFromGenerator,
-} from "./generator-utils";
-import {
-  ErrorCodes,
-  createFactoryError,
-  createDependencyError,
-  createSystemError,
-  getExecutorName,
-  buildDependencyChain,
-} from "./error-codes";
+import * as errors from "./error-codes";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -35,6 +24,12 @@ type CacheEntry = {
 
 type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
+
+interface ReplacerResult {
+  factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>;
+  dependencies: undefined | Core.UExecutor | Core.UExecutor[] | Record<string, Core.UExecutor>;
+  immediateValue?: unknown;
+}
 
 class AccessorImpl implements Core.Accessor<unknown> {
   public metas: Meta.Meta[] | undefined;
@@ -67,13 +62,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
       const cached = entry?.value;
 
       if (cached && !force) {
-        if (cached.kind === "resolved") {
-          return Promise.resolve(cached.value);
-        } else if (cached.kind === "rejected") {
-          throw cached.error;
-        } else {
-          return cached.promise;
-        }
+        return this.handleCachedState(cached);
       }
 
       if (this.currentPromise && !force) {
@@ -82,169 +71,67 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
       this.scope["~addToResolutionChain"](this.requestor, this.requestor);
 
-      this.currentPromise = new Promise((resolve, reject) => {
-        const replacer = this.scope["initialValues"].find(
-          (item) => item.executor === this.requestor
-        );
+      this.currentPromise = (async () => {
+        try {
+          const { factory, dependencies, immediateValue } = this.processReplacer();
 
-        let factory = this.requestor.factory;
-        let dependencies = this.requestor.dependencies;
-        if (replacer) {
-          const value = replacer.value;
+          if (immediateValue !== undefined) {
+            await new Promise<void>(resolve => queueMicrotask(resolve));
 
-          if (!isExecutor(value)) {
-            return setTimeout(() => {
-              this.scope["cache"].set(this.requestor, {
-                accessor: this,
-                value: { kind: "resolved", value: replacer.value },
-              });
-              resolve(replacer.value);
-            }, 0);
+            this.scope["cache"].set(this.requestor, {
+              accessor: this,
+              value: { kind: "resolved", value: immediateValue },
+            });
+
+            return immediateValue;
           }
 
-          factory = value.factory as any;
-          dependencies = value.dependencies;
-        }
+          const controller = this.createController();
 
-        const controller = this.createController();
+          const resolvedDependencies = await this.scope["~resolveDependencies"](
+            dependencies,
+            this.requestor
+          );
 
-        this.scope["~resolveDependencies"](dependencies, this.requestor)
-          .then((dependencies) => {
-            try {
-              const factoryResult = factory(dependencies as any, controller);
+          const result = await this.executeFactory(
+            factory,
+            resolvedDependencies,
+            controller
+          );
 
-              if (factoryResult instanceof Promise) {
-                return factoryResult.catch((asyncError) => {
-                  const executorName = getExecutorName(this.requestor);
-                  const dependencyChain = [executorName];
+          const processedResult = await this.processChangeEvents(result);
 
-                  const factoryError = createFactoryError(
-                    ErrorCodes.FACTORY_ASYNC_ERROR,
-                    executorName,
-                    dependencyChain,
-                    asyncError,
-                    {
-                      dependenciesResolved: dependencies !== undefined,
-                      factoryType: typeof factory,
-                      isAsyncFactory: true,
-                    }
-                  );
-
-                  throw factoryError;
-                });
-              }
-
-              return factoryResult;
-            } catch (error) {
-              const executorName = getExecutorName(this.requestor);
-              const dependencyChain = [executorName];
-
-              const factoryError = createFactoryError(
-                ErrorCodes.FACTORY_THREW_ERROR,
-                executorName,
-                dependencyChain,
-                error,
-                {
-                  dependenciesResolved: dependencies !== undefined,
-                  factoryType: typeof factory,
-                  isAsyncFactory: false,
-                }
-              );
-
-              throw factoryError;
-            }
-          })
-          .then(async (result) => {
-            let current = result;
-
-            if (isGenerator(result) || isAsyncGenerator(result)) {
-              try {
-                const { returned } = await collectFromGenerator(result);
-                current = returned;
-              } catch (generatorError) {
-                const executorName = getExecutorName(this.requestor);
-                const dependencyChain = [executorName];
-
-                const factoryError = createFactoryError(
-                  ErrorCodes.FACTORY_GENERATOR_ERROR,
-                  executorName,
-                  dependencyChain,
-                  generatorError,
-                  {
-                    generatorType: isGenerator(result) ? "sync" : "async",
-                    factoryType: typeof factory,
-                  }
-                );
-
-                throw factoryError;
-              }
-            }
-
-            const events = this.scope["onEvents"].change;
-            for (const event of events) {
-              const updated = await event(
-                "resolve",
-                this.requestor,
-                current,
-                this.scope
-              );
-              if (
-                updated !== undefined &&
-                updated.executor === this.requestor
-              ) {
-                current = updated.value;
-              }
-            }
-
-            this.scope["cache"].set(this.requestor, {
-              accessor: this,
-              value: { kind: "resolved", value: current },
-            });
-
-            this.scope["~removeFromResolutionChain"](this.requestor);
-            this.currentPromise = null;
-            resolve(current);
-          })
-          .catch((error) => {
-            let enhancedError = error;
-            let errorContext = undefined;
-
-            if (error?.context && error?.code) {
-              enhancedError = error;
-              errorContext = error.context;
-            } else {
-              const executorName = getExecutorName(this.requestor);
-              const dependencyChain = [executorName];
-
-              enhancedError = createSystemError(
-                ErrorCodes.INTERNAL_RESOLUTION_ERROR,
-                executorName,
-                dependencyChain,
-                error,
-                {
-                  errorType: error?.constructor?.name || "UnknownError",
-                  resolutionPhase: "post-factory",
-                }
-              );
-              errorContext = enhancedError.context;
-            }
-
-            this.scope["cache"].set(this.requestor, {
-              accessor: this,
-              value: {
-                kind: "rejected",
-                error,
-                context: errorContext,
-                enhancedError: enhancedError,
-              },
-            });
-
-            this.scope["~removeFromResolutionChain"](this.requestor);
-            this.scope["~triggerError"](enhancedError, this.requestor);
-            this.currentPromise = null;
-            reject(enhancedError);
+          this.scope["cache"].set(this.requestor, {
+            accessor: this,
+            value: { kind: "resolved", value: processedResult },
           });
-      });
+
+          this.scope["~removeFromResolutionChain"](this.requestor);
+          this.currentPromise = null;
+
+          return processedResult;
+
+        } catch (error) {
+          const { enhancedError, errorContext, originalError } =
+            this.enhanceResolutionError(error);
+
+          this.scope["cache"].set(this.requestor, {
+            accessor: this,
+            value: {
+              kind: "rejected",
+              error: originalError,
+              context: errorContext,
+              enhancedError: enhancedError,
+            },
+          });
+
+          this.scope["~removeFromResolutionChain"](this.requestor);
+          this.scope["~triggerError"](enhancedError, this.requestor);
+          this.currentPromise = null;
+
+          throw enhancedError;
+        }
+      })();
 
       this.scope["cache"].set(this.requestor, {
         accessor: this,
@@ -252,6 +139,158 @@ class AccessorImpl implements Core.Accessor<unknown> {
       });
 
       return this.currentPromise;
+    };
+  }
+
+  private handleCachedState(cached: Core.ResolveState<unknown>): Promise<unknown> | never {
+    if (cached.kind === "resolved") {
+      return Promise.resolve(cached.value);
+    }
+
+    if (cached.kind === "rejected") {
+      throw cached.error;
+    }
+
+    return cached.promise;
+  }
+
+  private processReplacer(): ReplacerResult {
+    const replacer = this.scope["initialValues"].find(
+      (item) => item.executor === this.requestor
+    );
+
+    if (!replacer) {
+      return {
+        factory: this.requestor.factory!,
+        dependencies: this.requestor.dependencies
+      };
+    }
+
+    const value = replacer.value;
+
+    if (!isExecutor(value)) {
+      return {
+        factory: this.requestor.factory!,
+        dependencies: this.requestor.dependencies,
+        immediateValue: value
+      };
+    }
+
+    return {
+      factory: value.factory!,
+      dependencies: value.dependencies
+    };
+  }
+
+  private async executeFactory(
+    factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>,
+    resolvedDependencies: unknown,
+    controller: Core.Controller
+  ): Promise<unknown> {
+    try {
+      const factoryResult = factory.length >= 2
+        ? (factory as Core.DependentFn<unknown, unknown>)(resolvedDependencies, controller)
+        : (factory as Core.NoDependencyFn<unknown>)(controller);
+
+      if (factoryResult instanceof Promise) {
+        try {
+          return await factoryResult;
+        } catch (asyncError) {
+          const executorName = errors.getExecutorName(this.requestor);
+          const dependencyChain = [executorName];
+
+          throw errors.createFactoryError(
+            errors.codes.FACTORY_ASYNC_ERROR,
+            executorName,
+            dependencyChain,
+            asyncError,
+            {
+              dependenciesResolved: resolvedDependencies !== undefined,
+              factoryType: typeof factory,
+              isAsyncFactory: true,
+            }
+          );
+        }
+      }
+
+      return factoryResult;
+    } catch (syncError) {
+      const executorName = errors.getExecutorName(this.requestor);
+      const dependencyChain = [executorName];
+
+      throw errors.createFactoryError(
+        errors.codes.FACTORY_THREW_ERROR,
+        executorName,
+        dependencyChain,
+        syncError,
+        {
+          dependenciesResolved: resolvedDependencies !== undefined,
+          factoryType: typeof factory,
+          isAsyncFactory: false,
+        }
+      );
+    }
+  }
+
+  private async processChangeEvents(result: unknown): Promise<unknown> {
+    let currentValue = result;
+    const events = this.scope["onEvents"].change;
+
+    for (const event of events) {
+      const updated = await event(
+        "resolve",
+        this.requestor,
+        currentValue,
+        this.scope
+      );
+
+      if (updated !== undefined && updated.executor === this.requestor) {
+        currentValue = updated.value;
+      }
+    }
+
+    return currentValue;
+  }
+
+  private enhanceResolutionError(error: unknown): {
+    enhancedError: ExecutorResolutionError;
+    errorContext: ErrorContext;
+    originalError: unknown;
+  } {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'context' in error &&
+      'code' in error &&
+      error.context &&
+      error.code
+    ) {
+      return {
+        enhancedError: error as ExecutorResolutionError,
+        errorContext: error.context as ErrorContext,
+        originalError: error
+      };
+    }
+
+    const executorName = errors.getExecutorName(this.requestor);
+    const dependencyChain = [executorName];
+
+    const enhancedError = errors.createSystemError(
+      errors.codes.INTERNAL_RESOLUTION_ERROR,
+      executorName,
+      dependencyChain,
+      error,
+      {
+        errorType: error?.constructor?.name || "UnknownError",
+        resolutionPhase: "post-factory",
+        hasOriginalContext: false
+      }
+    );
+
+    return {
+      enhancedError,
+      errorContext: enhancedError.context,
+      originalError: error
     };
   }
 
@@ -372,18 +411,20 @@ class BaseScope implements Core.Scope {
     const currentChain = this.resolutionChain.get(resolvingExecutor);
     if (currentChain && currentChain.has(executor)) {
       const chainArray = Array.from(currentChain);
-      const dependencyChain = buildDependencyChain(chainArray);
+      const dependencyChain = errors.buildDependencyChain(chainArray);
 
-      throw createDependencyError(
-        ErrorCodes.CIRCULAR_DEPENDENCY,
-        getExecutorName(executor),
+      throw errors.createDependencyError(
+        errors.codes.CIRCULAR_DEPENDENCY,
+        errors.getExecutorName(executor),
         dependencyChain,
-        getExecutorName(executor),
+        errors.getExecutorName(executor),
         undefined,
         {
           circularPath:
-            dependencyChain.join(" -> ") + " -> " + getExecutorName(executor),
-          detectedAt: getExecutorName(resolvingExecutor),
+            dependencyChain.join(" -> ") +
+            " -> " +
+            errors.getExecutorName(executor),
+          detectedAt: errors.getExecutorName(resolvingExecutor),
         }
       );
     }
@@ -843,7 +884,6 @@ class BaseScope implements Core.Scope {
     throw new Error("Invalid arguments for onError");
   }
 
-
   useExtension(extension: Extension.Extension): Core.Cleanup {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
@@ -867,9 +907,7 @@ class BaseScope implements Core.Scope {
 
   pod(...preset: Core.Preset<unknown>[]): Core.Pod;
   pod(options: PodOption): Core.Pod;
-  pod(
-    ...args: Core.Preset<unknown>[] | [PodOption]
-  ): Core.Pod {
+  pod(...args: Core.Preset<unknown>[] | [PodOption]): Core.Pod {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
       throw new Error("Cannot register update callback on a disposing scope");
@@ -933,7 +971,6 @@ export function createScope(
   });
 }
 
-
 class Pod extends BaseScope implements Core.Pod {
   private parentScope: BaseScope;
 
@@ -941,7 +978,9 @@ class Pod extends BaseScope implements Core.Pod {
     super({
       pod: true,
       initialValues: option?.initialValues,
-      extensions: option?.extensions ? [...(scope["extensions"] || []), ...option.extensions] : [...(scope["extensions"] || [])],
+      extensions: option?.extensions
+        ? [...(scope["extensions"] || []), ...option.extensions]
+        : [...(scope["extensions"] || [])],
       meta: option?.meta,
     });
     this.parentScope = scope;

@@ -1,57 +1,163 @@
-# Pumped Functions Library - LLM Prompts
+# Core Library - @pumped-fn/core-next
 
-_Optimized instruction set for AI models to build applications with @pumped-fn/core-next_
+_Dependency graph resolution, scope lifecycle, and reactive patterns_
 
----
+**Important**: Always refer to [api.md](./api.md) for actual API signatures.
 
-## 🧠 CORE CONCEPT: Graph-Based Dependency Resolution
+## Architecture
 
-pumped-fn is a **dependency graph orchestration library** that fundamentally differs from traditional dependency injection frameworks.
+### Graph Resolution
 
-### The Graph Resolution Advantage
+The library is designed around the concept of graph resolution. Each node of the graph (called an "executor") contains:
+- **Factory Function**: Resolves into a value when executed
+- **Upstream Declaration**: Dependencies that must resolve before this executor
+- **Caching Strategy**: Values cached per resolution by default
 
-**Traditional DI**: Manual dependency wiring with imperative resolution
+Nodes don't resolve themselves - they're resolved within a "Scope" that actualizes the graph.
+
+### Actualization Process
+
+Actualization is how the scope brings the graph to life:
+1. **Dependency Detection**: Scope analyzes upstream declarations
+2. **Ordered Resolution**: Resolves each dependency in topological order
+3. **Value Caching**: Stores resolved values for reuse
+4. **Downstream Updates**: Propagates changes through reactive edges
+
+### Long-span vs Short-span Operations
+
+The system distinguishes between two operational contexts:
+
+**Scope (Long-span)**:
+- Long-running operations (servers, cron jobs)
+- Holds persistent resources (database connections, configs)
+- Maintains reference to services
+- Lives for application lifetime
+
+**Pod (Short-span)**:
+- Fork version of scope for isolated operations
+- Copies already-resolved values from parent scope
+- Keeps everything local to the pod
+- Disposal doesn't affect parent scope
+- Perfect for request handling, transactions
+
 ```typescript
-// Traditional approach - manual, error-prone
-const config = new ConfigService();
-const logger = new LoggerService(config);
-const db = new DatabaseService(config, logger);
-const userService = new UserService(db, logger); // Must wire manually
+// Long-span: Application scope
+const appScope = createScope();
+const dbConnection = await appScope.resolve(database);
+
+// Short-span: Request pod
+const requestPod = appScope.pod();
+const handler = await requestPod.resolve(requestHandler);
+// Pod disposal won't affect appScope
+await appScope.disposePod(requestPod);
 ```
 
-**pumped-fn**: Declarative dependency graph with automatic resolution
-```typescript
-// Graph approach - declarative, automatic
-const config = provide(() => configData);
-const logger = derive([config], ([cfg]) => new LoggerService(cfg));
-const db = derive([config, logger], ([cfg, log]) => new DatabaseService(cfg, log));
-const userService = derive([db, logger], ([db, log]) => new UserService(db, log));
+### Pod Examples
 
-// Single resolve triggers entire graph resolution
-await scope.resolve(userService); // Automatically resolves: config → logger → db → userService
+**Request Handling with Pod Isolation**
+```typescript
+const database = provide(() => new DatabaseConnection());
+const userService = derive([database], ([db]) => new UserService(db));
+
+const appScope = createScope();
+await appScope.resolve(database); // Initialize once
+
+// Handle each request in isolated pod
+async function handleRequest(req: Request) {
+  const pod = appScope.pod();
+
+  try {
+    const service = await pod.resolve(userService);
+    const result = await service.process(req);
+    return result;
+  } finally {
+    await appScope.disposePod(pod);
+  }
+}
 ```
 
-### Graph Resolution Properties
+**Transaction Management with Pods**
+```typescript
+const transactionManager = derive([database], ([db]) => ({
+  begin: () => db.beginTransaction(),
+  commit: (tx) => tx.commit(),
+  rollback: (tx) => tx.rollback()
+}));
 
-1. **Automatic Dependency Ordering**: Dependencies resolved in declaration order, eliminating manual wiring
-2. **Complete Integration**: Single resolve operation handles entire dependency chain
-3. **Smart Caching**: Graph nodes cached and reused across resolution paths
-4. **Reactive Propagation**: Updates flow intelligently through dependency paths
-5. **Circular Detection**: Graph structure prevents circular dependencies at design time
+const orderProcessor = derive(
+  [database, transactionManager],
+  ([db, txManager]) => async (order: Order) => {
+    const tx = await txManager.begin();
+    try {
+      await db.insert('orders', order, { transaction: tx });
+      await db.update('inventory', order.items, { transaction: tx });
+      await txManager.commit(tx);
+      return { success: true };
+    } catch (error) {
+      await txManager.rollback(tx);
+      throw error;
+    }
+  }
+);
 
-This graph-centric approach transforms dependency management from imperative wiring to declarative graph composition.
+// Each order in isolated pod with transaction
+async function processOrder(order: Order) {
+  const pod = appScope.pod();
+  try {
+    const processor = await pod.resolve(orderProcessor);
+    return await processor(order);
+  } finally {
+    await appScope.disposePod(pod);
+  }
+}
+```
 
-## Core Definitions
+**Parallel Pod Execution**
+```typescript
+const itemProcessor = derive([database], ([db]) => async (item: Item) => {
+  return db.process(item);
+});
 
-**Executor**: Unit holding dependencies and factory function. Reference for scope caching/resolution.
+// Process items in parallel pods
+async function processBatch(items: Item[]) {
+  const results = await Promise.all(
+    items.map(async (item) => {
+      const pod = appScope.pod();
+      try {
+        const processor = await pod.resolve(itemProcessor);
+        return await processor(item);
+      } finally {
+        await appScope.disposePod(pod);
+      }
+    })
+  );
+  return results;
+}
+```
 
-**Scope**: Object from `createScope()` that resolves executors by recursively resolving dependencies first.
+### Reactivity Architecture
 
-**Resolving**: Process where scope detects dependencies, resolves them in order, passes results to factory.
+Scope manages reactivity by knowing the upstream and downstream graph:
+- **Update Propagation**: When a value updates, scope reinvokes actualization for affected nodes
+- **Selective Reactivity**: Not everything is reactive by default (performance)
+- **Reactive Declaration**: Nodes must explicitly use `.reactive` for automatic updates
+- **Controlled Re-actualization**: Only reactive paths trigger recalculation
 
-**Accessor**: Handle to executor's value with methods: `get()`, `update()`, `subscribe()`.
+```typescript
+// Non-reactive (default) - won't auto-update
+const consumer = derive([source], ([val]) => val * 2);
 
-**Pod**: Isolated sub-scope for flows. No reactive support. Disposed with parent or manually.
+// Reactive - auto-updates when source changes
+const reactiveConsumer = derive([source.reactive], ([val]) => val * 2);
+```
+
+## Core Concepts
+
+- **Executor**: Node in dependency graph containing factory function and upstream dependencies
+- **Scope**: Container managing graph lifecycle and resolution
+- **Pod**: Isolated fork of scope for request-scoped operations
+- **Accessor**: Handle to executor's value with get/update/subscribe methods
+- **Reactive**: Executors marked `.reactive` trigger downstream updates
 
 ## Reactive Updates
 
@@ -110,12 +216,9 @@ await scope.update(source, 1);
   - Before re-resolve (on update)
   - Scope disposal
 
-### The ONE Rule
+### Reactive Rule
 
-```
-.reactive = Pure functions only (no side effects)
-Everything else = Standard executors
-```
+**Use `.reactive` only for pure transformations without side effects**
 
 ## Decision Guide
 
@@ -131,14 +234,6 @@ Everything else = Standard executors
 
 **Usage Flow:** Define → Resolve → Use → Dispose
 
-## Naming
-
-Name by intention, no suffix is recommended
-
-For example
-
-- logger instead of loggerExecutor. Use single noun for obvious, common utilities, like db, config etc
-- append svc for service on reusable services, that's where things getting more specific
 
 ---
 
@@ -416,181 +511,9 @@ const result = await testScope.resolve(appExecutor);
 
 ---
 
-## 💡 COMPLETE EXAMPLE: Time Display TUI
+## 💡 Complete Example
 
-```typescript
-import { provide, derive, createScope, name } from "@pumped-fn/core-next";
-
-// 1. Time source (programmatic updates)
-const timeSource = provide(() => new Date(), name("time-source"));
-
-// 2. Config state
-const config = provide(
-  () => ({
-    formatIndex: 0,
-    showHelp: false,
-  }),
-  name("config")
-);
-
-// 3. Config controller
-const configController = derive(
-  config.static,
-  (accessor) => ({
-    cycleFormat: () =>
-      accessor.update((cfg) => ({
-        ...cfg,
-        formatIndex: (cfg.formatIndex + 1) % 3,
-      })),
-    toggleHelp: () =>
-      accessor.update((cfg) => ({
-        ...cfg,
-        showHelp: !cfg.showHelp,
-      })),
-  }),
-  name("config-controller")
-);
-
-// 4. Time display (pure transformation)
-const display = derive(
-  [timeSource.reactive, config.reactive],
-  ([time, cfg]) => {
-    const formats = ["24-hour", "12-hour", "ISO"];
-    const formatted =
-      cfg.formatIndex === 0
-        ? time.toLocaleTimeString("en-GB", { hour12: false })
-        : cfg.formatIndex === 1
-        ? time.toLocaleTimeString("en-US", { hour12: true })
-        : time.toISOString().split("T")[1].split(".")[0];
-
-    const content = [
-      `Time: ${formatted}`,
-      `Format: ${formats[cfg.formatIndex]}`,
-    ];
-
-    if (cfg.showHelp) {
-      content.push("", "f - cycle format", "h - toggle help", "q - quit");
-    }
-
-    return { rendered: content.join("\n") };
-  },
-  name("display")
-);
-
-// 5. Renderer (reactive display - auto-updates when display changes)
-const renderer = derive(
-  [display.reactive],
-  ([displayData], ctl) => {
-    let lastOutput = "";
-
-    // Auto-render when display data changes
-    if (displayData.rendered !== lastOutput) {
-      process.stdout.write("\x1b[H\x1b[J"); // Home + clear
-      process.stdout.write(displayData.rendered);
-      lastOutput = displayData.rendered;
-    }
-
-    ctl.cleanup(() => {
-      process.stdout.write("\x1b[?25h\n"); // Show cursor
-      console.log("Thanks!");
-    });
-
-    return { data: displayData };
-  },
-  name("renderer")
-);
-
-// 6. Input handler
-const inputHandler = derive(
-  [configController],
-  ([ctrl], ctl) => {
-    const handleKey = (key: string) => {
-      switch (key) {
-        case "f":
-          ctrl.cycleFormat();
-          break;
-        case "h":
-          ctrl.toggleHelp();
-          break;
-        case "q":
-        case "\u0003":
-          process.exit(0);
-      }
-    };
-
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.on("data", handleKey);
-
-    ctl.cleanup(() => {
-      process.stdin.removeListener("data", handleKey);
-      process.stdin.setRawMode(false);
-    });
-
-    return { handleKey };
-  },
-  name("input-handler")
-);
-
-// 7. Timer (updates time source only - rendering happens automatically)
-const timer = derive(
-  [timeSource.static],
-  ([timeAccessor], ctl) => {
-    const tick = () => {
-      timeAccessor.update(new Date()); // Update source, triggers reactive chain
-    };
-
-    process.stdout.write("\x1b[?25l"); // Hide cursor
-    tick(); // Initial update
-
-    const interval = setInterval(tick, 1000);
-    ctl.cleanup(() => clearInterval(interval));
-
-    return { tick };
-  },
-  name("timer")
-);
-
-// 8. App coordinator (includes renderer to ensure it's resolved)
-const app = derive(
-  [timer, inputHandler, renderer],
-  ([timerCtrl, input, display]) => ({
-    ...timerCtrl,
-    ...input,
-    display,
-  }),
-  name("app")
-);
-
-// Main
-async function main() {
-  const scope = createScope();
-  try {
-    await scope.resolve(app);
-    process.on("SIGINT", async () => {
-      await scope.dispose();
-      process.exit(0);
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    await scope.dispose();
-    process.exit(1);
-  }
-}
-
-main().catch(console.error);
-```
+For comprehensive examples with working code, see [patterns/examples.md](./patterns/examples.md).
 
 ---
 
-# Coding style
-
-- strict coding style, concrete reasonable naming
-- no any, unknonw or casting to direct type required
-- always make sure typecheck pass/ or use tsc --noEmit to verify, especially tests
-- don't add comments, most of the time those are codesmells (that's why it'll require comments)
-- group types using namespace, less cluttered
-- combine tests where possible, test running quite quickly, add test error message so it'll be easy to track from the stdout
-- with dependency of @pumped-fn/core-next, when using derive, prefer using destructure on factory function call where possible
-- cleanup redundant codes, dead codes
-- use `import { type ...}` where it's needed

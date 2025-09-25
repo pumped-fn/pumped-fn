@@ -18,6 +18,12 @@ NEVER NEVER KISS-ASS, plaudits, or flattering user. Go straight to the point, at
 
 The library is meant to be GENERIC, it has its core, and extensions (plugins, middlewares). DO NOT bring case-specific concepts/api into the design of the library, the library is meant to be generic
 
+# Coding workflow
+
+- **ALWAYS** make sure typechecking passed, for both src code and tests code, to the directory you are working on
+- **NEVER** use comment on code, code should be well named so the content explains for themseleves
+- use linebreak smartly to separate area of code with different meanings
+
 # Concept
 
 <principles>

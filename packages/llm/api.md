@@ -167,13 +167,17 @@ ExecutorResolutionError   // Base resolution error with context, code, category
 FactoryExecutionError     // Factory function failed
 DependencyResolutionError // Dependency resolution failed, may contain missingDependency
 
-// Error utilities
-ErrorCodes.{EXECUTOR_NOT_FOUND|CIRCULAR_DEPENDENCY|FACTORY_ERROR|...}
-ErrorMessages: Record<ErrorCode, string>
-formatErrorMessage(code, params?): string
-create{Factory|Dependency|System}Error(...): Error
-getExecutorName(executor): string
-buildDependencyChain(stack): string[]
+// Error creation utilities
+createFactoryError(context: ErrorContext): FactoryExecutionError
+createDependencyError(context: ErrorContext): DependencyResolutionError
+createSystemError(context: ErrorContext): ExecutorResolutionError
+
+// Error codes and messages (via errors namespace)
+errors.codes: { FACTORY_EXECUTION_FAILED, DEPENDENCY_NOT_FOUND, ... }
+errors.messages: Record<Code, string>
+errors.formatErrorMessage(code: Code, params?: Record<string, any>): string
+errors.getExecutorName(executor: Core.Executor<unknown>): string
+errors.buildDependencyChain(stack: Core.Executor<unknown>[]): string[]
 ```
 
 ---
@@ -181,16 +185,8 @@ buildDependencyChain(stack): string[]
 ## Schema Validation
 
 ```typescript
-validate<T>(schema: StandardSchemaV1<T>, data: unknown): T  // Throws SchemaError
 custom<T>(): StandardSchemaV1<T, T>                         // Create passthrough schema
-```
-
----
-
-## Generator Utilities
-
-```typescript
-is{Generator|AsyncGenerator|GeneratorFunction|AsyncGeneratorFunction|IterableOrAsyncIterable}(value): boolean
+// Note: validation happens internally when schemas are used with meta or flow
 ```
 
 ---
@@ -274,13 +270,11 @@ import { provide, derive, preset, createScope, flow, FlowExecutionContext, acces
 import { isExecutor, isMainExecutor, isLazyExecutor, isReactiveExecutor, isStaticExecutor, isPreset } from "@pumped-fn/core-next"
 
 // Utilities
-import { validate, custom, resolves, getValue, findValue, findValues } from "@pumped-fn/core-next"
+import { custom, resolves, getValue, findValue, findValues } from "@pumped-fn/core-next"
 
 // Error handling
-import { SchemaError, ExecutorResolutionError, FactoryExecutionError, DependencyResolutionError, ErrorCodes, ErrorMessages } from "@pumped-fn/core-next"
-
-// Generator utilities
-import { isGenerator, isAsyncGenerator, isGeneratorFunction, isAsyncGeneratorFunction, isIterableOrAsyncIterable } from "@pumped-fn/core-next"
+import { SchemaError, ExecutorResolutionError, FactoryExecutionError, DependencyResolutionError } from "@pumped-fn/core-next"
+import * as errors from "@pumped-fn/core-next"
 
 // Multi-executor
 import * as multi from "@pumped-fn/core-next/multi"
@@ -318,7 +312,7 @@ import type { Core, Flow, Meta, Extension, Multi, StandardSchemaV1, ErrorContext
 | Store context data | `accessor()` |
 | Handle errors | Error classes, `ErrorCodes` |
 | Extend functionality | `Extension.Extension` |
-| Validate data | `validate()`, `custom()` |
+| Create schemas | `custom()` |
 | Create multi-executor | `multi.provide/derive()` |
 
 ---

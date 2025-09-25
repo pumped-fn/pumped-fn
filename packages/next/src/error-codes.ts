@@ -1,16 +1,17 @@
 import {
-  ErrorContext,
+  type ErrorContext,
+  type Meta,
   ExecutorResolutionError,
   FactoryExecutionError,
   DependencyResolutionError,
 } from "./types";
+import { name } from "./index";
 
-export const ErrorCodes = {
+export const codes = {
   FACTORY_EXECUTION_FAILED: "F001",
   FACTORY_THREW_ERROR: "F002",
   FACTORY_RETURNED_INVALID_TYPE: "F003",
   FACTORY_ASYNC_ERROR: "F004",
-  FACTORY_GENERATOR_ERROR: "F005",
 
   DEPENDENCY_NOT_FOUND: "D001",
   CIRCULAR_DEPENDENCY: "D002",
@@ -48,86 +49,81 @@ export const ErrorCodes = {
   FLOW_OUTPUT_VALIDATION_FAILED: "FL005",
 } as const;
 
-export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+export type Code = (typeof codes)[keyof typeof codes];
 
-export const ErrorMessages: Record<ErrorCode, string> = {
-  [ErrorCodes.FACTORY_EXECUTION_FAILED]:
+const messages: Record<Code, string> = {
+  [codes.FACTORY_EXECUTION_FAILED]:
     "Factory function execution failed for executor '{executorName}'. {cause}",
-  [ErrorCodes.FACTORY_THREW_ERROR]:
+  [codes.FACTORY_THREW_ERROR]:
     "Factory function threw an error in executor '{executorName}': {originalMessage}",
-  [ErrorCodes.FACTORY_RETURNED_INVALID_TYPE]:
+  [codes.FACTORY_RETURNED_INVALID_TYPE]:
     "Factory function returned invalid type. Expected {expectedType}, got {actualType}",
-  [ErrorCodes.FACTORY_ASYNC_ERROR]:
+  [codes.FACTORY_ASYNC_ERROR]:
     "Async factory function failed with error: {originalMessage}",
-  [ErrorCodes.FACTORY_GENERATOR_ERROR]:
-    "Generator factory function failed during execution: {originalMessage}",
 
-  [ErrorCodes.DEPENDENCY_NOT_FOUND]:
+  [codes.DEPENDENCY_NOT_FOUND]:
     "Dependency '{dependencyName}' could not be resolved in the current scope",
-  [ErrorCodes.CIRCULAR_DEPENDENCY]:
+  [codes.CIRCULAR_DEPENDENCY]:
     "Circular dependency detected in chain: {dependencyChain}",
-  [ErrorCodes.DEPENDENCY_RESOLUTION_FAILED]:
+  [codes.DEPENDENCY_RESOLUTION_FAILED]:
     "Failed to resolve dependencies for executor '{executorName}': {cause}",
-  [ErrorCodes.INVALID_DEPENDENCY_TYPE]:
+  [codes.INVALID_DEPENDENCY_TYPE]:
     "Invalid dependency type provided. Expected Executor, got {actualType}",
-  [ErrorCodes.DEPENDENCY_CHAIN_TOO_DEEP]:
+  [codes.DEPENDENCY_CHAIN_TOO_DEEP]:
     "Dependency resolution chain exceeded maximum depth of {maxDepth}",
 
-  [ErrorCodes.SCOPE_DISPOSED]: "Cannot perform operation on disposed scope",
-  [ErrorCodes.EXECUTOR_NOT_RESOLVED]:
+  [codes.SCOPE_DISPOSED]: "Cannot perform operation on disposed scope",
+  [codes.EXECUTOR_NOT_RESOLVED]:
     "Executor '{executorName}' is not resolved. Call resolve() first or check if resolution failed",
-  [ErrorCodes.INVALID_SCOPE_STATE]:
+  [codes.INVALID_SCOPE_STATE]:
     "Scope is in invalid state for this operation: {currentState}",
-  [ErrorCodes.SCOPE_CLEANUP_FAILED]: "Scope cleanup failed: {cause}",
-  [ErrorCodes.REACTIVE_EXECUTOR_IN_POD]:
+  [codes.SCOPE_CLEANUP_FAILED]: "Scope cleanup failed: {cause}",
+  [codes.REACTIVE_EXECUTOR_IN_POD]:
     "Reactive executors cannot be used in pod environments",
-  [ErrorCodes.UPDATE_CALLBACK_ON_DISPOSING_SCOPE]:
+  [codes.UPDATE_CALLBACK_ON_DISPOSING_SCOPE]:
     "Cannot register update callback on a disposing scope",
 
-  [ErrorCodes.SCHEMA_VALIDATION_FAILED]:
+  [codes.SCHEMA_VALIDATION_FAILED]:
     "Schema validation failed: {validationMessage}",
-  [ErrorCodes.META_VALIDATION_FAILED]:
+  [codes.META_VALIDATION_FAILED]:
     "Meta validation failed for key '{metaKey}': {validationMessage}",
-  [ErrorCodes.INPUT_TYPE_MISMATCH]:
+  [codes.INPUT_TYPE_MISMATCH]:
     "Input type validation failed: {validationMessage}",
-  [ErrorCodes.OUTPUT_TYPE_MISMATCH]:
+  [codes.OUTPUT_TYPE_MISMATCH]:
     "Output type validation failed: {validationMessage}",
-  [ErrorCodes.ASYNC_VALIDATION_NOT_SUPPORTED]:
+  [codes.ASYNC_VALIDATION_NOT_SUPPORTED]:
     "Async validation is not currently supported",
 
-  [ErrorCodes.INTERNAL_RESOLUTION_ERROR]:
+  [codes.INTERNAL_RESOLUTION_ERROR]:
     "Internal error during executor resolution. This is likely a bug in Pumped Functions",
-  [ErrorCodes.CACHE_CORRUPTION]:
+  [codes.CACHE_CORRUPTION]:
     "Executor cache corruption detected. Scope integrity compromised",
-  [ErrorCodes.MEMORY_LEAK_DETECTED]:
+  [codes.MEMORY_LEAK_DETECTED]:
     "Potential memory leak detected in scope {scopeId}",
-  [ErrorCodes.PLUGIN_SYSTEM_ERROR]:
-    "Plugin system error: {pluginName} - {cause}",
+  [codes.PLUGIN_SYSTEM_ERROR]: "Plugin system error: {pluginName} - {cause}",
 
-  [ErrorCodes.INVALID_EXECUTOR_CONFIG]:
+  [codes.INVALID_EXECUTOR_CONFIG]:
     "Invalid executor configuration: {configError}",
-  [ErrorCodes.MALFORMED_DEPENDENCIES]:
+  [codes.MALFORMED_DEPENDENCIES]:
     "Malformed dependency structure: {dependencyError}",
-  [ErrorCodes.INVALID_FACTORY_SIGNATURE]:
+  [codes.INVALID_FACTORY_SIGNATURE]:
     "Factory function has invalid signature. Expected (dependencies, controller) => value",
-  [ErrorCodes.PRESET_APPLICATION_FAILED]:
-    "Failed to apply preset: {presetError}",
+  [codes.PRESET_APPLICATION_FAILED]: "Failed to apply preset: {presetError}",
 
-  [ErrorCodes.FLOW_EXECUTION_FAILED]: "Flow execution failed: {flowName}",
-  [ErrorCodes.FLOW_CONTEXT_MISSING]:
-    "Flow execution context is missing or invalid",
-  [ErrorCodes.FLOW_PLUGIN_ERROR]: "Flow plugin '{pluginName}' failed: {cause}",
-  [ErrorCodes.FLOW_INPUT_VALIDATION_FAILED]:
+  [codes.FLOW_EXECUTION_FAILED]: "Flow execution failed: {flowName}",
+  [codes.FLOW_CONTEXT_MISSING]: "Flow execution context is missing or invalid",
+  [codes.FLOW_PLUGIN_ERROR]: "Flow plugin '{pluginName}' failed: {cause}",
+  [codes.FLOW_INPUT_VALIDATION_FAILED]:
     "Flow input validation failed: {validationMessage}",
-  [ErrorCodes.FLOW_OUTPUT_VALIDATION_FAILED]:
+  [codes.FLOW_OUTPUT_VALIDATION_FAILED]:
     "Flow output validation failed: {validationMessage}",
 };
 
-export function formatErrorMessage(
-  code: ErrorCode,
+export function formatMessage(
+  code: Code,
   context: Record<string, unknown> = {}
 ): string {
-  let message = ErrorMessages[code];
+  let message = messages[code];
 
   for (const [key, value] of Object.entries(context)) {
     const placeholder = `{${key}}`;
@@ -138,7 +134,7 @@ export function formatErrorMessage(
 }
 
 export function createFactoryError(
-  code: ErrorCode,
+  code: Code,
   executorName: string,
   dependencyChain: string[],
   originalError?: unknown,
@@ -164,7 +160,7 @@ export function createFactoryError(
     ...additionalContext,
   };
 
-  const message = formatErrorMessage(code, messageContext);
+  const message = formatMessage(code, messageContext);
 
   return new FactoryExecutionError(message, context, code, {
     cause: originalError,
@@ -172,7 +168,7 @@ export function createFactoryError(
 }
 
 export function createDependencyError(
-  code: ErrorCode,
+  code: Code,
   executorName: string,
   dependencyChain: string[],
   missingDependency?: string,
@@ -197,7 +193,7 @@ export function createDependencyError(
     ...additionalContext,
   };
 
-  const message = formatErrorMessage(code, messageContext);
+  const message = formatMessage(code, messageContext);
 
   return new DependencyResolutionError(
     message,
@@ -211,7 +207,7 @@ export function createDependencyError(
 }
 
 export function createSystemError(
-  code: ErrorCode,
+  code: Code,
   executorName: string,
   dependencyChain: string[],
   originalError?: unknown,
@@ -234,46 +230,37 @@ export function createSystemError(
     ...additionalContext,
   };
 
-  const message = formatErrorMessage(code, messageContext);
+  const message = formatMessage(code, messageContext);
 
   return new ExecutorResolutionError(message, context, code, "SYSTEM_ERROR", {
     cause: originalError,
   });
 }
 
-/**
- * Helper to extract executor name from executor object for error context
- */
-export function getExecutorName(executor: any): string {
-  if (executor?.metas && Array.isArray(executor.metas)) {
-    for (const meta of executor.metas) {
-      if (meta?.key && typeof meta.key === "symbol") {
-        const keyString = meta.key.toString();
-        if (
-          keyString.includes("name") ||
-          keyString.includes("pumped-fn/name")
-        ) {
-          return String(meta.value);
-        }
-      }
-      if (typeof meta?.key === "string" && meta.key.includes("name")) {
-        return String(meta.value);
-      }
+export function getExecutorName(executor: unknown): string {
+  const executorName = name.find(executor as Meta.MetaContainer);
+  if (executorName) return executorName;
+
+  if (executor && typeof executor === "object" && "factory" in executor) {
+    const factory = executor.factory as { name?: string } | undefined;
+    if (factory?.name && factory.name !== "factory") {
+      return factory.name;
     }
   }
 
-  if (executor?.factory?.name && executor.factory.name !== "factory") {
-    return executor.factory.name;
-  }
-
-  if (executor) {
-    const kind = executor[Symbol.for("@pumped-fn/core/executor")] || "unknown";
-    return `${kind}-executor-${Math.random().toString(36).substr(2, 9)}`;
+  if (executor && typeof executor === "object") {
+    const kind =
+      (executor as Record<symbol, unknown>)[
+        Symbol.for("@pumped-fn/core/executor")
+      ] ?? "unknown";
+    return `${String(kind)}-executor-${Math.random()
+      .toString(36)
+      .substring(2, 11)}`;
   }
 
   return "unknown-executor";
 }
 
-export function buildDependencyChain(executorStack: any[]): string[] {
-  return executorStack.map((executor) => getExecutorName(executor));
+export function buildDependencyChain(executorStack: unknown[]): string[] {
+  return executorStack.map(getExecutorName);
 }

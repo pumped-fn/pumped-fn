@@ -29,11 +29,16 @@ class MetaFunction<V> {
   }
 
   find(source: Meta.MetaContainer | Meta.Meta[] | undefined): V | undefined {
-    return findValue(source, this as unknown as Meta.MetaFn<unknown>) as V | undefined;
+    return findValue(source, this as unknown as Meta.MetaFn<unknown>) as
+      | V
+      | undefined;
   }
 
   get(source: Meta.MetaContainer | Meta.Meta[] | undefined): V {
-    const values = findValues(source, this as unknown as Meta.MetaFn<unknown>) as V[];
+    const values = findValues(
+      source,
+      this as unknown as Meta.MetaFn<unknown>
+    ) as V[];
     if (values.length === 0) {
       throw new Error(`Meta value with key ${String(this.key)} not found`);
     }
@@ -46,11 +51,19 @@ export const meta = <V>(
   schema: StandardSchemaV1<V>
 ): Meta.MetaFn<V> => {
   const metaFunc = new MetaFunction(key, schema);
-  
+
   const fn = ((value: V) => metaFunc.__call(value)) as Meta.MetaFn<V>;
-  
-  Object.defineProperty(fn, 'key', { value: metaFunc.key, writable: false, configurable: false });
-  Object.defineProperty(fn, metaSymbol, { value: true, writable: false, configurable: false });
+
+  Object.defineProperty(fn, "key", {
+    value: metaFunc.key,
+    writable: false,
+    configurable: false,
+  });
+  Object.defineProperty(fn, metaSymbol, {
+    value: true,
+    writable: false,
+    configurable: false,
+  });
   fn.partial = metaFunc.partial.bind(metaFunc);
   fn.some = metaFunc.some.bind(metaFunc);
   fn.find = metaFunc.find.bind(metaFunc);

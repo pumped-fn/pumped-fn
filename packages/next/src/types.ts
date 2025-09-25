@@ -1,4 +1,3 @@
-import type { DataStore } from "./accessor";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -483,7 +482,7 @@ export namespace Flow {
   };
 
   export type ParallelExecutionOptions = {
-    failureMode?: "fail-fast" | "fail-all" | "continue";
+    mode?: "race" | "all" | "all-settled";
     errorMapper?: (error: unknown, index: number) => any;
     onItemComplete?: (result: any, index: number) => void;
   };
@@ -512,19 +511,8 @@ export namespace Flow {
     };
 
     executeParallel: {
-      <T extends ReadonlyArray<[UFlow, any]>>(
-        flows: T,
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends UFlow
-            ? Awaited<InferOutput<F>>
-            : never
-          : never;
-      }>>;
-
       <T extends ReadonlyArray<[FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        items: T,
+        items: { [K in keyof T]: T[K] },
         options?: ParallelExecutionOptions
       ): Promise<ParallelExecutionResult<{
         [K in keyof T]: T[K] extends [infer F, any]
@@ -536,8 +524,19 @@ export namespace Flow {
           : never;
       }>>;
 
+      <T extends ReadonlyArray<[UFlow, any]>>(
+        flows: { [K in keyof T]: T[K] },
+        options?: ParallelExecutionOptions
+      ): Promise<ParallelExecutionResult<{
+        [K in keyof T]: T[K] extends [infer F, any]
+          ? F extends UFlow
+            ? Awaited<InferOutput<F>>
+            : never
+          : never;
+      }>>;
+
       <T extends ReadonlyArray<[UFlow | FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        mixed: T,
+        mixed: { [K in keyof T]: T[K] },
         options?: ParallelExecutionOptions
       ): Promise<ParallelExecutionResult<{
         [K in keyof T]: T[K] extends [infer F, any]
@@ -553,7 +552,7 @@ export namespace Flow {
     };
   };
 
-  export type Context<I, S, E> = DataStore &
+  export type Context<I, S, E> = Accessor.DataStore &
     R<S, E> &
     C & {
       input: I;
@@ -566,17 +565,17 @@ export namespace Extension {
     name: string;
 
     init?(scope: Core.Scope): void | Promise<void>;
-    initPod?(pod: Core.Pod, context: DataStore): void | Promise<void>;
+    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void>;
 
     wrapResolve?(next: () => Promise<unknown>, context: ResolveContext): Promise<unknown>;
     wrapExecute?<T>(
-      context: DataStore,
+      context: Accessor.DataStore,
       next: () => Promise<T>,
       execution: ExecutionContext
     ): Promise<T>;
 
     onError?(error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError, scope: Core.Scope): void;
-    onPodError?(error: unknown, pod: Core.Pod, context: DataStore): void;
+    onPodError?(error: unknown, pod: Core.Pod, context: Accessor.DataStore): void;
 
     dispose?(scope: Core.Scope): void | Promise<void>;
     disposePod?(pod: Core.Pod): void | Promise<void>;
@@ -597,7 +596,55 @@ export namespace Extension {
   }
 }
 
+export declare namespace Accessor {
+  export interface DataStore {
+    get(key: unknown): unknown;
+    set(key: unknown, value: unknown): unknown | undefined;
+  }
+
+  export type AccessorSource = DataStore | Meta.MetaContainer | Meta.Meta[];
+
+  interface BaseAccessor<T> {
+    readonly key: symbol;
+    readonly schema: StandardSchemaV1<T>;
+  }
+
+  export interface Accessor<T> extends BaseAccessor<T> {
+    get(source: AccessorSource): T;
+    find(source: AccessorSource): T | undefined;
+    set(source: DataStore, value: T): void;
+    preset(value: T): [symbol, T];
+  }
+
+  export interface AccessorWithDefault<T> extends BaseAccessor<T> {
+    readonly defaultValue: T;
+    get(source: AccessorSource): T;
+    find(source: AccessorSource): T;
+    set(source: DataStore, value: T): void;
+    preset(value: T): [symbol, T];
+  }
+}
+
 export namespace Multi {
   export type Key = unknown;
-  export type MultiExecutor<T, K> = Core.Executor<(k: K) => Promise<T>>;
+  export type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> &
+    ((key: K) => Core.Executor<T>) & {
+      release: (scope: Core.Scope) => Promise<void>;
+      id: Meta.MetaFn<unknown>;
+    };
+
+  export type DependentFn<T, K, D> = (
+    dependencies: D,
+    key: K,
+    scope: Core.Controller
+  ) => Core.Output<T>;
+
+  export type Option<K> = {
+    keySchema: StandardSchemaV1<K>;
+    keyTransform?: (key: K) => unknown;
+  };
+
+  export type DeriveOption<K, D> = Option<K> & {
+    dependencies: D;
+  };
 }

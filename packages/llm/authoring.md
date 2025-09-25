@@ -2,6 +2,8 @@
 
 _Expert guide for creating reusable, configurable components using graph-based dependency resolution_
 
+**Important**: Always refer to [api.md](./api.md) for actual API signatures and available methods. Do not make assumptions about APIs.
+
 ## Core Authoring Principle: Meta-Based Configuration
 
 Components are designed around **configuration variation** through meta-based scope configuration. The graph's lazy evaluation combined with meta-driven configuration enables powerful configuration strategies impossible with traditional dependency injection.

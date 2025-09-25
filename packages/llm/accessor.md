@@ -2,6 +2,8 @@
 
 _Type-safe Map-like data access with validation, defaults, and context inheritance_
 
+**Important**: Always refer to [api.md](./api.md) for actual API signatures and available methods. Do not make assumptions about APIs.
+
 ## Core Concept
 
 DataAccessor provides type-safe access to Map-like structures (DataStore, MetaContainer, Meta arrays) with StandardSchema validation, symbol keys to avoid conflicts, optional defaults, and easy testing with Map instances.

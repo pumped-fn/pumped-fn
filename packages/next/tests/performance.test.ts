@@ -144,7 +144,7 @@ describe.skip("Performance Tests", () => {
       const endTime = process.hrtime.bigint();
       const durationMs = Number(endTime - startTime) / 1000000;
 
-      expect(durationMs).toBeLessThan(5000); // 5 seconds max
+      expect(durationMs).toBeLessThan(5000);
     });
 
     it("should measure meta system performance", () => {
@@ -166,7 +166,7 @@ describe.skip("Performance Tests", () => {
       const endTime = process.hrtime.bigint();
       const durationMs = Number(endTime - startTime) / 1000000;
 
-      expect(durationMs).toBeLessThan(10000); // 10 seconds max
+      expect(durationMs).toBeLessThan(10000);
     });
   });
 
@@ -190,7 +190,7 @@ describe.skip("Performance Tests", () => {
       const startTime = process.hrtime.bigint();
 
       for (let i = 0; i < ITERATIONS.DEPENDENCY_RESOLUTION; i++) {
-        await scope.resolve(complexExecutor, true); // Force re-resolution
+        await scope.resolve(complexExecutor, true);
       }
 
       const endTime = process.hrtime.bigint();
