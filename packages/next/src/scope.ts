@@ -365,14 +365,18 @@ function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, CacheEntry> = new Map();
-  protected cleanups = new Map<UE, Set<Core.Cleanup>>();
-  protected onUpdates = new Map<UE, Set<OnUpdateFn | UE>>();
-  protected onEvents = {
+  protected cleanups: Map<UE, Set<Core.Cleanup>> = new Map<UE, Set<Core.Cleanup>>();
+  protected onUpdates: Map<UE, Set<OnUpdateFn | UE>> = new Map<UE, Set<OnUpdateFn | UE>>();
+  protected onEvents: {
+    readonly change: Set<Core.ChangeCallback>;
+    readonly release: Set<Core.ReleaseCallback>;
+    readonly error: Set<Core.GlobalErrorCallback>;
+  } = {
     change: new Set<Core.ChangeCallback>(),
     release: new Set<Core.ReleaseCallback>(),
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
-  protected onErrors = new Map<UE, Set<Core.ErrorCallback<unknown>>>();
+  protected onErrors: Map<UE, Set<Core.ErrorCallback<unknown>>> = new Map<UE, Set<Core.ErrorCallback<unknown>>>();
   protected isPod: boolean;
   private isDisposing = false;
 
@@ -949,6 +953,7 @@ export type PodOption = {
   initialValues?: Core.Preset<unknown>[];
   extensions?: Extension.Extension[];
   meta?: Meta.Meta[];
+  parentPod?: Pod;
 };
 
 export function createScope(): Core.Scope;
@@ -973,17 +978,43 @@ export function createScope(
 
 class Pod extends BaseScope implements Core.Pod {
   private parentScope: BaseScope;
+  private parentPod?: Pod;
+  private childPods: Set<Pod> = new Set();
 
   constructor(scope: BaseScope, option?: PodOption) {
+    const actualParentScope = option?.parentPod || scope;
+
     super({
       pod: true,
       initialValues: option?.initialValues,
       extensions: option?.extensions
-        ? [...(scope["extensions"] || []), ...option.extensions]
-        : [...(scope["extensions"] || [])],
+        ? [...(actualParentScope["extensions"] || []), ...option.extensions]
+        : [...(actualParentScope["extensions"] || [])],
       meta: option?.meta,
     });
     this.parentScope = scope;
+    this.parentPod = option?.parentPod;
+  }
+
+  pod(...preset: Core.Preset<unknown>[]): Core.Pod;
+  pod(options: PodOption): Core.Pod;
+  pod(...args: Core.Preset<unknown>[] | [PodOption]): Core.Pod {
+    this["~ensureNotDisposed"]();
+
+    let podOptions: PodOption;
+    if (args.length === 1 && !isPreset(args[0])) {
+      podOptions = args[0] as PodOption;
+    } else {
+      podOptions = { initialValues: args as Core.Preset<unknown>[] };
+    }
+
+    const childPod = new Pod(this.parentScope, {
+      ...podOptions,
+      parentPod: this
+    });
+
+    this.childPods.add(childPod);
+    return childPod;
   }
 
   async resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T> {
@@ -1001,6 +1032,32 @@ class Pod extends BaseScope implements Core.Pod {
 
     if (this["~hasDependencyWithPreset"](executor)) {
       return await super.resolve(executor, force);
+    }
+
+    let currentParent = this.parentPod;
+    while (currentParent) {
+      if (currentParent["cache"].has(executor)) {
+        const { value } = currentParent["cache"].get(executor)!;
+        const accessor = super["~makeAccessor"](executor);
+
+        this["cache"].set(executor, {
+          accessor,
+          value,
+        });
+
+        if (value.kind === "rejected") {
+          throw value.error;
+        }
+
+        if (value.kind === "resolved") {
+          return value.value as T;
+        }
+
+        if (value.kind === "pending") {
+          return (await value.promise) as T;
+        }
+      }
+      currentParent = currentParent.parentPod;
     }
 
     if (this.parentScope["cache"].has(executor)) {
@@ -1083,5 +1140,41 @@ class Pod extends BaseScope implements Core.Pod {
     }
 
     return await super["~resolveExecutor"](ie, ref);
+  }
+
+  async dispose(): Promise<void> {
+    for (const childPod of this.childPods) {
+      await childPod.dispose();
+    }
+    this.childPods.clear();
+
+    if (this.parentPod) {
+      this.parentPod.childPods.delete(this);
+    }
+
+    const extensionDisposeEvents = this.extensions.map(
+      (ext) => ext.disposePod?.(this) ?? Promise.resolve()
+    );
+    await Promise.all(extensionDisposeEvents);
+
+    await super.dispose();
+  }
+
+  getDepth(): number {
+    let depth = 0;
+    let current = this.parentPod;
+    while (current) {
+      depth++;
+      current = current.parentPod;
+    }
+    return depth;
+  }
+
+  getRootPod(): Pod {
+    let current: Pod = this;
+    while (current.parentPod) {
+      current = current.parentPod;
+    }
+    return current;
   }
 }
