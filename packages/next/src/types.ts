@@ -338,7 +338,7 @@ export declare namespace Core {
   export interface Pod
     extends Omit<
       Core.Scope,
-      "update" | "pod" | "disposePod" | "onChange" | "registeredExecutors"
+      "update" | "disposePod" | "onChange" | "registeredExecutors"
     >, Meta.MetaContainer {}
 
   export interface Scope extends Meta.MetaContainer {

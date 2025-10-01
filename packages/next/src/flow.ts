@@ -143,13 +143,21 @@ class FlowContext<I, S, E>
   implements Flow.Context<I, S, E>, Accessor.DataStore
 {
   private contextData = new Map<unknown, unknown>();
+  private journal = new Map<string, unknown>();
+  public readonly pod: Core.Pod;
 
   constructor(
     public input: I,
-    public readonly pod: Core.Pod,
+    parentPodOrScope: Core.Pod | Core.Scope,
     private extensions: Extension.Extension[],
     private parent?: FlowContext<any, any, any>
-  ) {}
+  ) {
+    if ('pod' in parentPodOrScope && typeof parentPodOrScope.pod === 'function') {
+      this.pod = (parentPodOrScope as Core.Pod).pod();
+    } else {
+      this.pod = (parentPodOrScope as Core.Scope).pod();
+    }
+  }
 
   initializeExecutionContext(flowName: string, isParallel: boolean = false) {
     const currentDepth = this.parent
@@ -184,6 +192,102 @@ class FlowContext<I, S, E>
   output = (success: boolean, value: any): any => {
     return success ? this.ok(value) : this.ko(value);
   };
+
+  async run<T>(key: string, fn: () => Promise<T> | T): Promise<T> {
+    const flowName = FlowExecutionContext.flowName.find(this) || 'unknown';
+    const depth = FlowExecutionContext.depth.find(this) || 0;
+    const journalKey = `${flowName}:${depth}:${key}`;
+
+    if (this.journal.has(journalKey)) {
+      const entry = this.journal.get(journalKey);
+      if (entry && typeof entry === 'object' && '__error' in entry) {
+        throw (entry as any).error;
+      }
+      return entry as T;
+    }
+
+    try {
+      const result = await fn();
+      this.journal.set(journalKey, result);
+      return result;
+    } catch (error) {
+      this.journal.set(journalKey, { __error: true, error });
+      throw error;
+    }
+  }
+
+  async flow<F extends Flow.UFlow>(
+    flow: F,
+    input: Flow.InferInput<F>
+  ): Promise<Flow.InferOutput<F>> {
+    const handler = await this.pod.resolve(flow);
+    const definition = flowDefinitionMeta.find(flow);
+    if (!definition) {
+      throw new Error("Flow definition not found in executor metadata");
+    }
+
+    const childContext = new FlowContext<unknown, unknown, unknown>(
+      input,
+      this.pod,
+      this.extensions,
+      this
+    );
+    childContext.initializeExecutionContext(definition.name, false);
+
+    return (await this.executeWithExtensions(
+      handler,
+      childContext,
+      flow
+    )) as any;
+  }
+
+  async parallel<T extends readonly [Flow.UFlow, any][]>(
+    flows: [...T]
+  ): Promise<Flow.ParallelExecutionResult<{
+    [K in keyof T]: T[K] extends [infer F, any]
+      ? F extends Flow.UFlow
+        ? Awaited<Flow.InferOutput<F>>
+        : never
+      : never;
+  }>> {
+    const promises = flows.map(async ([flow, input], index) => {
+      const childContext = new FlowContext<unknown, unknown, unknown>(
+        input,
+        this.pod,
+        this.extensions,
+        this
+      );
+
+      const handler = await this.pod.resolve(flow);
+      const definition = flowDefinitionMeta.find(flow);
+      if (!definition) {
+        throw new Error("Flow definition not found in executor metadata");
+      }
+
+      childContext.initializeExecutionContext(definition.name, true);
+
+      return this.executeWithExtensions(
+        handler,
+        childContext,
+        flow
+      );
+    });
+
+    const results = await Promise.all(promises);
+
+    const succeeded = results.filter((r: any) => r.type === "ok").length;
+    const failed = results.filter((r: any) => r.type === "ko").length;
+
+    return {
+      type: failed === 0 ? "all-ok" : succeeded === 0 ? "all-ko" : "partial",
+      results: results as any,
+      stats: {
+        total: results.length,
+        succeeded,
+        failed,
+      },
+    };
+  }
 
   async execute<F extends Flow.UFlow>(
     flow: F,
