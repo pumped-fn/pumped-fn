@@ -1177,4 +1177,8 @@ class Pod extends BaseScope implements Core.Pod {
     }
     return current;
   }
+
+  getChildPods(): ReadonlySet<Pod> {
+    return this.childPods;
+  }
 }

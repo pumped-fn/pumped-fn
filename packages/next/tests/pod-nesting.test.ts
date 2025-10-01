@@ -151,14 +151,14 @@ describe("Pod Nesting", () => {
     const childPod2 = rootPod.pod();
     const childPod3 = rootPod.pod();
 
-    expect(rootPod["childPods"].size).toBe(3);
+    expect(rootPod.getChildPods().size).toBe(3);
 
     await childPod2.dispose();
 
-    expect(rootPod["childPods"].size).toBe(2);
-    expect(rootPod["childPods"].has(childPod1)).toBe(true);
-    expect(rootPod["childPods"].has(childPod2)).toBe(false);
-    expect(rootPod["childPods"].has(childPod3)).toBe(true);
+    expect(rootPod.getChildPods().size).toBe(2);
+    expect(rootPod.getChildPods().has(childPod1)).toBe(true);
+    expect(rootPod.getChildPods().has(childPod2)).toBe(false);
+    expect(rootPod.getChildPods().has(childPod3)).toBe(true);
   });
 
   test("pods with dependencies that have presets resolve correctly", async () => {

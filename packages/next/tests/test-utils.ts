@@ -2,7 +2,13 @@ import { vi, expect } from "vitest";
 import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
 import { createExecutor } from "../src/executor";
-import { createScope, provide, derive, type Extension } from "../src";
+import {
+  createScope,
+  provide,
+  derive,
+  type Extension,
+  StandardSchemaV1,
+} from "../src";
 
 export namespace TestTypes {
   export interface User {
@@ -65,9 +71,9 @@ export const testFlows = {
 
   generic: <TInput, TSuccess, TError>(
     name: string,
-    input: any,
-    success: any,
-    error: any
+    input: StandardSchemaV1<TInput, unknown>,
+    success: StandardSchemaV1<TSuccess, unknown>,
+    error: StandardSchemaV1<TError, unknown>
   ) =>
     flow.define({
       name,
@@ -148,7 +154,11 @@ export const ExtensionFactory = {
   contextCapture: (capturedContext: { current?: any } = {}) =>
     ({
       name: "context-capture",
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         capturedContext.current = context;
         return next();
       },
@@ -157,7 +167,11 @@ export const ExtensionFactory = {
   executionOrder: (execOrder: string[], extensionName: string) =>
     ({
       name: extensionName,
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         execOrder.push(`${extensionName}-before`);
         const result = await next();
         execOrder.push(`${extensionName}-after`);
@@ -174,7 +188,11 @@ export const ExtensionFactory = {
       async disposePod(pod: any) {
         lifecycleCalls.push(`${extensionName}-dispose`);
       },
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         lifecycleCalls.push(`${extensionName}-wrap`);
         return next();
       },

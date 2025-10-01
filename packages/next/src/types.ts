@@ -339,7 +339,11 @@ export declare namespace Core {
     extends Omit<
       Core.Scope,
       "update" | "disposePod" | "onChange" | "registeredExecutors"
-    >, Meta.MetaContainer {}
+    >, Meta.MetaContainer {
+    getDepth(): number;
+    getRootPod(): Pod;
+    getChildPods(): ReadonlySet<Pod>;
+  }
 
   export interface Scope extends Meta.MetaContainer {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
@@ -488,68 +492,24 @@ export namespace Flow {
   };
 
   export type C = {
-    execute: {
-      <F extends UFlow>(
-        flow: F,
-        input: InferInput<F>,
-        opt?: Opt
-      ): Promise<InferOutput<F>>;
+    readonly pod: Core.Pod;
 
-      <I, O, E = unknown>(
-        fn: FnExecutor<I, O>,
-        input: I,
-        errorMapper?: (error: unknown) => E,
-        opt?: Opt
-      ): Promise<OK<O> | KO<E>>;
+    run<T>(key: string, fn: () => Promise<T> | T): Promise<T>;
 
-      <Args extends readonly unknown[], O, E = unknown>(
-        fn: MultiFnExecutor<Args, O>,
-        args: Args,
-        errorMapper?: (error: unknown) => E,
-        opt?: Opt
-      ): Promise<OK<O> | KO<E>>;
-    };
+    flow<F extends UFlow>(
+      flow: F,
+      input: InferInput<F>
+    ): Promise<InferOutput<F>>;
 
-    executeParallel: {
-      <T extends ReadonlyArray<[FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        items: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends FnExecutor<any, infer O>
-            ? OK<O> | KO<unknown>
-            : F extends MultiFnExecutor<any[], infer O>
-            ? OK<O> | KO<unknown>
-            : never
-          : never;
-      }>>;
-
-      <T extends ReadonlyArray<[UFlow, any]>>(
-        flows: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends UFlow
-            ? Awaited<InferOutput<F>>
-            : never
-          : never;
-      }>>;
-
-      <T extends ReadonlyArray<[UFlow | FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        mixed: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends UFlow
-            ? Awaited<InferOutput<F>>
-            : F extends FnExecutor<any, infer O>
-            ? OK<O> | KO<unknown>
-            : F extends MultiFnExecutor<any[], infer O>
-            ? OK<O> | KO<unknown>
-            : never
-          : never;
-      }>>;
-    };
+    parallel<T extends readonly [UFlow, any][]>(
+      flows: [...T]
+    ): Promise<ParallelExecutionResult<{
+      [K in keyof T]: T[K] extends [infer F, any]
+        ? F extends UFlow
+          ? Awaited<InferOutput<F>>
+          : never
+        : never;
+    }>>;
   };
 
   export type Context<I, S, E> = Accessor.DataStore &
