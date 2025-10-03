@@ -42,7 +42,6 @@ export const testFlows = {
       name,
       input: custom<TestTypes.BasicInput>(),
       success: custom<TestTypes.SuccessResult<string>>(),
-      error: custom<TestTypes.ErrorResult>(),
     }),
 
   math: (name: string) =>
@@ -50,7 +49,6 @@ export const testFlows = {
       name,
       input: custom<TestTypes.MathInput>(),
       success: custom<TestTypes.SuccessResult<number>>(),
-      error: custom<TestTypes.ErrorResult>(),
     }),
 
   user: (name: string) =>
@@ -58,7 +56,6 @@ export const testFlows = {
       name,
       input: custom<{ userId: string }>(),
       success: custom<{ user: TestTypes.User }>(),
-      error: custom<TestTypes.ErrorResult>(),
     }),
 
   validation: (name: string) =>
@@ -66,20 +63,17 @@ export const testFlows = {
       name,
       input: custom<{ email: string }>(),
       success: custom<{ valid: boolean }>(),
-      error: custom<TestTypes.ErrorResult>(),
     }),
 
-  generic: <TInput, TSuccess, TError>(
+  generic: <TInput, TSuccess>(
     name: string,
     input: StandardSchemaV1<TInput, unknown>,
-    success: StandardSchemaV1<TSuccess, unknown>,
-    error: StandardSchemaV1<TError, unknown>
+    success: StandardSchemaV1<TSuccess, unknown>
   ) =>
     flow.define({
       name,
       input,
       success,
-      error,
     }),
 };
 
@@ -289,10 +283,9 @@ export const testSetup = {
   scopeWithExtensions: (extensions: Extension.Extension[]) =>
     createScope({ extensions }),
 
-  expectFlowResult: (result: any, type: "ok" | "ko", data?: any) => {
-    expect(result.type).toBe(type);
+  expectFlowResult: (result: any, data?: any) => {
     if (data !== undefined) {
-      expect(result.data).toEqual(data);
+      expect(result).toEqual(data);
     }
   },
 };

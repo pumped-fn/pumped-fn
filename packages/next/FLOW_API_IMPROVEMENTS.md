@@ -1,337 +1,480 @@
-# Flow API Improvements - Implementation Summary
+# Flow API - Expected Design
 
 ## Overview
 
-This document summarizes the comprehensive improvements made to the Flow API in the `flow-improved` branch, focusing on better ergonomics, true execution isolation through nested pods, and deterministic operations.
+This document describes the expected Flow API design based on standard JavaScript Promise patterns. The API eliminates Result types (OK/KO) in favor of direct returns and error throwing.
 
-## Architectural Changes
+## Core Principles
 
-### 1. Pod Nesting Infrastructure
+1. **Promise-based error handling** - throw for errors, return for success
+2. **Type inference** - minimal generic parameters needed
+3. **Flexible signatures** - support nameless flows, dependencies, void input
+4. **Journaling** - deterministic replay via ctx.run()
+5. **Composition** - FP operations on FlowPromise
 
-**What Changed:**
-- Pods can now create child pods via `pod.pod()`
-- Hierarchical resolution: child → parent pods → scope
-- Cascade disposal ensures proper cleanup
-- Added utility methods: `getDepth()`, `getRootPod()`
+## API Patterns
 
-**Files Modified:**
-- `src/scope.ts` - Pod class enhanced with nesting
-- `src/types.ts` - Core.Pod interface updated
+### 1. Nameless Flows
 
-**Key Implementation:**
+**Shortest form - handler only:**
 ```typescript
-class Pod extends BaseScope {
-  private parentPod?: Pod;
-  private childPods: Set<Pod> = new Set();
+const double = flow((_ctx, input: number) => input * 2);
+const result = await flow.execute(double, 5);
+expect(result).toBe(10);
+```
 
-  pod(...args): Core.Pod {
-    const childPod = new Pod(this.parentScope, {
-      ...options,
-      parentPod: this
-    });
-    this.childPods.add(childPod);
-    return childPod;
-  }
+**With explicit generics:**
+```typescript
+const impl = flow<{ value: number }>((ctx, input) => {
+  return { result: input.value * 2 };
+});
+const result = await flow.execute(impl, { value: 5 });
+```
 
-  async resolve<T>(executor: Core.Executor<T>): Promise<T> {
-    // Check own cache
-    // Check parent pod hierarchy
-    // Check scope
-    // Resolve if not found
+**With input and output types:**
+```typescript
+const stringToNumber = flow<string, number>((ctx, input) => {
+  return Number(input);
+});
+const result = await flow.execute(stringToNumber, "42");
+```
+
+### 2. Void Input Flows
+
+**No parameter needed:**
+```typescript
+const noInput = flow<void, number>(() => {
+  return 42;
+});
+const result = await flow.execute(noInput);
+```
+
+**With extensions:**
+```typescript
+const result = await flow.execute(noInput, undefined, {
+  extensions: []
+});
+```
+
+**Sub-flow with void input:**
+```typescript
+const noInputSub = flow<void, number>(() => 100);
+
+const main = flow<void, number>(
+  { name: "main" },
+  async (ctx) => {
+    const sub = await ctx.exec(noInputSub);
+    return sub + 1;
   }
+);
+```
+
+### 3. Dependency Injection
+
+**Nameless with dependencies:**
+```typescript
+const config = provide(() => ({ multiplier: 10 }));
+
+const multiply = flow({ config }, ({ config }, _ctx, input: number) => {
+  return input * config.multiplier;
+});
+
+const result: number = await flow.execute(multiply, 5);
+```
+
+**Dependencies with definition:**
+```typescript
+const logger = provide(() => ({ log: vi.fn() }));
+
+const loggedFlow = flow(
+  logger,
+  {
+    name: "logger-flow",
+    input: custom<string>(),
+    success: custom<string>(),
+  },
+  (deps, _ctx, input) => {
+    deps.log(`Processing: ${input}`);
+    return input.toUpperCase();
+  }
+);
+```
+
+**Complex example with nested flows:**
+```typescript
+const api = provide(() => ({ fetch: fetchMock }));
+
+const fetchUser = flow({ api }, async ({ api }, ctx, id: number) => {
+  const response = await ctx.run("fetch-user", () =>
+    api.fetch(`/users/${id}`)
+  );
+  return { userId: id, username: `user${id}`, raw: response.data };
+});
+
+const fetchPosts = flow({ api }, async ({ api }, ctx, userId: number) => {
+  const response = await ctx.run("fetch-posts", () =>
+    api.fetch(`/posts?userId=${userId}`)
+  );
+  return { posts: [{ id: 1, title: "Post 1" }], raw: response.data };
+});
+
+const getUserWithPosts = flow(
+  { api },
+  async ({ api }, ctx, userId: number) => {
+    const user = await ctx.exec(fetchUser, userId);
+    const posts = await ctx.exec(fetchPosts, userId);
+    const enriched = await ctx.run("enrich", () => ({
+      ...user,
+      postCount: posts.posts.length,
+    }));
+    return enriched;
+  }
+);
+```
+
+### 4. Definition Pattern
+
+**Pattern 1: Generic types with handler:**
+```typescript
+const impl = flow<{ value: number }, { result: number }>(
+  { name: "double" },
+  (ctx, input) => {
+    return { result: input.value * 2 };
+  }
+);
+```
+
+**Pattern 2: Schema-based with inferred types:**
+```typescript
+const impl = flow(
+  {
+    name: "triple",
+    input: custom<{ value: number }>(),
+    success: custom<{ result: number }>(),
+  },
+  (ctx, input) => {
+    return { result: input.value * 3 };
+  }
+);
+```
+
+**Pattern 3: Definition then handler:**
+```typescript
+const definition = flow({
+  name: "square",
+  input: custom<{ x: number }>(),
+  success: custom<{ y: number }>(),
+});
+
+const impl = definition.handler((ctx, input) => {
+  return { y: input.x * input.x };
+});
+```
+
+### 5. Context Methods
+
+**ctx.run() - Journaling:**
+```typescript
+const impl = flow<{ url: string }, { data: string }>(
+  { name: "fetch-flow" },
+  async (ctx, input) => {
+    const data = await ctx.run("fetch", () => fetchMock());
+    return { data };
+  }
+);
+```
+
+**ctx.exec() - Sub-flows:**
+```typescript
+const subFlow = flow<{ n: number }, { doubled: number }>(
+  { name: "sub" },
+  (ctx, input) => ({ doubled: input.n * 2 })
+);
+
+const mainFlow = flow<{ value: number }, { result: number }>(
+  { name: "main" },
+  async (ctx, input) => {
+    const sub = await ctx.exec(subFlow, { n: input.value });
+    return { result: sub.doubled };
+  }
+);
+```
+
+**ctx.parallel() - Parallel execution:**
+```typescript
+const main = flow<{ val: number }, { sum: number }>(
+  { name: "parallel-flow" },
+  async (ctx, input) => {
+    const p1 = ctx.exec(flow1, { x: input.val });
+    const p2 = ctx.exec(flow2, { x: input.val });
+    const result = await ctx.parallel([p1, p2]);
+
+    const sum = result.results[0].r + result.results[1].r;
+    return { sum };
+  }
+);
+```
+
+**ctx.parallelSettled() - Partial failures:**
+```typescript
+const main = flow<{}, { succeeded: number; failed: number }>(
+  { name: "settled" },
+  async (ctx) => {
+    const p1 = ctx.exec(success, {});
+    const p2 = ctx.exec(failure, {});
+    const p3 = ctx.exec(success, {});
+    const result = await ctx.parallelSettled([p1, p2, p3]);
+
+    return {
+      succeeded: result.stats.succeeded,
+      failed: result.stats.failed,
+    };
+  }
+);
+```
+
+### 6. Error Handling
+
+**Throws FlowError:**
+```typescript
+const impl = flow<{ shouldFail: boolean }, { success: boolean }>(
+  { name: "error-flow" },
+  (ctx, input) => {
+    if (input.shouldFail) {
+      throw new FlowError("Operation failed", "FAILED");
+    }
+    return { success: true };
+  }
+);
+
+await expect(flow.execute(impl, { shouldFail: true })).rejects.toThrow(
+  FlowError
+);
+```
+
+### 7. FlowPromise FP Operations
+
+**map - transform success value:**
+```typescript
+const result = await flow
+  .execute(getNumber)
+  .map((n) => n * 2)
+  .map((n) => n.toString());
+```
+
+**switch - chain flows:**
+```typescript
+const result = await flow
+  .execute(firstFlow)
+  .switch((num) => flow.execute(secondFlow, num));
+```
+
+**mapError - transform error:**
+```typescript
+try {
+  await flow.execute(failingFlow).mapError((err) => {
+    return new Error(`Transformed: ${err.message}`);
+  });
+} catch (error: any) {
+  expect(error.message).toBe("Transformed: Original error");
 }
 ```
 
-**Benefits:**
-- True execution isolation
-- Hierarchical value inheritance
-- Automatic resource cleanup
-- Better memory management
-
-### 2. FlowPromise Class
-
-**New File:** `src/flow-promise.ts`
-
-**Features:**
-- Promise wrapper maintaining pod reference
-- Combinators: `all()`, `race()`, `allSettled()`
-- Result handling: `unwrap()`, `unwrapOr()`, `match()`
-- Full Promise interface: `then()`, `catch()`, `finally()`
-
-**Usage Example:**
+**switchError - recover from error:**
 ```typescript
-const p1 = ctx.flow(flow1, input1);
-const p2 = ctx.flow(flow2, input2);
-
-// Combine with type-safe results
-const results = await FlowPromise.all([p1, p2]);
-
-// Pattern matching
-const data = await p1.match({
-  ok: (data) => processSuccess(data),
-  ko: (error) => handleError(error)
-});
-
-// Unwrap with error handling
-const value = await p1.unwrap(); // throws if ko
-const valueOrDefault = await p1.unwrapOr(defaultValue);
+const result = await flow
+  .execute(failingFlow)
+  .switchError(() => flow.execute(fallbackFlow));
 ```
 
-### 3. Enhanced FlowContext
-
-**File Modified:** `src/flow.ts`
-
-**New Methods:**
-
-#### `ctx.run<T>(key: string, fn: () => Promise<T>): Promise<T>`
-Journaled operations with automatic replay:
+**Chaining:**
 ```typescript
-const impl = flow.handler(async (ctx, input) => {
-  // Executes once, journals result
-  const data = await ctx.run("fetch-api", async () => {
-    return await fetch(input.url);
-  });
-
-  // Replays from journal on retry
-  const data2 = await ctx.run("fetch-api", async () => {
-    return await fetch(input.url); // Won't execute
-  });
-
-  return ctx.ok({ data });
-});
+const result = await flow
+  .execute(getUser)
+  .map((user) => user.name)
+  .map((name) => name.toUpperCase())
+  .map((name) => `Hello, ${name}!`);
 ```
 
-#### `ctx.flow<F>(flow: F, input: InferInput<F>): Promise<InferOutput<F>>`
-Simplified sub-flow execution with nested pods:
-```typescript
-const impl = flow.handler(async (ctx, input) => {
-  // Automatically creates nested pod
-  const result = await ctx.flow(subFlow, subInput);
+## Type System
 
-  if (result.isOk()) {
-    return ctx.ok({ data: result.data });
+### Handler Signatures
+
+```typescript
+// No dependencies, with input
+type Handler1<I, S> = (ctx: Context<I, S>, input: I) => S | Promise<S>;
+
+// With dependencies
+type Handler2<D, I, S> = (deps: D, ctx: Context<I, S>, input: I) => S | Promise<S>;
+
+// Void input, no dependencies
+type Handler3<S> = (ctx: Context<void, S>) => S | Promise<S>;
+
+// Void input, with dependencies
+type Handler4<D, S> = (deps: D, ctx: Context<void, S>) => S | Promise<S>;
+```
+
+### Context Type
+
+```typescript
+export type Context<I, S> = Accessor.DataStore & {
+  readonly pod: Core.Pod;
+  input: I;
+
+  run<T>(key: string, fn: () => Promise<T> | T): Promise<T>;
+
+  flow<F extends UFlow>(
+    flow: F,
+    input: InferInput<F>
+  ): Promise<InferOutput<F>>;
+
+  parallel<T extends readonly [UFlow, any][]>(
+    flows: [...T]
+  ): Promise<ParallelResult<{...}>>;
+
+  parallelSettled<T extends readonly [UFlow, any][]>(
+    flows: [...T]
+  ): Promise<ParallelSettledResult<{...}>>;
+
+  get(key: unknown): unknown;
+  set(key: unknown, value: unknown): unknown | undefined;
+};
+```
+
+### Flow Definition
+
+```typescript
+export type Definition<I, S> = {
+  name: string;
+  input: StandardSchemaV1<I>;
+  success: StandardSchemaV1<S>;
+  version?: string;
+} & Meta.MetaContainer;
+```
+
+### Type Inference
+
+```typescript
+export type InferInput<F> = F extends NoDependencyFlow<infer I, any>
+  ? I
+  : F extends DependentFlow<any, infer I, any>
+  ? I
+  : never;
+
+export type InferOutput<F> = F extends NoDependencyFlow<any, infer S>
+  ? S
+  : F extends DependentFlow<any, any, infer S>
+  ? S
+  : never;
+```
+
+### Parallel Results
+
+```typescript
+export type ParallelResult<T> = {
+  results: T;
+  stats: {
+    total: number;
+    succeeded: number;
+    failed: number;
+  };
+};
+
+export type ParallelSettledResult<T> = {
+  results: PromiseSettledResult<T>[];
+  stats: {
+    total: number;
+    succeeded: number;
+    failed: number;
+  };
+};
+```
+
+## FlowPromise Class
+
+```typescript
+class FlowPromise<T> {
+  constructor(pod: Core.Pod, promise: Promise<T>);
+
+  map<U>(fn: (value: T) => U | Promise<U>): FlowPromise<U>;
+
+  switch<U>(fn: (value: T) => FlowPromise<U>): FlowPromise<U>;
+
+  mapError(fn: (error: unknown) => unknown): FlowPromise<T>;
+
+  switchError(fn: (error: unknown) => FlowPromise<T>): FlowPromise<T>;
+
+  then<U>(onfulfilled?, onrejected?): FlowPromise<U>;
+  catch<U>(onrejected): FlowPromise<U>;
+  finally(onfinally): FlowPromise<T>;
+
+  toPromise(): Promise<T>;
+  getPod(): Core.Pod;
+
+  static all<T>(promises: [...T]): FlowPromise<...>;
+  static race<T>(promises: [...T]): FlowPromise<...>;
+  static allSettled<T>(promises: [...T]): FlowPromise<...>;
+}
+```
+
+## Error Classes
+
+```typescript
+export class FlowError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly data?: unknown,
+    options?: { cause?: unknown }
+  );
+}
+
+export class FlowValidationError extends FlowError {
+  constructor(
+    message: string,
+    public readonly issues: StandardSchemaV1.Issue[],
+    options?: { cause?: unknown }
+  );
+}
+```
+
+## Migration from Old API
+
+### Before (with Result types)
+```typescript
+const impl = flow<Input, Success, Error>({
+  name: "test",
+  handler: async (ctx, input) => {
+    const data = await ctx.run("op", () => operation());
+    return ctx.ok({ data });
   }
-
-  return ctx.ko(result.data);
 });
+
+const result = await flow.execute(impl, input);
+if (result.isOk()) {
+  console.log(result.data.data);
+}
 ```
 
-#### `ctx.parallel<T>(flows: [...T]): Promise<ParallelResult<T>>`
-Clean parallel execution:
+### After (Promise-based)
 ```typescript
-const impl = flow.handler(async (ctx, input) => {
-  const parallelResult = await ctx.parallel([
-    [flow1, input1],
-    [flow2, input2],
-    [flow3, input3]
-  ] as const);
-
-  // Check result type
-  if (parallelResult.type === "all-ok") {
-    const [r1, r2, r3] = parallelResult.results;
-    // All succeeded
+const impl = flow<Input, Success>({
+  name: "test",
+  handler: async (ctx, input) => {
+    const data = await ctx.run("op", () => operation());
+    return { data };
   }
-
-  // Access stats
-  const { total, succeeded, failed } = parallelResult.stats;
-});
-```
-
-**Key Changes:**
-- Constructor creates nested pod automatically
-- Each child context has its own pod (depth + 1)
-- Local journal for ctx.run() operations
-- Maintains parent context reference
-
-### 4. Journaling Extension
-
-**New File:** `src/extensions/journaling.ts`
-
-**Purpose:** Provides deterministic replay through extension system
-
-**Features:**
-- Journals all flow executions
-- Stores results with metadata (timestamp, flow name, depth)
-- Replays from journal on retry
-- Error journaling and replay support
-
-**Usage:**
-```typescript
-const journal = new Map();
-const journalingExt = createJournalingExtension(journal);
-
-await flow.execute(myFlow, input, {
-  extensions: [journalingExt]
 });
 
-// Access journal
-const entries = getJournalEntries(journal);
-clearJournal(journal);
+const result = await flow.execute(impl, input);
+console.log(result.data);
 ```
 
-## Testing
+## Key Benefits
 
-### New Test Files
-
-#### 1. `tests/pod-nesting.test.ts` (8 tests)
-- Pod nesting depth tracking
-- Value inheritance through hierarchy
-- Override with presets
-- Cascade disposal
-- Child pod removal
-
-#### 2. `tests/flow-improved.test.ts` (9 tests)
-- `ctx.run()` journaling and replay
-- Error journaling
-- `ctx.flow()` with nested pods
-- Context isolation
-- `ctx.parallel()` execution
-- Partial results handling
-- Journaling extension integration
-- Nested pod depth verification
-
-### Test Results
-```
-Test Files  9 passed | 1 skipped (10)
-Tests      106 passed | 11 skipped (117)
-Duration   1.41s
-```
-
-**All existing tests pass** - changes are backward compatible!
-
-## Migration Guide
-
-### Before (Old API)
-
-```typescript
-// Complex execute with overloads
-const result = await ctx.execute(subFlow, input);
-
-// Tuple-based parallel execution
-const results = await ctx.executeParallel([
-  [flow1, input1],
-  [flow2, input2]
-]);
-
-// No journaling support
-// Manual error handling
-```
-
-### After (New API)
-
-```typescript
-// Simplified flow execution
-const result = await ctx.flow(subFlow, input);
-
-// Clean parallel execution
-const results = await ctx.parallel([
-  [flow1, input1],
-  [flow2, input2]
-] as const);
-
-// Journaled operations
-const data = await ctx.run("operation-key", async () => {
-  return await expensiveOperation();
-});
-
-// Pattern matching
-const value = await result.match({
-  ok: (data) => data.value,
-  ko: (error) => handleError(error)
-});
-```
-
-### Backward Compatibility
-
-The old `execute()` and `executeParallel()` methods still work! They now automatically benefit from nested pod isolation.
-
-```typescript
-// Still works, now with nested pods
-const result = await ctx.execute(subFlow, input);
-```
-
-## Performance Considerations
-
-### Nested Pods
-- Small memory overhead per nesting level
-- Hierarchical resolution has O(depth) lookup
-- Automatic cleanup prevents memory leaks
-
-### Journaling
-- In-memory storage (configurable)
-- O(1) journal lookup
-- Consider cleanup strategies for long-running processes
-
-### Recommendations
-- Use `ctx.run()` for expensive operations
-- Limit nesting depth for deeply recursive flows
-- Implement journal cleanup for long-running services
-- Use parallel execution for independent operations
-
-## Future Enhancements
-
-### Potential Additions
-
-1. **FlowPromise.any()** - First successful result
-2. **Timeout support** - `ctx.run("key", fn, { timeout: 5000 })`
-3. **Retry policies** - Built into ctx.run()
-4. **Journal persistence** - Database-backed journal
-5. **Transaction extension** - Automatic transaction management
-6. **Metrics extension** - Execution time tracking
-
-### API Evolution
-
-Consider these for future iterations:
-- Single-step flow definition (remove two-step process)
-- Typed context store with accessor pattern
-- Better TypeScript inference for parallel results
-- Builder pattern for complex parallel orchestrations
-
-## Design Principles Maintained
-
-✅ **Generic Library** - No case-specific concepts
-✅ **Graph Resolution** - Core principle preserved
-✅ **Scope/Pod Pattern** - Enhanced, not replaced
-✅ **Extension System** - Leveraged for new features
-✅ **Type Safety** - Strong typing throughout
-✅ **Backward Compatible** - All existing code works
-
-## Key Learnings
-
-### What Worked Well
-
-1. **Nested Pods** - Natural fit for execution isolation
-2. **Extension System** - Perfect for journaling
-3. **Incremental Approach** - Added features without breaking changes
-4. **Comprehensive Testing** - Caught issues early
-
-### Challenges Overcome
-
-1. **Pod Interface** - Had to expose `pod()` method
-2. **Type Inference** - Complex parallel types required careful design
-3. **Constructor Logic** - Detecting Pod vs Scope
-4. **Journal Keys** - Needed unique keys per execution level
-
-## Implementation Timeline
-
-- **Week 1**: Pod nesting infrastructure (✅ Complete)
-- **Week 2**: FlowContext refactoring (✅ Complete)
-- **Week 3**: FlowPromise and extensions (✅ Complete)
-- **Week 4**: Testing and documentation (✅ Complete)
-
-## Commits
-
-1. `feat(core-next): implement pod nesting capability` (902c93a)
-2. `feat(core-next): complete Flow API improvements with nested pods` (6f32fd8)
-
-## Conclusion
-
-The Flow API improvements successfully deliver:
-- ✅ Better ergonomics through simplified methods
-- ✅ True execution isolation via nested pods
-- ✅ Deterministic operations with journaling
-- ✅ Improved composability through FlowPromise
-- ✅ Full backward compatibility
-- ✅ Comprehensive test coverage
-
-The implementation maintains pumped-fn's core principles while significantly improving the developer experience for building complex, resilient flows.
+1. **Simpler API** - no Result wrapping/unwrapping
+2. **Standard patterns** - throw/catch like regular JavaScript
+3. **Better type inference** - fewer generic parameters
+4. **Less boilerplate** - direct returns
+5. **Familiar** - works like Promise naturally
+6. **Composable** - FP operations on FlowPromise

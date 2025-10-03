@@ -7,6 +7,7 @@ import {
   isPreset,
 } from "./executor";
 import {
+  type Accessor,
   Core,
   Extension,
   Meta,
@@ -15,7 +16,7 @@ import {
   DependencyResolutionError,
   ErrorContext,
 } from "./types";
-import * as errors from "./error-codes";
+import * as errors from "./errors";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -27,7 +28,11 @@ type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
 interface ReplacerResult {
   factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>;
-  dependencies: undefined | Core.UExecutor | Core.UExecutor[] | Record<string, Core.UExecutor>;
+  dependencies:
+    | undefined
+    | Core.UExecutor
+    | Core.UExecutor[]
+    | Record<string, Core.UExecutor>;
   immediateValue?: unknown;
 }
 
@@ -73,10 +78,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
       this.currentPromise = (async () => {
         try {
-          const { factory, dependencies, immediateValue } = this.processReplacer();
+          const { factory, dependencies, immediateValue } =
+            this.processReplacer();
 
           if (immediateValue !== undefined) {
-            await new Promise<void>(resolve => queueMicrotask(resolve));
+            await new Promise<void>((resolve) => queueMicrotask(resolve));
 
             this.scope["cache"].set(this.requestor, {
               accessor: this,
@@ -110,7 +116,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
           this.currentPromise = null;
 
           return processedResult;
-
         } catch (error) {
           const { enhancedError, errorContext, originalError } =
             this.enhanceResolutionError(error);
@@ -142,7 +147,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
     };
   }
 
-  private handleCachedState(cached: Core.ResolveState<unknown>): Promise<unknown> | never {
+  private handleCachedState(
+    cached: Core.ResolveState<unknown>
+  ): Promise<unknown> | never {
     if (cached.kind === "resolved") {
       return Promise.resolve(cached.value);
     }
@@ -162,7 +169,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     if (!replacer) {
       return {
         factory: this.requestor.factory!,
-        dependencies: this.requestor.dependencies
+        dependencies: this.requestor.dependencies,
       };
     }
 
@@ -172,13 +179,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
       return {
         factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
-        immediateValue: value
+        immediateValue: value,
       };
     }
 
     return {
       factory: value.factory!,
-      dependencies: value.dependencies
+      dependencies: value.dependencies,
     };
   }
 
@@ -188,9 +195,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     controller: Core.Controller
   ): Promise<unknown> {
     try {
-      const factoryResult = factory.length >= 2
-        ? (factory as Core.DependentFn<unknown, unknown>)(resolvedDependencies, controller)
-        : (factory as Core.NoDependencyFn<unknown>)(controller);
+      const factoryResult =
+        factory.length >= 2
+          ? (factory as Core.DependentFn<unknown, unknown>)(
+              resolvedDependencies,
+              controller
+            )
+          : (factory as Core.NoDependencyFn<unknown>)(controller);
 
       if (factoryResult instanceof Promise) {
         try {
@@ -259,16 +270,16 @@ class AccessorImpl implements Core.Accessor<unknown> {
   } {
     if (
       error &&
-      typeof error === 'object' &&
-      'context' in error &&
-      'code' in error &&
+      typeof error === "object" &&
+      "context" in error &&
+      "code" in error &&
       error.context &&
       error.code
     ) {
       return {
         enhancedError: error as ExecutorResolutionError,
         errorContext: error.context as ErrorContext,
-        originalError: error
+        originalError: error,
       };
     }
 
@@ -283,14 +294,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
       {
         errorType: error?.constructor?.name || "UnknownError",
         resolutionPhase: "post-factory",
-        hasOriginalContext: false
+        hasOriginalContext: false,
       }
     );
 
     return {
       enhancedError,
       errorContext: enhancedError.context,
-      originalError: error
+      originalError: error,
     };
   }
 
@@ -365,8 +376,14 @@ function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, CacheEntry> = new Map();
-  protected cleanups: Map<UE, Set<Core.Cleanup>> = new Map<UE, Set<Core.Cleanup>>();
-  protected onUpdates: Map<UE, Set<OnUpdateFn | UE>> = new Map<UE, Set<OnUpdateFn | UE>>();
+  protected cleanups: Map<UE, Set<Core.Cleanup>> = new Map<
+    UE,
+    Set<Core.Cleanup>
+  >();
+  protected onUpdates: Map<UE, Set<OnUpdateFn | UE>> = new Map<
+    UE,
+    Set<OnUpdateFn | UE>
+  >();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -376,7 +393,10 @@ class BaseScope implements Core.Scope {
     release: new Set<Core.ReleaseCallback>(),
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
-  protected onErrors: Map<UE, Set<Core.ErrorCallback<unknown>>> = new Map<UE, Set<Core.ErrorCallback<unknown>>>();
+  protected onErrors: Map<UE, Set<Core.ErrorCallback<unknown>>> = new Map<
+    UE,
+    Set<Core.ErrorCallback<unknown>>
+  >();
   protected isPod: boolean;
   private isDisposing = false;
 
@@ -644,14 +664,20 @@ class BaseScope implements Core.Scope {
 
     let resolver = coreResolve;
 
+    const emptyDataStore: Accessor.DataStore = {
+      get: () => undefined,
+      set: () => undefined,
+    };
+
     for (const extension of [...this.extensions].reverse()) {
-      if (extension.wrapResolve) {
+      if (extension.wrap) {
         const currentResolver = resolver;
         resolver = () =>
-          extension.wrapResolve!(currentResolver, {
-            operation: "resolve",
+          extension.wrap!(emptyDataStore, currentResolver, {
+            kind: "resolve",
             executor,
             scope: this,
+            operation: "resolve",
           }) as any;
       }
     }
@@ -713,11 +739,17 @@ class BaseScope implements Core.Scope {
       return this.accessor(e).get() as T;
     };
 
+    const emptyDataStore: Accessor.DataStore = {
+      get: () => undefined,
+      set: () => undefined,
+    };
+
     for (const extension of [...this.extensions].reverse()) {
-      if (extension.wrapResolve) {
+      if (extension.wrap) {
         const currentUpdater = updater;
         updater = () =>
-          extension.wrapResolve!(currentUpdater, {
+          extension.wrap!(emptyDataStore, currentUpdater, {
+            kind: "resolve",
             operation: "update",
             executor: e,
             scope: this,
@@ -1010,7 +1042,7 @@ class Pod extends BaseScope implements Core.Pod {
 
     const childPod = new Pod(this.parentScope, {
       ...podOptions,
-      parentPod: this
+      parentPod: this,
     });
 
     this.childPods.add(childPod);
@@ -1106,7 +1138,7 @@ class Pod extends BaseScope implements Core.Pod {
     const deps = executor.dependencies;
     if (Array.isArray(deps)) {
       return deps.some(checkDependency);
-    } else if (typeof deps === "object" && deps !== null) {
+    } else if (typeof deps === "object" && deps !== null && !isExecutor(deps)) {
       return Object.values(deps).some(checkDependency);
     } else {
       return checkDependency(deps);

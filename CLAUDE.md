@@ -22,6 +22,7 @@ The library is meant to be GENERIC, it has its core, and extensions (plugins, mi
 
 - **ALWAYS** make sure typechecking passed, for both src code and tests code, to the directory you are working on
 - **NEVER** use comment on code, code should be well named so the content explains for themseleves
+- ALWAYS use pnpm, read to understand the project setting before hand
 - use linebreak smartly to separate area of code with different meanings
 
 # Concept

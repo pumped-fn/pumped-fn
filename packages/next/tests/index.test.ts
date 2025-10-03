@@ -201,17 +201,22 @@ test("can use release to control counter", async () => {
   expect(derivedCounterAccessor.get()).toBe(3);
 });
 
-test("can use preset to advance value", async () => {
+test("preset works with value and executor", async () => {
   const counter = provide(() => 0, name("counter"));
+  const fakeValue = provide(() => 1);
   const derivedCounter = derive(counter, (counter) => counter + 1);
 
-  const oScope = createScope();
-  let value = await oScope.resolve(derivedCounter);
-  expect(value).toBe(1);
+  let scope = createScope();
+  expect(await scope.resolve(derivedCounter)).toBe(1);
+  await scope.dispose();
 
-  const mScope = createScope(preset(counter, 2));
-  value = await mScope.resolve(derivedCounter);
-  expect(value).toBe(3);
+  scope = createScope(preset(counter, 2));
+  expect(await scope.resolve(derivedCounter)).toBe(3);
+  await scope.dispose();
+
+  scope = createScope(preset(counter, fakeValue));
+  expect(await scope.resolve(derivedCounter)).toBe(2);
+  await scope.dispose();
 });
 
 test("same promise with different resolves", async () => {
@@ -229,12 +234,6 @@ test("same promise with different resolves", async () => {
   expect(anotherAccessor.resolve()).toBe(accessor.resolve());
 });
 
-test("update without resolving", async () => {
-  const counter = provide(() => 0);
-  const scope = createScope();
-
-  await scope.set(counter, 2);
-});
 
 test("test scope option", async () => {
   const eagerMeta = meta("eagerLoad", custom<boolean>());
@@ -290,18 +289,3 @@ test("provider can control itself", async () => {
   expect(fn).toBeCalledTimes(2);
 });
 
-test("preset should work with either value and other executor", async () => {
-  const value = provide(() => 0);
-
-  const fakeValue = provide(() => 1);
-  const derivedValue = derive(value, (value) => value * 2);
-
-  let scope = createScope(preset(value, fakeValue));
-  let resolvedValue = await scope.resolve(derivedValue);
-  expect(resolvedValue).toBe(2);
-  await scope.dispose();
-
-  scope = createScope(preset(value, 2));
-  resolvedValue = await scope.resolve(derivedValue);
-  expect(resolvedValue).toBe(4);
-});
