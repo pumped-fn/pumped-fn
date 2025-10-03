@@ -20,7 +20,7 @@ import * as errors from "./errors";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
-  value: Core.ResolveState<unknown>;
+  value?: Core.ResolveState<unknown>;
 };
 
 type UE = Core.Executor<unknown>;
@@ -54,7 +54,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     if (!existing || !existing.accessor) {
       this.scope["cache"].set(requestor, {
         accessor: this,
-        value: existing?.value || (undefined as any),
+        value: existing?.value,
       });
     }
   }
@@ -676,12 +676,12 @@ class BaseScope implements Core.Scope {
       if (extension.wrap) {
         const currentResolver = resolver;
         resolver = () =>
-          extension.wrap!(emptyDataStore, currentResolver, {
+          extension.wrap!<T>(emptyDataStore, currentResolver, {
             kind: "resolve",
             executor,
             scope: this,
             operation: "resolve",
-          }) as any;
+          });
       }
     }
 
@@ -725,7 +725,7 @@ class BaseScope implements Core.Scope {
       for (const event of events) {
         const updated = await event("update", e, value, this);
         if (updated !== undefined && e === updated.executor) {
-          value = updated.value as any;
+          value = updated.value as T;
         }
       }
 
@@ -751,12 +751,12 @@ class BaseScope implements Core.Scope {
       if (extension.wrap) {
         const currentUpdater = updater;
         updater = () =>
-          extension.wrap!(emptyDataStore, currentUpdater, {
+          extension.wrap!<T>(emptyDataStore, currentUpdater, {
             kind: "resolve",
             operation: "update",
             executor: e,
             scope: this,
-          }) as any;
+          });
       }
     }
 
@@ -839,14 +839,14 @@ class BaseScope implements Core.Scope {
 
     const ou = this.onUpdates.get(e) ?? new Set();
     this.onUpdates.set(e, ou);
-    ou.add(cb as any);
+    ou.add(cb as OnUpdateFn);
 
     return () => {
       this["~ensureNotDisposed"]();
 
       const ou = this.onUpdates.get(e);
       if (ou) {
-        ou.delete(cb as any);
+        ou.delete(cb as OnUpdateFn);
         if (ou.size === 0) {
           this.onUpdates.delete(e);
         }
@@ -860,10 +860,10 @@ class BaseScope implements Core.Scope {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    this.onEvents["change"].add(callback as any);
+    this.onEvents["change"].add(callback);
     return () => {
       this["~ensureNotDisposed"]();
-      this.onEvents["change"].delete(callback as any);
+      this.onEvents["change"].delete(callback);
     };
   }
 
@@ -1082,16 +1082,18 @@ class Pod extends BaseScope implements Core.Pod {
           value,
         });
 
-        if (value.kind === "rejected") {
-          throw value.error;
-        }
+        if (value) {
+          if (value.kind === "rejected") {
+            throw value.error;
+          }
 
-        if (value.kind === "resolved") {
-          return value.value as T;
-        }
+          if (value.kind === "resolved") {
+            return value.value as T;
+          }
 
-        if (value.kind === "pending") {
-          return (await value.promise) as T;
+          if (value.kind === "pending") {
+            return (await value.promise) as T;
+          }
         }
       }
       currentParent = currentParent.parentPod;
@@ -1106,16 +1108,18 @@ class Pod extends BaseScope implements Core.Pod {
         value,
       });
 
-      if (value.kind === "rejected") {
-        throw value.error;
-      }
+      if (value) {
+        if (value.kind === "rejected") {
+          throw value.error;
+        }
 
-      if (value.kind === "resolved") {
-        return value.value as T;
-      }
+        if (value.kind === "resolved") {
+          return value.value as T;
+        }
 
-      if (value.kind === "pending") {
-        return (await value.promise) as T;
+        if (value.kind === "pending") {
+          return (await value.promise) as T;
+        }
       }
     }
 
