@@ -8,16 +8,16 @@ import {
   type StandardSchemaV1,
 } from "./types";
 
-class MultiExecutorImpl<T, K> {
+class MultiExecutorImpl<T, K, PoolIdType = unknown> {
   private option: Multi.Option<K>;
-  private poolId: Meta.MetaFn<any>;
+  private poolId: Meta.MetaFn<PoolIdType>;
   private keyPool: Map<unknown, Core.Executor<T>>;
   private createNewExecutor: (key: K) => Core.Executor<T>;
-  public id: Meta.MetaFn<any>;
+  public id: Meta.MetaFn<PoolIdType>;
 
   constructor(
     option: Multi.Option<K>,
-    poolId: Meta.MetaFn<any>,
+    poolId: Meta.MetaFn<PoolIdType>,
     keyPool: Map<unknown, Core.Executor<T>>,
     createNewExecutor: (key: K) => Core.Executor<T>
   ) {
@@ -77,14 +77,14 @@ function createValidatedExecutor<T, K>(
   return createExecutorFn(validatedKey);
 }
 
-function createMultiExecutor<T, K>(
+function createMultiExecutor<T, K, PoolIdType>(
   option: Multi.Option<K>,
-  poolId: Meta.MetaFn<any>,
+  poolId: Meta.MetaFn<PoolIdType>,
   keyPool: Map<unknown, Core.Executor<T>>,
   createNewExecutor: (key: K) => Core.Executor<T>,
   providerMetas: Meta.Meta[]
 ): Multi.MultiExecutor<T, K> {
-  const impl = new MultiExecutorImpl(
+  const impl = new MultiExecutorImpl<T, K, PoolIdType>(
     option,
     poolId,
     keyPool,
@@ -97,12 +97,11 @@ function createMultiExecutor<T, K>(
     providerMetas
   );
 
-  const multiExecutor: Multi.MultiExecutor<T, K> = ((key: K) =>
-    impl.__call(key)) as any;
-
-  Object.assign(multiExecutor, provider);
-  multiExecutor.release = (scope: Core.Scope) => impl.release(scope);
-  multiExecutor.id = impl.id;
+  const callableFn = (key: K) => impl.__call(key);
+  const multiExecutor = Object.assign(callableFn, provider, {
+    release: (scope: Core.Scope) => impl.release(scope),
+    id: impl.id,
+  }) as Multi.MultiExecutor<T, K>;
 
   return multiExecutor;
 }
@@ -140,13 +139,17 @@ export function derive<T, K, D extends Core.DependencyLike>(
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
-    return createValidatedExecutor(option, key, (validatedKey) =>
-      createExecutor(
-        (dependencies, ctl) => valueFn(dependencies as any, validatedKey, ctl),
-        option.dependencies as any,
-        metas
-      )
-    );
+    return createValidatedExecutor(option, key, (validatedKey) => {
+      const factory: Core.DependentFn<T, unknown> = (dependencies, ctl) =>
+        valueFn(dependencies as Core.InferOutput<D>, validatedKey, ctl);
+
+      const deps = option.dependencies as
+        | Core.UExecutor
+        | ReadonlyArray<Core.UExecutor>
+        | Record<string, Core.UExecutor>;
+
+      return createExecutor(factory, deps, metas);
+    });
   };
 
   return createMultiExecutor(option, poolId, keyPool, createNewExecutor, metas);
