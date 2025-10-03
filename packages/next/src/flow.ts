@@ -147,6 +147,7 @@ class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
   private journal = new Map<string, unknown>();
   public readonly pod: Core.Pod;
+  private reversedExtensions: Extension.Extension[];
 
   constructor(
     parentPodOrScope: Core.Pod | Core.Scope,
@@ -154,6 +155,7 @@ class FlowContext implements Flow.Context {
     private parent?: FlowContext
   ) {
     this.pod = parentPodOrScope.pod();
+    this.reversedExtensions = [...extensions].reverse();
   }
 
   initializeExecutionContext(flowName: string, isParallel: boolean = false) {
@@ -260,7 +262,7 @@ class FlowContext implements Flow.Context {
       };
 
       let executor = executeCore;
-      for (const extension of [...this.extensions].reverse()) {
+      for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
           executor = async () => {
@@ -357,7 +359,7 @@ class FlowContext implements Flow.Context {
         }
 
         let executor = executeCore;
-        for (const extension of [...this.extensions].reverse()) {
+        for (const extension of this.reversedExtensions) {
           if (extension.wrap) {
             const currentExecutor = executor;
             executor = async () => {
@@ -412,7 +414,7 @@ class FlowContext implements Flow.Context {
       }
 
       let executor = executeCore;
-      for (const extension of [...this.extensions].reverse()) {
+      for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
           executor = async () => {
@@ -462,7 +464,7 @@ class FlowContext implements Flow.Context {
     };
 
     let executor = executeCore;
-    for (const extension of [...this.extensions].reverse()) {
+    for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentExecutor = executor;
         executor = async () => {
@@ -508,7 +510,7 @@ class FlowContext implements Flow.Context {
     };
 
     let executor = executeCore;
-    for (const extension of [...this.extensions].reverse()) {
+    for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentExecutor = executor;
         executor = async () => {
@@ -540,7 +542,7 @@ class FlowContext implements Flow.Context {
     }
 
     let executor = executeCore;
-    for (const extension of [...this.extensions].reverse()) {
+    for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentExecutor = executor;
         executor = async () => {

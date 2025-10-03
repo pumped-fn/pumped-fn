@@ -403,6 +403,7 @@ class BaseScope implements Core.Scope {
   private resolutionChain: Map<UE, Set<UE>> = new Map();
 
   protected extensions: Extension.Extension[] = [];
+  private reversedExtensions: Extension.Extension[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
   public metas: Meta.Meta[] | undefined;
@@ -426,6 +427,8 @@ class BaseScope implements Core.Scope {
     if (options?.meta) {
       this.metas = options.meta;
     }
+
+    this.reversedExtensions = [...this.extensions].reverse();
   }
 
   protected "~checkCircularDependency"(
@@ -669,7 +672,7 @@ class BaseScope implements Core.Scope {
       set: () => undefined,
     };
 
-    for (const extension of [...this.extensions].reverse()) {
+    for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentResolver = resolver;
         resolver = () =>
@@ -744,7 +747,7 @@ class BaseScope implements Core.Scope {
       set: () => undefined,
     };
 
-    for (const extension of [...this.extensions].reverse()) {
+    for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentUpdater = updater;
         updater = () =>
@@ -927,11 +930,13 @@ class BaseScope implements Core.Scope {
     }
 
     this.extensions.push(extension);
+    this.reversedExtensions = [...this.extensions].reverse();
     extension.init?.(this);
 
     return () => {
       this["~ensureNotDisposed"]();
       this.extensions = this.extensions.filter((e) => e !== extension);
+      this.reversedExtensions = [...this.extensions].reverse();
     };
   }
 
