@@ -88,10 +88,7 @@ export class ExecutorResolutionError extends Error {
     category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR" = "USER_ERROR",
     options?: { cause?: unknown }
   ) {
-    super(message);
-    if (options && "cause" in options) {
-      (this as any).cause = options.cause;
-    }
+    super(message, options);
     this.name = "ExecutorResolutionError";
     this.context = context;
     this.code = code;

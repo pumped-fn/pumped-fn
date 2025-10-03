@@ -188,7 +188,10 @@ class FlowContext implements Flow.Context {
     if (this.contextData.has(key)) {
       return this.contextData.get(key);
     }
-    return this.parent?.get(key as any);
+    if (this.parent) {
+      return (this.parent.get as (key: unknown) => unknown)(key);
+    }
+    return undefined;
   }
 
   find<T>(accessor: Accessor.Accessor<T>): T | undefined;

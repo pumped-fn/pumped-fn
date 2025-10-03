@@ -13,7 +13,7 @@ export function validate<TSchema extends StandardSchemaV1>(
   if (result.issues) {
     throw new SchemaError(result.issues);
   }
-  return result.value as any;
+  return result.value as Awaited<StandardSchemaV1.InferOutput<TSchema>>;
 }
 
 
