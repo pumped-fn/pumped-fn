@@ -8,11 +8,9 @@ import { custom } from "./ssch";
 import { meta } from "./meta";
 import { FlowPromise } from "./promises";
 
-type JournalEntry<T = unknown> =
-  | { value: T }
-  | { __error: true; error: unknown };
-
-function isErrorEntry(entry: unknown): entry is { __error: true; error: unknown } {
+function isErrorEntry(
+  entry: unknown
+): entry is { __error: true; error: unknown } {
   return typeof entry === "object" && entry !== null && "__error" in entry;
 }
 
@@ -21,7 +19,7 @@ const flowDefinitionMeta = meta<Flow.Definition<any, any>>(
   custom<Flow.Definition<any, any>>()
 );
 
-export const FlowExecutionContext: {
+export const flowMeta: {
   depth: Accessor.AccessorWithDefault<number>;
   flowName: Accessor.Accessor<string | undefined>;
   parentFlowName: Accessor.Accessor<string | undefined>;
@@ -167,17 +165,15 @@ class FlowContext implements Flow.Context {
   }
 
   initializeExecutionContext(flowName: string, isParallel: boolean = false) {
-    const currentDepth = this.parent
-      ? this.parent.get(FlowExecutionContext.depth) + 1
-      : 0;
+    const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
     const parentFlowName = this.parent
-      ? this.parent.find(FlowExecutionContext.flowName)
+      ? this.parent.find(flowMeta.flowName)
       : undefined;
 
-    this.set(FlowExecutionContext.depth, currentDepth);
-    this.set(FlowExecutionContext.flowName, flowName);
-    this.set(FlowExecutionContext.parentFlowName, parentFlowName);
-    this.set(FlowExecutionContext.isParallel, isParallel);
+    this.set(flowMeta.depth, currentDepth);
+    this.set(flowMeta.flowName, flowName);
+    this.set(flowMeta.parentFlowName, parentFlowName);
+    this.set(flowMeta.isParallel, isParallel);
   }
 
   get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
@@ -243,8 +239,8 @@ class FlowContext implements Flow.Context {
     fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
     ...params: P
   ): FlowPromise<T> {
-    const flowName = this.find(FlowExecutionContext.flowName) || "unknown";
-    const depth = this.get(FlowExecutionContext.depth);
+    const flowName = this.find(flowMeta.flowName) || "unknown";
+    const depth = this.get(flowMeta.depth);
     const journalKey = `${flowName}:${depth}:${key}`;
 
     const promise = (async () => {
@@ -317,9 +313,9 @@ class FlowContext implements Flow.Context {
       const flow = flowOrInput as F;
       const input = inputOrUndefined as Flow.InferInput<F>;
 
-      const parentFlowName = this.find(FlowExecutionContext.flowName);
-      const depth = this.get(FlowExecutionContext.depth);
-      const flowName = this.find(FlowExecutionContext.flowName) || "unknown";
+      const parentFlowName = this.find(flowMeta.flowName);
+      const depth = this.get(flowMeta.depth);
+      const flowName = this.find(flowMeta.flowName) || "unknown";
       const journalKey = `${flowName}:${depth}:${key}`;
 
       const promise = (async () => {
@@ -398,8 +394,8 @@ class FlowContext implements Flow.Context {
     const input = flowOrInput as Flow.InferInput<F>;
 
     const promise = (async () => {
-      const parentFlowName = this.find(FlowExecutionContext.flowName);
-      const depth = this.get(FlowExecutionContext.depth);
+      const parentFlowName = this.find(flowMeta.flowName);
+      const depth = this.get(flowMeta.depth);
 
       const executeCore = async () => {
         const handler = await this.pod.resolve(flow);
@@ -456,8 +452,8 @@ class FlowContext implements Flow.Context {
       [K in keyof T]: T[K] extends FlowPromise<infer R> ? R : never;
     }>
   > {
-    const parentFlowName = this.find(FlowExecutionContext.flowName);
-    const depth = this.get(FlowExecutionContext.depth);
+    const parentFlowName = this.find(flowMeta.flowName);
+    const depth = this.get(flowMeta.depth);
 
     const executeCore = async () => {
       const results = await Promise.all(promises);
@@ -501,8 +497,8 @@ class FlowContext implements Flow.Context {
       [K in keyof T]: T[K] extends FlowPromise<infer R> ? R : never;
     }>
   > {
-    const parentFlowName = this.find(FlowExecutionContext.flowName);
-    const depth = this.get(FlowExecutionContext.depth);
+    const parentFlowName = this.find(flowMeta.flowName);
+    const depth = this.get(flowMeta.depth);
 
     const executeCore = async () => {
       const results = await Promise.allSettled(promises);
@@ -562,16 +558,43 @@ class FlowContext implements Flow.Context {
             flow,
             definition,
             input,
-            flowName: context.find(FlowExecutionContext.flowName),
-            depth: context.get(FlowExecutionContext.depth),
-            isParallel: context.get(FlowExecutionContext.isParallel),
-            parentFlowName: context.find(FlowExecutionContext.parentFlowName),
+            flowName: context.find(flowMeta.flowName),
+            depth: context.get(flowMeta.depth),
+            isParallel: context.get(flowMeta.isParallel),
+            parentFlowName: context.find(flowMeta.parentFlowName),
           });
         };
       }
     }
 
     return executor();
+  }
+
+  createSnapshot(): Flow.ExecutionData {
+    const contextDataSnapshot = new Map(this.contextData);
+
+    const dataStore = {
+      get: (key: unknown) => contextDataSnapshot.get(key),
+      set: (_key: unknown, _value: unknown) => {
+        throw new Error("Cannot set values on execution snapshot");
+      },
+    };
+
+    return {
+      journal: new Map(this.journal),
+      context: {
+        get<T>(
+          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
+        ): T {
+          return accessor.get(dataStore);
+        },
+        find<T>(
+          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
+        ): T | undefined {
+          return accessor.find(dataStore);
+        },
+      },
+    };
   }
 }
 
@@ -592,10 +615,17 @@ function execute<S, I>(
 
   const pod = scope.pod({ initialValues: options?.presets });
 
-  const promise = (async () => {
-    try {
-      const context = new FlowContext(pod, options?.extensions || []);
+  let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
+  const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
+    (resolve) => {
+      resolveSnapshot = resolve;
+    }
+  );
 
+  const promise = (async () => {
+    const context = new FlowContext(pod, options?.extensions || []);
+
+    try {
       if (options?.initialContext) {
         for (const [accessor, value] of options.initialContext) {
           accessor.set(context, value);
@@ -638,17 +668,21 @@ function execute<S, I>(
               flow,
               definition,
               input,
-              flowName:
-                definition.name || context.find(FlowExecutionContext.flowName),
-              depth: context.get(FlowExecutionContext.depth),
-              isParallel: context.get(FlowExecutionContext.isParallel),
-              parentFlowName: context.find(FlowExecutionContext.parentFlowName),
+              flowName: definition.name || context.find(flowMeta.flowName),
+              depth: context.get(flowMeta.depth),
+              isParallel: context.get(flowMeta.isParallel),
+              parentFlowName: context.find(flowMeta.parentFlowName),
             });
           };
         }
       }
 
-      return await executor();
+      const result = await executor();
+      resolveSnapshot(context.createSnapshot());
+      return result;
+    } catch (error) {
+      resolveSnapshot(context.createSnapshot());
+      throw error;
     } finally {
       for (const extension of options?.extensions || []) {
         await extension.disposePod?.(pod);
@@ -662,7 +696,7 @@ function execute<S, I>(
     }
   })();
 
-  return new FlowPromise(pod, promise);
+  return new FlowPromise(pod, promise, snapshotPromise);
 }
 
 function flowImpl<I, S>(

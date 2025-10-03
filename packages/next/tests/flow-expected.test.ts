@@ -408,4 +408,187 @@ describe("Flow API - New Patterns", () => {
       expect(result).toBe("Hello, ALICE!");
     });
   });
+
+  describe("Execution context access", () => {
+    test("ctx() returns execution data after flow completes", async () => {
+      const { flowMeta } = await import("../src/flow");
+
+      const testFlow = flow(async (ctx, input: { value: number }) => {
+        await ctx.run("operation", () => input.value * 2);
+        return { result: input.value };
+      });
+
+      const execution = flow.execute(testFlow, { value: 42 });
+      const result = await execution;
+      const executionData = await execution.ctx();
+
+      expect(result.result).toBe(42);
+      expect(executionData).toBeDefined();
+      expect(executionData?.context.find(flowMeta.flowName)).toBe(
+        "anonymous"
+      );
+      expect(executionData?.context.get(flowMeta.depth)).toBe(0);
+      expect(executionData?.context.get(flowMeta.isParallel)).toBe(
+        false
+      );
+    });
+
+    test("inDetails() returns both result and context on success", async () => {
+      const testFlow = flow(async (ctx, input: { x: number; y: number }) => {
+        const sum = await ctx.run("sum", () => input.x + input.y);
+        const product = await ctx.run("product", () => input.x * input.y);
+        return { sum, product };
+      });
+
+      const details = await flow
+        .execute(testFlow, { x: 5, y: 3 })
+        .inDetails();
+
+      expect(details.success).toBe(true);
+      if (details.success) {
+        expect(details.result.sum).toBe(8);
+        expect(details.result.product).toBe(15);
+      }
+      expect(details.ctx).toBeDefined();
+      expect(details.ctx.journal.size).toBeGreaterThan(0);
+    });
+
+    test("journal captures all operations", async () => {
+      const testFlow = flow(async (ctx, input: number) => {
+        const a = await ctx.run("double", () => input * 2);
+        const b = await ctx.run("triple", () => input * 3);
+        const c = await ctx.run("sum", () => a + b);
+        return c;
+      });
+
+      const execution = flow.execute(testFlow, 10);
+      await execution;
+      const executionData = await execution.ctx();
+
+      expect(executionData).toBeDefined();
+      expect(executionData?.journal.size).toBe(3);
+
+      const journalKeys = Array.from(executionData?.journal.keys() || []);
+      expect(journalKeys.some((k) => k.includes("double"))).toBe(true);
+      expect(journalKeys.some((k) => k.includes("triple"))).toBe(true);
+      expect(journalKeys.some((k) => k.includes("sum"))).toBe(true);
+    });
+
+    test("contextData captures custom context values", async () => {
+      const { accessor } = await import("../src/accessor");
+      const { custom } = await import("../src/ssch");
+
+      const customAccessor = accessor("customKey", custom<string>());
+      const testFlow = flow(async (ctx, input: string) => {
+        ctx.set(customAccessor, `processed-${input}`);
+        return input.toUpperCase();
+      });
+
+      const execution = flow.execute(testFlow, "hello");
+      await execution;
+      const executionData = await execution.ctx();
+
+      expect(executionData).toBeDefined();
+      expect(executionData?.context.find(customAccessor)).toBe(
+        "processed-hello"
+      );
+    });
+
+    test("inDetails() captures context even on error", async () => {
+      const failingFlow = flow(async (ctx, input: number) => {
+        await ctx.run("before-error", () => input * 2);
+        throw new Error("test error");
+      });
+
+      const details = await flow.execute(failingFlow, 5).inDetails();
+
+      expect(details.success).toBe(false);
+      if (!details.success) {
+        expect((details.error as Error).message).toBe("test error");
+      }
+      expect(details.ctx).toBeDefined();
+      expect(details.ctx.journal.size).toBeGreaterThan(0);
+    });
+
+    test("flowMeta tracks flow execution hierarchy", async () => {
+      const { flowMeta } = await import("../src/flow");
+
+      const subFlow = flow(
+        {
+          name: "subFlow",
+          input: custom<number>(),
+          success: custom<number>(),
+        },
+        async (_ctx, input: number) => {
+          return input + 1;
+        }
+      );
+
+      const mainFlow = flow(
+        {
+          name: "mainFlow",
+          input: custom<number>(),
+          success: custom<number>(),
+        },
+        async (ctx, input: number) => {
+          const result = await ctx.exec(subFlow, input);
+          return result * 2;
+        }
+      );
+
+      const execution = flow.execute(mainFlow, 5);
+      await execution;
+      const executionData = await execution.ctx();
+
+      expect(executionData).toBeDefined();
+      expect(executionData?.context.find(flowMeta.flowName)).toBe(
+        "mainFlow"
+      );
+      expect(executionData?.context.get(flowMeta.depth)).toBe(0);
+      expect(
+        executionData?.context.find(flowMeta.parentFlowName)
+      ).toBeUndefined();
+    });
+
+    test("inDetails() works with transformed promises", async () => {
+      const testFlow = flow(async (ctx, input: number) => {
+        await ctx.run("increment", () => input + 1);
+        return input * 2;
+      });
+
+      const details = await flow
+        .execute(testFlow, 10)
+        .map((x) => x + 1)
+        .inDetails();
+
+      expect(details.success).toBe(true);
+      if (details.success) {
+        expect(details.result).toBe(21);
+      }
+      expect(details.ctx).toBeDefined();
+    });
+
+    test("inDetails() type discrimination", async () => {
+      const conditionalFlow = flow(async (ctx, shouldFail: boolean) => {
+        await ctx.run("check", () => shouldFail);
+        if (shouldFail) {
+          throw new Error("failed");
+        }
+        return "success";
+      });
+
+      const successDetails = await flow.execute(conditionalFlow, false).inDetails();
+      expect(successDetails.success).toBe(true);
+      if (successDetails.success) {
+        expect(successDetails.result).toBe("success");
+      }
+
+      const errorDetails = await flow.execute(conditionalFlow, true).inDetails();
+      expect(errorDetails.success).toBe(false);
+      if (!errorDetails.success) {
+        expect((errorDetails.error as Error).message).toBe("failed");
+      }
+      expect(errorDetails.ctx).toBeDefined();
+    });
+  });
 });

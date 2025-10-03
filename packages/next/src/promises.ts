@@ -1,15 +1,21 @@
-import type { Core } from "./types";
+import type { Core, Flow } from "./types";
 
 export class FlowPromise<T> implements PromiseLike<T> {
+  private executionDataPromise?: Promise<Flow.ExecutionData | undefined>;
+
   constructor(
     private pod: Core.Pod,
-    private promise: Promise<T>
-  ) {}
+    private promise: Promise<T>,
+    executionDataPromise?: Promise<Flow.ExecutionData | undefined>
+  ) {
+    this.executionDataPromise = executionDataPromise;
+  }
 
   map<U>(fn: (value: T) => U | Promise<U>): FlowPromise<U> {
     return new FlowPromise(
       this.pod,
-      this.promise.then(fn)
+      this.promise.then(fn),
+      this.executionDataPromise
     );
   }
 
@@ -19,7 +25,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
       this.promise.then(async (value) => {
         const result = fn(value);
         return result.toPromise();
-      })
+      }),
+      this.executionDataPromise
     );
   }
 
@@ -28,7 +35,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
       this.pod,
       this.promise.catch((error) => {
         throw fn(error);
-      })
+      }),
+      this.executionDataPromise
     );
   }
 
@@ -38,7 +46,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
       this.promise.catch(async (error) => {
         const result = fn(error);
         return result.toPromise();
-      })
+      }),
+      this.executionDataPromise
     );
   }
 
@@ -48,7 +57,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
   ): FlowPromise<TResult1 | TResult2> {
     return new FlowPromise(
       this.pod,
-      this.promise.then(onfulfilled, onrejected)
+      this.promise.then(onfulfilled, onrejected),
+      this.executionDataPromise
     );
   }
 
@@ -57,14 +67,16 @@ export class FlowPromise<T> implements PromiseLike<T> {
   ): FlowPromise<T | TResult> {
     return new FlowPromise(
       this.pod,
-      this.promise.catch(onrejected)
+      this.promise.catch(onrejected),
+      this.executionDataPromise
     );
   }
 
   finally(onfinally?: (() => void) | null | undefined): FlowPromise<T> {
     return new FlowPromise(
       this.pod,
-      this.promise.finally(onfinally)
+      this.promise.finally(onfinally),
+      this.executionDataPromise
     );
   }
 
@@ -74,6 +86,40 @@ export class FlowPromise<T> implements PromiseLike<T> {
 
   getPod(): Core.Pod {
     return this.pod;
+  }
+
+  async ctx(): Promise<Flow.ExecutionData | undefined> {
+    if (!this.executionDataPromise) {
+      return undefined;
+    }
+    return this.executionDataPromise;
+  }
+
+  async inDetails(): Promise<Flow.ExecutionDetails<T>> {
+    try {
+      const [result, ctx] = await Promise.all([
+        this.promise,
+        this.executionDataPromise,
+      ]);
+
+      if (!ctx) {
+        throw new Error(
+          "Execution context not available. inDetails() can only be used on flows executed via flow.execute()"
+        );
+      }
+
+      return { success: true, result, ctx };
+    } catch (error) {
+      const ctx = await this.executionDataPromise;
+
+      if (!ctx) {
+        throw new Error(
+          "Execution context not available. inDetails() can only be used on flows executed via flow.execute()"
+        );
+      }
+
+      return { success: false, error, ctx };
+    }
   }
 
   static all<T extends readonly unknown[] | []>(

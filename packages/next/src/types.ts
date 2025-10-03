@@ -543,6 +543,19 @@ export namespace Flow {
   };
 
   export type Context = C;
+
+  export type ExecutionData = {
+    readonly journal: ReadonlyMap<string, unknown>;
+    readonly context: {
+      get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
+      find<T>(accessor: Accessor.Accessor<T>): T | undefined;
+      find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
+    };
+  };
+
+  export type ExecutionDetails<T> =
+    | { success: true; result: T; ctx: ExecutionData }
+    | { success: false; error: unknown; ctx: ExecutionData };
 }
 
 export namespace Extension {
