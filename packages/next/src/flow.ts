@@ -8,6 +8,14 @@ import { custom } from "./ssch";
 import { meta } from "./meta";
 import { FlowPromise } from "./promises";
 
+type JournalEntry<T = unknown> =
+  | { value: T }
+  | { __error: true; error: unknown };
+
+function isErrorEntry(entry: unknown): entry is { __error: true; error: unknown } {
+  return typeof entry === "object" && entry !== null && "__error" in entry;
+}
+
 const flowDefinitionMeta = meta<Flow.Definition<any, any>>(
   "flow.definition",
   custom<Flow.Definition<any, any>>()
@@ -245,8 +253,8 @@ class FlowContext implements Flow.Context {
       const executeCore = async () => {
         if (isReplay) {
           const entry = this.journal.get(journalKey);
-          if (entry && typeof entry === "object" && "__error" in entry) {
-            throw (entry as { __error: boolean; error: unknown }).error;
+          if (isErrorEntry(entry)) {
+            throw entry.error;
           }
           return entry as T;
         }
@@ -318,8 +326,8 @@ class FlowContext implements Flow.Context {
         const executeCore = async () => {
           if (this.journal.has(journalKey)) {
             const entry = this.journal.get(journalKey);
-            if (entry && typeof entry === "object" && "__error" in entry) {
-              throw (entry as { __error: boolean; error: unknown }).error;
+            if (isErrorEntry(entry)) {
+              throw entry.error;
             }
             return entry as Flow.InferOutput<F>;
           }
