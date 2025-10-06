@@ -21,23 +21,133 @@ const routeConfig = route.find(handler); // { path: "/api/users", method: "GET" 
 
 ## Core API
 
-### Meta Creation
+### `meta`
+
+Creates a typed metadata function with schema validation.
+
+```typescript
+function meta<V>(
+  key: string | symbol,
+  schema: StandardSchemaV1<V>
+): Meta.MetaFn<V>
+```
+
+**Parameters:**
+- `key` - Unique identifier (string or symbol) for the metadata type
+- `schema` - StandardSchema for runtime validation
+
+**Returns:** `Meta.MetaFn<V>` - A function that creates meta instances and provides query methods
+
+**Example:**
 
 ```typescript
 import { meta, custom } from "@pumped-fn/core-next";
 
-// Create meta function with schema
 const description = meta("description", custom<string>());
 const config = meta("config", custom<{ timeout: number; retries: number }>());
 const tags = meta("tags", custom<string[]>());
 
-// Create meta instances
 const descMeta = description("User service for authentication");
 const configMeta = config({ timeout: 5000, retries: 3 });
 const tagsMeta = tags(["auth", "user", "api"]);
 ```
 
-### Query Methods
+The returned `MetaFn` has these methods:
+- `(value: V): Meta<V>` - Create meta instance with value
+- `.find(source)` - Find first matching meta (returns `V | undefined`)
+- `.some(source)` - Find all matching meta (returns `V[]`)
+- `.get(source)` - Get first matching meta or throw (returns `V`)
+- `.partial(defaultValue)` - Create partial meta for object spreading
+
+### `getValue`
+
+Extracts and validates the value from a meta instance.
+
+```typescript
+function getValue<V>(meta: Meta.Meta<V>): Awaited<V>
+```
+
+**Parameters:**
+- `meta` - A meta instance created by calling a `MetaFn`
+
+**Returns:** The validated value of type `V`
+
+**Example:**
+
+```typescript
+import { meta, custom, getValue } from "@pumped-fn/core-next";
+
+const description = meta("description", custom<string>());
+const metaInstance = description("User authentication service");
+
+const value = getValue(metaInstance); // "User authentication service"
+```
+
+**Validation:** `getValue` runs the schema validation on the meta value. If validation fails, it throws.
+
+### `findValue`
+
+Finds the first meta value matching the given meta function from a container.
+
+```typescript
+function findValue<V>(
+  executor: Meta.MetaContainer | Meta.Meta[] | undefined,
+  meta: Meta.MetaFn<V>
+): V | undefined
+```
+
+**Parameters:**
+- `executor` - Meta container (executor, scope, pod, flow) or meta array
+- `meta` - Meta function to search for
+
+**Returns:** First matching value or `undefined` if not found
+
+**Example:**
+
+```typescript
+import { meta, custom, provide, findValue } from "@pumped-fn/core-next";
+
+const priority = meta("priority", custom<number>());
+const service = provide(() => {}, priority(1), priority(2));
+
+const first = findValue(service, priority); // 1
+```
+
+### `findValues`
+
+Finds all meta values matching the given meta function from a container.
+
+```typescript
+function findValues<V>(
+  executor: Meta.MetaContainer | Meta.Meta[] | undefined,
+  meta: Meta.MetaFn<V>
+): V[]
+```
+
+**Parameters:**
+- `executor` - Meta container (executor, scope, pod, flow) or meta array
+- `meta` - Meta function to search for
+
+**Returns:** Array of all matching values (empty array if none found)
+
+**Example:**
+
+```typescript
+import { meta, custom, provide, findValues } from "@pumped-fn/core-next";
+
+const tag = meta("tag", custom<string>());
+const service = provide(() => {},
+  tag("auth"),
+  tag("user"),
+  tag("critical")
+);
+
+const allTags = findValues(service, tag); // ["auth", "user", "critical"]
+```
+
+### Meta Query Methods
+
+Each `MetaFn` provides convenience methods for querying:
 
 ```typescript
 import { meta, custom, provide } from "@pumped-fn/core-next";
@@ -47,24 +157,62 @@ const priority = meta("priority", custom<number>());
 
 const service = provide(() => {}, name("auth-service"), priority(1), priority(2));
 
-// Query methods
-const serviceName = name.find(service);     // "auth-service" | undefined
-const firstPriority = priority.find(service); // 1 | undefined (first match)
-const allPriorities = priority.some(service);  // [1, 2] (all matches)
-const nameRequired = name.get(service);     // "auth-service" (throws if not found)
+name.find(service);     // "auth-service" | undefined (uses findValue)
+name.some(service);     // ["auth-service"] (uses findValues)
+name.get(service);      // "auth-service" (throws if not found)
+
+priority.find(service); // 1 (first match)
+priority.some(service); // [1, 2] (all matches)
 ```
 
-### MetaContainer Interface
+**Method signatures:**
+- `.find(source)` - Alias for `findValue(source, this)`
+- `.some(source)` - Alias for `findValues(source, this)`
+- `.get(source)` - Returns first value or throws if not found
+
+### `name`
+
+Built-in meta function for naming components.
 
 ```typescript
+const name: Meta.MetaFn<string>
+```
 
+`name` is a pre-defined meta function for attaching human-readable names to executors, flows, and other components. It uses the key `"pumped-fn/name"`.
+
+**Example:**
+
+```typescript
+import { provide, name } from "@pumped-fn/core-next";
+
+const database = provide(() => createDb(), name("database"));
+const cache = provide(() => createCache(), name("redis-cache"));
+
+const dbName = name.find(database); // "database"
+const cacheName = name.find(cache);  // "redis-cache"
+```
+
+**Use cases:**
+- Debug logging and tracing
+- Error messages with component names
+- Component introspection
+- Documentation generation
+
+### `MetaContainer` Interface
+
+```typescript
 interface MetaContainer {
   metas?: Meta.Meta[]
 }
-
-// Executors, Accessors, Flows all implement MetaContainer
-// You can attach meta to any of these types
 ```
+
+All components that support metadata implement `MetaContainer`:
+- Executors (and variants: `.static`, `.lazy`, `.reactive`)
+- Flows
+- Scopes
+- Pods
+
+Meta can be attached during creation and queried later using `findValue`, `findValues`, or the `MetaFn` query methods.
 
 ## Integration Patterns
 
