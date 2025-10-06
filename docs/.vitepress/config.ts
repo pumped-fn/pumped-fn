@@ -1,9 +1,9 @@
 import { defineConfig } from "vitepress";
-// import { transformerTwoslash } from "@shikijs/vitepress-twoslash";
-// import { createFileSystemTypesCache } from "@shikijs/vitepress-twoslash/cache-fs";
-// import { withMermaid } from "vitepress-plugin-mermaid";
+import { transformerTwoslash } from "@shikijs/vitepress-twoslash";
+import { createFileSystemTypesCache } from "@shikijs/vitepress-twoslash/cache-fs";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
-export default defineConfig({
+export default withMermaid(defineConfig({
     title: "Pumped Functions",
     description: "Graph-based dependency resolution for TypeScript",
     base: "/pumped-fn/",
@@ -89,12 +89,11 @@ export default defineConfig({
         dark: "github-dark",
       },
       codeTransformers: [
-        // Temporarily disabled due to type resolution issues
-        // transformerTwoslash({
-        //   typesCache: createFileSystemTypesCache(),
-        // }),
+        transformerTwoslash({
+          typesCache: createFileSystemTypesCache(),
+        }),
       ],
     },
 
     vite: {},
-  });
+  }));
