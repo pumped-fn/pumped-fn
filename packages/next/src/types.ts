@@ -396,6 +396,32 @@ export declare namespace Core {
       meta?: Meta.Meta[];
     }): Pod;
     disposePod(scope: Pod): Promise<void>;
+
+    exec<S, I>(
+      flow: Core.Executor<any>,
+      input: I,
+      options: {
+        extensions?: Extension.Extension[];
+        initialContext?: Array<
+          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        >;
+        presets?: Preset<unknown>[];
+        details: true;
+      }
+    ): any;
+
+    exec<S, I>(
+      flow: Core.Executor<any>,
+      input: I,
+      options?: {
+        extensions?: Extension.Extension[];
+        initialContext?: Array<
+          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        >;
+        presets?: Preset<unknown>[];
+        details?: false;
+      }
+    ): any;
   }
 }
 

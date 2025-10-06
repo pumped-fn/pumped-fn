@@ -13,6 +13,7 @@ NEVER NEVER KISS-ASS, plaudits, or flattering user. Go straight to the point, at
 - with dependency of @pumped-fn/core-next, when using derive, prefer using destructure on factory function call where possible
 - cleanup redundant codes, dead codes
 - use `import { type ...}` where it's needed
+- never use inline `import()`
 
 # Priority
 

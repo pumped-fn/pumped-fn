@@ -15,8 +15,11 @@ import {
   FactoryExecutionError,
   DependencyResolutionError,
   ErrorContext,
+  type Flow,
 } from "./types";
+import type { FlowPromise } from "./promises";
 import * as errors from "./errors";
+import { flow as flowApi } from "./flow";
 
 type CacheEntry = {
   accessor: Core.Accessor<unknown>;
@@ -975,6 +978,55 @@ class BaseScope implements Core.Scope {
 
     await pod.dispose();
     this.pods.delete(pod);
+  }
+
+  exec<S, I>(
+    flow: Core.Executor<Flow.Handler<S, I>>,
+    input: I,
+    options: {
+      extensions?: Extension.Extension[];
+      initialContext?: Array<
+        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+      >;
+      presets?: Core.Preset<unknown>[];
+      details: true;
+    }
+  ): FlowPromise<Flow.ExecutionDetails<S>>;
+
+  exec<S, I>(
+    flow: Core.Executor<Flow.Handler<S, I>>,
+    input: I,
+    options?: {
+      extensions?: Extension.Extension[];
+      initialContext?: Array<
+        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+      >;
+      presets?: Core.Preset<unknown>[];
+      details?: false;
+    }
+  ): FlowPromise<S>;
+
+  exec<S, I>(
+    flow: Core.Executor<Flow.Handler<S, I>>,
+    input: I,
+    options?: {
+      extensions?: Extension.Extension[];
+      initialContext?: Array<
+        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+      >;
+      presets?: Core.Preset<unknown>[];
+      details?: boolean;
+    }
+  ): FlowPromise<S> | FlowPromise<Flow.ExecutionDetails<S>> {
+    this["~ensureNotDisposed"]();
+
+    return flowApi.execute(flow, input, {
+      scope: this,
+      extensions: options?.extensions,
+      initialContext: options?.initialContext,
+      presets: options?.presets,
+      details: options?.details,
+    } as any);
   }
 }
 

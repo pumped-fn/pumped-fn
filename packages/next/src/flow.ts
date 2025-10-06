@@ -603,6 +603,20 @@ class FlowContext implements Flow.Context {
 function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>>,
   input: I,
+  options: {
+    scope?: Core.Scope;
+    extensions?: Extension.Extension[];
+    initialContext?: Array<
+      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+    >;
+    presets?: Core.Preset<unknown>[];
+    details: true;
+  }
+): FlowPromise<Flow.ExecutionDetails<S>>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input: I,
   options?: {
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
@@ -610,8 +624,23 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    details?: false;
   }
-): FlowPromise<S> {
+): FlowPromise<S>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input: I,
+  options?: {
+    scope?: Core.Scope;
+    extensions?: Extension.Extension[];
+    initialContext?: Array<
+      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+    >;
+    presets?: Core.Preset<unknown>[];
+    details?: boolean;
+  }
+): FlowPromise<S> | FlowPromise<Flow.ExecutionDetails<S>> {
   const scope = options?.scope || createScope();
   const shouldDisposeScope = !options?.scope;
 
@@ -697,6 +726,26 @@ function execute<S, I>(
       }
     }
   })();
+
+  if (options?.details) {
+    const detailsPromise = (async (): Promise<Flow.ExecutionDetails<S>> => {
+      try {
+        const [result, ctx] = await Promise.all([promise, snapshotPromise]);
+        if (!ctx) {
+          throw new Error("Execution context not available");
+        }
+        return { success: true, result, ctx };
+      } catch (error) {
+        const ctx = await snapshotPromise;
+        if (!ctx) {
+          throw new Error("Execution context not available");
+        }
+        return { success: false, error, ctx };
+      }
+    })();
+
+    return new FlowPromise(pod, detailsPromise, snapshotPromise);
+  }
 
   return new FlowPromise(pod, promise, snapshotPromise);
 }

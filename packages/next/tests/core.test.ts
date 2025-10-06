@@ -2,7 +2,8 @@ import { describe, test, expect, vi } from "vitest";
 import { accessor } from "../src/accessor";
 import { custom } from "../src/ssch";
 import { createScope } from "../src/scope";
-import { createExecutor, derive, provide } from "../src/executor";
+import { createExecutor, derive, provide, preset } from "../src/executor";
+import { flow } from "../src/flow";
 
 describe("Core Functionality", () => {
   describe("Accessor functionality", () => {
@@ -121,6 +122,99 @@ describe("Core Functionality", () => {
 
       const emptyDeps = derive({}, () => ({}));
       expect(emptyDeps.dependencies).toEqual({});
+    });
+  });
+
+  describe("Scope.exec", () => {
+    test("scope.exec executes flow with provided scope", async () => {
+      const scope = createScope();
+
+      const config = provide(() => ({ multiplier: 3 }));
+      const multiplyFlow = flow(config, (deps, _ctx, input: number) => {
+        return input * deps.multiplier;
+      });
+
+      const result = await scope.exec(multiplyFlow, 5);
+      expect(result).toBe(15);
+
+      await scope.dispose();
+    });
+
+    test("scope.exec with extensions", async () => {
+      const scope = createScope();
+      const calls: string[] = [];
+
+      const extension = {
+        name: "test-extension",
+        async initPod() {
+          calls.push("initPod");
+        },
+        async disposePod() {
+          calls.push("disposePod");
+        },
+      };
+
+      const simpleFlow = flow((_ctx, input: number) => input + 1);
+      const result = await scope.exec(simpleFlow, 10, {
+        extensions: [extension],
+      });
+
+      expect(result).toBe(11);
+      expect(calls).toContain("initPod");
+      expect(calls).toContain("disposePod");
+
+      await scope.dispose();
+    });
+
+    test("scope.exec with presets", async () => {
+      const scope = createScope();
+
+      const configExecutor = provide(() => ({ value: 10 }));
+      const flowWithConfig = flow(configExecutor, (deps, _ctx, input: number) => {
+        return input + deps.value;
+      });
+
+      const result = await scope.exec(flowWithConfig, 5, {
+        presets: [preset(configExecutor, { value: 20 })],
+      });
+
+      expect(result).toBe(25);
+
+      await scope.dispose();
+    });
+
+    test("scope.exec with details returns execution details on success", async () => {
+      const scope = createScope();
+
+      const simpleFlow = flow((_ctx, input: number) => input * 2);
+      const details = await scope.exec(simpleFlow, 5, { details: true });
+
+      expect(details.success).toBe(true);
+      if (details.success) {
+        expect(details.result).toBe(10);
+        expect(details.ctx).toBeDefined();
+      }
+
+      await scope.dispose();
+    });
+
+    test("scope.exec with details returns execution details on error", async () => {
+      const scope = createScope();
+
+      const failingFlow = flow((_ctx, _input: number): number => {
+        throw new Error("Test error");
+      });
+
+      const details = await scope.exec(failingFlow, 5, { details: true });
+
+      expect(details.success).toBe(false);
+      if (!details.success) {
+        expect(details.error).toBeInstanceOf(Error);
+        expect((details.error as Error).message).toBe("Test error");
+        expect(details.ctx).toBeDefined();
+      }
+
+      await scope.dispose();
     });
   });
 });
