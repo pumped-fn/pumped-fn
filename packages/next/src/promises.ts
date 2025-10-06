@@ -170,9 +170,14 @@ export class Promised<T> implements PromiseLike<T> {
   }
 
   static try<T>(pod: Core.Pod, fn: () => T | Promise<T>): Promised<T> {
-    const promise = (async () => {
-      return await fn();
-    })();
+    const promise = new Promise<T>((resolve, reject) => {
+      try {
+        const result = fn();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    });
 
     return new Promised(pod, promise);
   }
