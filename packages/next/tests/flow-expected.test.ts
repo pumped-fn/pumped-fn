@@ -423,13 +423,9 @@ describe("Flow API - New Patterns", () => {
 
       expect(result.result).toBe(42);
       expect(executionData).toBeDefined();
-      expect(executionData?.context.find(flowMeta.flowName)).toBe(
-        "anonymous"
-      );
+      expect(executionData?.context.find(flowMeta.flowName)).toBe("anonymous");
       expect(executionData?.context.get(flowMeta.depth)).toBe(0);
-      expect(executionData?.context.get(flowMeta.isParallel)).toBe(
-        false
-      );
+      expect(executionData?.context.get(flowMeta.isParallel)).toBe(false);
     });
 
     test("inDetails() returns both result and context on success", async () => {
@@ -439,9 +435,7 @@ describe("Flow API - New Patterns", () => {
         return { sum, product };
       });
 
-      const details = await flow
-        .execute(testFlow, { x: 5, y: 3 })
-        .inDetails();
+      const details = await flow.execute(testFlow, { x: 5, y: 3 }).inDetails();
 
       expect(details.success).toBe(true);
       if (details.success) {
@@ -538,9 +532,7 @@ describe("Flow API - New Patterns", () => {
       const executionData = await execution.ctx();
 
       expect(executionData).toBeDefined();
-      expect(executionData?.context.find(flowMeta.flowName)).toBe(
-        "mainFlow"
-      );
+      expect(executionData?.context.find(flowMeta.flowName)).toBe("mainFlow");
       expect(executionData?.context.get(flowMeta.depth)).toBe(0);
       expect(
         executionData?.context.find(flowMeta.parentFlowName)
@@ -574,13 +566,17 @@ describe("Flow API - New Patterns", () => {
         return "success";
       });
 
-      const successDetails = await flow.execute(conditionalFlow, false).inDetails();
+      const successDetails = await flow
+        .execute(conditionalFlow, false)
+        .inDetails();
       expect(successDetails.success).toBe(true);
       if (successDetails.success) {
         expect(successDetails.result).toBe("success");
       }
 
-      const errorDetails = await flow.execute(conditionalFlow, true).inDetails();
+      const errorDetails = await flow
+        .execute(conditionalFlow, true)
+        .inDetails();
       expect(errorDetails.success).toBe(false);
       if (!errorDetails.success) {
         expect((errorDetails.error as Error).message).toBe("failed");

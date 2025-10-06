@@ -285,7 +285,7 @@ const result = await flow.execute(handler, input);
 | Validation | Manual | Built-in schemas |
 | Context | Via scope | Via context param |
 | Error handling | Exceptions | Exceptions |
-| Return type | T | T (via Promised<T>) |
+| Return type | T | T (via `Promised<T>`) |
 
 ## Flow Coding Styles
 
