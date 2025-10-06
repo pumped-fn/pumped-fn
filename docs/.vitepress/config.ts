@@ -57,6 +57,7 @@ export default defineConfig({
             { text: "DataAccessor", link: "/accessor" },
             { text: "Extensions", link: "/extensions" },
             { text: "Meta System", link: "/meta" },
+            { text: "Utilities", link: "/utilities" },
           ],
         },
         {

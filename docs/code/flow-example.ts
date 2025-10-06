@@ -1,24 +1,16 @@
-import { flow, custom, derive, provide, createScope } from "@pumped-fn/core-next";
+import { flow, custom, provide, FlowError } from "@pumped-fn/core-next";
 import { z } from "zod";
 
-/**
- * Flow Example - User Registration System
- *
- * Shows flow patterns with validation, dependencies, and error handling
- */
-
-// #region snippet
-// Dependencies
 const database = provide(() => ({
-  findUser: async (email: string) => null,
-  createUser: async (data: any) => ({ id: "123", ...data })
+  findUser: async (email: string) => null as { id: string; email: string } | null,
+  createUser: async (data: { email: string; name: string; hashedPassword: string }) =>
+    ({ id: "123", ...data })
 }));
 
 const emailService = provide(() => ({
   sendWelcome: async (email: string) => console.log(`Welcome email sent to ${email}`)
 }));
 
-// Input/output schemas with runtime validation
 const registerFlow = flow.define({
   name: "user.register",
   input: z.object({
@@ -26,90 +18,63 @@ const registerFlow = flow.define({
     name: z.string().min(2),
     password: z.string().min(8)
   }),
-  success: z.object({
+  output: z.object({
     userId: z.string(),
     created: z.boolean()
-  }),
-  error: z.object({
-    code: z.string(),
-    message: z.string()
   })
 });
 
-// Validation flow (internal)
 const validateEmail = flow(
-  {
-    name: "internal.validateEmail",
-    input: custom<{ email: string }>(),
-    success: custom<{ valid: boolean }>(),
-    error: custom<{ reason: string }>()
-  },
   { db: database },
-  async ({ db }, ctx, input) => {
-    const existing = await db.findUser(input.email);
+  async ({ db }, ctx, input: { email: string }) => {
+    const existing = await ctx.run("check-email", () => db.findUser(input.email));
+
     if (existing) {
-      return ctx.ko({ reason: "Email already registered" });
+      throw new FlowError("Email already registered", "EMAIL_EXISTS");
     }
-    return ctx.ok({ valid: true });
+
+    return { valid: true };
   }
 );
 
-// Main registration handler with dependencies
 const registerHandler = registerFlow.handler(
   { db: database, email: emailService },
   async ({ db, email }, ctx, input) => {
-    // Validate email availability
-    const validation = await ctx.execute(validateEmail, { email: input.email });
+    await ctx.exec(validateEmail, { email: input.email });
 
-    if (validation.isKo()) {
-      return ctx.ko({
-        code: "VALIDATION_FAILED",
-        message: validation.data.reason
-      });
-    }
-
-    try {
-      // Create user
-      const user = await db.createUser({
+    const user = await ctx.run("create-user", () =>
+      db.createUser({
         email: input.email,
         name: input.name,
         hashedPassword: hashPassword(input.password)
-      });
+      })
+    );
 
-      // Send welcome email (fire and forget)
-      email.sendWelcome(input.email).catch(console.error);
+    email.sendWelcome(input.email).catch(console.error);
 
-      return ctx.ok({
-        userId: user.id,
-        created: true
-      });
-    } catch (error) {
-      return ctx.ko({
-        code: "CREATION_FAILED",
-        message: "Failed to create user account"
-      });
-    }
+    return {
+      userId: user.id,
+      created: true
+    };
   }
 );
 
-// Usage
 async function main() {
-  const result = await flow.execute(registerHandler, {
-    email: "user@example.com",
-    name: "John Doe",
-    password: "securepassword123"
-  });
+  try {
+    const result = await flow.execute(registerHandler, {
+      email: "user@example.com",
+      name: "John Doe",
+      password: "securepassword123"
+    });
 
-  if (result.isOk()) {
-    console.log("User created:", result.data.userId);
-  } else {
-    console.error("Registration failed:", result.data.message);
+    console.log("User created:", result.userId);
+  } catch (error) {
+    console.error("Registration failed:", error);
   }
 }
 
 function hashPassword(password: string): string {
   return `hashed_${password}`;
 }
-// #endregion snippet
 
 main().catch(console.error);
