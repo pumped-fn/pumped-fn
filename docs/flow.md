@@ -33,7 +33,7 @@ const loggerExecutor = provide(() => ({ info: (msg: string, data: any) => consol
 const myFlow = flow.define({
   name: "user.create",
   input: custom<{ email: string }>(),
-  success: custom<{ userId: string }>(),
+  output: custom<{ userId: string }>(),
   error: custom<{ code: string; message: string }>(),
 });
 
@@ -109,7 +109,7 @@ import { flow, custom } from "@pumped-fn/core-next";
 const calcFlow = flow.define({
   name: "calc.add",
   input: custom<{ a: number; b: number }>(),
-  success: custom<{ result: number }>(),
+  output: custom<{ result: number }>(),
   error: custom<{ code: string }>(),
 });
 
@@ -136,7 +136,7 @@ const dbExecutor = provide(() => ({
 const userFlow = flow.define({
   name: "user.get",
   input: custom<{ userId: string }>(),
-  success: custom<{ user: User }>(),
+  output: custom<{ user: User }>(),
   error: custom<{ code: string; message: string }>(),
 });
 
@@ -162,7 +162,7 @@ const getUser = userFlow.handler(
 const registerSpec = flow.define({
   name: "user.register",
   input: schema<{ email: string; password: string }>(),
-  success: schema<{ userId: string; token: string }>(),
+  output: schema<{ userId: string; token: string }>(),
   error: schema<{ code: string; message: string }>(),
 });
 
@@ -270,7 +270,7 @@ const result = await flow.execute(handler, input);
 const apiFlow = flow.define({
   name: "user.create",
   input: z.object({ email: z.string().email() }),
-  success: z.object({ userId: z.string() }),
+  output: z.object({ userId: z.string() }),
   error: z.object({ code: z.string(), message: z.string() })
 });
 
@@ -285,7 +285,7 @@ const validateEmail = flow(
   {
     name: "internal.validateEmail",
     input: custom<{ email: string }>(),
-    success: custom<{ valid: boolean }>(),
+    output: custom<{ valid: boolean }>(),
     error: custom<{ reason: string }>()
   },
   async (ctx, input) => {
@@ -299,7 +299,7 @@ const processUser = flow(
   {
     name: "internal.processUser",
     input: custom<{ userId: string }>(),
-    success: custom<{ processed: boolean }>(),
+    output: custom<{ processed: boolean }>(),
     error: custom<{ error: string }>()
   },
   { db: dbExecutor, logger: loggerExecutor },
@@ -325,7 +325,7 @@ const timestamp = accessor("request.time", custom<number>(), Date.now);
 const processFlow = flow.define({
   name: "process.request",
   input: custom<{ data: string }>(),
-  success: custom<{ processed: boolean }>(),
+  output: custom<{ processed: boolean }>(),
   error: custom<{ error: string }>()
 });
 
