@@ -1,4 +1,4 @@
-import { type FlowPromise } from "./promises";
+import { type Promised } from "./promises";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -533,37 +533,37 @@ export namespace Flow {
       value: T
     ): void;
 
-    run<T>(key: string, fn: () => Promise<T> | T): FlowPromise<T>;
+    run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
     run<T, P extends readonly unknown[]>(
       key: string,
       fn: (...args: P) => Promise<T> | T,
       ...params: P
-    ): FlowPromise<T>;
+    ): Promised<T>;
 
     exec<F extends UFlow>(
       flow: F,
       input: InferInput<F>
-    ): FlowPromise<InferOutput<F>>;
+    ): Promised<InferOutput<F>>;
 
     exec<F extends UFlow>(
       key: string,
       flow: F,
       input: InferInput<F>
-    ): FlowPromise<InferOutput<F>>;
+    ): Promised<InferOutput<F>>;
 
-    parallel<T extends readonly FlowPromise<any>[]>(
+    parallel<T extends readonly Promised<any>[]>(
       promises: [...T]
     ): Promise<
       ParallelResult<{
-        [K in keyof T]: T[K] extends FlowPromise<infer R> ? R : never;
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
       }>
     >;
 
-    parallelSettled<T extends readonly FlowPromise<any>[]>(
+    parallelSettled<T extends readonly Promised<any>[]>(
       promises: [...T]
     ): Promise<
       ParallelSettledResult<{
-        [K in keyof T]: T[K] extends FlowPromise<infer R> ? R : never;
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
       }>
     >;
   };

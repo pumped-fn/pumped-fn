@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, FlowError, provide, flowMeta } from "../src";
+import { flow, FlowError, provide, flowMeta, Promised } from "../src";
 import { custom } from "../src/ssch";
 import { accessor } from "../src/accessor";
 
@@ -340,7 +340,7 @@ describe("Flow API - New Patterns", () => {
     });
   });
 
-  describe("FlowPromise FP operations", () => {
+  describe("Promised FP operations", () => {
     test("map - transform success value", async () => {
       const getNumber = flow<void, number>(() => 42);
 

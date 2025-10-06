@@ -17,7 +17,7 @@ import {
   ErrorContext,
   type Flow,
 } from "./types";
-import type { FlowPromise } from "./promises";
+import type { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 
@@ -991,7 +991,7 @@ class BaseScope implements Core.Scope {
       presets?: Core.Preset<unknown>[];
       details: true;
     }
-  ): FlowPromise<Flow.ExecutionDetails<S>>;
+  ): Promised<Flow.ExecutionDetails<S>>;
 
   exec<S, I>(
     flow: Core.Executor<Flow.Handler<S, I>>,
@@ -1004,7 +1004,7 @@ class BaseScope implements Core.Scope {
       presets?: Core.Preset<unknown>[];
       details?: false;
     }
-  ): FlowPromise<S>;
+  ): Promised<S>;
 
   exec<S, I>(
     flow: Core.Executor<Flow.Handler<S, I>>,
@@ -1017,7 +1017,7 @@ class BaseScope implements Core.Scope {
       presets?: Core.Preset<unknown>[];
       details?: boolean;
     }
-  ): FlowPromise<S> | FlowPromise<Flow.ExecutionDetails<S>> {
+  ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
     this["~ensureNotDisposed"]();
 
     return flowApi.execute(flow, input, {

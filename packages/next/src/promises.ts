@@ -1,37 +1,36 @@
 import type { Core, Flow } from "./types";
 
-export class FlowPromise<T> implements PromiseLike<T> {
+export class Promised<T> implements PromiseLike<T> {
   private executionDataPromise?: Promise<Flow.ExecutionData | undefined>;
+  private promise: Promise<T>;
 
   constructor(
     private pod: Core.Pod,
-    private promise: Promise<T>,
+    promise: Promise<T> | Promised<T>,
     executionDataPromise?: Promise<Flow.ExecutionData | undefined>
   ) {
+    this.promise = promise instanceof Promised ? promise.promise : promise;
     this.executionDataPromise = executionDataPromise;
   }
 
-  map<U>(fn: (value: T) => U | Promise<U>): FlowPromise<U> {
-    return new FlowPromise(
+  map<U>(fn: (value: T) => U | Promise<U>): Promised<U> {
+    return new Promised(
       this.pod,
       this.promise.then(fn),
       this.executionDataPromise
     );
   }
 
-  switch<U>(fn: (value: T) => FlowPromise<U>): FlowPromise<U> {
-    return new FlowPromise(
+  switch<U>(fn: (value: T) => Promised<U>): Promised<U> {
+    return new Promised(
       this.pod,
-      this.promise.then(async (value) => {
-        const result = fn(value);
-        return result.toPromise();
-      }),
+      this.promise.then(fn),
       this.executionDataPromise
     );
   }
 
-  mapError(fn: (error: unknown) => unknown): FlowPromise<T> {
-    return new FlowPromise(
+  mapError(fn: (error: unknown) => unknown): Promised<T> {
+    return new Promised(
       this.pod,
       this.promise.catch((error) => {
         throw fn(error);
@@ -40,13 +39,10 @@ export class FlowPromise<T> implements PromiseLike<T> {
     );
   }
 
-  switchError(fn: (error: unknown) => FlowPromise<T>): FlowPromise<T> {
-    return new FlowPromise(
+  switchError(fn: (error: unknown) => Promised<T>): Promised<T> {
+    return new Promised(
       this.pod,
-      this.promise.catch(async (error) => {
-        const result = fn(error);
-        return result.toPromise();
-      }),
+      this.promise.catch(fn),
       this.executionDataPromise
     );
   }
@@ -54,8 +50,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
   then<TResult1 = T, TResult2 = never>(
     onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
-  ): FlowPromise<TResult1 | TResult2> {
-    return new FlowPromise(
+  ): Promised<TResult1 | TResult2> {
+    return new Promised(
       this.pod,
       this.promise.then(onfulfilled, onrejected),
       this.executionDataPromise
@@ -64,16 +60,16 @@ export class FlowPromise<T> implements PromiseLike<T> {
 
   catch<TResult = never>(
     onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null | undefined
-  ): FlowPromise<T | TResult> {
-    return new FlowPromise(
+  ): Promised<T | TResult> {
+    return new Promised(
       this.pod,
       this.promise.catch(onrejected),
       this.executionDataPromise
     );
   }
 
-  finally(onfinally?: (() => void) | null | undefined): FlowPromise<T> {
-    return new FlowPromise(
+  finally(onfinally?: (() => void) | null | undefined): Promised<T> {
+    return new Promised(
       this.pod,
       this.promise.finally(onfinally),
       this.executionDataPromise
@@ -96,7 +92,7 @@ export class FlowPromise<T> implements PromiseLike<T> {
   }
 
   async inDetails(): Promise<Flow.ExecutionDetails<T>> {
-    try {
+    return Promised.try(this.pod, async () => {
       const [result, ctx] = await Promise.all([
         this.promise,
         this.executionDataPromise,
@@ -108,8 +104,8 @@ export class FlowPromise<T> implements PromiseLike<T> {
         );
       }
 
-      return { success: true, result, ctx };
-    } catch (error) {
+      return { success: true as const, result, ctx };
+    }).catch(async (error) => {
       const ctx = await this.executionDataPromise;
 
       if (!ctx) {
@@ -118,58 +114,66 @@ export class FlowPromise<T> implements PromiseLike<T> {
         );
       }
 
-      return { success: false, error, ctx };
-    }
+      return { success: false as const, error, ctx };
+    });
   }
 
   static all<T extends readonly unknown[] | []>(
     values: T
-  ): FlowPromise<{ [K in keyof T]: Awaited<T[K]> }> {
-    const flowPromises = values as readonly (FlowPromise<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is FlowPromise<unknown> => v instanceof FlowPromise)?.getPod();
+  ): Promised<{ [K in keyof T]: Awaited<T[K]> }> {
+    const flowPromises = values as readonly (Promised<unknown> | unknown)[];
+    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
 
     if (!pod) {
-      throw new Error("At least one FlowPromise is required");
+      throw new Error("At least one Promised is required");
     }
 
     const promises = flowPromises.map((v) =>
-      v instanceof FlowPromise ? v.toPromise() : Promise.resolve(v)
+      v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new FlowPromise(pod, Promise.all(promises) as Promise<any>);
+    return new Promised(pod, Promise.all(promises) as Promise<any>);
   }
 
   static race<T extends readonly unknown[] | []>(
     values: T
-  ): FlowPromise<Awaited<T[number]>> {
-    const flowPromises = values as readonly (FlowPromise<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is FlowPromise<unknown> => v instanceof FlowPromise)?.getPod();
+  ): Promised<Awaited<T[number]>> {
+    const flowPromises = values as readonly (Promised<unknown> | unknown)[];
+    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
 
     if (!pod) {
-      throw new Error("At least one FlowPromise is required");
+      throw new Error("At least one Promised is required");
     }
 
     const promises = flowPromises.map((v) =>
-      v instanceof FlowPromise ? v.toPromise() : Promise.resolve(v)
+      v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new FlowPromise(pod, Promise.race(promises) as Promise<any>);
+    return new Promised(pod, Promise.race(promises) as Promise<any>);
   }
 
   static allSettled<T extends readonly unknown[] | []>(
     values: T
-  ): FlowPromise<{ [K in keyof T]: PromiseSettledResult<Awaited<T[K]>> }> {
-    const flowPromises = values as readonly (FlowPromise<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is FlowPromise<unknown> => v instanceof FlowPromise)?.getPod();
+  ): Promised<{ [K in keyof T]: PromiseSettledResult<Awaited<T[K]>> }> {
+    const flowPromises = values as readonly (Promised<unknown> | unknown)[];
+    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
 
     if (!pod) {
-      throw new Error("At least one FlowPromise is required");
+      throw new Error("At least one Promised is required");
     }
 
     const promises = flowPromises.map((v) =>
-      v instanceof FlowPromise ? v.toPromise() : Promise.resolve(v)
+      v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new FlowPromise(pod, Promise.allSettled(promises) as Promise<any>);
+    return new Promised(pod, Promise.allSettled(promises) as Promise<any>);
+  }
+
+  static try<T>(pod: Core.Pod, fn: () => T | Promise<T>): Promised<T> {
+    const promise = (async () => {
+      return await fn();
+    })();
+
+    return new Promised(pod, promise);
   }
 }
