@@ -437,7 +437,7 @@ export namespace Flow {
   export type Definition<S, I> = {
     name: string;
     input: StandardSchemaV1<I>;
-    success: StandardSchemaV1<S>;
+    output: StandardSchemaV1<S>;
     version?: string;
   } & Meta.MetaContainer;
 
@@ -545,7 +545,6 @@ export namespace Flow {
   export type Context = C;
 
   export type ExecutionData = {
-    readonly journal: ReadonlyMap<string, unknown>;
     readonly context: {
       get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
       find<T>(accessor: Accessor.Accessor<T>): T | undefined;

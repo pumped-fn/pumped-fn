@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, FlowError, provide } from "../src";
+import { flow, FlowError, provide, flowMeta } from "../src";
 import { custom } from "../src/ssch";
+import { accessor } from "../src/accessor";
 
 describe("Flow API - New Patterns", () => {
   describe("Nameless flows", () => {
@@ -149,7 +150,7 @@ describe("Flow API - New Patterns", () => {
         {
           name: "logger-flow",
           input: custom<string>(),
-          success: custom<string>(),
+          output: custom<string>(),
         },
         (deps, _ctx, input) => {
           deps.log(`Processing: ${input}`);
@@ -179,7 +180,7 @@ describe("Flow API - New Patterns", () => {
         {
           name: "triple",
           input: custom<{ value: number }>(),
-          success: custom<{ result: number }>(),
+          output: custom<{ result: number }>(),
         },
         (_ctx, input) => {
           return { result: input.value * 3 };
@@ -194,7 +195,7 @@ describe("Flow API - New Patterns", () => {
       const definition = flow({
         name: "square",
         input: custom<{ x: number }>(),
-        success: custom<{ y: number }>(),
+        output: custom<{ y: number }>(),
       });
 
       const impl = definition.handler((_ctx, input) => {
@@ -411,8 +412,6 @@ describe("Flow API - New Patterns", () => {
 
   describe("Execution context access", () => {
     test("ctx() returns execution data after flow completes", async () => {
-      const { flowMeta } = await import("../src/flow");
-
       const testFlow = flow(async (ctx, input: { value: number }) => {
         await ctx.run("operation", () => input.value * 2);
         return { result: input.value };
@@ -450,7 +449,8 @@ describe("Flow API - New Patterns", () => {
         expect(details.result.product).toBe(15);
       }
       expect(details.ctx).toBeDefined();
-      expect(details.ctx.journal.size).toBeGreaterThan(0);
+      const journal = details.ctx.context.find(flowMeta.journal);
+      expect(journal?.size).toBeGreaterThan(0);
     });
 
     test("journal captures all operations", async () => {
@@ -466,18 +466,16 @@ describe("Flow API - New Patterns", () => {
       const executionData = await execution.ctx();
 
       expect(executionData).toBeDefined();
-      expect(executionData?.journal.size).toBe(3);
+      const journal = executionData?.context.find(flowMeta.journal);
+      expect(journal?.size).toBe(3);
 
-      const journalKeys = Array.from(executionData?.journal.keys() || []);
+      const journalKeys = Array.from(journal?.keys() || []);
       expect(journalKeys.some((k) => k.includes("double"))).toBe(true);
       expect(journalKeys.some((k) => k.includes("triple"))).toBe(true);
       expect(journalKeys.some((k) => k.includes("sum"))).toBe(true);
     });
 
     test("contextData captures custom context values", async () => {
-      const { accessor } = await import("../src/accessor");
-      const { custom } = await import("../src/ssch");
-
       const customAccessor = accessor("customKey", custom<string>());
       const testFlow = flow(async (ctx, input: string) => {
         ctx.set(customAccessor, `processed-${input}`);
@@ -507,17 +505,16 @@ describe("Flow API - New Patterns", () => {
         expect((details.error as Error).message).toBe("test error");
       }
       expect(details.ctx).toBeDefined();
-      expect(details.ctx.journal.size).toBeGreaterThan(0);
+      const journal = details.ctx.context.find(flowMeta.journal);
+      expect(journal?.size).toBeGreaterThan(0);
     });
 
     test("flowMeta tracks flow execution hierarchy", async () => {
-      const { flowMeta } = await import("../src/flow");
-
       const subFlow = flow(
         {
           name: "subFlow",
           input: custom<number>(),
-          success: custom<number>(),
+          output: custom<number>(),
         },
         async (_ctx, input: number) => {
           return input + 1;
@@ -528,7 +525,7 @@ describe("Flow API - New Patterns", () => {
         {
           name: "mainFlow",
           input: custom<number>(),
-          success: custom<number>(),
+          output: custom<number>(),
         },
         async (ctx, input: number) => {
           const result = await ctx.exec(subFlow, input);

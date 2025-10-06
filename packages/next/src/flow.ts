@@ -24,11 +24,13 @@ export const flowMeta: {
   flowName: Accessor.Accessor<string | undefined>;
   parentFlowName: Accessor.Accessor<string | undefined>;
   isParallel: Accessor.AccessorWithDefault<boolean>;
+  journal: Accessor.Accessor<ReadonlyMap<string, unknown>>;
 } = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
   parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
   isParallel: accessor("flow.isParallel", custom<boolean>(), false),
+  journal: accessor("flow.journal", custom<ReadonlyMap<string, unknown>>()),
 };
 
 class FlowDefinition<S, I> {
@@ -36,7 +38,7 @@ class FlowDefinition<S, I> {
     public readonly name: string,
     public readonly version: string,
     public readonly input: StandardSchemaV1<I>,
-    public readonly success: StandardSchemaV1<S>,
+    public readonly output: StandardSchemaV1<S>,
     public readonly metas: Meta.Meta[] = []
   ) {}
 
@@ -96,7 +98,7 @@ type DefineConfig<S, I> = {
   name: string;
   version?: string;
   input: StandardSchemaV1<I>;
-  success: StandardSchemaV1<S>;
+  output: StandardSchemaV1<S>;
   meta?: Meta.Meta[];
 };
 
@@ -120,7 +122,7 @@ type FlowConfigInferred<S, I> = {
   name: string;
   version?: string;
   input?: StandardSchemaV1<I>;
-  success?: StandardSchemaV1<S>;
+  output?: StandardSchemaV1<S>;
   meta?: Meta.Meta[];
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
 };
@@ -129,7 +131,7 @@ type FlowConfigInferredWithDeps<S, I, D extends Core.DependencyLike> = {
   name: string;
   version?: string;
   input?: StandardSchemaV1<I>;
-  success?: StandardSchemaV1<S>;
+  output?: StandardSchemaV1<S>;
   meta?: Meta.Meta[];
   dependencies: D;
   handler: (
@@ -144,7 +146,7 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
     config.name,
     config.version || "1.0.0",
     config.input,
-    config.success,
+    config.output,
     config.meta
   );
 }
@@ -572,6 +574,7 @@ class FlowContext implements Flow.Context {
 
   createSnapshot(): Flow.ExecutionData {
     const contextDataSnapshot = new Map(this.contextData);
+    contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
 
     const dataStore = {
       get: (key: unknown) => contextDataSnapshot.get(key),
@@ -581,7 +584,6 @@ class FlowContext implements Flow.Context {
     };
 
     return {
-      journal: new Map(this.journal),
       context: {
         get<T>(
           accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
@@ -648,7 +650,7 @@ function execute<S, I>(
 
         const result = await handler(context, validated);
 
-        validate(definition.success, result);
+        validate(definition.output, result);
 
         return result;
       };
@@ -796,7 +798,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       name: "anonymous",
       version: "1.0.0",
       input: custom<I>(),
-      success: custom<S>(),
+      output: custom<S>(),
     });
     return def.handler(handler);
   }
@@ -822,14 +824,14 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     > & { name: string };
 
     const hasInput = "input" in definition && definition.input !== undefined;
-    const hasSuccess =
-      "success" in definition && definition.success !== undefined;
+    const hasOutput =
+      "output" in definition && definition.output !== undefined;
 
     const def = define({
       name: definition.name,
       version: definition.version,
       input: hasInput ? definition.input! : custom<I>(),
-      success: hasSuccess ? definition.success! : custom<S>(),
+      output: hasOutput ? definition.output! : custom<S>(),
       meta: definition.meta,
     });
 
@@ -847,7 +849,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       name: "anonymous",
       version: "1.0.0",
       input: custom<I>(),
-      success: custom<S>(),
+      output: custom<S>(),
     });
     return def.handler(dependencies, handler);
   }
@@ -860,13 +862,13 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       | FlowConfigInferredWithDeps<S, I, D>;
 
     const hasInput = "input" in config && config.input !== undefined;
-    const hasSuccess = "success" in config && config.success !== undefined;
+    const hasOutput = "output" in config && config.output !== undefined;
 
     const def = define({
       name: config.name,
       version: config.version,
       input: hasInput ? config.input! : custom<I>(),
-      success: hasSuccess ? config.success! : custom<S>(),
+      output: hasOutput ? config.output! : custom<S>(),
       meta: config.meta,
     });
 
@@ -888,14 +890,14 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     | Partial<DefineConfig<S, I>>;
 
   const hasInput = "input" in definition && definition.input !== undefined;
-  const hasSuccess =
-    "success" in definition && definition.success !== undefined;
+  const hasOutput =
+    "output" in definition && definition.output !== undefined;
 
   const def = define({
     name: definition.name || "anonymous",
     version: definition.version,
     input: hasInput ? definition.input! : custom<I>(),
-    success: hasSuccess ? definition.success! : custom<S>(),
+    output: hasOutput ? definition.output! : custom<S>(),
     meta: definition.meta,
   });
 

@@ -41,39 +41,39 @@ export const testFlows = {
     flow.define({
       name,
       input: custom<TestTypes.BasicInput>(),
-      success: custom<TestTypes.SuccessResult<string>>(),
+      output: custom<TestTypes.SuccessResult<string>>(),
     }),
 
   math: (name: string) =>
     flow.define({
       name,
       input: custom<TestTypes.MathInput>(),
-      success: custom<TestTypes.SuccessResult<number>>(),
+      output: custom<TestTypes.SuccessResult<number>>(),
     }),
 
   user: (name: string) =>
     flow.define({
       name,
       input: custom<{ userId: string }>(),
-      success: custom<{ user: TestTypes.User }>(),
+      output: custom<{ user: TestTypes.User }>(),
     }),
 
   validation: (name: string) =>
     flow.define({
       name,
       input: custom<{ email: string }>(),
-      success: custom<{ valid: boolean }>(),
+      output: custom<{ valid: boolean }>(),
     }),
 
   generic: <TInput, TSuccess>(
     name: string,
     input: StandardSchemaV1<TInput, unknown>,
-    success: StandardSchemaV1<TSuccess, unknown>
+    output: StandardSchemaV1<TSuccess, unknown>
   ) =>
     flow.define({
       name,
       input,
-      success,
+      output,
     }),
 };
 
