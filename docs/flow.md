@@ -13,12 +13,11 @@ Uses [standardschema v1](https://github.com/standard-schema/standard-schema) - a
 // Type-only (no runtime validation)
 import { custom } from "@pumped-fn/core-next";
 type MyType = { id: string };
-const spec = { input: custom<MyType>() };
+const input = custom<MyType>();
 
 // With runtime validation (zod example)
 import { z } from "zod";
 const schema = z.object({ email: z.string().email() });
-const spec2 = { input: schema };
 ```
 
 ### Quick Start
@@ -29,54 +28,75 @@ import { flow, custom, provide } from "@pumped-fn/core-next";
 const dbExecutor = provide(() => ({ create: (input: any) => "123" }));
 const loggerExecutor = provide(() => ({ info: (msg: string, data: any) => console.log(msg, data) }));
 
-// Define schemas and create flow
-const myFlow = flow.define({
+// Simplest form - handler only
+const simple = flow(async (ctx, input: number) => input * 2);
+
+// With dependencies
+const withDeps = flow(
+  { db: dbExecutor, logger: loggerExecutor },
+  async ({ db, logger }, ctx, input: { email: string }) => {
+    logger.info("Processing", input);
+    return { userId: db.create(input) };
+  }
+);
+
+// With explicit definition (for external APIs)
+const defined = flow.define({
   name: "user.create",
   input: custom<{ email: string }>(),
   output: custom<{ userId: string }>(),
-  error: custom<{ code: string; message: string }>(),
 });
 
-// Implement handler
-const handler = myFlow.handler(async (ctx, input) => {
-  return ctx.ok({ userId: "123" }); // Success
-  // return ctx.ko({ code: "ERROR", message: "Failed" }); // Error
-});
-
-// With dependencies
-const handlerWithDeps = myFlow.handler(
+const handler = defined.handler(
   { db: dbExecutor, logger: loggerExecutor },
   async ({ db, logger }, ctx, input) => {
     logger.info("Processing", input);
-    return ctx.ok({ userId: db.create(input) });
+    return { userId: db.create(input) };
   }
 );
 ```
 
 ## Context API
 
-The flow context provides validated input, result helpers, nested execution, and storage:
+The flow context provides data access, nested execution, journaling, and parallel operations:
 
 ```typescript
 
-interface Context<I, S, E> {
-  input: I; // Validated input
-  ok(data: S): OK<S>; // Success result
-  ko(data: E): KO<E>; // Error result
+interface Context {
+  readonly pod: Core.Pod;
+
+  // Context data access (use with accessors)
+  get<T>(accessor: Accessor<T>): T;
+  find<T>(accessor: Accessor<T>): T | undefined;
+  set<T>(accessor: Accessor<T>, value: T): void;
 
   // Execute nested flows
-  execute<F>(flow: F, input: Input): Promise<Output>;
+  exec<F>(flow: F, input: Input): Promised<Output>;
 
-  // Execute parallel flows
-  executeParallel(
-    flows: [[flow1, input1], [flow2, input2]]
-  ): Promise<[Output1, Output2]>;
+  // Journaling for deterministic replay
+  run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+  run<T, P extends readonly unknown[]>(
+    key: string,
+    fn: (...args: P) => Promise<T> | T,
+    ...params: P
+  ): Promised<T>;
 
-  // Context storage
-  get(key: unknown): unknown;
-  set(key: unknown, value: unknown): unknown;
+  // Parallel execution
+  parallel<T extends readonly Promised<any>[]>(
+    promises: [...T]
+  ): Promise<ParallelResult<T>>;
+
+  parallelSettled<T extends readonly Promised<any>[]>(
+    promises: [...T]
+  ): Promise<ParallelSettledResult<T>>;
 }
 ```
+
+**Key Points:**
+- Handlers return `T` directly, not `ctx.ok(T)`
+- Errors thrown as exceptions, not `ctx.ko(E)`
+- Use `Promised<T>` for flow results (extends Promise with flow metadata)
+- Context data uses `accessor` for type safety
 
 ## Execution
 
@@ -84,18 +104,22 @@ interface Context<I, S, E> {
 
 // Direct execution
 const result = await flow.execute(handler, { email: "test@example.com" });
-if (result.isOk()) {
-  console.log(result.data.userId);
-} else {
-  console.log(result.data.code);
-}
+console.log(result.userId);
 
-// With scope and plugins
+// With options
 const result = await flow.execute(handler, input, {
   scope: myScope,
-  plugins: [loggingPlugin, tracingPlugin],
+  extensions: [loggingExtension, tracingExtension],
   initialContext: [[contextKey, contextValue]],
 });
+
+// Error handling
+try {
+  const result = await flow.execute(handler, input);
+  console.log(result);
+} catch (error) {
+  console.error("Flow failed:", error);
+}
 ```
 
 ## Patterns
@@ -104,28 +128,24 @@ const result = await flow.execute(handler, input, {
 
 ```typescript
 
-import { flow, custom } from "@pumped-fn/core-next";
+import { flow } from "@pumped-fn/core-next";
 
-const calcFlow = flow.define({
-  name: "calc.add",
-  input: custom<{ a: number; b: number }>(),
-  output: custom<{ result: number }>(),
-  error: custom<{ code: string }>(),
-});
-
-const calc = calcFlow.handler(async (ctx, input) => {
+const calc = flow(async (ctx, input: { a: number; b: number }) => {
   if (isNaN(input.a) || isNaN(input.b)) {
-    return ctx.ko({ code: "INVALID_INPUT" });
+    throw new Error("INVALID_INPUT");
   }
-  return ctx.ok({ result: input.a + input.b });
+  return { result: input.a + input.b };
 });
+
+const result = await flow.execute(calc, { a: 5, b: 3 });
+console.log(result.result); // 8
 ```
 
 ### 2. Flow with Dependencies
 
 ```typescript
 
-import { flow, custom, provide } from "@pumped-fn/core-next";
+import { flow, provide } from "@pumped-fn/core-next";
 
 type User = { id: string; name: string };
 
@@ -133,80 +153,79 @@ const dbExecutor = provide(() => ({
   findUser: async (id: string): Promise<User | null> => ({ id, name: "John" })
 }));
 
-const userFlow = flow.define({
-  name: "user.get",
-  input: custom<{ userId: string }>(),
-  output: custom<{ user: User }>(),
-  error: custom<{ code: string; message: string }>(),
-});
-
-const getUser = userFlow.handler(
+const getUser = flow(
   { db: dbExecutor },
-  async ({ db }, ctx, input) => {
+  async ({ db }, ctx, input: { userId: string }) => {
     const user = await db.findUser(input.userId);
     if (!user) {
-      return ctx.ko({
-        code: "USER_NOT_FOUND",
-        message: `User ${input.userId} not found`,
-      });
+      throw new Error(`User ${input.userId} not found`);
     }
-    return ctx.ok({ user });
+    return { user };
   }
 );
+
+const result = await flow.execute(getUser, { userId: "123" });
+console.log(result.user);
 ```
 
 ### 3. Nested Flow Execution
 
 ```typescript
 
-const registerSpec = flow.define({
-  name: "user.register",
-  input: schema<{ email: string; password: string }>(),
-  output: schema<{ userId: string; token: string }>(),
-  error: schema<{ code: string; message: string }>(),
+const validateEmail = flow(async (ctx, input: { email: string }) => {
+  if (!input.email.includes("@")) {
+    throw new Error("Invalid email format");
+  }
+  return { valid: true };
 });
 
-const register = registerFlow.handler(
-  { validator: validatorExecutor },
-  async ({ validator }, ctx, input) => {
-    // Execute nested validation flow
-    const emailCheck = await ctx.execute(validateEmailFlow, {
-      email: input.email,
-    });
+const register = flow(async (ctx, input: { email: string; password: string }) => {
+  const emailCheck = await ctx.exec(validateEmail, { email: input.email });
 
-    if (emailCheck.isKo()) {
-      return ctx.ko({
-        code: "VALIDATION_FAILED",
-        message: emailCheck.data.message,
-      });
-    }
-
-    // Continue with registration...
-    return ctx.ok({ userId: "123", token: "abc" });
+  if (!emailCheck.valid) {
+    throw new Error("VALIDATION_FAILED");
   }
-);
+
+  return { userId: "123", token: "abc" };
+});
+
+const result = await flow.execute(register, {
+  email: "user@example.com",
+  password: "secret"
+});
 ```
 
 ### 4. Parallel Flow Execution
 
 ```typescript
 
-const processOrder = orderFlow.handler(async (ctx, input) => {
-  // Execute multiple flows in parallel
-  const [inventory, payment, shipping] = await ctx.executeParallel([
-    [checkInventoryFlow, { items: input.items }],
-    [processPaymentFlow, { amount: input.total }],
-    [calculateShippingFlow, { address: input.address }],
+const checkInventory = flow(async (ctx, items: string[]) => {
+  return { available: true, items };
+});
+
+const processPayment = flow(async (ctx, amount: number) => {
+  return { charged: amount, transactionId: "txn-123" };
+});
+
+const calculateShipping = flow(async (ctx, address: string) => {
+  return { cost: 10, address };
+});
+
+const processOrder = flow(async (ctx, input: { items: string[]; total: number; address: string }) => {
+  const result = await ctx.parallel([
+    ctx.exec(checkInventory, input.items),
+    ctx.exec(processPayment, input.total),
+    ctx.exec(calculateShipping, input.address),
   ]);
 
-  if (inventory.type === "ko" || payment.type === "ko") {
-    return ctx.ko({ code: "ORDER_FAILED", message: "..." });
-  }
+  const [inventory, payment, shipping] = result.results;
 
-  return ctx.ok({
-    orderId: generateId(),
-    shippingCost: shipping.data.cost,
-  });
+  return {
+    orderId: "order-123",
+    inventory,
+    payment,
+    shippingCost: shipping.cost,
+  };
 });
 ```
 
@@ -217,21 +236,27 @@ Flows integrate with the extension system for cross-cutting concerns:
 ```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
+import { accessor, custom } from "@pumped-fn/core-next";
+
+const traceId = accessor("trace.id", custom<string>());
 
 const tracingExtension: Extension.Extension = {
   name: "tracing",
 
   async initPod(pod, context) {
-    context.set(TRACE_ID, generateTraceId());
+    traceId.set(context, `trace-${Date.now()}`);
   },
 
-  async wrapExecute(context, next, execution) {
-    const start = Date.now();
-    try {
-      return await next();
-    } finally {
-      console.log(`Flow '${execution.flowName}' took ${Date.now() - start}ms`);
+  async wrap(context, next, operation) {
+    if (operation.kind === "execute") {
+      const start = Date.now();
+      try {
+        return await next();
+      } finally {
+        console.log(`Flow '${operation.definition.name}' took ${Date.now() - start}ms`);
+      }
     }
+    return next();
   },
 };
 
@@ -259,7 +284,8 @@ const result = await flow.execute(handler, input);
 | Reactive | ✅ Supported | ❌ Not in pods |
 | Validation | Manual | Built-in schemas |
 | Context | Via scope | Via context param |
-| Error handling | Exceptions | Structured ok/ko |
+| Error handling | Exceptions | Exceptions |
+| Return type | T | T (via Promised<T>) |
 
 ## Flow Coding Styles
 
@@ -320,16 +346,9 @@ import { accessor, custom, flow } from "@pumped-fn/core-next";
 // Define context accessors
 const traceId = accessor("trace.id", custom<string>());
 const userId = accessor("user.id", custom<string>());
-const timestamp = accessor("request.time", custom<number>(), Date.now);
+const timestamp = accessor("request.time", custom<number>(), Date.now());
 
-const processFlow = flow.define({
-  name: "process.request",
-  input: custom<{ data: string }>(),
-  output: custom<{ processed: boolean }>(),
-  error: custom<{ error: string }>()
-});
-
-const handler = processFlow.handler(async (ctx, input) => {
+const processFlow = flow(async (ctx, input: { data: string }) => {
   // Type-safe context access (no 'any' types)
   const trace = traceId.get(ctx); // throws if missing
   const user = userId.find(ctx); // undefined if missing
@@ -338,7 +357,7 @@ const handler = processFlow.handler(async (ctx, input) => {
   // Set context data with validation
   userId.set(ctx, "user-123");
 
-  return ctx.ok({ processed: true });
+  return { processed: true };
 });
 
 // Test with accessor presets
@@ -347,16 +366,17 @@ const initialContext = [
   userId.preset("test-user")
 ];
 
-const result = await flow.execute(handler, input, { initialContext });
+const result = await flow.execute(processFlow, { data: "test" }, { initialContext });
 ```
 
 ## Key Rules
 
 1. **Input/Output Validation**: All inputs are validated against schemas before handler execution
-2. **Error Handling**: Use ctx.ko() for business errors, exceptions for system errors
+2. **Error Handling**: Use exceptions for all errors (business and system)
 3. **Dependency Injection**: Dependencies resolved before handler execution
 4. **Context Isolation**: Each flow execution has isolated context (child contexts inherit from parent)
 5. **Type Safety**: Full TypeScript inference for inputs, outputs, and dependencies
 6. **Context Access**: Use DataAccessor for type-safe context data instead of direct Map operations
+7. **Journaling**: Use `ctx.run()` for deterministic replay of operations
 
 Common `standardSchemas` should be reusable and composable across your application flows.

@@ -30,27 +30,62 @@ interface Extension {
   initPod?(pod: Core.Pod, context: DataStore): void | Promise<void>
   disposePod?(pod: Core.Pod): void | Promise<void>
 
-  // Operation wrapping
-  wrapResolve?(next: () => Promise<unknown>, context: ResolveContext): Promise<unknown>
-  wrapExecute?<T>(context: DataStore, next: () => Promise<T>, execution: ExecutionContext): Promise<T>
+  // Unified operation wrapping
+  wrap?<T>(
+    context: DataStore,
+    next: () => Promise<T>,
+    operation: Operation
+  ): Promise<T>
 
   // Error handling
   onError?(error: Error, scope: Core.Scope): void
   onPodError?(error: unknown, pod: Core.Pod, context: DataStore): void
 }
 
-interface ResolveContext {
-  operation: 'resolve' | 'update'
-  executor: Core.Executor<unknown>
-  scope: Core.Scope
-}
-
-interface ExecutionContext {
-  flowName: string | undefined
-  depth: number
-  isParallel: boolean
-  parentFlowName: string | undefined
-}
+type Operation =
+  | {
+      kind: "resolve"
+      executor: Core.Executor<unknown>
+      scope: Core.Scope
+      operation: "resolve" | "update"
+    }
+  | {
+      kind: "execute"
+      flow: Flow.UFlow
+      definition: Flow.Definition<any, any>
+      input: unknown
+      flowName: string | undefined
+      depth: number
+      isParallel: boolean
+      parentFlowName: string | undefined
+    }
+  | {
+      kind: "journal"
+      key: string
+      flowName: string
+      depth: number
+      isReplay: boolean
+      pod: Core.Pod
+      params?: readonly unknown[]
+    }
+  | {
+      kind: "subflow"
+      flow: Flow.UFlow
+      definition: Flow.Definition<any, any>
+      input: unknown
+      journalKey: string | undefined
+      parentFlowName: string | undefined
+      depth: number
+      pod: Core.Pod
+    }
+  | {
+      kind: "parallel"
+      mode: "parallel" | "parallelSettled"
+      promiseCount: number
+      depth: number
+      parentFlowName: string | undefined
+      pod: Core.Pod
+    }
 ```
 
 ### Scope Access Capabilities
@@ -63,9 +98,9 @@ Extensions get full access to scope capabilities:
 - `scope.accessor(executor)` - Direct executor access
 - Full reactive system integration
 
-### Operation Wrapping vs Events
+### Unified Operation Wrapping
 
-Wrap methods provide advantages over traditional event patterns:
+The `wrap` method intercepts all operations with a discriminated union type. This provides advantages over traditional event patterns:
 
 ```typescript
 
@@ -80,15 +115,23 @@ scope.onChange((event, executor, value) => {
   }
 })
 
-// ✅ Clean, single-function metrics
-async function wrapResolve(next, context) {
+// ✅ Clean, single-function metrics with operation discrimination
+async function wrap<T>(context, next, operation): Promise<T> {
   const start = Date.now()
   try {
     const result = await next()
-    recordMetrics({ duration: Date.now() - start, success: true })
+    recordMetrics({
+      kind: operation.kind,
+      duration: Date.now() - start,
+      success: true
+    })
     return result
   } catch (error) {
-    recordMetrics({ duration: Date.now() - start, error: true })
+    recordMetrics({
+      kind: operation.kind,
+      duration: Date.now() - start,
+      error: true
+    })
     throw error
   }
 }
@@ -108,43 +151,39 @@ const performanceExtension = (): Extension => {
   return {
     name: "performance",
 
-    async wrapResolve(next, context) {
+    async wrap(context, next, operation) {
       const start = performance.now()
+
       try {
         const result = await next()
         const duration = performance.now() - start
 
-        metrics.set(context.executor, {
-          operation: context.operation,
-          duration,
-          success: true,
-          timestamp: Date.now()
-        })
+        if (operation.kind === "resolve") {
+          metrics.set(operation.executor, {
+            operation: operation.operation,
+            duration,
+            success: true,
+            timestamp: Date.now()
+          })
+        } else if (operation.kind === "execute") {
+          console.log(`Flow '${operation.flowName}' completed in ${duration.toFixed(2)}ms`)
+        }
 
         return result
       } catch (error) {
         const duration = performance.now() - start
-        metrics.set(context.executor, {
-          operation: context.operation,
-          duration,
-          error: error.message,
-          timestamp: Date.now()
-        })
-        throw error
-      }
-    },
 
-    async wrapExecute(context, next, execution) {
-      const start = performance.now()
-      try {
-        const result = await next()
-        const duration = performance.now() - start
+        if (operation.kind === "resolve") {
+          metrics.set(operation.executor, {
+            operation: operation.operation,
+            duration,
+            error: (error as Error).message,
+            timestamp: Date.now()
+          })
+        } else if (operation.kind === "execute") {
+          console.log(`Flow '${operation.flowName}' failed after ${duration.toFixed(2)}ms:`, error)
+        }
 
-        console.log(`Flow '${execution.flowName}' completed in ${duration.toFixed(2)}ms`)
-        return result
-      } catch (error) {
-        const duration = performance.now() - start
-        console.log(`Flow '${execution.flowName}' failed after ${duration.toFixed(2)}ms:`, error)
         throw error
       }
     },
@@ -159,55 +198,58 @@ const performanceExtension = (): Extension => {
 ```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
+import { accessor, custom } from "@pumped-fn/core-next";
+
+const traceIdAccessor = accessor("traceId", custom<string>());
+const spansAccessor = accessor("spans", custom<any[]>(), []);
 
 const tracingExtension = (): Extension => {
   return {
     name: "tracing",
 
     async initPod(pod, context) {
-      // Set trace ID for the entire pod execution
       const traceId = `trace-${Date.now()}-${Math.random().toString(36)}`
-      context.set("traceId", traceId)
-      context.set("spans", [])
+      traceIdAccessor.set(context, traceId)
+      spansAccessor.set(context, [])
     },
 
-    async wrapResolve(next, context) {
-      const traceId = context.scope.accessor(/* traceContext */).get()?.traceId
-      console.log(`[${traceId}] Resolving executor: ${context.executor}`)
+    async wrap(context, next, operation) {
+      const traceId = traceIdAccessor.find(context)
 
-      const result = await next()
-      console.log(`[${traceId}] Resolved executor: ${context.executor}`)
-      return result
-    },
-
-    async wrapExecute(context, next, execution) {
-      const traceId = context.get("traceId")
-      const spans = context.get("spans") || []
-
-      const span = {
-        flowName: execution.flowName,
-        start: Date.now(),
-        depth: execution.depth,
-        isParallel: execution.isParallel
-      }
-
-      spans.push(span)
-      context.set("spans", spans)
-
-      console.log(`[${traceId}] Starting ${execution.flowName} (depth: ${execution.depth})`)
-
-      try {
+      if (operation.kind === "resolve") {
+        console.log(`[${traceId}] ${operation.operation} executor`)
         const result = await next()
-        span.end = Date.now()
-        span.success = true
-        console.log(`[${traceId}] Completed ${execution.flowName} in ${span.end - span.start}ms`)
+        console.log(`[${traceId}] ${operation.operation} complete`)
         return result
-      } catch (error) {
-        span.end = Date.now()
-        span.error = error.message
-        console.log(`[${traceId}] Failed ${execution.flowName} after ${span.end - span.start}ms:`, error)
-        throw error
       }
+
+      if (operation.kind === "execute" || operation.kind === "subflow") {
+        const spans = spansAccessor.get(context)
+        const span: any = {
+          flowName: operation.definition.name,
+          start: Date.now(),
+          depth: operation.depth
+        }
+
+        spans.push(span)
+
+        console.log(`[${traceId}] Starting ${span.flowName} (depth: ${operation.depth})`)
+
+        try {
+          const result = await next()
+          span.end = Date.now()
+          span.success = true
+          console.log(`[${traceId}] Completed ${span.flowName} in ${span.end - span.start}ms`)
+          return result
+        } catch (error) {
+          span.end = Date.now()
+          span.error = (error as Error).message
+          console.log(`[${traceId}] Failed ${span.flowName} after ${span.end - span.start}ms:`, error)
+          throw error
+        }
+      }
+
+      return next()
     }
   }
 }
@@ -225,7 +267,6 @@ const debugExtension = (options: { logLevel: 'info' | 'debug' | 'verbose' } = { 
 
     init(scope) {
       if (options.logLevel === 'verbose') {
-        // Log all scope events
         scope.onChange((event, executor, value) => {
           console.log(`[SCOPE] ${event}:`, { executor: executor.toString(), value })
         })
@@ -236,39 +277,43 @@ const debugExtension = (options: { logLevel: 'info' | 'debug' | 'verbose' } = { 
       }
     },
 
-    async wrapResolve(next, context) {
-      if (options.logLevel === 'debug' || options.logLevel === 'verbose') {
-        console.log(`[RESOLVE] Starting ${context.operation} for executor`)
-      }
+    async wrap(context, next, operation) {
+      if (operation.kind === "resolve") {
+        if (options.logLevel === 'debug' || options.logLevel === 'verbose') {
+          console.log(`[RESOLVE] Starting ${operation.operation}`)
+        }
 
-      const result = await next()
-
-      if (options.logLevel === 'debug' || options.logLevel === 'verbose') {
-        console.log(`[RESOLVE] Completed ${context.operation}`, { result })
-      }
-
-      return result
-    },
-
-    async wrapExecute(context, next, execution) {
-      const logPrefix = `[FLOW${execution.depth > 0 ? `:${execution.depth}` : ''}]`
-
-      if (options.logLevel !== 'info') {
-        console.log(`${logPrefix} Starting ${execution.flowName}`)
-      }
-
-      try {
         const result = await next()
 
-        if (options.logLevel !== 'info') {
-          console.log(`${logPrefix} Success ${execution.flowName}`)
+        if (options.logLevel === 'debug' || options.logLevel === 'verbose') {
+          console.log(`[RESOLVE] Completed ${operation.operation}`, { result })
         }
 
         return result
-      } catch (error) {
-        console.error(`${logPrefix} Error ${execution.flowName}:`, error)
-        throw error
       }
+
+      if (operation.kind === "execute" || operation.kind === "subflow") {
+        const logPrefix = `[FLOW${operation.depth > 0 ? `:${operation.depth}` : ''}]`
+
+        if (options.logLevel !== 'info') {
+          console.log(`${logPrefix} Starting ${operation.definition.name}`)
+        }
+
+        try {
+          const result = await next()
+
+          if (options.logLevel !== 'info') {
+            console.log(`${logPrefix} Success ${operation.definition.name}`)
+          }
+
+          return result
+        } catch (error) {
+          console.error(`${logPrefix} Error ${operation.definition.name}:`, error)
+          throw error
+        }
+      }
+
+      return next()
     },
 
     onError(error, scope) {
@@ -356,19 +401,12 @@ const result = await scope.resolve(someExecutor)
 
 import { flow, custom } from "@pumped-fn/core-next";
 
-const myFlow = flow.define({
-  name: "example",
-  input: custom<{ data: string }>(),
-  success: custom<{ result: string }>(),
-  error: custom<{ error: string }>()
-})
-
-const handler = myFlow.handler(async (ctx, input) => {
-  return ctx.ok({ result: input.data.toUpperCase() })
+const myFlow = flow(async (ctx, input: { data: string }) => {
+  return { result: input.data.toUpperCase() }
 })
 
 // Extensions work automatically with flows
-const result = await flow.execute(handler, { data: "hello" }, {
+const result = await flow.execute(myFlow, { data: "hello" }, {
   extensions: [
     tracingExtension(),
     performanceExtension(),
