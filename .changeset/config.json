@@ -1,11 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
-  "changelog": [
-    "@changesets/changelog-github",
-    {
-      "repo": "pumped-fn/pumped-fn"
-    }
-  ],
+  "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
   "linked": [

@@ -1,0 +1,2 @@
+devCommand: pnpm i
+portRange: 8000-8005

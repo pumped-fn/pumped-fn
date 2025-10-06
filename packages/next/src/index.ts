@@ -1,6 +1,6 @@
 export type { Accessor } from "./types";
 export { accessor } from "./accessor";
-export * as errors from "./error-codes";
+export * as errors from "./errors";
 
 export {
   provide,
@@ -22,7 +22,8 @@ export { createScope, type PodOption, type ScopeOption } from "./scope";
 
 export * as standardSchema from "./ssch";
 export { custom } from "./ssch";
-export { flow, FlowExecutionContext } from "./flow";
+export { flow, flowMeta } from "./flow";
+export { Promised } from "./promises";
 export * from "./types";
 
 import type { Meta } from "./types";

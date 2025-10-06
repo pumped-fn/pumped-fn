@@ -57,7 +57,6 @@ const nameRequired = name.get(service);     // "auth-service" (throws if not fou
 ### MetaContainer Interface
 
 ```typescript
-
 interface MetaContainer {
   metas?: Meta.Meta[]
 }

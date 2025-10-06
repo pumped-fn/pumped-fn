@@ -59,7 +59,6 @@ const application = derive(
 #### accessing controller
 
 ```typescript
-
 import { provide, derive, type Core } from "@pumped-fn/core-next";
 
 // ---cut---
@@ -67,26 +66,24 @@ const value = provide((ctl) => "string");
 const otherValue = provide((ctl) => 20);
 
 const derived = derive(value, (value, ctl) => {
-  /* */
+  return value;
 });
 const derivedUsingArray = derive(
   [value, otherValue],
   ([value, otherValue], ctl) => {
-    /* */
+    return value + otherValue;
   }
 );
 const derivedUsingObject = derive(
   { value, otherValue },
   ({ value, otherValue }, ctl) => {
-    //                        ^^^
-  ctl.
-  //  ^|
-    /* */
+    const cleanup = ctl.cleanup
+    const scope = ctl.scope
+    return value + otherValue;
   }
 );
 
 type Controller = Core.Controller
-//   ^^^^^^^^^^
 ```
 
 #### Graph Node Variations
@@ -238,7 +235,6 @@ await scope.release(value);
 Retrieve the singleton of an executor respresentative in a scope
 
 ```typescript
-
 import { provide, createScope, type Core } from "@pumped-fn/core-next";
 const value = provide(() => 0);
 
@@ -247,13 +243,9 @@ const scope = createScope();
 
 const valueAccessor = scope.accessor(value);
 
-const getValue = valueAccessor.get(); // retrieve value. Will throw error if executor is yet resolved
+const getValue = valueAccessor.get();
 const maybeValue = valueAccessor.lookup();
 const resolvedValue = await valueAccessor.resolve();
-typeof valueAccessor['
-//                    ^|
-
-
 ```
 
 #### scope.dispose
@@ -539,15 +531,13 @@ import { flow, custom } from "@pumped-fn/core-next";
 Define a flow specification with input/output schemas:
 
 ```typescript
-
-import { flow, custom } from "@pumped-fn/core-next";
-
-// ---cut---
-const userFlow = flow.define({
+const userFlow = flow({
   name: "user.create",
   input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
-  error: custom<{ code: string; message: string }>(),
+  output: custom<{ userId: string; created: boolean }>(),
+  error: custom<{ code: string; message: string }>()
+}, async (ctx, input) => {
+  return { userId: "123", created: true };
 });
 ```
 
@@ -558,30 +548,20 @@ Create a handler for the flow definition:
 ```typescript
 import { flow, custom, provide } from "@pumped-fn/core-next";
 
-const userFlow = flow.define({
-  name: "user.create",
-  input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
-  error: custom<{ code: string; message: string }>(),
-});
-
 const dbExecutor = provide(() => ({ save: (data: any) => Promise.resolve("123") }));
 
-// ---cut---
-// Simple handler
-const createUser = userFlow.handler(async (ctx, input) => {
+const createUser = flow(async (ctx, input: { email: string; name: string }) => {
   if (!input.email.includes("@")) {
-    return ctx.ko({ code: "INVALID_EMAIL", message: "Invalid email format" });
+    throw new Error("Invalid email format");
   }
-  return ctx.ok({ userId: "123", created: true });
+  return { userId: "123", created: true };
 });
 
-// Handler with dependencies
-const createUserWithDb = userFlow.handler(
+const createUserWithDb = flow(
   { db: dbExecutor },
-  async ({ db }, ctx, input) => {
+  async ({ db }, ctx, input: { email: string; name: string }) => {
     const userId = await db.save(input);
-    return ctx.ok({ userId, created: true });
+    return { userId, created: true };
   }
 );
 ```
@@ -591,35 +571,19 @@ const createUserWithDb = userFlow.handler(
 Execute a flow handler with input:
 
 ```typescript
-
 import { flow, custom, createScope } from "@pumped-fn/core-next";
 
-const userFlow = flow.define({
-  name: "user.create",
-  input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
-  error: custom<{ code: string; message: string }>(),
+const handler = flow(async (ctx, input: { email: string; name: string }) => {
+  return { userId: "123", created: true };
 });
 
-const handler = userFlow.handler(async (ctx, input) => {
-  return ctx.ok({ userId: "123", created: true });
-});
-
-// ---cut---
-// Basic execution
 const result = await flow.execute(handler, { email: "user@example.com", name: "John" });
 
-if (result.isOk()) {
-  console.log("User created:", result.data.userId);
-} else {
-  console.log("Error:", result.data.message);
-}
+console.log("User created:", result.userId);
 
-// Execution with options
 const scope = createScope();
-const result2 = await flow.execute(handler, input, {
-  scope,
-  initialContext: [[contextKey, contextValue]],
+const result2 = await flow.execute(handler, { email: "test@test.com", name: "Test" }, {
+  scope
 });
 ```
 
@@ -628,48 +592,26 @@ const result2 = await flow.execute(handler, input, {
 The context object provides flow execution capabilities:
 
 ```typescript
+import { flow, custom, accessor } from "@pumped-fn/core-next";
 
-import { flow, custom } from "@pumped-fn/core-next";
+const startTimeAccessor = accessor("startTime", custom<number>());
 
-const processFlow = flow.define({
-  name: "process.data",
-  input: custom<{ data: string[] }>(),
-  success: custom<{ processed: number }>(),
-  error: custom<{ error: string }>(),
+const subFlowHandler = flow(async (ctx, input: { item: string }) => {
+  return { result: input.item.toUpperCase() };
 });
 
-const subFlow = flow.define({
-  name: "process.item",
-  input: custom<{ item: string }>(),
-  success: custom<{ result: string }>(),
-  error: custom<{ error: string }>(),
-});
+const processor = flow(async (ctx, input: { data: string[] }) => {
+  startTimeAccessor.set(ctx, Date.now());
+  const startTime = startTimeAccessor.get(ctx);
 
-const subFlowHandler = subFlow.handler(async (ctx, input) => {
-  return ctx.ok({ result: input.item.toUpperCase() });
-});
+  const itemResult = await ctx.exec(subFlowHandler, { item: input.data[0] });
 
-const processor = processFlow.handler(async (ctx, input) => {
-  // Context storage
-  ctx.set("startTime", Date.now());
-  const startTime = ctx.get("startTime");
-
-  // Nested execution
-  const itemResult = await ctx.execute(subFlowHandler, { item: input.data[0] });
-
-  if (itemResult.isKo()) {
-    return ctx.ko({ error: itemResult.data.error });
-  }
-
-  // Parallel execution
-  const results = await ctx.executeParallel([
-    [subFlowHandler, { item: input.data[0] }],
-    [subFlowHandler, { item: input.data[1] }],
+  const results = await ctx.parallel([
+    ctx.exec(subFlowHandler, { item: input.data[0] }),
+    ctx.exec(subFlowHandler, { item: input.data[1] }),
   ]);
 
-  // Success/error responses
-  return ctx.ok({ processed: input.data.length });
-  // return ctx.ko({ error: "Processing failed" });
+  return { processed: input.data.length };
 });
 ```
 
@@ -689,7 +631,7 @@ const simpleFlow = flow(
   {
     name: "simple.process",
     input: custom<{ value: number }>(),
-    success: custom<{ result: number }>(),
+    output: custom<{ result: number }>(),
     error: custom<{ error: string }>(),
   },
   async (ctx, input) => {
@@ -702,7 +644,7 @@ const flowWithDeps = flow(
   {
     name: "process.with.deps",
     input: custom<{ data: string }>(),
-    success: custom<{ processed: boolean }>(),
+    output: custom<{ processed: boolean }>(),
     error: custom<{ error: string }>(),
   },
   { logger: loggerExecutor },
@@ -720,3 +662,312 @@ const flowWithDeps = flow(
 - **Context Management**: Isolated context per execution
 - **Nested Execution**: Execute sub-flows with context inheritance
 - **Parallel Execution**: Execute multiple flows concurrently
+
+## Type Guards
+
+Type guards verify executor types at runtime. Use them for conditional logic based on executor variations.
+
+```typescript
+import {
+  isExecutor,
+  isMainExecutor,
+  isReactiveExecutor,
+  isStaticExecutor,
+  isLazyExecutor,
+  isPreset
+} from "@pumped-fn/core-next";
+```
+
+#### isExecutor - Check if value is an executor
+
+```typescript
+import { isExecutor, provide } from "@pumped-fn/core-next";
+
+const maybeExecutor = provide(() => 42);
+const notExecutor = { value: 42 };
+
+if (isExecutor(maybeExecutor)) {
+  // Type narrowed to Core.BaseExecutor<unknown>
+}
+```
+
+#### isMainExecutor - Check if executor is main type
+
+```typescript
+import { isMainExecutor, provide } from "@pumped-fn/core-next";
+
+const executor = provide(() => 42);
+
+if (isMainExecutor(executor)) {
+  // Type narrowed to Core.Executor<unknown>
+  // Has .lazy, .reactive, .static properties
+  const lazy = executor.lazy;
+}
+```
+
+#### isReactiveExecutor - Check if executor is reactive variant
+
+```typescript
+import { isReactiveExecutor, provide } from "@pumped-fn/core-next";
+
+const base = provide(() => 42);
+const reactive = base.reactive;
+
+if (isReactiveExecutor(reactive)) {
+  // Type narrowed to Core.Reactive<unknown>
+}
+```
+
+#### isStaticExecutor - Check if executor is static variant
+
+```typescript
+import { isStaticExecutor, provide } from "@pumped-fn/core-next";
+
+const base = provide(() => 42);
+const static_ = base.static;
+
+if (isStaticExecutor(static_)) {
+  // Type narrowed to Core.Static<unknown>
+}
+```
+
+#### isLazyExecutor - Check if executor is lazy variant
+
+```typescript
+import { isLazyExecutor, provide } from "@pumped-fn/core-next";
+
+const base = provide(() => 42);
+const lazy = base.lazy;
+
+if (isLazyExecutor(lazy)) {
+  // Type narrowed to Core.Lazy<unknown>
+}
+```
+
+#### isPreset - Check if value is a preset
+
+```typescript
+import { isPreset, preset, provide } from "@pumped-fn/core-next";
+
+const executor = provide(() => 42);
+const presetValue = preset(executor, 100);
+
+if (isPreset(presetValue)) {
+  // Type narrowed to Core.Preset<unknown>
+}
+```
+
+**Use for**: Plugin development, conditional dependency resolution, debugging
+
+## Helpers
+
+Utility functions for common execution patterns.
+
+```typescript
+import { resolves, prepare, adapt } from "@pumped-fn/core-next";
+```
+
+#### resolves - Batch resolve executors
+
+Resolve multiple executors in one call. Returns results in same structure (array or object).
+
+```typescript
+import { provide, derive, createScope, resolves } from "@pumped-fn/core-next";
+
+const a = provide(() => 1);
+const b = provide(() => 2);
+const c = derive([a, b], ([x, y]) => x + y);
+
+const scope = createScope();
+
+// Array form
+const [valA, valB, valC] = await resolves(scope, [a, b, c]);
+// valA: 1, valB: 2, valC: 3
+
+// Object form
+const { x, y, sum } = await resolves(scope, { x: a, y: b, sum: c });
+// x: 1, y: 2, sum: 3
+```
+
+**Use for**: Resolving multiple executors, cleaner than multiple await calls
+
+#### prepare - Create callable executor
+
+Prepare an executor for repeated execution without passing scope.
+
+```typescript
+import { provide, createScope, prepare } from "@pumped-fn/core-next";
+
+const counter = provide(() => Math.random());
+const scope = createScope();
+
+const getCounter = prepare(scope, counter);
+
+// Call without passing scope
+const value1 = await getCounter();
+const value2 = await getCounter(); // Same value (cached)
+
+// Access original executor
+const original = getCounter.escape();
+```
+
+**Use for**: Simplified executor access, API boundaries
+
+#### adapt - Create function from executor
+
+Transform an executor returning a function into a callable function.
+
+```typescript
+import { provide, derive, createScope, adapt } from "@pumped-fn/core-next";
+
+const config = provide(() => ({ prefix: "[LOG]" }));
+const logger = derive(config, (cfg) => (msg: string) => {
+  console.log(`${cfg.prefix} ${msg}`);
+});
+
+const scope = createScope();
+const log = adapt(scope, logger);
+
+// Call directly
+await log("Hello"); // Logs: [LOG] Hello
+
+// Access original executor
+const originalLogger = log.escape();
+```
+
+**Use for**: Converting service executors to functions, cleaner API
+
+## Validation
+
+Schema validation using StandardSchema.
+
+```typescript
+import { validate, custom } from "@pumped-fn/core-next";
+```
+
+#### validate - Validate against schema
+
+```typescript
+import { validate, custom } from "@pumped-fn/core-next";
+
+const numberSchema = custom<number>();
+
+// Throws if validation fails
+const validated = await validate(numberSchema, 42);
+```
+
+**Use for**: Input validation, runtime type checking
+
+#### custom - Create type-only schema
+
+Create a schema without validation. Useful for TypeScript-only type safety.
+
+```typescript
+import { custom } from "@pumped-fn/core-next";
+
+// Schema with no runtime validation
+const userSchema = custom<{ id: string; name: string }>();
+
+// Use with flow definitions
+const flow = flow.define({
+  name: "user.process",
+  input: custom<{ userId: string }>(),
+  output: custom<{ success: boolean }>(),
+  error: custom<{ error: string }>()
+});
+```
+
+**Use for**: Type-safe schemas without runtime overhead
+
+## Utilities
+
+Additional utilities for advanced patterns.
+
+#### multi - Multi-keyed executors
+
+Create executors that resolve different values based on a key parameter.
+
+```typescript
+import { multi, custom, createScope } from "@pumped-fn/core-next";
+
+// Provider form
+const userCache = multi.provide(
+  { keySchema: custom<string>() },
+  async (userId, ctl) => {
+    // Fetch user by ID
+    return { id: userId, name: "User" };
+  }
+);
+
+// Derive form
+const config = provide(() => ({ apiUrl: "https://api.example.com" }));
+const userService = multi.derive(
+  {
+    keySchema: custom<string>(),
+    dependencies: { config }
+  },
+  async ({ config }, userId, ctl) => {
+    // Fetch from API using config
+    return { id: userId, name: "User" };
+  }
+);
+
+const scope = createScope();
+
+// Access by key
+const user1Executor = userCache("user-1");
+const user1 = await scope.resolve(user1Executor);
+
+// Get accessor
+const user2Accessor = await scope.resolve(userCache.lazy)("user-2");
+const user2 = await user2Accessor.resolve();
+
+// Release all cached values
+await userCache.release(scope);
+```
+
+**Use for**: Keyed caches, per-ID services, dynamic executors
+
+#### Promised - Async type helper
+
+Type helper for promise-wrapped values.
+
+```typescript
+import { type Core } from "@pumped-fn/core-next";
+
+type Promised<T> = T | Promise<T>;
+
+// Used in Core.Output<T>
+type Output<T> = Promised<T>;
+```
+
+#### Error types
+
+Structured error types for executor resolution.
+
+```typescript
+import {
+  ExecutorResolutionError,
+  FactoryExecutionError,
+  DependencyResolutionError,
+  SchemaError,
+  ErrorCodes,
+  formatErrorMessage
+} from "@pumped-fn/core-next";
+
+// Catch specific errors
+try {
+  await scope.resolve(executor);
+} catch (error) {
+  if (error instanceof FactoryExecutionError) {
+    console.error("Factory failed:", error.context);
+  } else if (error instanceof DependencyResolutionError) {
+    console.error("Dependency missing:", error.missingDependency);
+  }
+}
+
+// Use error codes
+const msg = formatErrorMessage(ErrorCodes.SCOPE_DISPOSED, { scopeId: "123" });
+```
+
+**Use for**: Error handling, debugging, logging

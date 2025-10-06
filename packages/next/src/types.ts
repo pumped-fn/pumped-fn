@@ -1,3 +1,4 @@
+import { type Promised } from "./promises";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -87,10 +88,7 @@ export class ExecutorResolutionError extends Error {
     category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR" = "USER_ERROR",
     options?: { cause?: unknown }
   ) {
-    super(message);
-    if (options && "cause" in options) {
-      (this as any).cause = options.cause;
-    }
+    super(message, options);
     this.name = "ExecutorResolutionError";
     this.context = context;
     this.code = code;
@@ -267,9 +265,25 @@ export declare namespace Core {
     value: T | Executor<T>;
   }
 
-  export type InferOutput<T> = T extends
-    | Executor<infer U>
-    | Reactive<infer U>
+  export type ExecutorProxy<T> = T extends object
+    ? {
+        [K in keyof T]: T[K] extends (...args: infer Args) => infer R
+          ? Executor<(...args: Args) => R>
+          : never;
+      }
+    : never;
+
+  export type NestedProxy<T> = T extends object
+    ? {
+        [K in keyof T]: T[K] extends (...args: infer Args) => infer R
+          ? Executor<(...args: Args) => R>
+          : T[K] extends object
+          ? NestedProxy<T[K]>
+          : never;
+      }
+    : never;
+
+  export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
     ? Awaited<U>
     : T extends Lazy<infer U> | Static<infer U>
     ? Accessor<Awaited<U>>
@@ -320,7 +334,6 @@ export declare namespace Core {
     scope: Scope;
   };
 
-
   export type SingleDependencyLike = Core.BaseExecutor<unknown>;
 
   export type MultiDependencyLike =
@@ -337,9 +350,14 @@ export declare namespace Core {
 
   export interface Pod
     extends Omit<
-      Core.Scope,
-      "update" | "pod" | "disposePod" | "onChange" | "registeredExecutors"
-    >, Meta.MetaContainer {}
+        Core.Scope,
+        "update" | "disposePod" | "onChange" | "registeredExecutors"
+      >,
+      Meta.MetaContainer {
+    getDepth(): number;
+    getRootPod(): Pod;
+    getChildPods(): ReadonlySet<Pod>;
+  }
 
   export interface Scope extends Meta.MetaContainer {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
@@ -378,102 +396,119 @@ export declare namespace Core {
       meta?: Meta.Meta[];
     }): Pod;
     disposePod(scope: Pod): Promise<void>;
+
+    exec<S, I>(
+      flow: Core.Executor<any>,
+      input: I,
+      options: {
+        extensions?: Extension.Extension[];
+        initialContext?: Array<
+          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        >;
+        presets?: Preset<unknown>[];
+        details: true;
+      }
+    ): any;
+
+    exec<S, I>(
+      flow: Core.Executor<any>,
+      input: I,
+      options?: {
+        extensions?: Extension.Extension[];
+        initialContext?: Array<
+          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        >;
+        presets?: Preset<unknown>[];
+        details?: false;
+      }
+    ): any;
+  }
+}
+
+export class FlowError extends Error {
+  public readonly code: string;
+  public readonly data?: unknown;
+
+  constructor(
+    message: string,
+    code: string,
+    data?: unknown,
+    options?: { cause?: unknown }
+  ) {
+    super(message);
+    this.name = "FlowError";
+    this.code = code;
+    this.data = data;
+    if (options?.cause) {
+      this.cause = options.cause;
+    }
+  }
+}
+
+export class FlowValidationError extends FlowError {
+  public readonly issues: StandardSchemaV1.Issue[];
+
+  constructor(
+    message: string,
+    issues: StandardSchemaV1.Issue[],
+    options?: { cause?: unknown }
+  ) {
+    super(message, "VALIDATION_ERROR", { issues }, options);
+    this.name = "FlowValidationError";
+    this.issues = issues;
   }
 }
 
 export namespace Flow {
-  export type OK<S> = {
-    type: "ok";
-    data: S;
-    isOk(): this is OK<S>;
-    isKo(): this is never;
-  };
-  export type KO<E> = {
-    type: "ko";
-    data: E;
-    cause?: unknown;
-    isOk(): this is never;
-    isKo(): this is KO<E>;
-  };
-  export type OutputLike<S, E> = OK<S> | KO<E>;
-
-  export type Definition<I, S, E> = {
+  export type Definition<S, I> = {
     name: string;
     input: StandardSchemaV1<I>;
-    success: StandardSchemaV1<S>;
-    error: StandardSchemaV1<E>;
+    output: StandardSchemaV1<S>;
     version?: string;
   } & Meta.MetaContainer;
 
-  export interface NoDependencyHandler<I, S, E> {
-    (ctx: Context<I, S, E>): OutputLike<S, E> | Promise<OutputLike<S, E>>;
-    def: Definition<I, S, E>;
+  export interface Handler<S, I> {
+    (ctx: Context, input: I): S | Promise<S>;
+    def: Definition<S, I>;
   }
 
-  export interface DependentHandler<D, I, S, E> {
-    (ctx: Context<I, S, E>): OutputLike<S, E> | Promise<OutputLike<S, E>>;
-    def: Definition<I, S, E>;
-  }
+  export type UFlow = Core.Executor<Handler<any, any>>;
 
-  export type NoDependencyFlow<I, S, E> = Core.Executor<
-    NoDependencyHandler<I, S, E>
-  >;
-
-  export type DependentFlow<D, I, S, E> = Core.Executor<
-    DependentHandler<D, I, S, E>
-  >;
-
-  export type UFlow =
-    | Core.Executor<NoDependencyHandler<any, any, any>>
-    | Core.Executor<DependentHandler<any, any, any, any>>;
-
-  export type InferInput<F> = F extends NoDependencyFlow<infer I, any, any>
-    ? I
-    : F extends DependentFlow<any, infer I, any, any>
+  export type InferInput<F> = F extends
+    | Handler<any, infer I>
+    | Core.Executor<Handler<any, infer I>>
     ? I
     : never;
 
-  export type InferSuccess<F> = F extends NoDependencyFlow<any, infer S, any>
+  export type InferOutput<F> = F extends
+    | Handler<infer S, any>
+    | Core.Executor<Handler<infer S, any>>
     ? S
-    : F extends DependentFlow<any, any, infer S, any>
-    ? S
-    : never;
-
-  export type InferError<F> = F extends NoDependencyFlow<any, any, infer E>
-    ? E
-    : F extends DependentFlow<any, any, any, infer E>
-    ? E
-    : never;
-
-  export type InferOutput<F> = F extends NoDependencyFlow<any, infer S, infer E>
-    ? OK<S> | KO<E>
-    : F extends DependentFlow<any, any, infer S, infer E>
-    ? OK<S> | KO<E>
     : never;
 
   export type FnExecutor<I, O> = (input: I) => O | Promise<O>;
 
-  export type MultiFnExecutor<Args extends readonly unknown[], O> =
-    (...args: Args) => O | Promise<O>;
+  export type MultiFnExecutor<Args extends readonly unknown[], O> = (
+    ...args: Args
+  ) => O | Promise<O>;
 
   export type AnyFnExecutor<O = unknown> =
     | FnExecutor<any, O>
     | MultiFnExecutor<any[], O>;
 
-  export type R<S, E> = {
-    ok: (value: S) => OK<S>;
-    ko: (value: E, options?: { cause?: unknown }) => KO<E>;
-    output: (
-      ok: boolean,
-      value: typeof ok extends true ? S : E
-    ) => typeof ok extends true ? OK<S> : KO<E>;
-  };
-
   export type Opt = {};
 
-  export type ParallelExecutionResult<T> = {
-    type: "all-ok" | "partial" | "all-ko";
+  export type ParallelResult<T> = {
     results: T;
+    stats: {
+      total: number;
+      succeeded: number;
+      failed: number;
+    };
+  };
+
+  export type ParallelSettledResult<T> = {
+    results: PromiseSettledResult<T>[];
     stats: {
       total: number;
       succeeded: number;
@@ -488,111 +523,139 @@ export namespace Flow {
   };
 
   export type C = {
-    execute: {
-      <F extends UFlow>(
-        flow: F,
-        input: InferInput<F>,
-        opt?: Opt
-      ): Promise<InferOutput<F>>;
+    readonly pod: Core.Pod;
 
-      <I, O, E = unknown>(
-        fn: FnExecutor<I, O>,
-        input: I,
-        errorMapper?: (error: unknown) => E,
-        opt?: Opt
-      ): Promise<OK<O> | KO<E>>;
+    get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
+    find<T>(accessor: Accessor.Accessor<T>): T | undefined;
+    find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
+    set<T>(
+      accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>,
+      value: T
+    ): void;
 
-      <Args extends readonly unknown[], O, E = unknown>(
-        fn: MultiFnExecutor<Args, O>,
-        args: Args,
-        errorMapper?: (error: unknown) => E,
-        opt?: Opt
-      ): Promise<OK<O> | KO<E>>;
-    };
+    run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+    run<T, P extends readonly unknown[]>(
+      key: string,
+      fn: (...args: P) => Promise<T> | T,
+      ...params: P
+    ): Promised<T>;
 
-    executeParallel: {
-      <T extends ReadonlyArray<[FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        items: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends FnExecutor<any, infer O>
-            ? OK<O> | KO<unknown>
-            : F extends MultiFnExecutor<any[], infer O>
-            ? OK<O> | KO<unknown>
-            : never
-          : never;
-      }>>;
+    exec<F extends UFlow>(
+      flow: F,
+      input: InferInput<F>
+    ): Promised<InferOutput<F>>;
 
-      <T extends ReadonlyArray<[UFlow, any]>>(
-        flows: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends UFlow
-            ? Awaited<InferOutput<F>>
-            : never
-          : never;
-      }>>;
+    exec<F extends UFlow>(
+      key: string,
+      flow: F,
+      input: InferInput<F>
+    ): Promised<InferOutput<F>>;
 
-      <T extends ReadonlyArray<[UFlow | FnExecutor<any, any> | MultiFnExecutor<any[], any>, any]>>(
-        mixed: { [K in keyof T]: T[K] },
-        options?: ParallelExecutionOptions
-      ): Promise<ParallelExecutionResult<{
-        [K in keyof T]: T[K] extends [infer F, any]
-          ? F extends UFlow
-            ? Awaited<InferOutput<F>>
-            : F extends FnExecutor<any, infer O>
-            ? OK<O> | KO<unknown>
-            : F extends MultiFnExecutor<any[], infer O>
-            ? OK<O> | KO<unknown>
-            : never
-          : never;
-      }>>;
+    parallel<T extends readonly Promised<any>[]>(
+      promises: [...T]
+    ): Promise<
+      ParallelResult<{
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+      }>
+    >;
+
+    parallelSettled<T extends readonly Promised<any>[]>(
+      promises: [...T]
+    ): Promise<
+      ParallelSettledResult<{
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+      }>
+    >;
+  };
+
+  export type Context = C;
+
+  export type ExecutionData = {
+    readonly context: {
+      get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
+      find<T>(accessor: Accessor.Accessor<T>): T | undefined;
+      find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
     };
   };
 
-  export type Context<I, S, E> = Accessor.DataStore &
-    R<S, E> &
-    C & {
-      input: I;
-    };
-
+  export type ExecutionDetails<T> =
+    | { success: true; result: T; ctx: ExecutionData }
+    | { success: false; error: unknown; ctx: ExecutionData };
 }
 
 export namespace Extension {
+  export type Operation =
+    | {
+        kind: "resolve";
+        executor: Core.Executor<unknown>;
+        scope: Core.Scope;
+        operation: "resolve" | "update";
+      }
+    | {
+        kind: "execute";
+        flow: Flow.UFlow;
+        definition: Flow.Definition<any, any>;
+        input: unknown;
+        flowName: string | undefined;
+        depth: number;
+        isParallel: boolean;
+        parentFlowName: string | undefined;
+      }
+    | {
+        kind: "journal";
+        key: string;
+        flowName: string;
+        depth: number;
+        isReplay: boolean;
+        pod: Core.Pod;
+        params?: readonly unknown[];
+      }
+    | {
+        kind: "subflow";
+        flow: Flow.UFlow;
+        definition: Flow.Definition<any, any>;
+        input: unknown;
+        journalKey: string | undefined;
+        parentFlowName: string | undefined;
+        depth: number;
+        pod: Core.Pod;
+      }
+    | {
+        kind: "parallel";
+        mode: "parallel" | "parallelSettled";
+        promiseCount: number;
+        depth: number;
+        parentFlowName: string | undefined;
+        pod: Core.Pod;
+      };
+
   export interface Extension {
     name: string;
 
     init?(scope: Core.Scope): void | Promise<void>;
     initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void>;
 
-    wrapResolve?(next: () => Promise<unknown>, context: ResolveContext): Promise<unknown>;
-    wrapExecute?<T>(
+    wrap?<T>(
       context: Accessor.DataStore,
       next: () => Promise<T>,
-      execution: ExecutionContext
+      operation: Operation
     ): Promise<T>;
 
-    onError?(error: ExecutorResolutionError | FactoryExecutionError | DependencyResolutionError, scope: Core.Scope): void;
-    onPodError?(error: unknown, pod: Core.Pod, context: Accessor.DataStore): void;
+    onError?(
+      error:
+        | ExecutorResolutionError
+        | FactoryExecutionError
+        | DependencyResolutionError,
+      scope: Core.Scope
+    ): void;
+    onPodError?(
+      error: unknown,
+      pod: Core.Pod,
+      context: Accessor.DataStore
+    ): void;
 
     dispose?(scope: Core.Scope): void | Promise<void>;
     disposePod?(pod: Core.Pod): void | Promise<void>;
-  }
-
-  export interface ResolveContext {
-    operation: "resolve" | "update";
-    executor: Core.Executor<unknown>;
-    scope: Core.Scope;
-  }
-
-  export interface ExecutionContext {
-    flowName: string | undefined;
-    depth: number;
-    isParallel: boolean;
-    parentFlowName: string | undefined;
-    flow: Flow.UFlow
   }
 }
 

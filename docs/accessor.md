@@ -26,6 +26,8 @@ const prefs = userPrefs.get(context); // Fully typed, no 'any'
 ### Creating Accessors
 
 ```typescript
+import { accessor, custom } from "@pumped-fn/core-next";
+
 // Accessor without default (returns undefined if missing)
 const userId = accessor("user.id", custom<string>());
 
@@ -36,17 +38,22 @@ const theme = accessor("user.theme", custom<"light" | "dark">(), "light");
 ### Using Accessors
 
 ```typescript
+import { accessor, custom } from "@pumped-fn/core-next";
+
+const userId = accessor("user.id", custom<string>());
+const source = new Map();
+
 // Required access - throws if not found
-const value = accessor.get(source);
+const value = userId.get(source);
 
 // Optional access - returns undefined if not found
-const maybeValue = accessor.find(source);
+const maybeValue = userId.find(source);
 
 // Set with validation
-accessor.set(dataStore, newValue);
+userId.set(source, "123");
 
 // Create preset for initialization
-const [key, value] = accessor.preset(initialValue);
+const [key, val] = userId.preset("initial-id");
 ```
 
 ## Integration with Flows
@@ -59,25 +66,16 @@ import { accessor, custom, flow } from "@pumped-fn/core-next";
 // Define context accessors
 const traceId = accessor("trace.id", custom<string>());
 const userId = accessor("user.id", custom<string>());
-const timestamp = accessor("request.time", custom<number>(), Date.now);
+const timestamp = accessor("request.time", custom<number>(), Date.now());
 
-const processFlow = flow.define({
-  name: "process.request",
-  input: custom<{ data: string }>(),
-  success: custom<{ processed: boolean }>(),
-  error: custom<{ error: string }>()
-});
+const processFlow = flow(async (ctx, input: { data: string }) => {
+  const trace = traceId.get(ctx);
+  const user = userId.find(ctx);
+  const time = timestamp.find(ctx);
 
-const handler = processFlow.handler(async (ctx, input) => {
-  // Type-safe context access (no 'any' types)
-  const trace = traceId.get(ctx); // string - throws if missing
-  const user = userId.find(ctx); // string | undefined
-  const time = timestamp.find(ctx); // number - uses default
-
-  // Set context data
   userId.set(ctx, "user-123");
 
-  return ctx.ok({ processed: true });
+  return { processed: true };
 });
 ```
 
@@ -86,23 +84,27 @@ const handler = processFlow.handler(async (ctx, input) => {
 The library provides built-in flow context accessors:
 
 ```typescript
-export const FlowExecutionContext = {
+import { accessor, custom } from "@pumped-fn/core-next";
+
+const flowMeta = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
   parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
   isParallel: accessor("flow.isParallel", custom<boolean>(), false),
 };
 
-// Usage in extensions
-const tracingExtension: Extension.Extension = {
+const tracingExtension = {
   name: "tracing",
 
-  async wrapExecute(context, next, execution) {
-    const depth = FlowExecutionContext.depth.find(context);
-    const flowName = FlowExecutionContext.flowName.find(context);
+  async wrap(context: any, next: any, operation: any) {
+    if (operation.kind === "execute") {
+      const depth = flowMeta.depth.find(context);
+      const flowName = flowMeta.flowName.find(context);
 
-    console.log(`${"  ".repeat(depth)}→ ${flowName}`);
-    return await next();
+      console.log(`${"  ".repeat(depth)}→ ${flowName}`);
+      return await next();
+    }
+    return next();
   }
 };
 ```
@@ -112,22 +114,25 @@ const tracingExtension: Extension.Extension = {
 Extensions use accessors for managing state across executions:
 
 ```typescript
-// Extension-specific accessors with symbol keys
+import { accessor, custom } from "@pumped-fn/core-next";
+
 const executionCount = accessor(
   Symbol.for("metrics.execution.count"),
   custom<number>(),
   0
 );
 
-const metricsExtension: Extension.Extension = {
+const metricsExtension = {
   name: "metrics",
 
-  async wrapExecute(context, next, execution) {
-    // Type-safe state management
-    const count = executionCount.find(context);
-    executionCount.set(context, count + 1);
+  async wrap(context: any, next: any, operation: any) {
+    if (operation.kind === "execute") {
+      const count = executionCount.find(context);
+      executionCount.set(context, count + 1);
 
-    return await next();
+      return await next();
+    }
+    return next();
   }
 };
 ```
@@ -137,25 +142,25 @@ const metricsExtension: Extension.Extension = {
 Flow contexts automatically inherit from parent contexts:
 
 ```typescript
-// Parent sets global context
-const parentHandler = flow.handler(async (ctx, input) => {
-  traceId.set(ctx, `trace-${Date.now()}`);
+import { flow, custom, accessor } from "@pumped-fn/core-next";
 
-  // Child inherits parent context
-  const result = await ctx.execute(childHandler, input.data);
+const traceId = accessor("trace.id", custom<string>());
 
-  return result;
-});
+const childFlow = flow(async (ctx, input: string) => {
+  const trace = traceId.get(ctx);
 
-// Child accesses inherited + sets its own
-const childHandler = childFlow.handler(async (ctx, input) => {
-  const trace = traceId.get(ctx); // From parent
-
-  // Child-specific context (doesn't affect parent)
   const operationId = accessor("operation.id", custom<string>());
   operationId.set(ctx, `${trace}-child`);
 
-  return ctx.ok({ processed: input });
+  return { processed: input };
+});
+
+const parentHandler = flow(async (ctx, input: { data: string }) => {
+  traceId.set(ctx, `trace-${Date.now()}`);
+
+  const result = await ctx.exec(childFlow, input.data);
+
+  return result;
 });
 ```
 
@@ -164,28 +169,34 @@ const childHandler = childFlow.handler(async (ctx, input) => {
 Use accessor presets for easy test setup:
 
 ```typescript
+import { accessor, custom, flow } from "@pumped-fn/core-next";
+
+const traceId = accessor("trace.id", custom<string>());
+const userId = accessor("user.id", custom<string>());
+const timestamp = accessor("timestamp", custom<number>(), Date.now());
+
+const handler = flow(async (ctx, input: any) => {
+  return { processed: true };
+});
+
 describe("Flow with Context", () => {
   test("handles context correctly", async () => {
-    // Setup test context
     const initialContext = [
       traceId.preset("test-trace-123"),
       userId.preset("test-user-456")
     ];
 
-    const result = await flow.execute(handler, input, {
+    const result = await flow.execute(handler, {}, {
       initialContext
     });
 
-    expect(result.type).toBe("ok");
+    expect(result.processed).toBe(true);
   });
 
   test("uses defaults when missing", () => {
     const emptyContext = new Map();
 
-    // AccessorWithDefault returns default
     expect(timestamp.find(emptyContext)).toBeTypeOf("number");
-
-    // Regular accessor returns undefined
     expect(userId.find(emptyContext)).toBeUndefined();
   });
 });
@@ -213,6 +224,8 @@ describe("Flow with Context", () => {
 5. **Test with Maps** using `preset()` for easy setup
 
 ```typescript
+import { accessor, custom } from "@pumped-fn/core-next";
+
 // Good: Organized accessor groups
 const RequestContext = {
   TRACE_ID: accessor("trace.id", custom<string>()),

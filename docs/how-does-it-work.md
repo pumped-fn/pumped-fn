@@ -8,13 +8,27 @@
 Every application is a graph of dependencies. Instead of manually wiring components, you define the graph structure and let the library resolve it:
 
 ```typescript
-// Define the graph nodes
+import { provide, derive, createScope } from "@pumped-fn/core-next";
+
+function loadConfig() {
+  return { logLevel: 'info', database: 'db://localhost' }
+}
+function createLogger(level: string) {
+  return { log: (msg: string) => console.log(`[${level}] ${msg}`) }
+}
+function connectDB(url: string, logger: any) {
+  return { query: () => [], url }
+}
+function createApp(database: any, logger: any) {
+  return { start: () => logger.log('App started') }
+}
+
 const config = provide(() => loadConfig())
 const logger = derive([config], ([cfg]) => createLogger(cfg.logLevel))
 const db = derive([config, logger], ([cfg, log]) => connectDB(cfg.database, log))
 const app = derive([db, logger], ([database, log]) => createApp(database, log))
 
-// Resolve the entire graph with one call
+const scope = createScope()
 const resolvedApp = await scope.resolve(app)
 ```
 
@@ -29,11 +43,23 @@ The library topologically sorts dependencies and resolves them in the correct or
 Each executor resolves exactly once per scope. Multiple dependents share the same resolved instance:
 
 ```typescript
+import { provide, derive, createScope } from "@pumped-fn/core-next";
+
+function expensiveConfigLoad() {
+  return { setting: "value" };
+}
+function createServiceA(cfg: any) {
+  return { service: "A", cfg };
+}
+function createServiceB(cfg: any) {
+  return { service: "B", cfg };
+}
+
 const sharedConfig = provide(() => expensiveConfigLoad())
 const serviceA = derive([sharedConfig], ([cfg]) => createServiceA(cfg))
 const serviceB = derive([sharedConfig], ([cfg]) => createServiceB(cfg))
 
-// sharedConfig resolves only once, both services get same instance
+const scope = createScope()
 await scope.resolve([serviceA, serviceB])
 ```
 

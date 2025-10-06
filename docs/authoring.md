@@ -26,8 +26,20 @@ const service = new UserService(db, logger); // Fixed at construction
 
 **Meta-Based Configuration**:
 ```typescript
-// Declarative components with meta-driven configuration
+import { meta, custom, provide, derive, createScope } from "@pumped-fn/core-next";
+
 const dbConfigMeta = meta("db-config", custom<{ timeout: number }>());
+
+class Logger {
+  constructor(config: { timeout: number }) {}
+}
+class Database {
+  constructor(config: { timeout: number }, log: Logger) {}
+}
+class UserService {
+  constructor(db: Database, log: Logger) {}
+}
+
 const logger = provide((ctl) => {
   const config = dbConfigMeta.get(ctl.scope);
   return new Logger(config);
@@ -38,9 +50,8 @@ const db = derive([logger], ([log], ctl) => {
 });
 const service = derive([db, logger], ([db, log]) => new UserService(db, log));
 
-// Configuration variation without changing component structure
 const testScope = createScope({
-  meta: [dbConfigMeta({ timeout: 100 })] // Different config, same components
+  meta: [dbConfigMeta({ timeout: 100 })]
 });
 ```
 
@@ -61,9 +72,13 @@ const configMeta = meta("config", custom<{ timeout: number; retries: number }>()
 
 ### Configuration Access in Executors
 ```typescript
-import { provide, meta, custom } from "@pumped-fn/core-next";
+import { provide, meta, custom, name } from "@pumped-fn/core-next";
 
 const configMeta = meta("http-config", custom<{ timeout: number }>());
+
+function createClient(config: { timeout: number }) {
+  return { fetch: (url: string) => Promise.resolve({}) };
+}
 
 const httpClient = provide((ctl) => {
   const config = configMeta.get(ctl.scope);
@@ -73,16 +88,19 @@ const httpClient = provide((ctl) => {
 
 ### Meta Export Pattern
 ```typescript
-// Export meta definitions and default configurations
-export const meta = {
-  config: configMeta
-};
+import { meta, custom } from "@pumped-fn/core-next";
+
+const configMeta = meta("http-config", custom<{ timeout: number; retries: number }>());
+
+export { configMeta as meta };
 export const defaultConfig = configMeta({ timeout: 5000, retries: 3 });
 ```
 
 ### Scope Integration
 ```typescript
-import { createScope } from "@pumped-fn/core-next";
+import { createScope, meta, custom } from "@pumped-fn/core-next";
+
+const configMeta = meta("http-config", custom<{ timeout: number; retries: number }>());
 
 const scope = createScope({
   meta: [configMeta({ timeout: 10000, retries: 1 })]
@@ -139,7 +157,33 @@ export const defaultHttpConfig = httpConfigMeta({
 ### 2. Multi-Environment Configuration
 
 ```typescript
-// Define environment-specific configurations
+import { provide, derive, meta, custom, name, createScope } from "@pumped-fn/core-next";
+
+const httpConfigMeta = meta("http-config", custom<{
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+}>());
+
+const httpClient = provide((ctl) => {
+  const config = httpConfigMeta.get(ctl.scope);
+  return {
+    get: async (path: string) => {
+      return fetch(`${config.baseUrl}${path}`, {
+        signal: AbortSignal.timeout(config.timeout)
+      });
+    }
+  };
+}, name("http-client"));
+
+const apiService = derive([httpClient], ([http], ctl) => {
+  const config = httpConfigMeta.get(ctl.scope);
+  return {
+    getUser: (id: string) => http.get(`/users/${id}`),
+    createUser: (data: any) => http.get('/users')
+  };
+}, name("api-service"));
+
 const devConfig = httpConfigMeta({
   baseUrl: "http://localhost:3000",
   timeout: 1000,
@@ -158,12 +202,10 @@ const prodConfig = httpConfigMeta({
   retries: 3
 });
 
-// Create environment-specific scopes
 const devScope = createScope({ meta: [devConfig] });
 const stagingScope = createScope({ meta: [stagingConfig] });
 const prodScope = createScope({ meta: [prodConfig] });
 
-// Same components, different behavior
 const devApi = await devScope.resolve(apiService);
 const prodApi = await prodScope.resolve(apiService);
 ```
@@ -171,7 +213,8 @@ const prodApi = await prodScope.resolve(apiService);
 ### 3. Composable Configuration
 
 ```typescript
-// Multiple meta configurations for different concerns
+import { provide, meta, custom, createScope } from "@pumped-fn/core-next";
+
 const dbConfigMeta = meta("db-config", custom<{
   host: string;
   port: number;
@@ -189,7 +232,16 @@ const logConfigMeta = meta("log-config", custom<{
   format: 'json' | 'text';
 }>());
 
-// Components use their specific configurations
+class Database {
+  constructor(config: { host: string; port: number; database: string }) {}
+}
+class Cache {
+  constructor(config: { host: string; port: number; ttl: number }) {}
+}
+class Logger {
+  constructor(config: { level: string; format: string }) {}
+}
+
 const database = provide((ctl) => {
   const config = dbConfigMeta.get(ctl.scope);
   return new Database(config);
@@ -205,7 +257,6 @@ const logger = provide((ctl) => {
   return new Logger(config);
 });
 
-// Combine all configurations in scope
 const appScope = createScope({
   meta: [
     dbConfigMeta({ host: "localhost", port: 5432, database: "myapp" }),
@@ -291,10 +342,25 @@ const testScope = createScope({
 ### 1. Conditional Configuration
 
 ```typescript
+import { provide, derive, meta, custom, name } from "@pumped-fn/core-next";
+
+const httpConfigMeta = meta("http-config", custom<{ baseUrl: string; timeout: number; retries: number }>());
+
+const httpClient = provide((ctl) => {
+  const config = httpConfigMeta.get(ctl.scope);
+  return {
+    get: async (path: string) => fetch(`${config.baseUrl}${path}`)
+  };
+}, name("http-client"));
+
 const featureFlagMeta = meta("feature-flags", custom<{
   enableCache: boolean;
   enableMetrics: boolean;
 }>());
+
+function withCaching<T>(service: T): T {
+  return service;
+}
 
 const dataService = derive([httpClient], ([http], ctl) => {
   const flags = featureFlagMeta.get(ctl.scope);
@@ -304,7 +370,6 @@ const dataService = derive([httpClient], ([http], ctl) => {
       const data = await http.get(`/data/${id}`);
 
       if (flags.enableMetrics) {
-        // Record metrics
       }
 
       return data;
@@ -343,17 +408,21 @@ const httpService = provide((ctl) => {
 ### 3. Configuration Inheritance
 
 ```typescript
-// Base configuration
+import { provide, meta, custom, createScope } from "@pumped-fn/core-next";
+
 const baseConfigMeta = meta("base-config", custom<{
   environment: 'dev' | 'staging' | 'prod';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
 }>());
 
-// Service-specific configuration
 const serviceConfigMeta = meta("service-config", custom<{
   timeout: number;
   retries: number;
 }>());
+
+function createService(config: any) {
+  return { process: () => "result" };
+}
 
 const configuredService = provide((ctl) => {
   const baseConfig = baseConfigMeta.get(ctl.scope);
@@ -365,7 +434,6 @@ const configuredService = provide((ctl) => {
   });
 });
 
-// Scope with inherited configurations
 const scope = createScope({
   meta: [
     baseConfigMeta({ environment: 'dev', logLevel: 'debug' }),
@@ -385,7 +453,7 @@ describe('User Service', () => {
     const testScope = createScope({
       meta: [httpConfigMeta({
         baseUrl: "http://slow-server",
-        timeout: 100,  // Very short timeout
+        timeout: 100,
         retries: 0
       })]
     });
@@ -398,7 +466,7 @@ describe('User Service', () => {
   test('works with test configuration', async () => {
     const testScope = createScope({
       meta: [httpConfigMeta({
-        baseUrl: "http://localhost:3001", // Test server
+        baseUrl: "http://localhost:3001",
         timeout: 5000,
         retries: 1
       })]
@@ -417,7 +485,7 @@ describe('User Service', () => {
 ```typescript
 // Mock HTTP client through configuration
 const mockHttpConfig = httpConfigMeta({
-  baseUrl: "mock://api",  // Special mock URL
+  baseUrl: "mock://api",
   timeout: 1000,
   retries: 0
 });

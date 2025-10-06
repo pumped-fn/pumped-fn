@@ -6,472 +6,484 @@ import { accessor } from "./accessor";
 import type { Accessor } from "./types";
 import { custom } from "./ssch";
 import { meta } from "./meta";
+import { Promised } from "./promises";
 
-const ok = <S>(data: S): Flow.OK<S> => ({
-  type: "ok",
-  data,
-  isOk(): this is Flow.OK<S> {
-    return true;
-  },
-  isKo(): this is never {
-    return false;
-  },
-});
+function isErrorEntry(
+  entry: unknown
+): entry is { __error: true; error: unknown } {
+  return typeof entry === "object" && entry !== null && "__error" in entry;
+}
 
-const ko = <E>(data: E, options?: { cause?: unknown }): Flow.KO<E> => ({
-  type: "ko",
-  data,
-  cause: options?.cause,
-  isOk(): this is never {
-    return false;
-  },
-  isKo(): this is Flow.KO<E> {
-    return true;
-  },
-});
-
-const flowDefinitionMeta = meta<Flow.Definition<any, any, any>>(
+const flowDefinitionMeta = meta<Flow.Definition<any, any>>(
   "flow.definition",
-  custom<Flow.Definition<any, any, any>>()
+  custom<Flow.Definition<any, any>>()
 );
 
-export const FlowExecutionContext: {
+export const flowMeta: {
   depth: Accessor.AccessorWithDefault<number>;
   flowName: Accessor.Accessor<string | undefined>;
   parentFlowName: Accessor.Accessor<string | undefined>;
   isParallel: Accessor.AccessorWithDefault<boolean>;
+  journal: Accessor.Accessor<ReadonlyMap<string, unknown>>;
 } = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
   parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
   isParallel: accessor("flow.isParallel", custom<boolean>(), false),
+  journal: accessor("flow.journal", custom<ReadonlyMap<string, unknown>>()),
 };
 
-class FlowDefinition<I, S, E> {
+class FlowDefinition<S, I> {
   constructor(
     public readonly name: string,
     public readonly version: string,
     public readonly input: StandardSchemaV1<I>,
-    public readonly success: StandardSchemaV1<S>,
-    public readonly error: StandardSchemaV1<E>,
+    public readonly output: StandardSchemaV1<S>,
     public readonly metas: Meta.Meta[] = []
   ) {}
 
   handler(
-    handlerFn: (
-      ctx: Flow.Context<I, S, E>,
-      input: I
-    ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-  ): Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+    handlerFn: (ctx: Flow.Context, input: I) => Promise<S> | S
+  ): Core.Executor<Flow.Handler<S, I>>;
 
   handler<D extends Core.DependencyLike>(
     dependencies: D,
     handlerFn: (
       deps: Core.InferOutput<D>,
-      ctx: Flow.Context<I, S, E>,
+      ctx: Flow.Context,
       input: I
-    ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-  ): Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+    ) => Promise<S> | S
+  ): Core.Executor<Flow.Handler<S, I>>;
 
   handler<D extends Core.DependencyLike>(
     dependenciesOrHandler:
       | D
-      | ((
-          ctx: Flow.Context<I, S, E>,
-          input: I
-        ) => Promise<Flow.OutputLike<S, E>>)
-      | Flow.OutputLike<S, E>,
+      | ((ctx: Flow.Context, input: I) => Promise<S> | S),
     handlerFn?: (
       deps: Core.InferOutput<D>,
-      ctx: Flow.Context<I, S, E>,
+      ctx: Flow.Context,
       input: I
-    ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-  ):
-    | Core.Executor<Flow.NoDependencyHandler<I, S, E>>
-    | Core.Executor<Flow.DependentHandler<D, I, S, E>> {
+    ) => Promise<S> | S
+  ): Core.Executor<Flow.Handler<S, I>> {
     if (typeof dependenciesOrHandler === "function") {
       const noDepsHandler = dependenciesOrHandler;
       return createExecutor(
         () => {
-          const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
-            return noDepsHandler(ctx, ctx.input);
+          const flowHandler = async (ctx: Flow.Context, input: I) => {
+            return noDepsHandler(ctx, input);
           };
-          return flowHandler as Flow.NoDependencyHandler<I, S, E>;
+          return flowHandler as Flow.Handler<S, I>;
         },
         undefined,
         [...this.metas, flowDefinitionMeta(this)]
-      ) as Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+      ) as Core.Executor<Flow.Handler<S, I>>;
     }
     const dependencies = dependenciesOrHandler;
     const dependentHandler = handlerFn!;
     return createExecutor(
       (deps: unknown) => {
-        const flowHandler = async (ctx: Flow.Context<I, S, E>) => {
-          return dependentHandler(deps as Core.InferOutput<D>, ctx, ctx.input);
+        const flowHandler = async (ctx: Flow.Context, input: I) => {
+          return dependentHandler(deps as Core.InferOutput<D>, ctx, input);
         };
-        return flowHandler as Flow.DependentHandler<D, I, S, E>;
+
+        return flowHandler as Flow.Handler<S, I>;
       },
-      dependencies as any,
+      dependencies,
       [...this.metas, flowDefinitionMeta(this)]
-    ) as Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+    ) as Core.Executor<Flow.Handler<S, I>>;
   }
 }
 
-type DefineConfig<I, S, E> = {
+type DefineConfig<S, I> = {
   name: string;
   version?: string;
   input: StandardSchemaV1<I>;
-  success: StandardSchemaV1<S>;
-  error: StandardSchemaV1<E>;
+  output: StandardSchemaV1<S>;
   meta?: Meta.Meta[];
 };
 
-function define<I, S, E>(
-  config: DefineConfig<I, S, E>
-): FlowDefinition<I, S, E> {
+type FlowConfigWithHandler<S, I> = DefineConfig<S, I> & {
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
+};
+
+type FlowConfigWithDeps<S, I, D extends Core.DependencyLike> = DefineConfig<
+  S,
+  I
+> & {
+  dependencies: D;
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S;
+};
+
+type FlowConfigInferred<S, I> = {
+  name: string;
+  version?: string;
+  input?: StandardSchemaV1<I>;
+  output?: StandardSchemaV1<S>;
+  meta?: Meta.Meta[];
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
+};
+
+type FlowConfigInferredWithDeps<S, I, D extends Core.DependencyLike> = {
+  name: string;
+  version?: string;
+  input?: StandardSchemaV1<I>;
+  output?: StandardSchemaV1<S>;
+  meta?: Meta.Meta[];
+  dependencies: D;
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S;
+};
+
+function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
   return new FlowDefinition(
     config.name,
     config.version || "1.0.0",
     config.input,
-    config.success,
-    config.error,
+    config.output,
     config.meta
   );
 }
 
-class FlowContext<I, S, E>
-  implements Flow.Context<I, S, E>, Accessor.DataStore
-{
+class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
+  private journal = new Map<string, unknown>();
+  public readonly pod: Core.Pod;
+  private reversedExtensions: Extension.Extension[];
 
   constructor(
-    public input: I,
-    public readonly pod: Core.Pod,
+    parentPodOrScope: Core.Pod | Core.Scope,
     private extensions: Extension.Extension[],
-    private parent?: FlowContext<any, any, any>
-  ) {}
-
-  initializeExecutionContext(flowName: string, isParallel: boolean = false) {
-    const currentDepth = this.parent
-      ? (FlowExecutionContext.depth.find(this.parent) || 0) + 1
-      : 0;
-    const parentFlowName = this.parent
-      ? FlowExecutionContext.flowName.find(this.parent)
-      : undefined;
-
-    FlowExecutionContext.depth.set(this, currentDepth);
-    FlowExecutionContext.flowName.set(this, flowName);
-    FlowExecutionContext.parentFlowName.set(this, parentFlowName);
-    FlowExecutionContext.isParallel.set(this, isParallel);
+    private parent?: FlowContext
+  ) {
+    this.pod = parentPodOrScope.pod();
+    this.reversedExtensions = [...extensions].reverse();
   }
 
-  ok = (data: S): Flow.OK<S> => ok(data);
-  ko = (data: E, options?: { cause?: unknown }): Flow.KO<E> =>
-    ko(data, options);
+  initializeExecutionContext(flowName: string, isParallel: boolean = false) {
+    const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
+    const parentFlowName = this.parent
+      ? this.parent.find(flowMeta.flowName)
+      : undefined;
 
-  get(key: unknown): unknown {
+    this.set(flowMeta.depth, currentDepth);
+    this.set(flowMeta.flowName, flowName);
+    this.set(flowMeta.parentFlowName, parentFlowName);
+    this.set(flowMeta.isParallel, isParallel);
+  }
+
+  get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
+  get<T>(accessorOrKey: unknown): T | unknown {
+    if (
+      typeof accessorOrKey === "object" &&
+      accessorOrKey !== null &&
+      "get" in accessorOrKey
+    ) {
+      const accessor = accessorOrKey as
+        | Accessor.Accessor<T>
+        | Accessor.AccessorWithDefault<T>;
+      return accessor.get(this);
+    }
+    const key = accessorOrKey;
     if (this.contextData.has(key)) {
       return this.contextData.get(key);
     }
-    return this.parent?.get(key);
+    if (this.parent) {
+      return (this.parent.get as (key: unknown) => unknown)(key);
+    }
+    return undefined;
   }
 
-  set(key: unknown, value: unknown): unknown | undefined {
+  find<T>(accessor: Accessor.Accessor<T>): T | undefined;
+  find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
+  find<T>(
+    accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
+  ): T | undefined {
+    return accessor.find(this);
+  }
+
+  set<T>(
+    accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>,
+    value: T
+  ): void;
+  set<T>(accessorOrKey: unknown, value: unknown): void | unknown {
+    if (
+      typeof accessorOrKey === "object" &&
+      accessorOrKey !== null &&
+      "set" in accessorOrKey
+    ) {
+      const accessor = accessorOrKey as
+        | Accessor.Accessor<T>
+        | Accessor.AccessorWithDefault<T>;
+      accessor.set(this, value as T);
+      return;
+    }
+    const key = accessorOrKey;
     this.contextData.set(key, value);
     return value;
   }
 
-  output = (success: boolean, value: any): any => {
-    return success ? this.ok(value) : this.ko(value);
-  };
+  run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+  run<T, P extends readonly unknown[]>(
+    key: string,
+    fn: (...args: P) => Promise<T> | T,
+    ...params: P
+  ): Promised<T>;
 
-  async execute<F extends Flow.UFlow>(
+  run<T, P extends readonly unknown[]>(
+    key: string,
+    fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
+    ...params: P
+  ): Promised<T> {
+    const flowName = this.find(flowMeta.flowName) || "unknown";
+    const depth = this.get(flowMeta.depth);
+    const journalKey = `${flowName}:${depth}:${key}`;
+
+    const promise = (async () => {
+      const isReplay = this.journal.has(journalKey);
+
+      const executeCore = async () => {
+        if (isReplay) {
+          const entry = this.journal.get(journalKey);
+          if (isErrorEntry(entry)) {
+            throw entry.error;
+          }
+          return entry as T;
+        }
+
+        return Promised.try(this.pod, async () => {
+          const result =
+            params.length > 0
+              ? await (fn as (...args: P) => Promise<T> | T)(...params)
+              : await (fn as () => Promise<T> | T)();
+          this.journal.set(journalKey, result);
+          return result;
+        }).catch((error) => {
+          this.journal.set(journalKey, { __error: true, error });
+          throw error;
+        });
+      };
+
+      let executor = executeCore;
+      for (const extension of this.reversedExtensions) {
+        if (extension.wrap) {
+          const currentExecutor = executor;
+          executor = async () => {
+            return extension.wrap!(this, currentExecutor, {
+              kind: "journal",
+              key,
+              flowName,
+              depth,
+              isReplay,
+              pod: this.pod,
+              params: params.length > 0 ? params : undefined,
+            });
+          };
+        }
+      }
+
+      return executor();
+    })();
+
+    return new Promised(this.pod, promise);
+  }
+
+  exec<F extends Flow.UFlow>(
     flow: F,
     input: Flow.InferInput<F>
-  ): Promise<Awaited<Flow.InferOutput<F>>>;
+  ): Promised<Flow.InferOutput<F>>;
 
-  async execute<I, O, E = unknown>(
-    fn: Flow.FnExecutor<I, O>,
-    input: I,
-    errorMapper?: (error: unknown) => E
-  ): Promise<Flow.OK<O> | Flow.KO<E>>;
+  exec<F extends Flow.UFlow>(
+    key: string,
+    flow: F,
+    input: Flow.InferInput<F>
+  ): Promised<Flow.InferOutput<F>>;
 
-  async execute<Args extends readonly unknown[], O, E = unknown>(
-    fn: Flow.MultiFnExecutor<Args, O>,
-    args: Args,
-    errorMapper?: (error: unknown) => E
-  ): Promise<Flow.OK<O> | Flow.KO<E>>;
+  exec<F extends Flow.UFlow>(
+    keyOrFlow: string | F,
+    flowOrInput: F | Flow.InferInput<F>,
+    inputOrUndefined?: Flow.InferInput<F>
+  ): Promised<Flow.InferOutput<F>> {
+    if (typeof keyOrFlow === "string") {
+      const key = keyOrFlow;
+      const flow = flowOrInput as F;
+      const input = inputOrUndefined as Flow.InferInput<F>;
 
-  async execute(
-    flowOrFn:
-      | Flow.UFlow
-      | Flow.FnExecutor<any, any>
-      | Flow.MultiFnExecutor<any[], any>,
-    input: any,
-    errorMapperOrOpt?: ((error: unknown) => any) | Flow.Opt,
-    opt?: Flow.Opt
-  ): Promise<any> {
-    let errorMapper: ((error: unknown) => any) | undefined;
-    let actualOpt: Flow.Opt | undefined;
+      const parentFlowName = this.find(flowMeta.flowName);
+      const depth = this.get(flowMeta.depth);
+      const flowName = this.find(flowMeta.flowName) || "unknown";
+      const journalKey = `${flowName}:${depth}:${key}`;
 
-    if (typeof errorMapperOrOpt === "function") {
-      errorMapper = errorMapperOrOpt as (error: unknown) => any;
-      actualOpt = opt;
-    } else {
-      actualOpt = errorMapperOrOpt;
-    }
-
-    if (
-      typeof flowOrFn === "function" &&
-      !flowDefinitionMeta.find(flowOrFn as any)
-    ) {
-      try {
-        let result: any;
-        if (Array.isArray(input)) {
-          result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(
-            ...input
-          );
-        } else {
-          result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
-        }
-        return this.ok(result);
-      } catch (error) {
-        const mappedError = errorMapper ? errorMapper(error) : error;
-        return this.ko(mappedError as any, { cause: error });
-      }
-    }
-
-    const flow = flowOrFn as Flow.UFlow;
-    const handler = await this.pod.resolve(flow);
-    const definition = flowDefinitionMeta.find(flow);
-    if (!definition) {
-      throw new Error("Flow definition not found in executor metadata");
-    }
-
-    const childContext = new FlowContext<unknown, unknown, unknown>(
-      input,
-      this.pod,
-      this.extensions,
-      this
-    );
-    childContext.initializeExecutionContext(definition.name, false);
-
-    return (await this.executeWithExtensions(
-      handler,
-      childContext,
-      flow
-    )) as any;
-  }
-
-  async executeParallel<
-    T extends ReadonlyArray<
-      [Flow.FnExecutor<any, any> | Flow.MultiFnExecutor<any[], any>, any]
-    >
-  >(
-    items: { [K in keyof T]: T[K] },
-    options?: Flow.ParallelExecutionOptions
-  ): Promise<
-    Flow.ParallelExecutionResult<{
-      [K in keyof T]: T[K] extends [infer F, any]
-        ? F extends Flow.FnExecutor<any, infer O>
-          ? Flow.OK<O> | Flow.KO<unknown>
-          : F extends Flow.MultiFnExecutor<any[], infer O>
-          ? Flow.OK<O> | Flow.KO<unknown>
-          : never
-        : never;
-    }>
-  >;
-
-  async executeParallel<T extends ReadonlyArray<[Flow.UFlow, any]>>(
-    flows: { [K in keyof T]: T[K] },
-    options?: Flow.ParallelExecutionOptions
-  ): Promise<
-    Flow.ParallelExecutionResult<{
-      [K in keyof T]: T[K] extends [infer F, any]
-        ? F extends Flow.UFlow
-          ? Awaited<Flow.InferOutput<F>>
-          : never
-        : never;
-    }>
-  >;
-
-  async executeParallel<
-    T extends ReadonlyArray<
-      [
-        (
-          | Flow.UFlow
-          | Flow.FnExecutor<any, any>
-          | Flow.MultiFnExecutor<any[], any>
-        ),
-        any
-      ]
-    >
-  >(
-    mixed: { [K in keyof T]: T[K] },
-    options?: Flow.ParallelExecutionOptions
-  ): Promise<
-    Flow.ParallelExecutionResult<{
-      [K in keyof T]: T[K] extends [infer F, any]
-        ? F extends Flow.UFlow
-          ? Awaited<Flow.InferOutput<F>>
-          : F extends Flow.FnExecutor<any, infer O>
-          ? Flow.OK<O> | Flow.KO<unknown>
-          : F extends Flow.MultiFnExecutor<any[], infer O>
-          ? Flow.OK<O> | Flow.KO<unknown>
-          : never
-        : never;
-    }>
-  >;
-
-  async executeParallel(
-    items: ReadonlyArray<
-      [
-        (
-          | Flow.UFlow
-          | Flow.FnExecutor<any, any>
-          | Flow.MultiFnExecutor<any[], any>
-        ),
-        any
-      ]
-    >,
-    options?: Flow.ParallelExecutionOptions
-  ): Promise<any> {
-    const mode = options?.mode || "all-settled";
-    const errorMapper = options?.errorMapper;
-    const onItemComplete = options?.onItemComplete;
-
-    const executeItem = async (
-      item: [
-        (
-          | Flow.UFlow
-          | Flow.FnExecutor<any, any>
-          | Flow.MultiFnExecutor<any[], any>
-        ),
-        any
-      ],
-      index: number
-    ) => {
-      const [flowOrFn, input] = item;
-
-      try {
-        let result: any;
-
-        if (
-          typeof flowOrFn === "function" &&
-          !flowDefinitionMeta.find(flowOrFn as any)
-        ) {
-          try {
-            if (Array.isArray(input)) {
-              result = await (flowOrFn as Flow.MultiFnExecutor<any[], any>)(
-                ...input
-              );
-            } else {
-              result = await (flowOrFn as Flow.FnExecutor<any, any>)(input);
+      const promise = (async () => {
+        const executeCore = async () => {
+          if (this.journal.has(journalKey)) {
+            const entry = this.journal.get(journalKey);
+            if (isErrorEntry(entry)) {
+              throw entry.error;
             }
-            result = this.ok(result);
-          } catch (error) {
-            const mappedError = errorMapper ? errorMapper(error, index) : error;
-            result = this.ko(mappedError as any, { cause: error });
+            return entry as Flow.InferOutput<F>;
           }
-        } else {
-          const flow = flowOrFn as Flow.UFlow;
-          const childContext = new FlowContext<unknown, unknown, unknown>(
-            input,
-            this.pod,
-            this.extensions,
-            this
-          );
 
-          const handler = await this.pod.resolve(flow);
-          const definition = flowDefinitionMeta.find(flow);
-          if (!definition) {
-            throw new Error("Flow definition not found in executor metadata");
-          }
-          childContext.initializeExecutionContext(definition.name, true);
-          result = await this.executeWithExtensions(
-            handler,
-            childContext,
-            flow
-          );
+          return Promised.try(this.pod, async () => {
+            const handler = await this.pod.resolve(flow);
+            const definition = flowDefinitionMeta.find(flow);
+            if (!definition) {
+              throw new Error("Flow definition not found in executor metadata");
+            }
+
+            const childContext = new FlowContext(
+              this.pod,
+              this.extensions,
+              this
+            );
+            childContext.initializeExecutionContext(definition.name, false);
+
+            const result = (await this.executeWithExtensions<
+              Flow.InferOutput<F>
+            >(
+              async (ctx) =>
+                handler(ctx, input) as Promise<Flow.InferOutput<F>>,
+              childContext,
+              flow,
+              input
+            )) as Flow.InferOutput<F>;
+
+            this.journal.set(journalKey, result);
+            return result;
+          }).catch((error) => {
+            this.journal.set(journalKey, { __error: true, error });
+            throw error;
+          });
+        };
+
+        const definition = flowDefinitionMeta.find(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
         }
 
-        onItemComplete?.(result, index);
-        return result;
-      } catch (error) {
-        const mappedError = errorMapper ? errorMapper(error, index) : error;
-        const koResult = this.ko(mappedError as any, { cause: error });
-        onItemComplete?.(koResult, index);
-        return koResult;
+        let executor = executeCore;
+        for (const extension of this.reversedExtensions) {
+          if (extension.wrap) {
+            const currentExecutor = executor;
+            executor = async () => {
+              return extension.wrap!(this, currentExecutor, {
+                kind: "subflow",
+                flow,
+                definition,
+                input,
+                journalKey,
+                parentFlowName,
+                depth,
+                pod: this.pod,
+              });
+            };
+          }
+        }
+
+        return executor();
+      })();
+
+      return new Promised(this.pod, promise);
+    }
+
+    const flow = keyOrFlow as F;
+    const input = flowOrInput as Flow.InferInput<F>;
+
+    const promise = (async () => {
+      const parentFlowName = this.find(flowMeta.flowName);
+      const depth = this.get(flowMeta.depth);
+
+      const executeCore = async () => {
+        const handler = await this.pod.resolve(flow);
+        const definition = flowDefinitionMeta.find(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+
+        const childContext = new FlowContext(this.pod, this.extensions, this);
+        childContext.initializeExecutionContext(definition.name, false);
+
+        return (await this.executeWithExtensions<Flow.InferOutput<F>>(
+          async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
+          childContext,
+          flow,
+          input
+        )) as Flow.InferOutput<F>;
+      };
+
+      const definition = flowDefinitionMeta.find(flow);
+      if (!definition) {
+        throw new Error("Flow definition not found in executor metadata");
       }
-    };
 
-    let results: any[];
-
-    if (mode === "race") {
-      const promises = items.map((item, index) =>
-        executeItem(item, index).then((result) => ({ result, index }))
-      );
-      const { result, index } = await Promise.race(promises);
-      results = [result];
-      onItemComplete?.(result, index);
-    } else if (mode === "all") {
-      results = [];
-      for (let i = 0; i < items.length; i++) {
-        const result = await executeItem(items[i], i);
-        results.push(result);
-        if (result.type === "ko") {
-          break;
+      let executor = executeCore;
+      for (const extension of this.reversedExtensions) {
+        if (extension.wrap) {
+          const currentExecutor = executor;
+          executor = async () => {
+            return extension.wrap!(this, currentExecutor, {
+              kind: "subflow",
+              flow,
+              definition,
+              input,
+              journalKey: undefined,
+              parentFlowName,
+              depth,
+              pod: this.pod,
+            });
+          };
         }
       }
-    } else {
-      results = await Promise.all(
-        items.map((item, index) => executeItem(item, index))
-      );
-    }
 
-    const total =
-      mode === "all" || mode === "race" ? results.length : items.length;
-    const succeeded = results.filter((r) => r.type === "ok").length;
-    const failed = results.filter((r) => r.type === "ko").length;
+      return executor();
+    })();
 
-    let resultType: "all-ok" | "partial" | "all-ko";
-    if (failed === 0) {
-      resultType = "all-ok";
-    } else if (succeeded === 0) {
-      resultType = "all-ko";
-    } else {
-      resultType = "partial";
-    }
-
-    return {
-      type: resultType,
-      results: results as any,
-      stats: {
-        total,
-        succeeded,
-        failed,
-      },
-    };
+    return new Promised(this.pod, promise);
   }
 
-  private async executeWithExtensions<T>(
-    handler: any,
-    context: FlowContext<any, any, any>,
-    flow: Flow.UFlow
-  ): Promise<T> {
-    const executeCore = async (): Promise<T> => handler(context);
+  async parallel<T extends readonly Promised<any>[]>(
+    promises: [...T]
+  ): Promise<
+    Flow.ParallelResult<{
+      [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+    }>
+  > {
+    const parentFlowName = this.find(flowMeta.flowName);
+    const depth = this.get(flowMeta.depth);
+
+    const executeCore = async () => {
+      const results = await Promise.all(promises);
+
+      return {
+        results: results as Flow.ParallelResult<{
+          [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+        }>["results"],
+        stats: {
+          total: results.length,
+          succeeded: results.length,
+          failed: 0,
+        },
+      };
+    };
 
     let executor = executeCore;
-    for (const extension of [...this.extensions].reverse()) {
-      if (extension.wrapExecute) {
+    for (const extension of this.reversedExtensions) {
+      if (extension.wrap) {
         const currentExecutor = executor;
         executor = async () => {
-          return extension.wrapExecute!(context, currentExecutor, {
-            flowName: FlowExecutionContext.flowName.find(context),
-            depth: FlowExecutionContext.depth.find(context) || 0,
-            isParallel: FlowExecutionContext.isParallel.find(context) || false,
-            parentFlowName: FlowExecutionContext.parentFlowName.find(context),
-            flow,
+          return extension.wrap!(this, currentExecutor, {
+            kind: "parallel",
+            mode: "parallel",
+            promiseCount: promises.length,
+            depth,
+            parentFlowName,
+            pod: this.pod,
           });
         };
       }
@@ -479,158 +491,480 @@ class FlowContext<I, S, E>
 
     return executor();
   }
-}
 
-async function execute<I, S, E>(
-  flow: Core.Executor<
-    Flow.NoDependencyHandler<I, S, E> | Flow.DependentHandler<any, I, S, E>
-  >,
-  input: I,
-  options?: {
-    scope?: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?:
-      | Array<[Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]>
-      | Map<unknown, unknown>;
-    presets?: Core.Preset<unknown>[];
-  }
-): Promise<Flow.OutputLike<S, E>> {
-  const scope = options?.scope || createScope();
-  const shouldDisposeScope = !options?.scope;
-
-  const pod = scope.pod({ initialValues: options?.presets });
-
-  try {
-    const context = new FlowContext<I, S, E>(
-      input,
-      pod,
-      options?.extensions || []
-    );
-
-    if (options?.initialContext) {
-      if (Array.isArray(options.initialContext)) {
-        for (const [accessor, value] of options.initialContext) {
-          accessor.set(context, value);
-        }
-      } else if (options.initialContext instanceof Map) {
-        for (const [key, value] of options.initialContext) {
-          context.set(key, value);
-        }
-      }
-    }
-
-    for (const extension of options?.extensions || []) {
-      await extension.initPod?.(pod, context);
-    }
+  async parallelSettled<T extends readonly Promised<any>[]>(
+    promises: [...T]
+  ): Promise<
+    Flow.ParallelSettledResult<{
+      [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+    }>
+  > {
+    const parentFlowName = this.find(flowMeta.flowName);
+    const depth = this.get(flowMeta.depth);
 
     const executeCore = async () => {
-      const handler = await pod.resolve(flow);
-      const definition = flowDefinitionMeta.find(flow);
-      if (!definition) {
-        throw new Error("Flow definition not found in executor metadata");
-      }
-      const validated = validate(definition.input, input);
-      context.input = validated as I;
+      const results = await Promise.allSettled(promises);
 
-      context.initializeExecutionContext(definition.name, false);
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
 
-      const result = await handler(context);
-
-      if (result.type === "ok") {
-        validate(definition.success, result.data);
-      } else {
-        validate(definition.error, result.data);
-      }
-
-      return result;
+      return {
+        results: results as PromiseSettledResult<any>[],
+        stats: {
+          total: results.length,
+          succeeded,
+          failed,
+        },
+      };
     };
 
-    const definition = flowDefinitionMeta.find(flow);
-
     let executor = executeCore;
-    for (const extension of [...(options?.extensions || [])].reverse()) {
-      if (extension.wrapExecute) {
+    for (const extension of this.reversedExtensions) {
+      if (extension.wrap) {
         const currentExecutor = executor;
-        executor = () => {
-          return extension.wrapExecute!(context, currentExecutor, {
-            flowName:
-              definition?.name || FlowExecutionContext.flowName.find(context),
-            depth: FlowExecutionContext.depth.find(context) || 0,
-            isParallel: FlowExecutionContext.isParallel.find(context) || false,
-            parentFlowName: FlowExecutionContext.parentFlowName.find(context),
-            flow,
+        executor = async () => {
+          return extension.wrap!(this, currentExecutor, {
+            kind: "parallel",
+            mode: "parallelSettled",
+            promiseCount: promises.length,
+            depth,
+            parentFlowName,
+            pod: this.pod,
           });
         };
       }
     }
 
-    return await executor();
-  } finally {
-    for (const extension of options?.extensions || []) {
-      await extension.disposePod?.(pod);
+    return executor();
+  }
+
+  private async executeWithExtensions<T>(
+    handler: (ctx: FlowContext) => Promise<T>,
+    context: FlowContext,
+    flow: Flow.UFlow,
+    input: unknown
+  ): Promise<T> {
+    const executeCore = async (): Promise<T> => handler(context);
+    const definition = flowDefinitionMeta.find(flow);
+    if (!definition) {
+      throw new Error("Flow definition not found in executor metadata");
     }
 
-    await scope.disposePod(pod);
-
-    if (shouldDisposeScope) {
-      await scope.dispose();
+    let executor = executeCore;
+    for (const extension of this.reversedExtensions) {
+      if (extension.wrap) {
+        const currentExecutor = executor;
+        executor = async () => {
+          return extension.wrap!(context, currentExecutor, {
+            kind: "execute",
+            flow,
+            definition,
+            input,
+            flowName: context.find(flowMeta.flowName),
+            depth: context.get(flowMeta.depth),
+            isParallel: context.get(flowMeta.isParallel),
+            parentFlowName: context.find(flowMeta.parentFlowName),
+          });
+        };
+      }
     }
+
+    return executor();
+  }
+
+  createSnapshot(): Flow.ExecutionData {
+    const contextDataSnapshot = new Map(this.contextData);
+    contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
+
+    const dataStore = {
+      get: (key: unknown) => contextDataSnapshot.get(key),
+      set: (_key: unknown, _value: unknown) => {
+        throw new Error("Cannot set values on execution snapshot");
+      },
+    };
+
+    return {
+      context: {
+        get<T>(
+          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
+        ): T {
+          return accessor.get(dataStore);
+        },
+        find<T>(
+          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
+        ): T | undefined {
+          return accessor.find(dataStore);
+        },
+      },
+    };
   }
 }
 
-function flowImpl<I, S, E>(
-  definition: DefineConfig<I, S, E>,
-  handler: (
-    ctx: Flow.Context<I, S, E>,
-    input: I
-  ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-): Core.Executor<Flow.NoDependencyHandler<I, S, E>>;
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input: I,
+  options: {
+    scope?: Core.Scope;
+    extensions?: Extension.Extension[];
+    initialContext?: Array<
+      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+    >;
+    presets?: Core.Preset<unknown>[];
+    details: true;
+  }
+): Promised<Flow.ExecutionDetails<S>>;
 
-function flowImpl<I, S, E, D extends Core.DependencyLike>(
-  definition: DefineConfig<I, S, E>,
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input: I,
+  options?: {
+    scope?: Core.Scope;
+    extensions?: Extension.Extension[];
+    initialContext?: Array<
+      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+    >;
+    presets?: Core.Preset<unknown>[];
+    details?: false;
+  }
+): Promised<S>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input: I,
+  options?: {
+    scope?: Core.Scope;
+    extensions?: Extension.Extension[];
+    initialContext?: Array<
+      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+    >;
+    presets?: Core.Preset<unknown>[];
+    details?: boolean;
+  }
+): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
+  const scope = options?.scope || createScope();
+  const shouldDisposeScope = !options?.scope;
+
+  const pod = scope.pod({ initialValues: options?.presets });
+
+  let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
+  const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
+    (resolve) => {
+      resolveSnapshot = resolve;
+    }
+  );
+
+  const promise = (async () => {
+    const context = new FlowContext(pod, options?.extensions || []);
+
+    try {
+      if (options?.initialContext) {
+        for (const [accessor, value] of options.initialContext) {
+          accessor.set(context, value);
+        }
+      }
+
+      for (const extension of options?.extensions || []) {
+        await extension.initPod?.(pod, context);
+      }
+
+      const executeCore = async () => {
+        const handler = await pod.resolve(flow);
+        const definition = flowDefinitionMeta.find(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+        const validated = validate(definition.input, input);
+
+        context.initializeExecutionContext(definition.name, false);
+
+        const result = await handler(context, validated);
+
+        validate(definition.output, result);
+
+        return result;
+      };
+
+      const definition = flowDefinitionMeta.find(flow);
+      if (!definition) {
+        throw new Error("Flow definition not found in executor metadata");
+      }
+
+      let executor = executeCore;
+      for (const extension of [...(options?.extensions || [])].reverse()) {
+        if (extension.wrap) {
+          const currentExecutor = executor;
+          executor = () => {
+            return extension.wrap!(context, currentExecutor, {
+              kind: "execute",
+              flow,
+              definition,
+              input,
+              flowName: definition.name || context.find(flowMeta.flowName),
+              depth: context.get(flowMeta.depth),
+              isParallel: context.get(flowMeta.isParallel),
+              parentFlowName: context.find(flowMeta.parentFlowName),
+            });
+          };
+        }
+      }
+
+      const result = await executor();
+      resolveSnapshot(context.createSnapshot());
+      return result;
+    } catch (error) {
+      resolveSnapshot(context.createSnapshot());
+      throw error;
+    } finally {
+      for (const extension of options?.extensions || []) {
+        await extension.disposePod?.(pod);
+      }
+
+      await scope.disposePod(pod);
+
+      if (shouldDisposeScope) {
+        await scope.dispose();
+      }
+    }
+  })();
+
+  if (options?.details) {
+    const detailsPromise = Promised.try(pod, async (): Promise<Flow.ExecutionDetails<S>> => {
+      const [result, ctx] = await Promise.all([promise, snapshotPromise]);
+      if (!ctx) {
+        throw new Error("Execution context not available");
+      }
+      return { success: true as const, result, ctx };
+    }).catch(async (error) => {
+      const ctx = await snapshotPromise;
+      if (!ctx) {
+        throw new Error("Execution context not available");
+      }
+      return { success: false as const, error, ctx };
+    });
+
+    return new Promised(pod, detailsPromise, snapshotPromise);
+  }
+
+  return new Promised(pod, promise, snapshotPromise);
+}
+
+function flowImpl<I, S>(
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<I extends void, S>(
+  handler: (ctx?: Flow.Context) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<D extends Core.DependencyLike, I, S>(
   dependencies: D,
   handler: (
     deps: Core.InferOutput<D>,
-    ctx: Flow.Context<I, S, E>,
+    ctx: Flow.Context,
     input: I
-  ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-): Core.Executor<Flow.DependentHandler<D, I, S, E>>;
+  ) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
 
-function flowImpl<I, S, E, D extends Core.DependencyLike>(
-  definition: DefineConfig<I, S, E>,
-  dependenciesOrHandler:
+function flowImpl<S, I>(
+  config: FlowConfigWithHandler<S, I>
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S, I, D extends Core.DependencyLike>(
+  config: FlowConfigWithDeps<S, I, D>
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S = unknown, I = unknown>(
+  config: FlowConfigInferred<S, I>
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<
+  S = unknown,
+  I = unknown,
+  D extends Core.DependencyLike = never
+>(
+  config: FlowConfigInferredWithDeps<S, I, D>
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S, I>(
+  definition: DefineConfig<S, I>,
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S, I, D extends Core.DependencyLike>(
+  definition: DefineConfig<S, I>,
+  dependencies: D,
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S, I, D extends Core.DependencyLike>(
+  dependencies: D,
+  definition: DefineConfig<S, I>,
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>>;
+
+function flowImpl<S, I>(definition: DefineConfig<S, I>): FlowDefinition<S, I>;
+
+function flowImpl<S, I, D extends Core.DependencyLike>(
+  definitionOrConfigOrDepsOrHandler:
+    | DefineConfig<S, I>
+    | FlowConfigWithHandler<S, I>
+    | FlowConfigWithDeps<S, I, D>
+    | FlowConfigInferred<S, I>
+    | FlowConfigInferredWithDeps<S, I, D>
     | D
+    | ((ctx: Flow.Context, input: I) => Promise<S> | S)
+    | ((ctx?: Flow.Context) => Promise<S> | S),
+  dependenciesOrHandler?:
+    | D
+    | ((ctx: Flow.Context, input: I) => Promise<S> | S)
     | ((
-        ctx: Flow.Context<I, S, E>,
+        deps: Core.InferOutput<D>,
+        ctx: Flow.Context,
         input: I
-      ) => Promise<Flow.OutputLike<S, E>>),
+      ) => Promise<S> | S),
   handlerFn?: (
     deps: Core.InferOutput<D>,
-    ctx: Flow.Context<I, S, E>,
+    ctx: Flow.Context,
     input: I
-  ) => Promise<Flow.OutputLike<S, E>> | Flow.OutputLike<S, E>
-):
-  | Core.Executor<Flow.NoDependencyHandler<I, S, E>>
-  | Core.Executor<Flow.DependentHandler<D, I, S, E>> {
-  const def = define(definition);
+  ) => Promise<S> | S
+): Core.Executor<Flow.Handler<S, I>> | FlowDefinition<S, I> {
+  if (typeof definitionOrConfigOrDepsOrHandler === "function") {
+    const handler = definitionOrConfigOrDepsOrHandler as (
+      ctx: Flow.Context,
+      input: I
+    ) => Promise<S> | S;
+    const def = define({
+      name: "anonymous",
+      version: "1.0.0",
+      input: custom<I>(),
+      output: custom<S>(),
+    });
+    return def.handler(handler);
+  }
+
+  const firstArg = definitionOrConfigOrDepsOrHandler as
+    | DefineConfig<S, I>
+    | FlowConfigWithHandler<S, I>
+    | FlowConfigWithDeps<S, I, D>
+    | FlowConfigInferred<S, I>
+    | FlowConfigInferredWithDeps<S, I, D>
+    | D;
+
+  if (
+    !("name" in firstArg) &&
+    dependenciesOrHandler &&
+    typeof dependenciesOrHandler === "object" &&
+    "name" in dependenciesOrHandler &&
+    handlerFn
+  ) {
+    const dependencies = firstArg as D;
+    const definition = dependenciesOrHandler as unknown as Partial<
+      DefineConfig<S, I>
+    > & { name: string };
+
+    const hasInput = "input" in definition && definition.input !== undefined;
+    const hasOutput =
+      "output" in definition && definition.output !== undefined;
+
+    const def = define({
+      name: definition.name,
+      version: definition.version,
+      input: hasInput ? definition.input! : custom<I>(),
+      output: hasOutput ? definition.output! : custom<S>(),
+      meta: definition.meta,
+    });
+
+    return def.handler(dependencies, handlerFn);
+  }
+
+  if (typeof dependenciesOrHandler === "function" && !("name" in firstArg)) {
+    const dependencies = firstArg as D;
+    const handler = dependenciesOrHandler as (
+      deps: Core.InferOutput<D>,
+      ctx: Flow.Context,
+      input: I
+    ) => Promise<S> | S;
+    const def = define({
+      name: "anonymous",
+      version: "1.0.0",
+      input: custom<I>(),
+      output: custom<S>(),
+    });
+    return def.handler(dependencies, handler);
+  }
+
+  if ("handler" in firstArg) {
+    const config = firstArg as
+      | FlowConfigWithHandler<S, I>
+      | FlowConfigWithDeps<S, I, D>
+      | FlowConfigInferred<S, I>
+      | FlowConfigInferredWithDeps<S, I, D>;
+
+    const hasInput = "input" in config && config.input !== undefined;
+    const hasOutput = "output" in config && config.output !== undefined;
+
+    const def = define({
+      name: config.name,
+      version: config.version,
+      input: hasInput ? config.input! : custom<I>(),
+      output: hasOutput ? config.output! : custom<S>(),
+      meta: config.meta,
+    });
+
+    if ("dependencies" in config) {
+      const depsConfig = config as
+        | FlowConfigWithDeps<S, I, D>
+        | FlowConfigInferredWithDeps<S, I, D>;
+      return def.handler(depsConfig.dependencies, depsConfig.handler);
+    } else {
+      const handlerConfig = config as
+        | FlowConfigWithHandler<S, I>
+        | FlowConfigInferred<S, I>;
+      return def.handler(handlerConfig.handler);
+    }
+  }
+
+  const definition = firstArg as
+    | DefineConfig<S, I>
+    | Partial<DefineConfig<S, I>>;
+
+  const hasInput = "input" in definition && definition.input !== undefined;
+  const hasOutput =
+    "output" in definition && definition.output !== undefined;
+
+  const def = define({
+    name: definition.name || "anonymous",
+    version: definition.version,
+    input: hasInput ? definition.input! : custom<I>(),
+    output: hasOutput ? definition.output! : custom<S>(),
+    meta: definition.meta,
+  });
+
+  if (!dependenciesOrHandler) {
+    return def;
+  }
 
   if (typeof dependenciesOrHandler === "function") {
-    return def.handler(dependenciesOrHandler);
+    return def.handler(
+      dependenciesOrHandler as (ctx: Flow.Context, input: I) => Promise<S> | S
+    );
   } else {
-    return def.handler(dependenciesOrHandler, handlerFn!);
+    return def.handler(dependenciesOrHandler as D, handlerFn!);
   }
-}
-
-function defineExtension(extension: Extension.Extension): Extension.Extension {
-  return extension;
 }
 
 export const flow: typeof flowImpl & {
   define: typeof define;
   execute: typeof execute;
-  extension: typeof defineExtension;
 } = Object.assign(flowImpl, {
   define: define,
   execute: execute,
-  extension: defineExtension,
 });

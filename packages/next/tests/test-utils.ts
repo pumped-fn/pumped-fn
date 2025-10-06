@@ -2,7 +2,13 @@ import { vi, expect } from "vitest";
 import { flow } from "../src/flow";
 import { custom } from "../src/ssch";
 import { createExecutor } from "../src/executor";
-import { createScope, provide, derive, type Extension } from "../src";
+import {
+  createScope,
+  provide,
+  derive,
+  type Extension,
+  StandardSchemaV1,
+} from "../src";
 
 export namespace TestTypes {
   export interface User {
@@ -35,45 +41,39 @@ export const testFlows = {
     flow.define({
       name,
       input: custom<TestTypes.BasicInput>(),
-      success: custom<TestTypes.SuccessResult<string>>(),
-      error: custom<TestTypes.ErrorResult>(),
+      output: custom<TestTypes.SuccessResult<string>>(),
     }),
 
   math: (name: string) =>
     flow.define({
       name,
       input: custom<TestTypes.MathInput>(),
-      success: custom<TestTypes.SuccessResult<number>>(),
-      error: custom<TestTypes.ErrorResult>(),
+      output: custom<TestTypes.SuccessResult<number>>(),
     }),
 
   user: (name: string) =>
     flow.define({
       name,
       input: custom<{ userId: string }>(),
-      success: custom<{ user: TestTypes.User }>(),
-      error: custom<TestTypes.ErrorResult>(),
+      output: custom<{ user: TestTypes.User }>(),
     }),
 
   validation: (name: string) =>
     flow.define({
       name,
       input: custom<{ email: string }>(),
-      success: custom<{ valid: boolean }>(),
-      error: custom<TestTypes.ErrorResult>(),
+      output: custom<{ valid: boolean }>(),
     }),
 
-  generic: <TInput, TSuccess, TError>(
+  generic: <TInput, TSuccess>(
     name: string,
-    input: any,
-    success: any,
-    error: any
+    input: StandardSchemaV1<TInput, unknown>,
+    output: StandardSchemaV1<TSuccess, unknown>
   ) =>
     flow.define({
       name,
       input,
-      success,
-      error,
+      output,
     }),
 };
 
@@ -148,7 +148,11 @@ export const ExtensionFactory = {
   contextCapture: (capturedContext: { current?: any } = {}) =>
     ({
       name: "context-capture",
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         capturedContext.current = context;
         return next();
       },
@@ -157,7 +161,11 @@ export const ExtensionFactory = {
   executionOrder: (execOrder: string[], extensionName: string) =>
     ({
       name: extensionName,
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         execOrder.push(`${extensionName}-before`);
         const result = await next();
         execOrder.push(`${extensionName}-after`);
@@ -174,7 +182,11 @@ export const ExtensionFactory = {
       async disposePod(pod: any) {
         lifecycleCalls.push(`${extensionName}-dispose`);
       },
-      async wrapExecute(context: any, next: () => Promise<any>, execution: any) {
+      async wrapExecute(
+        context: any,
+        next: () => Promise<any>,
+        execution: any
+      ) {
         lifecycleCalls.push(`${extensionName}-wrap`);
         return next();
       },
@@ -271,10 +283,9 @@ export const testSetup = {
   scopeWithExtensions: (extensions: Extension.Extension[]) =>
     createScope({ extensions }),
 
-  expectFlowResult: (result: any, type: "ok" | "ko", data?: any) => {
-    expect(result.type).toBe(type);
+  expectFlowResult: (result: any, data?: any) => {
     if (data !== undefined) {
-      expect(result.data).toEqual(data);
+      expect(result).toEqual(data);
     }
   },
 };

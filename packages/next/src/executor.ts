@@ -122,7 +122,15 @@ export function derive<T, D extends Core.DependencyLike>(
   pfactory: Core.DependentFn<T, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): Core.Executor<T> {
-  return createExecutor(pfactory as any, pdependencies as any, metas);
+  const factory: Core.DependentFn<T, unknown> = (deps, ctl) =>
+    pfactory(deps as Core.InferOutput<D>, ctl);
+
+  const dependencies = pdependencies as
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>;
+
+  return createExecutor(factory, dependencies, metas);
 }
 
 export function preset<T>(

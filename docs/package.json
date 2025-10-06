@@ -11,7 +11,7 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@pumped-fn/core-next": "0.5.58",
+    "@pumped-fn/core-next": "0.5.67",
     "@types/node": "^20.19.17",
     "typedoc": "^0.28.13",
     "typedoc-github-theme": "^0.3.1",
