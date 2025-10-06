@@ -22,7 +22,7 @@ One `preset()` can simulate entire environments. No mock framework needed.
 ## Why Graph Testing Wins
 
 **Traditional Approach:**
-```ts twoslash
+```typescript
 mockFetch.mockResolvedValue(...)
 mockCache.mockImplementation(...)
 mockConfig.mockReturnValue(...)
@@ -30,7 +30,7 @@ mockDatabase.mockResolvedValue(...)
 ```
 
 **Graph Approach:**
-```ts twoslash
+```typescript
 const scope = createScope(
   preset(env, 'test')
 )
@@ -38,7 +38,7 @@ const scope = createScope(
 
 ## Testing Patterns
 
-```ts twoslash
+```typescript
 const prodScope = createScope(preset(env, 'production'))
 const testScope = createScope(preset(env, 'test'))
 

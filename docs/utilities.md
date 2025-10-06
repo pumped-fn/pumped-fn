@@ -10,7 +10,7 @@ Multi-value utilities create executors that dynamically generate instances based
 
 Creates a multi-executor that generates instances without dependencies:
 
-```ts twoslash
+```typescript
 import { multi, custom, createScope } from "@pumped-fn/core-next";
 
 const connectionPool = multi.provide(
@@ -41,7 +41,7 @@ const userConn = getUserConnection("users");
 
 Creates a multi-executor with dependencies:
 
-```ts twoslash
+```typescript
 import { multi, custom, provide, createScope } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ host: "localhost", port: 5432 }));
@@ -69,7 +69,7 @@ const db = await scope.resolve(dbPool("analytics"));
 
 Clean up all instances from a multi-executor pool:
 
-```ts twoslash
+```typescript
 import { multi, custom, createScope } from "@pumped-fn/core-next";
 
 const pool = multi.provide(
@@ -94,8 +94,8 @@ Enhanced promise wrapper with pod context and flow execution capabilities. Retur
 
 ### Basic Operations
 
-```ts twoslash
-import { flow, Promised } from "@pumped-fn/core-next";
+```typescript
+import { flow, type Promised } from "@pumped-fn/core-next";
 
 const processData = flow(async (ctx, data: string) => {
   return data.toUpperCase();
@@ -112,7 +112,7 @@ const pod = result.getPod();
 
 ### Transformation
 
-```ts twoslash
+```typescript
 import { flow } from "@pumped-fn/core-next";
 
 const process = flow(async (ctx, value: number) => value * 2);
@@ -134,7 +134,7 @@ await result;
 
 ### Execution Details
 
-```ts twoslash
+```typescript
 import { flow } from "@pumped-fn/core-next";
 
 const handler = flow(async (ctx, input: number) => {
@@ -159,7 +159,7 @@ if (details.success) {
 
 ### Promised Combinators
 
-```ts twoslash
+```typescript
 import { flow, Promised } from "@pumped-fn/core-next";
 
 const flow1 = flow(async (ctx, n: number) => n * 2);
@@ -179,7 +179,7 @@ const settled = await Promised.allSettled([p1, p2]);
 
 Wrap synchronous code with error handling:
 
-```ts twoslash
+```typescript
 import { Promised, createScope } from "@pumped-fn/core-next";
 
 const scope = createScope();
@@ -205,7 +205,7 @@ Error types, codes, and utilities for handling executor resolution failures.
 
 All errors extend `ExecutorResolutionError`:
 
-```ts twoslash
+```typescript
 import type { ExecutorResolutionError, FactoryExecutionError, DependencyResolutionError } from "@pumped-fn/core-next";
 
 type ErrorContext = {
@@ -226,7 +226,7 @@ type ErrorContext = {
 
 ### Error Codes
 
-```ts twoslash
+```typescript
 import { errors } from "@pumped-fn/core-next";
 
 errors.codes.FACTORY_EXECUTION_FAILED
@@ -248,7 +248,7 @@ errors.codes.REACTIVE_EXECUTOR_IN_POD
 
 ### Error Handling
 
-```ts twoslash
+```typescript
 import { createScope, provide, errors, type FactoryExecutionError } from "@pumped-fn/core-next";
 
 const scope = createScope();
@@ -279,7 +279,7 @@ try {
 
 ### Error Context Usage
 
-```ts twoslash
+```typescript
 import { createScope, provide, derive, type DependencyResolutionError } from "@pumped-fn/core-next";
 
 const db = provide(() => {
@@ -306,7 +306,7 @@ await scope.resolve(service).catch(() => {});
 
 ### Error Code Messages
 
-```ts twoslash
+```typescript
 import { errors } from "@pumped-fn/core-next";
 
 const message = errors.formatMessage(

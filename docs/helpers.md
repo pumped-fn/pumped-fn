@@ -6,7 +6,7 @@ Utilities for graph interaction: batch resolution, accessor creation, and type-s
 
 Resolves multiple executors in parallel while preserving structure.
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, resolves } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ apiUrl: "https://api.example.com", timeout: 5000 }));
@@ -29,7 +29,7 @@ deps.database.query();
 
 `resolves` maintains full type inference:
 
-```ts twoslash
+```typescript
 import { provide, createScope, resolves } from "@pumped-fn/core-next";
 
 const stringValue = provide(() => "hello");
@@ -53,7 +53,7 @@ const result = await resolves(scope, {
 
 **1. Testing - Batch Setup**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, resolves, preset } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ env: "prod" }));
@@ -81,7 +81,7 @@ describe("service tests", () => {
 
 **2. Multi-Service Initialization**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, resolves } from "@pumped-fn/core-next";
 
 const database = provide(async () => ({ connected: true }));
@@ -104,7 +104,7 @@ async function initializeApp() {
 
 **3. Conditional Resolution with Executors**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, resolves, preset, type Core } from "@pumped-fn/core-next";
 
 const isProd = provide(() => true);
@@ -129,7 +129,7 @@ const resolved = await resolves(scope, [
 
 Creates a singleton accessor for an executor in the scope.
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const counter = provide(() => 0);
@@ -149,7 +149,7 @@ await accessor.release(); // releases executor
 
 Each executor has one accessor per scope:
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const value = provide(() => "initial");
@@ -164,7 +164,7 @@ console.log(accessor1 === accessor2); // true
 
 ### vs resolveAccessor
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const executor = provide(() => "value");
@@ -185,7 +185,7 @@ resolvedAccessor.get(); // "value" - already resolved
 
 **1. Manual Resolution Control**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ loaded: false }));
@@ -211,7 +211,7 @@ if (configState?.kind === "resolved") {
 
 **2. Reactive Programming**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const counter = provide(() => 0);
@@ -234,7 +234,7 @@ await cleanup();
 
 **3. State Inspection**
 
-```ts twoslash
+```typescript
 import { provide, createScope, type Core } from "@pumped-fn/core-next";
 
 const asyncService = provide(async () => {
@@ -266,7 +266,7 @@ The `Accessor<T>` type represents a resolved or resolving executor in a scope.
 
 ### Type Definition
 
-```ts twoslash
+```typescript
 export interface Accessor<T> extends MetaContainer {
   lookup(): undefined | ResolveState<T>;
   get(): T;
@@ -287,7 +287,7 @@ type ResolveState<T> =
 
 **lookup() - Safe State Access**
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const value = provide(() => 42);
@@ -305,7 +305,7 @@ if (!state) {
 
 **get() - Direct Value Access**
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const value = provide(() => "hello");
@@ -318,7 +318,7 @@ const result = accessor.get(); // "hello"
 
 **resolve(force?) - Async Resolution**
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const expensive = provide(() => {
@@ -336,7 +336,7 @@ const v3 = await accessor.resolve(true); // logs: "Computing..." - forced
 
 **update(fn) - Reactive Updates**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const counter = provide(() => 0);
@@ -357,7 +357,7 @@ console.log(displayAccessor.get()); // "Count: 6"
 
 **set(value) - Direct Value Update**
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ theme: "light" }));
@@ -370,7 +370,7 @@ console.log(accessor.get()); // { theme: "dark" }
 
 **subscribe(callback) - Reactive Subscriptions**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const value = provide(() => 0);
@@ -392,7 +392,7 @@ await cleanup(); // unsubscribe
 
 **release() - Resource Cleanup**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const connection = provide((ctl) => {
@@ -418,7 +418,7 @@ await connAccessor.release();
 
 **1. Dynamic Graph Navigation**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const router = provide(() => ({
@@ -451,7 +451,7 @@ console.log(newPageData.title); // "About"
 
 **2. Testing with State Inspection**
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
 
 const apiService = provide(async () => ({ fetch: async () => ({ data: "real" }) }));
@@ -476,7 +476,7 @@ describe("service tests", () => {
 
 **3. Lazy Initialization**
 
-```ts twoslash
+```typescript
 import { provide, createScope } from "@pumped-fn/core-next";
 
 const heavyService = provide((ctl) => {
@@ -508,7 +508,7 @@ console.log(result);
 4. **Check `lookup()` before `get()`** - avoid errors from unresolved executors
 5. **Clean up subscriptions** - always call the cleanup function returned by `subscribe()`
 
-```ts twoslash
+```typescript
 import { provide, derive, createScope, resolves } from "@pumped-fn/core-next";
 
 const a = provide(() => 1);

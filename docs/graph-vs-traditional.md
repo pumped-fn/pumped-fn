@@ -5,7 +5,7 @@ Compare how graph resolution transforms common programming challenges.
 ## Code Organization
 
 ### Traditional: Manual Wiring
-```ts twoslash
+```typescript
 class DataService {
   constructor() {
     this.config = { logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }
@@ -15,18 +15,20 @@ class DataService {
     this.notifier = { send: async (message: string) => true }
   }
 
-  async createEntity(entityData) {
+  async createEntity(entityData: any) {
     const entity = await this.db.save(entityData)
     await this.cache.set(`entity:${entity.id}`, entity)
     await this.notifier.send(JSON.stringify(entity))
-    this.logger.info('Entity created', entity.id)
+    this.logger.log('Entity created')
     return entity
   }
 }
 ```
 
 ### Graph Resolution: Declare Dependencies
-```ts twoslash
+```typescript
+import { provide, derive, createScope } from "@pumped-fn/core-next";
+
 const config = provide(() => ({ logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }))
 const logger = derive([config], ([cfg]) => ({ log: (msg: string) => console.log(`[${cfg.logLevel}] ${msg}`) }))
 const db = derive([config, logger], ([cfg, log]) => ({ save: async (data: any) => ({ id: '123', ...data }) }))
@@ -35,17 +37,18 @@ const notifier = derive([config, logger], ([cfg, log]) => ({ send: async (messag
 
 const dataService = derive(
   [db, cache, notifier, logger],
-  ([database, cache, notify, log]) => ({
-    async createEntity(entityData) {
+  ([database, cacheService, notify, log]) => ({
+    async createEntity(entityData: any) {
       const entity = await database.save(entityData)
-      await cache.set(`entity:${entity.id}`, entity)
+      await cacheService.set(`entity:${entity.id}`, entity)
       await notify.send(JSON.stringify(entity))
-      log.info('Entity created', entity.id)
+      log.log('Entity created')
       return entity
     }
   })
 )
 
+const scope = createScope()
 const service = await scope.resolve(dataService)
 ```
 
@@ -58,7 +61,7 @@ const service = await scope.resolve(dataService)
 ## Testing
 
 ### Traditional: Complex Mock Setup
-```ts twoslash
+```typescript
 // Mock every dependency manually
 const mockConfig = {
   logLevel: 'silent',
@@ -89,8 +92,22 @@ const mockEmailService = {
 ```
 
 ### Graph Resolution: Single Point Changes
-```ts twoslash
-// Change entire system behavior with single presets
+```typescript
+import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
+
+const config = provide(() => ({ logLevel: 'info', db: { host: 'prod' }, redis: { host: 'prod' }, email: { provider: 'prod' } }))
+const db = provide(() => ({ save: async (data: any) => ({ id: '123', ...data }) }))
+const cache = provide(() => ({ set: async (key: string, value: any) => true }))
+const notifier = provide(() => ({ send: async (message: string) => true }))
+const dataService = derive([db, cache, notifier], ([database, cacheService, notify]) => ({
+  async createEntity(entityData: any) {
+    const entity = await database.save(entityData)
+    await cacheService.set(`entity:${entity.id}`, entity)
+    await notify.send(JSON.stringify(entity))
+    return entity
+  }
+}))
+
 const testScope = createScope(
   preset(config, {
     logLevel: 'silent',
@@ -100,14 +117,12 @@ const testScope = createScope(
   })
 )
 
-// Or mock specific services
 const mockScope = createScope(
   preset(db, { save: async () => ({ id: '123' }) }),
   preset(cache, { set: async () => true }),
   preset(notifier, { send: async () => true })
 )
 
-// Same code, different behavior
 const service = await testScope.resolve(dataService)
 const result = await service.createEntity({ name: 'Test' })
 ```
@@ -121,17 +136,19 @@ const result = await service.createEntity({ name: 'Test' })
 ## Configuration Management
 
 ### Traditional: Global Configuration Hell
-```ts twoslash
+```typescript
 // Global config object passed everywhere
 const globalConfig = { database: 'db://prod', email: { provider: 'smtp' } }
 
 class DatabaseService {
+  db: any
   constructor() {
     this.db = { url: globalConfig.database, query: () => [] } // Tight coupling
   }
 }
 
 class EmailService {
+  client: any
   constructor() {
     this.client = { provider: globalConfig.email.provider, send: () => true } // Tight coupling
   }
@@ -144,8 +161,14 @@ beforeEach(() => {
 ```
 
 ### Graph Resolution: Localized Configuration
-```ts twoslash
-// Configuration flows through dependency graph
+```typescript
+import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
+
+type Config = { database: string; email: { provider: string } }
+const devConfig: Config = { database: 'db://dev', email: { provider: 'console' } }
+const prodConfig: Config = { database: 'db://prod', email: { provider: 'smtp' } }
+const testConfig: Config = { database: 'db://test', email: { provider: 'mock' } }
+
 const config = provide(() => ({ database: 'db://prod', email: { provider: 'smtp' } }))
 const dbConfig = derive([config], ([cfg]) => cfg.database)
 const emailConfig = derive([config], ([cfg]) => cfg.email)
@@ -153,7 +176,6 @@ const emailConfig = derive([config], ([cfg]) => cfg.email)
 const db = derive([dbConfig], ([cfg]) => ({ url: cfg, query: () => [] }))
 const emailService = derive([emailConfig], ([cfg]) => ({ provider: cfg.provider, send: () => true }))
 
-// Different environments with different configs
 const devScope = createScope(preset(config, devConfig))
 const prodScope = createScope(preset(config, prodConfig))
 const testScope = createScope(preset(config, testConfig))
@@ -168,8 +190,11 @@ const testScope = createScope(preset(config, testConfig))
 ## Performance Optimization
 
 ### Traditional: Manual Optimization
-```ts twoslash
+```typescript
 class Application {
+  expensiveService: any
+  cache: Map<any, any>
+
   constructor() {
     // Must manually optimize initialization
     this.expensiveService = null // Lazy initialize later
@@ -183,7 +208,7 @@ class Application {
     return this.expensiveService
   }
 
-  async processData(data) {
+  async processData(data: any) {
     if (data.requiresExpensiveOperation) {
       const service = await this.getExpensiveService() // Manual lazy loading
       return service.process(data)
@@ -194,15 +219,17 @@ class Application {
 ```
 
 ### Graph Resolution: Automatic Optimization
-```ts twoslash
+```typescript
+import { provide, derive, createScope } from "@pumped-fn/core-next";
+
 const expensiveService = provide(async () => ({ process: (data: any) => data }))
 
 const processor = derive(
-  [expensiveService.lazy], // .lazy = resolve only when accessed
+  [expensiveService.lazy],
   ([lazyService]) => ({
-    async processData(data) {
+    async processData(data: any) {
       if (data.requiresExpensiveOperation) {
-        const service = await lazyService.resolve() // Auto lazy loading
+        const service = await lazyService.resolve()
         return service.process(data)
       }
       return data
@@ -210,7 +237,7 @@ const processor = derive(
   })
 )
 
-// expensiveService only creates if actually needed
+const scope = createScope()
 const result = await scope.resolve(processor)
 ```
 
@@ -223,36 +250,50 @@ const result = await scope.resolve(processor)
 ## Refactoring
 
 ### Traditional: Ripple Effect Changes
-```ts twoslash
+```typescript
 // Adding new dependency requires changes everywhere
 class DataService {
-  constructor(db, cache, logger) {
+  db: any
+  cache: any
+  logger: any
+
+  constructor(db: any, cache: any, logger: any) {
     this.db = db
     this.cache = cache
     this.logger = logger
   }
 }
 
+const db = { query: () => [] }
+const cache = { get: () => null }
+const logger = { log: () => {} }
 const dataService = new DataService(db, cache, logger)
+
+class Application {
+  constructor(service: any) {}
+}
 const app = new Application(dataService)
 ```
 
 ### Graph Resolution: Isolated Changes
-```ts twoslash
-// Add new dependency at definition site only
+```typescript
+import { provide, derive } from "@pumped-fn/core-next";
+
+const db = provide(() => ({ save: async (data: any) => ({ id: '123', ...data }) }))
+const cache = provide(() => ({ set: async (key: string, value: any) => true }))
+const logger = provide(() => ({ log: (msg: string) => console.log(msg) }))
+const auditService = provide(() => ({ logEntityCreation: (entity: any) => console.log('audit', entity) }))
+
 const dataService = derive(
   [db, cache, logger, auditService],
-  ([database, cache, log, audit]) => ({
-    async createEntity(entityData) {
+  ([database, cacheService, log, audit]) => ({
+    async createEntity(entityData: any) {
       const entity = await database.save(entityData)
       await audit.logEntityCreation(entity)
       return entity
     }
   })
 )
-
-// All usage sites automatically get the new dependency
-// No changes needed anywhere else
 ```
 
 **Benefits**:

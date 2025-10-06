@@ -17,18 +17,18 @@ Each flow execution:
 3. Journals all operations for replay
 4. Disposes pod after completion
 
-```ts twoslash
-// Root flow execution
-flow.execute(handler, input)
-  → creates scope → creates pod → executes → disposes pod → disposes scope
+```text
+Root flow execution:
+  flow.execute(handler, input)
+    → creates scope → creates pod → executes → disposes pod → disposes scope
 
-// With existing scope
-flow.execute(handler, input, { scope })
-  → uses scope → creates pod → executes → disposes pod
+With existing scope:
+  flow.execute(handler, input, { scope })
+    → uses scope → creates pod → executes → disposes pod
 
-// Sub-flow execution (via ctx.exec)
-ctx.exec(subFlow, input)
-  → uses parent pod → forks context → executes → context disposed
+Sub-flow execution (via ctx.exec):
+  ctx.exec(subFlow, input)
+    → uses parent pod → forks context → executes → context disposed
 ```
 
 ### Context Forking
@@ -38,12 +38,11 @@ Each flow execution creates a forked context:
 - **Sub-flow**: Child context inherits parent data, depth = parent.depth + 1
 - **Parallel flows**: Each gets independent forked context
 
-```ts twoslash
-const main = flow(async (ctx, input: number) => {
-  ctx.set(customKey, "parent-data");
+```typescript
+import { flow, accessor, custom } from "@pumped-fn/core-next";
 
-  const result = await ctx.exec(subFlow, input);
-});
+const customKey = accessor("custom", custom<string>());
+const childKey = accessor("child", custom<string>());
 
 const subFlow = flow(async (ctx, input: number) => {
   const parentData = ctx.find(customKey);
@@ -51,12 +50,18 @@ const subFlow = flow(async (ctx, input: number) => {
 
   return input * 2;
 });
+
+const main = flow(async (ctx, input: number) => {
+  ctx.set(customKey, "parent-data");
+
+  const result = await ctx.exec(subFlow, input);
+});
 ```
 
 ## Schema System
 Uses [standardschema v1](https://github.com/standard-schema/standard-schema).
 
-```ts twoslash
+```typescript
 import { custom } from "@pumped-fn/core-next";
 import { z } from "zod";
 
@@ -66,7 +71,7 @@ const withValidation = z.object({ email: z.string().email() });
 
 ### Quick Start
 
-```ts twoslash
+```typescript
 import { flow, custom, provide } from "@pumped-fn/core-next";
 
 const dbExecutor = provide(() => ({ create: (input: any) => "123" }));
@@ -104,8 +109,7 @@ const handler = defined.handler(
 
 The flow context provides data access, nested execution, journaling, and parallel operations:
 
-```ts twoslash
-
+```typescript
 interface Context {
   readonly pod: Core.Pod;
 
@@ -144,8 +148,7 @@ interface Context {
 
 ## Execution
 
-```ts twoslash
-
+```typescript
 // Direct execution
 const result = await flow.execute(handler, { email: "test@example.com" });
 console.log(result.userId);
@@ -170,7 +173,7 @@ try {
 
 ### 1. Simple Flow
 
-```ts twoslash
+```typescript
 
 import { flow } from "@pumped-fn/core-next";
 
@@ -187,7 +190,7 @@ console.log(result.result); // 8
 
 ### 2. Flow with Dependencies
 
-```ts twoslash
+```typescript
 
 import { flow, provide } from "@pumped-fn/core-next";
 
@@ -214,7 +217,8 @@ console.log(result.user);
 
 ### 3. Nested Flow Execution
 
-```ts twoslash
+```typescript
+import { flow } from "@pumped-fn/core-next";
 
 const validateEmail = flow(async (ctx, input: { email: string }) => {
   if (!input.email.includes("@")) {
@@ -241,7 +245,9 @@ const result = await flow.execute(register, {
 
 ### 4. Journaling for Deterministic Replay
 
-```ts twoslash
+```typescript
+import { flow } from "@pumped-fn/core-next";
+
 const fetchData = flow(async (ctx, url: string) => {
   const data = await ctx.run("fetch", async () => {
     const response = await fetch(url);
@@ -264,7 +270,9 @@ const fetchData = flow(async (ctx, url: string) => {
 
 ### 5. Parallel Flow Execution
 
-```ts twoslash
+```typescript
+import { flow } from "@pumped-fn/core-next";
+
 const checkInventory = flow(async (ctx, items: string[]) => {
   return { available: true, items };
 });
@@ -297,7 +305,15 @@ const processOrder = flow(async (ctx, input: { items: string[]; total: number; a
 
 ### 6. Parallel with Error Handling
 
-```ts twoslash
+```typescript
+import { flow } from "@pumped-fn/core-next";
+
+type Order = { items: string[]; total: number; address: string };
+
+const processOrder = flow(async (ctx, order: Order) => {
+  return { orderId: "123" };
+});
+
 const processOrders = flow(async (ctx, orders: Order[]) => {
   const promises = orders.map(order =>
     ctx.exec(processOrder, order)
@@ -326,7 +342,7 @@ const processOrders = flow(async (ctx, orders: Order[]) => {
 
 Flows integrate with the extension system for cross-cutting concerns:
 
-```ts twoslash
+```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
 import { accessor, custom } from "@pumped-fn/core-next";
@@ -363,7 +379,7 @@ const result = await flow.execute(handler, input, {
 
 `flowMeta` exposes flow execution state via accessors:
 
-```ts twoslash
+```typescript
 import { flowMeta } from "@pumped-fn/core-next";
 
 const flowMeta = {
@@ -377,7 +393,9 @@ const flowMeta = {
 
 ### Usage in Flows
 
-```ts twoslash
+```typescript
+import { flow, flowMeta } from "@pumped-fn/core-next";
+
 const tracingFlow = flow(async (ctx, input: { userId: string }) => {
   const depth = ctx.get(flowMeta.depth);
   const name = ctx.find(flowMeta.flowName);
@@ -391,7 +409,9 @@ const tracingFlow = flow(async (ctx, input: { userId: string }) => {
 
 ### Usage in Extensions
 
-```ts twoslash
+```typescript
+import { flowMeta, type Extension } from "@pumped-fn/core-next";
+
 const loggingExtension: Extension.Extension = {
   name: "logging",
 
@@ -415,7 +435,7 @@ const loggingExtension: Extension.Extension = {
 
 ### Journal Access
 
-```ts twoslash
+```typescript
 const execution = flow.execute(handler, input);
 await execution;
 
@@ -442,8 +462,7 @@ for (const [key, value] of journal) {
 
 **External-facing flows** (composing flows near entrypoints) should be explicit. The spec is often shared with clients for RPC. These flows use the definition → handler pattern:
 
-```ts twoslash
-
+```typescript
 const apiFlow = flow.define({
   name: "user.create",
   input: z.object({ email: z.string().email() }),
@@ -456,8 +475,7 @@ const handler = apiFlow.handler(/* implementation */);
 
 **Internal-facing flows** (flow steps within other flows) should be implicit. The spec is unlikely to be used outside the current environment. Use the inline pattern:
 
-```ts twoslash
-
+```typescript
 const validateEmail = flow(
   {
     name: "internal.validateEmail",
@@ -467,7 +485,7 @@ const validateEmail = flow(
   },
   async (ctx, input) => {
     // Implementation
-    return ctx.ok({ valid: true });
+    return { valid: true };
   }
 );
 
@@ -482,7 +500,7 @@ const processUser = flow(
   { db: dbExecutor, logger: loggerExecutor },
   async ({ db, logger }, ctx, input) => {
     // Implementation
-    return ctx.ok({ processed: true });
+    return { processed: true };
   }
 );
 ```
@@ -491,7 +509,7 @@ const processUser = flow(
 
 **Recommended**: Use DataAccessor for all context data in flows instead of direct Map access.
 
-```ts twoslash
+```typescript
 import { accessor, custom, flow } from "@pumped-fn/core-next";
 
 // Define context accessors
@@ -524,7 +542,7 @@ const result = await flow.execute(processFlow, { data: "test" }, { initialContex
 
 ### Request Pipeline
 
-```ts twoslash
+```typescript
 const authenticateUser = flow(
   { auth: authService },
   async ({ auth }, ctx, token: string) => {
@@ -542,7 +560,7 @@ const validateRequest = flow(async (ctx, input: RequestData) => {
   );
 
   if (!valid) {
-    throw new FlowError("Insufficient permissions", "FORBIDDEN");
+    throw new Error("Insufficient permissions");
   }
 
   return { validated: true };
@@ -565,14 +583,14 @@ const processRequest = flow(
 
 ### Batch Processing
 
-```ts twoslash
+```typescript
 const processItem = flow(
   { processor: itemProcessor },
   async ({ processor }, ctx, item: Item) => {
     const validated = await ctx.run("validate", () => processor.validate(item));
 
     if (!validated) {
-      throw new FlowError("Invalid item", "VALIDATION_ERROR");
+      throw new Error("Invalid item");
     }
 
     const processed = await ctx.run("process", () => processor.process(item));
@@ -605,7 +623,7 @@ const batchProcess = flow(async (ctx, items: Item[]) => {
 
 ### Multi-Step Workflow
 
-```ts twoslash
+```typescript
 const createOrder = flow(
   { db: database, inventory: inventoryService },
   async ({ db, inventory }, ctx, order: OrderInput) => {
@@ -614,7 +632,7 @@ const createOrder = flow(
     );
 
     if (!reserved) {
-      throw new FlowError("Items unavailable", "OUT_OF_STOCK");
+      throw new Error("Items unavailable");
     }
 
     const orderId = await ctx.run("create-order", () =>

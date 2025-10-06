@@ -17,8 +17,7 @@ Extensions access existing scope capabilities rather than duplicating them. The 
 
 ### Interface Definition
 
-```ts twoslash
-
+```typescript
 interface Extension {
   name: string
 
@@ -102,8 +101,7 @@ Extensions get full access to scope capabilities:
 
 The `wrap` method intercepts all operations with a discriminated union type. This provides advantages over traditional event patterns:
 
-```ts twoslash
-
+```typescript
 // ❌ Complex state tracking across events
 const startTimes = new Map()
 scope.onChange((event, executor, value) => {
@@ -141,7 +139,7 @@ async function wrap<T>(context, next, operation): Promise<T> {
 
 ### 1. Performance Monitoring
 
-```ts twoslash
+```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -195,7 +193,7 @@ const performanceExtension = (): Extension => {
 
 ### 2. Request Tracing
 
-```ts twoslash
+```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
 import { accessor, custom } from "@pumped-fn/core-next";
@@ -257,7 +255,7 @@ const tracingExtension = (): Extension => {
 
 ### 3. Development Debugging
 
-```ts twoslash
+```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -330,7 +328,7 @@ const debugExtension = (options: { logLevel: 'info' | 'debug' | 'verbose' } = { 
 
 ### 4. Error Collection
 
-```ts twoslash
+```typescript
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -378,7 +376,7 @@ const errorCollectionExtension = (): Extension => {
 
 ### With Scopes
 
-```ts twoslash
+```typescript
 
 import { createScope } from "@pumped-fn/core-next";
 
@@ -397,7 +395,7 @@ const result = await scope.resolve(someExecutor)
 
 ### With Flows
 
-```ts twoslash
+```typescript
 
 import { flow, custom } from "@pumped-fn/core-next";
 
@@ -419,7 +417,7 @@ const result = await flow.execute(myFlow, { data: "hello" }, {
 
 Extensions compose naturally - multiple extensions can wrap the same operations:
 
-```ts twoslash
+```typescript
 
 const result = await flow.execute(handler, input, {
   extensions: [
