@@ -86,7 +86,7 @@ const handler = processFlow.handler(async (ctx, input) => {
 The library provides built-in flow context accessors:
 
 ```typescript
-export const FlowExecutionContext = {
+export const flowMeta = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
   parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
@@ -98,8 +98,8 @@ const tracingExtension: Extension.Extension = {
   name: "tracing",
 
   async wrapExecute(context, next, execution) {
-    const depth = FlowExecutionContext.depth.find(context);
-    const flowName = FlowExecutionContext.flowName.find(context);
+    const depth = flowMeta.depth.find(context);
+    const flowName = flowMeta.flowName.find(context);
 
     console.log(`${"  ".repeat(depth)}→ ${flowName}`);
     return await next();

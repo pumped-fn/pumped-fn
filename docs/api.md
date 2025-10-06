@@ -546,7 +546,7 @@ import { flow, custom } from "@pumped-fn/core-next";
 const userFlow = flow.define({
   name: "user.create",
   input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
+  output: custom<{ userId: string; created: boolean }>(),
   error: custom<{ code: string; message: string }>(),
 });
 ```
@@ -561,7 +561,7 @@ import { flow, custom, provide } from "@pumped-fn/core-next";
 const userFlow = flow.define({
   name: "user.create",
   input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
+  output: custom<{ userId: string; created: boolean }>(),
   error: custom<{ code: string; message: string }>(),
 });
 
@@ -597,7 +597,7 @@ import { flow, custom, createScope } from "@pumped-fn/core-next";
 const userFlow = flow.define({
   name: "user.create",
   input: custom<{ email: string; name: string }>(),
-  success: custom<{ userId: string; created: boolean }>(),
+  output: custom<{ userId: string; created: boolean }>(),
   error: custom<{ code: string; message: string }>(),
 });
 
@@ -634,14 +634,14 @@ import { flow, custom } from "@pumped-fn/core-next";
 const processFlow = flow.define({
   name: "process.data",
   input: custom<{ data: string[] }>(),
-  success: custom<{ processed: number }>(),
+  output: custom<{ processed: number }>(),
   error: custom<{ error: string }>(),
 });
 
 const subFlow = flow.define({
   name: "process.item",
   input: custom<{ item: string }>(),
-  success: custom<{ result: string }>(),
+  output: custom<{ result: string }>(),
   error: custom<{ error: string }>(),
 });
 
@@ -689,7 +689,7 @@ const simpleFlow = flow(
   {
     name: "simple.process",
     input: custom<{ value: number }>(),
-    success: custom<{ result: number }>(),
+    output: custom<{ result: number }>(),
     error: custom<{ error: string }>(),
   },
   async (ctx, input) => {
@@ -702,7 +702,7 @@ const flowWithDeps = flow(
   {
     name: "process.with.deps",
     input: custom<{ data: string }>(),
-    success: custom<{ processed: boolean }>(),
+    output: custom<{ processed: boolean }>(),
     error: custom<{ error: string }>(),
   },
   { logger: loggerExecutor },
