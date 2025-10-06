@@ -17,7 +17,7 @@ Each flow execution:
 3. Journals all operations for replay
 4. Disposes pod after completion
 
-```typescript
+```ts twoslash
 // Root flow execution
 flow.execute(handler, input)
   → creates scope → creates pod → executes → disposes pod → disposes scope
@@ -38,7 +38,7 @@ Each flow execution creates a forked context:
 - **Sub-flow**: Child context inherits parent data, depth = parent.depth + 1
 - **Parallel flows**: Each gets independent forked context
 
-```typescript
+```ts twoslash
 const main = flow(async (ctx, input: number) => {
   ctx.set(customKey, "parent-data");
 
@@ -56,7 +56,7 @@ const subFlow = flow(async (ctx, input: number) => {
 ## Schema System
 Uses [standardschema v1](https://github.com/standard-schema/standard-schema).
 
-```typescript
+```ts twoslash
 import { custom } from "@pumped-fn/core-next";
 import { z } from "zod";
 
@@ -66,7 +66,7 @@ const withValidation = z.object({ email: z.string().email() });
 
 ### Quick Start
 
-```typescript
+```ts twoslash
 import { flow, custom, provide } from "@pumped-fn/core-next";
 
 const dbExecutor = provide(() => ({ create: (input: any) => "123" }));
@@ -104,7 +104,7 @@ const handler = defined.handler(
 
 The flow context provides data access, nested execution, journaling, and parallel operations:
 
-```typescript
+```ts twoslash
 
 interface Context {
   readonly pod: Core.Pod;
@@ -144,7 +144,7 @@ interface Context {
 
 ## Execution
 
-```typescript
+```ts twoslash
 
 // Direct execution
 const result = await flow.execute(handler, { email: "test@example.com" });
@@ -170,7 +170,7 @@ try {
 
 ### 1. Simple Flow
 
-```typescript
+```ts twoslash
 
 import { flow } from "@pumped-fn/core-next";
 
@@ -187,7 +187,7 @@ console.log(result.result); // 8
 
 ### 2. Flow with Dependencies
 
-```typescript
+```ts twoslash
 
 import { flow, provide } from "@pumped-fn/core-next";
 
@@ -214,7 +214,7 @@ console.log(result.user);
 
 ### 3. Nested Flow Execution
 
-```typescript
+```ts twoslash
 
 const validateEmail = flow(async (ctx, input: { email: string }) => {
   if (!input.email.includes("@")) {
@@ -241,7 +241,7 @@ const result = await flow.execute(register, {
 
 ### 4. Journaling for Deterministic Replay
 
-```typescript
+```ts twoslash
 const fetchData = flow(async (ctx, url: string) => {
   const data = await ctx.run("fetch", async () => {
     const response = await fetch(url);
@@ -264,7 +264,7 @@ const fetchData = flow(async (ctx, url: string) => {
 
 ### 5. Parallel Flow Execution
 
-```typescript
+```ts twoslash
 const checkInventory = flow(async (ctx, items: string[]) => {
   return { available: true, items };
 });
@@ -297,7 +297,7 @@ const processOrder = flow(async (ctx, input: { items: string[]; total: number; a
 
 ### 6. Parallel with Error Handling
 
-```typescript
+```ts twoslash
 const processOrders = flow(async (ctx, orders: Order[]) => {
   const promises = orders.map(order =>
     ctx.exec(processOrder, order)
@@ -326,7 +326,7 @@ const processOrders = flow(async (ctx, orders: Order[]) => {
 
 Flows integrate with the extension system for cross-cutting concerns:
 
-```typescript
+```ts twoslash
 
 import type { Extension } from "@pumped-fn/core-next";
 import { accessor, custom } from "@pumped-fn/core-next";
@@ -363,7 +363,7 @@ const result = await flow.execute(handler, input, {
 
 `flowMeta` exposes flow execution state via accessors:
 
-```typescript
+```ts twoslash
 import { flowMeta } from "@pumped-fn/core-next";
 
 const flowMeta = {
@@ -377,7 +377,7 @@ const flowMeta = {
 
 ### Usage in Flows
 
-```typescript
+```ts twoslash
 const tracingFlow = flow(async (ctx, input: { userId: string }) => {
   const depth = ctx.get(flowMeta.depth);
   const name = ctx.find(flowMeta.flowName);
@@ -391,7 +391,7 @@ const tracingFlow = flow(async (ctx, input: { userId: string }) => {
 
 ### Usage in Extensions
 
-```typescript
+```ts twoslash
 const loggingExtension: Extension.Extension = {
   name: "logging",
 
@@ -415,7 +415,7 @@ const loggingExtension: Extension.Extension = {
 
 ### Journal Access
 
-```typescript
+```ts twoslash
 const execution = flow.execute(handler, input);
 await execution;
 
@@ -442,7 +442,7 @@ for (const [key, value] of journal) {
 
 **External-facing flows** (composing flows near entrypoints) should be explicit. The spec is often shared with clients for RPC. These flows use the definition → handler pattern:
 
-```typescript
+```ts twoslash
 
 const apiFlow = flow.define({
   name: "user.create",
@@ -456,7 +456,7 @@ const handler = apiFlow.handler(/* implementation */);
 
 **Internal-facing flows** (flow steps within other flows) should be implicit. The spec is unlikely to be used outside the current environment. Use the inline pattern:
 
-```typescript
+```ts twoslash
 
 const validateEmail = flow(
   {
@@ -491,7 +491,7 @@ const processUser = flow(
 
 **Recommended**: Use DataAccessor for all context data in flows instead of direct Map access.
 
-```typescript
+```ts twoslash
 import { accessor, custom, flow } from "@pumped-fn/core-next";
 
 // Define context accessors
@@ -524,7 +524,7 @@ const result = await flow.execute(processFlow, { data: "test" }, { initialContex
 
 ### Request Pipeline
 
-```typescript
+```ts twoslash
 const authenticateUser = flow(
   { auth: authService },
   async ({ auth }, ctx, token: string) => {
@@ -565,7 +565,7 @@ const processRequest = flow(
 
 ### Batch Processing
 
-```typescript
+```ts twoslash
 const processItem = flow(
   { processor: itemProcessor },
   async ({ processor }, ctx, item: Item) => {
@@ -605,7 +605,7 @@ const batchProcess = flow(async (ctx, items: Item[]) => {
 
 ### Multi-Step Workflow
 
-```typescript
+```ts twoslash
 const createOrder = flow(
   { db: database, inventory: inventoryService },
   async ({ db, inventory }, ctx, order: OrderInput) => {

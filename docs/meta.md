@@ -6,7 +6,7 @@ Meta provides type-safe metadata attachment to executors, flows, and other compo
 
 Meta provides typed metadata decoration without logic inference. Components operate independently; meta decorates them for extensibility and configuration.
 
-```typescript
+```ts twoslash
 import { meta, custom, provide } from "@pumped-fn/core-next";
 
 // Define meta type
@@ -23,7 +23,7 @@ const routeConfig = route.find(handler); // { path: "/api/users", method: "GET" 
 
 ### Meta Creation
 
-```typescript
+```ts twoslash
 import { meta, custom } from "@pumped-fn/core-next";
 
 // Create meta function with schema
@@ -39,7 +39,7 @@ const tagsMeta = tags(["auth", "user", "api"]);
 
 ### Query Methods
 
-```typescript
+```ts twoslash
 import { meta, custom, provide } from "@pumped-fn/core-next";
 
 const name = meta("name", custom<string>());
@@ -56,7 +56,7 @@ const nameRequired = name.get(service);     // "auth-service" (throws if not fou
 
 ### MetaContainer Interface
 
-```typescript
+```ts twoslash
 
 interface MetaContainer {
   metas?: Meta.Meta[]
@@ -70,7 +70,7 @@ interface MetaContainer {
 
 ### 1. Executor Decoration
 
-```typescript
+```ts twoslash
 import { provide, derive, meta, custom, name } from "@pumped-fn/core-next";
 
 // Define meta types
@@ -105,7 +105,7 @@ const dbTags = tags.find(database);               // ["persistence", "sql"]
 
 Meta is accessible from all executor variants:
 
-```typescript
+```ts twoslash
 import { provide, meta, custom } from "@pumped-fn/core-next";
 
 const description = meta("description", custom<string>());
@@ -122,7 +122,7 @@ const desc4 = description.find(service.reactive); // Via .reactive
 
 ### 3. Flow Integration
 
-```typescript
+```ts twoslash
 
 import { flow, meta, custom } from "@pumped-fn/core-next";
 
@@ -158,7 +158,7 @@ const endpointInfo = endpoint.find(userFlow); // { path: "/api/users", method: "
 
 Extensions can use meta for conditional behavior:
 
-```typescript
+```ts twoslash
 
 import { meta, custom, provide, createScope, plugin } from "@pumped-fn/core-next";
 
@@ -209,7 +209,7 @@ const background = await scope.resolve(backgroundService);
 
 Use meta for component configuration:
 
-```typescript
+```ts twoslash
 
 import { meta, custom, provide, createScope } from "@pumped-fn/core-next";
 
@@ -247,7 +247,7 @@ const client = await scope.resolve(httpClient);
 
 ### 2. Validation and Documentation
 
-```typescript
+```ts twoslash
 
 import { meta, custom, provide } from "@pumped-fn/core-next";
 import { z } from "zod";
@@ -287,7 +287,7 @@ const userApi = provide(() => ({
 
 ### 3. Multiple Meta of Same Type
 
-```typescript
+```ts twoslash
 import { meta, custom, provide } from "@pumped-fn/core-next";
 
 const tag = meta("tag", custom<string>());
@@ -312,7 +312,7 @@ const hasCriticalTag = tag.some(service).includes("critical"); // true
 
 For extension-specific meta, use symbols to avoid conflicts:
 
-```typescript
+```ts twoslash
 import { meta, custom, provide } from "@pumped-fn/core-next";
 
 // Private meta keys
@@ -337,7 +337,7 @@ const ttl = cacheTtl.find(eagerService);          // 300
 
 Meta works with scope configuration for powerful composition:
 
-```typescript
+```ts twoslash
 import { createScope, meta, custom } from "@pumped-fn/core-next";
 
 const dbConfig = meta("db", custom<{ host: string; port: number }>());

@@ -7,7 +7,7 @@
 ### 1. Dependency Graph Structure
 Every application is a graph of dependencies. Instead of manually wiring components, you define the graph structure and let the library resolve it:
 
-```typescript
+```ts twoslash
 // Define the graph nodes
 const config = provide(() => loadConfig())
 const logger = derive([config], ([cfg]) => createLogger(cfg.logLevel))
@@ -28,7 +28,7 @@ The library topologically sorts dependencies and resolves them in the correct or
 ### 3. Singleton Caching
 Each executor resolves exactly once per scope. Multiple dependents share the same resolved instance:
 
-```typescript
+```ts twoslash
 const sharedConfig = provide(() => expensiveConfigLoad())
 const serviceA = derive([sharedConfig], ([cfg]) => createServiceA(cfg))
 const serviceB = derive([sharedConfig], ([cfg]) => createServiceB(cfg))
@@ -40,7 +40,7 @@ await scope.resolve([serviceA, serviceB])
 ### 4. Lazy Evaluation
 Graph nodes only resolve when needed, enabling conditional dependencies and performance optimization:
 
-```typescript
+```ts twoslash
 const expensiveService = provide(() => createExpensiveService())
 const conditionalFeature = derive([config, expensiveService.lazy], ([cfg, lazy]) => {
   if (cfg.enableFeature) {
@@ -53,7 +53,7 @@ const conditionalFeature = derive([config, expensiveService.lazy], ([cfg, lazy])
 ## Graph vs Traditional Patterns
 
 ### Traditional Approach Problems
-```typescript
+```ts twoslash
 // Manual dependency management - error prone
 class Application {
   constructor() {
@@ -73,7 +73,7 @@ const app = new Application()
 ```
 
 ### Graph Resolution Solution
-```typescript
+```ts twoslash
 // Dependencies declared where they're used
 const config = provide(() => loadConfig())
 const logger = derive([config], ([cfg]) => createLogger(cfg))

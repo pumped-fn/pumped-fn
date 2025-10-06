@@ -8,7 +8,7 @@ Schema validation ensures type safety at runtime, validating inputs before execu
 
 ### Integration with Validation Libraries
 
-```typescript
+```ts twoslash
 import { flow } from "@pumped-fn/core-next";
 import { z } from "zod";
 
@@ -36,7 +36,7 @@ const result = await flow.execute(createUser, {
 
 ### Supported Libraries
 
-```typescript
+```ts twoslash
 import { z } from "zod";
 import * as v from "valibot";
 import { type } from "arktype";
@@ -50,7 +50,7 @@ All libraries implementing Standard Schema v1 are compatible.
 
 ### Runtime Validation
 
-```typescript
+```ts twoslash
 import { standardSchema } from "@pumped-fn/core-next";
 import { z } from "zod";
 
@@ -69,7 +69,7 @@ try {
 
 ### Basic Usage
 
-```typescript
+```ts twoslash
 import { custom } from "@pumped-fn/core-next";
 
 type User = { id: string; name: string };
@@ -91,7 +91,7 @@ const input = custom<User>();
 
 ### With Flows
 
-```typescript
+```ts twoslash
 import { flow, custom } from "@pumped-fn/core-next";
 
 type Request = { userId: string };
@@ -113,7 +113,7 @@ const getUser = flow(
 
 ### With Meta
 
-```typescript
+```ts twoslash
 import { meta, custom } from "@pumped-fn/core-next";
 
 const apiKey = meta("config.apiKey", custom<string>());
@@ -124,7 +124,7 @@ const timeout = meta("config.timeout", custom<number>());
 
 ### Input Validation
 
-```typescript
+```ts twoslash
 import { flow } from "@pumped-fn/core-next";
 import { z } from "zod";
 
@@ -152,7 +152,7 @@ const processPayment = flow(
 
 ### Nested Schema Validation
 
-```typescript
+```ts twoslash
 import { z } from "zod";
 
 const addressSchema = z.object({
@@ -186,7 +186,7 @@ const createOrder = flow(
 
 ### Error Handling
 
-```typescript
+```ts twoslash
 import { SchemaError } from "@pumped-fn/core-next";
 
 try {
@@ -203,7 +203,7 @@ try {
 
 ### Hybrid Approach
 
-```typescript
+```ts twoslash
 import { flow, custom } from "@pumped-fn/core-next";
 import { z } from "zod";
 

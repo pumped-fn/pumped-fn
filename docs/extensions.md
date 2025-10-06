@@ -17,7 +17,7 @@ Extensions access existing scope capabilities rather than duplicating them. The 
 
 ### Interface Definition
 
-```typescript
+```ts twoslash
 
 interface Extension {
   name: string
@@ -102,7 +102,7 @@ Extensions get full access to scope capabilities:
 
 The `wrap` method intercepts all operations with a discriminated union type. This provides advantages over traditional event patterns:
 
-```typescript
+```ts twoslash
 
 // ❌ Complex state tracking across events
 const startTimes = new Map()
@@ -141,7 +141,7 @@ async function wrap<T>(context, next, operation): Promise<T> {
 
 ### 1. Performance Monitoring
 
-```typescript
+```ts twoslash
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -195,7 +195,7 @@ const performanceExtension = (): Extension => {
 
 ### 2. Request Tracing
 
-```typescript
+```ts twoslash
 
 import type { Extension } from "@pumped-fn/core-next";
 import { accessor, custom } from "@pumped-fn/core-next";
@@ -257,7 +257,7 @@ const tracingExtension = (): Extension => {
 
 ### 3. Development Debugging
 
-```typescript
+```ts twoslash
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -330,7 +330,7 @@ const debugExtension = (options: { logLevel: 'info' | 'debug' | 'verbose' } = { 
 
 ### 4. Error Collection
 
-```typescript
+```ts twoslash
 
 import type { Extension } from "@pumped-fn/core-next";
 
@@ -378,7 +378,7 @@ const errorCollectionExtension = (): Extension => {
 
 ### With Scopes
 
-```typescript
+```ts twoslash
 
 import { createScope } from "@pumped-fn/core-next";
 
@@ -397,7 +397,7 @@ const result = await scope.resolve(someExecutor)
 
 ### With Flows
 
-```typescript
+```ts twoslash
 
 import { flow, custom } from "@pumped-fn/core-next";
 
@@ -419,7 +419,7 @@ const result = await flow.execute(myFlow, { data: "hello" }, {
 
 Extensions compose naturally - multiple extensions can wrap the same operations:
 
-```typescript
+```ts twoslash
 
 const result = await flow.execute(handler, input, {
   extensions: [

@@ -2,7 +2,7 @@
 
 Build dependency graphs by defining nodes and their relationships. Each node represents a value or service in your application.
 
-```typescript
+```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 ```
 
@@ -12,7 +12,7 @@ import { provide, derive } from "@pumped-fn/core-next";
 
 Creates a graph node with no dependencies. These are typically configuration, constants, or root services.
 
-```typescript
+```ts twoslash
 import { provide } from "@pumped-fn/core-next";
 
 // ---cut---
@@ -26,7 +26,7 @@ const database = provide(async () => ({ query: async () => [] }));
 
 Creates a graph node that depends on other nodes. This is where you compose services and create derived values.
 
-```typescript
+```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ apiUrl: "https://api.example.com", database: "db://localhost" }));
@@ -58,7 +58,7 @@ const application = derive(
 
 #### accessing controller
 
-```typescript
+```ts twoslash
 
 import { provide, derive, type Core } from "@pumped-fn/core-next";
 
@@ -93,7 +93,7 @@ type Controller = Core.Controller
 
 Control how dependencies are resolved using node variations:
 
-```typescript
+```ts twoslash
 import { provide, derive } from "@pumped-fn/core-next";
 
 const expensiveService = provide(() => ({ process: (data: any) => data }));
@@ -119,7 +119,7 @@ const smartService = derive(
 
 Replace any graph node with a different value. This is the key to testing and environment configuration.
 
-```typescript
+```ts twoslash
 import { provide, derive, createScope, preset } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ dbUrl: 'prod-db://example.com' }));
@@ -139,7 +139,7 @@ const testDb = await testScope.resolve(database);
 
 Scope is the execution environment that resolves your dependency graph. It handles topological sorting, caching, and lifecycle management.
 
-```typescript
+```ts twoslash
 import { createScope } from "@pumped-fn/core-next";
 ```
 
@@ -147,7 +147,7 @@ import { createScope } from "@pumped-fn/core-next";
 
 Create an isolated environment for resolving your dependency graph.
 
-```typescript
+```ts twoslash
 import { createScope, preset, provide } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ env: 'prod' }));
@@ -168,7 +168,7 @@ const testScope = createScope(
 
 Resolve any node in your dependency graph. The scope automatically resolves all dependencies in the correct order.
 
-```typescript
+```ts twoslash
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ port: 3000, env: 'dev' }));
@@ -194,7 +194,7 @@ const loggerInstance = await scope.resolve(logger);
 
 #### scope.update
 
-```typescript
+```ts twoslash
 import { provide, createScope } from "@pumped-fn/core-next";
 const value = provide(() => 0);
 const scope = createScope();
@@ -220,7 +220,7 @@ On update, the following mechanism happen
 
 Release a reference and its value (and also all of dependencies relying on the reference)
 
-```typescript
+```ts twoslash
 import { provide, derive, createScope } from "@pumped-fn/core-next";
 const value = provide(() => 0);
 
@@ -237,7 +237,7 @@ await scope.release(value);
 
 Retrieve the singleton of an executor respresentative in a scope
 
-```typescript
+```ts twoslash
 
 import { provide, createScope, type Core } from "@pumped-fn/core-next";
 const value = provide(() => 0);
@@ -258,7 +258,7 @@ typeof valueAccessor['
 
 #### scope.dispose
 
-```typescript
+```ts twoslash
 
 import { provide, createScope, type Core } from "@pumped-fn/core-next";
 const value = provide((ctl) => {
@@ -285,7 +285,7 @@ Plugins provide cross-cutting concerns without modifying core logic. They can in
 
 Register plugins to intercept scope operations:
 
-```typescript
+```ts twoslash
 import { createScope, plugin } from "@pumped-fn/core-next";
 
 const scope = createScope();
@@ -304,7 +304,7 @@ const cleanup = scope.use(plugin({
 
 Intercept resolution and update events:
 
-```typescript
+```ts twoslash
 
 import { createScope, preset, provide } from "@pumped-fn/core-next";
 
@@ -329,7 +329,7 @@ scope.onChange((event, executor, value, scope) => {
 
 Handle executor cleanup:
 
-```typescript
+```ts twoslash
 
 import { createScope, provide } from "@pumped-fn/core-next";
 
@@ -344,7 +344,7 @@ scope.onRelease(async (event, executor, scope) => {
 
 #### practical plugin examples
 
-```typescript
+```ts twoslash
 
 import { createScope, plugin, provide, derive, preset } from "@pumped-fn/core-next";
 
@@ -381,7 +381,7 @@ Meta provides type-safe decorative information attached to executors. It uses St
 
 #### creating meta functions
 
-```typescript
+```ts twoslash
 import { meta, custom } from "@pumped-fn/core-next";
 
 // Create a meta function with a schema
@@ -392,7 +392,7 @@ const config = meta("config", custom<{ url: string; timeout: number }>());
 
 #### attaching meta to executors
 
-```typescript
+```ts twoslash
 import { provide, derive, meta, custom } from "@pumped-fn/core-next";
 
 const name = meta("name", custom<string>());
@@ -415,7 +415,7 @@ const cache = provide(
 
 #### accessing meta values
 
-```typescript
+```ts twoslash
 import { provide, meta, custom } from "@pumped-fn/core-next";
 
 const name = meta("name", custom<string>());
@@ -433,7 +433,7 @@ const allNames = name.some(service); // string[]
 
 #### meta with plugins
 
-```typescript
+```ts twoslash
 
 import { createScope, plugin, provide, meta, custom } from "@pumped-fn/core-next";
 
@@ -468,7 +468,7 @@ const internal = provide(
 
 #### meta accessor integration
 
-```typescript
+```ts twoslash
 import { createScope, provide, meta, custom } from "@pumped-fn/core-next";
 
 const description = meta("description", custom<string>());
@@ -483,7 +483,7 @@ const desc = description.find(accessor); // "Main service"
 
 #### practical meta patterns
 
-```typescript
+```ts twoslash
 
 import { provide, derive, meta, custom, createScope, plugin } from "@pumped-fn/core-next";
 
@@ -530,7 +530,7 @@ const newApi = provide(
 
 Flow provides structured business logic with input/output validation, dependency injection, and context management. It extends the graph-based executor system with workflow-specific features.
 
-```typescript
+```ts twoslash
 import { flow, custom } from "@pumped-fn/core-next";
 ```
 
@@ -538,7 +538,7 @@ import { flow, custom } from "@pumped-fn/core-next";
 
 Define a flow specification with input/output schemas:
 
-```typescript
+```ts twoslash
 
 import { flow, custom } from "@pumped-fn/core-next";
 
@@ -555,7 +555,7 @@ const userFlow = flow.define({
 
 Create a handler for the flow definition:
 
-```typescript
+```ts twoslash
 import { flow, custom, provide } from "@pumped-fn/core-next";
 
 const userFlow = flow.define({
@@ -590,7 +590,7 @@ const createUserWithDb = userFlow.handler(
 
 Execute a flow handler with input:
 
-```typescript
+```ts twoslash
 
 import { flow, custom, createScope } from "@pumped-fn/core-next";
 
@@ -627,7 +627,7 @@ const result2 = await flow.execute(handler, input, {
 
 The context object provides flow execution capabilities:
 
-```typescript
+```ts twoslash
 
 import { flow, custom } from "@pumped-fn/core-next";
 
@@ -677,7 +677,7 @@ const processor = processFlow.handler(async (ctx, input) => {
 
 Create flows with handler in one call:
 
-```typescript
+```ts twoslash
 
 import { flow, custom, provide } from "@pumped-fn/core-next";
 
@@ -725,7 +725,7 @@ const flowWithDeps = flow(
 
 Type guards verify executor types at runtime. Use them for conditional logic based on executor variations.
 
-```typescript
+```ts twoslash
 import {
   isExecutor,
   isMainExecutor,
@@ -738,7 +738,7 @@ import {
 
 #### isExecutor - Check if value is an executor
 
-```typescript
+```ts twoslash
 import { isExecutor, provide } from "@pumped-fn/core-next";
 
 const maybeExecutor = provide(() => 42);
@@ -751,7 +751,7 @@ if (isExecutor(maybeExecutor)) {
 
 #### isMainExecutor - Check if executor is main type
 
-```typescript
+```ts twoslash
 import { isMainExecutor, provide } from "@pumped-fn/core-next";
 
 const executor = provide(() => 42);
@@ -765,7 +765,7 @@ if (isMainExecutor(executor)) {
 
 #### isReactiveExecutor - Check if executor is reactive variant
 
-```typescript
+```ts twoslash
 import { isReactiveExecutor, provide } from "@pumped-fn/core-next";
 
 const base = provide(() => 42);
@@ -778,7 +778,7 @@ if (isReactiveExecutor(reactive)) {
 
 #### isStaticExecutor - Check if executor is static variant
 
-```typescript
+```ts twoslash
 import { isStaticExecutor, provide } from "@pumped-fn/core-next";
 
 const base = provide(() => 42);
@@ -791,7 +791,7 @@ if (isStaticExecutor(static_)) {
 
 #### isLazyExecutor - Check if executor is lazy variant
 
-```typescript
+```ts twoslash
 import { isLazyExecutor, provide } from "@pumped-fn/core-next";
 
 const base = provide(() => 42);
@@ -804,7 +804,7 @@ if (isLazyExecutor(lazy)) {
 
 #### isPreset - Check if value is a preset
 
-```typescript
+```ts twoslash
 import { isPreset, preset, provide } from "@pumped-fn/core-next";
 
 const executor = provide(() => 42);
@@ -821,7 +821,7 @@ if (isPreset(presetValue)) {
 
 Utility functions for common execution patterns.
 
-```typescript
+```ts twoslash
 import { resolves, prepare, adapt } from "@pumped-fn/core-next";
 ```
 
@@ -829,7 +829,7 @@ import { resolves, prepare, adapt } from "@pumped-fn/core-next";
 
 Resolve multiple executors in one call. Returns results in same structure (array or object).
 
-```typescript
+```ts twoslash
 import { provide, derive, createScope, resolves } from "@pumped-fn/core-next";
 
 const a = provide(() => 1);
@@ -853,7 +853,7 @@ const { x, y, sum } = await resolves(scope, { x: a, y: b, sum: c });
 
 Prepare an executor for repeated execution without passing scope.
 
-```typescript
+```ts twoslash
 import { provide, createScope, prepare } from "@pumped-fn/core-next";
 
 const counter = provide(() => Math.random());
@@ -875,7 +875,7 @@ const original = getCounter.escape();
 
 Transform an executor returning a function into a callable function.
 
-```typescript
+```ts twoslash
 import { provide, derive, createScope, adapt } from "@pumped-fn/core-next";
 
 const config = provide(() => ({ prefix: "[LOG]" }));
@@ -899,13 +899,13 @@ const originalLogger = log.escape();
 
 Schema validation using StandardSchema.
 
-```typescript
+```ts twoslash
 import { validate, custom } from "@pumped-fn/core-next";
 ```
 
 #### validate - Validate against schema
 
-```typescript
+```ts twoslash
 import { validate, custom } from "@pumped-fn/core-next";
 
 const numberSchema = custom<number>();
@@ -920,7 +920,7 @@ const validated = await validate(numberSchema, 42);
 
 Create a schema without validation. Useful for TypeScript-only type safety.
 
-```typescript
+```ts twoslash
 import { custom } from "@pumped-fn/core-next";
 
 // Schema with no runtime validation
@@ -945,7 +945,7 @@ Additional utilities for advanced patterns.
 
 Create executors that resolve different values based on a key parameter.
 
-```typescript
+```ts twoslash
 import { multi, custom, createScope } from "@pumped-fn/core-next";
 
 // Provider form
@@ -990,7 +990,7 @@ await userCache.release(scope);
 
 Type helper for promise-wrapped values.
 
-```typescript
+```ts twoslash
 import { type Core } from "@pumped-fn/core-next";
 
 type Promised<T> = T | Promise<T>;
@@ -1003,7 +1003,7 @@ type Output<T> = Promised<T>;
 
 Structured error types for executor resolution.
 
-```typescript
+```ts twoslash
 import {
   ExecutorResolutionError,
   FactoryExecutionError,

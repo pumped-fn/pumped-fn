@@ -73,7 +73,7 @@ $ bun add @pumped-fn/core-next
 
 Traditional testing requires mocking every dependency. Graph resolution lets you test entire systems by changing single nodes:
 
-```typescript
+```ts twoslash
 // Change environment = different entire system
 const testScope = createScope(preset(config, testConfig))
 const prodScope = createScope(preset(config, prodConfig))

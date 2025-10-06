@@ -6,7 +6,7 @@ DataAccessor provides type-safe access to Map-like data structures with schema v
 
 Instead of using Map.get() and Map.set() with any types, use DataAccessor for type-safe, validated data access across DataStore, MetaContainer, and Meta arrays.
 
-```typescript
+```ts twoslash
 import { accessor, custom } from "@pumped-fn/core-next";
 
 // Create typed accessor
@@ -25,7 +25,7 @@ const prefs = userPrefs.get(context); // Fully typed, no 'any'
 
 ### Creating Accessors
 
-```typescript
+```ts twoslash
 // Accessor without default (returns undefined if missing)
 const userId = accessor("user.id", custom<string>());
 
@@ -35,7 +35,7 @@ const theme = accessor("user.theme", custom<"light" | "dark">(), "light");
 
 ### Using Accessors
 
-```typescript
+```ts twoslash
 // Required access - throws if not found
 const value = accessor.get(source);
 
@@ -53,7 +53,7 @@ const [key, value] = accessor.preset(initialValue);
 
 DataAccessor is the recommended way to access flow context data:
 
-```typescript
+```ts twoslash
 import { accessor, custom, flow } from "@pumped-fn/core-next";
 
 // Define context accessors
@@ -85,7 +85,7 @@ const handler = processFlow.handler(async (ctx, input) => {
 
 The library provides built-in flow context accessors:
 
-```typescript
+```ts twoslash
 export const flowMeta = {
   depth: accessor("flow.depth", custom<number>(), 0),
   flowName: accessor("flow.name", custom<string | undefined>()),
@@ -111,7 +111,7 @@ const tracingExtension: Extension.Extension = {
 
 Extensions use accessors for managing state across executions:
 
-```typescript
+```ts twoslash
 // Extension-specific accessors with symbol keys
 const executionCount = accessor(
   Symbol.for("metrics.execution.count"),
@@ -136,7 +136,7 @@ const metricsExtension: Extension.Extension = {
 
 Flow contexts automatically inherit from parent contexts:
 
-```typescript
+```ts twoslash
 // Parent sets global context
 const parentHandler = flow.handler(async (ctx, input) => {
   traceId.set(ctx, `trace-${Date.now()}`);
@@ -163,7 +163,7 @@ const childHandler = childFlow.handler(async (ctx, input) => {
 
 Use accessor presets for easy test setup:
 
-```typescript
+```ts twoslash
 describe("Flow with Context", () => {
   test("handles context correctly", async () => {
     // Setup test context
@@ -212,7 +212,7 @@ describe("Flow with Context", () => {
 4. **Group Related Accessors** into objects for better organization
 5. **Test with Maps** using `preset()` for easy setup
 
-```typescript
+```ts twoslash
 // Good: Organized accessor groups
 const RequestContext = {
   TRACE_ID: accessor("trace.id", custom<string>()),

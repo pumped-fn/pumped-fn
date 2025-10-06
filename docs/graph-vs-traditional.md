@@ -5,7 +5,7 @@ Compare how graph resolution transforms common programming challenges.
 ## Code Organization
 
 ### Traditional: Manual Wiring
-```typescript
+```ts twoslash
 class DataService {
   constructor() {
     this.config = { logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }
@@ -26,7 +26,7 @@ class DataService {
 ```
 
 ### Graph Resolution: Declare Dependencies
-```typescript
+```ts twoslash
 const config = provide(() => ({ logLevel: 'info', db: 'db://prod', redis: 'redis://prod', notifier: 'smtp://prod' }))
 const logger = derive([config], ([cfg]) => ({ log: (msg: string) => console.log(`[${cfg.logLevel}] ${msg}`) }))
 const db = derive([config, logger], ([cfg, log]) => ({ save: async (data: any) => ({ id: '123', ...data }) }))
@@ -58,7 +58,7 @@ const service = await scope.resolve(dataService)
 ## Testing
 
 ### Traditional: Complex Mock Setup
-```typescript
+```ts twoslash
 // Mock every dependency manually
 const mockConfig = {
   logLevel: 'silent',
@@ -89,7 +89,7 @@ const mockEmailService = {
 ```
 
 ### Graph Resolution: Single Point Changes
-```typescript
+```ts twoslash
 // Change entire system behavior with single presets
 const testScope = createScope(
   preset(config, {
@@ -121,7 +121,7 @@ const result = await service.createEntity({ name: 'Test' })
 ## Configuration Management
 
 ### Traditional: Global Configuration Hell
-```typescript
+```ts twoslash
 // Global config object passed everywhere
 const globalConfig = { database: 'db://prod', email: { provider: 'smtp' } }
 
@@ -144,7 +144,7 @@ beforeEach(() => {
 ```
 
 ### Graph Resolution: Localized Configuration
-```typescript
+```ts twoslash
 // Configuration flows through dependency graph
 const config = provide(() => ({ database: 'db://prod', email: { provider: 'smtp' } }))
 const dbConfig = derive([config], ([cfg]) => cfg.database)
@@ -168,7 +168,7 @@ const testScope = createScope(preset(config, testConfig))
 ## Performance Optimization
 
 ### Traditional: Manual Optimization
-```typescript
+```ts twoslash
 class Application {
   constructor() {
     // Must manually optimize initialization
@@ -194,7 +194,7 @@ class Application {
 ```
 
 ### Graph Resolution: Automatic Optimization
-```typescript
+```ts twoslash
 const expensiveService = provide(async () => ({ process: (data: any) => data }))
 
 const processor = derive(
@@ -223,7 +223,7 @@ const result = await scope.resolve(processor)
 ## Refactoring
 
 ### Traditional: Ripple Effect Changes
-```typescript
+```ts twoslash
 // Adding new dependency requires changes everywhere
 class DataService {
   constructor(db, cache, logger) {
@@ -238,7 +238,7 @@ const app = new Application(dataService)
 ```
 
 ### Graph Resolution: Isolated Changes
-```typescript
+```ts twoslash
 // Add new dependency at definition site only
 const dataService = derive(
   [db, cache, logger, auditService],

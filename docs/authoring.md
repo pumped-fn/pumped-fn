@@ -16,7 +16,7 @@ Components are designed around **configuration variation** through meta-based sc
 ### Meta vs Traditional Configuration
 
 **Traditional DI Configuration**:
-```typescript
+```ts twoslash
 // Manual configuration passing - rigid, imperative
 const config = { timeout: 5000 };
 const logger = new Logger(config);
@@ -25,7 +25,7 @@ const service = new UserService(db, logger); // Fixed at construction
 ```
 
 **Meta-Based Configuration**:
-```typescript
+```ts twoslash
 // Declarative components with meta-driven configuration
 const dbConfigMeta = meta("db-config", custom<{ timeout: number }>());
 const logger = provide((ctl) => {
@@ -53,14 +53,14 @@ const testScope = createScope({
 ## Essential APIs
 
 ### Meta Definition
-```typescript
+```ts twoslash
 import { meta, custom } from "@pumped-fn/core-next";
 
 const configMeta = meta("config", custom<{ timeout: number; retries: number }>());
 ```
 
 ### Configuration Access in Executors
-```typescript
+```ts twoslash
 import { provide, meta, custom } from "@pumped-fn/core-next";
 
 const configMeta = meta("http-config", custom<{ timeout: number }>());
@@ -72,7 +72,7 @@ const httpClient = provide((ctl) => {
 ```
 
 ### Meta Export Pattern
-```typescript
+```ts twoslash
 // Export meta definitions and default configurations
 export const meta = {
   config: configMeta
@@ -81,7 +81,7 @@ export const defaultConfig = configMeta({ timeout: 5000, retries: 3 });
 ```
 
 ### Scope Integration
-```typescript
+```ts twoslash
 import { createScope } from "@pumped-fn/core-next";
 
 const scope = createScope({
@@ -93,7 +93,7 @@ const scope = createScope({
 
 ### 1. Basic Configurable Component
 
-```typescript
+```ts twoslash
 import { provide, derive, meta, custom, name } from "@pumped-fn/core-next";
 
 // Define configuration meta
@@ -138,7 +138,7 @@ export const defaultHttpConfig = httpConfigMeta({
 
 ### 2. Multi-Environment Configuration
 
-```typescript
+```ts twoslash
 // Define environment-specific configurations
 const devConfig = httpConfigMeta({
   baseUrl: "http://localhost:3000",
@@ -170,7 +170,7 @@ const prodApi = await prodScope.resolve(apiService);
 
 ### 3. Composable Configuration
 
-```typescript
+```ts twoslash
 // Multiple meta configurations for different concerns
 const dbConfigMeta = meta("db-config", custom<{
   host: string;
@@ -217,7 +217,7 @@ const appScope = createScope({
 
 ### 4. Component Library Structure
 
-```typescript
+```ts twoslash
 // lib/http/index.ts
 export const httpComponents = {
   client: httpClient,
@@ -290,7 +290,7 @@ const testScope = createScope({
 
 ### 1. Conditional Configuration
 
-```typescript
+```ts twoslash
 const featureFlagMeta = meta("feature-flags", custom<{
   enableCache: boolean;
   enableMetrics: boolean;
@@ -321,7 +321,7 @@ const dataService = derive([httpClient], ([http], ctl) => {
 
 ### 2. Meta Validation
 
-```typescript
+```ts twoslash
 import { z } from "zod";
 
 const configSchema = z.object({
@@ -342,7 +342,7 @@ const httpService = provide((ctl) => {
 
 ### 3. Configuration Inheritance
 
-```typescript
+```ts twoslash
 // Base configuration
 const baseConfigMeta = meta("base-config", custom<{
   environment: 'dev' | 'staging' | 'prod';
@@ -378,7 +378,7 @@ const scope = createScope({
 
 ### 1. Configuration-Based Testing
 
-```typescript
+```ts twoslash
 // Test with different configurations
 describe('User Service', () => {
   test('handles timeouts in production config', async () => {
@@ -414,7 +414,7 @@ describe('User Service', () => {
 
 ### 2. Mock Configuration
 
-```typescript
+```ts twoslash
 // Mock HTTP client through configuration
 const mockHttpConfig = httpConfigMeta({
   baseUrl: "mock://api",  // Special mock URL
