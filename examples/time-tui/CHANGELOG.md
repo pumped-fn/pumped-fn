@@ -1,5 +1,13 @@
 # time-tui-example
 
+## 1.0.9
+
+### Patch Changes
+
+- Updated dependencies [ab870ee]
+- Updated dependencies [e5d33df]
+  - @pumped-fn/core-next@0.5.67
+
 ## 1.0.8
 
 ### Patch Changes

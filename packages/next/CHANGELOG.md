@@ -1,5 +1,12 @@
 # @pumped-fn/core-next
 
+## 0.5.67
+
+### Patch Changes
+
+- ab870ee: chore: bring back is\* api
+- e5d33df: improve the flow aapi
+
 ## 0.5.66
 
 ### Patch Changes
