@@ -31,8 +31,8 @@
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "devDependencies": {
-    "tsdown": "^0.15.4",
-    "typescript": "^5.9.2",
+    "tsdown": "^0.15.6",
+    "typescript": "^5.9.3",
     "vitest": "^1.6.1"
   },
   "engines": {
