@@ -108,6 +108,47 @@ FlowExecutionContext.{depth|flowName|parentFlowName|isParallel}: Accessor
 FlowExecutionContext.get/set(source: DataStore, value): ExecutionContext
 ```
 
+### Promised Utility Methods
+
+For working with settled results from `parallelSettled()` or `Promised.allSettled()`:
+
+```typescript
+// Extract results
+.fulfilled(): Promised<T[]>              // Get all fulfilled values
+.rejected(): Promised<unknown[]>         // Get all rejection reasons
+.partition(): Promised<{ fulfilled: T[], rejected: unknown[] }>  // Split into groups
+
+// Find values
+.firstFulfilled(): Promised<T | undefined>        // First successful value
+.firstRejected(): Promised<unknown | undefined>   // First rejection
+.findFulfilled(predicate: (value: T, index: number) => boolean): Promised<T | undefined>
+
+// Transform
+.mapFulfilled(fn: (value: T, index: number) => R): Promised<R[]>  // Map over successful values
+
+// Assertions
+.assertAllFulfilled(errorMapper?: (reasons, fulfilledCount, totalCount) => Error): Promised<T[]>  // Throw if any failed
+```
+
+**Usage:**
+```typescript
+// Extract fulfilled values
+const values = await ctx.parallelSettled([p1, p2, p3]).fulfilled();
+
+// Chain operations
+const sum = await ctx
+  .parallelSettled([p1, p2, p3])
+  .fulfilled()
+  .map(arr => arr.reduce((a, b) => a + b, 0));
+
+// Handle errors
+const firstError = await ctx.parallelSettled([p1, p2, p3]).firstRejected();
+if (firstError) throw firstError;
+
+// Partition results
+const { fulfilled, rejected } = await ctx.parallelSettled([p1, p2, p3]).partition();
+```
+
 ---
 
 ## Meta System

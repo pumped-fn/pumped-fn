@@ -181,4 +181,146 @@ export class Promised<T> implements PromiseLike<T> {
 
     return new Promised(pod, promise);
   }
+
+  private static extractResults<U>(
+    value: readonly PromiseSettledResult<U>[] | { results: readonly PromiseSettledResult<U>[] }
+  ): readonly PromiseSettledResult<U>[] {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    return (value as { results: readonly PromiseSettledResult<U>[] }).results;
+  }
+
+  fulfilled<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
+  ): Promised<any[]> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      return results
+        .filter((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+        .map((r: any) => r.value);
+    });
+  }
+
+  rejected<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
+  ): Promised<unknown[]> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      return results
+        .filter((r: any): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r: any) => r.reason);
+    });
+  }
+
+  partition<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
+  ): Promised<{ fulfilled: any[]; rejected: unknown[] }> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      const fulfilled: any[] = [];
+      const rejected: unknown[] = [];
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          fulfilled.push(result.value);
+        } else {
+          rejected.push(result.reason);
+        }
+      }
+
+      return { fulfilled, rejected };
+    });
+  }
+
+  firstFulfilled<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
+  ): Promised<any> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      const found = results.find((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled");
+      return found?.value;
+    });
+  }
+
+  firstRejected<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
+  ): Promised<unknown | undefined> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      const found = results.find((r: any): r is PromiseRejectedResult => r.status === "rejected");
+      return found?.reason;
+    });
+  }
+
+  findFulfilled<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
+    predicate: (value: any, index: number) => boolean
+  ): Promised<any> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      let fulfilledIndex = 0;
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          if (predicate(result.value, fulfilledIndex)) {
+            return result.value;
+          }
+          fulfilledIndex++;
+        }
+      }
+
+      return undefined;
+    });
+  }
+
+  mapFulfilled<U, R>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
+    fn: (value: any, index: number) => R
+  ): Promised<R[]> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      const mapped: R[] = [];
+      let fulfilledIndex = 0;
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          mapped.push(fn(result.value, fulfilledIndex));
+          fulfilledIndex++;
+        }
+      }
+
+      return mapped;
+    });
+  }
+
+  assertAllFulfilled<U>(
+    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
+    errorMapper?: (reasons: unknown[], fulfilledCount: number, totalCount: number) => Error
+  ): Promised<any[]> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      const fulfilled: any[] = [];
+      const rejected: unknown[] = [];
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          fulfilled.push(result.value);
+        } else {
+          rejected.push(result.reason);
+        }
+      }
+
+      if (rejected.length > 0) {
+        const error = errorMapper
+          ? errorMapper(rejected, fulfilled.length, results.length)
+          : new Error(
+              `${rejected.length} of ${results.length} operations failed: ${rejected.map((r: unknown) => String(r)).join(", ")}`
+            );
+        throw error;
+      }
+
+      return fulfilled;
+    });
+  }
 }

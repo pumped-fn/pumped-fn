@@ -21,5 +21,18 @@
   },
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
-  }
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.changeset": true,
+    ".github": true,
+    ".vscode": true,
+    "**/node_modules": true,
+    "pnpm-lock.yaml": true
+  },
+  "explorerExclude.backup": {}
 }

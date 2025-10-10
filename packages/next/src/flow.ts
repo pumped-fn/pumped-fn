@@ -447,9 +447,9 @@ class FlowContext implements Flow.Context {
     return new Promised(this.pod, promise);
   }
 
-  async parallel<T extends readonly Promised<any>[]>(
+  parallel<T extends readonly Promised<any>[]>(
     promises: [...T]
-  ): Promise<
+  ): Promised<
     Flow.ParallelResult<{
       [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
     }>
@@ -457,44 +457,48 @@ class FlowContext implements Flow.Context {
     const parentFlowName = this.find(flowMeta.flowName);
     const depth = this.get(flowMeta.depth);
 
-    const executeCore = async () => {
-      const results = await Promise.all(promises);
+    const promise = (async () => {
+      const executeCore = async () => {
+        const results = await Promise.all(promises);
 
-      return {
-        results: results as Flow.ParallelResult<{
-          [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
-        }>["results"],
-        stats: {
-          total: results.length,
-          succeeded: results.length,
-          failed: 0,
-        },
-      };
-    };
-
-    let executor = executeCore;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const currentExecutor = executor;
-        executor = async () => {
-          return extension.wrap!(this, currentExecutor, {
-            kind: "parallel",
-            mode: "parallel",
-            promiseCount: promises.length,
-            depth,
-            parentFlowName,
-            pod: this.pod,
-          });
+        return {
+          results: results as Flow.ParallelResult<{
+            [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+          }>["results"],
+          stats: {
+            total: results.length,
+            succeeded: results.length,
+            failed: 0,
+          },
         };
-      }
-    }
+      };
 
-    return executor();
+      let executor = executeCore;
+      for (const extension of this.reversedExtensions) {
+        if (extension.wrap) {
+          const currentExecutor = executor;
+          executor = async () => {
+            return extension.wrap!(this, currentExecutor, {
+              kind: "parallel",
+              mode: "parallel",
+              promiseCount: promises.length,
+              depth,
+              parentFlowName,
+              pod: this.pod,
+            });
+          };
+        }
+      }
+
+      return executor();
+    })();
+
+    return new Promised(this.pod, promise);
   }
 
-  async parallelSettled<T extends readonly Promised<any>[]>(
+  parallelSettled<T extends readonly Promised<any>[]>(
     promises: [...T]
-  ): Promise<
+  ): Promised<
     Flow.ParallelSettledResult<{
       [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
     }>
@@ -502,40 +506,44 @@ class FlowContext implements Flow.Context {
     const parentFlowName = this.find(flowMeta.flowName);
     const depth = this.get(flowMeta.depth);
 
-    const executeCore = async () => {
-      const results = await Promise.allSettled(promises);
+    const promise = (async () => {
+      const executeCore = async () => {
+        const results = await Promise.allSettled(promises);
 
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.filter((r) => r.status === "rejected").length;
+        const succeeded = results.filter((r) => r.status === "fulfilled").length;
+        const failed = results.filter((r) => r.status === "rejected").length;
 
-      return {
-        results: results as PromiseSettledResult<any>[],
-        stats: {
-          total: results.length,
-          succeeded,
-          failed,
-        },
-      };
-    };
-
-    let executor = executeCore;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const currentExecutor = executor;
-        executor = async () => {
-          return extension.wrap!(this, currentExecutor, {
-            kind: "parallel",
-            mode: "parallelSettled",
-            promiseCount: promises.length,
-            depth,
-            parentFlowName,
-            pod: this.pod,
-          });
+        return {
+          results: results as PromiseSettledResult<any>[],
+          stats: {
+            total: results.length,
+            succeeded,
+            failed,
+          },
         };
-      }
-    }
+      };
 
-    return executor();
+      let executor = executeCore;
+      for (const extension of this.reversedExtensions) {
+        if (extension.wrap) {
+          const currentExecutor = executor;
+          executor = async () => {
+            return extension.wrap!(this, currentExecutor, {
+              kind: "parallel",
+              mode: "parallelSettled",
+              promiseCount: promises.length,
+              depth,
+              parentFlowName,
+              pod: this.pod,
+            });
+          };
+        }
+      }
+
+      return executor();
+    })();
+
+    return new Promised(this.pod, promise);
   }
 
   private async executeWithExtensions<T>(

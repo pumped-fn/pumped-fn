@@ -553,7 +553,7 @@ export namespace Flow {
 
     parallel<T extends readonly Promised<any>[]>(
       promises: [...T]
-    ): Promise<
+    ): Promised<
       ParallelResult<{
         [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
       }>
@@ -561,7 +561,7 @@ export namespace Flow {
 
     parallelSettled<T extends readonly Promised<any>[]>(
       promises: [...T]
-    ): Promise<
+    ): Promised<
       ParallelSettledResult<{
         [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
       }>

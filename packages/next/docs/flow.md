@@ -42,20 +42,16 @@ const results = await ctx.executeParallel([
   [flow2, input2]
 ]);
 
-// Handle parallel results
-if (results.type === 'all-success') {
-  // All flows succeeded
-  const [output1, output2] = results.data;
-} else {
-  // Some flows may have failed
-  results.data.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      console.log(`Flow ${index} result:`, result.value);
-    } else {
-      console.error(`Flow ${index} failed:`, result.reason);
-    }
-  });
-}
+// Handle parallel results with utility methods
+const values = await ctx.parallelSettled([p1, p2, p3]).fulfilled();
+const firstError = await ctx.parallelSettled([p1, p2, p3]).firstRejected();
+const { fulfilled, rejected } = await ctx.parallelSettled([p1, p2, p3]).partition();
+
+// Or chain operations
+const sum = await ctx
+  .parallelSettled([p1, p2, p3])
+  .fulfilled()
+  .map(values => values.reduce((a, b) => a + b, 0));
 ```
 
 ### Schema System
@@ -254,26 +250,69 @@ const register = registerFlow.handler(
 );
 ```
 
-### 4. Parallel Flow Execution
+### 4. Parallel Flow Execution with Utility Methods
+
+The `parallelSettled()` method returns `Promised<ParallelSettledResult<T>>` with chainable utility methods for easy result processing:
 
 ```typescript
 const processOrder = orderFlow.handler(async (ctx, input) => {
-  // Execute multiple flows in parallel
-  const [inventory, payment, shipping] = await ctx.executeParallel([
-    [checkInventoryFlow, { items: input.items }],
-    [processPaymentFlow, { amount: input.total }],
-    [calculateShippingFlow, { address: input.address }],
+  // Execute multiple flows in parallel with automatic result handling
+  const settled = ctx.parallelSettled([
+    ctx.exec(checkInventoryFlow, { items: input.items }),
+    ctx.exec(processPaymentFlow, { amount: input.total }),
+    ctx.exec(calculateShippingFlow, { address: input.address }),
   ]);
 
-  if (inventory.type === "ko" || payment.type === "ko") {
-    return ctx.ko({ code: "ORDER_FAILED", message: "..." });
+  // Extract only successful values
+  const [inventory, payment, shipping] = await settled.fulfilled();
+
+  // Or check for errors first
+  const firstError = await settled.firstRejected();
+  if (firstError) {
+    return ctx.ko({ code: "ORDER_FAILED", message: String(firstError) });
   }
+
+  // Or partition results
+  const { fulfilled, rejected } = await settled.partition();
+  if (rejected.length > 0) {
+    return ctx.ko({ code: "PARTIAL_FAILURE", failed: rejected.length });
+  }
+
+  // Or assert all succeeded (throws if any failed)
+  const allValues = await settled.assertAllFulfilled(
+    (reasons) => new Error(`${reasons.length} operations failed`)
+  );
 
   return ctx.ok({
     orderId: generateId(),
-    shippingCost: shipping.data.cost,
+    shippingCost: shipping.cost,
   });
 });
+```
+
+**Available Utility Methods:**
+
+- **`.fulfilled()`** - Extract all successful values as an array
+- **`.rejected()`** - Extract all rejection reasons as an array
+- **`.partition()`** - Split into `{ fulfilled: T[], rejected: unknown[] }`
+- **`.firstFulfilled()`** - Get first successful value or undefined
+- **`.firstRejected()`** - Get first rejection or undefined
+- **`.findFulfilled(predicate)`** - Find first fulfilled value matching predicate
+- **`.mapFulfilled(fn)`** - Map over only successful values
+- **`.assertAllFulfilled(errorMapper?)`** - Throw if any failed, return fulfilled values
+
+All methods are chainable with other `Promised` operations:
+
+```typescript
+// Complex chaining example
+const totalAmount = await ctx
+  .parallelSettled([
+    ctx.exec(getOrderTotal, orderId1),
+    ctx.exec(getOrderTotal, orderId2),
+    ctx.exec(getOrderTotal, orderId3),
+  ])
+  .fulfilled()
+  .map(totals => totals.reduce((sum, t) => sum + t, 0));
 ```
 
 ## Extension Integration
