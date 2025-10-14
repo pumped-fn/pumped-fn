@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.69
+
+### Patch Changes
+
+- 9efebeb: Added Flow<I, O> type that extends UFlow with generic Input/Output types and includes definition property for direct access to flow metadata at Executor level
+
 ## 0.5.68
 
 ### Patch Changes
