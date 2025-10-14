@@ -492,6 +492,49 @@ export namespace Flow {
     ? S extends never ? O : S
     : never;
 
+  export type FlowRouterNode = { [key: string]: UFlow | FlowRouterNode };
+
+  export type PathsToFlows<T> = T extends UFlow
+    ? ""
+    : T extends object
+    ? {
+        [K in keyof T]: K extends string
+          ? PathsToFlows<T[K]> extends infer P
+            ? P extends ""
+              ? K
+              : P extends string
+              ? `${K}.${P}`
+              : never
+            : never
+          : never;
+      }[keyof T]
+    : never;
+
+  export type GetFlowFromPath<T, P extends string> = P extends `${infer First}.${infer Rest}`
+    ? First extends keyof T
+      ? GetFlowFromPath<T[First], Rest>
+      : never
+    : P extends keyof T
+    ? T[P]
+    : never;
+
+  export type InferInputFromPath<Router, Path extends string> = GetFlowFromPath<Router, Path> extends infer F
+    ? F extends UFlow
+      ? InferInput<F>
+      : never
+    : never;
+
+  export type InferOutputFromPath<Router, Path extends string> = GetFlowFromPath<Router, Path> extends infer F
+    ? F extends UFlow
+      ? InferOutput<F>
+      : never
+    : never;
+
+  export type FlowRouterExecutor<Router extends FlowRouterNode> = <P extends PathsToFlows<Router>>(
+    path: P,
+    input: InferInputFromPath<Router, P>
+  ) => Promised<InferOutputFromPath<Router, P>>;
+
   export type FnExecutor<I, O> = (input: I) => O | Promise<O>;
 
   export type MultiFnExecutor<Args extends readonly unknown[], O> = (
