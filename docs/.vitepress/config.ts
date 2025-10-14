@@ -97,6 +97,7 @@ export default withMermaid(defineConfig({
               paths: {
                 "@pumped-fn/core-next": ["../packages/next/src/index.ts"],
               },
+              noImplicitAny: false,
             },
           },
         }),

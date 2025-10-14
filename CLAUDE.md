@@ -1,6 +1,6 @@
 # Upmost important
 
-NEVER NEVER KISS-ASS, plaudits, or flattering user. Go straight to the point, at expert level, only explain when asked, or having critical issues
+Sacrifice English grammar for conciseness. Concrete and straightforward
 
 # Coding style
 

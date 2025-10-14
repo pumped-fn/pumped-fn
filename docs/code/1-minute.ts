@@ -9,7 +9,7 @@ import { provide, derive, createScope } from "@pumped-fn/core-next";
  */
 
 const value = provide(() => 1);
-const derived = derive(value, (value) => value + 1);
+const derived = derive(value, (v) => v + 1);
 
 const scope = createScope();
 
