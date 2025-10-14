@@ -1,5 +1,13 @@
 # @pumped-fn/core-next
 
+## 0.5.71
+
+### Patch Changes
+
+- 402aef4: Add Flow router utility types for path-based type inference with nested router support
+- b44d622: Fix Flow.InferInput and Flow.InferOutput to properly infer types from Flow.Flow return values, and update flow.execute signatures to accept Flow.Flow type
+- 97463df: Fix scope.exec return types to properly infer Promised<S> instead of any, providing better type safety and IDE autocomplete support
+
 ## 0.5.70
 
 ### Patch Changes
