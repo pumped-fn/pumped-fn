@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.68
+
+### Patch Changes
+
+- b0969a9: Changed parallel() and parallelSettled() return type from Promise to Promised, added Promised settled result utilities: fulfilled(), rejected(), partition(), firstFulfilled(), firstRejected(), findFulfilled(), mapFulfilled(), assertAllFulfilled()
+
 ## 0.5.67
 
 ### Patch Changes
