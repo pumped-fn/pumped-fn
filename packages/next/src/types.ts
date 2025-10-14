@@ -481,13 +481,15 @@ export namespace Flow {
   export type InferInput<F> = F extends
     | Handler<any, infer I>
     | Core.Executor<Handler<any, infer I>>
+    | Flow<infer I, any>
     ? I
     : never;
 
   export type InferOutput<F> = F extends
     | Handler<infer S, any>
     | Core.Executor<Handler<infer S, any>>
-    ? S
+    | Flow<any, infer O>
+    ? S extends never ? O : S
     : never;
 
   export type FnExecutor<I, O> = (input: I) => O | Promise<O>;

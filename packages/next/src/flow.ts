@@ -613,7 +613,7 @@ class FlowContext implements Flow.Context {
 }
 
 function execute<S, I>(
-  flow: Core.Executor<Flow.Handler<S, I>>,
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options: {
     scope?: Core.Scope;
@@ -627,7 +627,7 @@ function execute<S, I>(
 ): Promised<Flow.ExecutionDetails<S>>;
 
 function execute<S, I>(
-  flow: Core.Executor<Flow.Handler<S, I>>,
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options?: {
     scope?: Core.Scope;
@@ -641,7 +641,7 @@ function execute<S, I>(
 ): Promised<S>;
 
 function execute<S, I>(
-  flow: Core.Executor<Flow.Handler<S, I>>,
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options?: {
     scope?: Core.Scope;
