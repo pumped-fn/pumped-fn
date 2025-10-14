@@ -398,7 +398,7 @@ export declare namespace Core {
     disposePod(scope: Pod): Promise<void>;
 
     exec<S, I>(
-      flow: Core.Executor<any>,
+      flow: Core.Executor<Flow.Handler<S, I>>,
       input: I,
       options: {
         extensions?: Extension.Extension[];
@@ -408,10 +408,10 @@ export declare namespace Core {
         presets?: Preset<unknown>[];
         details: true;
       }
-    ): any;
+    ): Promised<Flow.ExecutionDetails<S>>;
 
     exec<S, I>(
-      flow: Core.Executor<any>,
+      flow: Core.Executor<Flow.Handler<S, I>>,
       input: I,
       options?: {
         extensions?: Extension.Extension[];
@@ -421,7 +421,7 @@ export declare namespace Core {
         presets?: Preset<unknown>[];
         details?: false;
       }
-    ): any;
+    ): Promised<S>;
   }
 }
 
