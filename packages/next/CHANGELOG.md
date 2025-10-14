@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.70
+
+### Patch Changes
+
+- 86f7c8f: Updated all flow() creation methods to consistently return Flow.Flow<I, O> type instead of Core.Executor, providing better type inference and direct access to flow definition across all flow creation patterns
+
 ## 0.5.69
 
 ### Patch Changes
