@@ -474,6 +474,10 @@ export namespace Flow {
 
   export type UFlow = Core.Executor<Handler<any, any>>;
 
+  export interface Flow<I, O> extends Core.Executor<Handler<O, I>> {
+    definition: Definition<O, I>;
+  }
+
   export type InferInput<F> = F extends
     | Handler<any, infer I>
     | Core.Executor<Handler<any, infer I>>

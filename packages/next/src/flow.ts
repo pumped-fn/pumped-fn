@@ -44,7 +44,7 @@ class FlowDefinition<S, I> {
 
   handler(
     handlerFn: (ctx: Flow.Context, input: I) => Promise<S> | S
-  ): Core.Executor<Flow.Handler<S, I>>;
+  ): Flow.Flow<I, S>;
 
   handler<D extends Core.DependencyLike>(
     dependencies: D,
@@ -53,7 +53,7 @@ class FlowDefinition<S, I> {
       ctx: Flow.Context,
       input: I
     ) => Promise<S> | S
-  ): Core.Executor<Flow.Handler<S, I>>;
+  ): Flow.Flow<I, S>;
 
   handler<D extends Core.DependencyLike>(
     dependenciesOrHandler:
@@ -64,10 +64,10 @@ class FlowDefinition<S, I> {
       ctx: Flow.Context,
       input: I
     ) => Promise<S> | S
-  ): Core.Executor<Flow.Handler<S, I>> {
+  ): Flow.Flow<I, S> {
     if (typeof dependenciesOrHandler === "function") {
       const noDepsHandler = dependenciesOrHandler;
-      return createExecutor(
+      const executor = createExecutor(
         () => {
           const flowHandler = async (ctx: Flow.Context, input: I) => {
             return noDepsHandler(ctx, input);
@@ -76,11 +76,13 @@ class FlowDefinition<S, I> {
         },
         undefined,
         [...this.metas, flowDefinitionMeta(this)]
-      ) as Core.Executor<Flow.Handler<S, I>>;
+      ) as Flow.Flow<I, S>;
+      executor.definition = this;
+      return executor;
     }
     const dependencies = dependenciesOrHandler;
     const dependentHandler = handlerFn!;
-    return createExecutor(
+    const executor = createExecutor(
       (deps: unknown) => {
         const flowHandler = async (ctx: Flow.Context, input: I) => {
           return dependentHandler(deps as Core.InferOutput<D>, ctx, input);
@@ -90,7 +92,9 @@ class FlowDefinition<S, I> {
       },
       dependencies,
       [...this.metas, flowDefinitionMeta(this)]
-    ) as Core.Executor<Flow.Handler<S, I>>;
+    ) as Flow.Flow<I, S>;
+    executor.definition = this;
+    return executor;
   }
 }
 
