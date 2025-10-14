@@ -762,11 +762,11 @@ function execute<S, I>(
 
 function flowImpl<I, S>(
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<I extends void, S>(
   handler: (ctx?: Flow.Context) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<D extends Core.DependencyLike, I, S>(
   dependencies: D,
@@ -775,19 +775,19 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I>(
   config: FlowConfigWithHandler<S, I>
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I, D extends Core.DependencyLike>(
   config: FlowConfigWithDeps<S, I, D>
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S = unknown, I = unknown>(
   config: FlowConfigInferred<S, I>
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<
   S = unknown,
@@ -795,12 +795,12 @@ function flowImpl<
   D extends Core.DependencyLike = never
 >(
   config: FlowConfigInferredWithDeps<S, I, D>
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I>(
   definition: DefineConfig<S, I>,
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I, D extends Core.DependencyLike>(
   definition: DefineConfig<S, I>,
@@ -810,7 +810,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I, D extends Core.DependencyLike>(
   dependencies: D,
@@ -820,7 +820,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>>;
+): Flow.Flow<I, S>;
 
 function flowImpl<S, I>(definition: DefineConfig<S, I>): FlowDefinition<S, I>;
 
@@ -847,7 +847,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
-): Core.Executor<Flow.Handler<S, I>> | FlowDefinition<S, I> {
+): Flow.Flow<I, S> | FlowDefinition<S, I> {
   if (typeof definitionOrConfigOrDepsOrHandler === "function") {
     const handler = definitionOrConfigOrDepsOrHandler as (
       ctx: Flow.Context,
