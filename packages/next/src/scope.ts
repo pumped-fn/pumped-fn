@@ -413,10 +413,11 @@ class BaseScope implements Core.Scope {
     UE,
     Set<Core.Cleanup>
   >();
-  protected onUpdates: Map<UE, Set<OnUpdateFn | UE>> = new Map<
+  protected onUpdateCallbacks: Map<UE, Set<OnUpdateFn>> = new Map<
     UE,
-    Set<OnUpdateFn | UE>
+    Set<OnUpdateFn>
   >();
+  protected onUpdateExecutors: Map<UE, Set<UE>> = new Map<UE, Set<UE>>();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -526,23 +527,26 @@ class BaseScope implements Core.Scope {
       throw new Error("Executor is not yet resolved");
     }
 
-    const ou = this.onUpdates.get(e);
-    if (ou) {
-      for (const t of Array.from(ou.values())) {
-        if (isMainExecutor(t)) {
-          if (this.cleanups.has(t)) {
-            this["~triggerCleanup"](t);
-          }
-
-          const a = this.cache.get(t);
-          await a!.accessor.resolve(true);
-
-          if (this.onUpdates.has(t)) {
-            await this["~triggerUpdate"](t);
-          }
-        } else {
-          await t(ce.accessor);
+    const executors = this.onUpdateExecutors.get(e);
+    if (executors) {
+      for (const t of Array.from(executors.values())) {
+        if (this.cleanups.has(t)) {
+          this["~triggerCleanup"](t);
         }
+
+        const a = this.cache.get(t);
+        await a!.accessor.resolve(true);
+
+        if (this.onUpdateExecutors.has(t) || this.onUpdateCallbacks.has(t)) {
+          await this["~triggerUpdate"](t);
+        }
+      }
+    }
+
+    const callbacks = this.onUpdateCallbacks.get(e);
+    if (callbacks) {
+      for (const cb of Array.from(callbacks.values())) {
+        await cb(ce.accessor);
       }
     }
   }
@@ -601,8 +605,8 @@ class BaseScope implements Core.Scope {
     }
 
     if (isReactiveExecutor(ie)) {
-      const c = this.onUpdates.get(ie.executor) ?? new Set();
-      this.onUpdates.set(ie.executor, c);
+      const c = this.onUpdateExecutors.get(ie.executor) ?? new Set();
+      this.onUpdateExecutors.set(ie.executor, c);
       c.add(ref);
     }
 
@@ -636,13 +640,14 @@ class BaseScope implements Core.Scope {
       );
     }
 
-    const r: Record<string, unknown> = {};
-    for (const k of Object.keys(ie)) {
-      const t = ie[k];
-      const rd = await this["~resolveDependencies"](t, ref);
+    const keys = Object.keys(ie);
+    const promises = keys.map((k) => this["~resolveDependencies"](ie[k], ref));
+    const values = await Promise.all(promises);
 
-      r[k] = rd;
-    }
+    const r: Record<string, unknown> = Object.create(null);
+    keys.forEach((k, i) => {
+      r[k] = values[i];
+    });
 
     return r;
   }
@@ -816,16 +821,15 @@ class BaseScope implements Core.Scope {
         await event("release", e, this);
       }
 
-      const ou = this.onUpdates.get(e);
-      if (ou) {
-        for (const t of Array.from(ou.values())) {
-          if (isMainExecutor(t)) {
-            await this.release(t, true);
-          }
+      const executors = this.onUpdateExecutors.get(e);
+      if (executors) {
+        for (const t of Array.from(executors.values())) {
+          await this.release(t, true);
         }
-
-        this.onUpdates.delete(e);
+        this.onUpdateExecutors.delete(e);
       }
+
+      this.onUpdateCallbacks.delete(e);
 
       this.cache.delete(e);
     };
@@ -855,7 +859,8 @@ class BaseScope implements Core.Scope {
       this.disposed = true;
       this.cache.clear();
       this.cleanups.clear();
-      this.onUpdates.clear();
+      this.onUpdateCallbacks.clear();
+      this.onUpdateExecutors.clear();
       this.onEvents.change.clear();
       this.onEvents.release.clear();
       this.onEvents.error.clear();
@@ -873,18 +878,18 @@ class BaseScope implements Core.Scope {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    const ou = this.onUpdates.get(e) ?? new Set();
-    this.onUpdates.set(e, ou);
+    const ou = this.onUpdateCallbacks.get(e) ?? new Set();
+    this.onUpdateCallbacks.set(e, ou);
     ou.add(cb as OnUpdateFn);
 
     return () => {
       this["~ensureNotDisposed"]();
 
-      const ou = this.onUpdates.get(e);
+      const ou = this.onUpdateCallbacks.get(e);
       if (ou) {
         ou.delete(cb as OnUpdateFn);
         if (ou.size === 0) {
-          this.onUpdates.delete(e);
+          this.onUpdateCallbacks.delete(e);
         }
       }
     };
