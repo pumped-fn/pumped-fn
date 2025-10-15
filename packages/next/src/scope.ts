@@ -17,7 +17,7 @@ import {
   ErrorContext,
   type Flow,
 } from "./types";
-import type { Promised } from "./promises";
+import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 
@@ -44,7 +44,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private scope: BaseScope;
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
-  public resolve: (force?: boolean) => Promise<unknown>;
+  private currentPromised: Promised<unknown> | null = null;
+  private cachedResolvedPromised: Promised<unknown> | null = null;
+  public resolve: (force?: boolean) => Promised<unknown>;
 
   constructor(scope: BaseScope, requestor: UE, metas: Meta.Meta[] | undefined) {
     this.scope = scope;
@@ -62,8 +64,85 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
   }
 
+  private async resolveCore(): Promise<unknown> {
+    const { factory, dependencies, immediateValue } =
+      this.processReplacer();
+
+    if (immediateValue !== undefined) {
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+      this.scope["cache"].set(this.requestor, {
+        accessor: this,
+        value: {
+          kind: "resolved",
+          value: immediateValue,
+          promised: new Promised(Promise.resolve(immediateValue)),
+        },
+      });
+
+      return immediateValue;
+    }
+
+    const controller = this.createController();
+
+    const resolvedDependencies = await this.scope["~resolveDependencies"](
+      dependencies,
+      this.requestor
+    );
+
+    const result = await this.executeFactory(
+      factory,
+      resolvedDependencies,
+      controller
+    );
+
+    const processedResult = await this.processChangeEvents(result);
+
+    this.scope["cache"].set(this.requestor, {
+      accessor: this,
+      value: {
+        kind: "resolved",
+        value: processedResult,
+        promised: new Promised(Promise.resolve(processedResult)),
+      },
+    });
+
+    this.scope["~removeFromResolutionChain"](this.requestor);
+    this.currentPromise = null;
+    this.currentPromised = null;
+    this.cachedResolvedPromised = null;
+
+    return processedResult;
+  }
+
+  private async resolveWithErrorHandling(): Promise<unknown> {
+    try {
+      return await this.resolveCore();
+    } catch (error) {
+      const { enhancedError, errorContext, originalError } =
+        this.enhanceResolutionError(error);
+
+      this.scope["cache"].set(this.requestor, {
+        accessor: this,
+        value: {
+          kind: "rejected",
+          error: originalError,
+          context: errorContext,
+          enhancedError: enhancedError,
+        },
+      });
+
+      this.scope["~removeFromResolutionChain"](this.requestor);
+      this.scope["~triggerError"](enhancedError, this.requestor);
+      this.currentPromise = null;
+      this.currentPromised = null;
+
+      throw enhancedError;
+    }
+  }
+
   private createResolveFunction() {
-    return (force: boolean = false): Promise<unknown> => {
+    return (force: boolean = false): Promised<unknown> => {
       this.scope["~ensureNotDisposed"]();
 
       const entry = this.scope["cache"].get(this.requestor);
@@ -74,94 +153,47 @@ class AccessorImpl implements Core.Accessor<unknown> {
       }
 
       if (this.currentPromise && !force) {
-        return this.currentPromise;
+        if (!this.currentPromised) {
+          this.currentPromised = new Promised(this.currentPromise);
+        }
+        return this.currentPromised;
       }
 
       this.scope["~addToResolutionChain"](this.requestor, this.requestor);
 
-      this.currentPromise = (async () => {
-        try {
-          const { factory, dependencies, immediateValue } =
-            this.processReplacer();
-
-          if (immediateValue !== undefined) {
-            await new Promise<void>((resolve) => queueMicrotask(resolve));
-
-            this.scope["cache"].set(this.requestor, {
-              accessor: this,
-              value: { kind: "resolved", value: immediateValue },
-            });
-
-            return immediateValue;
-          }
-
-          const controller = this.createController();
-
-          const resolvedDependencies = await this.scope["~resolveDependencies"](
-            dependencies,
-            this.requestor
-          );
-
-          const result = await this.executeFactory(
-            factory,
-            resolvedDependencies,
-            controller
-          );
-
-          const processedResult = await this.processChangeEvents(result);
-
-          this.scope["cache"].set(this.requestor, {
-            accessor: this,
-            value: { kind: "resolved", value: processedResult },
-          });
-
-          this.scope["~removeFromResolutionChain"](this.requestor);
-          this.currentPromise = null;
-
-          return processedResult;
-        } catch (error) {
-          const { enhancedError, errorContext, originalError } =
-            this.enhanceResolutionError(error);
-
-          this.scope["cache"].set(this.requestor, {
-            accessor: this,
-            value: {
-              kind: "rejected",
-              error: originalError,
-              context: errorContext,
-              enhancedError: enhancedError,
-            },
-          });
-
-          this.scope["~removeFromResolutionChain"](this.requestor);
-          this.scope["~triggerError"](enhancedError, this.requestor);
-          this.currentPromise = null;
-
-          throw enhancedError;
-        }
-      })();
+      this.currentPromise = this.resolveWithErrorHandling();
 
       this.scope["cache"].set(this.requestor, {
         accessor: this,
         value: { kind: "pending", promise: this.currentPromise },
       });
 
-      return this.currentPromise;
+      this.currentPromised = new Promised(this.currentPromise);
+      return this.currentPromised;
     };
   }
 
   private handleCachedState(
     cached: Core.ResolveState<unknown>
-  ): Promise<unknown> | never {
+  ): Promised<unknown> | never {
     if (cached.kind === "resolved") {
-      return Promise.resolve(cached.value);
+      if (cached.promised) {
+        return cached.promised;
+      }
+      if (!this.cachedResolvedPromised) {
+        this.cachedResolvedPromised = new Promised(Promise.resolve(cached.value));
+      }
+      return this.cachedResolvedPromised;
     }
 
     if (cached.kind === "rejected") {
       throw cached.error;
     }
 
-    return cached.promise;
+    if (!this.currentPromised) {
+      this.currentPromised = new Promised(cached.promise);
+    }
+    return this.currentPromised;
   }
 
   private processReplacer(): ReplacerResult {
@@ -332,17 +364,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
     return cacheEntry.value;
   }
 
-  async release(soft: boolean = false): Promise<void> {
-    this.scope.release(this.requestor, soft);
+  release(soft: boolean = false): Promised<void> {
+    return this.scope.release(this.requestor, soft);
   }
 
-  async update(
+  update(
     updateFn: unknown | ((current: unknown) => unknown)
-  ): Promise<void> {
+  ): Promised<void> {
     return this.scope.update(this.requestor, updateFn);
   }
 
-  async set(value: unknown): Promise<void> {
+  set(value: unknown): Promised<void> {
     return this.scope.update(this.requestor, value);
   }
 
@@ -359,10 +391,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
         this.scope["cleanups"].set(this.requestor, currentSet);
         currentSet.add(cleanup);
       },
-      release: async () => this.scope.release(this.requestor),
-      reload: async () => {
-        await this.scope.resolve(this.requestor, true);
-      },
+      release: () => this.scope.release(this.requestor),
+      reload: () => this.scope.resolve(this.requestor, true).map(() => undefined),
       scope: this.scope,
     };
   }
@@ -421,17 +451,15 @@ class BaseScope implements Core.Scope {
       this.initialValues = options.initialValues;
     }
 
+    if (options?.meta) {
+      this.metas = options.meta;
+    }
+
     if (options?.extensions) {
       for (const extension of options.extensions) {
         this.useExtension(extension);
       }
     }
-
-    if (options?.meta) {
-      this.metas = options.meta;
-    }
-
-    this.reversedExtensions = [...this.extensions].reverse();
   }
 
   protected "~checkCircularDependency"(
@@ -656,16 +684,15 @@ class BaseScope implements Core.Scope {
     return [...this.registry];
   }
 
-  async resolve<T>(
+  resolve<T>(
     executor: Core.Executor<T>,
     force: boolean = false
-  ): Promise<T> {
+  ): Promised<T> {
     this["~ensureNotDisposed"]();
 
-    const coreResolve = async (): Promise<T> => {
+    const coreResolve = (): Promised<T> => {
       const accessor = this["~makeAccessor"](executor);
-      await accessor.resolve(force);
-      return accessor.get() as T;
+      return accessor.resolve(force).map(() => accessor.get() as T);
     };
 
     let resolver = coreResolve;
@@ -691,58 +718,62 @@ class BaseScope implements Core.Scope {
     return resolver();
   }
 
-  async resolveAccessor<T>(
+  resolveAccessor<T>(
     executor: Core.Executor<T>,
     force: boolean = false
-  ): Promise<Core.Accessor<T>> {
+  ): Promised<Core.Accessor<T>> {
     this["~ensureNotDisposed"]();
     const accessor = this["~makeAccessor"](executor);
-    await accessor.resolve(force);
-    return accessor as Core.Accessor<T>;
+    return accessor.resolve(force).map(() => accessor as Core.Accessor<T>);
   }
 
-  async update<T>(
+  update<T>(
     e: Core.Executor<T>,
     u: T | ((current: T) => T)
-  ): Promise<void> {
+  ): Promised<void> {
     if (this.isDisposing) {
-      return;
+      return new Promised(Promise.resolve());
     }
 
     this["~ensureNotDisposed"]();
 
-    const coreUpdate = async (): Promise<void> => {
-      this["~triggerCleanup"](e);
-      const accessor = this["~makeAccessor"](e);
+    const coreUpdate = (): Promised<void> => {
+      return new Promised((async () => {
+        this["~triggerCleanup"](e);
+        const accessor = this["~makeAccessor"](e);
 
-      let value: T | undefined;
+        let value: T | undefined;
 
-      if (typeof u === "function") {
-        const fn = u as (current: T) => T;
-        value = fn(accessor.get() as T);
-      } else {
-        value = u;
-      }
-
-      const events = this.onEvents.change;
-      for (const event of events) {
-        const updated = await event("update", e, value, this);
-        if (updated !== undefined && e === updated.executor) {
-          value = updated.value as T;
+        if (typeof u === "function") {
+          const fn = u as (current: T) => T;
+          value = fn(accessor.get() as T);
+        } else {
+          value = u;
         }
-      }
 
-      this.cache.set(e, {
-        accessor,
-        value: { kind: "resolved", value },
-      });
+        const events = this.onEvents.change;
+        for (const event of events) {
+          const updated = await event("update", e, value, this);
+          if (updated !== undefined && e === updated.executor) {
+            value = updated.value as T;
+          }
+        }
 
-      await this["~triggerUpdate"](e);
+        this.cache.set(e, {
+          accessor,
+          value: {
+            kind: "resolved",
+            value,
+            promised: new Promised(Promise.resolve(value)),
+          },
+        });
+
+        await this["~triggerUpdate"](e);
+      })());
     };
 
-    let updater = async (): Promise<T> => {
-      await coreUpdate();
-      return this.accessor(e).get() as T;
+    let updater = (): Promised<T> => {
+      return coreUpdate().map(() => this.accessor(e).get() as T);
     };
 
     const emptyDataStore: Accessor.DataStore = {
@@ -763,14 +794,14 @@ class BaseScope implements Core.Scope {
       }
     }
 
-    await updater();
+    return updater().map(() => undefined);
   }
 
-  async set<T>(e: Core.Executor<T>, value: T): Promise<void> {
+  set<T>(e: Core.Executor<T>, value: T): Promised<void> {
     return this.update(e, value);
   }
 
-  async release(e: Core.Executor<unknown>, s: boolean = false): Promise<void> {
+  release(e: Core.Executor<unknown>, s: boolean = false): Promised<void> {
     this["~ensureNotDisposed"]();
 
     const coreRelease = async (): Promise<void> => {
@@ -799,36 +830,38 @@ class BaseScope implements Core.Scope {
       this.cache.delete(e);
     };
 
-    return coreRelease();
+    return new Promised(coreRelease());
   }
 
-  async dispose(): Promise<void> {
+  dispose(): Promised<void> {
     this["~ensureNotDisposed"]();
     this.isDisposing = true;
 
-    for (const pod of this.pods) {
-      await this.disposePod(pod);
-    }
+    return new Promised((async () => {
+      for (const pod of this.pods) {
+        await this.disposePod(pod);
+      }
 
-    const extensionDisposeEvents = this.extensions.map(
-      (ext) => ext.dispose?.(this) ?? Promise.resolve()
-    );
-    await Promise.all(extensionDisposeEvents);
+      const extensionDisposeEvents = this.extensions.map(
+        (ext) => ext.dispose?.(this) ?? Promise.resolve()
+      );
+      await Promise.all(extensionDisposeEvents);
 
-    const currents = this.cache.keys();
-    for (const current of currents) {
-      await this.release(current, true);
-    }
+      const currents = this.cache.keys();
+      for (const current of currents) {
+        await this.release(current, true);
+      }
 
-    this.disposed = true;
-    this.cache.clear();
-    this.cleanups.clear();
-    this.onUpdates.clear();
-    this.onEvents.change.clear();
-    this.onEvents.release.clear();
-    this.onEvents.error.clear();
-    this.onErrors.clear();
-    this.resolutionChain.clear();
+      this.disposed = true;
+      this.cache.clear();
+      this.cleanups.clear();
+      this.onUpdates.clear();
+      this.onEvents.change.clear();
+      this.onEvents.release.clear();
+      this.onEvents.error.clear();
+      this.onErrors.clear();
+      this.resolutionChain.clear();
+    })());
   }
 
   onUpdate<T>(
@@ -933,13 +966,16 @@ class BaseScope implements Core.Scope {
     }
 
     this.extensions.push(extension);
-    this.reversedExtensions = [...this.extensions].reverse();
+    this.reversedExtensions.unshift(extension);
     extension.init?.(this);
 
     return () => {
       this["~ensureNotDisposed"]();
-      this.extensions = this.extensions.filter((e) => e !== extension);
-      this.reversedExtensions = [...this.extensions].reverse();
+      const idx = this.extensions.indexOf(extension);
+      if (idx !== -1) {
+        this.extensions.splice(idx, 1);
+        this.reversedExtensions.splice(this.reversedExtensions.length - 1 - idx, 1);
+      }
     };
   }
 
@@ -970,14 +1006,15 @@ class BaseScope implements Core.Scope {
     return pod;
   }
 
-  async disposePod(pod: Core.Pod): Promise<void> {
+  disposePod(pod: Core.Pod): Promised<void> {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
-      return;
+      return new Promised(Promise.resolve());
     }
 
-    await pod.dispose();
-    this.pods.delete(pod);
+    return pod.dispose().map(() => {
+      this.pods.delete(pod);
+    });
   }
 
   exec<S, I>(
@@ -1042,7 +1079,6 @@ export type PodOption = {
   initialValues?: Core.Preset<unknown>[];
   extensions?: Extension.Extension[];
   meta?: Meta.Meta[];
-  parentPod?: Pod;
 };
 
 export function createScope(): Core.Scope;
@@ -1067,46 +1103,21 @@ export function createScope(
 
 class Pod extends BaseScope implements Core.Pod {
   private parentScope: BaseScope;
-  private parentPod?: Pod;
-  private childPods: Set<Pod> = new Set();
 
   constructor(scope: BaseScope, option?: PodOption) {
-    const actualParentScope = option?.parentPod || scope;
-
     super({
       pod: true,
       initialValues: option?.initialValues,
       extensions: option?.extensions
-        ? [...(actualParentScope["extensions"] || []), ...option.extensions]
-        : [...(actualParentScope["extensions"] || [])],
+        ? [...(scope["extensions"] || []), ...option.extensions]
+        : [...(scope["extensions"] || [])],
       meta: option?.meta,
     });
     this.parentScope = scope;
-    this.parentPod = option?.parentPod;
   }
 
-  pod(...preset: Core.Preset<unknown>[]): Core.Pod;
-  pod(options: PodOption): Core.Pod;
-  pod(...args: Core.Preset<unknown>[] | [PodOption]): Core.Pod {
-    this["~ensureNotDisposed"]();
 
-    let podOptions: PodOption;
-    if (args.length === 1 && !isPreset(args[0])) {
-      podOptions = args[0] as PodOption;
-    } else {
-      podOptions = { initialValues: args as Core.Preset<unknown>[] };
-    }
-
-    const childPod = new Pod(this.parentScope, {
-      ...podOptions,
-      parentPod: this,
-    });
-
-    this.childPods.add(childPod);
-    return childPod;
-  }
-
-  async resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T> {
+  resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T> {
     if (this.cache.has(executor)) {
       return super.resolve(executor, force);
     }
@@ -1116,39 +1127,11 @@ class Pod extends BaseScope implements Core.Pod {
     );
 
     if (replacer) {
-      return await super.resolve(executor, force);
+      return super.resolve(executor, force);
     }
 
     if (this["~hasDependencyWithPreset"](executor)) {
-      return await super.resolve(executor, force);
-    }
-
-    let currentParent = this.parentPod;
-    while (currentParent) {
-      if (currentParent["cache"].has(executor)) {
-        const { value } = currentParent["cache"].get(executor)!;
-        const accessor = super["~makeAccessor"](executor);
-
-        this["cache"].set(executor, {
-          accessor,
-          value,
-        });
-
-        if (value) {
-          if (value.kind === "rejected") {
-            throw value.error;
-          }
-
-          if (value.kind === "resolved") {
-            return value.value as T;
-          }
-
-          if (value.kind === "pending") {
-            return (await value.promise) as T;
-          }
-        }
-      }
-      currentParent = currentParent.parentPod;
+      return super.resolve(executor, force);
     }
 
     if (this.parentScope["cache"].has(executor)) {
@@ -1166,16 +1149,16 @@ class Pod extends BaseScope implements Core.Pod {
         }
 
         if (value.kind === "resolved") {
-          return value.value as T;
+          return new Promised(Promise.resolve(value.value as T));
         }
 
         if (value.kind === "pending") {
-          return (await value.promise) as T;
+          return new Promised(value.promise as Promise<T>);
         }
       }
     }
 
-    return await super.resolve(executor, force);
+    return super.resolve(executor, force);
   }
 
   private "~hasDependencyWithPreset"(executor: Core.Executor<any>): boolean {
@@ -1214,64 +1197,18 @@ class Pod extends BaseScope implements Core.Pod {
       throw new Error("Reactive executors cannot be used in pod");
     }
 
-    const t = getExecutor(ie);
-
-    this["~checkCircularDependency"](t, ref);
-
-    this["~propagateResolutionChain"](ref, t);
-
-    const a = this["~makeAccessor"](t);
-
-    const replacer = this.initialValues.find((item) => item.executor === t);
-
-    if (!replacer && this.parentScope["cache"].has(t)) {
-      const { value } = this.parentScope["cache"].get(t)!;
-      this["cache"].set(t, {
-        accessor: a,
-        value,
-      });
-    }
-
     return await super["~resolveExecutor"](ie, ref);
   }
 
-  async dispose(): Promise<void> {
-    for (const childPod of this.childPods) {
-      await childPod.dispose();
-    }
-    this.childPods.clear();
+  dispose(): Promised<void> {
+    return new Promised((async () => {
+      const extensionDisposeEvents = this.extensions.map(
+        (ext) => ext.disposePod?.(this) ?? Promise.resolve()
+      );
+      await Promise.all(extensionDisposeEvents);
 
-    if (this.parentPod) {
-      this.parentPod.childPods.delete(this);
-    }
-
-    const extensionDisposeEvents = this.extensions.map(
-      (ext) => ext.disposePod?.(this) ?? Promise.resolve()
-    );
-    await Promise.all(extensionDisposeEvents);
-
-    await super.dispose();
+      await super.dispose();
+    })());
   }
 
-  getDepth(): number {
-    let depth = 0;
-    let current = this.parentPod;
-    while (current) {
-      depth++;
-      current = current.parentPod;
-    }
-    return depth;
-  }
-
-  getRootPod(): Pod {
-    let current: Pod = this;
-    while (current.parentPod) {
-      current = current.parentPod;
-    }
-    return current;
-  }
-
-  getChildPods(): ReadonlySet<Pod> {
-    return this.childPods;
-  }
 }

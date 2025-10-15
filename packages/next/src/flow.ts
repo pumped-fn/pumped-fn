@@ -157,16 +157,19 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
 
 class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
-  private journal = new Map<string, unknown>();
+  private journal: Map<string, unknown> | null = null;
   public readonly pod: Core.Pod;
   private reversedExtensions: Extension.Extension[];
+  private parentScope: Core.Scope;
 
   constructor(
-    parentPodOrScope: Core.Pod | Core.Scope,
+    parentScope: Core.Scope,
+    pod: Core.Pod,
     private extensions: Extension.Extension[],
     private parent?: FlowContext
   ) {
-    this.pod = parentPodOrScope.pod();
+    this.parentScope = parentScope;
+    this.pod = pod;
     this.reversedExtensions = [...extensions].reverse();
   }
 
@@ -245,31 +248,36 @@ class FlowContext implements Flow.Context {
     fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
     ...params: P
   ): Promised<T> {
+    if (!this.journal) {
+      this.journal = new Map();
+    }
+
     const flowName = this.find(flowMeta.flowName) || "unknown";
     const depth = this.get(flowMeta.depth);
     const journalKey = `${flowName}:${depth}:${key}`;
 
     const promise = (async () => {
-      const isReplay = this.journal.has(journalKey);
+      const journal = this.journal!;
+      const isReplay = journal.has(journalKey);
 
-      const executeCore = async () => {
+      const executeCore = (): Promised<T> => {
         if (isReplay) {
-          const entry = this.journal.get(journalKey);
+          const entry = journal.get(journalKey);
           if (isErrorEntry(entry)) {
             throw entry.error;
           }
-          return entry as T;
+          return new Promised(Promise.resolve(entry as T));
         }
 
-        return Promised.try(this.pod, async () => {
+        return Promised.try(async () => {
           const result =
             params.length > 0
               ? await (fn as (...args: P) => Promise<T> | T)(...params)
               : await (fn as () => Promise<T> | T)();
-          this.journal.set(journalKey, result);
+          journal.set(journalKey, result);
           return result;
         }).catch((error) => {
-          this.journal.set(journalKey, { __error: true, error });
+          journal.set(journalKey, { __error: true, error });
           throw error;
         });
       };
@@ -278,7 +286,7 @@ class FlowContext implements Flow.Context {
       for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
-          executor = async () => {
+          executor = () => {
             return extension.wrap!(this, currentExecutor, {
               kind: "journal",
               key,
@@ -295,7 +303,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(this.pod, promise);
+    return new Promised(promise);
   }
 
   exec<F extends Flow.UFlow>(
@@ -315,6 +323,10 @@ class FlowContext implements Flow.Context {
     inputOrUndefined?: Flow.InferInput<F>
   ): Promised<Flow.InferOutput<F>> {
     if (typeof keyOrFlow === "string") {
+      if (!this.journal) {
+        this.journal = new Map();
+      }
+
       const key = keyOrFlow;
       const flow = flowOrInput as F;
       const input = inputOrUndefined as Flow.InferInput<F>;
@@ -325,16 +337,17 @@ class FlowContext implements Flow.Context {
       const journalKey = `${flowName}:${depth}:${key}`;
 
       const promise = (async () => {
-        const executeCore = async () => {
-          if (this.journal.has(journalKey)) {
-            const entry = this.journal.get(journalKey);
+        const journal = this.journal!;
+        const executeCore = (): Promised<Flow.InferOutput<F>> => {
+          if (journal.has(journalKey)) {
+            const entry = journal.get(journalKey);
             if (isErrorEntry(entry)) {
               throw entry.error;
             }
-            return entry as Flow.InferOutput<F>;
+            return new Promised(Promise.resolve(entry as Flow.InferOutput<F>));
           }
 
-          return Promised.try(this.pod, async () => {
+          return Promised.try(async () => {
             const handler = await this.pod.resolve(flow);
             const definition = flowDefinitionMeta.find(flow);
             if (!definition) {
@@ -342,6 +355,7 @@ class FlowContext implements Flow.Context {
             }
 
             const childContext = new FlowContext(
+              this.parentScope,
               this.pod,
               this.extensions,
               this
@@ -358,10 +372,10 @@ class FlowContext implements Flow.Context {
               input
             )) as Flow.InferOutput<F>;
 
-            this.journal.set(journalKey, result);
+            journal.set(journalKey, result);
             return result;
           }).catch((error) => {
-            this.journal.set(journalKey, { __error: true, error });
+            journal.set(journalKey, { __error: true, error });
             throw error;
           });
         };
@@ -375,7 +389,7 @@ class FlowContext implements Flow.Context {
         for (const extension of this.reversedExtensions) {
           if (extension.wrap) {
             const currentExecutor = executor;
-            executor = async () => {
+            executor = () => {
               return extension.wrap!(this, currentExecutor, {
                 kind: "subflow",
                 flow,
@@ -393,7 +407,7 @@ class FlowContext implements Flow.Context {
         return executor();
       })();
 
-      return new Promised(this.pod, promise);
+      return new Promised(promise);
     }
 
     const flow = keyOrFlow as F;
@@ -403,22 +417,23 @@ class FlowContext implements Flow.Context {
       const parentFlowName = this.find(flowMeta.flowName);
       const depth = this.get(flowMeta.depth);
 
-      const executeCore = async () => {
-        const handler = await this.pod.resolve(flow);
-        const definition = flowDefinitionMeta.find(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
+      const executeCore = (): Promised<Flow.InferOutput<F>> => {
+        return this.pod.resolve(flow).map(async (handler) => {
+          const definition = flowDefinitionMeta.find(flow);
+          if (!definition) {
+            throw new Error("Flow definition not found in executor metadata");
+          }
 
-        const childContext = new FlowContext(this.pod, this.extensions, this);
-        childContext.initializeExecutionContext(definition.name, false);
+          const childContext = new FlowContext(this.parentScope, this.pod, this.extensions, this);
+          childContext.initializeExecutionContext(definition.name, false);
 
-        return (await this.executeWithExtensions<Flow.InferOutput<F>>(
-          async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
-          childContext,
-          flow,
-          input
-        )) as Flow.InferOutput<F>;
+          return (await this.executeWithExtensions<Flow.InferOutput<F>>(
+            async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
+            childContext,
+            flow,
+            input
+          )) as Flow.InferOutput<F>;
+        });
       };
 
       const definition = flowDefinitionMeta.find(flow);
@@ -430,7 +445,7 @@ class FlowContext implements Flow.Context {
       for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
-          executor = async () => {
+          executor = () => {
             return extension.wrap!(this, currentExecutor, {
               kind: "subflow",
               flow,
@@ -448,7 +463,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(this.pod, promise);
+    return new Promised(promise);
   }
 
   parallel<T extends readonly Promised<any>[]>(
@@ -462,10 +477,13 @@ class FlowContext implements Flow.Context {
     const depth = this.get(flowMeta.depth);
 
     const promise = (async () => {
-      const executeCore = async () => {
-        const results = await Promise.all(promises);
-
-        return {
+      const executeCore = (): Promised<{
+        results: Flow.ParallelResult<{
+          [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+        }>["results"];
+        stats: { total: number; succeeded: number; failed: number };
+      }> => {
+        return new Promised(Promise.all(promises).then((results) => ({
           results: results as Flow.ParallelResult<{
             [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
           }>["results"],
@@ -474,14 +492,14 @@ class FlowContext implements Flow.Context {
             succeeded: results.length,
             failed: 0,
           },
-        };
+        })));
       };
 
       let executor = executeCore;
       for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
-          executor = async () => {
+          executor = () => {
             return extension.wrap!(this, currentExecutor, {
               kind: "parallel",
               mode: "parallel",
@@ -497,7 +515,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(this.pod, promise);
+    return new Promised(promise);
   }
 
   parallelSettled<T extends readonly Promised<any>[]>(
@@ -511,27 +529,30 @@ class FlowContext implements Flow.Context {
     const depth = this.get(flowMeta.depth);
 
     const promise = (async () => {
-      const executeCore = async () => {
-        const results = await Promise.allSettled(promises);
+      const executeCore = (): Promised<{
+        results: PromiseSettledResult<any>[];
+        stats: { total: number; succeeded: number; failed: number };
+      }> => {
+        return new Promised(Promise.allSettled(promises).then((results) => {
+          const succeeded = results.filter((r) => r.status === "fulfilled").length;
+          const failed = results.filter((r) => r.status === "rejected").length;
 
-        const succeeded = results.filter((r) => r.status === "fulfilled").length;
-        const failed = results.filter((r) => r.status === "rejected").length;
-
-        return {
-          results: results as PromiseSettledResult<any>[],
-          stats: {
-            total: results.length,
-            succeeded,
-            failed,
-          },
-        };
+          return {
+            results: results as PromiseSettledResult<any>[],
+            stats: {
+              total: results.length,
+              succeeded,
+              failed,
+            },
+          };
+        }));
       };
 
       let executor = executeCore;
       for (const extension of this.reversedExtensions) {
         if (extension.wrap) {
           const currentExecutor = executor;
-          executor = async () => {
+          executor = () => {
             return extension.wrap!(this, currentExecutor, {
               kind: "parallel",
               mode: "parallelSettled",
@@ -547,16 +568,16 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(this.pod, promise);
+    return new Promised(promise);
   }
 
-  private async executeWithExtensions<T>(
+  private executeWithExtensions<T>(
     handler: (ctx: FlowContext) => Promise<T>,
     context: FlowContext,
     flow: Flow.UFlow,
     input: unknown
-  ): Promise<T> {
-    const executeCore = async (): Promise<T> => handler(context);
+  ): Promised<T> {
+    const executeCore = (): Promised<T> => new Promised(handler(context));
     const definition = flowDefinitionMeta.find(flow);
     if (!definition) {
       throw new Error("Flow definition not found in executor metadata");
@@ -566,7 +587,7 @@ class FlowContext implements Flow.Context {
     for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const currentExecutor = executor;
-        executor = async () => {
+        executor = () => {
           return extension.wrap!(context, currentExecutor, {
             kind: "execute",
             flow,
@@ -586,7 +607,9 @@ class FlowContext implements Flow.Context {
 
   createSnapshot(): Flow.ExecutionData {
     const contextDataSnapshot = new Map(this.contextData);
-    contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
+    if (this.journal) {
+      contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
+    }
 
     const dataStore = {
       get: (key: unknown) => contextDataSnapshot.get(key),
@@ -666,7 +689,7 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
-    const context = new FlowContext(pod, options?.extensions || []);
+    const context = new FlowContext(scope, pod, options?.extensions || []);
 
     try {
       if (options?.initialContext) {
@@ -679,21 +702,22 @@ function execute<S, I>(
         await extension.initPod?.(pod, context);
       }
 
-      const executeCore = async () => {
-        const handler = await pod.resolve(flow);
-        const definition = flowDefinitionMeta.find(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
-        const validated = validate(definition.input, input);
+      const executeCore = (): Promised<S> => {
+        return pod.resolve(flow).map(async (handler) => {
+          const definition = flowDefinitionMeta.find(flow);
+          if (!definition) {
+            throw new Error("Flow definition not found in executor metadata");
+          }
+          const validated = validate(definition.input, input);
 
-        context.initializeExecutionContext(definition.name, false);
+          context.initializeExecutionContext(definition.name, false);
 
-        const result = await handler(context, validated);
+          const result = await handler(context, validated);
 
-        validate(definition.output, result);
+          validate(definition.output, result);
 
-        return result;
+          return result;
+        });
       };
 
       const definition = flowDefinitionMeta.find(flow);
@@ -740,7 +764,7 @@ function execute<S, I>(
   })();
 
   if (options?.details) {
-    const detailsPromise = Promised.try(pod, async (): Promise<Flow.ExecutionDetails<S>> => {
+    const detailsPromise = Promised.try(async (): Promise<Flow.ExecutionDetails<S>> => {
       const [result, ctx] = await Promise.all([promise, snapshotPromise]);
       if (!ctx) {
         throw new Error("Execution context not available");
@@ -754,10 +778,10 @@ function execute<S, I>(
       return { success: false as const, error, ctx };
     });
 
-    return new Promised(pod, detailsPromise, snapshotPromise);
+    return new Promised(detailsPromise, snapshotPromise);
   }
 
-  return new Promised(pod, promise, snapshotPromise);
+  return new Promised(promise, snapshotPromise);
 }
 
 function flowImpl<I, S>(

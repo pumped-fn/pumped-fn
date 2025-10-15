@@ -187,12 +187,12 @@ export declare namespace Core {
   export type RecordLike = Record<string, unknown>;
   export type UExecutor = BaseExecutor<unknown>;
 
-  export type Cleanup = () => void | Promise<void>;
+  export type Cleanup = () => void | Promised<void>;
 
   export type Controller = {
     cleanup: (cleanup: Cleanup) => void;
-    release: () => Promise<void>;
-    reload: () => Promise<void>;
+    release: () => Promised<void>;
+    reload: () => Promised<void>;
     scope: Scope;
   };
 
@@ -235,7 +235,11 @@ export declare namespace Core {
   }
 
   export type PendingState<T> = { kind: "pending"; promise: Promise<T> };
-  export type ResolvedState<T> = { kind: "resolved"; value: T };
+  export type ResolvedState<T> = {
+    kind: "resolved";
+    value: T;
+    promised?: Promised<T>;
+  };
   export type RejectedState = {
     kind: "rejected";
     error: unknown;
@@ -252,10 +256,10 @@ export declare namespace Core {
     lookup(): undefined | ResolveState<T>;
 
     get(): T;
-    resolve(force?: boolean): Promise<T>;
-    release(soft?: boolean): Promise<void>;
-    update(updateFn: T | ((current: T) => T)): Promise<void>;
-    set(value: T): Promise<void>;
+    resolve(force?: boolean): Promised<T>;
+    release(soft?: boolean): Promised<void>;
+    update(updateFn: T | ((current: T) => T)): Promised<void>;
+    set(value: T): Promised<void>;
     subscribe(callback: (value: T) => void): Cleanup;
   }
 
@@ -302,13 +306,13 @@ export declare namespace Core {
     executor: Executor<unknown>,
     resolved: unknown,
     scope: Scope
-  ) => EventCallbackResult | Promise<EventCallbackResult>;
+  ) => EventCallbackResult | Promised<EventCallbackResult>;
 
   export type ReleaseCallback = (
     event: "release",
     executor: Executor<unknown>,
     scope: Scope
-  ) => void | Promise<void>;
+  ) => void | Promised<void>;
 
   export type ErrorCallback<T = unknown> = (
     error:
@@ -317,7 +321,7 @@ export declare namespace Core {
       | DependencyResolutionError,
     executor: Executor<T>,
     scope: Scope
-  ) => void | Promise<void>;
+  ) => void | Promised<void>;
 
   export type GlobalErrorCallback = (
     error:
@@ -326,7 +330,7 @@ export declare namespace Core {
       | DependencyResolutionError,
     executor: Executor<unknown>,
     scope: Scope
-  ) => void | Promise<void>;
+  ) => void | Promised<void>;
 
   export type WrapContext = {
     operation: "resolve" | "update";
@@ -353,29 +357,25 @@ export declare namespace Core {
         Core.Scope,
         "update" | "disposePod" | "onChange" | "registeredExecutors"
       >,
-      Meta.MetaContainer {
-    getDepth(): number;
-    getRootPod(): Pod;
-    getChildPods(): ReadonlySet<Pod>;
-  }
+      Meta.MetaContainer {}
 
   export interface Scope extends Meta.MetaContainer {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
     entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
     registeredExecutors(): Core.Executor<unknown>[];
 
-    resolve<T>(executor: Core.Executor<T>, force?: boolean): Promise<T>;
-    resolveAccessor<T>(executor: Core.Executor<T>): Promise<Accessor<T>>;
+    resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T>;
+    resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
 
     update<T>(
       executor: Executor<T>,
       updateFn: T | ((current: T) => T)
-    ): Promise<void>;
-    set<T>(executor: Executor<T>, value: T): Promise<void>;
+    ): Promised<void>;
+    set<T>(executor: Executor<T>, value: T): Promised<void>;
 
-    release(executor: Executor<any>, soft?: boolean): Promise<void>;
+    release(executor: Executor<any>, soft?: boolean): Promised<void>;
 
-    dispose(): Promise<void>;
+    dispose(): Promised<void>;
 
     onUpdate<T>(
       executor: Executor<T>,
@@ -395,7 +395,7 @@ export declare namespace Core {
       extensions?: Extension.Extension[];
       meta?: Meta.Meta[];
     }): Pod;
-    disposePod(scope: Pod): Promise<void>;
+    disposePod(scope: Pod): Promised<void>;
 
     exec<S, I>(
       flow: Core.Executor<Flow.Handler<S, I>>,
@@ -468,7 +468,7 @@ export namespace Flow {
   } & Meta.MetaContainer;
 
   export interface Handler<S, I> {
-    (ctx: Context, input: I): S | Promise<S>;
+    (ctx: Context, input: I): S | Promised<S>;
     def: Definition<S, I>;
   }
 
@@ -535,11 +535,11 @@ export namespace Flow {
     input: InferInputFromPath<Router, P>
   ) => Promised<InferOutputFromPath<Router, P>>;
 
-  export type FnExecutor<I, O> = (input: I) => O | Promise<O>;
+  export type FnExecutor<I, O> = (input: I) => O | Promised<O>;
 
   export type MultiFnExecutor<Args extends readonly unknown[], O> = (
     ...args: Args
-  ) => O | Promise<O>;
+  ) => O | Promised<O>;
 
   export type AnyFnExecutor<O = unknown> =
     | FnExecutor<any, O>
@@ -582,10 +582,10 @@ export namespace Flow {
       value: T
     ): void;
 
-    run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+    run<T>(key: string, fn: () => Promised<T> | T): Promised<T>;
     run<T, P extends readonly unknown[]>(
       key: string,
-      fn: (...args: P) => Promise<T> | T,
+      fn: (...args: P) => Promised<T> | T,
       ...params: P
     ): Promised<T>;
 
@@ -681,14 +681,14 @@ export namespace Extension {
   export interface Extension {
     name: string;
 
-    init?(scope: Core.Scope): void | Promise<void>;
-    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void>;
+    init?(scope: Core.Scope): void | Promised<void>;
+    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promised<void>;
 
     wrap?<T>(
       context: Accessor.DataStore,
-      next: () => Promise<T>,
+      next: () => Promised<T>,
       operation: Operation
-    ): Promise<T>;
+    ): Promised<T>;
 
     onError?(
       error:
@@ -703,8 +703,8 @@ export namespace Extension {
       context: Accessor.DataStore
     ): void;
 
-    dispose?(scope: Core.Scope): void | Promise<void>;
-    disposePod?(pod: Core.Pod): void | Promise<void>;
+    dispose?(scope: Core.Scope): void | Promised<void>;
+    disposePod?(pod: Core.Pod): void | Promised<void>;
   }
 }
 
@@ -741,7 +741,7 @@ export namespace Multi {
   export type Key = unknown;
   export type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> &
     ((key: K) => Core.Executor<T>) & {
-      release: (scope: Core.Scope) => Promise<void>;
+      release: (scope: Core.Scope) => Promised<void>;
       id: Meta.MetaFn<unknown>;
     };
 
