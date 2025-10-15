@@ -8,6 +8,7 @@ import {
   derive,
   type Extension,
   StandardSchemaV1,
+  Promised,
 } from "../src";
 
 export namespace TestTypes {
@@ -176,13 +177,15 @@ export const ExtensionFactory = {
   lifecycle: (lifecycleCalls: string[], extensionName: string) =>
     ({
       name: extensionName,
-      async initPod(pod: any, context: any) {
+      initPod(pod: any, context: any) {
         lifecycleCalls.push(`${extensionName}-init`);
+        return new Promised(Promise.resolve());
       },
-      async disposePod(pod: any) {
+      disposePod(pod: any) {
         lifecycleCalls.push(`${extensionName}-dispose`);
+        return new Promised(Promise.resolve());
       },
-      async wrapExecute(
+      wrapExecute(
         context: any,
         next: () => Promise<any>,
         execution: any

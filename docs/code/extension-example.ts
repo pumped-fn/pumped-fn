@@ -1,4 +1,4 @@
-import { provide, derive, createScope, plugin, meta, custom } from "@pumped-fn/core-next";
+import { provide, derive, createScope, extension, meta, custom } from "@pumped-fn/core-next";
 import type { Extension } from "@pumped-fn/core-next";
 
 /**
@@ -8,12 +8,11 @@ import type { Extension } from "@pumped-fn/core-next";
  */
 
 // #region snippet
-// Performance monitoring extension
 const performanceExtension = (): Extension.Extension & { getMetrics: () => any[] } => {
   const metrics = new Map();
   const executionTimes = new Map();
 
-  return {
+  return extension({
     name: "performance",
 
     // Track executor resolution performance
@@ -82,14 +81,14 @@ const performanceExtension = (): Extension.Extension & { getMetrics: () => any[]
         ...data
       }));
     }
-  };
+  }) as Extension.Extension & { getMetrics: () => any[] };
 };
 
 // Meta-driven monitoring
 const monitored = meta("monitored", custom<boolean>());
 const logLevel = meta("log-level", custom<"debug" | "info" | "warn" | "error">());
 
-const metaMonitoringExtension = (): Extension.Extension => ({
+const metaMonitoringExtension = (): Extension.Extension => extension({
   name: "meta-monitoring",
 
   init(scope) {

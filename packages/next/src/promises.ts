@@ -5,7 +5,6 @@ export class Promised<T> implements PromiseLike<T> {
   private promise: Promise<T>;
 
   constructor(
-    private pod: Core.Pod,
     promise: Promise<T> | Promised<T>,
     executionDataPromise?: Promise<Flow.ExecutionData | undefined>
   ) {
@@ -15,7 +14,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   map<U>(fn: (value: T) => U | Promise<U>): Promised<U> {
     return new Promised(
-      this.pod,
       this.promise.then(fn),
       this.executionDataPromise
     );
@@ -23,7 +21,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   switch<U>(fn: (value: T) => Promised<U>): Promised<U> {
     return new Promised(
-      this.pod,
       this.promise.then(fn),
       this.executionDataPromise
     );
@@ -31,7 +28,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   mapError(fn: (error: unknown) => unknown): Promised<T> {
     return new Promised(
-      this.pod,
       this.promise.catch((error) => {
         throw fn(error);
       }),
@@ -41,7 +37,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   switchError(fn: (error: unknown) => Promised<T>): Promised<T> {
     return new Promised(
-      this.pod,
       this.promise.catch(fn),
       this.executionDataPromise
     );
@@ -52,7 +47,6 @@ export class Promised<T> implements PromiseLike<T> {
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
   ): Promised<TResult1 | TResult2> {
     return new Promised(
-      this.pod,
       this.promise.then(onfulfilled, onrejected),
       this.executionDataPromise
     );
@@ -62,7 +56,6 @@ export class Promised<T> implements PromiseLike<T> {
     onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null | undefined
   ): Promised<T | TResult> {
     return new Promised(
-      this.pod,
       this.promise.catch(onrejected),
       this.executionDataPromise
     );
@@ -70,7 +63,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   finally(onfinally?: (() => void) | null | undefined): Promised<T> {
     return new Promised(
-      this.pod,
       this.promise.finally(onfinally),
       this.executionDataPromise
     );
@@ -78,10 +70,6 @@ export class Promised<T> implements PromiseLike<T> {
 
   toPromise(): Promise<T> {
     return this.promise;
-  }
-
-  getPod(): Core.Pod {
-    return this.pod;
   }
 
   async ctx(): Promise<Flow.ExecutionData | undefined> {
@@ -92,7 +80,7 @@ export class Promised<T> implements PromiseLike<T> {
   }
 
   async inDetails(): Promise<Flow.ExecutionDetails<T>> {
-    return Promised.try(this.pod, async () => {
+    return Promised.try(async () => {
       const [result, ctx] = await Promise.all([
         this.promise,
         this.executionDataPromise,
@@ -122,54 +110,36 @@ export class Promised<T> implements PromiseLike<T> {
     values: T
   ): Promised<{ [K in keyof T]: Awaited<T[K]> }> {
     const flowPromises = values as readonly (Promised<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
-
-    if (!pod) {
-      throw new Error("At least one Promised is required");
-    }
-
     const promises = flowPromises.map((v) =>
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(pod, Promise.all(promises) as Promise<any>);
+    return new Promised(Promise.all(promises) as Promise<any>);
   }
 
   static race<T extends readonly unknown[] | []>(
     values: T
   ): Promised<Awaited<T[number]>> {
     const flowPromises = values as readonly (Promised<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
-
-    if (!pod) {
-      throw new Error("At least one Promised is required");
-    }
-
     const promises = flowPromises.map((v) =>
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(pod, Promise.race(promises) as Promise<any>);
+    return new Promised(Promise.race(promises) as Promise<any>);
   }
 
   static allSettled<T extends readonly unknown[] | []>(
     values: T
   ): Promised<{ [K in keyof T]: PromiseSettledResult<Awaited<T[K]>> }> {
     const flowPromises = values as readonly (Promised<unknown> | unknown)[];
-    const pod = flowPromises.find((v): v is Promised<unknown> => v instanceof Promised)?.getPod();
-
-    if (!pod) {
-      throw new Error("At least one Promised is required");
-    }
-
     const promises = flowPromises.map((v) =>
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(pod, Promise.allSettled(promises) as Promise<any>);
+    return new Promised(Promise.allSettled(promises) as Promise<any>);
   }
 
-  static try<T>(pod: Core.Pod, fn: () => T | Promise<T>): Promised<T> {
+  static try<T>(fn: () => T | Promise<T>): Promised<T> {
     const promise = new Promise<T>((resolve, reject) => {
       try {
         const result = fn();
@@ -179,7 +149,7 @@ export class Promised<T> implements PromiseLike<T> {
       }
     });
 
-    return new Promised(pod, promise);
+    return new Promised(promise);
   }
 
   private static extractResults<U>(
@@ -191,33 +161,39 @@ export class Promised<T> implements PromiseLike<T> {
     return (value as { results: readonly PromiseSettledResult<U>[] }).results;
   }
 
+  private mapResults<R>(
+    fn: (results: readonly PromiseSettledResult<any>[]) => R
+  ): Promised<R> {
+    return this.map((value: any) => {
+      const results = Promised.extractResults(value);
+      return fn(results);
+    });
+  }
+
   fulfilled<U>(
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
   ): Promised<any[]> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
-      return results
+    return this.mapResults((results) =>
+      results
         .filter((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-        .map((r: any) => r.value);
-    });
+        .map((r: any) => r.value)
+    );
   }
 
   rejected<U>(
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
   ): Promised<unknown[]> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
-      return results
+    return this.mapResults((results) =>
+      results
         .filter((r: any): r is PromiseRejectedResult => r.status === "rejected")
-        .map((r: any) => r.reason);
-    });
+        .map((r: any) => r.reason)
+    );
   }
 
   partition<U>(
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
   ): Promised<{ fulfilled: any[]; rejected: unknown[] }> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       const fulfilled: any[] = [];
       const rejected: unknown[] = [];
 
@@ -236,8 +212,7 @@ export class Promised<T> implements PromiseLike<T> {
   firstFulfilled<U>(
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
   ): Promised<any> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       const found = results.find((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled");
       return found?.value;
     });
@@ -246,8 +221,7 @@ export class Promised<T> implements PromiseLike<T> {
   firstRejected<U>(
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
   ): Promised<unknown | undefined> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       const found = results.find((r: any): r is PromiseRejectedResult => r.status === "rejected");
       return found?.reason;
     });
@@ -257,8 +231,7 @@ export class Promised<T> implements PromiseLike<T> {
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
     predicate: (value: any, index: number) => boolean
   ): Promised<any> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       let fulfilledIndex = 0;
 
       for (const result of results) {
@@ -278,8 +251,7 @@ export class Promised<T> implements PromiseLike<T> {
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
     fn: (value: any, index: number) => R
   ): Promised<R[]> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       const mapped: R[] = [];
       let fulfilledIndex = 0;
 
@@ -298,8 +270,7 @@ export class Promised<T> implements PromiseLike<T> {
     this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
     errorMapper?: (reasons: unknown[], fulfilledCount: number, totalCount: number) => Error
   ): Promised<any[]> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
+    return this.mapResults((results) => {
       const fulfilled: any[] = [];
       const rejected: unknown[] = [];
 

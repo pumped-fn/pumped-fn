@@ -442,6 +442,11 @@ class BaseScope implements Core.Scope {
   protected initialValues: Core.Preset<unknown>[] = [];
   public metas: Meta.Meta[] | undefined;
 
+  private static readonly emptyDataStore: Accessor.DataStore = {
+    get: () => undefined,
+    set: () => undefined,
+  };
+
   constructor(options?: ScopeOption) {
     this.isPod = options?.pod || false;
     if (options?.registry) {
@@ -658,6 +663,21 @@ class BaseScope implements Core.Scope {
     }
   }
 
+  private wrapWithExtensions<T>(
+    baseExecutor: () => Promised<T>,
+    dataStore: Accessor.DataStore,
+    operation: Extension.Operation
+  ): () => Promised<T> {
+    let executor = baseExecutor;
+    for (const extension of this.reversedExtensions) {
+      if (extension.wrap) {
+        const current = executor;
+        executor = () => extension.wrap!<T>(dataStore, current, operation);
+      }
+    }
+    return executor;
+  }
+
   protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
     let requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
@@ -700,25 +720,16 @@ class BaseScope implements Core.Scope {
       return accessor.resolve(force).map(() => accessor.get() as T);
     };
 
-    let resolver = coreResolve;
-
-    const emptyDataStore: Accessor.DataStore = {
-      get: () => undefined,
-      set: () => undefined,
-    };
-
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const currentResolver = resolver;
-        resolver = () =>
-          extension.wrap!<T>(emptyDataStore, currentResolver, {
-            kind: "resolve",
-            executor,
-            scope: this,
-            operation: "resolve",
-          });
+    const resolver = this.wrapWithExtensions(
+      coreResolve,
+      BaseScope.emptyDataStore,
+      {
+        kind: "resolve",
+        executor,
+        scope: this,
+        operation: "resolve",
       }
-    }
+    );
 
     return resolver();
   }
@@ -777,27 +788,16 @@ class BaseScope implements Core.Scope {
       })());
     };
 
-    let updater = (): Promised<T> => {
+    const baseUpdater = (): Promised<T> => {
       return coreUpdate().map(() => this.accessor(e).get() as T);
     };
 
-    const emptyDataStore: Accessor.DataStore = {
-      get: () => undefined,
-      set: () => undefined,
-    };
-
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const currentUpdater = updater;
-        updater = () =>
-          extension.wrap!<T>(emptyDataStore, currentUpdater, {
-            kind: "resolve",
-            operation: "update",
-            executor: e,
-            scope: this,
-          });
-      }
-    }
+    const updater = this.wrapWithExtensions(baseUpdater, BaseScope.emptyDataStore, {
+      kind: "resolve",
+      operation: "update",
+      executor: e,
+      scope: this,
+    });
 
     return updater().map(() => undefined);
   }

@@ -3,6 +3,7 @@ import { provide, derive, preset } from "../src/executor";
 import { createScope } from "../src/scope";
 import { meta } from "../src/meta";
 import { custom } from "../src/ssch";
+import { Promised } from "../src/promises";
 import { type Extension } from "../src";
 
 const name = meta("name", custom<string>());
@@ -239,12 +240,14 @@ test("test scope option", async () => {
   const eagerMeta = meta("eagerLoad", custom<boolean>());
   const eagerLoadExtension: Extension.Extension = {
     name: "eager-load",
-    init: async (scope) => {
-      for (const executor of scope.registeredExecutors()) {
-        if (eagerMeta.find(executor)) {
-          await scope.resolve(executor);
+    init: (scope) => {
+      return new Promised((async () => {
+        for (const executor of scope.registeredExecutors()) {
+          if (eagerMeta.find(executor)) {
+            await scope.resolve(executor);
+          }
         }
-      }
+      })());
     },
   };
 

@@ -1,5 +1,6 @@
 import { createExecutor } from "./executor";
 import { meta } from "./meta";
+import { Promised } from "./promises";
 import { custom, validate } from "./ssch";
 import {
   type Core,
@@ -55,16 +56,18 @@ class MultiExecutorImpl<T, K, PoolIdType = unknown> {
     };
   }
 
-  async release(scope: Core.Scope): Promise<void> {
-    const entries = scope.entries();
-    for (const [executor] of entries) {
-      const check = this.poolId.some
-        ? this.poolId.some(executor)
-        : this.poolId.find(executor);
-      if (check && (Array.isArray(check) ? check.length > 0 : check)) {
-        await scope.release(executor);
+  release(scope: Core.Scope): Promised<void> {
+    return new Promised((async () => {
+      const entries = scope.entries();
+      for (const [executor] of entries) {
+        const check = this.poolId.some
+          ? this.poolId.some(executor)
+          : this.poolId.find(executor);
+        if (check && (Array.isArray(check) ? check.length > 0 : check)) {
+          await scope.release(executor);
+        }
       }
-    }
+    })());
   }
 }
 

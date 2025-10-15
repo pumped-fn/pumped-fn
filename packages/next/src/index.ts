@@ -19,6 +19,7 @@ export { resolves } from "./helpers";
 export { meta, getValue, findValue, findValues } from "./meta";
 export * as multi from "./multi";
 export { createScope, type PodOption, type ScopeOption } from "./scope";
+export { extension } from "./extension";
 
 export * as standardSchema from "./ssch";
 export { custom } from "./ssch";

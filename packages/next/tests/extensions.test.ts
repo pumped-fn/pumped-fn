@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, provide } from "../src";
+import { flow, provide, extension, Promised } from "../src";
 import type { Extension } from "../src/types";
 
 describe("Extension Operation Tracking", () => {
@@ -11,27 +11,26 @@ describe("Extension Operation Tracking", () => {
     };
 
     const records: JournalRecord[] = [];
-    const journalCapture: Extension.Extension = {
+    const journalCapture = extension({
       name: "journal-capture",
-      wrap: async (_ctx, next, operation) => {
+      wrap: (_ctx, next, operation) => {
         if (operation.kind === "journal") {
           const record: JournalRecord = {
             key: operation.key,
             params: operation.params,
           };
-          try {
-            const result = await next();
+          return next().then((result) => {
             record.output = result;
             records.push(record);
             return result;
-          } catch (error) {
+          }).catch((error) => {
             records.push(record);
             throw error;
-          }
+          });
         }
         return next();
       },
-    };
+    });
 
     const mathFlow = flow(async (ctx, input: { x: number; y: number }) => {
       const product = await ctx.run("multiply", (a: number, b: number) => a * b, input.x, input.y);
@@ -52,9 +51,9 @@ describe("Extension Operation Tracking", () => {
   test("execution and subflow - input/output tracking", async () => {
     const capturedInputs: Array<{ operation: string; input: unknown }> = [];
 
-    const inputCapture: Extension.Extension = {
+    const inputCapture = extension({
       name: "input-capture",
-      wrap: async (_ctx, next, operation) => {
+      wrap: (_ctx, next, operation) => {
         if (operation.kind === "execute" || operation.kind === "subflow") {
           capturedInputs.push({
             operation: `${operation.kind}:${operation.definition.name}`,
@@ -63,7 +62,7 @@ describe("Extension Operation Tracking", () => {
         }
         return next();
       },
-    };
+    });
 
     const addOne = flow((_ctx, x: number) => x + 1);
     const double = flow((_ctx, x: number) => x * 2);
@@ -98,9 +97,9 @@ describe("Extension Operation Tracking", () => {
     };
 
     const records: Record[] = [];
-    const tracker: Extension.Extension = {
+    const tracker = extension({
       name: "tracker",
-      wrap: async (_ctx, next, operation) => {
+      wrap: (_ctx, next, operation) => {
         const record: Record = { kind: operation.kind };
 
         if (operation.kind === "execute") {
@@ -116,18 +115,17 @@ describe("Extension Operation Tracking", () => {
           record.promiseCount = operation.promiseCount;
         }
 
-        try {
-          const result = await next();
+        return next().then((result) => {
           record.output = result;
           records.push(record);
           return result;
-        } catch (error) {
+        }).catch((error) => {
           record.error = error;
           records.push(record);
           throw error;
-        }
+        });
       },
-    };
+    });
 
     const api = provide(() => ({
       multiply: vi.fn((x: number) => x * 2),

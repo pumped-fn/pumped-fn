@@ -14,6 +14,26 @@ function isErrorEntry(
   return typeof entry === "object" && entry !== null && "__error" in entry;
 }
 
+function wrapWithExtensions<T>(
+  extensions: Extension.Extension[] | undefined,
+  baseExecutor: () => Promised<T>,
+  dataStore: Accessor.DataStore,
+  operation: Extension.Operation
+): () => Promised<T> {
+  if (!extensions || extensions.length === 0) {
+    return baseExecutor;
+  }
+  let executor = baseExecutor;
+  for (let i = extensions.length - 1; i >= 0; i--) {
+    const extension = extensions[i];
+    if (extension.wrap) {
+      const current = executor;
+      executor = () => extension.wrap!(dataStore, current, operation);
+    }
+  }
+  return executor;
+}
+
 const flowDefinitionMeta = meta<Flow.Definition<any, any>>(
   "flow.definition",
   custom<Flow.Definition<any, any>>()
@@ -173,6 +193,20 @@ class FlowContext implements Flow.Context {
     this.reversedExtensions = [...extensions].reverse();
   }
 
+  private wrapWithExtensions<T>(
+    baseExecutor: () => Promised<T>,
+    operation: Extension.Operation
+  ): () => Promised<T> {
+    let executor = baseExecutor;
+    for (const extension of this.reversedExtensions) {
+      if (extension.wrap) {
+        const current = executor;
+        executor = () => extension.wrap!(this, current, operation);
+      }
+    }
+    return executor;
+  }
+
   initializeExecutionContext(flowName: string, isParallel: boolean = false) {
     const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
     const parentFlowName = this.parent
@@ -282,23 +316,15 @@ class FlowContext implements Flow.Context {
         });
       };
 
-      let executor = executeCore;
-      for (const extension of this.reversedExtensions) {
-        if (extension.wrap) {
-          const currentExecutor = executor;
-          executor = () => {
-            return extension.wrap!(this, currentExecutor, {
-              kind: "journal",
-              key,
-              flowName,
-              depth,
-              isReplay,
-              pod: this.pod,
-              params: params.length > 0 ? params : undefined,
-            });
-          };
-        }
-      }
+      const executor = this.wrapWithExtensions(executeCore, {
+        kind: "journal",
+        key,
+        flowName,
+        depth,
+        isReplay,
+        pod: this.pod,
+        params: params.length > 0 ? params : undefined,
+      });
 
       return executor();
     })();
@@ -385,24 +411,16 @@ class FlowContext implements Flow.Context {
           throw new Error("Flow definition not found in executor metadata");
         }
 
-        let executor = executeCore;
-        for (const extension of this.reversedExtensions) {
-          if (extension.wrap) {
-            const currentExecutor = executor;
-            executor = () => {
-              return extension.wrap!(this, currentExecutor, {
-                kind: "subflow",
-                flow,
-                definition,
-                input,
-                journalKey,
-                parentFlowName,
-                depth,
-                pod: this.pod,
-              });
-            };
-          }
-        }
+        const executor = this.wrapWithExtensions(executeCore, {
+          kind: "subflow",
+          flow,
+          definition,
+          input,
+          journalKey,
+          parentFlowName,
+          depth,
+          pod: this.pod,
+        });
 
         return executor();
       })();
@@ -441,24 +459,16 @@ class FlowContext implements Flow.Context {
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      let executor = executeCore;
-      for (const extension of this.reversedExtensions) {
-        if (extension.wrap) {
-          const currentExecutor = executor;
-          executor = () => {
-            return extension.wrap!(this, currentExecutor, {
-              kind: "subflow",
-              flow,
-              definition,
-              input,
-              journalKey: undefined,
-              parentFlowName,
-              depth,
-              pod: this.pod,
-            });
-          };
-        }
-      }
+      const executor = this.wrapWithExtensions(executeCore, {
+        kind: "subflow",
+        flow,
+        definition,
+        input,
+        journalKey: undefined,
+        parentFlowName,
+        depth,
+        pod: this.pod,
+      });
 
       return executor();
     })();
@@ -495,22 +505,14 @@ class FlowContext implements Flow.Context {
         })));
       };
 
-      let executor = executeCore;
-      for (const extension of this.reversedExtensions) {
-        if (extension.wrap) {
-          const currentExecutor = executor;
-          executor = () => {
-            return extension.wrap!(this, currentExecutor, {
-              kind: "parallel",
-              mode: "parallel",
-              promiseCount: promises.length,
-              depth,
-              parentFlowName,
-              pod: this.pod,
-            });
-          };
-        }
-      }
+      const executor = this.wrapWithExtensions(executeCore, {
+        kind: "parallel",
+        mode: "parallel",
+        promiseCount: promises.length,
+        depth,
+        parentFlowName,
+        pod: this.pod,
+      });
 
       return executor();
     })();
@@ -548,22 +550,14 @@ class FlowContext implements Flow.Context {
         }));
       };
 
-      let executor = executeCore;
-      for (const extension of this.reversedExtensions) {
-        if (extension.wrap) {
-          const currentExecutor = executor;
-          executor = () => {
-            return extension.wrap!(this, currentExecutor, {
-              kind: "parallel",
-              mode: "parallelSettled",
-              promiseCount: promises.length,
-              depth,
-              parentFlowName,
-              pod: this.pod,
-            });
-          };
-        }
-      }
+      const executor = this.wrapWithExtensions(executeCore, {
+        kind: "parallel",
+        mode: "parallelSettled",
+        promiseCount: promises.length,
+        depth,
+        parentFlowName,
+        pod: this.pod,
+      });
 
       return executor();
     })();
@@ -583,24 +577,16 @@ class FlowContext implements Flow.Context {
       throw new Error("Flow definition not found in executor metadata");
     }
 
-    let executor = executeCore;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const currentExecutor = executor;
-        executor = () => {
-          return extension.wrap!(context, currentExecutor, {
-            kind: "execute",
-            flow,
-            definition,
-            input,
-            flowName: context.find(flowMeta.flowName),
-            depth: context.get(flowMeta.depth),
-            isParallel: context.get(flowMeta.isParallel),
-            parentFlowName: context.find(flowMeta.parentFlowName),
-          });
-        };
-      }
-    }
+    const executor = context.wrapWithExtensions(executeCore, {
+      kind: "execute",
+      flow,
+      definition,
+      input,
+      flowName: context.find(flowMeta.flowName),
+      depth: context.get(flowMeta.depth),
+      isParallel: context.get(flowMeta.isParallel),
+      parentFlowName: context.find(flowMeta.parentFlowName),
+    });
 
     return executor();
   }
@@ -725,24 +711,21 @@ function execute<S, I>(
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      let executor = executeCore;
-      for (const extension of [...(options?.extensions || [])].reverse()) {
-        if (extension.wrap) {
-          const currentExecutor = executor;
-          executor = () => {
-            return extension.wrap!(context, currentExecutor, {
-              kind: "execute",
-              flow,
-              definition,
-              input,
-              flowName: definition.name || context.find(flowMeta.flowName),
-              depth: context.get(flowMeta.depth),
-              isParallel: context.get(flowMeta.isParallel),
-              parentFlowName: context.find(flowMeta.parentFlowName),
-            });
-          };
+      const executor = wrapWithExtensions(
+        options?.extensions,
+        executeCore,
+        context,
+        {
+          kind: "execute",
+          flow,
+          definition,
+          input,
+          flowName: definition.name || context.find(flowMeta.flowName),
+          depth: context.get(flowMeta.depth),
+          isParallel: context.get(flowMeta.isParallel),
+          parentFlowName: context.find(flowMeta.parentFlowName),
         }
-      }
+      );
 
       const result = await executor();
       resolveSnapshot(context.createSnapshot());

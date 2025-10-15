@@ -127,7 +127,7 @@ export function formatMessage(
 
   for (const [key, value] of Object.entries(context)) {
     const placeholder = `{${key}}`;
-    message = message.replace(new RegExp(placeholder, "g"), String(value));
+    message = message.replaceAll(placeholder, String(value));
   }
 
   return message;

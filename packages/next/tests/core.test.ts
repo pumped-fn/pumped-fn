@@ -4,6 +4,7 @@ import { custom } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { createExecutor, derive, provide, preset } from "../src/executor";
 import { flow } from "../src/flow";
+import { Promised } from "../src/promises";
 
 describe("Core Functionality", () => {
   describe("Accessor functionality", () => {
@@ -146,11 +147,13 @@ describe("Core Functionality", () => {
 
       const extension = {
         name: "test-extension",
-        async initPod() {
+        initPod() {
           calls.push("initPod");
+          return new Promised(Promise.resolve());
         },
-        async disposePod() {
+        disposePod() {
           calls.push("disposePod");
+          return new Promised(Promise.resolve());
         },
       };
 
