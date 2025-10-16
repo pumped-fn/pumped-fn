@@ -845,10 +845,6 @@ class BaseScope implements Core.Scope {
     this.isDisposing = true;
 
     return Promised.create((async () => {
-      for (const pod of this.pods) {
-        await this.disposePod(pod);
-      }
-
       const extensionDisposeEvents = this.extensions.map(
         (ext) => ext.dispose?.(this) ?? Promise.resolve()
       );
@@ -991,40 +987,6 @@ class BaseScope implements Core.Scope {
     return this.useExtension(extension);
   }
 
-  private pods: Set<Core.Pod> = new Set();
-
-  pod(...preset: Core.Preset<unknown>[]): Core.Pod;
-  pod(options: PodOption): Core.Pod;
-  pod(...args: Core.Preset<unknown>[] | [PodOption]): Core.Pod {
-    this["~ensureNotDisposed"]();
-    if (this.isDisposing) {
-      throw new Error("Cannot register update callback on a disposing scope");
-    }
-
-    let podOptions: PodOption;
-
-    if (args.length === 1 && !isPreset(args[0])) {
-      podOptions = args[0] as PodOption;
-    } else {
-      podOptions = { initialValues: args as Core.Preset<unknown>[] };
-    }
-
-    const pod = new Pod(this, podOptions);
-    this.pods.add(pod);
-    return pod;
-  }
-
-  disposePod(pod: Core.Pod): Promised<void> {
-    this["~ensureNotDisposed"]();
-    if (this.isDisposing) {
-      return Promised.create(Promise.resolve());
-    }
-
-    return pod.dispose().map(() => {
-      this.pods.delete(pod);
-    });
-  }
-
   exec<S, I = undefined>(
     flow: Core.Executor<Flow.Handler<S, I>>,
     input?: I,
@@ -1098,12 +1060,6 @@ export type ScopeOption = {
   meta?: Meta.Meta[];
 };
 
-export type PodOption = {
-  initialValues?: Core.Preset<unknown>[];
-  extensions?: Extension.Extension[];
-  meta?: Meta.Meta[];
-};
-
 export function createScope(): Core.Scope;
 export function createScope(opt: ScopeOption): Core.Scope;
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope;
@@ -1122,136 +1078,4 @@ export function createScope(
   return new BaseScope({
     initialValues: opt as Core.Preset<unknown>[],
   });
-}
-
-class Pod extends BaseScope implements Core.Pod {
-  private parentScope: BaseScope;
-
-  constructor(scope: BaseScope, option?: PodOption) {
-    super({
-      pod: true,
-      initialValues: option?.initialValues,
-      extensions: option?.extensions
-        ? [...(scope["extensions"] || []), ...option.extensions]
-        : [...(scope["extensions"] || [])],
-      meta: option?.meta,
-    });
-    this.parentScope = scope;
-  }
-
-
-  resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T> {
-    if (this.cache.has(executor)) {
-      return super.resolve(executor, force);
-    }
-
-    const replacer = this.initialValues.find(
-      (item) => item.executor === executor
-    );
-
-    if (replacer) {
-      return super.resolve(executor, force);
-    }
-
-    if (this.parentScope["cache"].has(executor)) {
-      const { value } = this.parentScope["cache"].get(executor)!;
-      const accessor = super["~makeAccessor"](executor);
-
-      this["cache"].set(executor, {
-        accessor,
-        value,
-      });
-
-      if (value) {
-        if (value.kind === "rejected") {
-          throw value.error;
-        }
-
-        if (value.kind === "resolved") {
-          return Promised.create(Promise.resolve(value.value as T));
-        }
-
-        if (value.kind === "pending") {
-          return Promised.create(value.promise as Promise<T>);
-        }
-      }
-    }
-
-    if (this["~hasDependencyWithPreset"](executor)) {
-      return super.resolve(executor, force);
-    }
-
-    return super.resolve(executor, force);
-  }
-
-  private "~hasDependencyWithPreset"(executor: Core.Executor<any>): boolean {
-    if (!executor.dependencies) return false;
-
-    const checkDependency = (dep: Core.UExecutor): boolean => {
-      const actualExecutor = getExecutor(dep);
-
-      const hasPreset = this.initialValues.some(
-        (item) => item.executor === actualExecutor
-      );
-      if (hasPreset) return true;
-
-      if (actualExecutor.dependencies) {
-        return this["~hasDependencyWithPreset"](actualExecutor);
-      }
-
-      return false;
-    };
-
-    const deps = executor.dependencies;
-    if (Array.isArray(deps)) {
-      return deps.some(checkDependency);
-    } else if (typeof deps === "object" && deps !== null && !isExecutor(deps)) {
-      return Object.values(deps).some(checkDependency);
-    } else {
-      return checkDependency(deps);
-    }
-  }
-
-  protected async "~resolveExecutor"(
-    ie: Core.UExecutor,
-    ref: UE
-  ): Promise<unknown> {
-    if (isReactiveExecutor(ie)) {
-      throw new Error("Reactive executors cannot be used in pod");
-    }
-
-    const e = getExecutor(ie);
-
-    if (isLazyExecutor(ie)) {
-      this["~checkCircularDependency"](e, ref);
-      this["~propagateResolutionChain"](ref, e);
-      const a = this["~makeAccessor"](e);
-      return a;
-    }
-
-    if (isStaticExecutor(ie)) {
-      this["~checkCircularDependency"](e, ref);
-      this["~propagateResolutionChain"](ref, e);
-      await this.resolve(e);
-      const a = this["~makeAccessor"](e);
-      return a;
-    }
-
-    this["~checkCircularDependency"](e, ref);
-    this["~propagateResolutionChain"](ref, e);
-
-    return await this.resolve(e);
-  }
-
-  dispose(): Promised<void> {
-    return Promised.create((async () => {
-      const extensionDisposeEvents = this.extensions.map(
-        (ext) => ext.dispose?.(this) ?? Promise.resolve()
-      );
-      await Promise.all(extensionDisposeEvents);
-
-      await super.dispose();
-    })());
-  }
-
 }

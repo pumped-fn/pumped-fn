@@ -17,7 +17,7 @@ export {
   isStaticExecutor,
 } from "./executor";
 
-export { createScope, type PodOption, type ScopeOption } from "./scope";
+export { createScope, type ScopeOption } from "./scope";
 export { meta, getValue, findValue, findValues } from "./meta";
 export { accessor } from "./accessor";
 
