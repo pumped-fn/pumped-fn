@@ -23,7 +23,6 @@ export const codes = {
   EXECUTOR_NOT_RESOLVED: "S002",
   INVALID_SCOPE_STATE: "S003",
   SCOPE_CLEANUP_FAILED: "S004",
-  REACTIVE_EXECUTOR_IN_POD: "S005",
   UPDATE_CALLBACK_ON_DISPOSING_SCOPE: "S006",
 
   SCHEMA_VALIDATION_FAILED: "V001",
@@ -78,8 +77,6 @@ const messages: Record<Code, string> = {
   [codes.INVALID_SCOPE_STATE]:
     "Scope is in invalid state for this operation: {currentState}",
   [codes.SCOPE_CLEANUP_FAILED]: "Scope cleanup failed: {cause}",
-  [codes.REACTIVE_EXECUTOR_IN_POD]:
-    "Reactive executors cannot be used in pod environments",
   [codes.UPDATE_CALLBACK_ON_DISPOSING_SCOPE]:
     "Cannot register update callback on a disposing scope",
 
