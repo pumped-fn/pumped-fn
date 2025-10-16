@@ -181,19 +181,24 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
 class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
   private journal: Map<string, unknown> | null = null;
-  public readonly pod: Core.Pod;
+  private readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
-  private parentScope: Core.Scope;
 
   constructor(
-    parentScope: Core.Scope,
-    pod: Core.Pod,
+    scope: Core.Scope,
     private extensions: Extension.Extension[],
     private parent?: FlowContext
   ) {
-    this.parentScope = parentScope;
-    this.pod = pod;
+    this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
+  }
+
+  resolve<T>(executor: Core.Executor<T>): Promised<T> {
+    return this.scope.resolve(executor);
+  }
+
+  accessor<T>(executor: Core.Executor<T>): Core.Accessor<T> {
+    return this.scope.accessor(executor);
   }
 
   private wrapWithExtensions<T>(
@@ -380,15 +385,14 @@ class FlowContext implements Flow.Context {
           }
 
           return Promised.try(async () => {
-            const handler = await this.pod.resolve(flow);
+            const handler = await this.scope.resolve(flow);
             const definition = flowDefinitionMeta.find(flow);
             if (!definition) {
               throw new Error("Flow definition not found in executor metadata");
             }
 
             const childContext = new FlowContext(
-              this.parentScope,
-              this.pod,
+              this.scope,
               this.extensions,
               this
             );
@@ -442,13 +446,13 @@ class FlowContext implements Flow.Context {
       const depth = this.get(flowMeta.depth);
 
       const executeCore = (): Promised<Flow.InferOutput<F>> => {
-        return this.pod.resolve(flow).map(async (handler) => {
+        return this.scope.resolve(flow).map(async (handler) => {
           const definition = flowDefinitionMeta.find(flow);
           if (!definition) {
             throw new Error("Flow definition not found in executor metadata");
           }
 
-          const childContext = new FlowContext(this.parentScope, this.pod, this.extensions, this);
+          const childContext = new FlowContext(this.scope, this.extensions, this);
           childContext.initializeExecutionContext(definition.name, false);
 
           return (await this.executeWithExtensions<Flow.InferOutput<F>>(
@@ -674,8 +678,6 @@ function execute<S, I>(
   const scope = options?.scope || createScope();
   const shouldDisposeScope = !options?.scope;
 
-  const pod = scope.pod({ initialValues: options?.presets, meta: options?.meta });
-
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
   const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
     (resolve) => {
@@ -684,7 +686,7 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
-    const context = new FlowContext(scope, pod, options?.extensions || []);
+    const context = new FlowContext(scope, options?.extensions || []);
 
     try {
       if (options?.initialContext) {
@@ -694,7 +696,7 @@ function execute<S, I>(
       }
 
       const executeCore = (): Promised<S> => {
-        return pod.resolve(flow).map(async (handler) => {
+        return scope.resolve(flow).map(async (handler) => {
           const definition = flowDefinitionMeta.find(flow);
           if (!definition) {
             throw new Error("Flow definition not found in executor metadata");
@@ -739,8 +741,6 @@ function execute<S, I>(
       resolveSnapshot(context.createSnapshot());
       throw error;
     } finally {
-      await scope.disposePod(pod);
-
       if (shouldDisposeScope) {
         await scope.dispose();
       }
