@@ -352,13 +352,6 @@ export declare namespace Core {
           [K in keyof T]: T[K];
         };
 
-  export interface Pod
-    extends Omit<
-        Core.Scope,
-        "update" | "disposePod" | "onChange" | "registeredExecutors"
-      >,
-      Meta.MetaContainer {}
-
   export interface Scope extends Meta.MetaContainer {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
     entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
@@ -388,14 +381,6 @@ export declare namespace Core {
     onError(callback: GlobalErrorCallback): Cleanup;
 
     useExtension(extension: Extension.Extension): Cleanup;
-
-    pod(...presets: Preset<unknown>[]): Pod;
-    pod(options: {
-      initialValues?: Preset<unknown>[];
-      extensions?: Extension.Extension[];
-      meta?: Meta.Meta[];
-    }): Pod;
-    disposePod(scope: Pod): Promised<void>;
 
     exec<S, I = undefined>(
       flow: Core.Executor<Flow.Handler<S, I>>,
@@ -574,8 +559,6 @@ export namespace Flow {
   };
 
   export type C = {
-    readonly pod: Core.Pod;
-
     get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
     find<T>(accessor: Accessor.Accessor<T>): T | undefined;
     find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
