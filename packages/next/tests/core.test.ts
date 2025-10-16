@@ -387,5 +387,37 @@ describe("Core Functionality", () => {
       await pod.dispose();
       await scope.dispose();
     });
+
+    test("scope.exec(flow) reuses scope-cached resources", async () => {
+      let dbConnectionCount = 0;
+      let serviceResolveCount = 0;
+
+      const dbConnection = provide(() => {
+        dbConnectionCount++;
+        return { connected: true, id: dbConnectionCount };
+      });
+
+      const service = derive({ db: dbConnection }, ({ db }) => {
+        serviceResolveCount++;
+        return { db, count: serviceResolveCount };
+      });
+
+      const scope = createScope();
+
+      await scope.resolve(service);
+      expect(dbConnectionCount).toBe(1);
+      expect(serviceResolveCount).toBe(1);
+
+      const testFlow = flow(service, (_deps, _ctx, input: number) => {
+        return input * 2;
+      });
+
+      const result = await scope.exec(testFlow, 5);
+      expect(result).toBe(10);
+      expect(dbConnectionCount).toBe(1);
+      expect(serviceResolveCount).toBe(1);
+
+      await scope.dispose();
+    });
   });
 });

@@ -1220,7 +1220,19 @@ class Pod extends BaseScope implements Core.Pod {
       throw new Error("Reactive executors cannot be used in pod");
     }
 
-    return await super["~resolveExecutor"](ie, ref);
+    const e = getExecutor(ie);
+
+    if (isLazyExecutor(ie)) {
+      this["~checkCircularDependency"](e, ref);
+      this["~propagateResolutionChain"](ref, e);
+      const a = this["~makeAccessor"](e);
+      return a;
+    }
+
+    this["~checkCircularDependency"](e, ref);
+    this["~propagateResolutionChain"](ref, e);
+
+    return await this.resolve(e);
   }
 
   dispose(): Promised<void> {
