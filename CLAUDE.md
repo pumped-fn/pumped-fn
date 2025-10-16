@@ -1,6 +1,7 @@
 # Upmost important
 
-Sacrifice English grammar for conciseness. Concrete and straightforward
+Sacrifice English grammar for conciseness. Concrete and straightforward.
+Use ast-grep where possible to search and replace code
 
 # Coding style
 

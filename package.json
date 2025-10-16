@@ -7,6 +7,7 @@
     "typecheck": "pnpm -r typecheck",
     "docs:dev": "cd docs && pnpm dev",
     "docs:build": "cd docs && NODE_ENV=production pnpm build",
+    "docs:preview": "cd docs && pnpm preview",
     "verify": "pnpm build && pnpm test && pnpm typecheck",
     "format": "ultracite format",
     "format:check": "ultracite lint",
@@ -24,7 +25,7 @@
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.7",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   },
   "license": "MIT",
   "pnpm": {

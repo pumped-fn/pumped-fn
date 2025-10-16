@@ -1,10 +1,11 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect } from "vitest";
 import { accessor } from "../src/accessor";
 import { custom } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { createExecutor, derive, provide, preset } from "../src/executor";
 import { flow } from "../src/flow";
 import { Promised } from "../src/promises";
+import { meta } from "../src/meta";
 
 describe("Core Functionality", () => {
   describe("Accessor functionality", () => {
@@ -216,6 +217,67 @@ describe("Core Functionality", () => {
         expect((details.error as Error).message).toBe("Test error");
         expect(details.ctx).toBeDefined();
       }
+
+      await scope.dispose();
+    });
+
+    test("scope.exec(flow) without input parameter", async () => {
+      const scope = createScope();
+
+      const noInputFlow = flow((_ctx) => "no input needed");
+      const result = await scope.exec(noInputFlow);
+      expect(result).toBe("no input needed");
+
+      await scope.dispose();
+    });
+
+    test("scope.exec(flow, param) with input parameter", async () => {
+      const scope = createScope();
+
+      const doubleFlow = flow((_ctx, input: number) => input * 2);
+      const result = await scope.exec(doubleFlow, 5);
+      expect(result).toBe(10);
+
+      await scope.dispose();
+    });
+
+    test("scope.exec(flow, undefined, options) with options", async () => {
+      const scope = createScope();
+
+      const testMeta = meta<{ tag: string }>("test.meta", custom<{ tag: string }>());
+
+      const configExecutor = provide(() => ({ multiplier: 5 }));
+      const flowUsingConfig = flow(configExecutor, (deps, ctx) => {
+        const metaValue = testMeta.find(ctx.pod);
+        return deps.multiplier * (metaValue?.tag === "special" ? 10 : 1);
+      });
+
+      const result = await scope.exec(flowUsingConfig, undefined, {
+        meta: [testMeta({ tag: "special" })],
+      });
+
+      expect(result).toBe(50);
+
+      await scope.dispose();
+    });
+
+    test("scope.exec with presets and meta combined", async () => {
+      const scope = createScope();
+
+      const config = provide(() => ({ base: 10 }));
+      const testMeta = meta<{ multiplier: number }>("test.multiplier", custom<{ multiplier: number }>());
+
+      const combinedFlow = flow(config, (deps, ctx) => {
+        const metaValue = testMeta.find(ctx.pod);
+        return deps.base * (metaValue?.multiplier ?? 1);
+      });
+
+      const result = await scope.exec(combinedFlow, undefined, {
+        presets: [preset(config, { base: 20 })],
+        meta: [testMeta({ multiplier: 3 })],
+      });
+
+      expect(result).toBe(60);
 
       await scope.dispose();
     });
