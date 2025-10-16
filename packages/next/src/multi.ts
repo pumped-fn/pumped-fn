@@ -57,7 +57,7 @@ class MultiExecutorImpl<T, K, PoolIdType = unknown> {
   }
 
   release(scope: Core.Scope): Promised<void> {
-    return new Promised((async () => {
+    return Promised.create((async () => {
       const entries = scope.entries();
       for (const [executor] of entries) {
         const check = this.poolId.some

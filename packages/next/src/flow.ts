@@ -28,7 +28,10 @@ function wrapWithExtensions<T>(
     const extension = extensions[i];
     if (extension.wrap) {
       const current = executor;
-      executor = () => extension.wrap!(dataStore, current, operation);
+      executor = () => {
+        const result = extension.wrap!(dataStore, current, operation);
+        return result instanceof Promised ? result : Promised.create(result);
+      };
     }
   }
   return executor;
@@ -201,7 +204,10 @@ class FlowContext implements Flow.Context {
     for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const current = executor;
-        executor = () => extension.wrap!(this, current, operation);
+        executor = () => {
+          const result = extension.wrap!(this, current, operation);
+          return result instanceof Promised ? result : Promised.create(result);
+        };
       }
     }
     return executor;
@@ -300,7 +306,7 @@ class FlowContext implements Flow.Context {
           if (isErrorEntry(entry)) {
             throw entry.error;
           }
-          return new Promised(Promise.resolve(entry as T));
+          return Promised.create(Promise.resolve(entry as T));
         }
 
         return Promised.try(async () => {
@@ -329,7 +335,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(promise);
+    return Promised.create(promise);
   }
 
   exec<F extends Flow.UFlow>(
@@ -370,7 +376,7 @@ class FlowContext implements Flow.Context {
             if (isErrorEntry(entry)) {
               throw entry.error;
             }
-            return new Promised(Promise.resolve(entry as Flow.InferOutput<F>));
+            return Promised.create(Promise.resolve(entry as Flow.InferOutput<F>));
           }
 
           return Promised.try(async () => {
@@ -425,7 +431,7 @@ class FlowContext implements Flow.Context {
         return executor();
       })();
 
-      return new Promised(promise);
+      return Promised.create(promise);
     }
 
     const flow = keyOrFlow as F;
@@ -473,7 +479,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(promise);
+    return Promised.create(promise);
   }
 
   parallel<T extends readonly Promised<any>[]>(
@@ -493,7 +499,7 @@ class FlowContext implements Flow.Context {
         }>["results"];
         stats: { total: number; succeeded: number; failed: number };
       }> => {
-        return new Promised(Promise.all(promises).then((results) => ({
+        return Promised.create(Promise.all(promises).then((results) => ({
           results: results as Flow.ParallelResult<{
             [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
           }>["results"],
@@ -517,7 +523,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(promise);
+    return Promised.create(promise);
   }
 
   parallelSettled<T extends readonly Promised<any>[]>(
@@ -535,10 +541,10 @@ class FlowContext implements Flow.Context {
         results: PromiseSettledResult<any>[];
         stats: { total: number; succeeded: number; failed: number };
       }> => {
-        return new Promised(Promise.allSettled(promises).then((results) => {
+        return Promised.create(Promise.allSettled(promises).then((results) => {
           const succeeded = results.filter((r) => r.status === "fulfilled").length;
           const failed = results.filter((r) => r.status === "rejected").length;
-
+        
           return {
             results: results as PromiseSettledResult<any>[],
             stats: {
@@ -562,7 +568,7 @@ class FlowContext implements Flow.Context {
       return executor();
     })();
 
-    return new Promised(promise);
+    return Promised.create(promise);
   }
 
   private executeWithExtensions<T>(
@@ -571,7 +577,7 @@ class FlowContext implements Flow.Context {
     flow: Flow.UFlow,
     input: unknown
   ): Promised<T> {
-    const executeCore = (): Promised<T> => new Promised(handler(context));
+    const executeCore = (): Promised<T> => Promised.create(handler(context));
     const definition = flowDefinitionMeta.find(flow);
     if (!definition) {
       throw new Error("Flow definition not found in executor metadata");
@@ -631,6 +637,7 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    meta?: Meta.Meta[];
     details: true;
   }
 ): Promised<Flow.ExecutionDetails<S>>;
@@ -645,6 +652,7 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    meta?: Meta.Meta[];
     details?: false;
   }
 ): Promised<S>;
@@ -659,13 +667,14 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    meta?: Meta.Meta[];
     details?: boolean;
   }
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
   const scope = options?.scope || createScope();
   const shouldDisposeScope = !options?.scope;
 
-  const pod = scope.pod({ initialValues: options?.presets });
+  const pod = scope.pod({ initialValues: options?.presets, meta: options?.meta });
 
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
   const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
@@ -761,10 +770,10 @@ function execute<S, I>(
       return { success: false as const, error, ctx };
     });
 
-    return new Promised(detailsPromise, snapshotPromise);
+    return Promised.create(detailsPromise, snapshotPromise);
   }
 
-  return new Promised(promise, snapshotPromise);
+  return Promised.create(promise, snapshotPromise);
 }
 
 function flowImpl<I, S>(

@@ -76,7 +76,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         value: {
           kind: "resolved",
           value: immediateValue,
-          promised: new Promised(Promise.resolve(immediateValue)),
+          promised: Promised.create(Promise.resolve(immediateValue)),
         },
       });
 
@@ -103,7 +103,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
       value: {
         kind: "resolved",
         value: processedResult,
-        promised: new Promised(Promise.resolve(processedResult)),
+        promised: Promised.create(Promise.resolve(processedResult)),
       },
     });
 
@@ -154,7 +154,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
       if (this.currentPromise && !force) {
         if (!this.currentPromised) {
-          this.currentPromised = new Promised(this.currentPromise);
+          this.currentPromised = Promised.create(this.currentPromise);
         }
         return this.currentPromised;
       }
@@ -168,7 +168,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         value: { kind: "pending", promise: this.currentPromise },
       });
 
-      this.currentPromised = new Promised(this.currentPromise);
+      this.currentPromised = Promised.create(this.currentPromise);
       return this.currentPromised;
     };
   }
@@ -181,7 +181,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         return cached.promised;
       }
       if (!this.cachedResolvedPromised) {
-        this.cachedResolvedPromised = new Promised(Promise.resolve(cached.value));
+        this.cachedResolvedPromised = Promised.create(Promise.resolve(cached.value));
       }
       return this.cachedResolvedPromised;
     }
@@ -191,7 +191,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
 
     if (!this.currentPromised) {
-      this.currentPromised = new Promised(cached.promise);
+      this.currentPromised = Promised.create(cached.promise);
     }
     return this.currentPromised;
   }
@@ -672,7 +672,10 @@ class BaseScope implements Core.Scope {
     for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const current = executor;
-        executor = () => extension.wrap!<T>(dataStore, current, operation);
+        executor = () => {
+          const result = extension.wrap!<T>(dataStore, current, operation);
+          return result instanceof Promised ? result : Promised.create(result);
+        };
       }
     }
     return executor;
@@ -748,25 +751,25 @@ class BaseScope implements Core.Scope {
     u: T | ((current: T) => T)
   ): Promised<void> {
     if (this.isDisposing) {
-      return new Promised(Promise.resolve());
+      return Promised.create(Promise.resolve());
     }
 
     this["~ensureNotDisposed"]();
 
     const coreUpdate = (): Promised<void> => {
-      return new Promised((async () => {
+      return Promised.create((async () => {
         this["~triggerCleanup"](e);
         const accessor = this["~makeAccessor"](e);
-
+      
         let value: T | undefined;
-
+      
         if (typeof u === "function") {
           const fn = u as (current: T) => T;
           value = fn(accessor.get() as T);
         } else {
           value = u;
         }
-
+      
         const events = this.onEvents.change;
         for (const event of events) {
           const updated = await event("update", e, value, this);
@@ -780,10 +783,10 @@ class BaseScope implements Core.Scope {
           value: {
             kind: "resolved",
             value,
-            promised: new Promised(Promise.resolve(value)),
+            promised: Promised.create(Promise.resolve(value)),
           },
         });
-
+      
         await this["~triggerUpdate"](e);
       })());
     };
@@ -834,14 +837,14 @@ class BaseScope implements Core.Scope {
       this.cache.delete(e);
     };
 
-    return new Promised(coreRelease());
+    return Promised.create(coreRelease());
   }
 
   dispose(): Promised<void> {
     this["~ensureNotDisposed"]();
     this.isDisposing = true;
 
-    return new Promised((async () => {
+    return Promised.create((async () => {
       for (const pod of this.pods) {
         await this.disposePod(pod);
       }
@@ -1014,7 +1017,7 @@ class BaseScope implements Core.Scope {
   disposePod(pod: Core.Pod): Promised<void> {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
-      return new Promised(Promise.resolve());
+      return Promised.create(Promise.resolve());
     }
 
     return pod.dispose().map(() => {
@@ -1022,53 +1025,68 @@ class BaseScope implements Core.Scope {
     });
   }
 
-  exec<S, I>(
+  exec<S, I = undefined>(
     flow: Core.Executor<Flow.Handler<S, I>>,
-    input: I,
+    input?: I,
+    options?: {
+      extensions?: Extension.Extension[];
+      initialContext?: Array<
+        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+      >;
+      presets?: Core.Preset<unknown>[];
+      meta?: Meta.Meta[];
+      details?: false;
+    }
+  ): Promised<S>;
+
+  exec<S, I = undefined>(
+    flow: Core.Executor<Flow.Handler<S, I>>,
+    input: I | undefined,
     options: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
         [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
       >;
       presets?: Core.Preset<unknown>[];
+      meta?: Meta.Meta[];
       details: true;
     }
   ): Promised<Flow.ExecutionDetails<S>>;
 
-  exec<S, I>(
+  exec<S, I = undefined>(
     flow: Core.Executor<Flow.Handler<S, I>>,
-    input: I,
+    input?: I,
     options?: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
         [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
       >;
       presets?: Core.Preset<unknown>[];
-      details?: false;
-    }
-  ): Promised<S>;
-
-  exec<S, I>(
-    flow: Core.Executor<Flow.Handler<S, I>>,
-    input: I,
-    options?: {
-      extensions?: Extension.Extension[];
-      initialContext?: Array<
-        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
-      >;
-      presets?: Core.Preset<unknown>[];
+      meta?: Meta.Meta[];
       details?: boolean;
     }
   ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
     this["~ensureNotDisposed"]();
 
-    return flowApi.execute(flow, input, {
+    if (options?.details === true) {
+      return flowApi.execute(flow, input as I, {
+        scope: this,
+        extensions: options.extensions,
+        initialContext: options.initialContext,
+        presets: options.presets,
+        meta: options.meta,
+        details: true,
+      });
+    }
+
+    return flowApi.execute(flow, input as I, {
       scope: this,
       extensions: options?.extensions,
       initialContext: options?.initialContext,
       presets: options?.presets,
-      details: options?.details,
-    } as any);
+      meta: options?.meta,
+      details: false,
+    });
   }
 }
 
@@ -1154,11 +1172,11 @@ class Pod extends BaseScope implements Core.Pod {
         }
 
         if (value.kind === "resolved") {
-          return new Promised(Promise.resolve(value.value as T));
+          return Promised.create(Promise.resolve(value.value as T));
         }
 
         if (value.kind === "pending") {
-          return new Promised(value.promise as Promise<T>);
+          return Promised.create(value.promise as Promise<T>);
         }
       }
     }
@@ -1206,12 +1224,12 @@ class Pod extends BaseScope implements Core.Pod {
   }
 
   dispose(): Promised<void> {
-    return new Promised((async () => {
+    return Promised.create((async () => {
       const extensionDisposeEvents = this.extensions.map(
         (ext) => ext.disposePod?.(this) ?? Promise.resolve()
       );
       await Promise.all(extensionDisposeEvents);
-
+    
       await super.dispose();
     })());
   }

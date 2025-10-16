@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, provide, extension, Promised } from "../src";
+import { flow, provide, extension } from "../src";
 import type { Extension } from "../src/types";
 
 describe("Extension Operation Tracking", () => {
@@ -285,5 +285,45 @@ describe("Extension Operation Tracking", () => {
         total: 75,
       })
     ).rejects.toThrow("Items unavailable");
+  });
+
+  test("extension API accepts both Promise and Promised", async () => {
+    const initCalls: string[] = [];
+    const initPodCalls: string[] = [];
+    const disposeCalls: string[] = [];
+    const disposePodCalls: string[] = [];
+
+    const promiseExtension = extension({
+      name: "promise-extension",
+      init: (_scope) => {
+        initCalls.push("promise-init");
+        return Promise.resolve();
+      },
+      initPod: (_pod, _context) => {
+        initPodCalls.push("promise-initPod");
+        return Promise.resolve();
+      },
+      wrap: <T>(_ctx: any, next: () => any, _operation: any) => {
+        return next() as Promise<T>;
+      },
+      dispose: (_scope) => {
+        disposeCalls.push("promise-dispose");
+        return Promise.resolve();
+      },
+      disposePod: (_pod) => {
+        disposePodCalls.push("promise-disposePod");
+        return Promise.resolve();
+      },
+    });
+
+    const testFlow = flow((_ctx, input: number) => input * 2);
+
+    const result = await flow.execute(testFlow, 5, {
+      extensions: [promiseExtension],
+    });
+
+    expect(result).toBe(10);
+    expect(initPodCalls).toContain("promise-initPod");
+    expect(disposePodCalls).toContain("promise-disposePod");
   });
 });

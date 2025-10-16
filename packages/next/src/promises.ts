@@ -12,60 +12,53 @@ export class Promised<T> implements PromiseLike<T> {
     this.executionDataPromise = executionDataPromise;
   }
 
+  static create<T>(
+    promise: Promise<T> | Promised<T>,
+    executionDataPromise?: Promise<Flow.ExecutionData | undefined>
+  ): Promised<T> {
+    return new Promised(promise, executionDataPromise);
+  }
+
   map<U>(fn: (value: T) => U | Promise<U>): Promised<U> {
-    return new Promised(
-      this.promise.then(fn),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.then(fn),
+    this.executionDataPromise);
   }
 
   switch<U>(fn: (value: T) => Promised<U>): Promised<U> {
-    return new Promised(
-      this.promise.then(fn),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.then(fn),
+    this.executionDataPromise);
   }
 
   mapError(fn: (error: unknown) => unknown): Promised<T> {
-    return new Promised(
-      this.promise.catch((error) => {
-        throw fn(error);
-      }),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.catch((error) => {
+      throw fn(error);
+    }),
+    this.executionDataPromise);
   }
 
   switchError(fn: (error: unknown) => Promised<T>): Promised<T> {
-    return new Promised(
-      this.promise.catch(fn),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.catch(fn),
+    this.executionDataPromise);
   }
 
   then<TResult1 = T, TResult2 = never>(
     onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
   ): Promised<TResult1 | TResult2> {
-    return new Promised(
-      this.promise.then(onfulfilled, onrejected),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.then(onfulfilled, onrejected),
+    this.executionDataPromise);
   }
 
   catch<TResult = never>(
     onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null | undefined
   ): Promised<T | TResult> {
-    return new Promised(
-      this.promise.catch(onrejected),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.catch(onrejected),
+    this.executionDataPromise);
   }
 
   finally(onfinally?: (() => void) | null | undefined): Promised<T> {
-    return new Promised(
-      this.promise.finally(onfinally),
-      this.executionDataPromise
-    );
+    return Promised.create(this.promise.finally(onfinally),
+    this.executionDataPromise);
   }
 
   toPromise(): Promise<T> {
@@ -114,7 +107,7 @@ export class Promised<T> implements PromiseLike<T> {
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(Promise.all(promises) as Promise<any>);
+    return Promised.create(Promise.all(promises) as Promise<any>);
   }
 
   static race<T extends readonly unknown[] | []>(
@@ -125,7 +118,7 @@ export class Promised<T> implements PromiseLike<T> {
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(Promise.race(promises) as Promise<any>);
+    return Promised.create(Promise.race(promises) as Promise<any>);
   }
 
   static allSettled<T extends readonly unknown[] | []>(
@@ -136,7 +129,7 @@ export class Promised<T> implements PromiseLike<T> {
       v instanceof Promised ? v.toPromise() : Promise.resolve(v)
     );
 
-    return new Promised(Promise.allSettled(promises) as Promise<any>);
+    return Promised.create(Promise.allSettled(promises) as Promise<any>);
   }
 
   static try<T>(fn: () => T | Promise<T>): Promised<T> {
@@ -149,7 +142,7 @@ export class Promised<T> implements PromiseLike<T> {
       }
     });
 
-    return new Promised(promise);
+    return Promised.create(promise);
   }
 
   private static extractResults<U>(
