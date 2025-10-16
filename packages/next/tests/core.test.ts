@@ -282,4 +282,110 @@ describe("Core Functionality", () => {
       await scope.dispose();
     });
   });
+
+  describe("Pod Cache Delegation", () => {
+    test("pod reuses scope-cached resources without re-resolution", async () => {
+      let dbConnectionCount = 0;
+      let serviceResolveCount = 0;
+
+      const dbConnection = provide(() => {
+        dbConnectionCount++;
+        return { connected: true, id: dbConnectionCount };
+      });
+
+      const requestId = provide(() => "default-request");
+
+      const service = derive({ db: dbConnection, reqId: requestId }, ({ db, reqId }) => {
+        serviceResolveCount++;
+        return { db, reqId, count: serviceResolveCount };
+      });
+
+      const scope = createScope();
+
+      const scopeResult = await scope.resolve(service);
+      expect(dbConnectionCount).toBe(1);
+      expect(serviceResolveCount).toBe(1);
+      expect(scopeResult.count).toBe(1);
+
+      const pod = scope.pod({
+        initialValues: [preset(requestId, "req-123")]
+      });
+
+      const podResult = await pod.resolve(service);
+
+      expect(dbConnectionCount).toBe(1);
+      expect(serviceResolveCount).toBe(1);
+      expect(podResult.count).toBe(1);
+
+      await pod.dispose();
+      await scope.dispose();
+    });
+
+    test("pod re-resolves when executor itself has preset", async () => {
+      let resolveCount = 0;
+
+      const value = provide(() => {
+        resolveCount++;
+        return resolveCount;
+      });
+
+      const scope = createScope();
+
+      const scopeResult = await scope.resolve(value);
+      expect(scopeResult).toBe(1);
+      expect(resolveCount).toBe(1);
+
+      const pod = scope.pod({
+        initialValues: [preset(value, 99)]
+      });
+
+      const podResult = await pod.resolve(value);
+      expect(podResult).toBe(99);
+
+      await pod.dispose();
+      await scope.dispose();
+    });
+
+    test("pod copies multiple cached executors from scope", async () => {
+      let aCount = 0;
+      let bCount = 0;
+      let cCount = 0;
+
+      const a = provide(() => {
+        aCount++;
+        return `a-${aCount}`;
+      });
+
+      const b = provide(() => {
+        bCount++;
+        return `b-${bCount}`;
+      });
+
+      const c = derive({ a, b }, ({ a, b }) => {
+        cCount++;
+        return `c-${cCount}:${a}:${b}`;
+      });
+
+      const scope = createScope();
+
+      await scope.resolve(c);
+      expect(aCount).toBe(1);
+      expect(bCount).toBe(1);
+      expect(cCount).toBe(1);
+
+      const unrelatedExecutor = provide(() => "unrelated");
+      const pod = scope.pod({
+        initialValues: [preset(unrelatedExecutor, "test")]
+      });
+
+      const result = await pod.resolve(c);
+      expect(result).toBe("c-1:a-1:b-1");
+      expect(aCount).toBe(1);
+      expect(bCount).toBe(1);
+      expect(cCount).toBe(1);
+
+      await pod.dispose();
+      await scope.dispose();
+    });
+  });
 });

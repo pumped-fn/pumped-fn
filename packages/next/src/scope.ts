@@ -1153,10 +1153,6 @@ class Pod extends BaseScope implements Core.Pod {
       return super.resolve(executor, force);
     }
 
-    if (this["~hasDependencyWithPreset"](executor)) {
-      return super.resolve(executor, force);
-    }
-
     if (this.parentScope["cache"].has(executor)) {
       const { value } = this.parentScope["cache"].get(executor)!;
       const accessor = super["~makeAccessor"](executor);
@@ -1179,6 +1175,10 @@ class Pod extends BaseScope implements Core.Pod {
           return Promised.create(value.promise as Promise<T>);
         }
       }
+    }
+
+    if (this["~hasDependencyWithPreset"](executor)) {
+      return super.resolve(executor, force);
     }
 
     return super.resolve(executor, force);
