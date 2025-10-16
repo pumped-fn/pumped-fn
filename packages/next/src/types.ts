@@ -397,31 +397,33 @@ export declare namespace Core {
     }): Pod;
     disposePod(scope: Pod): Promised<void>;
 
-    exec<S, I>(
+    exec<S, I = undefined>(
       flow: Core.Executor<Flow.Handler<S, I>>,
-      input: I,
-      options: {
-        extensions?: Extension.Extension[];
-        initialContext?: Array<
-          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
-        >;
-        presets?: Preset<unknown>[];
-        details: true;
-      }
-    ): Promised<Flow.ExecutionDetails<S>>;
-
-    exec<S, I>(
-      flow: Core.Executor<Flow.Handler<S, I>>,
-      input: I,
+      input?: I,
       options?: {
         extensions?: Extension.Extension[];
         initialContext?: Array<
           [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
         >;
         presets?: Preset<unknown>[];
+        meta?: Meta.Meta[];
         details?: false;
       }
     ): Promised<S>;
+
+    exec<S, I = undefined>(
+      flow: Core.Executor<Flow.Handler<S, I>>,
+      input: I | undefined,
+      options: {
+        extensions?: Extension.Extension[];
+        initialContext?: Array<
+          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        >;
+        presets?: Preset<unknown>[];
+        meta?: Meta.Meta[];
+        details: true;
+      }
+    ): Promised<Flow.ExecutionDetails<S>>;
   }
 }
 
@@ -681,14 +683,14 @@ export namespace Extension {
   export interface Extension {
     name: string;
 
-    init?(scope: Core.Scope): void | Promised<void>;
-    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promised<void>;
+    init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void> | Promised<void>;
 
     wrap?<T>(
       context: Accessor.DataStore,
       next: () => Promised<T>,
       operation: Operation
-    ): Promised<T>;
+    ): Promise<T> | Promised<T>;
 
     onError?(
       error:
@@ -703,8 +705,8 @@ export namespace Extension {
       context: Accessor.DataStore
     ): void;
 
-    dispose?(scope: Core.Scope): void | Promised<void>;
-    disposePod?(pod: Core.Pod): void | Promised<void>;
+    dispose?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    disposePod?(pod: Core.Pod): void | Promise<void> | Promised<void>;
   }
 }
 
