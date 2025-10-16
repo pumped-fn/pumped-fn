@@ -328,7 +328,7 @@ class FlowContext implements Flow.Context {
         flowName,
         depth,
         isReplay,
-        pod: this.pod,
+        context: this,
         params: params.length > 0 ? params : undefined,
       });
 
@@ -425,7 +425,7 @@ class FlowContext implements Flow.Context {
           journalKey,
           parentFlowName,
           depth,
-          pod: this.pod,
+          context: this,
         });
 
         return executor();
@@ -473,7 +473,7 @@ class FlowContext implements Flow.Context {
         journalKey: undefined,
         parentFlowName,
         depth,
-        pod: this.pod,
+        context: this,
       });
 
       return executor();
@@ -517,7 +517,7 @@ class FlowContext implements Flow.Context {
         promiseCount: promises.length,
         depth,
         parentFlowName,
-        pod: this.pod,
+        context: this,
       });
 
       return executor();
@@ -562,7 +562,7 @@ class FlowContext implements Flow.Context {
         promiseCount: promises.length,
         depth,
         parentFlowName,
-        pod: this.pod,
+        context: this,
       });
 
       return executor();
@@ -693,10 +693,6 @@ function execute<S, I>(
         }
       }
 
-      for (const extension of options?.extensions || []) {
-        await extension.initPod?.(pod, context);
-      }
-
       const executeCore = (): Promised<S> => {
         return pod.resolve(flow).map(async (handler) => {
           const definition = flowDefinitionMeta.find(flow);
@@ -743,10 +739,6 @@ function execute<S, I>(
       resolveSnapshot(context.createSnapshot());
       throw error;
     } finally {
-      for (const extension of options?.extensions || []) {
-        await extension.disposePod?.(pod);
-      }
-
       await scope.disposePod(pod);
 
       if (shouldDisposeScope) {

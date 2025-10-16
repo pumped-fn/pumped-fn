@@ -658,7 +658,7 @@ export namespace Extension {
         flowName: string;
         depth: number;
         isReplay: boolean;
-        pod: Core.Pod;
+        context: Accessor.DataStore;
         params?: readonly unknown[];
       }
     | {
@@ -669,7 +669,7 @@ export namespace Extension {
         journalKey: string | undefined;
         parentFlowName: string | undefined;
         depth: number;
-        pod: Core.Pod;
+        context: Accessor.DataStore;
       }
     | {
         kind: "parallel";
@@ -677,14 +677,13 @@ export namespace Extension {
         promiseCount: number;
         depth: number;
         parentFlowName: string | undefined;
-        pod: Core.Pod;
+        context: Accessor.DataStore;
       };
 
   export interface Extension {
     name: string;
 
     init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
-    initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void> | Promised<void>;
 
     wrap?<T>(
       context: Accessor.DataStore,
@@ -699,14 +698,8 @@ export namespace Extension {
         | DependencyResolutionError,
       scope: Core.Scope
     ): void;
-    onPodError?(
-      error: unknown,
-      pod: Core.Pod,
-      context: Accessor.DataStore
-    ): void;
 
     dispose?(scope: Core.Scope): void | Promise<void> | Promised<void>;
-    disposePod?(pod: Core.Pod): void | Promise<void> | Promised<void>;
   }
 }
 

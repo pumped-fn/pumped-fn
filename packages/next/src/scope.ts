@@ -1246,10 +1246,10 @@ class Pod extends BaseScope implements Core.Pod {
   dispose(): Promised<void> {
     return Promised.create((async () => {
       const extensionDisposeEvents = this.extensions.map(
-        (ext) => ext.disposePod?.(this) ?? Promise.resolve()
+        (ext) => ext.dispose?.(this) ?? Promise.resolve()
       );
       await Promise.all(extensionDisposeEvents);
-    
+
       await super.dispose();
     })());
   }
