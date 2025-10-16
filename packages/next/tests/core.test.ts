@@ -419,5 +419,79 @@ describe("Core Functionality", () => {
 
       await scope.dispose();
     });
+
+    test("pod resolves .static dependencies as accessors", async () => {
+      const config = provide(() => ({ value: 42 }));
+
+      const controller = derive(config.static, (configAccessor) => {
+        return {
+          getValue: () => configAccessor.get().value,
+          updateValue: (newValue: number) =>
+            configAccessor.update((c) => ({ ...c, value: newValue }))
+        };
+      });
+
+      const scope = createScope();
+      await scope.resolve(config);
+
+      const pod = scope.pod({});
+
+      const result = await pod.resolve(controller);
+
+      expect(result.getValue()).toBe(42);
+      expect(typeof result.updateValue).toBe("function");
+
+      await pod.dispose();
+      await scope.dispose();
+    });
+
+    test("pod resolves .lazy dependencies as accessors without resolving", async () => {
+      let resolveCount = 0;
+
+      const resource = provide(() => {
+        resolveCount++;
+        return { id: resolveCount };
+      });
+
+      const consumer = derive(resource.lazy, (resourceAccessor) => {
+        return {
+          getResource: async () => {
+            await resourceAccessor.resolve(false);
+            return resourceAccessor.get();
+          }
+        };
+      });
+
+      const scope = createScope();
+
+      const pod = scope.pod({});
+
+      const result = await pod.resolve(consumer);
+      expect(resolveCount).toBe(0);
+
+      const resource1 = await result.getResource();
+      expect(resource1.id).toBe(1);
+      expect(resolveCount).toBe(1);
+
+      await pod.dispose();
+      await scope.dispose();
+    });
+
+    test("pod throws error for .reactive dependencies", async () => {
+      const value = provide(() => 42);
+
+      const consumer = derive(value.reactive, (val) => {
+        return val * 2;
+      });
+
+      const scope = createScope();
+
+      const pod = scope.pod({});
+
+      await expect(pod.resolve(consumer)).rejects.toThrow();
+
+      await pod.dispose();
+      await scope.dispose();
+    });
   });
 });

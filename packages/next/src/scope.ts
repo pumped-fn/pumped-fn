@@ -1229,6 +1229,14 @@ class Pod extends BaseScope implements Core.Pod {
       return a;
     }
 
+    if (isStaticExecutor(ie)) {
+      this["~checkCircularDependency"](e, ref);
+      this["~propagateResolutionChain"](ref, e);
+      await this.resolve(e);
+      const a = this["~makeAccessor"](e);
+      return a;
+    }
+
     this["~checkCircularDependency"](e, ref);
     this["~propagateResolutionChain"](ref, e);
 
