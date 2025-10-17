@@ -77,3 +77,58 @@ describe("multiple dependencies", () => {
   })
 })
 // #endregion multiple-dependencies
+
+// #region anti-pattern-side-effects
+// [!code --:2]
+import { provide as p4 } from "@pumped-fn/core-next"
+
+// ❌ Bad: Side effects in executor factory
+const badCounter = provide(() => {
+  let count = 0
+  console.log("This runs every resolve!")
+  return { value: count++ }
+})
+
+// ✅ Good: Pure factory, side effects in usage
+const goodCounter = provide(() => {
+  return {
+    value: 0,
+    increment: () => console.log("Side effect in method")
+  }
+})
+// [!code --:7]
+
+describe("anti-pattern: side effects", () => {
+  it("shows proper pattern", () => {
+    expect(goodCounter).toBeDefined()
+  })
+})
+// #endregion anti-pattern-side-effects
+
+// #region anti-pattern-async-factory
+// [!code --:2]
+import { provide as p5 } from "@pumped-fn/core-next"
+
+// ❌ Bad: Async factory function
+// const badAsync = provide(async () => {
+//   const data = await fetch("/api")
+//   return data
+// })
+
+// ✅ Good: Sync factory, return promise
+const goodAsync = provide(() => {
+  return {
+    fetchData: async () => {
+      const data = await fetch("/api")
+      return data
+    }
+  }
+})
+// [!code --:8]
+
+describe("anti-pattern: async factory", () => {
+  it("shows correct pattern", () => {
+    expect(goodAsync).toBeDefined()
+  })
+})
+// #endregion anti-pattern-async-factory
