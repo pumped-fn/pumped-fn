@@ -14,4 +14,9 @@ describe("Public API", () => {
     expect(devtools.Transport).toBeDefined()
     expect(devtools.State).toBeDefined()
   })
+
+  it("should export transport factories", () => {
+    expect(devtools.createInMemoryTransport).toBeDefined()
+    expect(devtools.createIPCTransport).toBeDefined()
+  })
 })
