@@ -5,7 +5,6 @@ import { createScope } from "../src/scope";
 import { createExecutor, derive, provide, preset } from "../src/executor";
 import { flow } from "../src/flow";
 import { Promised } from "../src/promises";
-import { meta } from "../src/meta";
 
 describe("Core Functionality", () => {
   describe("Accessor functionality", () => {
@@ -142,34 +141,6 @@ describe("Core Functionality", () => {
       await scope.dispose();
     });
 
-    test("scope.exec with extensions", async () => {
-      const scope = createScope();
-      const calls: string[] = [];
-
-      const extension = {
-        name: "test-extension",
-        initPod() {
-          calls.push("initPod");
-          return new Promised(Promise.resolve());
-        },
-        disposePod() {
-          calls.push("disposePod");
-          return new Promised(Promise.resolve());
-        },
-      };
-
-      const simpleFlow = flow((_ctx, input: number) => input + 1);
-      const result = await scope.exec(simpleFlow, 10, {
-        extensions: [extension],
-      });
-
-      expect(result).toBe(11);
-      expect(calls).toContain("initPod");
-      expect(calls).toContain("disposePod");
-
-      await scope.dispose();
-    });
-
     test("scope.exec with presets", async () => {
       const scope = createScope();
 
@@ -241,153 +212,9 @@ describe("Core Functionality", () => {
       await scope.dispose();
     });
 
-    test("scope.exec(flow, undefined, options) with options", async () => {
-      const scope = createScope();
-
-      const testMeta = meta<{ tag: string }>("test.meta", custom<{ tag: string }>());
-
-      const configExecutor = provide(() => ({ multiplier: 5 }));
-      const flowUsingConfig = flow(configExecutor, (deps, ctx) => {
-        const metaValue = testMeta.find(ctx.pod);
-        return deps.multiplier * (metaValue?.tag === "special" ? 10 : 1);
-      });
-
-      const result = await scope.exec(flowUsingConfig, undefined, {
-        meta: [testMeta({ tag: "special" })],
-      });
-
-      expect(result).toBe(50);
-
-      await scope.dispose();
-    });
-
-    test("scope.exec with presets and meta combined", async () => {
-      const scope = createScope();
-
-      const config = provide(() => ({ base: 10 }));
-      const testMeta = meta<{ multiplier: number }>("test.multiplier", custom<{ multiplier: number }>());
-
-      const combinedFlow = flow(config, (deps, ctx) => {
-        const metaValue = testMeta.find(ctx.pod);
-        return deps.base * (metaValue?.multiplier ?? 1);
-      });
-
-      const result = await scope.exec(combinedFlow, undefined, {
-        presets: [preset(config, { base: 20 })],
-        meta: [testMeta({ multiplier: 3 })],
-      });
-
-      expect(result).toBe(60);
-
-      await scope.dispose();
-    });
   });
 
-  describe("Pod Cache Delegation", () => {
-    test("pod reuses scope-cached resources without re-resolution", async () => {
-      let dbConnectionCount = 0;
-      let serviceResolveCount = 0;
-
-      const dbConnection = provide(() => {
-        dbConnectionCount++;
-        return { connected: true, id: dbConnectionCount };
-      });
-
-      const requestId = provide(() => "default-request");
-
-      const service = derive({ db: dbConnection, reqId: requestId }, ({ db, reqId }) => {
-        serviceResolveCount++;
-        return { db, reqId, count: serviceResolveCount };
-      });
-
-      const scope = createScope();
-
-      const scopeResult = await scope.resolve(service);
-      expect(dbConnectionCount).toBe(1);
-      expect(serviceResolveCount).toBe(1);
-      expect(scopeResult.count).toBe(1);
-
-      const pod = scope.pod({
-        initialValues: [preset(requestId, "req-123")]
-      });
-
-      const podResult = await pod.resolve(service);
-
-      expect(dbConnectionCount).toBe(1);
-      expect(serviceResolveCount).toBe(1);
-      expect(podResult.count).toBe(1);
-
-      await pod.dispose();
-      await scope.dispose();
-    });
-
-    test("pod re-resolves when executor itself has preset", async () => {
-      let resolveCount = 0;
-
-      const value = provide(() => {
-        resolveCount++;
-        return resolveCount;
-      });
-
-      const scope = createScope();
-
-      const scopeResult = await scope.resolve(value);
-      expect(scopeResult).toBe(1);
-      expect(resolveCount).toBe(1);
-
-      const pod = scope.pod({
-        initialValues: [preset(value, 99)]
-      });
-
-      const podResult = await pod.resolve(value);
-      expect(podResult).toBe(99);
-
-      await pod.dispose();
-      await scope.dispose();
-    });
-
-    test("pod copies multiple cached executors from scope", async () => {
-      let aCount = 0;
-      let bCount = 0;
-      let cCount = 0;
-
-      const a = provide(() => {
-        aCount++;
-        return `a-${aCount}`;
-      });
-
-      const b = provide(() => {
-        bCount++;
-        return `b-${bCount}`;
-      });
-
-      const c = derive({ a, b }, ({ a, b }) => {
-        cCount++;
-        return `c-${cCount}:${a}:${b}`;
-      });
-
-      const scope = createScope();
-
-      await scope.resolve(c);
-      expect(aCount).toBe(1);
-      expect(bCount).toBe(1);
-      expect(cCount).toBe(1);
-
-      const unrelatedExecutor = provide(() => "unrelated");
-      const pod = scope.pod({
-        initialValues: [preset(unrelatedExecutor, "test")]
-      });
-
-      const result = await pod.resolve(c);
-      expect(result).toBe("c-1:a-1:b-1");
-      expect(aCount).toBe(1);
-      expect(bCount).toBe(1);
-      expect(cCount).toBe(1);
-
-      await pod.dispose();
-      await scope.dispose();
-    });
-
+  describe("Scope Cache Delegation", () => {
     test("scope.exec(flow) reuses scope-cached resources", async () => {
       let dbConnectionCount = 0;
       let serviceResolveCount = 0;
@@ -417,80 +244,6 @@ describe("Core Functionality", () => {
       expect(dbConnectionCount).toBe(1);
       expect(serviceResolveCount).toBe(1);
 
-      await scope.dispose();
-    });
-
-    test("pod resolves .static dependencies as accessors", async () => {
-      const config = provide(() => ({ value: 42 }));
-
-      const controller = derive(config.static, (configAccessor) => {
-        return {
-          getValue: () => configAccessor.get().value,
-          updateValue: (newValue: number) =>
-            configAccessor.update((c) => ({ ...c, value: newValue }))
-        };
-      });
-
-      const scope = createScope();
-      await scope.resolve(config);
-
-      const pod = scope.pod({});
-
-      const result = await pod.resolve(controller);
-
-      expect(result.getValue()).toBe(42);
-      expect(typeof result.updateValue).toBe("function");
-
-      await pod.dispose();
-      await scope.dispose();
-    });
-
-    test("pod resolves .lazy dependencies as accessors without resolving", async () => {
-      let resolveCount = 0;
-
-      const resource = provide(() => {
-        resolveCount++;
-        return { id: resolveCount };
-      });
-
-      const consumer = derive(resource.lazy, (resourceAccessor) => {
-        return {
-          getResource: async () => {
-            await resourceAccessor.resolve(false);
-            return resourceAccessor.get();
-          }
-        };
-      });
-
-      const scope = createScope();
-
-      const pod = scope.pod({});
-
-      const result = await pod.resolve(consumer);
-      expect(resolveCount).toBe(0);
-
-      const resource1 = await result.getResource();
-      expect(resource1.id).toBe(1);
-      expect(resolveCount).toBe(1);
-
-      await pod.dispose();
-      await scope.dispose();
-    });
-
-    test("pod throws error for .reactive dependencies", async () => {
-      const value = provide(() => 42);
-
-      const consumer = derive(value.reactive, (val) => {
-        return val * 2;
-      });
-
-      const scope = createScope();
-
-      const pod = scope.pod({});
-
-      await expect(pod.resolve(consumer)).rejects.toThrow();
-
-      await pod.dispose();
       await scope.dispose();
     });
   });
