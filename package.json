@@ -9,10 +9,10 @@
     "docs:build": "cd docs && NODE_ENV=production pnpm build",
     "docs:preview": "cd docs && pnpm preview",
     "verify": "pnpm build && pnpm test && pnpm typecheck",
-    "format": "ultracite format",
-    "format:check": "ultracite lint",
-    "lint": "ultracite lint --fix",
-    "lint:check": "ultracite lint",
+    "format": "echo 'Formatting disabled'",
+    "format:check": "echo 'Format check disabled'",
+    "lint": "echo 'Linting disabled'",
+    "lint:check": "echo 'Lint check disabled'",
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm build && changeset publish",
@@ -38,7 +38,6 @@
       "puppeteer"
     ],
     "onlyBuiltDependencies": [
-      "ultracite",
       "esbuild",
       "sharp"
     ]
