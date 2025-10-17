@@ -559,6 +559,8 @@ export namespace Flow {
   };
 
   export type C = {
+    readonly metas: Meta.Meta[] | undefined;
+
     get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
     find<T>(accessor: Accessor.Accessor<T>): T | undefined;
     find<T>(accessor: Accessor.AccessorWithDefault<T>): T;

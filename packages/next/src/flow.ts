@@ -183,14 +183,17 @@ class FlowContext implements Flow.Context {
   private journal: Map<string, unknown> | null = null;
   private readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
+  public readonly metas: Meta.Meta[] | undefined;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
+    meta?: Meta.Meta[],
     private parent?: FlowContext
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
+    this.metas = meta;
   }
 
   resolve<T>(executor: Core.Executor<T>): Promised<T> {
@@ -394,6 +397,7 @@ class FlowContext implements Flow.Context {
             const childContext = new FlowContext(
               this.scope,
               this.extensions,
+              undefined,
               this
             );
             childContext.initializeExecutionContext(definition.name, false);
@@ -452,7 +456,7 @@ class FlowContext implements Flow.Context {
             throw new Error("Flow definition not found in executor metadata");
           }
 
-          const childContext = new FlowContext(this.scope, this.extensions, this);
+          const childContext = new FlowContext(this.scope, this.extensions, undefined, this);
           childContext.initializeExecutionContext(definition.name, false);
 
           return (await this.executeWithExtensions<Flow.InferOutput<F>>(
@@ -641,6 +645,7 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details: true;
   }
@@ -656,6 +661,7 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: false;
   }
@@ -671,11 +677,12 @@ function execute<S, I>(
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
     presets?: Core.Preset<unknown>[];
+    scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: boolean;
   }
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  const scope = options?.scope || createScope({ meta: options?.meta });
+  const scope = options?.scope || createScope({ meta: options?.scopeMeta });
   const shouldDisposeScope = !options?.scope;
 
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
@@ -696,7 +703,7 @@ function execute<S, I>(
       }
     }
 
-    const context = new FlowContext(scope, options?.extensions || []);
+    const context = new FlowContext(scope, options?.extensions || [], options?.meta);
 
     try {
       if (options?.initialContext) {
