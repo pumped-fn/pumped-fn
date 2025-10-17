@@ -2,7 +2,7 @@
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "Pumped-FN",
   "description": "Type-safe dependency injection with graph resolution for long-lived services and short-lived operations",
-  "folders": ["docs"],
+  "folders": ["docs", "docs/code"],
   "excludeFolders": ["src", "node_modules", "dist", "tests", ".git"],
   "rules": [
     "NEVER use ctx.get() or scope.resolve() inside executors - declare dependencies explicitly in arrays",
