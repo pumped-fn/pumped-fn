@@ -10,24 +10,13 @@ pnpm add @pumped-fn/core-next
 
 ## Basic Example
 
-```typescript
-import { provide, derive, createScope } from "@pumped-fn/core-next"
+### Simple Provider
 
-// Simple provider
-const config = provide(() => ({ port: 3000 }))
+<<< @/code/basic-patterns.ts#simple-provider
 
-// Derived with dependencies
-const server = derive([config], ([cfg]) => ({
-  start: () => {
-    console.log(`Server starting on port ${cfg.port}`)
-  }
-}))
+### Derived with Dependencies
 
-// Create scope and resolve
-const scope = createScope()
-const app = await scope.resolve(server)
-app.start()
-```
+<<< @/code/basic-patterns.ts#derived-with-deps
 
 ## Core Concepts
 
