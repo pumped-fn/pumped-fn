@@ -64,4 +64,36 @@ describe("IPC Transport", () => {
     expect(receivedHandshake?.name).toBe("test-scope")
     expect(receivedHandshake?.pid).toBe(process.pid)
   })
+
+  it("should emit messages to socket", async () => {
+    const receivedMessages: Transport.Message[] = []
+
+    server.on("connection", (socket) => {
+      socket.on("data", (data) => {
+        const lines = data.toString().trim().split("\n")
+        for (const line of lines) {
+          if (line.startsWith("MESSAGE:")) {
+            receivedMessages.push(JSON.parse(line.slice(8)))
+          }
+        }
+      })
+    })
+
+    const transport = createIPCTransport({ socketPath })
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const testMsg: Transport.Message = {
+      timestamp: Date.now(),
+      duration: 10,
+      operation: { kind: "resolve", executorId: "test" }
+    }
+
+    transport.emit(testMsg)
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    expect(receivedMessages).toHaveLength(1)
+    expect(receivedMessages[0]).toEqual(testMsg)
+  })
 })
