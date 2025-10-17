@@ -36,9 +36,38 @@ export namespace State {
     children: string[]
   }
 
+  export type JournalEntry = {
+    key: string
+    flowName: string
+    depth: number
+    isReplay: boolean
+    timestamp: number
+  }
+
+  export type SubflowExecution = {
+    id: string
+    name: string
+    parentFlowName?: string
+    depth: number
+    journalKey?: string
+    startedAt: number
+  }
+
+  export type ParallelBatch = {
+    id: string
+    mode: "parallel" | "parallelSettled"
+    promiseCount: number
+    depth: number
+    parentFlowName?: string
+    startedAt: number
+  }
+
   export type Snapshot = {
     executors: Map<string, ExecutorNode>
     flows: Map<string, FlowExecution>
+    journals: Map<string, JournalEntry>
+    subflows: Map<string, SubflowExecution>
+    parallelBatches: Map<string, ParallelBatch>
     updates: Array<{ executorId: string; timestamp: number }>
   }
 

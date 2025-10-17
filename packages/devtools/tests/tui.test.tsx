@@ -6,7 +6,14 @@ import { stateAggregatorExecutor } from "../src/aggregator"
 describe("TUI Executor", () => {
   it("should resolve with start/stop methods", async () => {
     const mockAggregator = {
-      getSnapshot: () => ({ executors: new Map(), flows: new Map(), updates: [] }),
+      getSnapshot: () => ({
+        executors: new Map(),
+        flows: new Map(),
+        journals: new Map(),
+        subflows: new Map(),
+        parallelBatches: new Map(),
+        updates: []
+      }),
       subscribe: () => () => {}
     }
 

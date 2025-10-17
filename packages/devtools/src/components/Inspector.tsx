@@ -8,6 +8,9 @@ export const Inspector: React.FC<{ snapshot: State.Snapshot }> = ({ snapshot }) 
       <Text bold color="magenta">Inspector</Text>
       <Text>Total executors: {snapshot.executors.size}</Text>
       <Text>Active flows: {snapshot.flows.size}</Text>
+      <Text>Journal entries: {snapshot.journals.size}</Text>
+      <Text>Subflows: {snapshot.subflows.size}</Text>
+      <Text>Parallel batches: {snapshot.parallelBatches.size}</Text>
       <Text>Updates: {snapshot.updates.length}</Text>
     </Box>
   )
