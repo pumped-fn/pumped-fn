@@ -1,5 +1,64 @@
 # @pumped-fn/core-next
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **REMOVED: Pod concept entirely**
+  - Removed `Scope.pod()` and `Scope.disposePod()` methods
+  - Removed `Core.Pod` type
+  - Flows now execute directly on scope instead of creating intermediate pod layer
+  - Extensions: Removed `initPod` and `disposePod` lifecycle hooks
+  - Flow context provides data isolation (no need for pod layer)
+
+### Migration Guide
+
+**Before:**
+```typescript
+const pod = scope.pod({ initialValues: [...], meta: [...] });
+const result = await pod.resolve(executor);
+await scope.disposePod(pod);
+```
+
+**After:**
+```typescript
+// Flows execute directly on scope
+const result = await scope.exec(
+  flow((c) => c.resolve(executor)),
+  undefined,
+  { presets: [...], meta: [...] }
+);
+// Flow cleanup is automatic
+```
+
+**Extension Authors:**
+```typescript
+// Before: initPod/disposePod hooks
+const extension: Extension = {
+  initPod: async (pod, context) => { /* setup */ },
+  disposePod: async (pod) => { /* cleanup */ }
+};
+
+// After: Use flow context and wrap operations
+const extension: Extension = {
+  wrap: async (context, next, operation) => {
+    // Setup per-execution state in context
+    context.set("state", initState());
+    const result = await next();
+    // Cleanup if needed
+    return result;
+  }
+};
+```
+
+### Rationale
+
+Removing pods simplifies the architecture:
+- **Simpler mental model**: `scope → flow → context` instead of `scope → pod → flow → context`
+- **Fewer footguns**: No more `.static` linkage bugs or cache delegation issues
+- **Less cognitive overhead**: Two places for data (scope resources, flow context) instead of three (scope, pod, context)
+- **Flow context sufficient**: Already provides data isolation and sharing between executions
+
 ## 0.5.76
 
 ### Patch Changes
