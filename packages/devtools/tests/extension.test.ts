@@ -55,4 +55,15 @@ describe("Devtools Extension", () => {
 
     await scope.dispose()
   })
+
+  it("should support IPC transport via config", async () => {
+    const ext = createDevtoolsExtension({
+      transport: "ipc",
+      transportConfig: {
+        socketPath: "/tmp/test-devtools.sock"
+      }
+    })
+
+    expect(ext.name).toBe("devtools")
+  })
 })
