@@ -8,14 +8,14 @@ import { type Extension } from "../src";
 
 const name = meta("name", custom<string>());
 
-test("syntax", async () => {
-  const configFn = vi.fn(() => ({
+test("demonstrates core dependency injection and reactive patterns", async () => {
+  const configFactory = vi.fn(() => ({
     dbName: "test",
     port: 3000,
     logLevel: "debug",
   }));
 
-  const config = provide(configFn, name("config"));
+  const config = provide(configFactory, name("config"));
 
   const logger = derive(
     config,
@@ -26,49 +26,51 @@ test("syntax", async () => {
   );
 
   const counter = provide(() => 0, name("counter"));
-  const reactived = derive(
+  const incrementedCounter = derive(
     counter.reactive,
     (count) => {
       return count + 1;
     },
-    name("reactived")
+    name("incrementedCounter")
   );
 
-  const reactiveOfReactive = derive(
-    reactived.reactive,
+  const doubleIncrementedCounter = derive(
+    incrementedCounter.reactive,
     (count) => {
       return count + 1;
     },
-    name("reactiveOfReactive")
+    name("doubleIncrementedCounter")
   );
 
   const scope = createScope();
 
-  const loggerFn = await scope.resolve(logger);
-  loggerFn("Hello world");
+  const loggerFunction = await scope.resolve(logger);
+  loggerFunction("Hello world");
 
-  expect(configFn).toBeCalledTimes(1);
+  expect(configFactory).toBeCalledTimes(1);
 
-  const currentCounterValue = await scope.resolve(counter);
-  const derivedCounterValue = await scope.resolve(reactived);
-  const derivedOfDerivedCounterValue = scope.accessor(reactiveOfReactive);
+  const counterValue = await scope.resolve(counter);
+  const incrementedValue = await scope.resolve(incrementedCounter);
+  const doubleIncrementedAccessor = scope.accessor(doubleIncrementedCounter);
 
-  expect(currentCounterValue).toBe(0);
-  expect(derivedCounterValue).toBe(1);
-  expect(await derivedOfDerivedCounterValue.resolve()).toBe(2);
+  expect(counterValue).toBe(0);
+  expect(incrementedValue).toBe(1);
+  expect(await doubleIncrementedAccessor.resolve()).toBe(2);
 
   await scope.update(counter, (current) => current + 1);
-  const updatedCounterValue = await scope.resolve(reactived);
-  expect(updatedCounterValue).toBe(2);
-  expect(derivedOfDerivedCounterValue.get()).toBe(3);
+
+  const updatedIncrementedValue = await scope.resolve(incrementedCounter);
+
+  expect(updatedIncrementedValue).toBe(2);
+  expect(doubleIncrementedAccessor.get()).toBe(3);
 });
 
-test("reactive changes", async () => {
-  const c = vi.fn();
+test("propagates reactive changes through dependency graph", async () => {
+  const cleanupCallback = vi.fn();
   const counter = provide(() => 0, name("counter"));
   const derivedCounter = derive(counter.reactive, (count) => count.toString());
-  const derviedArrayCounter = derive([counter.reactive], (count, ctl) => {
-    ctl.cleanup(c);
+  const derivedArrayCounter = derive([counter.reactive], (count, ctl) => {
+    ctl.cleanup(cleanupCallback);
     return count.toString();
   });
 
@@ -77,45 +79,49 @@ test("reactive changes", async () => {
     ({ counter }) => counter.toString()
   );
 
-  const fn = vi.fn();
+  const updateCallback = vi.fn();
 
   const scope = createScope();
   const cleanup = scope.onUpdate(counter, (accessor) => {
-    fn(accessor.get());
+    updateCallback(accessor.get());
   });
 
-  const resolvedDerivedCounter = await scope.resolveAccessor(derivedCounter);
-  const resolvedDerivedArrayCounter = await scope.resolveAccessor(
-    derviedArrayCounter
+  const derivedCounterAccessor = await scope.resolveAccessor(derivedCounter);
+  const derivedArrayAccessor = await scope.resolveAccessor(
+    derivedArrayCounter
   );
-  const resolvedDerivedObjectCounter = await scope.resolveAccessor(
+  const derivedObjectAccessor = await scope.resolveAccessor(
     derivedObjectCounter
   );
 
-  expect(resolvedDerivedCounter.get()).toBe("0");
-  expect(resolvedDerivedArrayCounter.get()).toEqual("0");
-  expect(resolvedDerivedObjectCounter.get()).toEqual("0");
-  expect(c).toBeCalledTimes(0);
+  expect(derivedCounterAccessor.get()).toBe("0");
+  expect(derivedArrayAccessor.get()).toEqual("0");
+  expect(derivedObjectAccessor.get()).toEqual("0");
+  expect(cleanupCallback).toBeCalledTimes(0);
 
   await scope.update(counter, (current) => current + 1);
-  expect(c).toBeCalledTimes(1);
-  expect(fn).toBeCalledTimes(1);
-  expect(fn).toBeCalledWith(1);
 
-  expect(resolvedDerivedCounter.get()).toBe("1");
-  expect(resolvedDerivedArrayCounter.get()).toEqual("1");
-  expect(resolvedDerivedObjectCounter.get()).toEqual("1");
+  expect(cleanupCallback).toBeCalledTimes(1);
+  expect(updateCallback).toBeCalledTimes(1);
+  expect(updateCallback).toBeCalledWith(1);
+
+  expect(derivedCounterAccessor.get()).toBe("1");
+  expect(derivedArrayAccessor.get()).toEqual("1");
+  expect(derivedObjectAccessor.get()).toEqual("1");
 
   await scope.update(counter, (current) => current + 1);
-  expect(fn).toBeCalledTimes(2);
-  expect(fn).toBeCalledWith(2);
-  expect(resolvedDerivedCounter.get()).toBe("2");
-  expect(resolvedDerivedArrayCounter.get()).toEqual("2");
-  expect(resolvedDerivedObjectCounter.get()).toEqual("2");
+
+  expect(updateCallback).toBeCalledTimes(2);
+  expect(updateCallback).toBeCalledWith(2);
+  expect(derivedCounterAccessor.get()).toBe("2");
+  expect(derivedArrayAccessor.get()).toEqual("2");
+  expect(derivedObjectAccessor.get()).toEqual("2");
 
   await cleanup();
+
   await scope.update(counter, (current) => current + 1);
-  expect(fn).toBeCalledTimes(2);
+
+  expect(updateCallback).toBeCalledTimes(2);
 });
 
 test("complicated cleanup", async () => {
