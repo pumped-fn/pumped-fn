@@ -78,3 +78,19 @@ export namespace State {
     subscribe: (listener: SnapshotListener) => () => void
   }
 }
+
+export namespace IPCTransport {
+  export type Config = {
+    socketPath?: string
+    retryInterval?: number
+    bufferSize?: number
+    bufferStrategy?: "drop-old" | "drop-new"
+  }
+
+  export type Handshake = {
+    scopeId: string
+    name?: string
+    pid: number
+    timestamp: number
+  }
+}
