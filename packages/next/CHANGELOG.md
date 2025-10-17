@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.77
+
+### Patch Changes
+
+- 071f415: Expose scope in Flow.Context, add multi.ts tests, improve coverage to 90.72%
+
 ## [Unreleased]
 
 ### Breaking Changes
@@ -14,6 +20,7 @@
 ### Migration Guide
 
 **Before:**
+
 ```typescript
 const pod = scope.pod({ initialValues: [...], meta: [...] });
 const result = await pod.resolve(executor);
@@ -21,6 +28,7 @@ await scope.disposePod(pod);
 ```
 
 **After:**
+
 ```typescript
 // Flows execute directly on scope
 const result = await scope.exec(
@@ -32,11 +40,16 @@ const result = await scope.exec(
 ```
 
 **Extension Authors:**
+
 ```typescript
 // Before: initPod/disposePod hooks
 const extension: Extension = {
-  initPod: async (pod, context) => { /* setup */ },
-  disposePod: async (pod) => { /* cleanup */ }
+  initPod: async (pod, context) => {
+    /* setup */
+  },
+  disposePod: async (pod) => {
+    /* cleanup */
+  },
 };
 
 // After: Use flow context and wrap operations
@@ -47,13 +60,14 @@ const extension: Extension = {
     const result = await next();
     // Cleanup if needed
     return result;
-  }
+  },
 };
 ```
 
 ### Rationale
 
 Removing pods simplifies the architecture:
+
 - **Simpler mental model**: `scope → flow → context` instead of `scope → pod → flow → context`
 - **Fewer footguns**: No more `.static` linkage bugs or cache delegation issues
 - **Less cognitive overhead**: Two places for data (scope resources, flow context) instead of three (scope, pod, context)
