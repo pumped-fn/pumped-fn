@@ -7,9 +7,11 @@ export const createIPCTransport = (
   config: IPCTransport.Config & { scopeName?: string } = {}
 ): Transport.Transport => {
   const socketPath = config.socketPath ?? DEFAULT_SOCKET_PATH
+  const retryInterval = config.retryInterval ?? 5000
   let socket: net.Socket | null = null
   let connected = false
   let errorLogged = false
+  let retryTimer: NodeJS.Timeout | null = null
 
   const connect = () => {
     try {
@@ -18,6 +20,10 @@ export const createIPCTransport = (
       socket.on("connect", () => {
         connected = true
         errorLogged = false
+        if (retryTimer) {
+          clearTimeout(retryTimer)
+          retryTimer = null
+        }
         const handshake: IPCTransport.Handshake = {
           scopeId: Math.random().toString(36).slice(2),
           name: config.scopeName,
@@ -33,16 +39,28 @@ export const createIPCTransport = (
           console.error(`Pumped-FN devtools connection failed: ${err.message}`)
           errorLogged = true
         }
+        scheduleRetry()
       })
 
       socket.on("close", () => {
         connected = false
+        scheduleRetry()
       })
     } catch (err) {
       if (!errorLogged && err instanceof Error) {
         console.error(`Pumped-FN devtools connection failed: ${err.message}`)
         errorLogged = true
       }
+      scheduleRetry()
+    }
+  }
+
+  const scheduleRetry = () => {
+    if (!retryTimer && !connected) {
+      retryTimer = setTimeout(() => {
+        retryTimer = null
+        connect()
+      }, retryInterval)
     }
   }
 

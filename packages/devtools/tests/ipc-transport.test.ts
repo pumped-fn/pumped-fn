@@ -119,4 +119,30 @@ describe("IPC Transport", () => {
 
     consoleErrorSpy.mockRestore()
   })
+
+  it("should retry connection with configurable interval", async () => {
+    const receivedHandshakes: IPCTransport.Handshake[] = []
+
+    server.on("connection", (socket) => {
+      socket.on("data", (data) => {
+        const line = data.toString().trim()
+        if (line.startsWith("HANDSHAKE:")) {
+          receivedHandshakes.push(JSON.parse(line.slice(10)))
+        }
+      })
+    })
+
+    const transport = createIPCTransport({
+      socketPath,
+      retryInterval: 100
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    connections[0]?.destroy()
+
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    expect(receivedHandshakes.length).toBeGreaterThan(1)
+  })
 })
