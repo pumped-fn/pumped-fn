@@ -6,7 +6,12 @@ export const transportExecutor = provide(() => {
 
   return {
     emit: (msg: Transport.Message) => {
-      handlers.forEach(h => h(msg))
+      handlers.forEach(h => {
+        try {
+          h(msg)
+        } catch {
+        }
+      })
     },
     subscribe: (handler: Transport.Handler): Transport.Unsubscribe => {
       handlers.push(handler)
