@@ -17,6 +17,22 @@ export namespace Transport {
   }
 }
 
+export namespace IPCTransport {
+  export type Config = {
+    socketPath?: string
+    retryInterval?: number
+    bufferSize?: number
+    bufferStrategy?: "drop-old" | "drop-new"
+  }
+
+  export type Handshake = {
+    scopeId: string
+    name?: string
+    pid: number
+    timestamp: number
+  }
+}
+
 export namespace State {
   export type ExecutorNode = {
     id: string
