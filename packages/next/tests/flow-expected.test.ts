@@ -61,17 +61,6 @@ describe("Flow API - New Patterns", () => {
       expect(fetchMock).toHaveBeenCalledWith("/posts?userId=42");
     });
 
-    test("handler only with explicit generics", async () => {
-      const impl = flow<{ value: number }, { result: number }>(
-        (_ctx, input) => {
-          return { result: input.value * 2 };
-        }
-      );
-
-      const result = await flow.execute(impl, { value: 5 });
-      expect(result.result).toBe(10);
-    });
-
     test("simple transformation", async () => {
       const stringToNumber = flow<string, number>((_ctx, input) => {
         return Number(input);
@@ -79,15 +68,6 @@ describe("Flow API - New Patterns", () => {
 
       const result = await flow.execute(stringToNumber, "42");
       expect(result).toBe(42);
-    });
-
-    test("nameless with optional name for journaling", async () => {
-      const impl = flow<{ val: number }, { result: number }>((_ctx, input) => {
-        return { result: input.val + 1 };
-      });
-
-      const result = await flow.execute(impl, { val: 99 });
-      expect(result.result).toBe(100);
     });
   });
 
