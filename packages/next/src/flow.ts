@@ -1,5 +1,5 @@
 import type { Core, Extension, Flow, Meta, StandardSchemaV1 } from "./types";
-import { createExecutor } from "./executor";
+import { createExecutor, isExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
 import { accessor } from "./accessor";
@@ -686,6 +686,16 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
+    if (options?.presets) {
+      for (const preset of options.presets) {
+        if (isExecutor(preset.value)) {
+          await scope.set(preset.executor, await scope.resolve(preset.value as Core.Executor<unknown>));
+        } else {
+          await scope.set(preset.executor, preset.value);
+        }
+      }
+    }
+
     const context = new FlowContext(scope, options?.extensions || []);
 
     try {
