@@ -28,4 +28,29 @@ describe("Multi-Scope Aggregator", () => {
     expect(scopes[0].id).toBe("scope-1")
     expect(scopes[1].id).toBe("scope-2")
   })
+
+  it("should route messages to scope-specific aggregators", () => {
+    const aggregator = createMultiScopeAggregator()
+
+    const handshake: IPCTransport.Handshake = {
+      scopeId: "scope-1",
+      name: "api",
+      pid: 1000,
+      timestamp: Date.now()
+    }
+
+    aggregator.registerScope(handshake)
+
+    const msg: Transport.Message = {
+      timestamp: Date.now(),
+      duration: 10,
+      operation: { kind: "resolve" as const, executor: {} as any, scope: {} as any, operation: "resolve" as const }
+    }
+
+    aggregator.handleMessage("scope-1", msg)
+
+    const scopeState = aggregator.getScopeState("scope-1")
+    expect(scopeState).toBeDefined()
+    expect(scopeState?.executors.size).toBe(1)
+  })
 })
