@@ -1,6 +1,5 @@
-import { extension, createScope, preset, type Extension } from "@pumped-fn/core-next"
+import { extension, createScope, type Extension } from "@pumped-fn/core-next"
 import { transportExecutor } from "./transport"
-import { stateAggregatorExecutor } from "./aggregator"
 import { type Transport } from "./types"
 
 export type DevtoolsConfig = {
@@ -8,40 +7,35 @@ export type DevtoolsConfig = {
 }
 
 export const createDevtoolsExtension = (config?: DevtoolsConfig): Extension.Extension => {
-  const handlers: Transport.Handler[] = []
+  let devtoolsScope: ReturnType<typeof createScope> | null = null
+  let transport: Transport.Transport | null = null
 
-  const transport: Transport.Transport = {
-    emit: (msg) => handlers.forEach(h => h(msg)),
-    subscribe: (handler) => {
-      handlers.push(handler)
-      return () => {
-        const index = handlers.indexOf(handler)
-        if (index > -1) handlers.splice(index, 1)
+  const ensureTransport = async () => {
+    if (!transport) {
+      devtoolsScope = createScope()
+      transport = await devtoolsScope.resolve(transportExecutor)
+
+      if (config?.onMessage) {
+        transport.subscribe(config.onMessage)
       }
     }
+    return transport
   }
-
-  if (config?.onMessage) {
-    transport.subscribe(config.onMessage)
-  }
-
-  let devtoolsScope: ReturnType<typeof createScope> | null = null
 
   return extension({
     name: "devtools",
 
     init: async (targetScope) => {
-      devtoolsScope = createScope(preset(transportExecutor, transport))
-      await devtoolsScope.resolve(transportExecutor)
-      await devtoolsScope.resolve(stateAggregatorExecutor)
+      await ensureTransport()
     },
 
     wrap: async (ctx, next, operation) => {
+      const currentTransport = await ensureTransport()
       const start = Date.now()
       const result = await next()
       const duration = Date.now() - start
 
-      transport.emit({
+      currentTransport.emit({
         timestamp: Date.now(),
         duration,
         operation
@@ -54,6 +48,7 @@ export const createDevtoolsExtension = (config?: DevtoolsConfig): Extension.Exte
       if (devtoolsScope) {
         await devtoolsScope.dispose()
         devtoolsScope = null
+        transport = null
       }
     }
   })
