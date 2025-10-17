@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { meta, getValue, findValue, findValues } from "../src/meta";
-import { custom, provide, derive, createScope, preset } from "../src";
+import { custom, provide, derive, createScope } from "../src";
 
 describe("Meta System", () => {
   describe("Basic Meta Operations", () => {
@@ -46,7 +46,7 @@ describe("Meta System", () => {
     });
   });
 
-  describe("Meta container support for scope and pod", () => {
+  describe("Meta container support for scope", () => {
     const configMeta = meta("config", custom<string>());
     const debugMeta = meta("debug", custom<string>());
 
@@ -65,22 +65,6 @@ describe("Meta System", () => {
       expect(debug).toBe("off");
     });
 
-    test("pod should implement Meta.MetaContainer and inherit scope meta by default", async () => {
-      const scope = createScope({
-        meta: [configMeta("production")]
-      });
-
-      const pod = scope.pod({
-        meta: [debugMeta("verbose")]
-      });
-
-      expect(pod.metas).toBeDefined();
-      expect(pod.metas).toHaveLength(1);
-
-      const debug = debugMeta.get(pod);
-      expect(debug).toBe("verbose");
-    });
-
     test("executors can access scope meta through controller", async () => {
       const scope = createScope({
         meta: [configMeta("test-env")]
@@ -93,54 +77,6 @@ describe("Meta System", () => {
 
       const result = await scope.resolve(configExecutor);
       expect(result).toBe("Running in test-env");
-    });
-
-    test("executors can access pod meta through controller", async () => {
-      const scope = createScope({
-        meta: [configMeta("production")]
-      });
-
-      const pod = scope.pod({
-        meta: [debugMeta("enabled"), configMeta("development")]
-      });
-
-      const debugExecutor = provide((ctl) => {
-        const debug = debugMeta.get(ctl.scope);
-        const config = configMeta.get(ctl.scope);
-        return `Debug: ${debug}, Config: ${config}`;
-      });
-
-      const result = await pod.resolve(debugExecutor);
-      expect(result).toBe("Debug: enabled, Config: development");
-    });
-
-    test("pod with both presets and meta", async () => {
-      const valueExecutor = provide(() => "original");
-
-      const scope = createScope({
-        meta: [configMeta("production")]
-      });
-
-      const pod = scope.pod({
-        initialValues: [preset(valueExecutor, "overridden")],
-        meta: [debugMeta("on")]
-      });
-
-      const result = await pod.resolve(valueExecutor);
-      expect(result).toBe("overridden");
-
-      const debug = debugMeta.get(pod);
-      expect(debug).toBe("on");
-    });
-
-    test("backward compatibility - pod with variadic presets still works", async () => {
-      const valueExecutor = provide(() => "original");
-      const scope = createScope();
-
-      const pod = scope.pod(preset(valueExecutor, "legacy-way"));
-
-      const result = await pod.resolve(valueExecutor);
-      expect(result).toBe("legacy-way");
     });
   });
 });
