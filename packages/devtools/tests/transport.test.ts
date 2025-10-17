@@ -15,6 +15,24 @@ describe("Transport Interface", () => {
 
     await scope.dispose()
   })
+
+  it("should create transport via executor", async () => {
+    const scope = createScope()
+    const transport = await scope.resolve(transportExecutor)
+    const messages: Transport.Message[] = []
+
+    transport.subscribe(msg => messages.push(msg))
+
+    transport.emit({
+      timestamp: Date.now(),
+      duration: 5,
+      operation: { kind: "resolve", executorId: "test" }
+    })
+
+    expect(messages).toHaveLength(1)
+
+    await scope.dispose()
+  })
 })
 
 describe("Transport", () => {
