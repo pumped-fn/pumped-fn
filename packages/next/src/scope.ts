@@ -1033,7 +1033,6 @@ class BaseScope implements Core.Scope {
         scope: this,
         extensions: options.extensions,
         initialContext: options.initialContext,
-        presets: options.presets,
         meta: options.meta,
         details: true,
       });
@@ -1043,7 +1042,6 @@ class BaseScope implements Core.Scope {
       scope: this,
       extensions: options?.extensions,
       initialContext: options?.initialContext,
-      presets: options?.presets,
       meta: options?.meta,
       details: false,
     });

@@ -172,15 +172,16 @@ describe("Core Functionality", () => {
     });
 
     test("scope executes flow with preset overriding default dependency value", async () => {
-      const scope = createScope();
       const configExecutor = provide(() => ({ value: 10 }));
       const flowWithConfig = flow(configExecutor, (deps, _ctx, input: number) => {
         return input + deps.value;
       });
 
-      const result = await scope.exec(flowWithConfig, 5, {
-        presets: [preset(configExecutor, { value: 20 })],
+      const scope = createScope({
+        initialValues: [preset(configExecutor, { value: 20 })],
       });
+
+      const result = await scope.exec(flowWithConfig, 5);
 
       expect(result).toBe(25);
 

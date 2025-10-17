@@ -462,7 +462,6 @@ exec<S, I = undefined>(
   options?: {
     extensions?: Extension.Extension[];
     initialContext?: Array<[Accessor.Accessor<any>, any]>;
-    presets?: Preset<unknown>[];
     meta?: Meta.Meta[];
   }
 ): Promised<S>;
@@ -775,22 +774,27 @@ const createUser = flow({
 
 ```typescript
 const database = provide(() => new Database())
-const cache = provide(() => new Cache())
+const requestId = accessor("requestId", z.string())
+const userId = accessor("userId", z.string())
 
 const scope = createScope()
 
-// Execute flow with custom presets and meta
+// Execute flow with initialContext and meta
 const processFlow = flow({
   name: "processData",
   handler: async (ctx, input) => {
     const db = await ctx.scope.resolve(database)
-    const c = await ctx.scope.resolve(cache)
-    return processData(db, c, input)
+    const reqId = ctx.get(requestId)
+    const user = ctx.get(userId)
+    return processData(db, reqId, user, input)
   }
 })
 
 const result = await scope.exec(processFlow, { id: "123" }, {
-  presets: [preset(cache, mockCache)],
+  initialContext: [
+    [requestId, "req-456"],
+    [userId, "user-789"]
+  ],
   meta: [customMeta("value")]
 })
 // Flow cleanup is automatic

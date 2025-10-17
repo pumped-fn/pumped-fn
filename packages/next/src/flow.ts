@@ -644,7 +644,6 @@ function execute<S, I>(
     initialContext?: Array<
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
-    presets?: Core.Preset<unknown>[];
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details: true;
@@ -660,7 +659,6 @@ function execute<S, I>(
     initialContext?: Array<
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
-    presets?: Core.Preset<unknown>[];
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: false;
@@ -676,7 +674,6 @@ function execute<S, I>(
     initialContext?: Array<
       [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
     >;
-    presets?: Core.Preset<unknown>[];
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: boolean;
@@ -693,16 +690,6 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
-    if (options?.presets) {
-      for (const preset of options.presets) {
-        if (isExecutor(preset.value)) {
-          await scope.set(preset.executor, await scope.resolve(preset.value as Core.Executor<unknown>));
-        } else {
-          await scope.set(preset.executor, preset.value);
-        }
-      }
-    }
-
     const context = new FlowContext(scope, options?.extensions || [], options?.meta);
 
     try {

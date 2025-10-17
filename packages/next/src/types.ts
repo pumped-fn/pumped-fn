@@ -390,7 +390,6 @@ export declare namespace Core {
         initialContext?: Array<
           [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
         >;
-        presets?: Preset<unknown>[];
         meta?: Meta.Meta[];
         details?: false;
       }
@@ -404,7 +403,6 @@ export declare namespace Core {
         initialContext?: Array<
           [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
         >;
-        presets?: Preset<unknown>[];
         meta?: Meta.Meta[];
         details: true;
       }
