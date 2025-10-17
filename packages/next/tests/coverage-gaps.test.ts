@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { accessor } from "../src/accessor";
-import { custom } from "../src/ssch";
+import { custom, validate } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { createExecutor, derive, provide } from "../src/executor";
 import { flow } from "../src/flow";
@@ -465,6 +465,38 @@ describe("Coverage Gaps", () => {
       });
 
       await expect(promised.toPromise()).rejects.toThrow("sync error");
+    });
+  });
+
+  describe("ssch.ts - validation error paths", () => {
+    test("validate throws error when schema validation returns promise", () => {
+      const asyncSchema = {
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate: () => Promise.resolve({ value: "async" }),
+        },
+      };
+
+      expect(() => {
+        validate(asyncSchema, "test");
+      }).toThrow("validating async is not supported");
+    });
+
+    test("validate throws SchemaError when validation returns issues", () => {
+      const failingSchema = {
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate: () => ({
+            issues: [{ message: "validation failed" }],
+          }),
+        },
+      };
+
+      expect(() => {
+        validate(failingSchema, "test");
+      }).toThrow("validation failed");
     });
   });
 });
