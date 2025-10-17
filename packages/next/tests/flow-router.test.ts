@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, test, expect } from "vitest";
 import { flow, custom, type Flow } from "../src/index";
 
 describe("Flow Router Utilities", () => {
@@ -48,112 +48,105 @@ describe("Flow Router Utilities", () => {
     getUser: getUserFlow,
   };
 
-  const routers = {
+  const nestedRouters = {
     todo: todoRouter,
     user: userRouter,
   };
 
-  it("should infer valid paths from nested router", () => {
-    type Paths = Flow.PathsToFlows<typeof routers>;
+  test("PathsToFlows generates dot-notation paths from nested router", () => {
+    type Paths = Flow.PathsToFlows<typeof nestedRouters>;
 
-    const path1: Paths = "todo.addTodo";
-    const path2: Paths = "todo.getTodo";
-    const path3: Paths = "user.addUser";
-    const path4: Paths = "user.getUser";
+    const todoAddPath: Paths = "todo.addTodo";
+    const todoGetPath: Paths = "todo.getTodo";
+    const userAddPath: Paths = "user.addUser";
+    const userGetPath: Paths = "user.getUser";
 
-    expect(path1).toBe("todo.addTodo");
-    expect(path2).toBe("todo.getTodo");
-    expect(path3).toBe("user.addUser");
-    expect(path4).toBe("user.getUser");
+    expect(todoAddPath).toBe("todo.addTodo");
+    expect(todoGetPath).toBe("todo.getTodo");
+    expect(userAddPath).toBe("user.addUser");
+    expect(userGetPath).toBe("user.getUser");
   });
 
-  it("should extract flow from path", () => {
-    type AddTodoFlowType = Flow.GetFlowFromPath<typeof routers, "todo.addTodo">;
-    type GetUserFlowType = Flow.GetFlowFromPath<typeof routers, "user.getUser">;
+  test("GetFlowFromPath extracts flow type from router path", () => {
+    type AddTodoFlowType = Flow.GetFlowFromPath<typeof nestedRouters, "todo.addTodo">;
+    type GetUserFlowType = Flow.GetFlowFromPath<typeof nestedRouters, "user.getUser">;
 
-    const flow1: AddTodoFlowType = addTodoFlow;
-    const flow2: GetUserFlowType = getUserFlow;
+    const todoFlowInstance: AddTodoFlowType = addTodoFlow;
+    const userFlowInstance: GetUserFlowType = getUserFlow;
 
-    expect(flow1).toBe(addTodoFlow);
-    expect(flow2).toBe(getUserFlow);
+    expect(todoFlowInstance).toBe(addTodoFlow);
+    expect(userFlowInstance).toBe(getUserFlow);
   });
 
-  it("should infer input type from path", () => {
-    type AddTodoInput = Flow.InferInputFromPath<typeof routers, "todo.addTodo">;
-    type GetUserInput = Flow.InferInputFromPath<typeof routers, "user.getUser">;
+  test("InferInputFromPath extracts input type from router path", () => {
+    type AddTodoInput = Flow.InferInputFromPath<typeof nestedRouters, "todo.addTodo">;
+    type GetUserInput = Flow.InferInputFromPath<typeof nestedRouters, "user.getUser">;
 
-    const todoInput: AddTodoInput = {
+    const validTodoInput: AddTodoInput = {
       title: "Test Todo",
       description: "Test Description",
     };
-
-    const userInput: GetUserInput = {
+    const validUserInput: GetUserInput = {
       id: "u1",
     };
 
-    expect(todoInput.title).toBe("Test Todo");
-    expect(userInput.id).toBe("u1");
+    expect(validTodoInput.title).toBe("Test Todo");
+    expect(validUserInput.id).toBe("u1");
   });
 
-  it("should infer output type from path", () => {
-    type AddTodoOutput = Flow.InferOutputFromPath<typeof routers, "todo.addTodo">;
-    type GetUserOutput = Flow.InferOutputFromPath<typeof routers, "user.getUser">;
+  test("InferOutputFromPath extracts output type from router path", () => {
+    type AddTodoOutput = Flow.InferOutputFromPath<typeof nestedRouters, "todo.addTodo">;
+    type GetUserOutput = Flow.InferOutputFromPath<typeof nestedRouters, "user.getUser">;
 
-    const todoOutput: AddTodoOutput = {
+    const validTodoOutput: AddTodoOutput = {
       id: "1",
       title: "Test Todo",
       description: "Test Description",
     };
-
-    const userOutput: GetUserOutput = {
+    const validUserOutput: GetUserOutput = {
       id: "u1",
       name: "John",
       email: "john@example.com",
     };
 
-    expect(todoOutput.id).toBe("1");
-    expect(userOutput.name).toBe("John");
+    expect(validTodoOutput.id).toBe("1");
+    expect(validUserOutput.name).toBe("John");
   });
 
-  it("should have correct type signature for router executor", () => {
-    type ExecutorFn = Flow.FlowRouterExecutor<typeof routers>;
+  test("FlowRouterExecutor provides type-safe executor function signature", () => {
+    type ExecutorFn = Flow.FlowRouterExecutor<typeof nestedRouters>;
 
     const mockExecutor: ExecutorFn = null as any;
+    type AddTodoInput = Flow.InferInputFromPath<typeof nestedRouters, "todo.addTodo">;
+    type AddTodoOutput = Flow.InferOutputFromPath<typeof nestedRouters, "todo.addTodo">;
+    type GetUserInput = Flow.InferInputFromPath<typeof nestedRouters, "user.getUser">;
+    type GetUserOutput = Flow.InferOutputFromPath<typeof nestedRouters, "user.getUser">;
 
-    type TestInput1 = Flow.InferInputFromPath<typeof routers, "todo.addTodo">;
-    type TestOutput1 = Flow.InferOutputFromPath<typeof routers, "todo.addTodo">;
-
-    type TestInput2 = Flow.InferInputFromPath<typeof routers, "user.getUser">;
-    type TestOutput2 = Flow.InferOutputFromPath<typeof routers, "user.getUser">;
-
-    const input1: TestInput1 = {
+    const validTodoInput: AddTodoInput = {
       title: "Test",
       description: "Description",
     };
-
-    const output1: TestOutput1 = {
+    const validTodoOutput: AddTodoOutput = {
       id: "1",
       title: "Test",
       description: "Description",
     };
-
-    const input2: TestInput2 = {
+    const validUserInput: GetUserInput = {
       id: "u1",
     };
-
-    const output2: TestOutput2 = {
+    const validUserOutput: GetUserOutput = {
       id: "u1",
       name: "John",
       email: "john@example.com",
     };
 
-    expect(input1.title).toBe("Test");
-    expect(output1.id).toBe("1");
-    expect(input2.id).toBe("u1");
-    expect(output2.email).toBe("john@example.com");
+    expect(validTodoInput.title).toBe("Test");
+    expect(validTodoOutput.id).toBe("1");
+    expect(validUserInput.id).toBe("u1");
+    expect(validUserOutput.email).toBe("john@example.com");
   });
 
-  it("should work with single-level router", () => {
+  test("router types work with single-level flat structure", () => {
     const flatRouter = {
       addTodo: addTodoFlow,
       getTodo: getTodoFlow,
@@ -163,23 +156,23 @@ describe("Flow Router Utilities", () => {
     type AddTodoInput = Flow.InferInputFromPath<typeof flatRouter, "addTodo">;
     type GetTodoOutput = Flow.InferOutputFromPath<typeof flatRouter, "getTodo">;
 
-    const path: Paths = "addTodo";
-    const input: AddTodoInput = {
+    const validPath: Paths = "addTodo";
+    const validInput: AddTodoInput = {
       title: "Test",
       description: "Test description",
     };
-    const output: GetTodoOutput = {
+    const validOutput: GetTodoOutput = {
       id: "1",
       title: "Test",
       description: "Test description",
     };
 
-    expect(path).toBe("addTodo");
-    expect(input.title).toBe("Test");
-    expect(output.id).toBe("1");
+    expect(validPath).toBe("addTodo");
+    expect(validInput.title).toBe("Test");
+    expect(validOutput.id).toBe("1");
   });
 
-  it("should work with deeply nested routers", () => {
+  test("router types work with deeply nested multi-level structure", () => {
     const deepRouter = {
       api: {
         v1: {
@@ -199,19 +192,19 @@ describe("Flow Router Utilities", () => {
     type AddTodoInput = Flow.InferInputFromPath<typeof deepRouter, "api.v1.todo.add">;
     type GetUserOutput = Flow.InferOutputFromPath<typeof deepRouter, "api.v1.user.get">;
 
-    const path: Paths = "api.v1.todo.add";
-    const input: AddTodoInput = {
+    const validPath: Paths = "api.v1.todo.add";
+    const validInput: AddTodoInput = {
       title: "Deep Todo",
       description: "Nested description",
     };
-    const output: GetUserOutput = {
+    const validOutput: GetUserOutput = {
       id: "u1",
       name: "John",
       email: "john@example.com",
     };
 
-    expect(path).toBe("api.v1.todo.add");
-    expect(input.title).toBe("Deep Todo");
-    expect(output.email).toBe("john@example.com");
+    expect(validPath).toBe("api.v1.todo.add");
+    expect(validInput.title).toBe("Deep Todo");
+    expect(validOutput.email).toBe("john@example.com");
   });
 });
