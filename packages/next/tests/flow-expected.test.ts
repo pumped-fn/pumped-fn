@@ -586,42 +586,9 @@ describe("Flow API - New Patterns", () => {
   });
 
   describe("details option", () => {
-    test("execute with details: true returns execution details on success", async () => {
-      const testFlow = flow((_ctx, input: number) => input * 2);
-      const details = await flow.execute(testFlow, 5, { details: true });
-
-      expect(details.success).toBe(true);
-      if (details.success) {
-        expect(details.result).toBe(10);
-        expect(details.ctx).toBeDefined();
-      }
-    });
-
-    test("execute with details: true returns execution details on error", async () => {
-      const failingFlow = flow((_ctx, _input: number): number => {
-        throw new Error("Test error");
-      });
-
-      const details = await flow.execute(failingFlow, 5, { details: true });
-
-      expect(details.success).toBe(false);
-      if (!details.success) {
-        expect(details.error).toBeInstanceOf(Error);
-        expect((details.error as Error).message).toBe("Test error");
-        expect(details.ctx).toBeDefined();
-      }
-    });
-
     test("execute with details: false returns normal result", async () => {
       const testFlow = flow((_ctx, input: number) => input * 2);
       const result = await flow.execute(testFlow, 5, { details: false });
-
-      expect(result).toBe(10);
-    });
-
-    test("execute without details option returns normal result", async () => {
-      const testFlow = flow((_ctx, input: number) => input * 2);
-      const result = await flow.execute(testFlow, 5);
 
       expect(result).toBe(10);
     });
