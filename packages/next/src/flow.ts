@@ -181,7 +181,7 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
 class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
   private journal: Map<string, unknown> | null = null;
-  private readonly scope: Core.Scope;
+  public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
   public readonly metas: Meta.Meta[] | undefined;
 

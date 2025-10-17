@@ -559,6 +559,7 @@ export namespace Flow {
   };
 
   export type C = {
+    readonly scope: Core.Scope;
     readonly metas: Meta.Meta[] | undefined;
 
     get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;

@@ -473,7 +473,7 @@ describe("Coverage Gaps", () => {
       const asyncSchema = {
         "~standard": {
           vendor: "test",
-          version: 1,
+          version: 1 as const,
           validate: () => Promise.resolve({ value: "async" }),
         },
       };
@@ -487,7 +487,7 @@ describe("Coverage Gaps", () => {
       const failingSchema = {
         "~standard": {
           vendor: "test",
-          version: 1,
+          version: 1 as const,
           validate: () => ({
             issues: [{ message: "validation failed" }],
           }),
