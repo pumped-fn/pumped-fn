@@ -147,27 +147,6 @@ const memoryBenchmarks = {
       externalDiff: after.external - before.external,
     };
   },
-
-  "Pod creation and disposal": async () => {
-    const executor = provide(() => ({ value: 42 }));
-    const scope = createScope();
-
-    const before = getMemoryUsage();
-
-    for (let i = 0; i < iterations; i++) {
-      const pod = scope.pod();
-      await pod.resolve(executor);
-      await scope.disposePod(pod);
-    }
-
-    const after = getMemoryUsage();
-    await scope.dispose();
-
-    return {
-      heapDiff: after.heapUsed - before.heapUsed,
-      externalDiff: after.external - before.external,
-    };
-  },
 };
 
 async function runMemoryBenchmarks() {

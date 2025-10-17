@@ -431,7 +431,6 @@ class BaseScope implements Core.Scope {
     UE,
     Set<Core.ErrorCallback<unknown>>
   >();
-  protected isPod: boolean;
   private isDisposing = false;
 
   private resolutionChain: Map<UE, Set<UE>> = new Map();
@@ -448,7 +447,6 @@ class BaseScope implements Core.Scope {
   };
 
   constructor(options?: ScopeOption) {
-    this.isPod = options?.pod || false;
     if (options?.registry) {
       this.registry = [...options.registry];
     }
@@ -1053,7 +1051,6 @@ class BaseScope implements Core.Scope {
 }
 
 export type ScopeOption = {
-  pod?: boolean;
   initialValues?: Core.Preset<unknown>[];
   registry?: Core.Executor<unknown>[];
   extensions?: Extension.Extension[];

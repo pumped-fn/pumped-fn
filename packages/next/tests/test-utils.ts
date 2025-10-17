@@ -174,27 +174,6 @@ export const ExtensionFactory = {
       },
     } as Extension.Extension),
 
-  lifecycle: (lifecycleCalls: string[], extensionName: string) =>
-    ({
-      name: extensionName,
-      initPod(pod: any, context: any) {
-        lifecycleCalls.push(`${extensionName}-init`);
-        return new Promised(Promise.resolve());
-      },
-      disposePod(pod: any) {
-        lifecycleCalls.push(`${extensionName}-dispose`);
-        return new Promised(Promise.resolve());
-      },
-      wrapExecute(
-        context: any,
-        next: () => Promise<any>,
-        execution: any
-      ) {
-        lifecycleCalls.push(`${extensionName}-wrap`);
-        return next();
-      },
-    } as Extension.Extension),
-
   errorHandler: (onError: any, extensionName = "error-extension") =>
     ({
       name: extensionName,
