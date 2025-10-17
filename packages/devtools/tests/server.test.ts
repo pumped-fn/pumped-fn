@@ -57,4 +57,34 @@ describe("IPC Server", () => {
 
     client.end()
   })
+
+  it("should receive and parse messages from client", async () => {
+    const receivedMessages: any[] = []
+
+    server = createIPCServer({
+      socketPath,
+      onMessage: (msg) => {
+        receivedMessages.push(msg)
+      }
+    })
+    await server.listen()
+
+    const client = net.createConnection(socketPath)
+
+    client.on("connect", () => {
+      const msg = {
+        timestamp: Date.now(),
+        duration: 10,
+        operation: { kind: "resolve", executorId: "test" }
+      }
+      client.write(`MESSAGE:${JSON.stringify(msg)}\n`)
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    expect(receivedMessages).toHaveLength(1)
+    expect(receivedMessages[0].operation.executorId).toBe("test")
+
+    client.end()
+  })
 })

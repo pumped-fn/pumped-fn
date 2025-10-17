@@ -1,10 +1,11 @@
 import * as net from "node:net"
 import * as fs from "node:fs"
-import { type IPCTransport } from "./types"
+import { type IPCTransport, type Transport } from "./types"
 
 export type ServerConfig = {
   socketPath?: string
   onHandshake?: (handshake: IPCTransport.Handshake) => void
+  onMessage?: (msg: Transport.Message) => void
 }
 
 const DEFAULT_SOCKET_PATH = `/tmp/pumped-fn-devtools-${process.env.USER || "default"}.sock`
@@ -23,6 +24,9 @@ export const createIPCServer = (config: ServerConfig = {}) => {
         if (line.startsWith("HANDSHAKE:")) {
           const handshake = JSON.parse(line.slice(10)) as IPCTransport.Handshake
           config.onHandshake?.(handshake)
+        } else if (line.startsWith("MESSAGE:")) {
+          const msg = JSON.parse(line.slice(8)) as Transport.Message
+          config.onMessage?.(msg)
         }
       }
     })
