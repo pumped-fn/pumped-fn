@@ -5,32 +5,36 @@ import { accessor } from "../src/accessor";
 
 describe("Flow API - New Patterns", () => {
   describe("Nameless flows", () => {
-    test("shortest form - handler only", async () => {
+    test("handler-only flow executes transformation", async () => {
       const double = flow((_ctx, input: number) => input * 2);
 
       const result = await flow.execute(double, 5);
+
       expect(result).toBe(10);
     });
 
-    test("shortest form with dependencies, nested flow, and operations", async () => {
+    test("flow composes dependencies, nested flows, and operations", async () => {
       const fetchMock = vi.fn((url: string) =>
         Promise.resolve({ data: `fetched from ${url}` })
       );
-      const api = provide(() => ({ fetch: fetchMock }));
+      const apiService = provide(() => ({ fetch: fetchMock }));
 
-      const fetchUser = flow(api, async (api, ctx, id: number) => {
+      const fetchUserById = flow(apiService, async (api, ctx, userId: number) => {
         const response = await ctx.run("fetch-user", () =>
-          api.fetch(`/users/${id}`)
+          api.fetch(`/users/${userId}`)
         );
-        return { userId: id, username: `user${id}`, raw: response.data };
+        return { userId, username: `user${userId}`, raw: response.data };
       });
 
-      const fetchPosts = flow({ api }, async ({ api }, ctx, userId: number) => {
-        const response = await ctx.run("fetch-posts", () =>
-          api.fetch(`/posts?userId=${userId}`)
-        );
-        return { posts: [{ id: 1, title: "Post 1" }], raw: response.data };
-      });
+      const fetchPostsByUserId = flow(
+        { api: apiService },
+        async ({ api }, ctx, userId: number) => {
+          const response = await ctx.run("fetch-posts", () =>
+            api.fetch(`/posts?userId=${userId}`)
+          );
+          return { posts: [{ id: 1, title: "Post 1" }], raw: response.data };
+        }
+      );
 
       type UserWithPosts = {
         userId: number;
@@ -39,10 +43,10 @@ describe("Flow API - New Patterns", () => {
         postCount: number;
       };
       const getUserWithPosts = flow(
-        { api },
+        { api: apiService },
         async ({ api: _api }, ctx, userId: number): Promise<UserWithPosts> => {
-          const user = await ctx.exec(fetchUser, userId);
-          const posts = await ctx.exec(fetchPosts, userId);
+          const user = await ctx.exec(fetchUserById, userId);
+          const posts = await ctx.exec(fetchPostsByUserId, userId);
           const enriched = await ctx.run("enrich", () => ({
             ...user,
             postCount: posts.posts.length,
@@ -61,102 +65,106 @@ describe("Flow API - New Patterns", () => {
       expect(fetchMock).toHaveBeenCalledWith("/posts?userId=42");
     });
 
-    test("simple transformation", async () => {
+    test("generic type parameters constrain input and output", async () => {
       const stringToNumber = flow<string, number>((_ctx, input) => {
         return Number(input);
       });
 
       const result = await flow.execute(stringToNumber, "42");
+
       expect(result).toBe(42);
     });
   });
 
   describe("Void input flows", () => {
-    test("flow with void input - no parameter needed", async () => {
-      const noInput = flow<void, number>(() => {
+    test("void input flow executes without parameters", async () => {
+      const constant = flow<void, number>(() => {
         return 42;
       });
 
-      const result = await flow.execute(noInput, undefined);
+      const result = await flow.execute(constant, undefined);
+
       expect(result).toBe(42);
     });
 
-    test("flow with void input - with extensions", async () => {
-      const noInput = flow<void, string>(() => {
+    test("void input flow works with execution options", async () => {
+      const greet = flow<void, string>(() => {
         return "hello";
       });
 
-      const result = await flow.execute(noInput, undefined, {
+      const result = await flow.execute(greet, undefined, {
         extensions: [],
       });
+
       expect(result).toBe("hello");
     });
 
-    test("sub-flow with void input", async () => {
-      const noInputSub = flow<void, number>(() => {
+    test("void input sub-flow composes with parent flow", async () => {
+      const getBaseValue = flow<void, number>(() => {
         return 100;
       });
-
-      const main = flow<void, number>(async (ctx) => {
-        const sub = await ctx.exec(noInputSub, undefined);
-        return sub + 1;
+      const incrementValue = flow<void, number>(async (ctx) => {
+        const base = await ctx.exec(getBaseValue, undefined);
+        return base + 1;
       });
 
-      const result = await flow.execute(main, undefined);
+      const result = await flow.execute(incrementValue, undefined);
+
       expect(result).toBe(101);
     });
   });
 
   describe("Dependency injection", () => {
-    test("nameless with dependencies", async () => {
-      const config = provide(() => ({ multiplier: 10 }));
-
-      const multiply = flow(
-        { config },
+    test("flow injects dependencies into handler", async () => {
+      const appConfig = provide(() => ({ multiplier: 10 }));
+      const multiplyByConfig = flow(
+        { config: appConfig },
         ({ config }, _ctx, input: number): number => {
           return input * config.multiplier;
         }
       );
 
-      const result: number = await flow.execute(multiply, 5);
+      const result: number = await flow.execute(multiplyByConfig, 5);
+
       expect(result).toBe(50);
     });
 
-    test("dependencies with definition", async () => {
-      const logger = provide(() => ({ log: vi.fn() }));
-
-      const loggedFlow = flow(
-        logger,
+    test("flow combines dependencies with definition metadata", async () => {
+      const loggerService = provide(() => ({ log: vi.fn() }));
+      const upperCaseWithLogging = flow(
+        loggerService,
         {
           name: "logger-flow",
           input: custom<string>(),
           output: custom<string>(),
         },
-        (deps, _ctx, input) => {
-          deps.log(`Processing: ${input}`);
+        (logger, _ctx, input) => {
+          logger.log(`Processing: ${input}`);
           return input.toUpperCase();
         }
       );
 
-      const result = await flow.execute(loggedFlow, "hello");
+      const result = await flow.execute(upperCaseWithLogging, "hello");
+
       expect(result).toBe("HELLO");
     });
   });
 
   describe("Basic flow creation", () => {
-    test("pattern 1: generic types with handler", async () => {
-      const impl = flow<{ value: number }, { result: number }>(
+    test("generic type parameters define input and output", async () => {
+      const doubleValue = flow<{ value: number }, { result: number }>(
         (_ctx, input) => {
           return { result: input.value * 2 };
         }
       );
 
-      const result = await flow.execute(impl, { value: 5 });
+      const result = await flow.execute(doubleValue, { value: 5 });
+
       expect(result.result).toBe(10);
     });
 
-    test("pattern 2: schema-based with inferred types", async () => {
-      const impl = flow(
+    test("definition with schemas provides type inference", async () => {
+      const tripleValue = flow(
         {
           name: "triple",
           input: custom<{ value: number }>(),
@@ -167,63 +175,64 @@ describe("Flow API - New Patterns", () => {
         }
       );
 
-      const result = await flow.execute(impl, { value: 5 });
+      const result = await flow.execute(tripleValue, { value: 5 });
+
       expect(result.result).toBe(15);
     });
 
-    test("pattern 3: definition then handler", async () => {
-      const definition = flow({
+    test("flow.define().handler() separates definition from implementation", async () => {
+      const squareDefinition = flow({
         name: "square",
         input: custom<{ x: number }>(),
         output: custom<{ y: number }>(),
       });
-
-      const impl = definition.handler((_ctx, input) => {
+      const squareFlow = squareDefinition.handler((_ctx, input) => {
         return { y: input.x * input.x };
       });
 
-      const result = await flow.execute(impl, { x: 4 });
+      const result = await flow.execute(squareFlow, { x: 4 });
+
       expect(result.y).toBe(16);
     });
   });
 
   describe("ctx.run() - journaling", () => {
-    test("executes and journals operations", async () => {
-      const fetchMock = vi.fn(() => Promise.resolve("data"));
-
-      const impl = flow<{ url: string }, { data: string }>(
+    test("ctx.run journals and executes operations", async () => {
+      const fetchData = vi.fn(() => Promise.resolve("data"));
+      const loadData = flow<{ url: string }, { data: string }>(
         async (ctx, _input) => {
-          const data = await ctx.run("fetch", () => fetchMock());
+          const data = await ctx.run("fetch", () => fetchData());
           return { data };
         }
       );
 
-      const result = await flow.execute(impl, { url: "http://test.com" });
+      const result = await flow.execute(loadData, { url: "http://test.com" });
+
       expect(result.data).toBe("data");
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchData).toHaveBeenCalledTimes(1);
     });
 
-    test("replays from journal", async () => {
-      let count = 0;
-      const op = vi.fn(() => ++count);
-
-      const impl = flow<Record<string, never>, { value: number }>(
+    test("ctx.run deduplicates operations with same key", async () => {
+      let executionCount = 0;
+      const incrementCounter = vi.fn(() => ++executionCount);
+      const deduplicatedOps = flow<Record<string, never>, { value: number }>(
         async (ctx, _input) => {
-          const v1 = await ctx.run("op", () => op());
-          await ctx.run("op", () => op());
-          return { value: v1 };
+          const firstCall = await ctx.run("op", () => incrementCounter());
+          await ctx.run("op", () => incrementCounter());
+          return { value: firstCall };
         }
       );
 
-      const result = await flow.execute(impl, {});
+      const result = await flow.execute(deduplicatedOps, {});
+
       expect(result.value).toBe(1);
-      expect(op).toHaveBeenCalledTimes(1);
+      expect(incrementCounter).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("Error handling", () => {
-    test("throws FlowError on failure", async () => {
-      const impl = flow<{ shouldFail: boolean }, { success: boolean }>(
+    test("flow throws FlowError on handler failure", async () => {
+      const conditionalFlow = flow<{ shouldFail: boolean }, { success: boolean }>(
         (_ctx, input) => {
           if (input.shouldFail) {
             throw new FlowError("Operation failed", "FAILED");
@@ -232,96 +241,95 @@ describe("Flow API - New Patterns", () => {
         }
       );
 
-      await expect(flow.execute(impl, { shouldFail: true })).rejects.toThrow(
-        FlowError
-      );
+      await expect(
+        flow.execute(conditionalFlow, { shouldFail: true })
+      ).rejects.toThrow(FlowError);
 
-      const result = await flow.execute(impl, { shouldFail: false });
+      const result = await flow.execute(conditionalFlow, { shouldFail: false });
+
       expect(result.success).toBe(true);
     });
   });
 
   describe("ctx.exec() - sub-flows", () => {
-    test("executes sub-flow", async () => {
-      const subFlow = flow<{ n: number }, { doubled: number }>(
+    test("ctx.exec executes nested sub-flow", async () => {
+      const doubleNumber = flow<{ n: number }, { doubled: number }>(
         (_ctx, input) => {
           return { doubled: input.n * 2 };
         }
       );
-
-      const mainFlow = flow<{ value: number }, { result: number }>(
+      const processValue = flow<{ value: number }, { result: number }>(
         async (ctx, input) => {
-          const sub = await ctx.exec(subFlow, { n: input.value });
-          return { result: sub.doubled };
+          const doubled = await ctx.exec(doubleNumber, { n: input.value });
+          return { result: doubled.doubled };
         }
       );
 
-      const result = await flow.execute(mainFlow, { value: 10 });
+      const result = await flow.execute(processValue, { value: 10 });
+
       expect(result.result).toBe(20);
     });
   });
 
   describe("ctx.parallel()", () => {
-    test("executes flows in parallel", async () => {
-      const flow1 = flow<{ x: number }, { r: number }>(async (_ctx, input) => {
-        await new Promise((r) => setTimeout(r, 10));
+    test("ctx.parallel executes multiple flows concurrently", async () => {
+      const doubleAsync = flow<{ x: number }, { r: number }>(async (_ctx, input) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
         return { r: input.x * 2 };
       });
-
-      const flow2 = flow<{ x: number }, { r: number }>(async (_ctx, input) => {
-        await new Promise((r) => setTimeout(r, 10));
+      const tripleAsync = flow<{ x: number }, { r: number }>(async (_ctx, input) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
         return { r: input.x * 3 };
       });
-
-      const main = flow<{ val: number }, { sum: number }>(
+      const combineResults = flow<{ val: number }, { sum: number }>(
         async (ctx, input) => {
-          const p1 = ctx.exec(flow1, { x: input.val });
-          const p2 = ctx.exec(flow2, { x: input.val });
-          const result = await ctx.parallel([p1, p2]);
+          const doublePromise = ctx.exec(doubleAsync, { x: input.val });
+          const triplePromise = ctx.exec(tripleAsync, { x: input.val });
+          const parallel = await ctx.parallel([doublePromise, triplePromise]);
 
-          const sum = result.results[0].r + result.results[1].r;
+          const sum = parallel.results[0].r + parallel.results[1].r;
           return { sum };
         }
       );
 
-      const result = await flow.execute(main, { val: 5 });
+      const result = await flow.execute(combineResults, { val: 5 });
+
       expect(result.sum).toBe(25);
     });
   });
 
   describe("ctx.parallelSettled()", () => {
-    test("handles partial failures", async () => {
-      const success = flow<Record<string, never>, { ok: boolean }>(() => ({
+    test("ctx.parallelSettled collects successes and failures", async () => {
+      const successFlow = flow<Record<string, never>, { ok: boolean }>(() => ({
         ok: true,
       }));
-
-      const failure = flow(() => {
+      const failureFlow = flow(() => {
         throw new FlowError("Failed", "ERR");
       });
-
-      const main = flow<
+      const gatherResults = flow<
         Record<string, never>,
         { succeeded: number; failed: number }
       >(async (ctx, _input) => {
-        const p1 = ctx.exec(success, {});
-        const p2 = ctx.exec(failure, {});
-        const p3 = ctx.exec(success, {});
-        const result = await ctx.parallelSettled([p1, p2, p3]);
+        const first = ctx.exec(successFlow, {});
+        const second = ctx.exec(failureFlow, {});
+        const third = ctx.exec(successFlow, {});
+        const settled = await ctx.parallelSettled([first, second, third]);
 
         return {
-          succeeded: result.stats.succeeded,
-          failed: result.stats.failed,
+          succeeded: settled.stats.succeeded,
+          failed: settled.stats.failed,
         };
       });
 
-      const result = await flow.execute(main, {});
+      const result = await flow.execute(gatherResults, {});
+
       expect(result.succeeded).toBe(2);
       expect(result.failed).toBe(1);
     });
   });
 
   describe("Promised FP operations", () => {
-    test("map - transform success value", async () => {
+    test("map transforms successful execution result", async () => {
       const getNumber = flow<void, number>(() => 42);
 
       const result = await flow
@@ -332,26 +340,26 @@ describe("Flow API - New Patterns", () => {
       expect(result).toBe("84");
     });
 
-    test("switch - chain flows", async () => {
-      const firstFlow = flow<void, number>(() => 5);
-      const secondFlow = flow<number, string>((_, input) => {
+    test("switch chains flow execution with result", async () => {
+      const getInitialValue = flow<void, number>(() => 5);
+      const formatNumber = flow<number, string>((_, input) => {
         return `Number: ${input}`;
       });
 
       const result = await flow
-        .execute(firstFlow, undefined)
-        .switch((num) => flow.execute(secondFlow, num));
+        .execute(getInitialValue, undefined)
+        .switch((value) => flow.execute(formatNumber, value));
 
       expect(result).toBe("Number: 5");
     });
 
-    test("mapError - transform error", async () => {
-      const failingFlow = flow<void, number>(() => {
+    test("mapError transforms error before propagation", async () => {
+      const throwError = flow<void, number>(() => {
         throw new Error("Original error");
       });
 
       try {
-        await flow.execute(failingFlow, undefined).mapError((err: unknown) => {
+        await flow.execute(throwError, undefined).mapError((err: unknown) => {
           return new Error(`Transformed: ${(err as Error).message}`);
         });
         throw new Error("Should have thrown");
@@ -360,28 +368,27 @@ describe("Flow API - New Patterns", () => {
       }
     });
 
-    test("switchError - recover from error", async () => {
-      const failingFlow = flow<void, number>(() => {
+    test("switchError recovers from failure with fallback flow", async () => {
+      const failingOperation = flow<void, number>(() => {
         throw new FlowError("Failed", "ERR");
       });
-
-      const fallbackFlow = flow<void, number>(() => 99);
+      const fallbackValue = flow<void, number>(() => 99);
 
       const result = await flow
-        .execute(failingFlow, undefined)
-        .switchError(() => flow.execute(fallbackFlow, undefined));
+        .execute(failingOperation, undefined)
+        .switchError(() => flow.execute(fallbackValue, undefined));
 
       expect(result).toBe(99);
     });
 
-    test("chaining multiple FP operations", async () => {
-      const getUser = flow<void, { id: number; name: string }>(() => ({
+    test("FP operations chain sequentially", async () => {
+      const getUserData = flow<void, { id: number; name: string }>(() => ({
         id: 1,
         name: "Alice",
       }));
 
       const result = await flow
-        .execute(getUser, undefined)
+        .execute(getUserData, undefined)
         .map((user) => user.name)
         .map((name) => name.toUpperCase())
         .map((name) => `Hello, ${name}!`);
@@ -391,31 +398,31 @@ describe("Flow API - New Patterns", () => {
   });
 
   describe("Execution context access", () => {
-    test("ctx() returns execution data after flow completes", async () => {
-      const testFlow = flow(async (ctx, input: { value: number }) => {
+    test("execution.ctx() provides metadata after completion", async () => {
+      const processValue = flow(async (ctx, input: { value: number }) => {
         await ctx.run("operation", () => input.value * 2);
         return { result: input.value };
       });
 
-      const execution = flow.execute(testFlow, { value: 42 });
+      const execution = flow.execute(processValue, { value: 42 });
       const result = await execution;
-      const executionData = await execution.ctx();
+      const metadata = await execution.ctx();
 
       expect(result.result).toBe(42);
-      expect(executionData).toBeDefined();
-      expect(executionData?.context.find(flowMeta.flowName)).toBe("anonymous");
-      expect(executionData?.context.get(flowMeta.depth)).toBe(0);
-      expect(executionData?.context.get(flowMeta.isParallel)).toBe(false);
+      expect(metadata).toBeDefined();
+      expect(metadata?.context.find(flowMeta.flowName)).toBe("anonymous");
+      expect(metadata?.context.get(flowMeta.depth)).toBe(0);
+      expect(metadata?.context.get(flowMeta.isParallel)).toBe(false);
     });
 
-    test("inDetails() returns both result and context on success", async () => {
-      const testFlow = flow(async (ctx, input: { x: number; y: number }) => {
+    test("inDetails() returns result and context on success", async () => {
+      const calculateBoth = flow(async (ctx, input: { x: number; y: number }) => {
         const sum = await ctx.run("sum", () => input.x + input.y);
         const product = await ctx.run("product", () => input.x * input.y);
         return { sum, product };
       });
 
-      const details = await flow.execute(testFlow, { x: 5, y: 3 }).inDetails();
+      const details = await flow.execute(calculateBoth, { x: 5, y: 3 }).inDetails();
 
       expect(details.success).toBe(true);
       if (details.success) {
@@ -423,24 +430,25 @@ describe("Flow API - New Patterns", () => {
         expect(details.result.product).toBe(15);
       }
       expect(details.ctx).toBeDefined();
+
       const journal = details.ctx.context.find(flowMeta.journal);
       expect(journal?.size).toBeGreaterThan(0);
     });
 
-    test("journal captures all operations", async () => {
-      const testFlow = flow(async (ctx, input: number) => {
-        const a = await ctx.run("double", () => input * 2);
-        const b = await ctx.run("triple", () => input * 3);
-        const c = await ctx.run("sum", () => a + b);
-        return c;
+    test("journal tracks all ctx.run operations", async () => {
+      const multiStepCalculation = flow(async (ctx, input: number) => {
+        const doubled = await ctx.run("double", () => input * 2);
+        const tripled = await ctx.run("triple", () => input * 3);
+        const combined = await ctx.run("sum", () => doubled + tripled);
+        return combined;
       });
 
-      const execution = flow.execute(testFlow, 10);
+      const execution = flow.execute(multiStepCalculation, 10);
       await execution;
-      const executionData = await execution.ctx();
+      const metadata = await execution.ctx();
 
-      expect(executionData).toBeDefined();
-      const journal = executionData?.context.find(flowMeta.journal);
+      expect(metadata).toBeDefined();
+      const journal = metadata?.context.find(flowMeta.journal);
       expect(journal?.size).toBe(3);
 
       const journalKeys = Array.from(journal?.keys() || []);
@@ -449,42 +457,41 @@ describe("Flow API - New Patterns", () => {
       expect(journalKeys.some((k) => k.includes("sum"))).toBe(true);
     });
 
-    test("contextData captures custom context values", async () => {
-      const customAccessor = accessor("customKey", custom<string>());
-      const testFlow = flow(async (ctx, input: string) => {
-        ctx.set(customAccessor, `processed-${input}`);
+    test("context stores custom accessor values", async () => {
+      const processingKey = accessor("customKey", custom<string>());
+      const storeCustomValue = flow(async (ctx, input: string) => {
+        ctx.set(processingKey, `processed-${input}`);
         return input.toUpperCase();
       });
 
-      const execution = flow.execute(testFlow, "hello");
+      const execution = flow.execute(storeCustomValue, "hello");
       await execution;
-      const executionData = await execution.ctx();
+      const metadata = await execution.ctx();
 
-      expect(executionData).toBeDefined();
-      expect(executionData?.context.find(customAccessor)).toBe(
-        "processed-hello"
-      );
+      expect(metadata).toBeDefined();
+      expect(metadata?.context.find(processingKey)).toBe("processed-hello");
     });
 
-    test("inDetails() captures context even on error", async () => {
-      const failingFlow = flow(async (ctx, input: number) => {
+    test("inDetails() preserves context on error", async () => {
+      const operationWithError = flow(async (ctx, input: number) => {
         await ctx.run("before-error", () => input * 2);
         throw new Error("test error");
       });
 
-      const details = await flow.execute(failingFlow, 5).inDetails();
+      const details = await flow.execute(operationWithError, 5).inDetails();
 
       expect(details.success).toBe(false);
       if (!details.success) {
         expect((details.error as Error).message).toBe("test error");
       }
       expect(details.ctx).toBeDefined();
+
       const journal = details.ctx.context.find(flowMeta.journal);
       expect(journal?.size).toBeGreaterThan(0);
     });
 
-    test("flowMeta tracks flow execution hierarchy", async () => {
-      const subFlow = flow(
+    test("flowMeta captures execution hierarchy metadata", async () => {
+      const incrementFlow = flow(
         {
           name: "subFlow",
           input: custom<number>(),
@@ -494,39 +501,36 @@ describe("Flow API - New Patterns", () => {
           return input + 1;
         }
       );
-
-      const mainFlow = flow(
+      const doubleAfterIncrement = flow(
         {
           name: "mainFlow",
           input: custom<number>(),
           output: custom<number>(),
         },
         async (ctx, input: number) => {
-          const result = await ctx.exec(subFlow, input);
-          return result * 2;
+          const incremented = await ctx.exec(incrementFlow, input);
+          return incremented * 2;
         }
       );
 
-      const execution = flow.execute(mainFlow, 5);
+      const execution = flow.execute(doubleAfterIncrement, 5);
       await execution;
-      const executionData = await execution.ctx();
+      const metadata = await execution.ctx();
 
-      expect(executionData).toBeDefined();
-      expect(executionData?.context.find(flowMeta.flowName)).toBe("mainFlow");
-      expect(executionData?.context.get(flowMeta.depth)).toBe(0);
-      expect(
-        executionData?.context.find(flowMeta.parentFlowName)
-      ).toBeUndefined();
+      expect(metadata).toBeDefined();
+      expect(metadata?.context.find(flowMeta.flowName)).toBe("mainFlow");
+      expect(metadata?.context.get(flowMeta.depth)).toBe(0);
+      expect(metadata?.context.find(flowMeta.parentFlowName)).toBeUndefined();
     });
 
-    test("inDetails() works with transformed promises", async () => {
-      const testFlow = flow(async (ctx, input: number) => {
+    test("inDetails() works after promise transformations", async () => {
+      const doubleValue = flow(async (ctx, input: number) => {
         await ctx.run("increment", () => input + 1);
         return input * 2;
       });
 
       const details = await flow
-        .execute(testFlow, 10)
+        .execute(doubleValue, 10)
         .map((x) => x + 1)
         .inDetails();
 
@@ -537,8 +541,8 @@ describe("Flow API - New Patterns", () => {
       expect(details.ctx).toBeDefined();
     });
 
-    test("inDetails() type discrimination", async () => {
-      const conditionalFlow = flow(async (ctx, shouldFail: boolean) => {
+    test("inDetails() discriminates success and failure types", async () => {
+      const maybeFailFlow = flow(async (ctx, shouldFail: boolean) => {
         await ctx.run("check", () => shouldFail);
         if (shouldFail) {
           throw new Error("failed");
@@ -547,16 +551,16 @@ describe("Flow API - New Patterns", () => {
       });
 
       const successDetails = await flow
-        .execute(conditionalFlow, false)
+        .execute(maybeFailFlow, false)
         .inDetails();
+
       expect(successDetails.success).toBe(true);
       if (successDetails.success) {
         expect(successDetails.result).toBe("success");
       }
 
-      const errorDetails = await flow
-        .execute(conditionalFlow, true)
-        .inDetails();
+      const errorDetails = await flow.execute(maybeFailFlow, true).inDetails();
+
       expect(errorDetails.success).toBe(false);
       if (!errorDetails.success) {
         expect((errorDetails.error as Error).message).toBe("failed");
@@ -566,21 +570,22 @@ describe("Flow API - New Patterns", () => {
   });
 
   describe("details option", () => {
-    test("execute with details: false returns normal result", async () => {
-      const testFlow = flow((_ctx, input: number) => input * 2);
-      const result = await flow.execute(testFlow, 5, { details: false });
+    test("details:false returns unwrapped result", async () => {
+      const doubleValue = flow((_ctx, input: number) => input * 2);
+
+      const result = await flow.execute(doubleValue, 5, { details: false });
 
       expect(result).toBe(10);
     });
 
-    test("details: true works with nested flows", async () => {
-      const innerFlow = flow((_ctx, input: number) => input + 1);
-      const outerFlow = flow(async (ctx, input: number) => {
-        const inner = await ctx.exec(innerFlow, input);
-        return inner * 2;
+    test("details:true returns wrapped result with context", async () => {
+      const incrementValue = flow((_ctx, input: number) => input + 1);
+      const processNested = flow(async (ctx, input: number) => {
+        const incremented = await ctx.exec(incrementValue, input);
+        return incremented * 2;
       });
 
-      const details = await flow.execute(outerFlow, 5, { details: true });
+      const details = await flow.execute(processNested, 5, { details: true });
 
       expect(details.success).toBe(true);
       if (details.success) {
