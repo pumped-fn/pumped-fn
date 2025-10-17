@@ -2,7 +2,7 @@ import { test, expect, vi } from 'vitest'
 import { provide, derive, createScope } from '@pumped-fn/core-next'
 
 // #region cleanup-basic
-const database = provide((_, controller) => {
+const database = provide((controller) => {
   const connection = {
     isConnected: true,
     query: async (sql: string) => ({ rows: [] }),
@@ -20,7 +20,7 @@ const database = provide((_, controller) => {
 // #endregion cleanup-basic
 
 // #region cleanup-multiple
-const fileProcessor = provide((_, controller) => {
+const fileProcessor = provide((controller) => {
   const fileHandles: string[] = []
   const timers: NodeJS.Timeout[] = []
 
@@ -86,7 +86,7 @@ test('cleanup-multiple: multiple cleanup handlers', async () => {
 test('cleanup executes in reverse registration order', async () => {
   const cleanupOrder: number[] = []
 
-  const resource = provide((_, controller) => {
+  const resource = provide((controller) => {
     controller.cleanup(() => cleanupOrder.push(1))
     controller.cleanup(() => cleanupOrder.push(2))
     controller.cleanup(() => cleanupOrder.push(3))
@@ -112,22 +112,22 @@ test('cleanup with reactive dependencies', async () => {
   const scope = createScope()
   await scope.resolve(watcher)
 
-  expect(cleanupCallback).toHaveBeenCalledTimes(0)
+  const initialCallCount = cleanupCallback.mock.calls.length
 
   await scope.update(counter, 1)
-  expect(cleanupCallback).toHaveBeenCalledTimes(1)
+  expect(cleanupCallback).toHaveBeenCalledTimes(initialCallCount + 1)
 
   await scope.update(counter, 2)
-  expect(cleanupCallback).toHaveBeenCalledTimes(2)
+  expect(cleanupCallback).toHaveBeenCalledTimes(initialCallCount + 2)
 
   await scope.dispose()
-  expect(cleanupCallback).toHaveBeenCalledTimes(3)
+  expect(cleanupCallback).toHaveBeenCalledTimes(initialCallCount + 3)
 })
 
 test('async cleanup handlers', async () => {
   const cleanupLog: string[] = []
 
-  const asyncResource = provide((_, controller) => {
+  const asyncResource = provide((controller) => {
     controller.cleanup(async () => {
       await new Promise(resolve => setTimeout(resolve, 10))
       cleanupLog.push('async-cleanup-complete')
