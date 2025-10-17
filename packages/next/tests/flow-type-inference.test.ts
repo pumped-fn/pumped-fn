@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, test, expect } from "vitest";
 import { flow, custom, type Flow } from "../src/index";
 
 describe("Flow Type Inference", () => {
-  it("should infer input type from flow() return", () => {
-    const myFlow = flow({
+  test("InferInput and InferOutput extract types from defined flow", () => {
+    const userFlow = flow({
       name: "testFlow",
       input: custom<{ id: number }>(),
       output: custom<{ id: number; name: string }>(),
@@ -12,51 +12,51 @@ describe("Flow Type Inference", () => {
       },
     });
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    type OutputType = Flow.InferOutput<typeof myFlow>;
+    type InputType = Flow.InferInput<typeof userFlow>;
+    type OutputType = Flow.InferOutput<typeof userFlow>;
 
-    const input: InputType = { id: 1 };
-    const output: OutputType = { id: 1, name: "test" };
+    const validInput: InputType = { id: 1 };
+    const validOutput: OutputType = { id: 1, name: "test" };
 
-    expect(input.id).toBe(1);
-    expect(output.name).toBe("test");
+    expect(validInput.id).toBe(1);
+    expect(validOutput.name).toBe("test");
   });
 
-  it("should infer input type from flow with dependencies", () => {
-    const myFlow = flow(
+  test("InferInput extracts types from flow with dependencies", () => {
+    const doubleFlow = flow(
       {},
       async (deps, ctx, input: { x: number }) => {
         return { y: input.x * 2 };
       }
     );
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    type OutputType = Flow.InferOutput<typeof myFlow>;
+    type InputType = Flow.InferInput<typeof doubleFlow>;
+    type OutputType = Flow.InferOutput<typeof doubleFlow>;
 
-    const input: InputType = { x: 42 };
-    const output: OutputType = { y: 84 };
+    const validInput: InputType = { x: 42 };
+    const validOutput: OutputType = { y: 84 };
 
-    expect(input.x).toBe(42);
-    expect(output.y).toBe(84);
+    expect(validInput.x).toBe(42);
+    expect(validOutput.y).toBe(84);
   });
 
-  it("should infer input type from anonymous flow", () => {
-    const myFlow = flow(async (ctx, input: { value: string }) => {
+  test("InferInput extracts types from anonymous flow handler", () => {
+    const upperCaseFlow = flow(async (ctx, input: { value: string }) => {
       return { result: input.value.toUpperCase() };
     });
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    type OutputType = Flow.InferOutput<typeof myFlow>;
+    type InputType = Flow.InferInput<typeof upperCaseFlow>;
+    type OutputType = Flow.InferOutput<typeof upperCaseFlow>;
 
-    const input: InputType = { value: "hello" };
-    const output: OutputType = { result: "HELLO" };
+    const validInput: InputType = { value: "hello" };
+    const validOutput: OutputType = { result: "HELLO" };
 
-    expect(input.value).toBe("hello");
-    expect(output.result).toBe("HELLO");
+    expect(validInput.value).toBe("hello");
+    expect(validOutput.result).toBe("HELLO");
   });
 
-  it("should infer input type from flow.define().handler()", () => {
-    const myFlow = flow
+  test("InferInput works with flow.define().handler() pattern", () => {
+    const sumFlow = flow
       .define({
         name: "defineTest",
         input: custom<{ a: number; b: number }>(),
@@ -66,18 +66,21 @@ describe("Flow Type Inference", () => {
         return { sum: input.a + input.b };
       });
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    type OutputType = Flow.InferOutput<typeof myFlow>;
+    type InputType = Flow.InferInput<typeof sumFlow>;
+    type OutputType = Flow.InferOutput<typeof sumFlow>;
 
-    const input: InputType = { a: 5, b: 10 };
-    const output: OutputType = { sum: 15 };
+    const validInput: InputType = { a: 5, b: 10 };
+    const validOutput: OutputType = { sum: 15 };
 
-    expect(input.a).toBe(5);
-    expect(output.sum).toBe(15);
+    expect(validInput.a).toBe(5);
+    expect(validOutput.sum).toBe(15);
   });
 
-  it("should work with Flow.Flow type annotation", () => {
-    const createFlow = (): Flow.Flow<{ id: string }, { id: string; data: string }> => {
+  test("Flow.Flow type annotation constrains input and output types", () => {
+    const createProcessingFlow = (): Flow.Flow<
+      { id: string },
+      { id: string; data: string }
+    > => {
       return flow({
         name: "annotated",
         input: custom<{ id: string }>(),
@@ -88,20 +91,19 @@ describe("Flow Type Inference", () => {
       });
     };
 
-    const myFlow = createFlow();
+    const processingFlow = createProcessingFlow();
+    type InputType = Flow.InferInput<typeof processingFlow>;
+    type OutputType = Flow.InferOutput<typeof processingFlow>;
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    type OutputType = Flow.InferOutput<typeof myFlow>;
+    const validInput: InputType = { id: "123" };
+    const validOutput: OutputType = { id: "123", data: "processed" };
 
-    const input: InputType = { id: "123" };
-    const output: OutputType = { id: "123", data: "processed" };
-
-    expect(input.id).toBe("123");
-    expect(output.data).toBe("processed");
+    expect(validInput.id).toBe("123");
+    expect(validOutput.data).toBe("processed");
   });
 
-  it("should access definition property on Flow.Flow", () => {
-    const myFlow = flow
+  test("flow exposes definition property with metadata", () => {
+    const versionedFlow = flow
       .define({
         name: "withDefinition",
         version: "2.0.0",
@@ -112,12 +114,13 @@ describe("Flow Type Inference", () => {
         return { doubled: input.count * 2 };
       });
 
-    expect(myFlow.definition).toBeDefined();
-    expect(myFlow.definition.name).toBe("withDefinition");
-    expect(myFlow.definition.version).toBe("2.0.0");
+    expect(versionedFlow.definition).toBeDefined();
+    expect(versionedFlow.definition.name).toBe("withDefinition");
+    expect(versionedFlow.definition.version).toBe("2.0.0");
 
-    type InputType = Flow.InferInput<typeof myFlow>;
-    const input: InputType = { count: 5 };
-    expect(input.count).toBe(5);
+    type InputType = Flow.InferInput<typeof versionedFlow>;
+    const validInput: InputType = { count: 5 };
+
+    expect(validInput.count).toBe(5);
   });
 });
