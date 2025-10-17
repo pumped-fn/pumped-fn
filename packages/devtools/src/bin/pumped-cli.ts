@@ -21,12 +21,14 @@ const main = async () => {
 
   const server = createIPCServer({
     socketPath,
-    onHandshake: (handshake) => {
+    onHandshake: (socket, handshake) => {
       console.log(`Scope connected: ${handshake.name || handshake.scopeId} (pid: ${handshake.pid})`)
       aggregator.registerScope(handshake)
+      clientScopes.set(socket, handshake.scopeId)
     },
-    onMessage: (msg) => {
-      for (const scopeId of clientScopes.values()) {
+    onMessage: (socket, msg) => {
+      const scopeId = clientScopes.get(socket)
+      if (scopeId) {
         aggregator.handleMessage(scopeId, msg)
       }
     }

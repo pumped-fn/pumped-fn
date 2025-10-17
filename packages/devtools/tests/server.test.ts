@@ -31,7 +31,7 @@ describe("IPC Server", () => {
 
     server = createIPCServer({
       socketPath,
-      onHandshake: (handshake) => {
+      onHandshake: (socket, handshake) => {
         receivedHandshake = handshake
       }
     })
@@ -63,7 +63,7 @@ describe("IPC Server", () => {
 
     server = createIPCServer({
       socketPath,
-      onMessage: (msg) => {
+      onMessage: (socket, msg) => {
         receivedMessages.push(msg)
       }
     })

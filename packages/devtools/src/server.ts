@@ -4,8 +4,8 @@ import { type IPCTransport, type Transport } from "./types"
 
 export type ServerConfig = {
   socketPath?: string
-  onHandshake?: (handshake: IPCTransport.Handshake) => void
-  onMessage?: (msg: Transport.Message) => void
+  onHandshake?: (socket: net.Socket, handshake: IPCTransport.Handshake) => void
+  onMessage?: (socket: net.Socket, msg: Transport.Message) => void
 }
 
 const DEFAULT_SOCKET_PATH = `/tmp/pumped-fn-devtools-${process.env.USER || "default"}.sock`
@@ -23,10 +23,10 @@ export const createIPCServer = (config: ServerConfig = {}) => {
       for (const line of lines) {
         if (line.startsWith("HANDSHAKE:")) {
           const handshake = JSON.parse(line.slice(10)) as IPCTransport.Handshake
-          config.onHandshake?.(handshake)
+          config.onHandshake?.(socket, handshake)
         } else if (line.startsWith("MESSAGE:")) {
           const msg = JSON.parse(line.slice(8)) as Transport.Message
-          config.onMessage?.(msg)
+          config.onMessage?.(socket, msg)
         }
       }
     })
