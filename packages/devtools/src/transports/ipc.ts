@@ -8,10 +8,14 @@ export const createIPCTransport = (
 ): Transport.Transport => {
   const socketPath = config.socketPath ?? DEFAULT_SOCKET_PATH
   const retryInterval = config.retryInterval ?? 5000
+  const bufferSize = config.bufferSize ?? 100
+  const bufferStrategy = config.bufferStrategy ?? "drop-old"
+
   let socket: net.Socket | null = null
   let connected = false
   let errorLogged = false
   let retryTimer: NodeJS.Timeout | null = null
+  const messageBuffer: Transport.Message[] = []
 
   const connect = () => {
     try {
@@ -31,6 +35,13 @@ export const createIPCTransport = (
           timestamp: Date.now()
         }
         socket?.write(`HANDSHAKE:${JSON.stringify(handshake)}\n`)
+
+        while (messageBuffer.length > 0) {
+          const msg = messageBuffer.shift()
+          if (msg) {
+            socket?.write(`MESSAGE:${JSON.stringify(msg)}\n`)
+          }
+        }
       })
 
       socket.on("error", (err) => {
@@ -70,6 +81,15 @@ export const createIPCTransport = (
     emit: (msg: Transport.Message) => {
       if (connected && socket) {
         socket.write(`MESSAGE:${JSON.stringify(msg)}\n`)
+      } else {
+        if (messageBuffer.length >= bufferSize) {
+          if (bufferStrategy === "drop-old") {
+            messageBuffer.shift()
+          } else {
+            return
+          }
+        }
+        messageBuffer.push(msg)
       }
     },
     subscribe: (handler: Transport.Handler): Transport.Unsubscribe => {

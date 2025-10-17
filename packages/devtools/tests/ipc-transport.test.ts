@@ -145,4 +145,48 @@ describe("IPC Transport", () => {
 
     expect(receivedHandshakes.length).toBeGreaterThan(1)
   })
+
+  it("should buffer messages while disconnected", async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        if (fs.existsSync(socketPath)) {
+          fs.unlinkSync(socketPath)
+        }
+        resolve()
+      })
+    })
+
+    const transport = createIPCTransport({
+      socketPath,
+      bufferSize: 5,
+      retryInterval: 100
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    transport.emit({ timestamp: 1, duration: 1, operation: { kind: "resolve" as const, executor: {} as any, scope: {} as any, operation: "resolve" as const } })
+    transport.emit({ timestamp: 2, duration: 1, operation: { kind: "resolve" as const, executor: {} as any, scope: {} as any, operation: "resolve" as const } })
+
+    const receivedMessages: Transport.Message[] = []
+
+    server = net.createServer((socket) => {
+      connections.push(socket)
+      socket.on("data", (data) => {
+        const lines = data.toString().trim().split("\n")
+        for (const line of lines) {
+          if (line.startsWith("MESSAGE:")) {
+            receivedMessages.push(JSON.parse(line.slice(8)))
+          }
+        }
+      })
+    })
+
+    await new Promise<void>((resolve) => {
+      server.listen(socketPath, resolve)
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    expect(receivedMessages).toHaveLength(2)
+  })
 })
