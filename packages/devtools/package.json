@@ -34,8 +34,8 @@
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/ws": "^8.5.13",
-    "tsdown": "^0.15.4",
-    "typescript": "^5.9.2",
+    "tsdown": "^0.15.7",
+    "typescript": "^5.9.3",
     "vitest": "^1.6.1"
   },
   "engines": {

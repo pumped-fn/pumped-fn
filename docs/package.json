@@ -12,12 +12,12 @@
   },
   "devDependencies": {
     "@pumped-fn/core-next": "workspace:*",
-    "@types/node": "^20.19.17",
-    "typedoc": "^0.28.13",
+    "@types/node": "^20.19.22",
+    "typedoc": "^0.28.14",
     "typedoc-github-theme": "^0.3.1",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.21"
+    "vue": "^3.5.22"
   },
   "type": "module",
   "dependencies": {
