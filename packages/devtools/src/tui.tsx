@@ -8,7 +8,7 @@ import { FlowTimeline } from "./components/FlowTimeline"
 import { Inspector } from "./components/Inspector"
 import { type State } from "./types"
 
-const DevtoolsApp: React.FC<{ aggregator: any }> = ({ aggregator }) => {
+const DevtoolsApp: React.FC<{ aggregator: State.Aggregator }> = ({ aggregator }) => {
   const [snapshot, setSnapshot] = useState<State.Snapshot>(aggregator.getSnapshot())
 
   useEffect(() => {

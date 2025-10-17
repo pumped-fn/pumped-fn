@@ -43,4 +43,9 @@ export namespace State {
   }
 
   export type SnapshotListener = (snapshot: Snapshot) => void
+
+  export type Aggregator = {
+    getSnapshot: () => Snapshot
+    subscribe: (listener: SnapshotListener) => () => void
+  }
 }
