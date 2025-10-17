@@ -675,7 +675,7 @@ function execute<S, I>(
     details?: boolean;
   }
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  const scope = options?.scope || createScope();
+  const scope = options?.scope || createScope({ meta: options?.meta });
   const shouldDisposeScope = !options?.scope;
 
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
