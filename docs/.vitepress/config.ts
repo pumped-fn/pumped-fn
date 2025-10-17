@@ -45,10 +45,42 @@ export default withMermaid(defineConfig({
       nav: [],
 
       sidebar: [
-        { text: "Getting Started", link: "/" },
-        { text: "Graph vs Traditional", link: "/graph-vs-traditional" },
-        { text: "How It Works", link: "/how-does-it-work" },
-        { text: "Testing", link: "/testings" },
+        {
+          text: "Getting Started",
+          items: [
+            { text: "Home", link: "/" },
+            { text: "Quick Start", link: "/quick-start" },
+            { text: "Graph vs Traditional", link: "/graph-vs-traditional" },
+            { text: "How It Works", link: "/how-does-it-work" },
+          ],
+        },
+        {
+          text: "Core Concepts",
+          items: [
+            { text: "Executors and Scopes", link: "/concepts/executors-and-scopes" },
+            { text: "Flows", link: "/concepts/flows" },
+            { text: "Extensions", link: "/concepts/extensions" },
+            { text: "Multi-Executors", link: "/concepts/multi-executors" },
+            { text: "Accessors", link: "/concepts/accessors" },
+          ],
+        },
+        {
+          text: "Patterns & Best Practices",
+          items: [
+            { text: "Testing Strategies", link: "/patterns/testing-strategies" },
+            { text: "Lifecycle Management", link: "/patterns/lifecycle-management" },
+            { text: "Framework Integration", link: "/patterns/framework-integration" },
+          ],
+        },
+        {
+          text: "Decision Guides",
+          items: [
+            { text: "Executors vs Flows", link: "/decisions/executors-vs-flows" },
+            { text: "Lazy vs Reactive", link: "/decisions/lazy-vs-reactive" },
+            { text: "Graph Design", link: "/decisions/graph-design" },
+            { text: "Anti-Patterns", link: "/decisions/anti-patterns" },
+          ],
+        },
         {
           text: "API Reference",
           items: [
@@ -64,7 +96,7 @@ export default withMermaid(defineConfig({
           text: "Guides",
           items: [
             { text: "Component Authoring", link: "/authoring" },
-            { text: "LLM Integration", link: "/llm" },
+            { text: "LLM Integration", link: "/llm-guide" },
           ],
         },
       ],
