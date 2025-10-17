@@ -376,8 +376,13 @@ await scope.dispose() // triggers all cleanup functions
 ```typescript
 import { Promised } from "@pumped-fn/core-next"
 
-// Wrap async operations
-const result = await Promised.try(async () => {
+// Preferred: Use Promised.create() static method
+const result = await Promised.create(fetchData())
+  .map(data => transformData(data))
+  .mapError(err => new CustomError(err))
+
+// Or use Promised.try() for sync/async functions
+const result2 = await Promised.try(async () => {
   return await fetchData()
 })
   .map(data => transformData(data))
@@ -389,7 +394,27 @@ scope.resolve(executor)
   .mapError(err => handleError(err))
 ```
 
-**Promised API:** Read dist/index.d.ts:2-50 for complete method list
+**Promised API:** Read dist/index.d.ts for complete method list
+
+**Promised Settled Utilities (Advanced):**
+```typescript
+// Work with parallel results
+const results = await scope.exec(flow({
+  handler: async (ctx) => {
+    const promises = items.map(item => ctx.run(`process-${item.id}`, () => process(item)))
+    return ctx.parallelSettled(promises)
+  }
+}), undefined)
+
+// Extract only successful results
+const successful = await results.fulfilled()
+
+// Partition into fulfilled/rejected
+const { fulfilled, rejected } = await results.partition()
+
+// Assert all succeeded or throw
+const allValues = await results.assertAllFulfilled()
+```
 
 ## API Verification Protocol
 
@@ -402,40 +427,45 @@ packages/next/dist/index.d.ts
 
 **Find exact signatures by namespace:**
 
-- `Core.*` (lines 141-273)
-  - `Core.Executor<T>`, `Core.Scope`, `Core.Pod`, `Core.Accessor<T>`
+- `Core.*`
+  - `Core.Executor<T>`, `Core.Scope`, `Core.Accessor<T>`
   - `Core.Controller`, `Core.Preset<T>`
 
-- `Flow.*` (lines 287-367)
-  - `Flow.Context`, `Flow.Handler<S, I>`, `Flow.Definition<S, I>`
+- `Flow.*`
+  - `Flow.Context`, `Flow.Handler<S, I>`, `Flow.Definition<S, I>`, `Flow.Flow<I, O>`
   - Flow execution, parallel operations
 
-- `Extension.*` (lines 368-418)
+- `Extension.*`
   - `Extension.Extension`, `Extension.Operation`
-  - Lifecycle hooks: `init`, `wrap`, `dispose`
+  - Lifecycle hooks: `init`, `wrap`, `dispose`, `onError`
 
-- `Multi.*` (lines 443-457)
+- `Multi.*`
   - `Multi.MultiExecutor<T, K>`, `Multi.Option<K>`
 
-- `Accessor.*` (lines 419-442)
+- `Accessor.*`
   - `Accessor.Accessor<T>`, `Accessor.DataStore`
   - Used in flow context operations
 
-- `Promised` (lines 2-50)
+- `Promised`
   - Extended promise: `map`, `switch`, `mapError`, `partition`, etc.
+  - Settled utilities: `fulfilled`, `rejected`, `firstFulfilled`, `assertAllFulfilled`
 
 **Example lookup:**
 
 ```typescript
-// Unsure about scope.pod() signature?
-// Read dist/index.d.ts:251-256
+// Unsure about scope.exec() signature?
+// Read dist/index.d.ts and search for "exec"
 
-pod(...presets: Preset<unknown>[]): Pod;
-pod(options: {
-  initialValues?: Preset<unknown>[];
-  extensions?: Extension.Extension[];
-  meta?: Meta.Meta[];
-}): Pod;
+exec<S, I = undefined>(
+  flow: Core.Executor<Flow.Handler<S, I>>,
+  input?: I,
+  options?: {
+    extensions?: Extension.Extension[];
+    initialContext?: Array<[Accessor.Accessor<any>, any]>;
+    presets?: Preset<unknown>[];
+    meta?: Meta.Meta[];
+  }
+): Promised<S>;
 ```
 
 ## Decision Tree: When to Read Advanced Sections
@@ -443,9 +473,10 @@ pod(options: {
 ```
 Need conditional resolution? → Read "Advanced: Accessors"
 Need per-key instances? → Read "Advanced: Multi-Executors"
-Need short-lived operations? → Read "Advanced: Flows & Pods"
+Need short-lived operations? → Read "Advanced: Flows"
 Need cross-cutting concerns? → Read "Advanced: Extensions"
-Unsure about API signature? → Read dist/index.d.ts (line numbers above)
+Working with parallel results? → Read "Promised Settled Utilities" (above)
+Unsure about API signature? → Read dist/index.d.ts
 ```
 
 ---
@@ -624,12 +655,12 @@ await sessionStore.release(scope)
 
 ---
 
-# Advanced: Flows & Pods
+# Advanced: Flows
 
 **When to use:**
 - **Flows** - Short-lived operations (request handling, workflows)
-- **Pods** - Isolated execution context, forks scope state
-- **Flow Context** - Request-scoped data storage
+- **Flow Context** - Request-scoped data storage and sub-flow execution
+- **Flow Execution** - Execute flows directly on scope with isolated context
 
 ## Pattern: Basic Flow
 
@@ -740,28 +771,37 @@ const createUser = flow({
 })
 ```
 
-## Pattern: Pod (Isolated Execution)
+## Pattern: Flow Execution Options
 
 ```typescript
 const database = provide(() => new Database())
 const cache = provide(() => new Cache())
 
 const scope = createScope()
-await scope.resolve(database) // resolved in scope
 
-// Pod forks scope state
-const pod = scope.pod()
-const dbInPod = await pod.resolve(database) // reuses scope's database
-const cacheInPod = await pod.resolve(cache) // isolated to pod
+// Execute flow with custom presets and meta
+const processFlow = flow({
+  name: "processData",
+  handler: async (ctx, input) => {
+    const db = await ctx.scope.resolve(database)
+    const c = await ctx.scope.resolve(cache)
+    return processData(db, c, input)
+  }
+})
 
-await scope.disposePod(pod) // cleanup pod, scope unaffected
+const result = await scope.exec(processFlow, { id: "123" }, {
+  presets: [preset(cache, mockCache)],
+  meta: [customMeta("value")]
+})
+// Flow cleanup is automatic
 ```
 
 ## Flow Context API
 
 ```typescript
 interface Flow.Context {
-  readonly pod: Core.Pod
+  readonly scope: Core.Scope
+  readonly metas: Meta.Meta[] | undefined
 
   get<T>(accessor: Accessor.Accessor<T>): T
   find<T>(accessor: Accessor.Accessor<T>): T | undefined
@@ -775,7 +815,11 @@ interface Flow.Context {
 }
 ```
 
-**Full reference:** dist/index.d.ts:287-367, 503-583
+**Key properties:**
+- `scope` - Access parent scope for resolving executors
+- `metas` - Flow-specific metadata passed via exec options
+
+**Full reference:** dist/index.d.ts (search for "Flow.Context")
 
 ---
 
@@ -846,11 +890,6 @@ const errorHandler = extension({
     reportError(error)
   },
 
-  onPodError: (error, pod, ctx) => {
-    // Handle pod-level errors
-    reportPodError(error)
-  },
-
   wrap: async (ctx, next, op) => {
     try {
       return await next()
@@ -865,33 +904,30 @@ const errorHandler = extension({
 ## Pattern: Transaction Management
 
 ```typescript
+const transactionKey = accessor("transaction", z.any())
+
 const transaction = extension({
   name: "transaction",
 
-  initPod: async (pod, ctx) => {
-    const db = await pod.resolve(database)
-    const tx = await db.beginTransaction()
-    ctx.set(transactionKey, tx)
-  },
-
   wrap: async (ctx, next, op) => {
     if (op.kind === "execute") {
-      try {
-        const result = await next()
-        const tx = ctx.get(transactionKey)
-        await tx.commit()
-        return result
-      } catch (error) {
-        const tx = ctx.get(transactionKey)
-        await tx.rollback()
-        throw error
+      // Initialize transaction for flow execution
+      const db = await op.definition.scope?.resolve(database)
+      if (db) {
+        const tx = await db.beginTransaction()
+        ctx.set(transactionKey, tx)
+
+        try {
+          const result = await next()
+          await tx.commit()
+          return result
+        } catch (error) {
+          await tx.rollback()
+          throw error
+        }
       }
     }
     return next()
-  },
-
-  disposePod: async (pod) => {
-    // Cleanup transaction resources
   }
 })
 ```
@@ -930,10 +966,6 @@ interface Extension {
   init?(scope: Core.Scope): void | Promise<void> | Promised<void>
   dispose?(scope: Core.Scope): void | Promise<void> | Promised<void>
 
-  // Pod lifecycle
-  initPod?(pod: Core.Pod, context: Accessor.DataStore): void | Promise<void>
-  disposePod?(pod: Core.Pod): void | Promise<void> | Promised<void>
-
   // Intercept operations
   wrap?<T>(
     context: Accessor.DataStore,
@@ -943,7 +975,6 @@ interface Extension {
 
   // Error handling
   onError?(error: ExecutorResolutionError, scope: Core.Scope): void
-  onPodError?(error: unknown, pod: Core.Pod, context: Accessor.DataStore): void
 }
 
 type Operation =
@@ -954,9 +985,17 @@ type Operation =
   | { kind: "parallel"; mode: "parallel" | "parallelSettled"; ... }
 ```
 
+**Lifecycle hooks:**
+- `init` - Called once when scope is created
+- `dispose` - Called once when scope is disposed
+- `wrap` - Called for every operation (resolve, execute, etc.)
+- `onError` - Called when errors occur in scope
+
+**Extension API accepts both Promise and Promised types for ergonomics**
+
 **Wrapping order:** Last registered extension wraps all previous ones
 
-**Full reference:** dist/index.d.ts:368-418, 585-586
+**Full reference:** dist/index.d.ts (search for "Extension.Extension")
 
 ---
 

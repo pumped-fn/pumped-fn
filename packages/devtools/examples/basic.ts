@@ -1,6 +1,5 @@
 import { createScope, provide, derive, flow, name } from "@pumped-fn/core-next"
 import { createDevtoolsExtension, tuiExecutor } from "../src/index"
-import { z } from "zod"
 
 const logger = provide(() => ({
   info: (msg: string) => console.log(`[INFO] ${msg}`)
@@ -13,15 +12,9 @@ const database = derive([logger], ([log]) => ({
   }
 }), name("database"))
 
-const userFlow = flow({
-  name: "createUser",
-  input: z.object({ name: z.string() }),
-  output: z.object({ id: z.string() }),
-  dependencies: [database],
-  handler: async ([db], ctx, input) => {
-    await db.query(`INSERT INTO users (name) VALUES ('${input.name}')`)
-    return { id: "user-123" }
-  }
+const userFlow = flow({ database }, async ({ database: db }, ctx, input: { name: string }) => {
+  await db.query(`INSERT INTO users (name) VALUES ('${input.name}')`)
+  return { id: "user-123" }
 })
 
 const devtoolsExt = createDevtoolsExtension()
