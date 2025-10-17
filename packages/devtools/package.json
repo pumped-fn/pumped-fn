@@ -1,0 +1,45 @@
+{
+  "name": "@pumped-fn/devtools",
+  "version": "0.1.0",
+  "description": "Development tools for pumped-fn applications",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit --project tsconfig.test.json"
+  },
+  "dependencies": {
+    "@pumped-fn/core-next": "workspace:*",
+    "ink": "^5.0.1",
+    "react": "^18.3.1",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/ws": "^8.5.13",
+    "tsdown": "^0.15.4",
+    "typescript": "^5.9.2",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
