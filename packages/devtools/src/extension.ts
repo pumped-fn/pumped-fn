@@ -1,8 +1,13 @@
 import { extension, createScope, type Extension } from "@pumped-fn/core-next"
 import { transportExecutor } from "./transport"
-import { type Transport } from "./types"
+import { createTransport } from "./transports/in-memory"
+import { createIPCTransport } from "./transports/ipc"
+import { type Transport, type IPCTransport } from "./types"
 
 export type DevtoolsConfig = {
+  transport?: "in-memory" | "ipc"
+  transportConfig?: IPCTransport.Config
+  scopeName?: string
   onMessage?: (msg: Transport.Message) => void
 }
 
@@ -12,8 +17,17 @@ export const createDevtoolsExtension = (config?: DevtoolsConfig): Extension.Exte
 
   const ensureTransport = async () => {
     if (!transport) {
-      devtoolsScope = createScope()
-      transport = await devtoolsScope.resolve(transportExecutor)
+      const transportType = config?.transport ?? "in-memory"
+
+      if (transportType === "ipc") {
+        transport = createIPCTransport({
+          ...config?.transportConfig,
+          scopeName: config?.scopeName
+        })
+      } else {
+        devtoolsScope = createScope()
+        transport = await devtoolsScope.resolve(transportExecutor)
+      }
 
       if (config?.onMessage) {
         transport.subscribe(config.onMessage)

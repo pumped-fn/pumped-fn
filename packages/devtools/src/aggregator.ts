@@ -1,8 +1,8 @@
 import { derive, name } from "@pumped-fn/core-next"
 import { transportExecutor } from "./transport"
-import { type State } from "./types"
+import { type State, type Transport } from "./types"
 
-export const stateAggregatorExecutor = derive([transportExecutor], ([transport]) => {
+export const createStateAggregator = () => {
   const snapshot: State.Snapshot = {
     executors: new Map(),
     flows: new Map(),
@@ -18,7 +18,7 @@ export const stateAggregatorExecutor = derive([transportExecutor], ([transport])
     listeners.forEach(l => l(snapshot))
   }
 
-  transport.subscribe((msg) => {
+  const process = (msg: Transport.Message) => {
     if (msg.operation.kind === "resolve") {
       const executorId = msg.operation.executor.toString()
       snapshot.executors.set(executorId, {
@@ -78,9 +78,10 @@ export const stateAggregatorExecutor = derive([transportExecutor], ([transport])
       })
       notify()
     }
-  })
+  }
 
   return {
+    process,
     getSnapshot: () => snapshot,
     subscribe: (listener: State.SnapshotListener) => {
       listeners.push(listener)
@@ -92,4 +93,10 @@ export const stateAggregatorExecutor = derive([transportExecutor], ([transport])
       }
     }
   }
+}
+
+export const stateAggregatorExecutor = derive([transportExecutor], ([transport]) => {
+  const aggregator = createStateAggregator()
+  transport.subscribe(aggregator.process)
+  return aggregator
 }, name("stateAggregator"))

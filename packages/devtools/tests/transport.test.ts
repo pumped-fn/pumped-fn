@@ -1,6 +1,39 @@
 import { describe, it, expect, vi } from "vitest"
 import { createScope } from "@pumped-fn/core-next"
 import { transportExecutor } from "../src/transport"
+import { type Transport } from "../src/types"
+
+describe("Transport Interface", () => {
+  it("should satisfy Transport interface contract", async () => {
+    const scope = createScope()
+    const transport = await scope.resolve(transportExecutor)
+
+    expect(transport).toHaveProperty("emit")
+    expect(transport).toHaveProperty("subscribe")
+    expect(typeof transport.emit).toBe("function")
+    expect(typeof transport.subscribe).toBe("function")
+
+    await scope.dispose()
+  })
+
+  it("should create transport via executor", async () => {
+    const scope = createScope()
+    const transport = await scope.resolve(transportExecutor)
+    const messages: Transport.Message[] = []
+
+    transport.subscribe(msg => messages.push(msg))
+
+    transport.emit({
+      timestamp: Date.now(),
+      duration: 5,
+      operation: { kind: "resolve", executorId: "test" }
+    })
+
+    expect(messages).toHaveLength(1)
+
+    await scope.dispose()
+  })
+})
 
 describe("Transport", () => {
   it("should emit messages to subscribers", async () => {
