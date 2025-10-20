@@ -118,3 +118,41 @@ describe("Tag Callable Creation", () => {
     expect(() => emailTag()).toThrow("Value required");
   });
 });
+
+describe("Tag Entry Method", () => {
+  test("entry creates symbol-value tuple", () => {
+    const emailTag = tag(custom<string>());
+    const [key, value] = emailTag.entry("test@example.com");
+
+    expect(key).toBe(emailTag.key);
+    expect(value).toBe("test@example.com");
+  });
+
+  test("entry with default can omit value", () => {
+    const portTag = tag(custom<number>(), { default: 3000 });
+    const [key, value] = portTag.entry();
+
+    expect(key).toBe(portTag.key);
+    expect(value).toBe(3000);
+  });
+
+  test("entry with default can override default", () => {
+    const portTag = tag(custom<number>(), { default: 3000 });
+    const [, value] = portTag.entry(8080);
+
+    expect(value).toBe(8080);
+  });
+
+  test("entry without default throws when called without value", () => {
+    const emailTag = tag(custom<string>()) as Tag.Tag<string, true>;
+
+    expect(() => emailTag.entry()).toThrow();
+  });
+
+  test("entry can initialize Map", () => {
+    const portTag = tag(custom<number>(), { default: 3000 });
+    const store = new Map([portTag.entry()]);
+
+    expect(portTag.get(store)).toBe(3000);
+  });
+});
