@@ -9,7 +9,6 @@ import {
 import {
   Core,
   Extension,
-  Meta,
   ExecutorResolutionError,
   FactoryExecutionError,
   DependencyResolutionError,
@@ -39,7 +38,7 @@ interface ReplacerResult {
 }
 
 class AccessorImpl implements Core.Accessor<unknown> {
-  public metas: Meta.Meta[] | undefined;
+  public tags: import("./tag-types").Tag.Tagged[] | undefined;
   private scope: BaseScope;
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
@@ -47,10 +46,10 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private cachedResolvedPromised: Promised<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
-  constructor(scope: BaseScope, requestor: UE, metas: Meta.Meta[] | undefined) {
+  constructor(scope: BaseScope, requestor: UE, tags: import("./tag-types").Tag.Tagged[] | undefined) {
     this.scope = scope;
     this.requestor = requestor;
-    this.metas = metas;
+    this.tags = tags;
 
     this.resolve = this.createResolveFunction();
 
@@ -438,7 +437,7 @@ class BaseScope implements Core.Scope {
   private reversedExtensions: Extension.Extension[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
-  public metas: Meta.Meta[] | undefined;
+  public tags: import("./tag-types").Tag.Tagged[] | undefined;
 
   private static readonly emptyDataStore: import("./tag-types").Tag.Store = {
     get: () => undefined,
@@ -454,8 +453,8 @@ class BaseScope implements Core.Scope {
       this.initialValues = options.initialValues;
     }
 
-    if (options?.meta) {
-      this.metas = options.meta;
+    if (options?.tags) {
+      this.tags = options.tags;
     }
 
     if (options?.extensions) {
@@ -689,7 +688,7 @@ class BaseScope implements Core.Scope {
       return cachedAccessor.accessor;
     }
 
-    const accessor = new AccessorImpl(this, requestor, e.metas);
+    const accessor = new AccessorImpl(this, requestor, e.tags);
     return accessor;
   }
 
@@ -993,7 +992,7 @@ class BaseScope implements Core.Scope {
         [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
-      meta?: Meta.Meta[];
+      tags?: import("./tag-types").Tag.Tagged[];
       details?: false;
     }
   ): Promised<S>;
@@ -1007,7 +1006,7 @@ class BaseScope implements Core.Scope {
         [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
-      meta?: Meta.Meta[];
+      tags?: import("./tag-types").Tag.Tagged[];
       details: true;
     }
   ): Promised<Flow.ExecutionDetails<S>>;
@@ -1021,7 +1020,7 @@ class BaseScope implements Core.Scope {
         [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
-      meta?: Meta.Meta[];
+      tags?: import("./tag-types").Tag.Tagged[];
       details?: boolean;
     }
   ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
@@ -1032,7 +1031,7 @@ class BaseScope implements Core.Scope {
         scope: this,
         extensions: options.extensions,
         initialContext: options.initialContext,
-        meta: options.meta,
+        tags: options.tags,
         details: true,
       });
     }
@@ -1041,7 +1040,7 @@ class BaseScope implements Core.Scope {
       scope: this,
       extensions: options?.extensions,
       initialContext: options?.initialContext,
-      meta: options?.meta,
+      tags: options?.tags,
       details: false,
     });
   }
@@ -1051,7 +1050,7 @@ export type ScopeOption = {
   initialValues?: Core.Preset<unknown>[];
   registry?: Core.Executor<unknown>[];
   extensions?: Extension.Extension[];
-  meta?: Meta.Meta[];
+  tags?: import("./tag-types").Tag.Tagged[];
 };
 
 export function createScope(): Core.Scope;
