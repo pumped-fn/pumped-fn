@@ -61,6 +61,79 @@ function write<T>(
   store.set(key, validated);
 }
 
+class TagImpl<T, HasDefault extends boolean = false> {
+  public readonly key: symbol;
+  public readonly schema: StandardSchemaV1<T>;
+  public readonly label?: string;
+  public readonly default: HasDefault extends true ? T : never;
+
+  constructor(
+    schema: StandardSchemaV1<T>,
+    options?: { label?: string; default?: T }
+  ) {
+    this.label = options?.label;
+    this.key = options?.label ? Symbol.for(options.label) : Symbol();
+    this.schema = schema;
+    this.default = (options?.default ?? (undefined as never)) as HasDefault extends true
+      ? T
+      : never;
+  }
+
+  get(source: Tag.Source): T {
+    const value = extract(source, this.key, this.schema);
+    if (value === undefined) {
+      if (this.default !== undefined) {
+        return this.default as T;
+      }
+      throw new Error(`Value not found for key: ${this.key.toString()}`);
+    }
+    return value;
+  }
+
+  find(source: Tag.Source): HasDefault extends true ? T : T | undefined {
+    const value = extract(source, this.key, this.schema);
+    return (value !== undefined ? value : (this.default as T | undefined)) as HasDefault extends true ? T : T | undefined;
+  }
+
+  some(source: Tag.Source): T[] {
+    return collect(source, this.key, this.schema);
+  }
+
+  set(target: Tag.Store, value: T): void;
+  set(target: Tag.Container | Tag.Tagged[], value: T): Tag.Tagged<T>;
+  set(target: Tag.Source, value: T): void | Tag.Tagged<T> {
+    if (isStore(target)) {
+      write(target, this.key, this.schema, value);
+      return;
+    }
+
+    const validated = validate(this.schema, value);
+    return {
+      [tagSymbol]: true,
+      key: this.key,
+      schema: this.schema,
+      value: validated,
+    };
+  }
+
+  entry(value?: T): [symbol, T] {
+    const val = value !== undefined ? value : this.default;
+    if (val === undefined) {
+      throw new Error("Value required for entry without default");
+    }
+    const validated = validate(this.schema, val);
+    return [this.key, validated];
+  }
+
+  toString(): string {
+    return this.label ? `Tag(${this.label})` : `Tag(${this.key.toString()})`;
+  }
+
+  get [Symbol.toStringTag](): string {
+    return this.label ? `Tag<${this.label}>` : "Tag<anonymous>";
+  }
+}
+
 export function tag<T>(schema: StandardSchemaV1<T>): Tag.Tag<T, false>;
 export function tag<T>(
   schema: StandardSchemaV1<T>,
@@ -74,5 +147,52 @@ export function tag<T>(
   schema: StandardSchemaV1<T>,
   options?: { label?: string; default?: T }
 ): Tag.Tag<T, boolean> {
-  throw new Error("Not implemented");
+  const impl = new TagImpl<T, boolean>(schema, options);
+
+  const fn = ((value?: T) => {
+    const val = value !== undefined ? value : impl.default;
+    if (val === undefined) {
+      throw new Error("Value required for tag without default");
+    }
+    const validated = validate(schema, val);
+    return {
+      [tagSymbol]: true,
+      key: impl.key,
+      schema: impl.schema,
+      value: validated,
+    };
+  }) as Tag.Tag<T, boolean>;
+
+  Object.defineProperty(fn, "key", {
+    value: impl.key,
+    writable: false,
+    configurable: false,
+  });
+  Object.defineProperty(fn, "schema", {
+    value: impl.schema,
+    writable: false,
+    configurable: false,
+  });
+  Object.defineProperty(fn, "label", {
+    value: impl.label,
+    writable: false,
+    configurable: false,
+  });
+  Object.defineProperty(fn, "default", {
+    value: impl.default,
+    writable: false,
+    configurable: false,
+  });
+
+  fn.get = impl.get.bind(impl);
+  fn.find = impl.find.bind(impl);
+  fn.some = impl.some.bind(impl);
+  fn.set = impl.set.bind(impl) as typeof impl.set;
+  fn.entry = impl.entry.bind(impl);
+  fn.toString = impl.toString.bind(impl);
+  Object.defineProperty(fn, Symbol.toStringTag, {
+    get: () => impl[Symbol.toStringTag],
+  });
+
+  return fn;
 }
