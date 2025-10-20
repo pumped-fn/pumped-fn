@@ -1,4 +1,4 @@
-import type { Core, Extension, Flow, Meta, StandardSchemaV1 } from "./types";
+import type { Core, Extension, Flow, StandardSchemaV1 } from "./types";
 import { createExecutor, isExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
@@ -38,7 +38,7 @@ function wrapWithExtensions<T>(
 
 const flowDefinitionMeta = tag(custom<Flow.Definition<any, any>>(), {
   label: "flow.definition",
-}) as Meta.MetaFn<Flow.Definition<any, any>>;
+});
 
 export const flowMeta: {
   depth: Tag.Tag<number, true>;
@@ -60,7 +60,7 @@ class FlowDefinition<S, I> {
     public readonly version: string,
     public readonly input: StandardSchemaV1<I>,
     public readonly output: StandardSchemaV1<S>,
-    public readonly metas: Meta.Meta[] = []
+    public readonly tags: Tag.Tagged[] = []
   ) {}
 
   handler(
@@ -96,7 +96,7 @@ class FlowDefinition<S, I> {
           return flowHandler as Flow.Handler<S, I>;
         },
         undefined,
-        [...this.metas, flowDefinitionMeta(this)]
+        [...this.tags, flowDefinitionMeta(this)]
       ) as Flow.Flow<I, S>;
       executor.definition = this;
       return executor;
@@ -112,7 +112,7 @@ class FlowDefinition<S, I> {
         return flowHandler as Flow.Handler<S, I>;
       },
       dependencies,
-      [...this.metas, flowDefinitionMeta(this)]
+      [...this.tags, flowDefinitionMeta(this)]
     ) as Flow.Flow<I, S>;
     executor.definition = this;
     return executor;
@@ -124,7 +124,7 @@ type DefineConfig<S, I> = {
   version?: string;
   input: StandardSchemaV1<I>;
   output: StandardSchemaV1<S>;
-  meta?: Meta.Meta[];
+  tags?: Tag.Tagged[];
 };
 
 type FlowConfigWithHandler<S, I> = DefineConfig<S, I> & {
@@ -148,7 +148,7 @@ type FlowConfigInferred<S, I> = {
   version?: string;
   input?: StandardSchemaV1<I>;
   output?: StandardSchemaV1<S>;
-  meta?: Meta.Meta[];
+  tags?: Tag.Tagged[];
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
 };
 
@@ -157,7 +157,7 @@ type FlowConfigInferredWithDeps<S, I, D extends Core.DependencyLike> = {
   version?: string;
   input?: StandardSchemaV1<I>;
   output?: StandardSchemaV1<S>;
-  meta?: Meta.Meta[];
+  tags?: Tag.Tagged[];
   dependencies: D;
   handler: (
     deps: Core.InferOutput<D>,
@@ -172,7 +172,7 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
     config.version || "1.0.0",
     config.input,
     config.output,
-    config.meta
+    config.tags
   );
 }
 
@@ -181,17 +181,17 @@ class FlowContext implements Flow.Context {
   private journal: Map<string, unknown> | null = null;
   public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
-  public readonly metas: Meta.Meta[] | undefined;
+  public readonly tags: Tag.Tagged[] | undefined;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
-    meta?: Meta.Meta[],
+    tags?: Tag.Tagged[],
     private parent?: FlowContext
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
-    this.metas = meta;
+    this.tags = tags;
   }
 
   resolve<T>(executor: Core.Executor<T>): Promised<T> {
@@ -245,8 +245,8 @@ class FlowContext implements Flow.Context {
     if (this.contextData.has(key)) {
       return this.contextData.get(key);
     }
-    if (this.metas && typeof key === "symbol") {
-      const tagged = this.metas.find((m: Meta.Meta) => m.key === key);
+    if (this.tags && typeof key === "symbol") {
+      const tagged = this.tags.find((m: Tag.Tagged) => m.key === key);
       if (tagged) {
         return tagged.value;
       }
@@ -612,7 +612,7 @@ class FlowContext implements Flow.Context {
       set: (_key: unknown, _value: unknown) => {
         throw new Error("Cannot set values on execution snapshot");
       },
-      metas: this.metas,
+      tags: this.tags,
     };
 
     return {
@@ -635,8 +635,8 @@ function execute<S, I>(
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
     initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeMeta?: Meta.Meta[];
-    meta?: Meta.Meta[];
+    scopeTags?: Tag.Tagged[];
+    tags?: Tag.Tagged[];
     details: true;
   }
 ): Promised<Flow.ExecutionDetails<S>>;
@@ -648,8 +648,8 @@ function execute<S, I>(
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
     initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeMeta?: Meta.Meta[];
-    meta?: Meta.Meta[];
+    scopeTags?: Tag.Tagged[];
+    tags?: Tag.Tagged[];
     details?: false;
   }
 ): Promised<S>;
@@ -661,12 +661,12 @@ function execute<S, I>(
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
     initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeMeta?: Meta.Meta[];
-    meta?: Meta.Meta[];
+    scopeTags?: Tag.Tagged[];
+    tags?: Tag.Tagged[];
     details?: boolean;
   }
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  const scope = options?.scope || createScope({ meta: options?.scopeMeta });
+  const scope = options?.scope || createScope({ tags: options?.scopeTags });
   const shouldDisposeScope = !options?.scope;
 
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
@@ -677,7 +677,7 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
-    const context = new FlowContext(scope, options?.extensions || [], options?.meta);
+    const context = new FlowContext(scope, options?.extensions || [], options?.tags);
 
     try {
       if (options?.initialContext) {
@@ -890,7 +890,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       version: definition.version,
       input: hasInput ? definition.input! : custom<I>(),
       output: hasOutput ? definition.output! : custom<S>(),
-      meta: definition.meta,
+      tags: definition.tags,
     });
 
     return def.handler(dependencies, handlerFn);
@@ -927,7 +927,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       version: config.version,
       input: hasInput ? config.input! : custom<I>(),
       output: hasOutput ? config.output! : custom<S>(),
-      meta: config.meta,
+      tags: config.tags,
     });
 
     if ("dependencies" in config) {
@@ -956,7 +956,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     version: definition.version,
     input: hasInput ? definition.input! : custom<I>(),
     output: hasOutput ? definition.output! : custom<S>(),
-    meta: definition.meta,
+    tags: definition.tags,
   });
 
   if (!dependenciesOrHandler) {
