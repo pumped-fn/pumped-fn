@@ -61,6 +61,39 @@ function write<T>(
   store.set(key, validated);
 }
 
+function createTagged<T>(
+  key: symbol,
+  schema: StandardSchemaV1<T>,
+  value: T,
+  label?: string
+): Tag.Tagged<T> {
+  const tagged: Tag.Tagged<T> = {
+    [tagSymbol]: true,
+    key,
+    schema,
+    value,
+    toString() {
+      const keyStr = label || key.toString();
+      return `${keyStr}=${JSON.stringify(value)}`;
+    },
+    get [Symbol.toStringTag]() {
+      return "Tagged";
+    },
+  };
+
+  Object.defineProperty(tagged, Symbol.for("nodejs.util.inspect.custom"), {
+    value: function (depth: number, opts: { stylize?: (str: string, style: string) => string }) {
+      const keyStr = label || "anonymous";
+      const valueStr = opts.stylize
+        ? opts.stylize(JSON.stringify(value), "string")
+        : JSON.stringify(value);
+      return `Tagged { ${keyStr}: ${valueStr} }`;
+    },
+  });
+
+  return tagged;
+}
+
 class TagImpl<T, HasDefault extends boolean = false> {
   public readonly key: symbol;
   public readonly schema: StandardSchemaV1<T>;
@@ -108,12 +141,7 @@ class TagImpl<T, HasDefault extends boolean = false> {
     }
 
     const validated = validate(this.schema, value);
-    return {
-      [tagSymbol]: true,
-      key: this.key,
-      schema: this.schema,
-      value: validated,
-    };
+    return createTagged(this.key, this.schema, validated, this.label);
   }
 
   entry(value?: T): [symbol, T] {
@@ -131,6 +159,10 @@ class TagImpl<T, HasDefault extends boolean = false> {
 
   get [Symbol.toStringTag](): string {
     return this.label ? `Tag<${this.label}>` : "Tag<anonymous>";
+  }
+
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return this.label ? `Tag { ${this.label} }` : "Tag { anonymous }";
   }
 }
 
@@ -155,12 +187,7 @@ export function tag<T>(
       throw new Error("Value required for tag without default");
     }
     const validated = validate(schema, val);
-    return {
-      [tagSymbol]: true,
-      key: impl.key,
-      schema: impl.schema,
-      value: validated,
-    };
+    return createTagged(impl.key, impl.schema, validated, impl.label);
   }) as Tag.Tag<T, boolean>;
 
   Object.defineProperty(fn, "key", {
@@ -192,6 +219,10 @@ export function tag<T>(
   fn.toString = impl.toString.bind(impl);
   Object.defineProperty(fn, Symbol.toStringTag, {
     get: () => impl[Symbol.toStringTag],
+  });
+  const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
+  Object.defineProperty(fn, inspectSymbol, {
+    value: (impl as any)[inspectSymbol].bind(impl),
   });
 
   return fn;

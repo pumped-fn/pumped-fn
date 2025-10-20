@@ -13,6 +13,8 @@ export declare namespace Tag {
     readonly key: symbol;
     readonly schema: StandardSchemaV1<T>;
     readonly value: T;
+    toString(): string;
+    readonly [Symbol.toStringTag]: string;
   }
 
   export interface Container {

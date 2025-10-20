@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { tag } from "../src/tag";
 import { custom } from "../src/ssch";
 import { tagSymbol, type Tag } from "../src/tag-types";
+import { inspect } from "util";
 
 describe("Tag System", () => {
   test("tag creates symbol-keyed accessor with schema", () => {
@@ -247,5 +248,41 @@ describe("Tag Some Method", () => {
       "test@example.com",
       "another@example.com",
     ]);
+  });
+});
+
+describe("Tag Debug Display", () => {
+  test("toString shows label for named tag", () => {
+    const portTag = tag(custom<number>(), { label: "port" });
+
+    expect(portTag.toString()).toBe("Tag(port)");
+  });
+
+  test("toString shows anonymous for nameless tag", () => {
+    const anonTag = tag(custom<string>());
+
+    expect(anonTag.toString()).toContain("Tag(");
+  });
+
+  test("Symbol.toStringTag shows label", () => {
+    const portTag = tag(custom<number>(), { label: "port" });
+
+    expect(portTag[Symbol.toStringTag]).toBe("Tag<port>");
+  });
+
+  test("Tagged value toString shows key-value", () => {
+    const portTag = tag(custom<number>(), { label: "port" });
+    const tagged = portTag(8080);
+
+    expect(tagged.toString()).toBe("port=8080");
+  });
+
+  test("Tagged value inspect shows formatted output", () => {
+    const portTag = tag(custom<number>(), { label: "port" });
+    const tagged = portTag(8080);
+
+    const output = inspect(tagged);
+    expect(output).toContain("port");
+    expect(output).toContain("8080");
   });
 });
