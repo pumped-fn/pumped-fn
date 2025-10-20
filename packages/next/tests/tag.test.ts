@@ -23,12 +23,7 @@ describe("Tag System", () => {
   test("detects Tagged array source type", () => {
     const emailTag = tag(custom<string>());
     const tagged: Tag.Tagged<string>[] = [
-      {
-        [tagSymbol]: true,
-        key: emailTag.key,
-        schema: emailTag.schema,
-        value: "test@example.com",
-      },
+      emailTag("test@example.com"),
     ];
 
     expect(emailTag.find(tagged)).toBe("test@example.com");
@@ -38,12 +33,7 @@ describe("Tag System", () => {
     const emailTag = tag(custom<string>());
     const container: Tag.Container = {
       tags: [
-        {
-          [tagSymbol]: true,
-          key: emailTag.key,
-          schema: emailTag.schema,
-          value: "test@example.com",
-        },
+        emailTag("test@example.com"),
       ],
     };
 
@@ -114,7 +104,7 @@ describe("Tag Callable Creation", () => {
   });
 
   test("tag without default throws when called without value", () => {
-    const emailTag = tag(custom<string>()) as Tag.Tag<string, true>;
+    const emailTag = tag(custom<string>()) as unknown as Tag.Tag<string, true>;
 
     expect(() => emailTag()).toThrow("Value required");
   });
@@ -145,7 +135,7 @@ describe("Tag Entry Method", () => {
   });
 
   test("entry without default throws when called without value", () => {
-    const emailTag = tag(custom<string>()) as Tag.Tag<string, true>;
+    const emailTag = tag(custom<string>()) as unknown as Tag.Tag<string, true>;
 
     expect(() => emailTag.entry()).toThrow();
   });

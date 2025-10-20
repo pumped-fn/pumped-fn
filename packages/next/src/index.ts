@@ -21,6 +21,9 @@ export { createScope, type ScopeOption } from "./scope";
 export { meta, getValue, findValue, findValues } from "./meta";
 export { accessor } from "./accessor";
 
+export { tag } from "./tag";
+export type { Tag } from "./tag-types";
+
 export { flow, flowMeta } from "./flow";
 export { Promised } from "./promises";
 
