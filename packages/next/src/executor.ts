@@ -1,4 +1,5 @@
-import { Core, executorSymbol, Meta } from "./types";
+import { Core, executorSymbol } from "./types";
+import type { Tag } from "./tag-types";
 import type { Escapable } from "./helpers";
 
 export function createExecutor<T>(
@@ -8,7 +9,7 @@ export function createExecutor<T>(
     | Core.UExecutor
     | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>,
-  metas: Meta.Meta[] | undefined
+  tags: Tag.Tagged[] | undefined
 ): Core.Executor<T> {
   const executor = {
     [executorSymbol]: "main",
@@ -22,7 +23,7 @@ export function createExecutor<T>(
       return f(_, controller);
     },
     dependencies,
-    metas: metas,
+    tags: tags,
   } as unknown as Core.Executor<T>;
 
   const lazyExecutor = {
@@ -30,7 +31,7 @@ export function createExecutor<T>(
     dependencies: undefined,
     executor,
     factory: undefined,
-    metas: metas,
+    tags: tags,
   } satisfies Core.Lazy<T>;
 
   const reactiveExecutor = {
@@ -38,14 +39,14 @@ export function createExecutor<T>(
     executor,
     factory: undefined,
     dependencies: undefined,
-    metas: metas,
+    tags: tags,
   } satisfies Core.Reactive<T>;
 
   const staticExecutor = {
     [executorSymbol]: "static",
     dependencies: undefined,
     factory: undefined,
-    metas: metas,
+    tags: tags,
     executor,
   } satisfies Core.Static<T>;
 
@@ -112,15 +113,15 @@ export function isPreset(input: unknown): input is Core.Preset<unknown> {
 
 export function provide<T>(
   factory: Core.NoDependencyFn<T>,
-  ...metas: Meta.Meta[]
+  ...tags: Tag.Tagged[]
 ): Core.Executor<T> {
-  return createExecutor(factory, undefined, metas);
+  return createExecutor(factory, undefined, tags);
 }
 
 export function derive<T, D extends Core.DependencyLike>(
   pdependencies: { [K in keyof D]: D[K] },
   pfactory: Core.DependentFn<T, Core.InferOutput<D>>,
-  ...metas: Meta.Meta[]
+  ...tags: Tag.Tagged[]
 ): Core.Executor<T> {
   const factory: Core.DependentFn<T, unknown> = (deps, ctl) =>
     pfactory(deps as Core.InferOutput<D>, ctl);
@@ -130,7 +131,7 @@ export function derive<T, D extends Core.DependencyLike>(
     | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>;
 
-  return createExecutor(factory, dependencies, metas);
+  return createExecutor(factory, dependencies, tags);
 }
 
 export function preset<T>(
