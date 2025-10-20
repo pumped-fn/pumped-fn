@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import { meta, getValue, findValue, findValues } from "../src/meta";
 import { custom, provide, derive, createScope } from "../src";
+import { tag } from "../src/tag";
 
 describe("Meta System", () => {
   describe("Basic Meta Operations", () => {
@@ -81,6 +82,42 @@ describe("Meta System", () => {
       const result = await scope.resolve(environmentAwareExecutor);
 
       expect(result).toBe("Running in test-env");
+    });
+  });
+
+  describe("Tag Migration Compatibility", () => {
+    test("tag replaces meta for basic operations", () => {
+      const nameTag = tag(custom<string>(), { label: "name" });
+      const nameMeta = meta("name", custom<string>());
+
+      const taggedValue = nameTag("test");
+      const executorWithMeta = provide(() => {}, nameMeta("test"));
+
+      expect(taggedValue.value).toBe("test");
+      expect(nameTag.find([taggedValue])).toBe("test");
+      expect(nameMeta.find(executorWithMeta)).toBe("test");
+    });
+
+    test("tag some() replaces meta some()", () => {
+      const nameTag = tag(custom<string>(), { label: "name" });
+      const nameMeta = meta("name", custom<string>());
+
+      const taggedArray = [nameTag("John"), nameTag("Jane")];
+      const metaArray = [nameMeta("John"), nameMeta("Jane")];
+
+      expect(nameTag.some(taggedArray)).toEqual(["John", "Jane"]);
+      expect(nameMeta.some(metaArray)).toEqual(["John", "Jane"]);
+    });
+
+    test("tag callable replaces meta callable", () => {
+      const nameTag = tag(custom<string>());
+      const nameMeta = meta("name", custom<string>());
+
+      const taggedValue = nameTag("test");
+      const metaValue = nameMeta("test");
+
+      expect(taggedValue.value).toBe("test");
+      expect(metaValue.value).toBe("test");
     });
   });
 });
