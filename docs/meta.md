@@ -1,49 +1,49 @@
-# Meta System - Typed Metadata Decoration
+# Tag System - Typed Metadata Decoration
 
-Meta provides type-safe metadata attachment to executors, flows, and other components without affecting their core logic. It uses StandardSchema for validation and enables powerful extension patterns.
+Tag provides type-safe metadata attachment to executors, flows, and other components without affecting their core logic. It uses StandardSchema for validation and enables powerful extension patterns.
 
 ## Core Concept
 
-Meta provides typed metadata decoration without logic inference. Components operate independently; meta decorates them for extensibility and configuration.
+Tag provides typed metadata decoration without logic inference. Components operate independently; tags decorate them for extensibility and configuration.
 
 ```typescript
-import { meta, custom, provide } from "@pumped-fn/core-next";
+import { tag, custom, provide } from "@pumped-fn/core-next";
 
-// Define meta type
-const route = meta("route", custom<{ path: string; method: string }>());
+// Define tag type
+const route = tag(custom<{ path: string; method: string }>(), { label: "route" });
 
 // Attach to executor
 const handler = provide(() => ({ process: () => "result" }), route({ path: "/api/users", method: "GET" }));
 
-// Query meta
+// Query tag
 const routeConfig = route.find(handler); // { path: "/api/users", method: "GET" } | undefined
 ```
 
 ## Core API
 
-### Meta Creation
+### Tag Creation
 
 ```typescript
-import { meta, custom } from "@pumped-fn/core-next";
+import { tag, custom } from "@pumped-fn/core-next";
 
-// Create meta function with schema
-const description = meta("description", custom<string>());
-const config = meta("config", custom<{ timeout: number; retries: number }>());
-const tags = meta("tags", custom<string[]>());
+// Create tag function with schema
+const description = tag(custom<string>(), { label: "description" });
+const config = tag(custom<{ timeout: number; retries: number }>(), { label: "config" });
+const tags = tag(custom<string[]>(), { label: "tags" });
 
-// Create meta instances
-const descMeta = description("User service for authentication");
-const configMeta = config({ timeout: 5000, retries: 3 });
-const tagsMeta = tags(["auth", "user", "api"]);
+// Create tagged instances
+const descTag = description("User service for authentication");
+const configTag = config({ timeout: 5000, retries: 3 });
+const tagsTag = tags(["auth", "user", "api"]);
 ```
 
 ### Query Methods
 
 ```typescript
-import { meta, custom, provide } from "@pumped-fn/core-next";
+import { tag, custom, provide } from "@pumped-fn/core-next";
 
-const name = meta("name", custom<string>());
-const priority = meta("priority", custom<number>());
+const name = tag(custom<string>(), { label: "name" });
+const priority = tag(custom<number>(), { label: "priority" });
 
 const service = provide(() => {}, name("auth-service"), priority(1), priority(2));
 
@@ -54,15 +54,15 @@ const allPriorities = priority.some(service);  // [1, 2] (all matches)
 const nameRequired = name.get(service);     // "auth-service" (throws if not found)
 ```
 
-### MetaContainer Interface
+### Tag.Container Interface
 
 ```typescript
-interface MetaContainer {
-  metas?: Meta.Meta[]
+interface Container {
+  tags?: Tag.Tagged[]
 }
 
-// Executors, Accessors, Flows all implement MetaContainer
-// You can attach meta to any of these types
+// Executors, Accessors, Flows all implement Tag.Container
+// You can attach tags to any of these types
 ```
 
 ## Integration Patterns
@@ -70,14 +70,14 @@ interface MetaContainer {
 ### 1. Executor Decoration
 
 ```typescript
-import { provide, derive, meta, custom, name } from "@pumped-fn/core-next";
+import { provide, derive, tag, custom, name } from "@pumped-fn/core-next";
 
-// Define meta types
-const serviceName = meta("service-name", custom<string>());
-const version = meta("version", custom<string>());
-const tags = meta("tags", custom<string[]>());
+// Define tag types
+const serviceName = tag(custom<string>(), { label: "service-name" });
+const version = tag(custom<string>(), { label: "version" });
+const tags = tag(custom<string[]>(), { label: "tags" });
 
-// Attach meta during executor creation
+// Attach tags during executor creation
 const database = provide(() => ({
   query: async (sql: string) => []
 }),
@@ -94,7 +94,7 @@ const userService = derive([database], ([db]) => ({
   tags(["business-logic", "users"])
 );
 
-// Query meta from executors
+// Query tags from executors
 const dbName = serviceName.find(database);        // "database"
 const dbVersion = version.find(database);         // "2.1.0"
 const dbTags = tags.find(database);               // ["persistence", "sql"]
@@ -102,12 +102,12 @@ const dbTags = tags.find(database);               // ["persistence", "sql"]
 
 ### 2. Executor Variants
 
-Meta is accessible from all executor variants:
+Tags are accessible from all executor variants:
 
 ```typescript
-import { provide, meta, custom } from "@pumped-fn/core-next";
+import { provide, tag, custom } from "@pumped-fn/core-next";
 
-const description = meta("description", custom<string>());
+const description = tag(custom<string>(), { label: "description" });
 const service = provide(() => "value", description("Main service"));
 
 // Access via any executor variant
@@ -123,49 +123,49 @@ const desc4 = description.find(service.reactive); // Via .reactive
 
 ```typescript
 
-import { flow, meta, custom } from "@pumped-fn/core-next";
+import { flow, tag, custom } from "@pumped-fn/core-next";
 
-// Flow-specific meta
-const apiMeta = meta("api", custom<{
+// Flow-specific tags
+const apiTag = tag(custom<{
   version: string;
   auth: boolean;
   rateLimit?: number
-}>());
+}>(), { label: "api" });
 
-const endpoint = meta("endpoint", custom<{
+const endpoint = tag(custom<{
   path: string;
   method: "GET" | "POST" | "PUT" | "DELETE"
-}>());
+}>(), { label: "endpoint" });
 
-// Attach meta to flow definitions
+// Attach tags to flow definitions
 const userFlow = flow.define({
   name: "user.create",
   input: custom<{ email: string; name: string }>(),
   success: custom<{ userId: string }>(),
   error: custom<{ code: string; message: string }>(),
 },
-  apiMeta({ version: "v1", auth: true, rateLimit: 100 }),
+  apiTag({ version: "v1", auth: true, rateLimit: 100 }),
   endpoint({ path: "/api/users", method: "POST" })
 );
 
-// Extensions can query flow meta
-const apiConfig = apiMeta.find(userFlow);     // { version: "v1", auth: true, rateLimit: 100 }
+// Extensions can query flow tags
+const apiConfig = apiTag.find(userFlow);     // { version: "v1", auth: true, rateLimit: 100 }
 const endpointInfo = endpoint.find(userFlow); // { path: "/api/users", method: "POST" }
 ```
 
 ### 4. Extension Integration
 
-Extensions can use meta for conditional behavior:
+Extensions can use tags for conditional behavior:
 
 ```typescript
 
-import { meta, custom, provide, createScope, plugin } from "@pumped-fn/core-next";
+import { tag, custom, provide, createScope, plugin } from "@pumped-fn/core-next";
 
-// Define extension-specific meta
-const monitor = meta("monitor", custom<boolean>());
-const logLevel = meta("log-level", custom<"debug" | "info" | "warn" | "error">());
+// Define extension-specific tags
+const monitor = tag(custom<boolean>(), { label: "monitor" });
+const logLevel = tag(custom<"debug" | "info" | "warn" | "error">(), { label: "log-level" });
 
-// Mark executors with meta
+// Mark executors with tags
 const criticalService = provide(() => ({
   process: () => "critical-result"
 }),
@@ -180,7 +180,7 @@ const backgroundService = provide(() => ({
   logLevel("debug")
 );
 
-// Extension uses meta for behavior
+// Extension uses tags for behavior
 const monitoringExtension = plugin({
   init: (scope) => {
     scope.onChange((event, executor, value) => {
@@ -204,22 +204,22 @@ const background = await scope.resolve(backgroundService);
 
 ## Advanced Patterns
 
-### 1. Configuration Meta
+### 1. Configuration Tags
 
-Use meta for component configuration:
+Use tags for component configuration:
 
 ```typescript
 
-import { meta, custom, provide, createScope } from "@pumped-fn/core-next";
+import { tag, custom, provide, createScope } from "@pumped-fn/core-next";
 
-// Configuration meta
-const httpConfig = meta("http-config", custom<{
+// Configuration tag
+const httpConfig = tag(custom<{
   baseUrl: string;
   timeout: number;
   retries: number;
-}>());
+}>(), { label: "http-config" });
 
-// Component uses configuration meta
+// Component uses configuration tag
 const httpClient = provide((ctl) => {
   const config = httpConfig.get(ctl.scope); // Throws if not found
 
@@ -232,9 +232,9 @@ const httpClient = provide((ctl) => {
   };
 });
 
-// Configure via scope meta
+// Configure via scope tags
 const scope = createScope({
-  meta: [httpConfig({
+  tags: [httpConfig({
     baseUrl: "https://api.example.com",
     timeout: 5000,
     retries: 3
@@ -248,21 +248,21 @@ const client = await scope.resolve(httpClient);
 
 ```typescript
 
-import { meta, custom, provide } from "@pumped-fn/core-next";
+import { tag, custom, provide } from "@pumped-fn/core-next";
 import { z } from "zod";
 
 // Runtime validation with zod
-const apiConfig = meta("api-config", z.object({
+const apiConfig = tag(z.object({
   version: z.string().regex(/^v\d+$/),
   deprecated: z.boolean().optional(),
   maintainer: z.string().email()
-}));
+}), { label: "api-config" });
 
-const documentation = meta("docs", custom<{
+const documentation = tag(custom<{
   description: string;
   examples?: string[];
   since?: string;
-}>());
+}>(), { label: "docs" });
 
 // Well-documented, validated component
 const userApi = provide(() => ({
@@ -284,42 +284,42 @@ const userApi = provide(() => ({
 );
 ```
 
-### 3. Multiple Meta of Same Type
+### 3. Multiple Tags of Same Type
 
 ```typescript
-import { meta, custom, provide } from "@pumped-fn/core-next";
+import { tag, custom, provide } from "@pumped-fn/core-next";
 
-const tag = meta("tag", custom<string>());
+const serviceTag = tag(custom<string>(), { label: "tag" });
 
 // Multiple tags on same executor
 const service = provide(() => "service",
-  tag("auth"),
-  tag("user-management"),
-  tag("v2-api"),
-  tag("critical")
+  serviceTag("auth"),
+  serviceTag("user-management"),
+  serviceTag("v2-api"),
+  serviceTag("critical")
 );
 
 // Query strategies
-const firstTag = tag.find(service);  // "auth" (first match)
-const allTags = tag.some(service);   // ["auth", "user-management", "v2-api", "critical"]
+const firstTag = serviceTag.find(service);  // "auth" (first match)
+const allTags = serviceTag.some(service);   // ["auth", "user-management", "v2-api", "critical"]
 
 // Filter by tag
-const hasCriticalTag = tag.some(service).includes("critical"); // true
+const hasCriticalTag = serviceTag.some(service).includes("critical"); // true
 ```
 
-### 4. Symbol-Based Meta Keys
+### 4. Symbol-Based Tag Keys
 
-For extension-specific meta, use symbols to avoid conflicts:
+For extension-specific tags, use symbols to avoid conflicts:
 
 ```typescript
-import { meta, custom, provide } from "@pumped-fn/core-next";
+import { tag, custom, provide } from "@pumped-fn/core-next";
 
-// Private meta keys
+// Private tag keys
 const EAGER_INIT = Symbol.for("@myapp/eager-init");
 const CACHE_TTL = Symbol.for("@myapp/cache-ttl");
 
-const eager = meta(EAGER_INIT, custom<boolean>());
-const cacheTtl = meta(CACHE_TTL, custom<number>());
+const eager = tag(custom<boolean>(), { label: EAGER_INIT });
+const cacheTtl = tag(custom<number>(), { label: CACHE_TTL });
 
 // Extension-specific decoration
 const eagerService = provide(() => initializeService(),
@@ -332,19 +332,19 @@ const shouldEagerInit = eager.find(eagerService); // true
 const ttl = cacheTtl.find(eagerService);          // 300
 ```
 
-## Scope Meta Integration
+## Scope Tag Integration
 
-Meta works with scope configuration for powerful composition:
+Tags work with scope configuration for powerful composition:
 
 ```typescript
-import { createScope, meta, custom } from "@pumped-fn/core-next";
+import { createScope, tag, custom } from "@pumped-fn/core-next";
 
-const dbConfig = meta("db", custom<{ host: string; port: number }>());
-const cacheConfig = meta("cache", custom<{ ttl: number }>());
+const dbConfig = tag(custom<{ host: string; port: number }>(), { label: "db" });
+const cacheConfig = tag(custom<{ ttl: number }>(), { label: "cache" });
 
-// Configure multiple meta at scope level
+// Configure multiple tags at scope level
 const appScope = createScope({
-  meta: [
+  tags: [
     dbConfig({ host: "localhost", port: 5432 }),
     cacheConfig({ ttl: 600 })
   ]
@@ -360,11 +360,11 @@ const database = provide((ctl) => {
 ## Key Benefits
 
 - **Type Safety**: Full TypeScript support with schema validation
-- **Non-Intrusive**: Meta doesn't affect core component logic
-- **Extensible**: Extensions can define their own meta types
-- **Composable**: Multiple meta can be attached to same component
+- **Non-Intrusive**: Tags don't affect core component logic
+- **Extensible**: Extensions can define their own tag types
+- **Composable**: Multiple tags can be attached to same component
 - **Query Flexible**: Find first, get all, or require presence
-- **Scope Integration**: Meta configuration at scope level
-- **Symbol Support**: Private meta keys prevent conflicts
+- **Scope Integration**: Tag configuration at scope level
+- **Symbol Support**: Private tag keys prevent conflicts
 
-Meta transforms components from simple executors into rich, self-describing, configurable building blocks for complex applications.
+Tags transform components from simple executors into rich, self-describing, configurable building blocks for complex applications.
