@@ -87,3 +87,34 @@ describe("Tag Creation and Retrieval", () => {
     expect(emailTag.get(store)).toBe("test@example.com");
   });
 });
+
+describe("Tag Callable Creation", () => {
+  test("tag creates Tagged value", () => {
+    const emailTag = tag(custom<string>());
+    const tagged = emailTag("test@example.com");
+
+    expect(tagged.key).toBe(emailTag.key);
+    expect(tagged.value).toBe("test@example.com");
+    expect(tagged[tagSymbol]).toBe(true);
+  });
+
+  test("tag with default can be called without value", () => {
+    const portTag = tag(custom<number>(), { default: 3000 });
+    const tagged = portTag();
+
+    expect(tagged.value).toBe(3000);
+  });
+
+  test("tag with default can override default", () => {
+    const portTag = tag(custom<number>(), { default: 3000 });
+    const tagged = portTag(8080);
+
+    expect(tagged.value).toBe(8080);
+  });
+
+  test("tag without default throws when called without value", () => {
+    const emailTag = tag(custom<string>()) as Tag.Tag<string, true>;
+
+    expect(() => emailTag()).toThrow("Value required");
+  });
+});
