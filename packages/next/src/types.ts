@@ -739,3 +739,5 @@ export namespace Multi {
     dependencies: D;
   };
 }
+
+export { tagSymbol, type Tag } from "./tag-types";
