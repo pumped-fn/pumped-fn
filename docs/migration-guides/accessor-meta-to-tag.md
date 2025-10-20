@@ -116,7 +116,7 @@ const executor = provide(() => {}, name('John'), name('Jane'));
 console.log(name.some(executor)); // ['John', 'Jane']
 ```
 
-#### Meta with Scope Configuration
+#### Tag with Scope Configuration
 
 ```typescript
 // Before
@@ -136,7 +136,7 @@ import { tag, custom, createScope } from "@pumped-fn/core-next";
 
 const config = tag(custom<string>(), { label: 'config' });
 const scope = createScope({
-  meta: [config('production')]
+  tags: [config('production')]
 });
 
 const executor = provide((controller) => {
@@ -144,7 +144,7 @@ const executor = provide((controller) => {
 });
 ```
 
-#### Flow Execution Meta
+#### Flow Execution Tags
 
 ```typescript
 // Before
@@ -168,7 +168,7 @@ const getRequestId = flow((context) => {
 });
 
 await flow.execute(getRequestId, undefined, {
-  meta: [requestId('req-123')]
+  tags: [requestId('req-123')]
 });
 ```
 
@@ -209,7 +209,7 @@ console.log(name.find(tags)); // 'Bob'
 const executor = provide(() => {}, name('Charlie'));
 console.log(name.find(executor)); // 'Charlie'
 
-const scope = createScope({ meta: [name('Dave')] });
+const scope = createScope({ tags: [name('Dave')] });
 console.log(name.get(scope)); // 'Dave'
 ```
 
@@ -274,29 +274,46 @@ port.set(store, 8080); // OK
 
 ### Type Changes
 
-The `Meta` and `Accessor` namespaces now alias `Tag` types:
+The `Meta` namespace has been removed entirely:
 
 ```typescript
-// Old types still work but are deprecated
-Meta.Meta<T> // Now aliases Tag.Tagged<T>
-Meta.MetaFn<T> // Now aliases Tag.Tag<T>
-Meta.DefaultMetaFn<T> // Now aliases Tag.Tag<T, true>
+// Old - REMOVED
+Meta.Meta<T> // No longer exists
+Meta.MetaFn<T> // No longer exists
+Meta.MetaContainer // No longer exists
 
-// Accessor namespace removed entirely
-// Use Tag namespace instead
-Tag.Store // Replaces Accessor.DataStore
-Tag.Source // Replaces Accessor.AccessorSource
-Tag.Tagged<T> // New unified tagged value type
-Tag.Tag<T, HasDefault> // New unified tag function type
+// New - Use Tag namespace
+Tag.Tagged<T> // Unified tagged value type
+Tag.Tag<T, false> // Tag without default
+Tag.Tag<T, true> // Tag with default
+Tag.Container // Replaces MetaContainer
+Tag.Store // Map-like storage
+Tag.Source // Union of valid sources
 ```
+
+### Property and Parameter Names
+
+All instances of `metas` property and `meta` parameter have been renamed to `tags`:
+
+```typescript
+// Property access
+executor.tags // was: executor.metas
+scope.tags // was: scope.metas
+accessor.tags // was: accessor.metas
+
+// Function parameters
+createScope({ tags: [...] }) // was: { meta: [...] }
+scope.exec(flow, input, { tags: [...] }) // was: { meta: [...] }
+flow.execute(handler, input, { tags: [...] }) // was: { meta: [...] }
+```
+
+**No backward compatibility:** Code using `metas` property or `meta` parameters will break and must be updated.
 
 ### Behavioral Changes
 
 1. **Symbol keys**: Tags with labels use `Symbol.for(label)` for global symbols. Anonymous tags use `Symbol()` for unique symbols.
 
 2. **Default handling**: Tags without defaults return `undefined` from `find()`, while tags with defaults always return a value.
-
-3. **Source compatibility**: Tags automatically detect and work with `metas` property on executors/scopes for backward compatibility.
 
 ## Migration Checklist
 
@@ -305,25 +322,22 @@ Tag.Tag<T, HasDefault> // New unified tag function type
 - [ ] Rename `preset()` calls to `entry()`
 - [ ] Update imports to remove `accessor` and `meta`
 - [ ] Update type annotations from `Meta.MetaFn` to `Tag.Tag`
+- [ ] Rename all `metas` property access to `tags`
+- [ ] Rename all `meta:` parameters to `tags:`
 - [ ] Run type checking: `pnpm typecheck:full`
 - [ ] Run tests to verify behavior: `pnpm test`
 - [ ] Update any documentation or comments referencing old APIs
 
 ## Compatibility Notes
 
-The `metas` property on executors and scopes continues to work with tags. The migration is designed to be backward compatible at the runtime level - existing code using the `metas` property will continue to work with tag-created values.
+**No backward compatibility** - This is a breaking change requiring updates:
 
-```typescript
-// Both work the same way
-const name = tag(custom<string>(), { label: 'name' });
-const executor = provide(() => {}, name('test'));
+1. All `metas` property access must change to `tags`
+2. All `meta:` parameters must change to `tags:`
+3. All `Meta` namespace references must change to `Tag`
+4. The `metas` property is no longer checked by tag operations
 
-// Access via tag API
-name.find(executor); // 'test'
-
-// Access via metas property (backward compatible)
-executor.metas?.find(m => m.key === name.key)?.value; // 'test'
-```
+Migration must be complete - partial migration will result in runtime errors.
 
 ## Migration Strategy
 
