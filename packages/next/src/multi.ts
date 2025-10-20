@@ -4,21 +4,21 @@ import { Promised } from "./promises";
 import { custom, validate } from "./ssch";
 import {
   type Core,
-  type Meta,
   type Multi,
   type StandardSchemaV1,
 } from "./types";
+import { type Tag } from "./tag-types";
 
 class MultiExecutorImpl<T, K, PoolIdType = unknown> {
   private option: Multi.Option<K>;
-  private poolId: Meta.MetaFn<PoolIdType>;
+  private poolId: Tag.Tag<PoolIdType, true>;
   private keyPool: Map<unknown, Core.Executor<T>>;
   private createNewExecutor: (key: K) => Core.Executor<T>;
-  public id: Meta.MetaFn<PoolIdType>;
+  public id: Tag.Tag<PoolIdType, true>;
 
   constructor(
     option: Multi.Option<K>,
-    poolId: Meta.MetaFn<PoolIdType>,
+    poolId: Tag.Tag<PoolIdType, true>,
     keyPool: Map<unknown, Core.Executor<T>>,
     createNewExecutor: (key: K) => Core.Executor<T>
   ) {
@@ -82,10 +82,10 @@ function createValidatedExecutor<T, K>(
 
 function createMultiExecutor<T, K, PoolIdType>(
   option: Multi.Option<K>,
-  poolId: Meta.MetaFn<PoolIdType>,
+  poolId: Tag.Tag<PoolIdType, true>,
   keyPool: Map<unknown, Core.Executor<T>>,
   createNewExecutor: (key: K) => Core.Executor<T>,
-  providerMetas: Meta.Meta[]
+  providerTags: Tag.Tagged[]
 ): Multi.MultiExecutor<T, K> {
   const impl = new MultiExecutorImpl<T, K, PoolIdType>(
     option,
@@ -97,7 +97,7 @@ function createMultiExecutor<T, K, PoolIdType>(
   const provider = createExecutor(
     (ctl: Core.Controller) => impl.providerFactory(ctl),
     undefined,
-    providerMetas
+    providerTags
   );
 
   const callableFn = (key: K) => impl.__call(key);
@@ -112,9 +112,9 @@ function createMultiExecutor<T, K, PoolIdType>(
 export function provide<T, K>(
   option: Multi.Option<K>,
   valueFn: (key: K, controller: Core.Controller) => T | Promise<T>,
-  ...metas: Meta.Meta[]
+  ...tags: Tag.Tagged[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Meta.MetaFn<null>;
+  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Tag.Tag<null, true>;
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
@@ -122,23 +122,23 @@ export function provide<T, K>(
       createExecutor(
         (ctl: Core.Controller) => valueFn(validatedKey, ctl),
         undefined,
-        [poolId(null), ...metas]
+        [poolId(null), ...tags]
       )
     );
   };
 
   return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [
     poolId(null),
-    ...metas,
+    ...tags,
   ]);
 }
 
 export function derive<T, K, D extends Core.DependencyLike>(
   option: Multi.DeriveOption<K, { [K in keyof D]: D[K] }>,
   valueFn: Multi.DependentFn<T, K, Core.InferOutput<D>>,
-  ...metas: Meta.Meta[]
+  ...tags: Tag.Tagged[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Meta.MetaFn<null>;
+  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Tag.Tag<null, true>;
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
@@ -151,9 +151,9 @@ export function derive<T, K, D extends Core.DependencyLike>(
         | ReadonlyArray<Core.UExecutor>
         | Record<string, Core.UExecutor>;
 
-      return createExecutor(factory, deps, metas);
+      return createExecutor(factory, deps, tags);
     });
   };
 
-  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, metas);
+  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, tags);
 }
