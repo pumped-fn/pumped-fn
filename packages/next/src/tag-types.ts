@@ -1,4 +1,4 @@
-import { type StandardSchemaV1, type metaSymbol } from "./types";
+import { type StandardSchemaV1 } from "./types";
 
 export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/core/tag");
 
@@ -21,7 +21,7 @@ export declare namespace Tag {
     tags?: Tagged[];
   }
 
-  export type Source = Store | Container | Tagged[] | { metas?: Tagged[] };
+  export type Source = Store | Container | Tagged[];
 
   export interface Tag<T, HasDefault extends boolean = false> {
     readonly key: symbol;
