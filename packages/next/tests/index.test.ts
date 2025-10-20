@@ -243,13 +243,13 @@ test("same promise with different resolves", async () => {
 
 
 test("test scope option", async () => {
-  const eagerMeta = tag(custom<boolean>(), { label: "eagerLoad" });
+  const eagerTag = tag(custom<boolean>(), { label: "eagerLoad" });
   const eagerLoadExtension: Extension.Extension = {
     name: "eager-load",
     init: (scope) => {
       return new Promised((async () => {
         for (const executor of scope.registeredExecutors()) {
-          if (eagerMeta.find(executor)) {
+          if (eagerTag.find(executor)) {
             await scope.resolve(executor);
           }
         }
@@ -259,7 +259,7 @@ test("test scope option", async () => {
 
   const counter = provide(() => 0);
   const fn = vi.fn((count: number) => count + 1);
-  const plus = derive(counter, (count) => fn(count), eagerMeta(true));
+  const plus = derive(counter, (count) => fn(count), eagerTag(true));
 
   createScope({
     initialValues: [preset(counter, 2)],

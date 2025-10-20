@@ -3,10 +3,10 @@ import { custom, provide, derive, createScope, tag } from "../src";
 
 describe("Meta System", () => {
   describe("Basic Meta Operations", () => {
-    test("meta definition with validation schema stores and retrieves typed values", async () => {
+    test("tag definition with validation schema stores and retrieves typed values", async () => {
       const validationFn = vi.fn();
 
-      const nameMeta = tag<string>({
+      const nameTag = tag<string>({
         "~standard": {
           vendor: "test",
           version: 1,
@@ -32,48 +32,48 @@ describe("Meta System", () => {
         },
       }, { label: "name" });
 
-      const executor = provide(() => {}, nameMeta("test"));
+      const executor = provide(() => {}, nameTag("test"));
 
-      expect(nameMeta("test").value).toBe("test");
-      expect(nameMeta.find(executor)).toBe("test");
-      expect(nameMeta.some(executor)).toEqual(["test"]);
+      expect(nameTag("test").value).toBe("test");
+      expect(nameTag.find(executor)).toBe("test");
+      expect(nameTag.some(executor)).toEqual(["test"]);
     });
 
-    test("tag supports boolean marker metadata", async () => {
-      const markerMeta = tag(custom<boolean>(), { default: true });
+    test("tag supports boolean marker tags", async () => {
+      const markerTag = tag(custom<boolean>(), { default: true });
 
-      const executor = provide(() => null, markerMeta());
+      const executor = provide(() => null, markerTag());
 
-      expect(markerMeta.find(executor)).toBe(true);
+      expect(markerTag.find(executor)).toBe(true);
     });
   });
 
   describe("Meta container support for scope", () => {
-    const configMeta = tag(custom<string>(), { label: "config" });
-    const debugMeta = tag(custom<string>(), { label: "debug" });
+    const configTag = tag(custom<string>(), { label: "config" });
+    const debugTag = tag(custom<string>(), { label: "debug" });
 
     test("scope stores and provides type-safe access to meta configuration", async () => {
       const scope = createScope({
-        meta: [configMeta("production"), debugMeta("off")],
+        meta: [configTag("production"), debugTag("off")],
       });
 
       expect(scope.metas).toBeDefined();
       expect(scope.metas).toHaveLength(2);
 
-      const environmentConfig = configMeta.get(scope);
+      const environmentConfig = configTag.get(scope);
       expect(environmentConfig).toBe("production");
 
-      const debugMode = debugMeta.get(scope);
+      const debugMode = debugTag.get(scope);
       expect(debugMode).toBe("off");
     });
 
     test("executors access scope meta through controller for configuration injection", async () => {
       const scope = createScope({
-        meta: [configMeta("test-env")],
+        meta: [configTag("test-env")],
       });
 
       const environmentAwareExecutor = provide((controller) => {
-        const environment = configMeta.get(controller.scope);
+        const environment = configTag.get(controller.scope);
         return `Running in ${environment}`;
       });
 

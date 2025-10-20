@@ -51,8 +51,8 @@ describe("Flow Execution Meta", () => {
     const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const readBothMetas = flow((context) => {
       const scopeConfig = appConfig.get(context.scope);
-      const execMeta = requestId.get(context);
-      return { scope: scopeConfig, exec: execMeta };
+      const execTag = requestId.get(context);
+      return { scope: scopeConfig, exec: execTag };
     });
 
     const result = await flow.execute(readBothMetas, undefined, {
@@ -73,8 +73,8 @@ describe("Flow Execution Meta", () => {
 
     const inspectScope = flow((context) => {
       const scopeMetas = context.scope.metas;
-      const execMeta = requestId.get(context);
-      return { scopeMetas, execMeta };
+      const execTag = requestId.get(context);
+      return { scopeMetas, execTag };
     });
 
     const result = await flow.execute(inspectScope, undefined, {
@@ -83,6 +83,6 @@ describe("Flow Execution Meta", () => {
     });
 
     expect(result.scopeMetas).toBeUndefined();
-    expect(result.execMeta).toEqual({ requestId: "req-xyz" });
+    expect(result.execTag).toEqual({ requestId: "req-xyz" });
   });
 });

@@ -426,7 +426,7 @@ describe("Coverage Gaps", () => {
       expect(() => testTag.get(exec)).toThrow();
     });
 
-    test("tag.partial creates partial metadata", () => {
+    test("tag.partial creates partial tags", () => {
       const testTag = tag(custom<{ a: string; b: number }>(), { label: "test" });
 
       const partial = (testTag as any).partial({ a: "test" });
