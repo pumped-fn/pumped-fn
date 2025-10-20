@@ -201,3 +201,51 @@ describe("Tag Set Method", () => {
     expect(() => numberTag.set(store, "invalid" as unknown as number)).toThrow();
   });
 });
+
+describe("Tag Some Method", () => {
+  test("some returns all matching values from array", () => {
+    const emailTag = tag(custom<string>());
+    const tags: Tag.Tagged<string>[] = [
+      emailTag("test1@example.com"),
+      emailTag("test2@example.com"),
+      emailTag("test3@example.com"),
+    ];
+
+    expect(emailTag.some(tags)).toEqual([
+      "test1@example.com",
+      "test2@example.com",
+      "test3@example.com",
+    ]);
+  });
+
+  test("some returns single value from Store", () => {
+    const emailTag = tag(custom<string>());
+    const store = new Map<symbol, unknown>();
+    store.set(emailTag.key, "test@example.com");
+
+    expect(emailTag.some(store)).toEqual(["test@example.com"]);
+  });
+
+  test("some returns empty array when no match", () => {
+    const emailTag = tag(custom<string>());
+    const store = new Map<symbol, unknown>();
+
+    expect(emailTag.some(store)).toEqual([]);
+  });
+
+  test("some filters by key in mixed array", () => {
+    const emailTag = tag(custom<string>());
+    const nameTag = tag(custom<string>(), { label: "name" });
+
+    const tags: Tag.Tagged[] = [
+      emailTag("test@example.com"),
+      nameTag("John"),
+      emailTag("another@example.com"),
+    ];
+
+    expect(emailTag.some(tags)).toEqual([
+      "test@example.com",
+      "another@example.com",
+    ]);
+  });
+});
