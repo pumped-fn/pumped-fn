@@ -156,3 +156,48 @@ describe("Tag Entry Method", () => {
     expect(portTag.get(store)).toBe(3000);
   });
 });
+
+describe("Tag Set Method", () => {
+  test("set mutates Store", () => {
+    const emailTag = tag(custom<string>());
+    const store = new Map<symbol, unknown>();
+
+    emailTag.set(store, "test@example.com");
+    expect(emailTag.get(store)).toBe("test@example.com");
+  });
+
+  test("set with Container returns Tagged", () => {
+    const emailTag = tag(custom<string>());
+    const container: Tag.Container = { tags: [] };
+
+    const tagged = emailTag.set(container, "test@example.com");
+    expect(tagged.value).toBe("test@example.com");
+    expect(tagged.key).toBe(emailTag.key);
+  });
+
+  test("set with Tagged array returns Tagged", () => {
+    const emailTag = tag(custom<string>());
+    const tags: Tag.Tagged[] = [];
+
+    const tagged = emailTag.set(tags, "test@example.com");
+    expect(tagged.value).toBe("test@example.com");
+  });
+
+  test("set validates value via schema", () => {
+    const numberTag = tag({
+      "~standard": {
+        vendor: "test",
+        version: 1,
+        validate(value) {
+          if (typeof value !== "number") {
+            return { issues: [{ message: "must be number" }] };
+          }
+          return { value };
+        },
+      },
+    });
+    const store = new Map<symbol, unknown>();
+
+    expect(() => numberTag.set(store, "invalid" as unknown as number)).toThrow();
+  });
+});
