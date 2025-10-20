@@ -1,5 +1,5 @@
-import type { Meta } from "./types";
 import { tag } from "./tag";
+import { type Tag } from "./tag-types";
 import { custom } from "./ssch";
 
 export * from "./types";
@@ -33,6 +33,6 @@ export * as standardSchema from "./ssch";
 export * as multi from "./multi";
 export * as errors from "./errors";
 
-export const name: Meta.MetaFn<string> = tag(custom<string>(), {
+export const name: Tag.Tag<string, false> = tag(custom<string>(), {
   label: "pumped-fn/name",
-}) as Meta.MetaFn<string>;
+});

@@ -1,10 +1,10 @@
 import {
   type ErrorContext,
-  type Meta,
   ExecutorResolutionError,
   FactoryExecutionError,
   DependencyResolutionError,
 } from "./types";
+import { type Tag } from "./tag-types";
 import { name } from "./index";
 
 export const codes = {
@@ -235,7 +235,7 @@ export function createSystemError(
 }
 
 export function getExecutorName(executor: unknown): string {
-  const executorName = name.find(executor as Meta.MetaContainer);
+  const executorName = name.find(executor as Tag.Container);
   if (executorName) return executorName;
 
   if (executor && typeof executor === "object" && "factory" in executor) {
