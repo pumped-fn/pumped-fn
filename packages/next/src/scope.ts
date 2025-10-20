@@ -7,7 +7,6 @@ import {
   isPreset,
 } from "./executor";
 import {
-  type Accessor,
   Core,
   Extension,
   Meta,
@@ -441,7 +440,7 @@ class BaseScope implements Core.Scope {
   protected initialValues: Core.Preset<unknown>[] = [];
   public metas: Meta.Meta[] | undefined;
 
-  private static readonly emptyDataStore: Accessor.DataStore = {
+  private static readonly emptyDataStore: import("./tag-types").Tag.Store = {
     get: () => undefined,
     set: () => undefined,
   };
@@ -663,7 +662,7 @@ class BaseScope implements Core.Scope {
 
   private wrapWithExtensions<T>(
     baseExecutor: () => Promised<T>,
-    dataStore: Accessor.DataStore,
+    dataStore: import("./tag-types").Tag.Store,
     operation: Extension.Operation
   ): () => Promised<T> {
     let executor = baseExecutor;
@@ -991,7 +990,7 @@ class BaseScope implements Core.Scope {
     options?: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
       meta?: Meta.Meta[];
@@ -1005,7 +1004,7 @@ class BaseScope implements Core.Scope {
     options: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
       meta?: Meta.Meta[];
@@ -1019,7 +1018,7 @@ class BaseScope implements Core.Scope {
     options?: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
       >;
       presets?: Core.Preset<unknown>[];
       meta?: Meta.Meta[];

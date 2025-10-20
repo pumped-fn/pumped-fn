@@ -138,29 +138,18 @@ export class DependencyResolutionError extends ExecutorResolutionError {
 
 export declare namespace Meta {
   export interface MetaContainer {
-    metas: Meta[] | undefined;
+    metas: import("./tag-types").Tag.Tagged[] | undefined;
   }
 
-  export interface Meta<V = unknown> {
-    readonly [metaSymbol]: true;
-    readonly key: string | symbol;
-    readonly schema: StandardSchemaV1<V>;
-    readonly value: V;
-  }
+  export type Meta<V = unknown> = import("./tag-types").Tag.Tagged<V>;
 
-  export interface MetaFn<V> {
-    (value: V): Meta<V>;
-    readonly key: string | symbol;
+  export type MetaFn<V> = import("./tag-types").Tag.Tag<V, false> & {
     partial: <D extends Partial<V>>(d: D) => D;
-    some: (source: MetaContainer | Meta[] | undefined) => V[];
-    find: (source: MetaContainer | Meta[] | undefined) => V | undefined;
-    get: (source: MetaContainer | Meta[] | undefined) => V;
-  }
+  };
 
-  export interface DefaultMetaFn<V> extends MetaFn<V> {
-    (value?: V): Meta<V>;
-    defaultValue: V;
-  }
+  export type DefaultMetaFn<V> = import("./tag-types").Tag.Tag<V, true> & {
+    partial: <D extends Partial<V>>(d: D) => D;
+  };
 }
 
 export declare namespace Core {
@@ -388,7 +377,7 @@ export declare namespace Core {
       options?: {
         extensions?: Extension.Extension[];
         initialContext?: Array<
-          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+          [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
         >;
         meta?: Meta.Meta[];
         details?: false;
@@ -401,7 +390,7 @@ export declare namespace Core {
       options: {
         extensions?: Extension.Extension[];
         initialContext?: Array<
-          [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
+          [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
         >;
         meta?: Meta.Meta[];
         details: true;
@@ -560,11 +549,11 @@ export namespace Flow {
     readonly scope: Core.Scope;
     readonly metas: Meta.Meta[] | undefined;
 
-    get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
-    find<T>(accessor: Accessor.Accessor<T>): T | undefined;
-    find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
+    get<T>(accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>): T;
+    find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
+    find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
     set<T>(
-      accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>,
+      accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>,
       value: T
     ): void;
 
@@ -607,9 +596,9 @@ export namespace Flow {
 
   export type ExecutionData = {
     readonly context: {
-      get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
-      find<T>(accessor: Accessor.Accessor<T>): T | undefined;
-      find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
+      get<T>(accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>): T;
+      find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
+      find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
     };
   };
 
@@ -642,7 +631,7 @@ export namespace Extension {
         flowName: string;
         depth: number;
         isReplay: boolean;
-        context: Accessor.DataStore;
+        context: import("./tag-types").Tag.Store;
         params?: readonly unknown[];
       }
     | {
@@ -653,7 +642,7 @@ export namespace Extension {
         journalKey: string | undefined;
         parentFlowName: string | undefined;
         depth: number;
-        context: Accessor.DataStore;
+        context: import("./tag-types").Tag.Store;
       }
     | {
         kind: "parallel";
@@ -661,7 +650,7 @@ export namespace Extension {
         promiseCount: number;
         depth: number;
         parentFlowName: string | undefined;
-        context: Accessor.DataStore;
+        context: import("./tag-types").Tag.Store;
       };
 
   export interface Extension {
@@ -670,7 +659,7 @@ export namespace Extension {
     init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
 
     wrap?<T>(
-      context: Accessor.DataStore,
+      context: import("./tag-types").Tag.Store,
       next: () => Promised<T>,
       operation: Operation
     ): Promise<T> | Promised<T>;
@@ -687,34 +676,6 @@ export namespace Extension {
   }
 }
 
-export declare namespace Accessor {
-  export interface DataStore {
-    get(key: unknown): unknown;
-    set(key: unknown, value: unknown): unknown | undefined;
-  }
-
-  export type AccessorSource = DataStore | Meta.MetaContainer | Meta.Meta[];
-
-  interface BaseAccessor<T> {
-    readonly key: symbol;
-    readonly schema: StandardSchemaV1<T>;
-  }
-
-  export interface Accessor<T> extends BaseAccessor<T> {
-    get(source: AccessorSource): T;
-    find(source: AccessorSource): T | undefined;
-    set(source: DataStore, value: T): void;
-    preset(value: T): [symbol, T];
-  }
-
-  export interface AccessorWithDefault<T> extends BaseAccessor<T> {
-    readonly defaultValue: T;
-    get(source: AccessorSource): T;
-    find(source: AccessorSource): T;
-    set(source: DataStore, value: T): void;
-    preset(value: T): [symbol, T];
-  }
-}
 
 export namespace Multi {
   export type Key = unknown;

@@ -2,10 +2,9 @@ import type { Core, Extension, Flow, Meta, StandardSchemaV1 } from "./types";
 import { createExecutor, isExecutor } from "./executor";
 import { createScope } from "./scope";
 import { validate } from "./ssch";
-import { accessor } from "./accessor";
-import type { Accessor } from "./types";
+import { type Tag } from "./tag-types";
+import { tag } from "./tag";
 import { custom } from "./ssch";
-import { meta } from "./meta";
 import { Promised } from "./promises";
 
 function isErrorEntry(
@@ -17,7 +16,7 @@ function isErrorEntry(
 function wrapWithExtensions<T>(
   extensions: Extension.Extension[] | undefined,
   baseExecutor: () => Promised<T>,
-  dataStore: Accessor.DataStore,
+  dataStore: Tag.Store,
   operation: Extension.Operation
 ): () => Promised<T> {
   if (!extensions || extensions.length === 0) {
@@ -37,23 +36,22 @@ function wrapWithExtensions<T>(
   return executor;
 }
 
-const flowDefinitionMeta = meta<Flow.Definition<any, any>>(
-  "flow.definition",
-  custom<Flow.Definition<any, any>>()
-);
+const flowDefinitionMeta = tag(custom<Flow.Definition<any, any>>(), {
+  label: "flow.definition",
+}) as Meta.MetaFn<Flow.Definition<any, any>>;
 
 export const flowMeta: {
-  depth: Accessor.AccessorWithDefault<number>;
-  flowName: Accessor.Accessor<string | undefined>;
-  parentFlowName: Accessor.Accessor<string | undefined>;
-  isParallel: Accessor.AccessorWithDefault<boolean>;
-  journal: Accessor.Accessor<ReadonlyMap<string, unknown>>;
+  depth: Tag.Tag<number, true>;
+  flowName: Tag.Tag<string | undefined, false>;
+  parentFlowName: Tag.Tag<string | undefined, false>;
+  isParallel: Tag.Tag<boolean, true>;
+  journal: Tag.Tag<ReadonlyMap<string, unknown>, false>;
 } = {
-  depth: accessor("flow.depth", custom<number>(), 0),
-  flowName: accessor("flow.name", custom<string | undefined>()),
-  parentFlowName: accessor("flow.parentName", custom<string | undefined>()),
-  isParallel: accessor("flow.isParallel", custom<boolean>(), false),
-  journal: accessor("flow.journal", custom<ReadonlyMap<string, unknown>>()),
+  depth: tag(custom<number>(), { label: "flow.depth", default: 0 }),
+  flowName: tag(custom<string | undefined>(), { label: "flow.name" }),
+  parentFlowName: tag(custom<string | undefined>(), { label: "flow.parentName" }),
+  isParallel: tag(custom<boolean>(), { label: "flow.isParallel", default: false }),
+  journal: tag(custom<ReadonlyMap<string, unknown>>(), { label: "flow.journal" }),
 };
 
 class FlowDefinition<S, I> {
@@ -233,16 +231,14 @@ class FlowContext implements Flow.Context {
     this.set(flowMeta.isParallel, isParallel);
   }
 
-  get<T>(accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>): T;
+  get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
   get<T>(accessorOrKey: unknown): T | unknown {
     if (
       typeof accessorOrKey === "object" &&
       accessorOrKey !== null &&
       "get" in accessorOrKey
     ) {
-      const accessor = accessorOrKey as
-        | Accessor.Accessor<T>
-        | Accessor.AccessorWithDefault<T>;
+      const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
       return accessor.get(this);
     }
     const key = accessorOrKey;
@@ -255,27 +251,20 @@ class FlowContext implements Flow.Context {
     return undefined;
   }
 
-  find<T>(accessor: Accessor.Accessor<T>): T | undefined;
-  find<T>(accessor: Accessor.AccessorWithDefault<T>): T;
-  find<T>(
-    accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
-  ): T | undefined {
+  find<T>(accessor: Tag.Tag<T, false>): T | undefined;
+  find<T>(accessor: Tag.Tag<T, true>): T;
+  find<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T | undefined {
     return accessor.find(this);
   }
 
-  set<T>(
-    accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>,
-    value: T
-  ): void;
+  set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
   set<T>(accessorOrKey: unknown, value: unknown): void | unknown {
     if (
       typeof accessorOrKey === "object" &&
       accessorOrKey !== null &&
       "set" in accessorOrKey
     ) {
-      const accessor = accessorOrKey as
-        | Accessor.Accessor<T>
-        | Accessor.AccessorWithDefault<T>;
+      const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
       accessor.set(this, value as T);
       return;
     }
@@ -620,14 +609,10 @@ class FlowContext implements Flow.Context {
 
     return {
       context: {
-        get<T>(
-          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
-        ): T {
+        get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T {
           return accessor.get(dataStore);
         },
-        find<T>(
-          accessor: Accessor.Accessor<T> | Accessor.AccessorWithDefault<T>
-        ): T | undefined {
+        find<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T | undefined {
           return accessor.find(dataStore);
         },
       },
@@ -641,9 +626,7 @@ function execute<S, I>(
   options: {
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
-    initialContext?: Array<
-      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
-    >;
+    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details: true;
@@ -656,9 +639,7 @@ function execute<S, I>(
   options?: {
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
-    initialContext?: Array<
-      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
-    >;
+    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: false;
@@ -671,9 +652,7 @@ function execute<S, I>(
   options?: {
     scope?: Core.Scope;
     extensions?: Extension.Extension[];
-    initialContext?: Array<
-      [Accessor.Accessor<any> | Accessor.AccessorWithDefault<any>, any]
-    >;
+    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
     scopeMeta?: Meta.Meta[];
     meta?: Meta.Meta[];
     details?: boolean;

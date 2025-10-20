@@ -21,7 +21,7 @@ export declare namespace Tag {
     tags?: Tagged[];
   }
 
-  export type Source = Store | Container | Tagged[];
+  export type Source = Store | Container | Tagged[] | { metas?: Tagged[] };
 
   export interface Tag<T, HasDefault extends boolean = false> {
     readonly key: symbol;

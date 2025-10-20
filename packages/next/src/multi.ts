@@ -1,5 +1,5 @@
 import { createExecutor } from "./executor";
-import { meta } from "./meta";
+import { tag } from "./tag";
 import { Promised } from "./promises";
 import { custom, validate } from "./ssch";
 import {
@@ -114,7 +114,7 @@ export function provide<T, K>(
   valueFn: (key: K, controller: Core.Controller) => T | Promise<T>,
   ...metas: Meta.Meta[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = meta(Symbol(), custom<undefined>());
+  const poolId = tag(custom<undefined>(), { label: Symbol().toString(), default: undefined }) as Meta.MetaFn<undefined>;
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {
@@ -122,13 +122,13 @@ export function provide<T, K>(
       createExecutor(
         (ctl: Core.Controller) => valueFn(validatedKey, ctl),
         undefined,
-        [poolId(undefined), ...metas]
+        [poolId(), ...metas]
       )
     );
   };
 
   return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [
-    poolId(undefined),
+    poolId(),
     ...metas,
   ]);
 }
@@ -138,7 +138,7 @@ export function derive<T, K, D extends Core.DependencyLike>(
   valueFn: Multi.DependentFn<T, K, Core.InferOutput<D>>,
   ...metas: Meta.Meta[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = meta(Symbol(), custom<void>());
+  const poolId = tag(custom<void>(), { label: Symbol().toString(), default: undefined as void }) as Meta.MetaFn<void>;
   const keyPool = new Map<unknown, Core.Executor<T>>();
 
   const createNewExecutor = (key: K) => {

@@ -32,8 +32,8 @@ function extract<T>(
     return value === undefined ? undefined : validate(schema, value);
   }
 
-  const tags = Array.isArray(source) ? source : source.tags ?? [];
-  const tagged = tags.find((t) => t.key === key);
+  const tags = Array.isArray(source) ? source : ((source as any).tags ?? (source as any).metas ?? []);
+  const tagged = tags.find((t: Tag.Tagged) => t.key === key);
   return tagged ? validate(schema, tagged.value) : undefined;
 }
 
@@ -47,8 +47,8 @@ function collect<T>(
     return value === undefined ? [] : [validate(schema, value)];
   }
 
-  const tags = Array.isArray(source) ? source : source.tags ?? [];
-  return tags.filter((t) => t.key === key).map((t) => validate(schema, t.value));
+  const tags = Array.isArray(source) ? source : ((source as any).tags ?? (source as any).metas ?? []);
+  return tags.filter((t: Tag.Tagged) => t.key === key).map((t: Tag.Tagged) => validate(schema, t.value));
 }
 
 function write<T>(
@@ -217,6 +217,9 @@ export function tag<T>(
   fn.set = impl.set.bind(impl) as typeof impl.set;
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
+  (fn as any).partial = <D extends Partial<T>>(d: D): D => {
+    return Object.assign({}, createTagged(impl.key, impl.schema, {} as T, impl.label), d);
+  };
   Object.defineProperty(fn, Symbol.toStringTag, {
     get: () => impl[Symbol.toStringTag],
   });
