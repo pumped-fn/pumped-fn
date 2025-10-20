@@ -359,7 +359,7 @@ Migration must be complete - partial migration will result in runtime errors.
 
 ## Further Reading
 
-- [Tag API Documentation](../api/tag.md)
+- [Tag System Documentation](../meta.md)
 - [Tag Type Definitions](../../packages/next/src/tag-types.ts)
 - [Tag Implementation](../../packages/next/src/tag.ts)
 - [Migration Implementation Plan](../plans/2025-10-20-unify-accessor-meta-into-tag.md)
