@@ -122,13 +122,13 @@ export function provide<T, K>(
       createExecutor(
         (ctl: Core.Controller) => valueFn(validatedKey, ctl),
         undefined,
-        [poolId(), ...metas]
+        [poolId(null), ...metas]
       )
     );
   };
 
   return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [
-    poolId(),
+    poolId(null),
     ...metas,
   ]);
 }

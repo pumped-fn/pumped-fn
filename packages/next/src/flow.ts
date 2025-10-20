@@ -266,8 +266,9 @@ class FlowContext implements Flow.Context {
   set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
   set<T>(accessorOrKey: unknown, value: unknown): void | unknown {
     if (
-      typeof accessorOrKey === "object" &&
       accessorOrKey !== null &&
+      accessorOrKey !== undefined &&
+      (typeof accessorOrKey === "object" || typeof accessorOrKey === "function") &&
       "set" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
@@ -611,6 +612,7 @@ class FlowContext implements Flow.Context {
       set: (_key: unknown, _value: unknown) => {
         throw new Error("Cannot set values on execution snapshot");
       },
+      metas: this.metas,
     };
 
     return {
