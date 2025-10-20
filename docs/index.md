@@ -113,8 +113,8 @@ const result = await scope.resolve(application);
 - [**Flow API**](./flow.md) - Structured business logic with validation and context management
 - [**DataAccessor**](./accessor.md) - Type-safe data access for Map-like structures with validation
 - [**Extensions**](./extensions.md) - Build cross-cutting functionality with unified extension API
-- [**Component Authoring**](./authoring.md) - Create reusable components with meta-based configuration
-- [**Meta System**](./meta.md) - Type-safe metadata decoration for extensibility
+- [**Component Authoring**](./authoring.md) - Create reusable components with tag-based configuration
+- [**Tag System**](./meta.md) - Type-safe metadata decoration for extensibility
 
 ### Quick Navigation
 
@@ -123,7 +123,7 @@ const result = await scope.resolve(application);
 | **Start building apps**       | [API Reference](./api.md) → Graph Construction             |
 | **Add business logic**        | [Flow API](./flow.md) → Patterns                           |
 | **Manage context data**       | [DataAccessor](./accessor.md) → Integration with Flows     |
-| **Build reusable components** | [Component Authoring](./authoring.md) → Meta Configuration |
+| **Build reusable components** | [Component Authoring](./authoring.md) → Tag Configuration |
 | **Add monitoring/logging**    | [Extensions](./extensions.md) → Extension Patterns         |
 | **Test my application**       | [Testing](./testings.md) → Graph Testing                   |
 | **Understand the concepts**   | [How It Works](./how-does-it-work.md)                      |

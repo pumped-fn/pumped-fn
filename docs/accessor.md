@@ -202,18 +202,18 @@ describe("Flow with Context", () => {
 });
 ```
 
-## vs Meta System
+## vs Tag System
 
-| Feature | Accessor | Meta |
+| Feature | Accessor | Tag |
 |---------|----------|------|
 | **Purpose** | Runtime data access | Component decoration |
 | **Mutability** | Mutable (get/set) | Immutable (attached at creation) |
 | **Defaults** | Built-in support | Not supported |
-| **Storage** | DataStore, MetaContainer | MetaContainer only |
+| **Storage** | DataStore, Tag.Container | Tag.Container only |
 | **Inheritance** | Context hierarchy | No inheritance |
 
 **Use Accessor for**: Runtime data, execution context, mutable state, configuration
-**Use Meta for**: Component metadata, static decoration, API configuration
+**Use Tag for**: Component metadata, static decoration, API configuration
 
 ## Best Practices
 

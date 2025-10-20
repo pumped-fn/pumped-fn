@@ -1,19 +1,19 @@
 # Component Authoring - Building Reusable Components
 
-Learn how to create reusable, configurable components using graph-based dependency resolution with meta-driven configuration strategies.
+Learn how to create reusable, configurable components using graph-based dependency resolution with tag-driven configuration strategies.
 
-## Core Authoring Principle: Meta-Based Configuration
+## Core Authoring Principle: Tag-Based Configuration
 
-Components are designed around **configuration variation** through meta-based scope configuration. The graph's lazy evaluation combined with meta-driven configuration enables powerful configuration strategies impossible with traditional dependency injection.
+Components are designed around **configuration variation** through tag-based scope configuration. The graph's lazy evaluation combined with tag-driven configuration enables powerful configuration strategies impossible with traditional dependency injection.
 
-### The Meta Configuration Strategy
+### The Tag Configuration Strategy
 
 1. **Lazy Graph Resolution**: Dependency graph remains unresolved until `scope.resolve()` is called
-2. **Meta-Based Configuration**: Components export meta definitions; configuration applied to scope/pod
+2. **Tag-Based Configuration**: Components export tag definitions; configuration applied to scope/pod
 3. **Configuration Inheritance**: Child pods inherit parent scope configurations and add their own
-4. **Multi-Environment Scopes**: Same component structure, different meta configurations per scope instance
+4. **Multi-Environment Scopes**: Same component structure, different tag configurations per scope instance
 
-### Meta vs Traditional Configuration
+### Tag vs Traditional Configuration
 
 **Traditional DI Configuration**:
 ```typescript
@@ -24,7 +24,7 @@ const db = new Database(config, logger);
 const service = new UserService(db, logger); // Fixed at construction
 ```
 
-**Meta-Based Configuration**:
+**Tag-Based Configuration**:
 ```typescript
 import { meta, custom, provide, derive, createScope } from "@pumped-fn/core-next";
 
@@ -51,19 +51,19 @@ const db = derive([logger], ([log], ctl) => {
 const service = derive([db, logger], ([db, log]) => new UserService(db, log));
 
 const testScope = createScope({
-  meta: [dbConfigMeta({ timeout: 100 })]
+  tags: [dbConfigMeta({ timeout: 100 })]
 });
 ```
 
-**Meta Configuration Benefits**:
+**Tag Configuration Benefits**:
 - **Scope-Level Configuration**: Configure entire component hierarchies at scope creation
-- **Composition-Friendly**: Combine multiple meta configurations
-- **Type-Safe Configuration**: TypeScript ensures meta schema compatibility
-- **Pod Inheritance**: Pods inherit scope meta and can add their own
+- **Composition-Friendly**: Combine multiple tag configurations
+- **Type-Safe Configuration**: TypeScript ensures tag schema compatibility
+- **Pod Inheritance**: Pods inherit scope tags and can add their own
 
 ## Essential APIs
 
-### Meta Definition
+### Tag Definition
 ```typescript
 import { meta, custom } from "@pumped-fn/core-next";
 
@@ -86,7 +86,7 @@ const httpClient = provide((ctl) => {
 }, name("http-client"));
 ```
 
-### Meta Export Pattern
+### Tag Export Pattern
 ```typescript
 import { meta, custom } from "@pumped-fn/core-next";
 
@@ -103,7 +103,7 @@ import { createScope, meta, custom } from "@pumped-fn/core-next";
 const configMeta = meta("http-config", custom<{ timeout: number; retries: number }>());
 
 const scope = createScope({
-  meta: [configMeta({ timeout: 10000, retries: 1 })]
+  tags: [configMeta({ timeout: 10000, retries: 1 })]
 });
 ```
 
@@ -202,9 +202,9 @@ const prodConfig = httpConfigMeta({
   retries: 3
 });
 
-const devScope = createScope({ meta: [devConfig] });
-const stagingScope = createScope({ meta: [stagingConfig] });
-const prodScope = createScope({ meta: [prodConfig] });
+const devScope = createScope({ tags: [devConfig] });
+const stagingScope = createScope({ tags: [stagingConfig] });
+const prodScope = createScope({ tags: [prodConfig] });
 
 const devApi = await devScope.resolve(apiService);
 const prodApi = await prodScope.resolve(apiService);
@@ -258,7 +258,7 @@ const logger = provide((ctl) => {
 });
 
 const appScope = createScope({
-  meta: [
+  tags: [
     dbConfigMeta({ host: "localhost", port: 5432, database: "myapp" }),
     cacheConfigMeta({ host: "localhost", port: 6379, ttl: 300 }),
     logConfigMeta({ level: "info", format: "json" })
@@ -329,11 +329,11 @@ const application = derive(
 );
 
 const devScope = createScope({
-  meta: [httpDefaults.dev, dbDefaults.dev]
+  tags: [httpDefaults.dev, dbDefaults.dev]
 });
 
 const testScope = createScope({
-  meta: [httpDefaults.dev, dbDefaults.test]
+  tags: [httpDefaults.dev, dbDefaults.test]
 });
 ```
 
@@ -435,7 +435,7 @@ const configuredService = provide((ctl) => {
 });
 
 const scope = createScope({
-  meta: [
+  tags: [
     baseConfigMeta({ environment: 'dev', logLevel: 'debug' }),
     serviceConfigMeta({ timeout: 1000, retries: 1 })
   ]
@@ -451,7 +451,7 @@ const scope = createScope({
 describe('User Service', () => {
   test('handles timeouts in production config', async () => {
     const testScope = createScope({
-      meta: [httpConfigMeta({
+      tags: [httpConfigMeta({
         baseUrl: "http://slow-server",
         timeout: 100,
         retries: 0
@@ -465,7 +465,7 @@ describe('User Service', () => {
 
   test('works with test configuration', async () => {
     const testScope = createScope({
-      meta: [httpConfigMeta({
+      tags: [httpConfigMeta({
         baseUrl: "http://localhost:3001",
         timeout: 5000,
         retries: 1
@@ -492,7 +492,7 @@ const mockHttpConfig = httpConfigMeta({
 
 // Override HTTP client with mock
 const mockScope = createScope({
-  meta: [mockHttpConfig]
+  tags: [mockHttpConfig]
 }, preset(httpClient, mockHttpService));
 ```
 

@@ -314,7 +314,7 @@ const database = derive([logger], ([log], ctl) => {
 }, name("database"))
 
 const scope = createScope({
-  meta: [
+  tags: [
     logConfig.level("debug"),
     dbConfig.path("/data/prod.db")
   ]
@@ -462,7 +462,7 @@ exec<S, I = undefined>(
   options?: {
     extensions?: Extension.Extension[];
     initialContext?: Array<[Accessor.Accessor<any>, any]>;
-    meta?: Meta.Meta[];
+    tags?: Tag.Tagged[];
   }
 ): Promised<S>;
 ```
@@ -643,7 +643,7 @@ type MultiExecutor<T, K> =
   ((key: K) => Core.Executor<T>) &
   {
     release: (scope: Core.Scope) => Promised<void>
-    id: Meta.MetaFn<unknown>
+    id: Tag.Tag<unknown>
   }
 
 // Release all instances
@@ -795,7 +795,7 @@ const result = await scope.exec(processFlow, { id: "123" }, {
     [requestId, "req-456"],
     [userId, "user-789"]
   ],
-  meta: [customMeta("value")]
+  tags: [customMeta("value")]
 })
 // Flow cleanup is automatic
 ```
@@ -805,7 +805,7 @@ const result = await scope.exec(processFlow, { id: "123" }, {
 ```typescript
 interface Flow.Context {
   readonly scope: Core.Scope
-  readonly metas: Meta.Meta[] | undefined
+  readonly tags: Tag.Tagged[] | undefined
 
   get<T>(accessor: Accessor.Accessor<T>): T
   find<T>(accessor: Accessor.Accessor<T>): T | undefined
@@ -1057,7 +1057,7 @@ app.post('/users', async (c) => {
 ```typescript
 // Create scope
 const scope = createScope({
-  meta: [config.value("production")],
+  tags: [config.value("production")],
   presets: [preset(mockService, testImpl)],
   extensions: [logger, tracing]
 })
