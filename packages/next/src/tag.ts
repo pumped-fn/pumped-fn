@@ -36,7 +36,7 @@ function extract<T>(
     return value === undefined ? undefined : validate(schema, value);
   }
 
-  const tags = Array.isArray(source) ? source : ((source as any).tags ?? (source as any).metas ?? []);
+  const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
   const tagged = tags.find((t: Tag.Tagged) => t.key === key);
   return tagged ? validate(schema, tagged.value) : undefined;
 }
@@ -51,7 +51,7 @@ function collect<T>(
     return value === undefined ? [] : [validate(schema, value)];
   }
 
-  const tags = Array.isArray(source) ? source : ((source as any).tags ?? (source as any).metas ?? []);
+  const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
   return tags.filter((t: Tag.Tagged) => t.key === key).map((t: Tag.Tagged) => validate(schema, t.value));
 }
 
