@@ -1,9 +1,9 @@
 import { type Promised } from "./promises";
+import { type Tag } from "./tag-types";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
-export const metaSymbol: unique symbol = Symbol.for("@pumped-fn/core/meta");
 
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly "~standard": StandardSchemaV1.Props<Input, Output>;
@@ -136,21 +136,6 @@ export class DependencyResolutionError extends ExecutorResolutionError {
   }
 }
 
-export declare namespace Meta {
-  export interface MetaContainer {
-    metas: import("./tag-types").Tag.Tagged[] | undefined;
-  }
-
-  export type Meta<V = unknown> = import("./tag-types").Tag.Tagged<V>;
-
-  export type MetaFn<V> = import("./tag-types").Tag.Tag<V, false> & {
-    partial: <D extends Partial<V>>(d: D) => D;
-  };
-
-  export type DefaultMetaFn<V> = import("./tag-types").Tag.Tag<V, true> & {
-    partial: <D extends Partial<V>>(d: D) => D;
-  };
-}
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
@@ -187,7 +172,7 @@ export declare namespace Core {
 
   export type Kind = "main" | "reactive" | "lazy" | "static";
 
-  export interface BaseExecutor<T> extends Meta.MetaContainer {
+  export interface BaseExecutor<T> extends Tag.Container {
     [executorSymbol]: Kind;
     factory: NoDependencyFn<T> | DependentFn<T, unknown> | undefined;
     dependencies:
@@ -241,7 +226,7 @@ export declare namespace Core {
     | ResolvedState<T>
     | RejectedState;
 
-  export interface Accessor<T> extends Meta.MetaContainer {
+  export interface Accessor<T> extends Tag.Container {
     lookup(): undefined | ResolveState<T>;
 
     get(): T;
@@ -341,7 +326,7 @@ export declare namespace Core {
           [K in keyof T]: T[K];
         };
 
-  export interface Scope extends Meta.MetaContainer {
+  export interface Scope extends Tag.Container {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
     entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
     registeredExecutors(): Core.Executor<unknown>[];
@@ -377,9 +362,15 @@ export declare namespace Core {
       options?: {
         extensions?: Extension.Extension[];
         initialContext?: Array<
-          [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
+          [
+            (
+              | import("./tag-types").Tag.Tag<any, false>
+              | import("./tag-types").Tag.Tag<any, true>
+            ),
+            any
+          ]
         >;
-        meta?: Meta.Meta[];
+        tags?: Tag.Tagged[];
         details?: false;
       }
     ): Promised<S>;
@@ -390,9 +381,15 @@ export declare namespace Core {
       options: {
         extensions?: Extension.Extension[];
         initialContext?: Array<
-          [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
+          [
+            (
+              | import("./tag-types").Tag.Tag<any, false>
+              | import("./tag-types").Tag.Tag<any, true>
+            ),
+            any
+          ]
         >;
-        meta?: Meta.Meta[];
+        tags?: Tag.Tagged[];
         details: true;
       }
     ): Promised<Flow.ExecutionDetails<S>>;
@@ -439,7 +436,7 @@ export namespace Flow {
     input: StandardSchemaV1<I>;
     output: StandardSchemaV1<S>;
     version?: string;
-  } & Meta.MetaContainer;
+  } & Tag.Container;
 
   export interface Handler<S, I> {
     (ctx: Context, input: I): S | Promised<S>;
@@ -463,7 +460,9 @@ export namespace Flow {
     | Handler<infer S, any>
     | Core.Executor<Handler<infer S, any>>
     | Flow<any, infer O>
-    ? S extends never ? O : S
+    ? S extends never
+      ? O
+      : S
     : never;
 
   export type FlowRouterNode = { [key: string]: UFlow | FlowRouterNode };
@@ -484,7 +483,10 @@ export namespace Flow {
       }[keyof T]
     : never;
 
-  export type GetFlowFromPath<T, P extends string> = P extends `${infer First}.${infer Rest}`
+  export type GetFlowFromPath<
+    T,
+    P extends string
+  > = P extends `${infer First}.${infer Rest}`
     ? First extends keyof T
       ? GetFlowFromPath<T[First], Rest>
       : never
@@ -492,19 +494,27 @@ export namespace Flow {
     ? T[P]
     : never;
 
-  export type InferInputFromPath<Router, Path extends string> = GetFlowFromPath<Router, Path> extends infer F
+  export type InferInputFromPath<Router, Path extends string> = GetFlowFromPath<
+    Router,
+    Path
+  > extends infer F
     ? F extends UFlow
       ? InferInput<F>
       : never
     : never;
 
-  export type InferOutputFromPath<Router, Path extends string> = GetFlowFromPath<Router, Path> extends infer F
+  export type InferOutputFromPath<
+    Router,
+    Path extends string
+  > = GetFlowFromPath<Router, Path> extends infer F
     ? F extends UFlow
       ? InferOutput<F>
       : never
     : never;
 
-  export type FlowRouterExecutor<Router extends FlowRouterNode> = <P extends PathsToFlows<Router>>(
+  export type FlowRouterExecutor<Router extends FlowRouterNode> = <
+    P extends PathsToFlows<Router>
+  >(
     path: P,
     input: InferInputFromPath<Router, P>
   ) => Promised<InferOutputFromPath<Router, P>>;
@@ -547,13 +557,19 @@ export namespace Flow {
 
   export type C = {
     readonly scope: Core.Scope;
-    readonly metas: Meta.Meta[] | undefined;
+    readonly tags: Tag.Tagged[] | undefined;
 
-    get<T>(accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>): T;
+    get<T>(
+      accessor:
+        | import("./tag-types").Tag.Tag<T, false>
+        | import("./tag-types").Tag.Tag<T, true>
+    ): T;
     find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
     find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
     set<T>(
-      accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>,
+      accessor:
+        | import("./tag-types").Tag.Tag<T, false>
+        | import("./tag-types").Tag.Tag<T, true>,
       value: T
     ): void;
 
@@ -596,7 +612,11 @@ export namespace Flow {
 
   export type ExecutionData = {
     readonly context: {
-      get<T>(accessor: import("./tag-types").Tag.Tag<T, false> | import("./tag-types").Tag.Tag<T, true>): T;
+      get<T>(
+        accessor:
+          | import("./tag-types").Tag.Tag<T, false>
+          | import("./tag-types").Tag.Tag<T, true>
+      ): T;
       find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
       find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
     };
@@ -676,13 +696,12 @@ export namespace Extension {
   }
 }
 
-
 export namespace Multi {
   export type Key = unknown;
   export type MultiExecutor<T, K> = Core.Executor<(k: K) => Core.Accessor<T>> &
     ((key: K) => Core.Executor<T>) & {
       release: (scope: Core.Scope) => Promised<void>;
-      id: Meta.MetaFn<unknown>;
+      id: Tag.Tag<unknown, true>;
     };
 
   export type DependentFn<T, K, D> = (
