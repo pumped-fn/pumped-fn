@@ -1,7 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, FlowError, provide, flowMeta, Promised } from "../src";
+import { flow, FlowError, provide, flowMeta, Promised, tag } from "../src";
 import { custom } from "../src/ssch";
-import { accessor } from "../src/accessor";
 
 describe("Flow API - New Patterns", () => {
   describe("Nameless flows", () => {
@@ -458,7 +457,7 @@ describe("Flow API - New Patterns", () => {
     });
 
     test("context stores custom accessor values", async () => {
-      const processingKey = accessor("customKey", custom<string>());
+      const processingKey = tag(custom<string>(), { label: "customKey" });
       const storeCustomValue = flow(async (ctx, input: string) => {
         ctx.set(processingKey, `processed-${input}`);
         return input.toUpperCase();

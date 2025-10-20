@@ -245,6 +245,12 @@ class FlowContext implements Flow.Context {
     if (this.contextData.has(key)) {
       return this.contextData.get(key);
     }
+    if (this.metas && typeof key === "symbol") {
+      const tagged = this.metas.find((m: Meta.Meta) => m.key === key);
+      if (tagged) {
+        return tagged.value;
+      }
+    }
     if (this.parent) {
       return (this.parent.get as (key: unknown) => unknown)(key);
     }

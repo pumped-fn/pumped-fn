@@ -1,12 +1,12 @@
 import { vi, test, expect } from "vitest";
 import { provide, derive, preset } from "../src/executor";
 import { createScope } from "../src/scope";
-import { meta } from "../src/meta";
+import { tag } from "../src/tag";
 import { custom } from "../src/ssch";
 import { Promised } from "../src/promises";
 import { type Extension } from "../src";
 
-const name = meta("name", custom<string>());
+const name = tag(custom<string>(), { label: "name" });
 
 test("demonstrates core dependency injection and reactive patterns", async () => {
   const configFactory = vi.fn(() => ({
@@ -125,7 +125,7 @@ test("propagates reactive changes through dependency graph", async () => {
 });
 
 test("complicated cleanup", async () => {
-  const name = meta("name", custom<string>());
+  const name = tag(custom<string>(), { label: "name" });
   const fn = vi.fn();
 
   const config = provide(
@@ -243,7 +243,7 @@ test("same promise with different resolves", async () => {
 
 
 test("test scope option", async () => {
-  const eagerMeta = meta("eagerLoad", custom<boolean>());
+  const eagerMeta = tag(custom<boolean>(), { label: "eagerLoad" });
   const eagerLoadExtension: Extension.Extension = {
     name: "eager-load",
     init: (scope) => {

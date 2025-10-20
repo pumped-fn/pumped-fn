@@ -27,6 +27,10 @@ function extract<T>(
   key: symbol,
   schema: StandardSchemaV1<T>
 ): T | undefined {
+  if (source === null || source === undefined) {
+    return undefined;
+  }
+
   if (isStore(source)) {
     const value = source.get(key);
     return value === undefined ? undefined : validate(schema, value);

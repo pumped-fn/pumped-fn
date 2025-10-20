@@ -1,11 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { flow } from "../src";
-import { meta } from "../src/meta";
+import { flow, tag } from "../src";
 import { custom } from "../src/ssch";
 
 describe("Flow Execution Meta", () => {
   test("scopeMeta applies configuration to newly created scope", async () => {
-    const appConfig = meta("app.config", custom<{ env: string }>());
+    const appConfig = tag(custom<{ env: string }>(), { label: "app.config" });
     const readConfig = flow((context) => {
       return appConfig.get(context.scope);
     });
@@ -18,7 +17,7 @@ describe("Flow Execution Meta", () => {
   });
 
   test("execution meta accessible from flow context", async () => {
-    const requestId = meta("request.id", custom<{ requestId: string }>());
+    const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const getRequestId = flow((context) => {
       return requestId.get(context);
     });
@@ -31,7 +30,7 @@ describe("Flow Execution Meta", () => {
   });
 
   test("execution meta isolated between concurrent executions", async () => {
-    const requestId = meta("request.id", custom<{ requestId: string }>());
+    const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const getRequestId = flow((context) => {
       return requestId.get(context);
     });
@@ -48,8 +47,8 @@ describe("Flow Execution Meta", () => {
   });
 
   test("scopeMeta and execution meta coexist independently", async () => {
-    const appConfig = meta("app.config", custom<{ env: string }>());
-    const requestId = meta("request.id", custom<{ requestId: string }>());
+    const appConfig = tag(custom<{ env: string }>(), { label: "app.config" });
+    const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const readBothMetas = flow((context) => {
       const scopeConfig = appConfig.get(context.scope);
       const execMeta = requestId.get(context);
@@ -69,7 +68,7 @@ describe("Flow Execution Meta", () => {
 
   test("execution meta does not pollute provided scope", async () => {
     const { createScope } = await import("../src/scope");
-    const requestId = meta("request.id", custom<{ requestId: string }>());
+    const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const existingScope = createScope();
 
     const inspectScope = flow((context) => {

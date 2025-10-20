@@ -1,46 +1,46 @@
 import { describe, test, expect } from "vitest";
-import { accessor } from "../src/accessor";
 import { custom } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { createExecutor, derive, provide, preset } from "../src/executor";
 import { flow } from "../src/flow";
 import { Promised } from "../src/promises";
+import { tag } from "../src/tag";
 
 describe("Core Functionality", () => {
-  describe("Accessor functionality", () => {
-    test("accessor provides default value when created with initial value", () => {
-      const numberAccessor = accessor("test.number", custom<number>(), 42);
+  describe("Tag functionality", () => {
+    test("tag provides default value when created with initial value", () => {
+      const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
       const store = new Map();
 
-      const result = numberAccessor.find(store);
+      const result = numberTag.find(store);
 
       expect(result).toBe(42);
     });
 
-    test("accessor stores and retrieves values from store", () => {
-      const stringAccessor = accessor("test.string", custom<string>());
+    test("tag stores and retrieves values from store", () => {
+      const stringTag = tag(custom<string>(), { label: "test.string" });
       const store = new Map();
 
-      stringAccessor.set(store, "hello");
-      const result = stringAccessor.find(store);
+      stringTag.set(store, "hello");
+      const result = stringTag.find(store);
 
       expect(result).toBe("hello");
     });
 
-    test("accessor returns undefined when no value set and no default provided", () => {
-      const optionalAccessor = accessor("test.optional", custom<string>());
+    test("tag returns undefined when no value set and no default provided", () => {
+      const optionalTag = tag(custom<string>(), { label: "test.optional" });
       const store = new Map();
 
-      const result = optionalAccessor.find(store);
+      const result = optionalTag.find(store);
 
       expect(result).toBeUndefined();
     });
 
-    test("accessor allows updating existing values without error", () => {
-      const numberAccessor = accessor("test.number", custom<number>(), 42);
+    test("tag allows updating existing values without error", () => {
+      const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
       const store = new Map();
 
-      const updateOperation = () => numberAccessor.set(store, 123);
+      const updateOperation = () => numberTag.set(store, 123);
 
       expect(updateOperation).not.toThrow();
     });

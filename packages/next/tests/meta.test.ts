@@ -1,18 +1,16 @@
 import { describe, test, expect, vi } from "vitest";
-import { meta, getValue, findValue, findValues } from "../src/meta";
-import { custom, provide, derive, createScope } from "../src";
-import { tag } from "../src/tag";
+import { custom, provide, derive, createScope, tag } from "../src";
 
 describe("Meta System", () => {
   describe("Basic Meta Operations", () => {
     test("meta definition with validation schema stores and retrieves typed values", async () => {
       const validationFn = vi.fn();
 
-      const nameMeta = meta("name", {
+      const nameMeta = tag<string>({
         "~standard": {
           vendor: "test",
           version: 1,
-          validate(value) {
+          validate(value: unknown) {
             validationFn(0);
 
             if (typeof value !== "string") {
@@ -32,27 +30,27 @@ describe("Meta System", () => {
             };
           },
         },
-      });
+      }, { label: "name" });
 
       const executor = provide(() => {}, nameMeta("test"));
 
-      expect(getValue(nameMeta("test"))).toBe("test");
-      expect(findValue(executor, nameMeta)).toBe("test");
-      expect(findValues(executor, nameMeta)).toEqual(["test"]);
+      expect(nameMeta("test").value).toBe("test");
+      expect(nameMeta.find(executor)).toBe("test");
+      expect(nameMeta.some(executor)).toEqual(["test"]);
     });
 
-    test("meta supports void type for marker metadata", async () => {
-      const markerMeta = meta(Symbol(), custom<void>());
+    test("tag supports boolean marker metadata", async () => {
+      const markerMeta = tag(custom<boolean>(), { default: true });
 
       const executor = provide(() => null, markerMeta());
 
-      expect(markerMeta.find(executor), "can void be void?").not.toBeUndefined;
+      expect(markerMeta.find(executor)).toBe(true);
     });
   });
 
   describe("Meta container support for scope", () => {
-    const configMeta = meta("config", custom<string>());
-    const debugMeta = meta("debug", custom<string>());
+    const configMeta = tag(custom<string>(), { label: "config" });
+    const debugMeta = tag(custom<string>(), { label: "debug" });
 
     test("scope stores and provides type-safe access to meta configuration", async () => {
       const scope = createScope({
@@ -85,39 +83,32 @@ describe("Meta System", () => {
     });
   });
 
-  describe("Tag Migration Compatibility", () => {
-    test("tag replaces meta for basic operations", () => {
+  describe("Tag API", () => {
+    test("tag basic operations", () => {
       const nameTag = tag(custom<string>(), { label: "name" });
-      const nameMeta = meta("name", custom<string>());
 
       const taggedValue = nameTag("test");
-      const executorWithMeta = provide(() => {}, nameMeta("test"));
+      const executor = provide(() => {}, nameTag("test"));
 
       expect(taggedValue.value).toBe("test");
       expect(nameTag.find([taggedValue])).toBe("test");
-      expect(nameMeta.find(executorWithMeta)).toBe("test");
+      expect(nameTag.find(executor)).toBe("test");
     });
 
-    test("tag some() replaces meta some()", () => {
+    test("tag some() collects multiple values", () => {
       const nameTag = tag(custom<string>(), { label: "name" });
-      const nameMeta = meta("name", custom<string>());
 
       const taggedArray = [nameTag("John"), nameTag("Jane")];
-      const metaArray = [nameMeta("John"), nameMeta("Jane")];
 
       expect(nameTag.some(taggedArray)).toEqual(["John", "Jane"]);
-      expect(nameMeta.some(metaArray)).toEqual(["John", "Jane"]);
     });
 
-    test("tag callable replaces meta callable", () => {
+    test("tag callable creates tagged values", () => {
       const nameTag = tag(custom<string>());
-      const nameMeta = meta("name", custom<string>());
 
       const taggedValue = nameTag("test");
-      const metaValue = nameMeta("test");
 
       expect(taggedValue.value).toBe("test");
-      expect(metaValue.value).toBe("test");
     });
   });
 });

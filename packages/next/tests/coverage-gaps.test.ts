@@ -1,5 +1,4 @@
 import { describe, test, expect } from "vitest";
-import { accessor } from "../src/accessor";
 import { custom, validate } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { createExecutor, derive, provide } from "../src/executor";
@@ -11,7 +10,7 @@ import {
   createDependencyError,
   createSystemError,
 } from "../src/errors";
-import { meta } from "../src/meta";
+import { tag } from "../src/tag";
 import { Promised } from "../src/promises";
 
 describe("Coverage Gaps", () => {
@@ -91,35 +90,34 @@ describe("Coverage Gaps", () => {
     });
   });
 
-  describe("accessor.ts - uncovered lines", () => {
-    test("accessor.get throws when value not found", () => {
-      const acc = accessor("test.key", custom<number>());
+  describe("tag.ts - uncovered lines", () => {
+    test("tag.get throws when value not found", () => {
+      const acc = tag(custom<number>(), { label: "test.key" });
       const store = new Map();
 
       expect(() => acc.get(store)).toThrow("Value not found for key:");
     });
 
-    test("accessor.preset returns symbol and value tuple", () => {
-      const acc = accessor("test.preset", custom<string>());
+    test("tag.entry returns symbol and value tuple", () => {
+      const acc = tag(custom<string>(), { label: "test.preset" });
 
-      const [symbol, value] = acc.preset("test-value");
+      const [symbol, value] = acc.entry("test-value");
 
       expect(typeof symbol).toBe("symbol");
       expect(value).toBe("test-value");
     });
 
-    test("accessor with default value preset returns symbol and value tuple", () => {
-      const acc = accessor("test.preset.default", custom<number>(), 42);
+    test("tag with default value entry returns symbol and value tuple", () => {
+      const acc = tag(custom<number>(), { label: "test.preset.default", default: 42 });
 
-      const [symbol, value] = acc.preset(100);
+      const [symbol, value] = acc.entry(100);
 
       expect(typeof symbol).toBe("symbol");
       expect(value).toBe(100);
     });
 
-    test("accessor created with symbol key", () => {
-      const symbolKey = Symbol("custom-key");
-      const acc = accessor(symbolKey, custom<string>());
+    test("tag created without label uses anonymous symbol key", () => {
+      const acc = tag(custom<string>());
       const store = new Map();
 
       acc.set(store, "value");
@@ -128,37 +126,37 @@ describe("Coverage Gaps", () => {
       expect(result).toBe("value");
     });
 
-    test("accessor.find from meta array", () => {
-      const acc = accessor("test.meta", custom<string>());
-      const metaMeta = meta("test.meta", custom<string>());
-      const metaArray = [metaMeta("test-value")];
+    test("tag.find from tag array with different key", () => {
+      const acc = tag(custom<string>(), { label: "test.meta" });
+      const otherTag = tag(custom<string>(), { label: "test.other" });
+      const tagArray = [otherTag("test-value")];
 
-      const result = acc.find(metaArray);
+      const result = acc.find(tagArray);
 
       expect(result).toBeUndefined();
     });
 
-    test("accessor.find from executor with metas", () => {
-      const acc = accessor("test.exec", custom<number>());
-      const accMeta = meta("test.exec", custom<number>());
-      const exec = provide(() => 1, accMeta(42));
+    test("tag.find from executor with different tag", () => {
+      const acc = tag(custom<number>(), { label: "test.exec" });
+      const otherTag = tag(custom<number>(), { label: "test.other" });
+      const exec = provide(() => 1, otherTag(42));
 
       const result = acc.find(exec);
 
       expect(result).toBeUndefined();
     });
 
-    test("accessor.set throws on non-datastore", () => {
-      const acc = accessor("test.invalid", custom<string>());
+    test("tag.set on executor returns tagged value", () => {
+      const acc = tag(custom<string>(), { label: "test.set" });
       const exec = provide(() => 1);
 
-      expect(() => acc.set(exec as any, "value")).toThrow(
-        "set() can only be used with DataStore"
-      );
+      const tagged = acc.set(exec.metas ?? [], "value");
+
+      expect(tagged.value).toBe("value");
     });
 
-    test("accessor.get retrieves value from datastore", () => {
-      const acc = accessor("test.get", custom<number>());
+    test("tag.get retrieves value from datastore", () => {
+      const acc = tag(custom<number>(), { label: "test.get" });
       const store = new Map();
       acc.set(store, 999);
 
@@ -402,36 +400,36 @@ describe("Coverage Gaps", () => {
     });
   });
 
-  describe("meta.ts - uncovered lines", () => {
-    test("meta.some with non-existing meta returns empty array", () => {
-      const testMeta = meta("test", custom<string>());
+  describe("tag.ts - additional coverage", () => {
+    test("tag.some with non-existing tag returns empty array", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      const result = testMeta.some(exec);
+      const result = testTag.some(exec);
 
       expect(result).toEqual([]);
     });
 
-    test("meta.find on executor without meta", () => {
-      const testMeta = meta("test", custom<string>());
+    test("tag.find on executor without tag", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      const result = testMeta.find(exec);
+      const result = testTag.find(exec);
 
       expect(result).toBeUndefined();
     });
 
-    test("meta.get on executor without meta throws", () => {
-      const testMeta = meta("test", custom<string>());
+    test("tag.get on executor without tag throws", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      expect(() => testMeta.get(exec)).toThrow();
+      expect(() => testTag.get(exec)).toThrow();
     });
 
-    test("meta.partial creates partial metadata", () => {
-      const testMeta = meta("test", custom<{ a: string; b: number }>());
+    test("tag.partial creates partial metadata", () => {
+      const testTag = tag(custom<{ a: string; b: number }>(), { label: "test" });
 
-      const partial = testMeta.partial({ a: "test" });
+      const partial = (testTag as any).partial({ a: "test" });
 
       expect(partial).toBeDefined();
     });
