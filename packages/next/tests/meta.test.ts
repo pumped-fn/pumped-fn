@@ -54,11 +54,11 @@ describe("Meta System", () => {
 
     test("scope stores and provides type-safe access to meta configuration", async () => {
       const scope = createScope({
-        meta: [configTag("production"), debugTag("off")],
+        tags: [configTag("production"), debugTag("off")],
       });
 
-      expect(scope.metas).toBeDefined();
-      expect(scope.metas).toHaveLength(2);
+      expect(scope.tags).toBeDefined();
+      expect(scope.tags).toHaveLength(2);
 
       const environmentConfig = configTag.get(scope);
       expect(environmentConfig).toBe("production");
@@ -69,7 +69,7 @@ describe("Meta System", () => {
 
     test("executors access scope meta through controller for configuration injection", async () => {
       const scope = createScope({
-        meta: [configTag("test-env")],
+        tags: [configTag("test-env")],
       });
 
       const environmentAwareExecutor = provide((controller) => {

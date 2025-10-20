@@ -150,7 +150,7 @@ describe("Coverage Gaps", () => {
       const acc = tag(custom<string>(), { label: "test.set" });
       const exec = provide(() => 1);
 
-      const tagged = acc.set(exec.metas ?? [], "value");
+      const tagged = acc.set(exec.tags ?? [], "value");
 
       expect(tagged.value).toBe("value");
     });

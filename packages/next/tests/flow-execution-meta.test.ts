@@ -10,7 +10,7 @@ describe("Flow Execution Meta", () => {
     });
 
     const result = await flow.execute(readConfig, undefined, {
-      scopeMeta: [appConfig({ env: "production" })],
+      scopeTags: [appConfig({ env: "production" })],
     });
 
     expect(result).toEqual({ env: "production" });
@@ -23,7 +23,7 @@ describe("Flow Execution Meta", () => {
     });
 
     const result = await flow.execute(getRequestId, undefined, {
-      meta: [requestId({ requestId: "req-123" })],
+      tags: [requestId({ requestId: "req-123" })],
     });
 
     expect(result).toEqual({ requestId: "req-123" });
@@ -36,10 +36,10 @@ describe("Flow Execution Meta", () => {
     });
 
     const firstExecution = await flow.execute(getRequestId, undefined, {
-      meta: [requestId({ requestId: "req-1" })],
+      tags: [requestId({ requestId: "req-1" })],
     });
     const secondExecution = await flow.execute(getRequestId, undefined, {
-      meta: [requestId({ requestId: "req-2" })],
+      tags: [requestId({ requestId: "req-2" })],
     });
 
     expect(firstExecution).toEqual({ requestId: "req-1" });
@@ -56,8 +56,8 @@ describe("Flow Execution Meta", () => {
     });
 
     const result = await flow.execute(readBothMetas, undefined, {
-      scopeMeta: [appConfig({ env: "test" })],
-      meta: [requestId({ requestId: "req-abc" })],
+      scopeTags: [appConfig({ env: "test" })],
+      tags: [requestId({ requestId: "req-abc" })],
     });
 
     expect(result).toEqual({
@@ -72,17 +72,17 @@ describe("Flow Execution Meta", () => {
     const existingScope = createScope();
 
     const inspectScope = flow((context) => {
-      const scopeMetas = context.scope.metas;
+      const scopeTags = context.scope.tags;
       const execTag = requestId.get(context);
-      return { scopeMetas, execTag };
+      return { scopeTags, execTag };
     });
 
     const result = await flow.execute(inspectScope, undefined, {
       scope: existingScope,
-      meta: [requestId({ requestId: "req-xyz" })],
+      tags: [requestId({ requestId: "req-xyz" })],
     });
 
-    expect(result.scopeMetas).toBeUndefined();
+    expect(result.scopeTags).toBeUndefined();
     expect(result.execTag).toEqual({ requestId: "req-xyz" });
   });
 });
