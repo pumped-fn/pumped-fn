@@ -29,8 +29,18 @@ func (e *Executor[T]) SetTag(tag any, val any) {
 }
 
 func (e *Executor[T]) ResolveAny(s *Scope) (any, error) {
-	ctx := &ResolveCtx{scope: s}
-	return e.factory(ctx)
+	ctx := &ResolveCtx{
+		scope:      s,
+		executorID: e,
+		cleanups:   []cleanupEntry{},
+	}
+	result, err := e.factory(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	s.registerCleanups(e, ctx.cleanups)
+	return result, nil
 }
 
 // DependencyMode defines how a dependency behaves

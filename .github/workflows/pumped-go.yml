@@ -1,0 +1,103 @@
+name: Pumped Go CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'pumped-go/**'
+      - '.github/workflows/pumped-go.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pumped-go/**'
+      - '.github/workflows/pumped-go.yml'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.23', '1.24', '1.25']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache-dependency-path: pumped-go/go.sum
+
+    - name: Verify dependencies
+      working-directory: pumped-go
+      run: |
+        go mod download
+        go mod verify
+
+    - name: Build
+      working-directory: pumped-go
+      run: go build -v ./...
+
+    - name: Run tests
+      working-directory: pumped-go
+      run: CGO_ENABLED=1 go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      if: matrix.go-version == '1.23'
+      with:
+        file: pumped-go/coverage.txt
+        flags: pumped-go
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        working-directory: pumped-go
+        args: --timeout=5m
+
+  examples:
+    name: Build Examples
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Build examples with go.mod
+      run: |
+        for example in pumped-go/examples/*/; do
+          if [ -f "${example}go.mod" ]; then
+            echo "Building ${example}"
+            (cd "${example}" && go build -v .)
+          fi
+        done
+
+    - name: Build examples without go.mod
+      run: |
+        for example in pumped-go/examples/*/; do
+          if [ ! -f "${example}go.mod" ] && [ -f "${example}main.go" ]; then
+            echo "Building ${example}"
+            (cd "${example}" && go build -v .)
+          fi
+        done

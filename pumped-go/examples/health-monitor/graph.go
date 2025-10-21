@@ -49,7 +49,16 @@ func DefineGraph() *Graph {
 			if err != nil {
 				return nil, err
 			}
-			return NewDB(cfg.DBPath)
+			database, err := NewDB(cfg.DBPath)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx.OnCleanup(func() error {
+				return database.Close()
+			})
+
+			return database, nil
 		},
 	)
 
@@ -118,7 +127,16 @@ func DefineGraph() *Graph {
 			hc, _ := hcCtrl.Get()
 			id, _ := idCtrl.Get()
 			log, _ := logCtrl.Get()
-			return NewScheduler(sr, hr, hc, id, log), nil
+
+			sched := NewScheduler(sr, hr, hc, id, log)
+			sched.Start()
+
+			ctx.OnCleanup(func() error {
+				sched.Stop()
+				return nil
+			})
+
+			return sched, nil
 		},
 	)
 

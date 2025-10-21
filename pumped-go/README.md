@@ -6,9 +6,10 @@ A powerful dependency injection and reactive execution library for Go, inspired 
 
 - **Graph-based DI**: Declare dependencies explicitly, resolve lazily
 - **Reactive Updates**: Automatic propagation of changes through dependency graph
+- **Flow Execution**: Short-span operations with execution context trees and tracing
 - **Type-safe**: Full generic support with minimal casting
 - **Controller Pattern**: Fine-grained lifecycle control (get, update, reload, release)
-- **Tags**: Type-safe metadata system for executors and scopes
+- **Tags**: Type-safe metadata system for executors, scopes, and flows
 - **Extensions**: Powerful middleware system for cross-cutting concerns
 - **No IDs Required**: Executors are their own keys
 
@@ -149,6 +150,80 @@ scope := pumped.NewScope(
     pumped.WithExtension(metrics),
 )
 ```
+
+### Flows
+
+Flows are short-span executable units with context trees and tracing:
+
+```go
+// Define long-running resources as executors
+db := pumped.Derive1(config, func(ctx *pumped.ResolveCtx, cfg *pumped.Controller[*Config]) (*DB, error) {
+    return NewDB(cfg.Get().DBHost)
+})
+
+// Define short-span operations as flows
+fetchUser := pumped.Flow1(db,
+    func(execCtx *pumped.ExecutionCtx, db *pumped.Controller[*DB]) (*User, error) {
+        database, _ := db.Get()
+        return database.QueryUser("123")
+    },
+    pumped.WithFlowTag(pumped.FlowName(), "fetchUser"),
+)
+
+// Execute flow with context
+result, execNode, err := pumped.Exec(scope, context.Background(), fetchUser)
+
+// Query execution tree
+tree := scope.GetExecutionTree()
+roots := tree.GetRoots()
+for _, root := range roots {
+    children := tree.GetChildren(root.ID)
+    // Visualize execution tree
+}
+```
+
+**Sub-flow execution:**
+
+```go
+parentFlow := pumped.Flow1(db, func(execCtx *pumped.ExecutionCtx, db *pumped.Controller[*DB]) (string, error) {
+    // Execute sub-flows
+    user, userCtx, _ := pumped.Exec1(execCtx, fetchUserFlow)
+    orders, _, _ := pumped.Exec1(userCtx, fetchOrdersFlow)
+
+    // Child contexts can read parent data via tags
+    userID, _ := execCtx.Lookup(customTag)
+
+    return fmt.Sprintf("User %s has %d orders", user, len(orders)), nil
+})
+```
+
+**Tag-based data flow:**
+
+```go
+// Set data in parent flow
+execCtx.Set(pumped.Input(), "user-123")
+
+// Child flows can read upward (but not write)
+userID, _ := childCtx.GetFromParent(pumped.Input())
+userID, _ := childCtx.Lookup(pumped.Input()) // checks self, then parents, then scope
+```
+
+**Execution lifecycle:**
+
+- Flows execute with `ExecutionCtx` (execution-specific context tree)
+- Executors resolve with `ResolveCtx` (scope-level resolution)
+- Extensions hook into flow lifecycle: `OnFlowStart`, `OnFlowEnd`, `OnFlowPanic`
+- Execution tree automatically tracks all executions with tags
+
+## Examples
+
+See [examples/](./examples/) for complete working examples:
+
+- `basic/` - Executor fundamentals with reactivity
+- `health-monitor/` - Production-ready health monitoring service
+- `order-processing/` - Flow execution with context trees
+- `http-api/` - REST API with dependency injection
+- `cli-tasks/` - CLI application with services
 
 ## License
 

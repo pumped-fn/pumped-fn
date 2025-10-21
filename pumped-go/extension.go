@@ -7,6 +7,9 @@ type Extension interface {
 	// Name returns the extension's name
 	Name() string
 
+	// Order determines extension execution order (lower = earlier)
+	Order() int
+
 	// Init is called when the extension is registered to a scope
 	Init(scope *Scope) error
 
@@ -16,8 +19,24 @@ type Extension interface {
 	// OnError handles errors during resolution
 	OnError(err error, op *Operation, scope *Scope)
 
+	// OnCleanupError handles cleanup failures
+	// Returns true if the error was handled, false to use default behavior
+	OnCleanupError(err *CleanupError) bool
+
+	// Flow execution hooks
+	OnFlowStart(execCtx *ExecutionCtx, flow AnyFlow) error
+	OnFlowEnd(execCtx *ExecutionCtx, result any, err error) error
+	OnFlowPanic(execCtx *ExecutionCtx, recovered any, stack []byte) error
+
 	// Dispose is called when the scope is disposed
 	Dispose(scope *Scope) error
+}
+
+// CleanupError contains information about a cleanup failure
+type CleanupError struct {
+	ExecutorID AnyExecutor
+	Err        error
+	Context    string // "reactive" or "dispose"
 }
 
 // BaseExtension provides default implementations for Extension methods
@@ -34,6 +53,10 @@ func (e *BaseExtension) Name() string {
 	return e.name
 }
 
+func (e *BaseExtension) Order() int {
+	return 100
+}
+
 func (e *BaseExtension) Init(scope *Scope) error {
 	return nil
 }
@@ -43,6 +66,22 @@ func (e *BaseExtension) Wrap(ctx context.Context, next func() (any, error), op *
 }
 
 func (e *BaseExtension) OnError(err error, op *Operation, scope *Scope) {
+}
+
+func (e *BaseExtension) OnCleanupError(err *CleanupError) bool {
+	return false
+}
+
+func (e *BaseExtension) OnFlowStart(execCtx *ExecutionCtx, flow AnyFlow) error {
+	return nil
+}
+
+func (e *BaseExtension) OnFlowEnd(execCtx *ExecutionCtx, result any, err error) error {
+	return nil
+}
+
+func (e *BaseExtension) OnFlowPanic(execCtx *ExecutionCtx, recovered any, stack []byte) error {
+	return nil
 }
 
 func (e *BaseExtension) Dispose(scope *Scope) error {

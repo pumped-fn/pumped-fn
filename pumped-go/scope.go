@@ -3,17 +3,23 @@ package pumped
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
+	"time"
 )
 
 // Scope manages the lifecycle and resolution of executors
 type Scope struct {
-	mu         sync.RWMutex
-	cache      map[AnyExecutor]any
-	tags       map[any]any
-	downstream map[AnyExecutor][]reactiveDependent
-	extensions []Extension
-	presets    map[AnyExecutor]preset
+	mu              sync.RWMutex
+	cache           map[AnyExecutor]any
+	tags            map[any]any
+	downstream      map[AnyExecutor][]reactiveDependent
+	extensions      []Extension
+	presets         map[AnyExecutor]preset
+	cleanupRegistry map[AnyExecutor][]cleanupEntry
+	cleanupMu       sync.RWMutex
+	execTree        *ExecutionTree
+	idCounter       uint64
 }
 
 type reactiveDependent struct {
@@ -66,11 +72,14 @@ func WithPreset[T any](original *Executor[T], replacement any) ScopeOption {
 // NewScope creates a new scope with optional configuration
 func NewScope(opts ...ScopeOption) *Scope {
 	s := &Scope{
-		cache:      make(map[AnyExecutor]any),
-		tags:       make(map[any]any),
-		downstream: make(map[AnyExecutor][]reactiveDependent),
-		extensions: []Extension{},
-		presets:    make(map[AnyExecutor]preset),
+		cache:           make(map[AnyExecutor]any),
+		tags:            make(map[any]any),
+		downstream:      make(map[AnyExecutor][]reactiveDependent),
+		extensions:      []Extension{},
+		presets:         make(map[AnyExecutor]preset),
+		cleanupRegistry: make(map[AnyExecutor][]cleanupEntry),
+		execTree:        newExecutionTree(1000),
+		idCounter:       0,
 	}
 
 	for _, opt := range opts {
@@ -207,14 +216,20 @@ func Update[T any](s *Scope, exec *Executor[T], newVal T) error {
 
 	next := func() (any, error) {
 		s.mu.Lock()
-		defer s.mu.Unlock()
-
-		s.cache[exec] = newVal
 		toInvalidate := s.findReactiveDependents(exec)
+		s.mu.Unlock()
+
+		for _, dependent := range toInvalidate {
+			s.cleanupExecutor(dependent)
+		}
+
+		s.mu.Lock()
+		s.cache[exec] = newVal
 
 		for _, dependent := range toInvalidate {
 			delete(s.cache, dependent)
 		}
+		s.mu.Unlock()
 
 		return nil, nil
 	}
@@ -258,13 +273,87 @@ func (s *Scope) findReactiveDependents(exec AnyExecutor) []AnyExecutor {
 func (s *Scope) UseExtension(ext Extension) error {
 	s.mu.Lock()
 	s.extensions = append(s.extensions, ext)
+	sort.Slice(s.extensions, func(i, j int) bool {
+		return s.extensions[i].Order() < s.extensions[j].Order()
+	})
 	s.mu.Unlock()
 
 	return ext.Init(s)
 }
 
+func (s *Scope) registerCleanups(exec AnyExecutor, entries []cleanupEntry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	s.cleanupMu.Lock()
+	defer s.cleanupMu.Unlock()
+	s.cleanupRegistry[exec] = entries
+}
+
+func (s *Scope) cleanupExecutor(exec AnyExecutor) {
+	s.cleanupMu.Lock()
+	entries := s.cleanupRegistry[exec]
+	delete(s.cleanupRegistry, exec)
+	s.cleanupMu.Unlock()
+
+	if len(entries) == 0 {
+		return
+	}
+
+	s.runCleanups(entries, exec, "reactive")
+}
+
+func (s *Scope) runCleanups(entries []cleanupEntry, exec AnyExecutor, cleanupContext string) {
+	s.mu.RLock()
+	exts := make([]Extension, len(s.extensions))
+	copy(exts, s.extensions)
+	s.mu.RUnlock()
+
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+
+		if err := entry.fn(); err != nil {
+			cleanupErr := &CleanupError{
+				ExecutorID: exec,
+				Err:        err,
+				Context:    cleanupContext,
+			}
+
+			handled := false
+			for _, ext := range exts {
+				if ext.OnCleanupError(cleanupErr) {
+					handled = true
+					break
+				}
+			}
+
+			if !handled {
+			}
+		}
+	}
+}
+
 // Dispose cleans up the scope and all its extensions
 func (s *Scope) Dispose() error {
+	s.cleanupMu.Lock()
+	allEntries := make([]struct {
+		exec    AnyExecutor
+		entries []cleanupEntry
+	}, 0, len(s.cleanupRegistry))
+
+	for exec, entries := range s.cleanupRegistry {
+		allEntries = append(allEntries, struct {
+			exec    AnyExecutor
+			entries []cleanupEntry
+		}{exec, entries})
+	}
+	s.cleanupMu.Unlock()
+
+	for i := len(allEntries) - 1; i >= 0; i-- {
+		s.runCleanups(allEntries[i].entries, allEntries[i].exec, "dispose")
+	}
+
 	s.mu.RLock()
 	exts := make([]Extension, len(s.extensions))
 	copy(exts, s.extensions)
@@ -292,4 +381,80 @@ func (s *Scope) SetTag(tag any, val any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tags[tag] = val
+}
+
+// GetExecutionTree returns the execution tree for querying
+func (s *Scope) GetExecutionTree() *ExecutionTree {
+	return s.execTree
+}
+
+func (s *Scope) generateExecutionID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.idCounter++
+	return fmt.Sprintf("exec-%d", s.idCounter)
+}
+
+func Exec[R any](s *Scope, ctx context.Context, flow *Flow[R]) (R, *ExecutionCtx, error) {
+	var zero R
+
+	for _, dep := range flow.deps {
+		if dep.GetMode() == ModeLazy {
+			continue
+		}
+		_, err := dep.GetExecutor().ResolveAny(s)
+		if err != nil {
+			return zero, nil, fmt.Errorf("resolving dependency: %w", err)
+		}
+	}
+
+	execCtx := &ExecutionCtx{
+		id:     s.generateExecutionID(),
+		parent: nil,
+		scope:  s,
+		data:   make(map[any]any),
+		ctx:    ctx,
+	}
+
+	if name, ok := flow.GetTag(flowNameTag); ok {
+		execCtx.Set(flowNameTag, name)
+	}
+
+	execCtx.Set(startTimeTag, time.Now())
+	execCtx.Set(statusTag, ExecutionStatusRunning)
+
+	s.mu.RLock()
+	exts := make([]Extension, len(s.extensions))
+	copy(exts, s.extensions)
+	s.mu.RUnlock()
+
+	for _, ext := range exts {
+		if err := ext.OnFlowStart(execCtx, flow); err != nil {
+			execCtx.Set(statusTag, ExecutionStatusFailed)
+			execCtx.Set(errorTag, err)
+			return zero, execCtx, err
+		}
+	}
+
+	result, err := executeFlow(execCtx, flow)
+
+	execCtx.Set(endTimeTag, time.Now())
+	if err != nil {
+		execCtx.Set(statusTag, ExecutionStatusFailed)
+		execCtx.Set(errorTag, err)
+	} else {
+		execCtx.Set(statusTag, ExecutionStatusSuccess)
+		execCtx.Set(outputTag, result)
+	}
+
+	for i := len(exts) - 1; i >= 0; i-- {
+		if extErr := exts[i].OnFlowEnd(execCtx, result, err); extErr != nil && err == nil {
+			err = extErr
+		}
+	}
+
+	node := execCtx.finalize()
+	s.execTree.addNode(node)
+
+	return result, execCtx, err
 }

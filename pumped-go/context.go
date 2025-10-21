@@ -1,8 +1,31 @@
 package pumped
 
+import "sync"
+
+type cleanupEntry struct {
+	fn    func() error
+	order int
+}
+
 // ResolveCtx provides context for factory functions
 type ResolveCtx struct {
-	scope *Scope
+	scope      *Scope
+	cleanups   []cleanupEntry
+	cleanupMu  sync.Mutex
+	executorID AnyExecutor
+}
+
+// OnCleanup registers a cleanup function to be called when the executor is disposed
+// Extensions can read tags from the executor to determine cleanup behavior
+func (ctx *ResolveCtx) OnCleanup(fn func() error) {
+	ctx.cleanupMu.Lock()
+	defer ctx.cleanupMu.Unlock()
+
+	entry := cleanupEntry{
+		fn:    fn,
+		order: len(ctx.cleanups),
+	}
+	ctx.cleanups = append(ctx.cleanups, entry)
 }
 
 // GetTag retrieves a tag value from the scope

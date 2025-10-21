@@ -141,6 +141,39 @@ dist
 
 # Act artifacts
 .act/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Go binaries (explicitly list known binary names)
+basic
+cli-tasks
+http-api
+order-processing
+health-monitor
+pumped-go/basic
+pumped-go/cli-tasks
+pumped-go/http-api
+pumped-go/main
+pumped-go/order-processing
+pumped-go/examples/basic/basic
+pumped-go/examples/cli-tasks/cli-tasks
+pumped-go/examples/health-monitor/health-monitor
+pumped-go/examples/http-api/http-api
+pumped-go/examples/order-processing/order-processing
+
+# Go database and test artifacts
+*.db
+*.db-shm
+*.db-wal
+
 # Logs
 logs
 *.log

@@ -4,7 +4,27 @@ Production-ready examples demonstrating integration patterns for pumped-go.
 
 ## Examples
 
-### 1. CLI Tasks - Command-Based Integration
+### 1. Order Processing - Flow Execution Pattern
+
+**Path:** `order-processing/`
+
+**Pattern:** Flow-based execution with context trees
+
+A simple order processing system demonstrating:
+- Executors for long-running resources (DB, config)
+- Flows for short-span operations (fetch user, fetch orders, process)
+- Sub-flow execution with parent-child context relationships
+- Tag-based data flow between flows
+- Execution tree visualization for debugging
+
+```bash
+cd order-processing
+go run .
+```
+
+**Key takeaway:** Use Executors for resources that live for the scope lifetime (DB connections, caches), use Flows for request-scoped operations that need tracing and context propagation.
+
+### 2. CLI Tasks - Command-Based Integration
 
 **Path:** `cli-tasks/`
 
@@ -56,6 +76,34 @@ curl http://localhost:8080/stats
 ```
 
 **Key takeaway:** HTTP handlers are "leaf nodes" that resolve dependencies once per request, leveraging scope caching across requests.
+
+### 4. Health Monitor - Production Service
+
+**Path:** `health-monitor/`
+
+**Pattern:** Production-ready health monitoring service
+
+A comprehensive health monitoring service demonstrating:
+- Scheduler for periodic health checks
+- Database persistence with SQLite
+- Incident detection and alerting
+- REST API with multiple handlers
+- Reactive configuration updates
+
+```bash
+cd health-monitor
+go build -o health-monitor .
+./health-monitor
+
+# In another terminal:
+curl -X POST http://localhost:8080/services \
+  -H "Content-Type: application/json" \
+  -d '{"name":"API","url":"http://example.com","check_interval":30}'
+
+curl http://localhost:8080/services
+```
+
+**Key takeaway:** Complete production service showing resource lifecycle management, scheduled tasks, and graceful shutdown.
 
 ## Integration Principles
 

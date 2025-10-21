@@ -21,7 +21,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	scheduler, err := pumped.Resolve(scope, g.Scheduler)
+	_, err = pumped.Resolve(scope, g.Scheduler)
 	if err != nil {
 		logger.Error("failed to resolve scheduler: %v", err)
 		os.Exit(1)
@@ -44,9 +44,6 @@ func main() {
 		logger.Error("failed to resolve incident handler: %v", err)
 		os.Exit(1)
 	}
-
-	scheduler.Start()
-	defer scheduler.Stop()
 
 	mux := http.NewServeMux()
 
