@@ -60,13 +60,8 @@ const errorBoundary = extension({
     try {
       return await next()
     } catch (error) {
-      console.error('Caught error:', error)
-
-      return {
-        error: (error as Error).message,
-        operation: operation.kind,
-        timestamp: Date.now()
-      }
+      console.error(`Error in ${operation.kind}:`, error)
+      throw error
     }
   }
 })
