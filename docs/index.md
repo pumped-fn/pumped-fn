@@ -122,29 +122,41 @@ const result = await scope.resolve(application);
 
 ## Documentation
 
-### Core Library
+### Getting Started
 
-- [**API Reference**](./api.md) - Complete API documentation for graph construction, resolution, plugins, meta, and flows
-- [**Testing**](./testings.md) - Graph-based testing strategies with preset power
-- [**How It Works**](./how-does-it-work.md) - Deep dive into graph resolution mechanics
-- [**Graph vs Traditional**](./graph-vs-traditional.md) - Comparison with traditional dependency injection
+- [**Executors and Dependencies**](./guides/01-executors-and-dependencies.md) - Build your dependency graph
+- [**Tags: The Type System**](./guides/02-tags-the-type-system.md) - Type-safe runtime data access
+- [**Scope Lifecycle**](./guides/03-scope-lifecycle.md) - Manage long-running resources
+- [**Type Inference Patterns**](./guides/04-type-inference-patterns.md) - Zero-annotation TypeScript
 
-### Advanced Guides
+### Core Guides
 
-- [**Flow API**](./flow.md) - Structured business logic with validation and context management
-- [**DataAccessor**](./accessor.md) - Type-safe data access for Map-like structures with validation
-- [**Extensions**](./extensions.md) - Build cross-cutting functionality with unified extension API
-- [**Component Authoring**](./authoring.md) - Create reusable components with tag-based configuration
-- [**Tag System**](./meta.md) - Type-safe metadata decoration for extensibility
+- [**Flow Basics**](./guides/05-flow-basics.md) - Handle short-lived operations
+- [**Flow Composition**](./guides/06-flow-composition.md) - Compose flows with ctx.exec
+- [**Extensions**](./guides/09-extensions.md) - Cross-cutting concerns
+- [**Error Handling**](./guides/10-error-handling.md) - Error boundaries and recovery
+
+### Patterns
+
+- [**Testing Strategies**](./patterns/testing-strategies.md) - Graph-based testing with presets
+- [**HTTP Server Setup**](./patterns/http-server-setup.md) - Complete server lifecycle
+- [**Database Transactions**](./patterns/database-transactions.md) - Transaction-per-flow pattern
+- [**Middleware Composition**](./patterns/middleware-composition.md) - Extension pipelines
+
+### Reference
+
+- [**API Cheatsheet**](./reference/api-cheatsheet.md) - Quick API reference
+- [**Common Mistakes**](./reference/common-mistakes.md) - Anti-patterns and fixes
+- [**Error Solutions**](./reference/error-solutions.md) - TypeScript error mappings
 
 ### Quick Navigation
 
-| I want to...                  | Go to                                                      |
-| ----------------------------- | ---------------------------------------------------------- |
-| **Start building apps**       | [API Reference](./api.md) → Graph Construction             |
-| **Add business logic**        | [Flow API](./flow.md) → Patterns                           |
-| **Manage context data**       | [DataAccessor](./accessor.md) → Integration with Flows     |
-| **Build reusable components** | [Component Authoring](./authoring.md) → Tag Configuration |
-| **Add monitoring/logging**    | [Extensions](./extensions.md) → Extension Patterns         |
-| **Test my application**       | [Testing](./testings.md) → Graph Testing                   |
-| **Understand the concepts**   | [How It Works](./how-does-it-work.md)                      |
+| I want to...                  | Go to                                                           |
+| ----------------------------- | --------------------------------------------------------------- |
+| **Start building apps**       | [Executors and Dependencies](./guides/01-executors-and-dependencies.md) |
+| **Add business logic**        | [Flow Basics](./guides/05-flow-basics.md)                      |
+| **Manage context data**       | [Tags: The Type System](./guides/02-tags-the-type-system.md)  |
+| **Build reusable components** | [Extensions](./guides/09-extensions.md)                        |
+| **Add monitoring/logging**    | [Extensions](./guides/09-extensions.md)                        |
+| **Test my application**       | [Testing Strategies](./patterns/testing-strategies.md)        |
+| **Understand the concepts**   | [Scope Lifecycle](./guides/03-scope-lifecycle.md)              |

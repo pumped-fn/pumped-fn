@@ -261,6 +261,6 @@ pnpm -F @pumped-fn/core-next test
 
 ## See Also
 
-- [Full Guides](../guides/)
 - [Type Verification](./type-verification.md)
 - [Common Mistakes](./common-mistakes.md)
+- [Error Solutions](./error-solutions.md)
