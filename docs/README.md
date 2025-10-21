@@ -9,9 +9,8 @@ Graph-based dependency injection with complete type inference.
 3. **[Scope Lifecycle](./guides/03-scope-lifecycle.md)** - Manage long-running resources
 4. **[Type Inference Patterns](./guides/04-type-inference-patterns.md)** - Zero-annotation TypeScript
 
-## Core Concepts
+## Core Guides
 
-### Guides
 - [Executors and Dependencies](./guides/01-executors-and-dependencies.md)
 - [Tags: The Type System](./guides/02-tags-the-type-system.md)
 - [Scope Lifecycle](./guides/03-scope-lifecycle.md)
@@ -23,13 +22,15 @@ Graph-based dependency injection with complete type inference.
 - [Extensions](./guides/09-extensions.md)
 - [Error Handling](./guides/10-error-handling.md)
 
-### Patterns
+## Patterns
+
 - [HTTP Server Setup](./patterns/http-server-setup.md)
 - [Database Transactions](./patterns/database-transactions.md)
 - [Testing Strategies](./patterns/testing-strategies.md)
 - [Middleware Composition](./patterns/middleware-composition.md)
 
-### Reference
+## Reference
+
 - [API Cheatsheet](./reference/api-cheatsheet.md)
 - [Type Verification](./reference/type-verification.md)
 - [Common Mistakes](./reference/common-mistakes.md)
@@ -50,25 +51,30 @@ Working examples in `examples/http-server/`:
 - Tag-based type safety
 - Type inference patterns
 - Promised API usage
-- Complete HTTP server
+- Flow composition
+- Reactive updates
+- Extensions and middleware
+- Error handling
+- Database transactions
+- Testing with mocks
 
 ## Quick Example
 
 ```typescript
 import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
-// Tags for type-safe config
 const appConfig = tag(custom<{ port: number }>(), { label: 'app.config' })
 
-// Executors with dependencies
-const config = provide(() => ({ port: 3000 }))
+const config = provide((controller) => appConfig.get(controller.scope))
 const db = derive(config, (cfg) => createConnection(cfg))
 const userService = derive({ db, config }, ({ db, config }) => ({
   getUser: (id: string) => db.query('...')
 }))
 
-// Resolve in scope
-const scope = createScope()
+const scope = createScope({
+  tags: [appConfig({ port: 3000 })]
+})
+
 const service = await scope.resolve(userService)
 const user = await service.getUser('123')
 await scope.dispose()
@@ -79,7 +85,8 @@ await scope.dispose()
 All documentation examples are verified:
 
 ```bash
-pnpm -F @pumped-fn/core-next typecheck:full
+pnpm --filter @pumped-fn/examples typecheck
+pnpm docs:build
 ```
 
 Zero TypeScript errors, no type assertions, complete inference.
