@@ -38,7 +38,7 @@ Zero errors required.
 
 ### 1. Destructure Parameters for Type Inference
 
-<<< @/examples/http-server/06-type-inference.ts#destructure-for-inference{ts}
+<<< @/../examples/http-server/type-inference.ts#destructure-for-inference{ts}
 
 **Why destructuring works:**
 
@@ -69,7 +69,7 @@ const service = derive(dbExecutor, (db) => ({
 
 ### 3. Let Return Types Infer
 
-<<< @/examples/http-server/06-type-inference.ts#return-inference{ts}
+<<< @/../examples/http-server/type-inference.ts#return-inference{ts}
 
 **Don't add explicit return types:**
 
@@ -87,7 +87,7 @@ const good = derive({ db }, ({ db }) => ({
 
 ### 4. Complex Types - Structure for Inference
 
-<<< @/examples/http-server/06-type-inference.ts#inference-with-complex-types{ts}
+<<< @/../examples/http-server/type-inference.ts#inference-with-complex-types{ts}
 
 For complex return types, extract functions to help inference:
 
@@ -197,7 +197,7 @@ Every example includes verification:
 
 ```typescript
 /**
- * @file 06-type-inference.ts
+ * @file type-inference.ts
  *
  * Verify: pnpm -F @pumped-fn/core-next typecheck:full
  */

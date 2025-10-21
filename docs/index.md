@@ -62,12 +62,33 @@ $ bun add @pumped-fn/core-next
 
 ### Graph Resolution in Action
 
-::: code-group
+```ts twoslash
+import { provide, derive, createScope } from '@pumped-fn/core-next'
 
-<<< @/code/1-minute.ts#snippet{ts:line-numbers twoslash} [Basic Graph]
-<<< @/code/5-minutes.ts#snippet{29,34 ts:line-numbers twoslash} [Complex Dependencies]
-<<< @/code/10-minutes.ts#snippet{53,75,55-60 ts:line-numbers twoslash} [Full Application]
-:::
+const config = provide(() => ({
+  port: 3000,
+  dbHost: 'localhost'
+}))
+
+const db = derive(config, (cfg) => ({
+  query: async (sql: string) => {
+    console.log(`Querying ${cfg.dbHost}: ${sql}`)
+    return []
+  }
+}))
+
+const userService = derive({ db, config }, ({ db, config }) => ({
+  getUser: async (id: string) => {
+    const results = await db.query(`SELECT * FROM users WHERE id = '${id}'`)
+    return results[0]
+  }
+}))
+
+const scope = createScope()
+const service = await scope.resolve(userService)
+const user = await service.getUser('123')
+await scope.dispose()
+```
 
 ## How Graph Resolution Works
 

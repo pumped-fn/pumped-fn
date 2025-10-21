@@ -25,7 +25,7 @@ Executors are nodes in a dependency graph. Each executor:
 
 Use `provide()` for executors without dependencies:
 
-<<< @/examples/http-server/01-basic-handler.ts#provide-basic{ts}
+<<< @/../examples/http-server/basic-handler.ts#provide-basic{ts}
 
 The factory function runs when the executor is resolved:
 
@@ -39,7 +39,7 @@ const cfg = await scope.resolve(config)
 
 Use `derive()` when you need dependencies:
 
-<<< @/examples/http-server/01-basic-handler.ts#derive-single-dep{ts}
+<<< @/../examples/http-server/basic-handler.ts#derive-single-dep{ts}
 
 **Single dependency** - Direct parameter:
 
@@ -51,7 +51,7 @@ derive(dependency, (dep) => {
 
 **Multiple dependencies** - Destructure object:
 
-<<< @/examples/http-server/01-basic-handler.ts#derive-multi-deps{ts}
+<<< @/../examples/http-server/basic-handler.ts#derive-multi-deps{ts}
 
 ## Type Inference
 
@@ -78,7 +78,7 @@ See [Type Inference Patterns](./04-type-inference-patterns.md) for details.
 
 The scope resolves dependencies automatically:
 
-<<< @/examples/http-server/01-basic-handler.ts#scope-resolution{ts}
+<<< @/../examples/http-server/basic-handler.ts#scope-resolution{ts}
 
 Resolution order:
 1. `config` executor runs (no dependencies)

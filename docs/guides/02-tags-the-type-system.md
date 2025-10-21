@@ -41,7 +41,7 @@ ctx.set(appConfig, "invalid")          // ✗ Compile error
 
 Tags are typed accessors that work with any container:
 
-<<< @/examples/http-server/shared/tags.ts#L8-L30{ts}
+<<< @/../examples/http-server/shared/tags.ts#L8-L30{ts}
 
 ### Basic Tag Creation
 
@@ -225,7 +225,7 @@ const config = tag(custom<AppConfig>(), { label: 'app.config' })
 
 Tags enable zero-annotation type safety:
 
-<<< @/examples/http-server/03-tags-foundation.ts#solution-tags{ts}
+<<< @/../examples/http-server/tags-foundation.ts#solution-tags{ts}
 
 Notice:
 - No type annotations on `config`
