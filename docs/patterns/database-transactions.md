@@ -79,14 +79,14 @@ const createUser = flow(async (ctx, data: { name: string, email: string }) => {
   return { id: result.insertId, ...data }
 })
 
-const createProfile = flow(async (ctx, userId: string, bio: string) => {
+const createProfile = flow(async (ctx, input: { userId: string, bio: string }) => {
   const txn = ctx.get(transaction)
 
   await txn.query(
-    `INSERT INTO profiles (user_id, bio) VALUES ('${userId}', '${bio}')`
+    `INSERT INTO profiles (user_id, bio) VALUES ('${input.userId}', '${input.bio}')`
   )
 
-  return { userId, bio }
+  return { userId: input.userId, bio: input.bio }
 })
 
 const registerUser = flow(async (ctx, input: {
@@ -99,7 +99,10 @@ const registerUser = flow(async (ctx, input: {
     email: input.email
   })
 
-  const profile = await ctx.exec(createProfile, user.id, input.bio)
+  const profile = await ctx.exec(createProfile, {
+    userId: user.id,
+    bio: input.bio
+  })
 
   return { user, profile }
 })
