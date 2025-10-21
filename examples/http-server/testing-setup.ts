@@ -67,7 +67,7 @@ async function testUsage() {
         dbHost: 'localhost'
       })
     ],
-    presets: [preset(db, mockDb)]
+    initialValues: [preset(db, mockDb)]
   })
 
   const service = await scope.resolve(userService)

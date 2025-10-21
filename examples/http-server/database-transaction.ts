@@ -21,7 +21,7 @@ const transaction = tag(custom<{
 const transactionExtension = extension({
   name: 'transaction',
   wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'flow') {
+    if (operation.kind !== 'execute') {
       return next()
     }
 
@@ -49,10 +49,10 @@ const createUser = flow((ctx, data: { name: string, email: string }) => {
   return { id: '123', ...data }
 })
 
-const updateProfile = flow((ctx, userId: string, data: { bio: string }) => {
+const updateProfile = flow((ctx, input: { userId: string, bio: string }) => {
   const txn = ctx.get(transaction)
-  console.log('Updating profile in transaction:', userId, data)
-  return { userId, ...data }
+  console.log('Updating profile in transaction:', input.userId, input.bio)
+  return { userId: input.userId, bio: input.bio }
 })
 
 const registerUser = flow(async (ctx, input: { name: string, email: string, bio: string }) => {
@@ -61,7 +61,8 @@ const registerUser = flow(async (ctx, input: { name: string, email: string, bio:
     email: input.email
   })
 
-  const profile = await ctx.exec(updateProfile, user.id, {
+  const profile = await ctx.exec(updateProfile, {
+    userId: user.id,
     bio: input.bio
   })
 

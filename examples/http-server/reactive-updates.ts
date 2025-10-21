@@ -21,7 +21,7 @@ const cachedData = derive(config, (cfg) => ({
   timestamp: Date.now()
 }))
 
-const reactiveConsumer = derive.reactive(cachedData, (data) => {
+const reactiveConsumer = derive(cachedData.reactive, (data) => {
   console.log('Config changed:', data)
   return data
 })
@@ -40,11 +40,11 @@ async function main() {
   const consumer = await scope.resolve(reactiveConsumer)
   console.log('Initial:', consumer)
 
-  scope.update(appConfig({
+  await scope.update(config, {
     port: 3000,
     env: 'production',
     dbHost: 'prod.db.example.com'
-  }))
+  })
 
   await new Promise(resolve => setTimeout(resolve, 100))
   await scope.dispose()
