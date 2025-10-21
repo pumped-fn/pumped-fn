@@ -51,7 +51,7 @@ const fetchUser = flow((ctx, id: string) => ({ id, name: 'User' }))
 const fetchPosts = flow((ctx, userId: string) => [{ id: '1', title: 'Post' }])
 
 const handler = flow(async (ctx, userId: string) => {
-  const results = await ctx.parallel([
+  const { results } = await ctx.parallel([
     ctx.exec(fetchUser, userId),
     ctx.exec(fetchPosts, userId)
   ])
