@@ -6,7 +6,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "docs:dev": "cd docs && pnpm dev",
-    "docs:build": "cd docs && NODE_ENV=production pnpm build",
+    "docs:build": "pnpm --filter @pumped-fn/core-next build && cd docs && NODE_ENV=production pnpm build",
     "docs:preview": "cd docs && pnpm preview",
     "verify": "pnpm build && pnpm test && pnpm typecheck",
     "format": "echo 'Formatting disabled'",
