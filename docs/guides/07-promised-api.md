@@ -92,9 +92,8 @@ const results = await Promised.allSettled([
   scope.resolve(failure)
 ])
 
-const fulfilled = results.fulfilled()
-const rejected = results.rejected()
-const [good, bad] = results.partition()
+const fulfilled = results.filter(r => r.status === 'fulfilled')
+const rejected = results.filter(r => r.status === 'rejected')
 ```
 
 ## Lazy Composition

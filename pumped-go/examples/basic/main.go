@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Pumped Go Example ===\n")
+	fmt.Println("=== Pumped Go Example ===")
 
 	// Create scope with logging extension
 	scope := pumped.NewScope(
@@ -74,7 +74,8 @@ func main() {
 	val2, _ := tripledAcc.Get()
 	btn, _ := buttonAcc.Get()
 
-	fmt.Printf("Doubled: %d, Tripled: %d\n\n", val1, val2)
+	fmt.Printf("Doubled: %d, Tripled: %d\n", val1, val2)
+	fmt.Println()
 
 	// Click button to update counter
 	fmt.Println("=== Click Button (triggers reactivity) ===")
@@ -83,7 +84,8 @@ func main() {
 	// Reactive executors are invalidated
 	val1, _ = doubledAcc.Get()
 	val2, _ = tripledAcc.Get()
-	fmt.Printf("Doubled: %d, Tripled: %d\n\n", val1, val2)
+	fmt.Printf("Doubled: %d, Tripled: %d\n", val1, val2)
+	fmt.Println()
 
 	// Click again
 	fmt.Println("=== Click Again ===")
@@ -91,7 +93,8 @@ func main() {
 
 	val1, _ = doubledAcc.Get()
 	val2, _ = tripledAcc.Get()
-	fmt.Printf("Doubled: %d, Tripled: %d\n\n", val1, val2)
+	fmt.Printf("Doubled: %d, Tripled: %d\n", val1, val2)
+	fmt.Println()
 
 	// Demo tags
 	fmt.Println("=== Tags Demo ===")
