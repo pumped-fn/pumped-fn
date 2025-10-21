@@ -11,7 +11,7 @@ Common TypeScript errors and how to fix them.
 ## Type 'unknown' is not assignable to type 'T'
 
 **Error:**
-```
+```text
 Type 'unknown' is not assignable to type 'UserData'
 ```
 
@@ -34,7 +34,7 @@ if (!data) {
 ## Cannot find name 'ctx'
 
 **Error:**
-```
+```text
 Cannot find name 'ctx'
 ```
 
@@ -55,7 +55,7 @@ const cfg = appConfig.get(scope)
 ## Argument of type 'X' is not assignable to parameter of type 'Y'
 
 **Error:**
-```
+```text
 Argument of type '{ port: number }' is not assignable to parameter of type 'AppConfig'
 ```
 
@@ -77,7 +77,7 @@ appConfig({
 ## Property 'X' does not exist on type 'never'
 
 **Error:**
-```
+```text
 Property 'query' does not exist on type 'never'
 ```
 
@@ -99,8 +99,8 @@ derive({ db, config }, ({ db, config }) => {
 ## Circular dependency detected
 
 **Error:**
-```
-Circular dependency detected: A → B → A
+```text
+Circular dependency detected: A -> B -> A
 ```
 
 **Cause:** Executor A depends on B, B depends on A.
@@ -116,7 +116,7 @@ const b = derive(shared, (s) => ({ ...s, fromB: true }))
 ## Type instantiation is excessively deep
 
 **Error:**
-```
+```text
 Type instantiation is excessively deep and possibly infinite
 ```
 
@@ -137,7 +137,7 @@ const service = derive({ db, config }, ({ db, config }): ServiceType => ({
 ## Promise returned is not awaited
 
 **Error:**
-```
+```text
 Promise<T> returned but expected T
 ```
 
@@ -161,7 +161,7 @@ flow((ctx, input) => {
 ## Object is possibly 'undefined'
 
 **Error:**
-```
+```text
 Object is possibly 'undefined'
 ```
 
@@ -185,10 +185,10 @@ const value = tag.get(ctx)
 return value.property
 ```
 
-## Type 'Promised<T>' is not awaitable
+## Type 'Promised&lt;T&gt;' is not awaitable
 
 **Error:**
-```
+```text
 Type 'Promised<User>' is not awaitable
 ```
 

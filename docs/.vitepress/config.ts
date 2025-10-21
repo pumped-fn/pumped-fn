@@ -7,6 +7,8 @@ export default withMermaid(defineConfig({
     title: "Pumped Functions",
     description: "Graph-based dependency resolution for TypeScript",
     base: "/pumped-fn/",
+    srcExclude: ["**/plans/**"],
+    ignoreDeadLinks: true,
 
     head: [
       ["link", { rel: "icon", href: "/pumped-fn/favicon.ico" }],

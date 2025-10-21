@@ -10,10 +10,10 @@ Build request/response pipelines with composed extensions: authentication, loggi
 
 ## Architecture
 
-Extensions run in order: outer → inner → operation → inner → outer
+Extensions run in order: outer -> inner -> operation -> inner -> outer
 
 ```
-[Auth] → [Logging] → [Error Handler] → [Business Logic]
+[Auth] -> [Logging] -> [Error Handler] -> [Business Logic]
 ```
 
 ## Complete Pipeline
@@ -83,13 +83,13 @@ const scope = createScope({
 
 ```typescript
 // Request enters
-→ authMiddleware start
-  → loggingMiddleware start
-    → errorMiddleware start
-      → business logic
-    ← errorMiddleware end
-  ← loggingMiddleware end
-← authMiddleware end
+-> authMiddleware start
+  -> loggingMiddleware start
+    -> errorMiddleware start
+      -> business logic
+    <- errorMiddleware end
+  <- loggingMiddleware end
+<- authMiddleware end
 // Response exits
 ```
 
@@ -191,7 +191,7 @@ const productionExtensions = [
 
 ## Checklist
 
-- ✅ Order extensions outer → inner
+- ✅ Order extensions outer -> inner
 - ✅ Error handler as outermost extension
 - ✅ Auth before business logic
 - ✅ Logging early in pipeline

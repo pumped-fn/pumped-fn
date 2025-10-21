@@ -32,7 +32,7 @@ function wrapWithExtensions<T>(
         return result instanceof Promised ? result : Promised.create(result);
       };
     }
-  }
+  } 
   return executor;
 }
 

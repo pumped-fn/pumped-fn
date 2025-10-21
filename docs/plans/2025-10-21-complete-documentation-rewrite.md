@@ -90,7 +90,7 @@ git commit -m "docs: remove all legacy documentation files"
 import { provide, derive, createScope } from '@pumped-fn/core-next'
 import { appConfig, type AppConfig, type DB } from './shared/tags'
 
-const config = provide(() => appConfig.get(ctx))
+const config = provide((controller) => appConfig.get(controller.scope))
 
 const dbConnection = derive(config, (cfg) => ({
   pool: `connected to ${cfg.dbHost}`,
@@ -230,7 +230,7 @@ git commit -m "docs: add flow composition example"
 import { provide, derive, createScope } from '@pumped-fn/core-next'
 import { appConfig } from './shared/tags'
 
-const config = provide(() => appConfig.get(ctx))
+const config = provide((controller) => appConfig.get(controller.scope))
 
 const cachedData = derive(config, (cfg) => ({
   environment: cfg.env,
@@ -361,7 +361,7 @@ git commit -m "docs: add extension logging example"
 ```typescript
 import { flow, createScope } from '@pumped-fn/core-next'
 
-const riskyOperation = flow((ctx, shouldFail: boolean) => {
+const riskyOperation = flow(async (ctx, shouldFail: boolean) => {
   if (shouldFail) {
     throw new Error('Operation failed')
   }
@@ -539,7 +539,7 @@ const transactionExtension = extension({
   }
 })
 
-const createUser = flow((ctx, data: { name: string, email: string }) => {
+const createUser = flow(async (ctx, data: { name: string, email: string }) => {
   const txn = ctx.get(transaction)
   console.log('Creating user in transaction:', data)
   return { id: '123', ...data }
@@ -551,7 +551,7 @@ const updateProfile = flow((ctx, userId: string, data: { bio: string }) => {
   return { userId, ...data }
 })
 
-const registerUser = flow((ctx, input: { name: string, email: string, bio: string }) => {
+const registerUser = flow(async (ctx, input: { name: string, email: string, bio: string }) => {
   const user = await ctx.exec(createUser, {
     name: input.name,
     email: input.email
@@ -608,7 +608,7 @@ git commit -m "docs: add database transaction example"
 import { provide, derive, createScope, preset } from '@pumped-fn/core-next'
 import { appConfig, type DB } from './shared/tags'
 
-const config = provide(() => appConfig.get(ctx))
+const config = provide((controller) => appConfig.get(controller.scope))
 
 const db = derive(config, (cfg) => ({
   query: async (sql: string) => {
@@ -753,24 +753,17 @@ const scope = createScope({
 Executors resolve once per scope:
 
 ```ts twoslash
-// @filename: setup.ts
-import { provide, derive } from '@pumped-fn/core-next'
+import { provide, derive, createScope } from '@pumped-fn/core-next'
 
 const db = provide(() => ({ id: Math.random() }))
 const service = derive(db, (database) => ({ database }))
-
-// @filename: usage.ts
-import { createScope } from '@pumped-fn/core-next'
-import { service } from './setup'
 
 const scope = createScope()
 
 const s1 = await scope.resolve(service)
 const s2 = await scope.resolve(service)
 
-console.log(s1 === s2)
-// ---cut---
-// true - same instance
+console.log(s1 === s2) // true - same instance
 ```
 
 ## Cleanup
@@ -1015,7 +1008,7 @@ import { flow } from '@pumped-fn/core-next'
 const fetchUser = flow((ctx, id: string) => ({ id, name: 'User' }))
 const fetchPosts = flow((ctx, userId: string) => [{ id: '1', title: 'Post' }])
 
-const handler = flow((ctx, userId: string) => {
+const handler = flow(async (ctx, userId: string) => {
   const results = await ctx.parallel([
     ctx.exec(fetchUser, userId),
     ctx.exec(fetchPosts, userId)
@@ -1036,12 +1029,12 @@ const riskyStep = flow((ctx, shouldFail: boolean) => {
   return 'success'
 })
 
-const handler = flow((ctx, input: boolean) => {
+const handler = flow(async (ctx, input: boolean) => {
   try {
     const result = await ctx.exec(riskyStep, input)
     return { status: 'ok', result }
   } catch (error) {
-    return { status: 'error', message: error.message }
+    return { status: 'error', message: (error as Error).message }
   }
 })
 ```
@@ -1271,7 +1264,7 @@ Reactive executors re-execute when upstream dependencies change via `scope.updat
 import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const config = tag(custom<{ env: string }>(), { label: 'config' })
-const source = provide(() => config.get(ctx))
+const source = provide((controller) => config.get(controller.scope))
 
 const reactive = derive.reactive(source, (cfg) => {
   console.log('Config changed:', cfg.env)
@@ -1295,7 +1288,7 @@ Only `.reactive()` executors re-execute on updates:
 import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const data = tag(custom<number>(), { label: 'data' })
-const source = provide(() => data.get(ctx))
+const source = provide((controller) => data.get(controller.scope))
 
 const normal = derive(source, (n) => n * 2)
 const reactive = derive.reactive(source, (n) => n * 2)
@@ -1323,7 +1316,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 const appConfig = tag(custom<{ logLevel: string }>(), { label: 'config' })
 
 const logger = derive.reactive(
-  provide(() => appConfig.get(ctx)),
+  provide((controller) => appConfig.get(controller.scope)),
   (cfg) => ({
     log: (msg: string) => {
       if (cfg.logLevel === 'debug') {
@@ -1342,7 +1335,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 const cacheKey = tag(custom<string>(), { label: 'cache.key' })
 
 const cache = derive.reactive(
-  provide(() => cacheKey.get(ctx)),
+  provide((controller) => cacheKey.get(controller.scope)),
   (key) => {
     console.log('Loading cache for:', key)
     return new Map()
@@ -1584,7 +1577,7 @@ const handler = flow((ctx, input: { shouldFail: boolean }) => {
     }
     return { success: true }
   } catch (error) {
-    return { success: false, error: error.message }
+    return { success: false, error: (error as Error).message }
   }
 })
 ```
@@ -1627,7 +1620,7 @@ const errorBoundary = extension({
       console.error('Caught error:', error)
 
       return {
-        error: error.message,
+        error: (error as Error).message,
         operation: operation.kind,
         timestamp: Date.now()
       }
@@ -1650,12 +1643,12 @@ const subFlow = flow((ctx, shouldFail: boolean) => {
   return 'success'
 })
 
-const parent = flow((ctx, input: boolean) => {
+const parent = flow(async (ctx, input: boolean) => {
   try {
     const result = await ctx.exec(subFlow, input)
     return { status: 'ok', result }
   } catch (error) {
-    return { status: 'error', message: error.message }
+    return { status: 'error', message: (error as Error).message }
   }
 })
 ```
@@ -1702,7 +1695,7 @@ const handler = flow((ctx, input: { value: number }) => {
   return { result: input.value * 2 }
 })
 
-const wrapper = flow((ctx, input: { value: number }) => {
+const wrapper = flow(async (ctx, input: { value: number }) => {
   try {
     return await ctx.exec(handler, input)
   } catch (error) {
@@ -2023,7 +2016,7 @@ Cannot find name 'ctx'
 **Solution:**
 ```typescript
 // ❌ Wrong - ctx doesn't exist in executors
-const executor = provide(() => appConfig.get(ctx))
+const executor = provide((controller) => appConfig.get(controller.scope))
 
 // ✅ Right - get tag from scope, not ctx
 const executor = derive.tag(appConfig, (cfg) => cfg)
@@ -2464,7 +2457,7 @@ type Transaction = {
 
 const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 
-const createUser = flow((ctx, data: { name: string, email: string }) => {
+const createUser = flow(async (ctx, data: { name: string, email: string }) => {
   const txn = ctx.get(transaction)
 
   const result = await txn.query(
@@ -2474,7 +2467,7 @@ const createUser = flow((ctx, data: { name: string, email: string }) => {
   return { id: result.insertId, ...data }
 })
 
-const createProfile = flow((ctx, userId: string, bio: string) => {
+const createProfile = flow(async (ctx, userId: string, bio: string) => {
   const txn = ctx.get(transaction)
 
   await txn.query(
@@ -2484,7 +2477,7 @@ const createProfile = flow((ctx, userId: string, bio: string) => {
   return { userId, bio }
 })
 
-const registerUser = flow((ctx, input: {
+const registerUser = flow(async (ctx, input: {
   name: string
   email: string
   bio: string
@@ -2510,7 +2503,7 @@ import { flow, tag, custom } from '@pumped-fn/core-next'
 type Transaction = { query: (sql: string) => Promise<any> }
 const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 
-const parentFlow = flow((ctx, input: any) => {
+const parentFlow = flow(async (ctx, input: any) => {
   const txn = ctx.get(transaction)
 
   await ctx.exec(childFlow1, input)
@@ -2520,12 +2513,12 @@ const parentFlow = flow((ctx, input: any) => {
   // Commit happens after parentFlow completes
 })
 
-const childFlow1 = flow((ctx, input: any) => {
+const childFlow1 = flow(async (ctx, input: any) => {
   const txn = ctx.get(transaction)
   return txn.query('...')
 })
 
-const childFlow2 = flow((ctx, input: any) => {
+const childFlow2 = flow(async (ctx, input: any) => {
   const txn = ctx.get(transaction)
   return txn.query('...')
 })
@@ -2539,7 +2532,7 @@ import { flow, tag, custom } from '@pumped-fn/core-next'
 type Transaction = { query: (sql: string) => Promise<any> }
 const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 
-const riskyOperation = flow((ctx, shouldFail: boolean) => {
+const riskyOperation = flow(async (ctx, shouldFail: boolean) => {
   const txn = ctx.get(transaction)
 
   await txn.query('INSERT INTO logs ...')
@@ -2676,14 +2669,16 @@ async function test2() {
 
 Mocks must match executor types:
 
-```ts twoslash
-import { derive, type Executor } from '@pumped-fn/core-next'
+```typescript
+import { provide } from '@pumped-fn/core-next'
 
 type DB = {
   query: (sql: string) => Promise<{ rows: any[] }>
 }
 
-const db: Executor<DB> = derive.tag(/* ... */)
+const db = provide(() => ({
+  query: async (sql: string) => ({ rows: [] })
+}))
 
 const mockDb: DB = {
   query: async (sql: string) => ({
@@ -2737,7 +2732,7 @@ const testExtension = extension({
 
 const testFlow = flow((ctx, input: number) => input * 2)
 
-async function testExtension() {
+async function runTest() {
   const scope = createScope({
     extensions: [testExtension]
   })
@@ -2858,7 +2853,7 @@ const errorMiddleware = extension({
       console.error(`[${reqId}] Error:`, error.message)
 
       return {
-        error: error.message,
+        error: (error as Error).message,
         requestId: reqId,
         timestamp: Date.now()
       }
@@ -3165,7 +3160,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const appConfig = tag(custom<{ port: number }>(), { label: 'app.config' })
 
-const config = provide(() => appConfig.get(ctx))
+const config = provide((controller) => appConfig.get(controller.scope))
 const db = derive(config, (cfg) => createConnection(cfg))
 const userService = derive({ db, config }, ({ db, config }) => ({
   getUser: (id: string) => db.query('...')
