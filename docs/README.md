@@ -1,48 +1,85 @@
-# Pumped-FN Documentation
+# Documentation
 
-Documentation optimized for Context7 and human consumption.
+Graph-based dependency injection with complete type inference.
 
-## Structure
+## Getting Started
 
-### Quick Start
-- [Quick Start](./quick-start.md) - Get running in 5 minutes
+1. **[Executors and Dependencies](./guides/01-executors-and-dependencies.md)** - Create executors with `provide()` and `derive()`
+2. **[Tags: The Type System](./guides/02-tags-the-type-system.md)** - Type-safe runtime data access
+3. **[Scope Lifecycle](./guides/03-scope-lifecycle.md)** - Manage long-running resources
+4. **[Type Inference Patterns](./guides/04-type-inference-patterns.md)** - Zero-annotation TypeScript
 
-### Decision Guides
-"When to use X vs Y" comparisons:
-- [Executors vs Flows](./decisions/executors-vs-flows.md)
-- [Lazy vs Reactive](./decisions/lazy-vs-reactive.md)
-- [Graph Design Principles](./decisions/graph-design.md)
-- [Anti-Patterns](./decisions/anti-patterns.md)
+## Core Concepts
 
-### Pattern Catalog
-Real scenarios with trade-offs:
+### Guides
+- [Executors and Dependencies](./guides/01-executors-and-dependencies.md)
+- [Tags: The Type System](./guides/02-tags-the-type-system.md)
+- [Scope Lifecycle](./guides/03-scope-lifecycle.md)
+- [Type Inference Patterns](./guides/04-type-inference-patterns.md)
+- [Flow Basics](./guides/05-flow-basics.md)
+- [Flow Composition](./guides/06-flow-composition.md)
+- [Promised API](./guides/07-promised-api.md)
+- [Reactive Patterns](./guides/08-reactive-patterns.md)
+- [Extensions](./guides/09-extensions.md)
+- [Error Handling](./guides/10-error-handling.md)
+
+### Patterns
+- [HTTP Server Setup](./patterns/http-server-setup.md)
+- [Database Transactions](./patterns/database-transactions.md)
 - [Testing Strategies](./patterns/testing-strategies.md)
-- [Lifecycle Management](./patterns/lifecycle-management.md)
-- [Framework Integration](./patterns/framework-integration.md)
+- [Middleware Composition](./patterns/middleware-composition.md)
 
-### Concept Deep-Dives
-- [Executors and Scopes](./concepts/executors-and-scopes.md)
-- [Flows](./concepts/flows.md)
-- [Extensions](./concepts/extensions.md)
-- [Multi-Executors](./concepts/multi-executors.md)
-- [Accessors](./concepts/accessors.md)
+### Reference
+- [API Cheatsheet](./reference/api-cheatsheet.md)
+- [Type Verification](./reference/type-verification.md)
+- [Common Mistakes](./reference/common-mistakes.md)
+- [Error Solutions](./reference/error-solutions.md)
 
-### Executable Examples
-- [Code Examples](./code/) - TypeScript examples validated in CI
+## Philosophy
 
-### LLM Guide
-- [LLM Guide](./llm-guide.md) - Comprehensive guide for AI assistants
+**Tags provide type safety. Inference provides ergonomics.**
 
-## Context7 Integration
+- All typed runtime data flows through tags
+- 99% type inference - zero annotations
+- Verified with `tsc --noEmit` on all examples
 
-This documentation is indexed by Context7. See [context7.json](../context7.json) for configuration.
+## Examples
 
-## Contributing
+Working examples in `examples/http-server/`:
+- Basic handlers with executors
+- Tag-based type safety
+- Type inference patterns
+- Promised API usage
+- Complete HTTP server
 
-Keep documentation:
-- **Self-contained** - Each page should be understandable independently
-- **Concrete** - Include code examples
-- **Concise** - Focus on essentials
-- **Cross-referenced** - Link to related docs
+## Quick Example
 
-Code examples in `docs/code/` are validated during build.
+```typescript
+import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
+
+// Tags for type-safe config
+const appConfig = tag(custom<{ port: number }>(), { label: 'app.config' })
+
+// Executors with dependencies
+const config = provide(() => ({ port: 3000 }))
+const db = derive(config, (cfg) => createConnection(cfg))
+const userService = derive({ db, config }, ({ db, config }) => ({
+  getUser: (id: string) => db.query('...')
+}))
+
+// Resolve in scope
+const scope = createScope()
+const service = await scope.resolve(userService)
+const user = await service.getUser('123')
+await scope.dispose()
+```
+
+## Verification
+
+All documentation examples are verified:
+
+```bash
+pnpm -F @pumped-fn/core-next typecheck:full
+```
+
+Zero TypeScript errors, no type assertions, complete inference.

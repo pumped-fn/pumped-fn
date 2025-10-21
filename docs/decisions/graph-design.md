@@ -1,1 +1,0 @@
-# Graph Design Principles
