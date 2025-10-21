@@ -112,10 +112,6 @@ export default withMermaid(defineConfig({
           typesCache: createFileSystemTypesCache(),
           twoslashOptions: {
             compilerOptions: {
-              baseUrl: ".",
-              paths: {
-                "@pumped-fn/core-next": ["../packages/next/src/index.ts"],
-              },
               noImplicitAny: false,
             },
           },
