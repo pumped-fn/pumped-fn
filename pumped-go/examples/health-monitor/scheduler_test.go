@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -32,10 +33,14 @@ func TestScheduler_ExecutesHealthChecks(t *testing.T) {
 	mockHealthRepoExecutor := pumped.Provide(func(ctx *pumped.ResolveCtx) (HealthCheckRepo, error) {
 		return mockHealthRepo, nil
 	})
+	mockLoggerExecutor := pumped.Provide(func(ctx *pumped.ResolveCtx) (*Logger, error) {
+		return NewLogger("info", io.Discard), nil
+	})
 
 	testScope := pumped.NewScope(
 		pumped.WithPreset(g.ServiceRepo, mockServiceRepoExecutor),
 		pumped.WithPreset(g.HealthRepo, mockHealthRepoExecutor),
+		pumped.WithPreset(g.Logger, mockLoggerExecutor),
 	)
 	defer testScope.Dispose()
 
@@ -71,10 +76,14 @@ func TestScheduler_StopsGracefully(t *testing.T) {
 	mockHealthRepoExecutor := pumped.Provide(func(ctx *pumped.ResolveCtx) (HealthCheckRepo, error) {
 		return mockHealthRepo, nil
 	})
+	mockLoggerExecutor := pumped.Provide(func(ctx *pumped.ResolveCtx) (*Logger, error) {
+		return NewLogger("info", io.Discard), nil
+	})
 
 	testScope := pumped.NewScope(
 		pumped.WithPreset(g.ServiceRepo, mockServiceRepoExecutor),
 		pumped.WithPreset(g.HealthRepo, mockHealthRepoExecutor),
+		pumped.WithPreset(g.Logger, mockLoggerExecutor),
 	)
 	defer testScope.Dispose()
 

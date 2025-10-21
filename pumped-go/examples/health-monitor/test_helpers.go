@@ -1,6 +1,39 @@
 package main
 
-import "time"
+import (
+	"io"
+	"time"
+)
+
+type MockLogger struct {
+	logs []string
+}
+
+func NewMockLogger() *MockLogger {
+	return &MockLogger{
+		logs: make([]string, 0),
+	}
+}
+
+func (m *MockLogger) Debug(format string, args ...interface{}) {
+	m.logs = append(m.logs, "DEBUG")
+}
+
+func (m *MockLogger) Info(format string, args ...interface{}) {
+	m.logs = append(m.logs, "INFO")
+}
+
+func (m *MockLogger) Warn(format string, args ...interface{}) {
+	m.logs = append(m.logs, "WARN")
+}
+
+func (m *MockLogger) Error(format string, args ...interface{}) {
+	m.logs = append(m.logs, "ERROR")
+}
+
+func (m *MockLogger) With(keyvals ...interface{}) *Logger {
+	return NewLogger("info", io.Discard)
+}
 
 type MockServiceRepository struct {
 	services map[string]*Service

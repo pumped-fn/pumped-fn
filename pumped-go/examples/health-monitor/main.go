@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,24 +15,34 @@ func main() {
 
 	scope := pumped.NewScope()
 
+	logger, err := pumped.Resolve(scope, g.Logger)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve logger: %v\n", err)
+		os.Exit(1)
+	}
+
 	scheduler, err := pumped.Resolve(scope, g.Scheduler)
 	if err != nil {
-		log.Fatalf("failed to resolve scheduler: %v", err)
+		logger.Error("failed to resolve scheduler: %v", err)
+		os.Exit(1)
 	}
 
 	serviceHandler, err := pumped.Resolve(scope, g.ServiceHandler)
 	if err != nil {
-		log.Fatalf("failed to resolve service handler: %v", err)
+		logger.Error("failed to resolve service handler: %v", err)
+		os.Exit(1)
 	}
 
 	healthHandler, err := pumped.Resolve(scope, g.HealthHandler)
 	if err != nil {
-		log.Fatalf("failed to resolve health handler: %v", err)
+		logger.Error("failed to resolve health handler: %v", err)
+		os.Exit(1)
 	}
 
 	incidentHandler, err := pumped.Resolve(scope, g.IncidentHandler)
 	if err != nil {
-		log.Fatalf("failed to resolve incident handler: %v", err)
+		logger.Error("failed to resolve incident handler: %v", err)
+		os.Exit(1)
 	}
 
 	scheduler.Start()
@@ -60,9 +69,10 @@ func main() {
 	}
 
 	go func() {
-		log.Println("Server starting on :8080")
+		logger.Info("Server starting on :8080")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+			logger.Error("server failed: %v", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -70,6 +80,6 @@ func main() {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	<-sigCh
 
-	fmt.Println("\nShutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 	scope.Dispose()
 }

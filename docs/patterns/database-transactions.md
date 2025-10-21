@@ -31,7 +31,7 @@ const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 const transactionExtension = extension({
   name: 'transaction',
   wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'flow') {
+    if (operation.kind !== 'execute') {
       return next()
     }
 

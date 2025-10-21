@@ -25,6 +25,15 @@ func TestGraph_ConfigReactivity(t *testing.T) {
 		t.Fatalf("failed to resolve initial DB: %v", err)
 	}
 
+	logger1, err := pumped.Resolve(testScope, g.Logger)
+	if err != nil {
+		t.Fatalf("failed to resolve initial logger: %v", err)
+	}
+
+	if logger1.level != LogLevelInfo {
+		t.Errorf("expected initial logger level to be Info, got %v", logger1.level)
+	}
+
 	configAcc := pumped.Accessor(testScope, g.Config)
 	newConfig := &Config{
 		DBPath:     ":memory:",
@@ -42,8 +51,21 @@ func TestGraph_ConfigReactivity(t *testing.T) {
 		t.Fatalf("failed to resolve updated DB: %v", err)
 	}
 
+	logger2, err := pumped.Resolve(testScope, g.Logger)
+	if err != nil {
+		t.Fatalf("failed to resolve updated logger: %v", err)
+	}
+
 	if db1 == db2 {
 		t.Error("expected DB to be reinitialized after config change")
+	}
+
+	if logger1 == logger2 {
+		t.Error("expected Logger to be reinitialized after config change")
+	}
+
+	if logger2.level != LogLevelDebug {
+		t.Errorf("expected updated logger level to be Debug, got %v", logger2.level)
 	}
 }
 
@@ -65,6 +87,10 @@ func TestGraph_AllComponentsResolve(t *testing.T) {
 		name string
 		fn   func() error
 	}{
+		{"Logger", func() error {
+			_, err := pumped.Resolve(testScope, g.Logger)
+			return err
+		}},
 		{"DB", func() error {
 			_, err := pumped.Resolve(testScope, g.DB)
 			return err

@@ -106,14 +106,14 @@ Extensions can filter by operation type:
 ```ts twoslash
 import { extension } from '@pumped-fn/core-next'
 
-const flowOnly = extension({
-  name: 'flow-only',
+const executeOnly = extension({
+  name: 'execute-only',
   wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'flow') {
+    if (operation.kind !== 'execute') {
       return next()
     }
 
-    console.log('Flow-specific logic')
+    console.log('Execute-specific logic')
     return next()
   }
 })
