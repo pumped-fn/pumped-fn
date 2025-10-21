@@ -14,7 +14,7 @@ Test with `preset()` to override executors, scope isolation for test independenc
 import { provide, derive, createScope, preset } from '@pumped-fn/core-next'
 
 const db = provide(() => ({
-  query: async (sql: string) => ({ rows: [] })
+  query: async (sql: string) => ({ rows: [] as any[] })
 }))
 
 const userService = derive({ db }, ({ db }) => ({
@@ -32,7 +32,7 @@ const mockDb = {
 
 async function testUserService() {
   const scope = createScope({
-    presets: [preset(db, mockDb)]
+    initialValues: [preset(db, mockDb)]
   })
 
   const service = await scope.resolve(userService)
@@ -54,7 +54,7 @@ const config = provide(() => ({ env: 'prod' }))
 
 async function test1() {
   const scope = createScope({
-    presets: [preset(config, { env: 'test1' })]
+    initialValues: [preset(config, { env: 'test1' })]
   })
 
   // Independent from test2
@@ -63,7 +63,7 @@ async function test1() {
 
 async function test2() {
   const scope = createScope({
-    presets: [preset(config, { env: 'test2' })]
+    initialValues: [preset(config, { env: 'test2' })]
   })
 
   // Independent from test1
@@ -83,7 +83,7 @@ type DB = {
 }
 
 const db = provide(() => ({
-  query: async (sql: string) => ({ rows: [] })
+  query: async (sql: string) => ({ rows: [] as any[] })
 }))
 
 const mockDb: DB = {
