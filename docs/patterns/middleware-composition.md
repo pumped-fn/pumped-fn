@@ -60,12 +60,7 @@ const errorMiddleware = extension({
     } catch (error) {
       const reqId = requestId.find(ctx) || 'no-id'
       console.error(`[${reqId}] Error:`, (error as Error).message)
-
-      return {
-        error: (error as Error).message,
-        requestId: reqId,
-        timestamp: Date.now()
-      }
+      throw error
     }
   }
 })
