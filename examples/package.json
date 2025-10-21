@@ -13,7 +13,7 @@
     "@pumped-fn/core-next": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.23",
     "tsx": "^4.0.0",
     "typescript": "^5.9.3"
   }
