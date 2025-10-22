@@ -166,5 +166,5 @@ async function runTest() {
 ## See Also
 
 - [Scope Lifecycle](../guides/03-scope-lifecycle.md)
-- [Flow Basics](../guides/05-flow-basics.md)
+- [Flow](../guides/05-flow.md)
 - [Extensions](../guides/09-extensions.md)

@@ -255,5 +255,5 @@ pnpm -F @pumped-fn/core-next typecheck:full
 
 ## See Also
 - [Type Inference Patterns](./04-type-inference-patterns.md) - Complement tags with proper factory types
-- [Flow Basics](./05-flow-basics.md) - Tag-based context in flows
+- [Flow](./05-flow.md) - Tag-based context in flows
 - [Extensions](./09-extensions.md) - Tags in cross-cutting concerns

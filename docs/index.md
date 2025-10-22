@@ -131,8 +131,7 @@ const result = await scope.resolve(application);
 
 ### Core Guides
 
-- [**Flow Basics**](./guides/05-flow-basics.md) - Handle short-lived operations
-- [**Flow Composition**](./guides/06-flow-composition.md) - Compose flows with ctx.exec
+- [**Flow**](./guides/05-flow.md) - Execution context for short-lived operations
 - [**Extensions**](./guides/09-extensions.md) - Cross-cutting concerns
 - [**Error Handling**](./guides/10-error-handling.md) - Error boundaries and recovery
 
@@ -154,7 +153,7 @@ const result = await scope.resolve(application);
 | I want to...                  | Go to                                                           |
 | ----------------------------- | --------------------------------------------------------------- |
 | **Start building apps**       | [Executors and Dependencies](./guides/01-executors-and-dependencies.md) |
-| **Add business logic**        | [Flow Basics](./guides/05-flow-basics.md)                      |
+| **Add business logic**        | [Flow](./guides/05-flow.md)                                    |
 | **Manage context data**       | [Tags: The Type System](./guides/02-tags-the-type-system.md)  |
 | **Build reusable components** | [Extensions](./guides/09-extensions.md)                        |
 | **Add monitoring/logging**    | [Extensions](./guides/09-extensions.md)                        |

@@ -159,6 +159,6 @@ const wrapper = flow(async (ctx, input: { value: number }) => {
 
 ## See Also
 
-- [Flow Composition](./06-flow-composition.md)
+- [Flow](./05-flow.md)
 - [Extensions](./09-extensions.md)
 - [Scope Lifecycle](./03-scope-lifecycle.md)

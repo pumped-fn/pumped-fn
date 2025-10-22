@@ -137,6 +137,6 @@ const executeOnly = extension({
 
 ## See Also
 
-- [Flow Basics](./05-flow-basics.md)
+- [Flow](./05-flow.md)
 - [Error Handling](./10-error-handling.md)
 - [Middleware Composition](../patterns/middleware-composition.md)

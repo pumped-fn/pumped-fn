@@ -178,5 +178,5 @@ If error is thrown, extension automatically rolls back both queries.
 ## See Also
 
 - [Extensions](../guides/09-extensions.md)
-- [Flow Composition](../guides/06-flow-composition.md)
+- [Flow](../guides/05-flow.md)
 - [Error Handling](../guides/10-error-handling.md)
