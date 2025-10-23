@@ -316,3 +316,6 @@ dist
 
 # Act artifacts
 .act/
+
+# Plans directory (may contain work-in-progress implementation plans)
+plans/

@@ -3,6 +3,14 @@
 Sacrifice English grammar for conciseness. Concrete and straightforward.
 Use ast-grep where possible to search and replace code
 
+# Plans directory
+
+- use `plans/` (project root) for implementation plans, NOT `docs/plans/`
+- plan details MUST NOT include machine-specific info (username, absolute paths like /home/user)
+- use relative paths for project files (e.g., `docs/guides/`, `examples/`)
+- use `/tmp` for temporary file operations
+- use `${SUPERPOWERS_SKILLS_ROOT}` for Claude skills/superpowers paths
+
 # Coding style
 
 - strict coding style, concrete reasonable naming
