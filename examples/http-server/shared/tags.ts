@@ -12,7 +12,7 @@ export type AppConfig = {
 }
 
 export type DB = {
-  query: (sql: string, params: any[]) => Promise<any>
+  query: (sql: string, params: unknown[]) => Promise<{ rows: unknown[] }>
   close: () => Promise<void>
 }
 

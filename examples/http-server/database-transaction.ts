@@ -56,12 +56,12 @@ const updateProfile = flow((ctx, input: { userId: string, bio: string }) => {
 })
 
 const registerUser = flow(async (ctx, input: { name: string, email: string, bio: string }) => {
-  const user = await ctx.exec(createUser, {
+  const user = await ctx.exec('create-user', createUser, {
     name: input.name,
     email: input.email
   })
 
-  const profile = await ctx.exec(updateProfile, {
+  const profile = await ctx.exec('update-profile', updateProfile, {
     userId: user.id,
     bio: input.bio
   })

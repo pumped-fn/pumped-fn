@@ -17,11 +17,12 @@ import { appConfig, requestId, logger } from './shared/tags'
 
 // #region problem-untyped
 function withoutTags() {
-  const scope = createScope() as any
+  const scope = new Map<string, unknown>()
+  scope.set('appConfig', { port: 8080, env: 'production', dbHost: 'db' })
 
   const config = scope.get('appConfig')
-  // config is 'any' - no type safety
-  // config.port could be wrong type at runtime
+  // config is 'unknown' - no type safety
+  // Would need runtime checks or unsafe casting
 }
 // #endregion problem-untyped
 

@@ -115,12 +115,12 @@ async function settledExample() {
   ] as const)
 
   const settled = await results
-  const fulfilledServices = settled.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-  const rejectedServices = settled.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  const fulfilledCount = settled.filter(r => r.status === 'fulfilled').length
+  const rejectedCount = settled.filter(r => r.status === 'rejected').length
 
-  console.log('Fulfilled services:', fulfilledServices.length)
-  console.log('Failed services:', rejectedServices.length)
-  console.log('Success/Failures:', fulfilledServices.length, rejectedServices.length)
+  console.log('Fulfilled services:', fulfilledCount)
+  console.log('Failed services:', rejectedCount)
+  console.log('Success/Failures:', fulfilledCount, rejectedCount)
 
   await scope.dispose()
 }

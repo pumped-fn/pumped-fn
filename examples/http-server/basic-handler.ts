@@ -6,12 +6,13 @@
  * - provide() for executors without dependencies
  * - derive() for executors with dependencies
  * - Type inference from destructuring
+ * - ctx.run() for journaling resource operations
  *
  * Verify: pnpm -F @pumped-fn/examples typecheck
  * Run: pnpm -F @pumped-fn/examples dev:basic-handler
  */
 
-import { provide, derive, createScope, Promised } from '@pumped-fn/core-next'
+import { provide, derive, createScope, flow, Promised } from '@pumped-fn/core-next'
 import type { AppConfig, DB } from './shared/tags'
 
 // #region provide-basic
@@ -24,7 +25,7 @@ const config = provide(() => ({
 
 // #region derive-single-dep
 const dbConnection = derive(config, (cfg) => ({
-  query: async (sql: string, params: any[]) => {
+  query: async (sql: string, params: unknown[]) => {
     console.log(`[${cfg.dbHost}] ${sql}`)
     return [{ id: '1', name: 'Test User' }]
   },
@@ -52,6 +53,23 @@ const userService = derive(
 )
 // #endregion derive-multi-deps
 
+// #region flow-with-ctx-run
+const getUserFlow = flow(
+  { db: dbConnection },
+  async (deps, ctx, userId: string) => {
+    const results = await ctx.run('query-user-by-id', async () => {
+      return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
+    })
+
+    if (results.length === 0) {
+      return { ok: false as const, reason: 'user_not_found' as const }
+    }
+
+    return { ok: true as const, user: results[0] }
+  }
+)
+// #endregion flow-with-ctx-run
+
 // #region scope-resolution
 async function main() {
   const scope = createScope()
@@ -60,6 +78,9 @@ async function main() {
   const user = await service.getUser('123')
 
   console.log('User:', user)
+
+  const flowResult = await flow.execute(getUserFlow, '123', { scope })
+  console.log('Flow result:', flowResult)
 
   await scope.dispose()
 }

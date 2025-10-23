@@ -15,7 +15,7 @@
 import { provide, derive, createScope, Promised } from '@pumped-fn/core-next'
 
 type DB = {
-  query: (sql: string, params: any[]) => Promise<any[]>
+  query: (sql: string, params: unknown[]) => Promise<unknown[]>
 }
 
 type Config = {
@@ -24,7 +24,7 @@ type Config = {
 }
 
 const dbExecutor = provide(() => ({
-  query: async (sql: string, params: any[]) => {
+  query: async (sql: string, params: unknown[]) => {
     return [{ id: '1', name: 'Test' }]
   }
 }))

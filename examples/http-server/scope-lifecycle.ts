@@ -18,7 +18,7 @@ const config = provide((controller) => appConfig.get(controller.scope))
 
 const dbConnection = derive(config, (cfg) => ({
   pool: `connected to ${cfg.dbHost}`,
-  query: async (sql: string, params: any[]) => ({ rows: [] }),
+  query: async (sql: string, params: unknown[]) => ({ rows: [] }),
   close: async () => console.log('DB connection closed')
 }))
 

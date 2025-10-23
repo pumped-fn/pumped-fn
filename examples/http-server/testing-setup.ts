@@ -17,7 +17,7 @@ import { appConfig, type DB } from './shared/tags'
 const config = provide((controller) => appConfig.get(controller.scope))
 
 const db = derive(config, (cfg) => ({
-  query: async (sql: string, params: any[]) => {
+  query: async (sql: string, params: unknown[]) => {
     console.log('Real DB query:', sql)
     return { rows: [] }
   },
@@ -32,7 +32,7 @@ const userService = derive({ db }, ({ db }) => ({
 }))
 
 const mockDb: DB = {
-  query: async (sql: string, params: any[]) => {
+  query: async (sql: string, params: unknown[]) => {
     console.log('Mock DB query:', sql)
     return {
       rows: [{ id: '123', name: 'Test User' }]
