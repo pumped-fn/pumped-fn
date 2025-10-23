@@ -83,7 +83,7 @@ const subFlow = flow((ctx, shouldFail: boolean) => {
 
 const parent = flow(async (ctx, input: boolean) => {
   try {
-    const result = await ctx.exec(subFlow, input)
+    const result = await ctx.exec('sub-flow', subFlow, input)
     return { status: 'ok', result }
   } catch (error) {
     return { status: 'error', message: (error as Error).message }
@@ -135,7 +135,7 @@ const handler = flow((ctx, input: { value: number }) => {
 
 const wrapper = flow(async (ctx, input: { value: number }) => {
   try {
-    return await ctx.exec(handler, input)
+    return await ctx.exec('handler', handler, input)
   } catch (error) {
     if (error instanceof ValidationError) {
       return { error: 'validation', message: error.message }

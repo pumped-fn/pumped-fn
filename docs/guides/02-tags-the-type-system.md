@@ -95,7 +95,7 @@ const authenticate = flow((ctx, token: string) => {
 const handleRequest = flow(async (ctx, req: { token: string }) => {
   ctx.set(requestId, crypto.randomUUID())
 
-  const uid = await ctx.exec(authenticate, req.token)
+  const uid = await ctx.exec('authenticate', authenticate, req.token)
   const reqId = ctx.get(requestId)
 
   return { requestId: reqId, userId: uid }
