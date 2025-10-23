@@ -5,11 +5,16 @@ Use ast-grep where possible to search and replace code
 
 # Plans directory
 
-- use `plans/` (project root) for implementation plans, NOT `docs/plans/`
-- plan details MUST NOT include machine-specific info (username, absolute paths like /home/user)
-- use relative paths for project files (e.g., `docs/guides/`, `examples/`)
-- use `/tmp` for temporary file operations
-- use `${SUPERPOWERS_SKILLS_ROOT}` for Claude skills/superpowers paths
+- use `plans/` (project root) for implementation plans
+- plans are committed to git for reference
+- **CRITICAL: plans MUST NOT include private/machine-specific information:**
+  - NO usernames in paths (e.g., `/home/username/`)
+  - NO absolute paths with user directories
+  - USE relative paths for project files (`docs/guides/`, `examples/`)
+  - USE `/tmp` for temporary file operations
+  - USE `${SUPERPOWERS_SKILLS_ROOT}` for Claude skills/superpowers paths
+  - USE environment variables or placeholders instead of hardcoded values
+- before committing plans, verify no sensitive data (usernames, machine names, absolute paths)
 
 # Coding style
 
