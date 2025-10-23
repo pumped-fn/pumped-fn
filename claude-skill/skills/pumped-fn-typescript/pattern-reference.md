@@ -1,6 +1,13 @@
 # Pumped-fn Pattern Reference
 
-Quick lookup mapping common patterns to canonical examples.
+Quick lookup for four core elements and their patterns.
+
+## Core Elements Decision
+
+- **Resource** → Integration details (DB, API, external service) - no business logic
+- **Flow** → Business logic with journal keys - orchestrates resources
+- **Interaction Point** → Entry point (HTTP, CLI, cron) - transforms to flow input
+- **Utility** → Pure function - no side effects, no dependencies
 
 ## Type Safety & Inference
 
@@ -36,8 +43,9 @@ Quick lookup mapping common patterns to canonical examples.
 **Pattern**: Type-safe tag declaration and usage
 **Example**: `examples/tags-foundation.ts`
 **Key Points**:
-- Define tags with explicit types
-- Use tag() helper for type inference
+- Schema-flexible: `tag(z.object({...}), {label, default})` with Zod
+- Or custom: `tag(custom<T>(), {label, default})`
+- Works with any Standard Schema validator (Valibot, etc)
 - Reference tags consistently across graph
 
 ## Scope vs Flow Lifecycle
@@ -61,9 +69,17 @@ Quick lookup mapping common patterns to canonical examples.
 **Pattern**: Context management and sub-flow execution
 **Example**: `examples/flow-composition.ts`
 **Key Points**:
+- Always use journal keys: `ctx.exec('key', flow, input)`
 - Root context for flow-specific data
-- Sequential vs parallel sub-flows
-- Dispose flow to cleanup resources
+- Sequential vs parallel sub-flows via ctx.parallel/parallelSettled
+- Max 3 levels deep
+
+**Pattern**: Flow with dependencies
+**Example**: `examples/basic-handler.ts`
+**Key Points**:
+- `flow({ resource1, resource2 }, async (deps, ctx, input) => {})`
+- Access resources via deps.resource1, deps.resource2
+- Use ctx.run('key', () => operation) for journaled operations
 
 **Pattern**: Database transactions per flow
 **Example**: `examples/database-transaction.ts`

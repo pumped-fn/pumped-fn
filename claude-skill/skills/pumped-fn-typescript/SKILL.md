@@ -1,63 +1,676 @@
 ---
 name: Pumped-fn TypeScript
 description: Auto-activating guidance for @pumped-fn/core-next ensuring type-safe, pattern-consistent code
-when_to_use: automatically activates when detecting @pumped-fn/core-next imports
-version: 1.0.0
+when_to_use: automatically activates when package.json contains @pumped-fn/core-next dependency
+version: 2.1.0
 ---
 
 # Pumped-fn TypeScript Skill
 
 ## Overview
 
-Ensures high-quality, consistent TypeScript code when using `@pumped-fn/core-next` through automatic pattern checking and example-driven guidance.
+Build observable, inspectable applications with four core elements:
 
-**Core principle:** Enforce type safety, guide dependency patterns, reference canonical examples.
+1. **Resources** - Integration details (DB pools, API clients, external services)
+2. **Flows** - Business logic operations (deterministic, journaled, max 3-level depth)
+3. **Interaction Points** - Entry points (HTTP routes, CLI commands, cron jobs)
+4. **Utilities** - Pure transformations (stateless, effect-free, unit testable)
 
-**Auto-activates when:** Code contains `import ... from '@pumped-fn/core-next'` or `from "@pumped-fn/core-next"`
+Supporting: **Tags** (configuration/data boundaries) + **Extensions** (cross-cutting observation)
 
-## Detection Logic
+**Core principle:** Operations that matter operationally should flow through the library's tracking system for visibility.
 
-When you detect pumped-fn usage:
-1. Scan imports for `@pumped-fn/core-next`
-2. Identify context: new project, integration, or extension
-3. Load pattern reference for quick lookups
-4. Apply 3-tier pattern checking as you write/review code
+**Auto-activates when:** package.json contains `@pumped-fn/core-next` in dependencies
+
+## Decision Tree
+
+```
+What am I building?
+        ↓
+    ┌───────┴───────┐
+    ↓               ↓
+Integration     Business logic?
+details?        (validate, transform,
+(DB, API,        orchestrate)
+gateway)             ↓
+    ↓             FLOW
+RESOURCE       (flow w/ deps)
+(executor)           ↓
+    ↓         Always use journal keys:
+Testing:      ctx.exec('name', flow, input)
+Mock via      ctx.run('name', () => op)
+preset()             ↓
+              Testing: Mock resources,
+                      verify journal
+                      ↓
+              Pure transformation?
+                      ↓
+                  UTILITY
+                 (function)
+                      ↓
+              Testing: Unit test I/O
+```
+
+## Quick API Reference
+
+### Tags (Schema-Flexible)
+
+```typescript
+import { tag, custom } from '@pumped-fn/core-next'
+import { z } from 'zod' // or valibot, or any Standard Schema validator
+
+// With Zod (runtime validation)
+export const dbConfig = tag(z.object({
+  host: z.string(),
+  port: z.number(),
+  database: z.string()
+}), {
+  label: 'db.config',
+  default: { host: 'localhost', port: 5432, database: 'app' }
+})
+
+// With custom (no validation)
+export const userId = tag(custom<string>(), { label: 'flow.userId' })
+```
+
+### Resources (Executors)
+
+```typescript
+import { provide, derive } from '@pumped-fn/core-next'
+
+// Resource with lifecycle
+const dbPool = provide((controller) => {
+  const config = dbConfig.get(controller.scope)
+  const pool = new Pool(config)
+
+  controller.cleanup(async () => {
+    await pool.end()
+  })
+
+  return {
+    query: async (sql: string, params: any[]) => {
+      return pool.query(sql, params)
+    }
+  }
+})
+
+// Resource with dependencies
+const userRepository = derive({ db: dbPool }, ({ db }) => ({
+  findById: async (id: string) => {
+    return db.query('SELECT * FROM users WHERE id = $1', [id])
+  },
+  create: async (userData: User) => {
+    return db.query('INSERT INTO users ...', [userData])
+  }
+}))
+```
+
+### Flows (Business Logic)
+
+```typescript
+import { flow } from '@pumped-fn/core-next'
+
+// Flow with dependencies
+const createUser = flow({
+  userRepo: userRepository
+}, async (deps, ctx, input: { email: string, name: string }) => {
+  // Always use journal keys for visibility
+  const validated = await ctx.run('validate-input', () => {
+    if (!validateEmail(input.email)) {
+      return { ok: false as const, reason: 'invalid_email' }
+    }
+    return { ok: true as const, data: input }
+  })
+
+  if (!validated.ok) {
+    return validated
+  }
+
+  const user = await ctx.run('save-user', async () => {
+    return deps.userRepo.create(validated.data)
+  })
+
+  return { ok: true, user }
+})
+
+// Sub-flow composition (always with journal keys)
+const registerUser = flow({
+  userRepo: userRepository
+}, async (deps, ctx, input: RegisterInput) => {
+  const user = await ctx.exec('create-user', createUser, {
+    email: input.email,
+    name: input.name
+  })
+
+  if (!user.ok) {
+    return user
+  }
+
+  const profile = await ctx.exec('create-profile', createProfile, {
+    userId: user.user.id,
+    bio: input.bio
+  })
+
+  return { ok: true, user: user.user, profile }
+})
+```
+
+### Scope & Execution
+
+```typescript
+import { createScope } from '@pumped-fn/core-next'
+
+const scope = createScope({
+  tags: [
+    dbConfig({ host: 'localhost', port: 5432, database: 'app' })
+  ]
+})
+
+// Resolve resources
+const userRepo = await scope.resolve(userRepository)
+
+// Execute flows
+const result = await flow.execute(registerUser, input, { scope })
+
+// Cleanup
+await scope.dispose()
+```
+
+### Promised Utilities
+
+```typescript
+import { Promised } from '@pumped-fn/core-next'
+
+// Parallel resolution
+const [repo1, repo2] = await Promised.all([
+  scope.resolve(userRepository),
+  scope.resolve(postRepository)
+])
+
+// Error handling with partition
+const results = await Promised.allSettled([
+  scope.resolve(service1),
+  scope.resolve(service2)
+])
+
+// partition() returns { fulfilled: T[], rejected: Error[] }
+// IMPORTANT: Destructure immediately to access values
+const { fulfilled, rejected } = await results.partition()
+
+console.log(`Success: ${fulfilled.length}, Failed: ${rejected.length}`)
+
+// Access successful values
+fulfilled.forEach(value => console.log(value))
+
+// Handle errors
+rejected.forEach(error => console.error(error))
+
+// Main wrapper
+Promised.try(main).catch((error) => {
+  console.error(error)
+  process.exit(1)
+})
+```
+
+## 1. Resources (Integration Layer)
+
+**What:** Technical details of external systems (business-logic-free)
+
+**Examples:** Database connection pool, HTTP client for OAuth, Redis client, S3 bucket
+
+**Key characteristics:**
+- Configuration via tags (`controller.scope`)
+- Lifecycle management (`controller.cleanup`)
+- Generic operations (no business rules)
+- Integration-focused
+
+```typescript
+// ✅ GOOD: Resource - How to communicate with OAuth provider
+const googleOAuth = provide((controller) => {
+  const config = oauthConfig.get(controller.scope)
+  const client = new OAuth2Client({
+    clientId: config.clientId,
+    clientSecret: config.clientSecret
+  })
+
+  controller.cleanup(async () => {
+    await client.disconnect()
+  })
+
+  return {
+    exchangeCode: async (code: string) => client.getToken(code),
+    refreshToken: async (token: string) => client.refresh(token),
+    validateToken: async (token: string) => client.verifyIdToken({ idToken: token })
+  }
+})
+
+// ✅ GOOD: Repository as Resource (common pattern)
+// Why: Repositories are integration layer (DB operations), not business logic
+const userRepository = derive({ db: dbPool }, ({ db }) => ({
+  // Generic CRUD - no business rules
+  findById: async (id: string) => {
+    const result = await db.query('SELECT * FROM users WHERE id = $1', [id])
+    return result.rows[0]
+  },
+
+  findByEmail: async (email: string) => {
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email])
+    return result.rows[0]
+  },
+
+  create: async (user: User) => {
+    const result = await db.query(
+      'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING *',
+      [user.email, user.name]
+    )
+    return result.rows[0]
+  },
+
+  update: async (id: string, user: Partial<User>) => {
+    const result = await db.query(
+      'UPDATE users SET name = $1 WHERE id = $2 RETURNING *',
+      [user.name, id]
+    )
+    return result.rows[0]
+  }
+}))
+
+// Business logic goes in FLOWS, not repositories
+const registerUser = flow({
+  userRepo: userRepository
+}, async (deps, ctx, input) => {
+  // Business rule: Check if email already exists
+  const existing = await ctx.run('check-existing', async () => {
+    return deps.userRepo.findByEmail(input.email)
+  })
+
+  if (existing) {
+    return { ok: false, reason: 'email_exists' as const }
+  }
+
+  // Business rule: Validate email domain
+  if (!input.email.endsWith('@company.com')) {
+    return { ok: false, reason: 'invalid_domain' as const }
+  }
+
+  // Create user (repository just executes, no logic)
+  const user = await ctx.run('create-user', async () => {
+    return deps.userRepo.create(input)
+  })
+
+  return { ok: true, user }
+})
+```
+
+**Testing:**
+```typescript
+const mockOAuth = provide(() => ({
+  exchangeCode: async (code: string) => ({ access_token: 'mock' }),
+  refreshToken: async (token: string) => ({ access_token: 'refreshed' }),
+  validateToken: async (token: string) => ({ email: 'test@example.com' })
+}))
+
+const testScope = createScope({
+  initialValues: [preset(googleOAuth, mockOAuth)]
+})
+```
+
+## 2. Flows (Business Logic Layer)
+
+**What:** Business operations orchestrating resources, deterministic outcomes
+
+**Rules:**
+- ALL outputs embedded (happy + edge cases, discriminated unions)
+- Journaled via ctx.exec / ctx.run (ALWAYS with keys)
+- Max 3 levels deep (see depth counting below)
+- Self-documenting
+
+**Flow Depth Counting:**
+Flow depth = nested `ctx.exec()` calls. `ctx.run()` operations don't count toward depth.
+
+```typescript
+// ✅ GOOD: 2 levels of flow nesting
+const orchestrator = flow({}, async (deps, ctx, input) => {
+  await ctx.run('operation-1', () => work())  // ctx.run doesn't add depth
+  await ctx.exec('sub-flow', level2Flow, data)  // Level 2
+})
+
+const level2Flow = flow({}, async (deps, ctx, input) => {
+  await ctx.run('operation-2', () => work())  // ctx.run doesn't count
+  await ctx.run('operation-3', () => work())  // Still level 2
+})
+
+// ✅ GOOD: 3 levels (maximum allowed)
+const orchestrator = flow({}, async (deps, ctx, input) => {
+  await ctx.exec('level-2', level2Flow, data)  // Level 2
+})
+
+const level2Flow = flow({}, async (deps, ctx, input) => {
+  await ctx.exec('level-3', level3Flow, data)  // Level 3
+})
+
+const level3Flow = flow({}, async (deps, ctx, input) => {
+  await ctx.run('final-operation', () => work())  // Operations don't add depth
+})
+
+// ❌ BAD: 4 levels (too deep)
+orchestrator → ctx.exec(level2) → ctx.exec(level3) → ctx.exec(level4)  // Exceeds limit
+```
+
+```typescript
+// ✅ GOOD: Flow with business logic
+const authorizeWithGoogle = flow({
+  oauth: googleOAuth,
+  userRepo: userRepository
+}, async (deps, ctx, input: { code: string }) => {
+  ctx.set(authAttemptId, generateId())
+
+  // Step 1: Exchange code (journaled with key)
+  const tokenResult = await ctx.run('exchange-code', async () => {
+    try {
+      return { ok: true as const, token: await deps.oauth.exchangeCode(input.code) }
+    } catch (error) {
+      return { ok: false as const, reason: 'invalid_code' as const, error }
+    }
+  })
+
+  if (!tokenResult.ok) {
+    return { success: false, reason: tokenResult.reason }
+  }
+
+  // Step 2: Validate token (sub-flow with journal key)
+  const validation = await ctx.exec('validate-token', validateGoogleToken, tokenResult.token)
+
+  if (!validation.ok) {
+    return { success: false, reason: validation.reason }
+  }
+
+  // Business rule: Only @company.com emails
+  if (!validation.email.endsWith('@company.com')) {
+    return { success: false, reason: 'unauthorized_domain' as const }
+  }
+
+  // Step 3: Ensure user exists (sub-flow with journal key)
+  const user = await ctx.exec('ensure-user', ensureUserExists, {
+    email: validation.email,
+    name: validation.name
+  })
+
+  return {
+    success: true,
+    user,
+    authAttemptId: ctx.get(authAttemptId)
+  }
+})
+```
+
+**Testing:**
+```typescript
+const testScope = createScope({
+  initialValues: [
+    preset(googleOAuth, mockOAuth),
+    preset(userRepository, mockUserRepo)
+  ]
+})
+
+const result = await flow.execute(authorizeWithGoogle,
+  { code: 'test-code' },
+  { scope: testScope, details: true }
+)
+
+// Verify journal
+expect(result.ctx.context.get(flowMeta.journal)).toContain('exchange-code')
+
+// Verify business logic
+expect(result.result.success).toBe(true)
+```
+
+## 3. Interaction Points (Integration Points)
+
+**What:** Entry points where external world meets flows
+
+**Rule:** Keep flows framework-agnostic—don't pass framework objects into flows
+
+```typescript
+// ❌ BAD: Flow coupled to Express
+const handleLogin = flow({
+  oauth: googleOAuth
+}, async (deps, ctx, req: express.Request) => {
+  const code = req.body.code // Tightly coupled
+})
+
+// ✅ GOOD: Flow has clean interface
+const handleLogin = flow({
+  oauth: googleOAuth
+}, async (deps, ctx, input: { code: string }) => {
+  // Framework-agnostic business logic
+})
+
+// Interaction Point: Express route
+app.post('/auth/google', async (req, res) => {
+  const scope = req.app.get('scope')
+
+  const result = await flow.execute(handleLogin, {
+    code: req.body.code
+  }, { scope })
+
+  if (result.success) {
+    res.json({ token: result.token })
+  } else {
+    res.status(400).json({ error: result.reason })
+  }
+})
+
+// Interaction Point: CLI command
+program
+  .command('auth <code>')
+  .action(async (code) => {
+    const scope = createScope({ tags: [...] })
+
+    const result = await flow.execute(handleLogin, { code }, { scope })
+
+    console.log(result.success ? 'Success' : `Failed: ${result.reason}`)
+
+    await scope.dispose()
+  })
+```
+
+## 4. Utilities (Pure Functions)
+
+**What:** Stateless transformations (no side effects, no dependencies)
+
+```typescript
+// ✅ Utilities: Pure, stateless
+const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim()
+}
+
+const validateEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+const calculateTax = (amount: number, rate: number): number => {
+  return amount * rate
+}
+
+// Used in flows without tracking overhead
+const processPayment = flow({
+  gateway: paymentGateway
+}, async (deps, ctx, input) => {
+  const normalizedEmail = normalizeEmail(input.email) // Direct call
+  const tax = calculateTax(input.amount, 0.1)        // Direct call
+  const total = input.amount + tax
+
+  // Business operation tracked
+  return await ctx.exec('charge-payment', chargePayment, { total, email: normalizedEmail })
+})
+```
+
+**Testing:**
+```typescript
+expect(normalizeEmail('  Test@Example.COM  ')).toBe('test@example.com')
+expect(calculateTax(100, 0.1)).toBe(10)
+```
+
+## 5. ctx.exec & ctx.run - Always Use Journal Keys
+
+**Why:** Makes operations visible to extensions (logging, tracing, metrics)
+
+```typescript
+const processOrder = flow({
+  inventory: inventoryService,
+  payment: paymentService
+}, async (deps, ctx, order) => {
+
+  // ✅ ALWAYS use journal keys - makes visible to extensions
+  const stock = await ctx.run('check-inventory', async () => {
+    return deps.inventory.checkStock(order.items)
+  })
+
+  // ✅ Works with sync or async operations
+  const pricing = await ctx.run('calculate-pricing', () => {
+    const base = calculateTotal(order.items)
+    const tax = calculateTax(base, order.region)
+    return { base, tax, total: base + tax }
+  })
+
+  // ✅ Sub-flows always with journal keys
+  const charged = await ctx.exec('charge-payment', chargePayment, pricing.total)
+
+  // Direct call: Only for trivial operations
+  const formatted = formatCurrency(pricing.total)
+
+  return { ok: true, total: pricing.total }
+})
+```
+
+**Benefits:**
+- Extensions see all operations
+- Logging, tracing, metrics work automatically
+- Debugging shows execution path
+- Journal enables replay
+
+**When to use ctx.run:**
+```
+✓ Resource method calls (API, DB, external services)
+✓ Important utility operations (validation, pricing)
+✓ Any operation you want visible in logs/traces/metrics
+✓ Operations that might fail or have latency
+
+✗ Only skip for trivial formatting/property access
+```
+
+## 6. Extensions (Cross-Cutting Observation)
+
+```typescript
+const loggingExtension: Extension = {
+  wrap: (ctx, next, operation) => {
+    if (operation.kind === 'execute') {
+      console.log(`[FLOW START] ${operation.flowName}`)
+      return next().finally(() => {
+        console.log(`[FLOW END] ${operation.flowName}`)
+      })
+    }
+
+    if (operation.kind === 'journal') {
+      console.log(`  [STEP] ${operation.key}`)
+    }
+
+    return next()
+  }
+}
+
+await flow.execute(processOrder, input, {
+  scope,
+  extensions: [loggingExtension]
+})
+
+/* Output:
+[FLOW START] processOrder
+  [STEP] check-inventory
+  [STEP] calculate-pricing
+  [STEP] charge-payment
+[FLOW END] processOrder
+*/
+```
+
+## Testing Strategy Matrix
+
+| Element | How to Test | Example |
+|---------|-------------|---------|
+| **Resource** | Integration test (real) OR Mock via preset() | ```typescript<br>// Real DB<br>const scope = createScope({ tags: [dbConfig({...})] })<br>const db = await scope.resolve(dbPool)<br><br>// Mock<br>const testScope = createScope({<br>  initialValues: [preset(dbPool, mockDb)]<br>})<br>``` |
+| **Flow** | Mock resources via preset(), verify journal | ```typescript<br>const testScope = createScope({<br>  initialValues: [preset(googleOAuth, mockOAuth)]<br>})<br>const result = await flow.execute(auth, input, { scope: testScope })<br>``` |
+| **Utility** | Unit test (pure functions) | ```typescript<br>expect(normalizeEmail(' Test@Example.COM ')).toBe('test@example.com')<br>``` |
+
+**You have flexibility:**
+- Test flows WITH real database (integration test)
+- Test flows WITHOUT real database (unit test via mocks)
+- Mix both approaches based on what you're testing
+
+## Design Validation: When It's NOT a Flow
+
+Keep it simple—focus on violations:
+
+```
+❌ Pure computation (no side effects)
+   → Should be utility, not flow
+   Example: calculateTotal, formatDate, validateEmail
+
+❌ No business logic (just technical wiring)
+   → Should be resource, not flow
+   Example: Database connection pool, HTTP client setup
+
+❌ Long-lived resource (not per-operation)
+   → Should be resource (executor), not flow
+   Example: Redis client, S3 bucket connection
+
+✅ Has side effects + needs tracking → Flow
+✅ Business logic with multiple outcomes → Flow
+✅ Orchestrates resources/sub-flows → Flow
+```
 
 ## Three-Tier Pattern Enforcement
 
 ### Tier 1: Critical (Block/require fixes)
 
-These patterns MUST be followed. Violations prevent proceeding until fixed.
-
 **Type Safety**
 - ❌ No `any` types
 - ❌ No `unknown` without proper type guards
-- ❌ No type casting (`as Type`)
+- ❌ No unsafe type casting (see acceptable patterns below)
 - ✅ Use derive() for type propagation
 - ✅ Leverage factory function destructuring
-- ✅ Let TypeScript infer from graph structure
 
-**Reference**: `examples/type-inference.ts`
+**Acceptable Type Assertions:**
+```typescript
+// ✅ GOOD: Library type narrowing
+const client = createClient({...}) as RedisClientType  // Library-specific type
 
-**Dependency Modifiers**
-- ✅ `.reactive()` - downstream re-executes on upstream changes (declare on consumer side)
-- ✅ `.lazy()` - conditional dependency resolution (only resolves when accessed)
-- ✅ `.static()` - controller/updater pattern (doesn't re-execute on changes)
-- ❌ Missing modifier when reactivity needed
-- ❌ Wrong modifier for use case
+// ✅ GOOD: Error narrowing in catch blocks
+try {
+  await operation()
+} catch (error) {
+  // TypeScript makes error: unknown
+  const err = error as Error  // Safe - Error is base type
+  console.error(err.message)
+}
 
-**References**:
-- `.reactive()`: `examples/reactive-updates.ts`
-- `.lazy()`: `examples/flow-composition.ts`
-- `.static()`: `examples/scope-lifecycle.ts`
+// ✅ GOOD: Type guard instead of assertion (preferred)
+function isUser(data: unknown): data is User {
+  return typeof data === 'object' && data !== null && 'id' in data
+}
+
+if (isUser(data)) {
+  // data is now User type
+}
+
+// ❌ BAD: Casting to bypass type checking
+const user = data as User  // Dangerous if data isn't actually User
+```
 
 **Tag System**
-- ✅ Define tags with explicit types using tag() helper
-- ✅ Type-safe tag references across graph
+- ✅ Define tags with schema validators (Zod, Valibot) or custom<T>()
+- ✅ Type-safe tag references
 - ❌ String-based tag references
-- ❌ Inconsistent tag usage
-
-**Reference**: `examples/tags-foundation.ts`
 
 **Lifecycle Separation**
 - ✅ Long-running resources (DB, servers) in scope
@@ -65,173 +678,56 @@ These patterns MUST be followed. Violations prevent proceeding until fixed.
 - ❌ Request-specific data in scope
 - ❌ Connection pools in flows
 
-**References**:
-- Scope: `examples/scope-lifecycle.ts`
-- Flow: `examples/flow-composition.ts`
+**Flow Composition**
+- ✅ Always use journal keys: `ctx.exec('key', flow, input)`
+- ✅ Always use journal keys: `ctx.run('key', () => operation)`
+- ❌ Unnamed operations (harder to debug)
+- ✅ Max 3 levels deep
+- ✅ Discriminated union outputs
 
 ### Tier 2: Important (Strong warnings)
 
-These patterns should be followed. Warn clearly but allow override with justification.
-
 **Flow Patterns**
-- Root context for flow-specific data
-- Proper sub-flow execution (sequential vs parallel)
-- Flow disposal for cleanup
-- Transaction management per flow
+- Context inheritance via ctx.exec
+- Proper error handling (discriminated unions)
+- Sub-flow composition for visibility
 
-**References**:
-- Context: `examples/flow-composition.ts`
-- Transactions: `examples/database-transaction.ts`
+**Resource Patterns**
+- Configuration via tags (`controller.scope`)
+- Cleanup via `controller.cleanup()`
+- Business-logic-free operations
 
-**Meta Usage**
-- Proper decoration of executors with metadata
-- Scope configuration via meta
-- Flow configuration via meta
-- Extension configuration
-
-**Reference**: `examples/extension-logging.ts`
-
-**Extension Decisions**
-- Use extensions for cross-cutting concerns (logging, metrics, transactions)
-- Use regular executors for domain logic
-- Extension lifecycle hooks (scope/flow/executor)
-
-**Reference**: `examples/extension-logging.ts`
+**Testing Patterns**
+- Mock via preset()
+- Verify flow logic with mocked resources
+- Integration tests with real resources when needed
 
 ### Tier 3: Best Practices (Educational)
 
-Suggest improvements when detected, but don't block.
-
-**Testing Patterns**
-- Graph swapping for mocks
-- Test-specific scope configuration
-- Isolated test setups
-
-**Reference**: `examples/testing-setup.ts`
-
 **Code Organization**
-- Logical executor grouping
-- Clear dependency structure
-- Consistent naming
+- Clear separation: Resources → Flows → Interaction Points
+- Utilities for pure functions
+- Extensions for cross-cutting concerns
 
-**Error Handling**
-- Error boundaries
-- Type-safe error propagation
-
-**Reference**: `examples/error-handling.ts`
-
-## Guidance Flow
-
-When writing or reviewing pumped-fn code:
-
-1. **Scan for violations**
-   - Check Tier 1 patterns first
-   - Then Tier 2
-   - Finally Tier 3
-
-2. **Provide guidance**
-   - **Tier 1 violation**: Block with clear explanation + reference to example
-   - **Tier 2 violation**: Strong warning with explanation + example reference
-   - **Tier 3 opportunity**: Suggest improvement with example reference
-
-3. **Reference examples**
-   - Always point to specific example file
-   - Quote relevant code sections from examples
-   - Explain why pattern matters (graph implications)
-
-4. **Allow overrides**
-   - If user provides good justification
-   - Explain trade-offs clearly
-   - Document decision
-
-## Context Detection
-
-Detect which scenario user is in:
-
-**New Project**
-- No existing pumped-fn code
-- Guide scope setup first
-- Reference: `examples/basic-handler.ts` → `examples/scope-lifecycle.ts`
-
-**Integration**
-- Existing codebase, adding pumped-fn
-- Guide gradual adoption
-- Show how to integrate with existing patterns
-
-**Extension**
-- Existing pumped-fn code
-- Adding new executors/flows
-- Ensure consistency with existing graph
-
-## Focus Areas (Common Pain Points)
-
-### 1. Conceptual Model
-
-**Challenge**: Graph resolution vs imperative/OOP thinking
-
-**Guidance**:
-- Executors declare factory functions, not values
-- Dependencies declared explicitly, resolved by scope
-- Think in terms of dependency graphs, not call chains
-- Scope actualizes the graph (detects deps, resolves in order)
-
-**Reference**: `examples/basic-handler.ts` for simplest mental model
-
-### 2. Dependency Declaration
-
-**Challenge**: Understanding upstream relationships and modifiers
-
-**Guidance**:
-- Upstream dependencies declared in factory function parameters
-- Modifiers control resolution behavior:
-  - `.reactive()`: consumer re-executes when producer changes
-  - `.lazy()`: only resolve when accessed
-  - `.static()`: never re-execute (controllers/updaters)
-- Default behavior: resolve once, cache forever
-
-**References**:
-- Basic: `examples/basic-handler.ts`
-- Reactive: `examples/reactive-updates.ts`
-- Lazy: `examples/flow-composition.ts`
-- Static: `examples/scope-lifecycle.ts`
-
-### 3. Type Inference
-
-**Challenge**: Maintaining strict types through graph without escape hatches
-
-**Guidance**:
-- Use derive() to propagate types from factories
-- Destructure factory functions for better inference
-- Let graph structure inform types
-- Never use `any`, `unknown` without guards, or `as` casting
-
-**Reference**: `examples/type-inference.ts`
-
-## Quick Pattern Lookup
-
-For detailed pattern mapping, see: `pattern-reference.md`
-
-Common lookups:
-- "How do I make this reactive?" → `examples/reactive-updates.ts`
-- "Where do I put DB connection?" → `examples/scope-lifecycle.ts`
-- "How do I handle requests?" → `examples/flow-composition.ts`
-- "How do I maintain types?" → `examples/type-inference.ts`
-- "How do I use tags?" → `examples/tags-foundation.ts`
-- "How do I test this?" → `examples/testing-setup.ts`
-- "How do I add logging?" → `examples/extension-logging.ts`
+**Observability**
+- Journal important operations
+- Use extensions for logging/tracing
+- Meaningful journal keys
 
 ## Key Behaviors
 
-- **Non-intrusive**: Only activate on detected usage
-- **Example-driven**: Always reference concrete code
-- **Type-focused**: Relentless about maintaining inference
-- **Conceptual**: Explain *why* patterns matter (graph implications)
-- **Pragmatic**: Allow overrides with good justification
+- **Non-intrusive**: Only activate when package.json has @pumped-fn/core-next
+- **Example-driven**: Reference examples directory
+- **Observability-focused**: Guide toward inspectable operations
+- **Testing-friendly**: Emphasize preset() and mock strategies
+- **Pragmatic**: Balance tracking overhead with visibility needs
 
 ## Remember
 
-- Examples live in `examples/` directory - read them when needed
-- Pattern reference provides quick mapping
-- Focus on Tier 1 (critical) first
-- Explain graph implications, not just syntax
-- Point to docs for deep dives: See pumped-fn documentation at https://github.com/lagz0ne/pumped-fn/tree/main/docs
+- Use journal keys for all ctx.exec and ctx.run calls
+- Resources are integration details, flows are business logic
+- Keep flows framework-agnostic
+- Mock resources via preset() for testing
+- Extensions make operations observable without code changes
+- Max 3 levels of flow depth
+- Discriminated unions for all flow outcomes
