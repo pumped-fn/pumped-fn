@@ -1,8 +1,8 @@
 ---
 name: Pumped-fn TypeScript
 description: Auto-activating guidance for @pumped-fn/core-next ensuring type-safe, pattern-consistent code
-when_to_use: automatically activates when package.json contains @pumped-fn/core-next dependency
-version: 2.1.0
+when_to_use: when brainstorming architecture for applications needing observable operations, dependency management, testable flows, composition of reusable components, or framework integration (OR when package.json contains @pumped-fn/core-next)
+version: 3.0.0
 ---
 
 # Pumped-fn TypeScript Skill
@@ -21,6 +21,217 @@ Supporting: **Tags** (configuration/data boundaries) + **Extensions** (cross-cut
 **Core principle:** Operations that matter operationally should flow through the library's tracking system for visibility.
 
 **Auto-activates when:** package.json contains `@pumped-fn/core-next` in dependencies
+
+## Architecture Decision Guide
+
+### When to Apply Pumped-fn Patterns
+
+**If you're already using pumped-fn or planning to:**
+Apply these patterns to operations that benefit from observability and testability. Not everything needs to flow through the library.
+
+✅ **Apply pumped-fn patterns to:**
+- Operations needing observability (want logging/tracing/metrics without manual instrumentation)
+- Business logic that should be testable independent of framework
+- Resources with lifecycle (DB pools, API clients, connections needing cleanup)
+- Shared dependencies across flows (auth flow + order flow both use same DB)
+- Operations you want inspectable (debugging, audit trails, replay)
+
+⚡ **Keep as regular functions:**
+- Simple transformations (formatDate, normalizeEmail, calculateTotal)
+- Direct passthrough (CRUD with no business rules)
+- One-off scripts with no shared resources
+- Prototype code where observability overhead isn't justified yet
+
+### Application Type → Pumped-fn Structure
+
+**HTTP Server (Express, Fastify, Hono):**
+```
+Scope (singleton, app lifetime)
+  ↓
+Resources (DB pool, Redis, API clients)
+  ↓
+Flows (business logic: login, createOrder, processPayment)
+  ↓
+Interaction Points (route handlers)
+```
+
+**CLI Application:**
+```
+Scope (per command execution)
+  ↓
+Resources (config files, API clients)
+  ↓
+Flows (business operations)
+  ↓
+Interaction Points (command handlers)
+```
+
+**Cron/Scheduled Jobs:**
+```
+Scope (singleton, app lifetime)
+  ↓
+Resources (DB, external services)
+  ↓
+Flows (batch operations, sync tasks)
+  ↓
+Interaction Points (job scheduler)
+```
+
+**Event Processor (Queue consumer, Kafka, etc):**
+```
+Scope (singleton, consumer lifetime)
+  ↓
+Resources (queue connection, DB)
+  ↓
+Flows (event handling logic)
+  ↓
+Interaction Points (event handlers)
+```
+
+## Scope Lifecycle Patterns
+
+**Rule: One app, one scope.** Create at startup, dispose at termination.
+
+### HTTP Server (Express, Fastify, Hono)
+
+```typescript
+const scope = createScope({
+  tags: [
+    dbConfig({ host: 'localhost', port: 5432, database: 'app' }),
+    redisConfig({ url: 'redis://localhost:6379' })
+  ]
+})
+
+const app = express()
+app.set('scope', scope)
+
+app.post('/users', async (req, res) => {
+  const result = await flow.execute(createUser, {
+    email: req.body.email,
+    name: req.body.name
+  }, { scope })
+
+  res.json(result)
+})
+
+const server = app.listen(3000)
+
+process.on('SIGTERM', async () => {
+  await server.close()
+  await scope.dispose()
+  process.exit(0)
+})
+
+process.on('SIGINT', async () => {
+  await server.close()
+  await scope.dispose()
+  process.exit(0)
+})
+```
+
+### Cron/Scheduled Jobs
+
+```typescript
+import cron from 'node-cron'
+
+const scope = createScope({
+  tags: [dbConfig({ /* ... */ })]
+})
+
+cron.schedule('*/5 * * * *', async () => {
+  await flow.execute(syncData, {}, { scope })
+})
+
+cron.schedule('0 * * * *', async () => {
+  await flow.execute(cleanupOldData, {}, { scope })
+})
+
+process.on('SIGTERM', async () => {
+  await scope.dispose()
+  process.exit(0)
+})
+```
+
+### Event Processor (Queues, Kafka, WebSockets)
+
+```typescript
+import { Kafka } from 'kafkajs'
+
+const scope = createScope({
+  tags: [
+    dbConfig({ /* ... */ }),
+    kafkaConfig({ /* ... */ })
+  ]
+})
+
+const kafka = new Kafka({ /* ... */ })
+const consumer = kafka.consumer({ groupId: 'app' })
+
+await consumer.connect()
+await consumer.subscribe({ topic: 'orders' })
+
+await consumer.run({
+  eachMessage: async ({ message }) => {
+    await flow.execute(processOrder,
+      JSON.parse(message.value.toString()),
+      { scope }
+    )
+  }
+})
+
+process.on('SIGTERM', async () => {
+  await consumer.disconnect()
+  await scope.dispose()
+  process.exit(0)
+})
+```
+
+### CLI Application
+
+**Exception:** CLI commands are separate app invocations - one scope per command.
+
+```typescript
+import { Command } from 'commander'
+
+const program = new Command()
+
+program
+  .command('create-user')
+  .argument('<email>')
+  .argument('<name>')
+  .action(async (email, name) => {
+    const scope = createScope({
+      tags: [dbConfig({ /* ... */ })]
+    })
+
+    try {
+      const result = await flow.execute(createUser, { email, name }, { scope })
+      console.log(result.ok ? 'Success' : `Failed: ${result.reason}`)
+    } finally {
+      await scope.dispose()
+    }
+  })
+
+program.parse()
+```
+
+### Serverless/Lambda
+
+**Exception:** Lambda manages app lifecycle - create scope per invocation, dispose in finally.
+
+```typescript
+export const handler = async (event) => {
+  const scope = createScope({
+    tags: [dbConfig({ /* ... */ })]
+  })
+
+  return scope.exec(handleRequest, event).finally(async () => {
+    await scope.dispose()
+  })
+}
+```
+
+**Why:** Lambda can freeze containers between invocations. Creating scope per invocation ensures clean state. `finally` guarantees disposal even on errors or timeout.
 
 ## Decision Tree
 
@@ -51,9 +262,11 @@ preset()             ↓
               Testing: Unit test I/O
 ```
 
-## Quick API Reference
+## Implementation Reference
 
-### Tags (Schema-Flexible)
+### Quick API Reference
+
+#### Tags (Schema-Flexible)
 
 ```typescript
 import { tag, custom } from '@pumped-fn/core-next'
@@ -73,7 +286,7 @@ export const dbConfig = tag(z.object({
 export const userId = tag(custom<string>(), { label: 'flow.userId' })
 ```
 
-### Resources (Executors)
+#### Resources (Executors)
 
 ```typescript
 import { provide, derive } from '@pumped-fn/core-next'
@@ -105,7 +318,7 @@ const userRepository = derive({ db: dbPool }, ({ db }) => ({
 }))
 ```
 
-### Flows (Business Logic)
+#### Flows (Business Logic)
 
 ```typescript
 import { flow } from '@pumped-fn/core-next'
@@ -155,7 +368,7 @@ const registerUser = flow({
 })
 ```
 
-### Scope & Execution
+#### Scope & Execution
 
 ```typescript
 import { createScope } from '@pumped-fn/core-next'
@@ -176,7 +389,7 @@ const result = await flow.execute(registerUser, input, { scope })
 await scope.dispose()
 ```
 
-### Promised Utilities
+#### Promised Utilities
 
 ```typescript
 import { Promised } from '@pumped-fn/core-next'
@@ -212,7 +425,7 @@ Promised.try(main).catch((error) => {
 })
 ```
 
-## 1. Resources (Integration Layer)
+### 1. Resources (Integration Layer)
 
 **What:** Technical details of external systems (business-logic-free)
 
@@ -315,7 +528,7 @@ const testScope = createScope({
 })
 ```
 
-## 2. Flows (Business Logic Layer)
+### 2. Flows (Business Logic Layer)
 
 **What:** Business operations orchestrating resources, deterministic outcomes
 
@@ -425,7 +638,7 @@ expect(result.ctx.context.get(flowMeta.journal)).toContain('exchange-code')
 expect(result.result.success).toBe(true)
 ```
 
-## 3. Interaction Points (Integration Points)
+### 3. Interaction Points (Integration Points)
 
 **What:** Entry points where external world meets flows
 
@@ -475,7 +688,7 @@ program
   })
 ```
 
-## 4. Utilities (Pure Functions)
+### 4. Utilities (Pure Functions)
 
 **What:** Stateless transformations (no side effects, no dependencies)
 
@@ -512,7 +725,7 @@ expect(normalizeEmail('  Test@Example.COM  ')).toBe('test@example.com')
 expect(calculateTax(100, 0.1)).toBe(10)
 ```
 
-## 5. ctx.exec & ctx.run - Always Use Journal Keys
+### 5. ctx.exec & ctx.run - Always Use Journal Keys
 
 **Why:** Makes operations visible to extensions (logging, tracing, metrics)
 
@@ -560,7 +773,7 @@ const processOrder = flow({
 ✗ Only skip for trivial formatting/property access
 ```
 
-## 6. Extensions (Cross-Cutting Observation)
+### 6. Extensions (Cross-Cutting Observation)
 
 ```typescript
 const loggingExtension: Extension = {
