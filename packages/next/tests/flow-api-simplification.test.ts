@@ -229,4 +229,19 @@ describe("Flow API Simplification", () => {
       }).toThrow();
     });
   });
+
+  describe("Validation errors", () => {
+    test("object with non-executor/non-function values should throw", () => {
+      expect(() => {
+        flow({ foo: "bar", baz: 123 } as any, (_deps: any, _ctx: any, n: number) => n * 2);
+      }).toThrow("Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions");
+    });
+
+    test("object with mixed valid and invalid values should throw", () => {
+      const service = provide(() => ({ value: 10 }));
+      expect(() => {
+        flow({ service, invalid: "string" } as any, (_deps: any, _ctx: any, n: number) => n * 2);
+      }).toThrow("Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions");
+    });
+  });
 });
