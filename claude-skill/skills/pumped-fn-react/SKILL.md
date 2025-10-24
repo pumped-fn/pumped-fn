@@ -127,6 +127,155 @@ Don't fight the type system with complex patterns. Use `Core.InferOutput<T>`.
 
 ---
 
+## Scope Lifecycle Management
+
+### Rule: One App, One Scope
+
+**Create scope at app startup, dispose on unmount.**
+
+```typescript
+// ===== app/scope.ts =====
+import { createScope, tag, custom } from '@pumped-fn/core-next'
+
+export const apiBaseUrl = tag(custom<string>(), {
+  label: 'api.baseUrl',
+  default: import.meta.env.VITE_API_URL || 'https://api.example.com'
+})
+
+export const appScope = createScope({
+  tags: [
+    apiBaseUrl(import.meta.env.VITE_API_URL || 'https://api.example.com')
+  ]
+})
+
+// ===== app/main.tsx =====
+import { appScope } from './scope'
+
+appScope.run(async () => {
+  // Initialize critical resources if needed
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <ScopeProvider scope={appScope}>
+      <App />
+    </ScopeProvider>
+  )
+})
+
+// Cleanup on page unload (important for SPA navigation)
+window.addEventListener('beforeunload', () => {
+  appScope.dispose()
+})
+```
+
+### Development Mode: Hot Module Replacement (HMR)
+
+**Problem:** Vite/Webpack HMR creates new scope instances on every reload → resource leaks.
+
+**Solution:** Singleton pattern that survives HMR.
+
+```typescript
+// ===== app/scope.ts =====
+import { createScope } from '@pumped-fn/core-next'
+
+// @ts-ignore - Vite HMR API
+const globalScope = globalThis.__APP_SCOPE__ as ReturnType<typeof createScope> | undefined
+
+export const appScope = globalScope || createScope({
+  tags: [
+    apiBaseUrl(import.meta.env.VITE_API_URL || 'https://api.example.com')
+  ]
+})
+
+// Store for HMR
+// @ts-ignore
+globalThis.__APP_SCOPE__ = appScope
+
+// Cleanup old scope on HMR
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    // Don't dispose - we're reusing the scope
+  })
+}
+```
+
+**Why:** Prevents creating new DB pools/API clients/WebSocket connections on every HMR reload.
+
+### Production: Meta-Frameworks (Next.js, TanStack Start)
+
+**Next.js App Router:**
+
+```typescript
+// ===== app/scope.ts (Server-side singleton) =====
+let _scope: ReturnType<typeof createScope> | null = null
+
+export function getAppScope() {
+  if (!_scope) {
+    _scope = createScope({
+      tags: [
+        apiBaseUrl(process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com')
+      ]
+    })
+  }
+  return _scope
+}
+
+// ===== app/layout.tsx =====
+import { ScopeProvider } from '@pumped-fn/react'
+import { getAppScope } from './scope'
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const scope = getAppScope()
+
+  return (
+    <html>
+      <body>
+        <ScopeProvider scope={scope}>
+          {children}
+        </ScopeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+**TanStack Start:**
+
+```typescript
+// ===== app/router.tsx =====
+import { createRouter } from '@tanstack/react-router'
+import { createScope } from '@pumped-fn/core-next'
+
+const appScope = createScope({
+  tags: [apiBaseUrl(import.meta.env.VITE_API_URL)]
+})
+
+export const router = createRouter({
+  routeTree,
+  context: {
+    scope: appScope
+  }
+})
+
+// ===== app/routes/__root.tsx =====
+import { ScopeProvider } from '@pumped-fn/react'
+import { Outlet } from '@tanstack/react-router'
+
+export const Route = createRootRoute({
+  component: () => {
+    const { scope } = Route.useRouteContext()
+
+    return (
+      <ScopeProvider scope={scope}>
+        <Outlet />
+      </ScopeProvider>
+    )
+  }
+})
+```
+
+**Key principle:** One scope per app instance. Only create multiple scopes for multi-tenant apps where each tenant needs isolated state.
+
+---
+
 ## Critical Architectural Patterns
 
 ### Pattern 1: Application Initialization
@@ -205,6 +354,153 @@ appScope.run(async () => {
 - Single scope, never recreated
 - Context API propagates scope (never pass as props)
 - Tests can create separate scope with different tags
+
+---
+
+### Pattern 1b: Environment-Based Configuration
+
+**Rule:** Use tags for environment-specific config (dev/staging/prod).
+
+```typescript
+// ===== app/config.ts =====
+import { tag, custom } from '@pumped-fn/core-next'
+import { z } from 'zod'
+
+// Option 1: With Zod validation (runtime safety)
+export const apiConfig = tag(z.object({
+  baseUrl: z.string().url(),
+  timeout: z.number().positive(),
+  retries: z.number().int().min(0).max(5)
+}), {
+  label: 'api.config',
+  default: {
+    baseUrl: 'http://localhost:3000',
+    timeout: 5000,
+    retries: 3
+  }
+})
+
+// Option 2: Simple custom type (no validation)
+export const featureFlags = tag(custom<{
+  enableBetaFeatures: boolean
+  enableAnalytics: boolean
+}>(), {
+  label: 'features',
+  default: {
+    enableBetaFeatures: false,
+    enableAnalytics: true
+  }
+})
+
+// ===== app/env.ts =====
+// Environment detection
+const isDev = import.meta.env.DEV
+const isProd = import.meta.env.PROD
+const isStaging = import.meta.env.VITE_ENV === 'staging'
+
+export function getEnvConfig() {
+  if (isProd) {
+    return {
+      api: {
+        baseUrl: 'https://api.production.com',
+        timeout: 10000,
+        retries: 5
+      },
+      features: {
+        enableBetaFeatures: false,
+        enableAnalytics: true
+      }
+    }
+  }
+
+  if (isStaging) {
+    return {
+      api: {
+        baseUrl: 'https://api.staging.com',
+        timeout: 8000,
+        retries: 3
+      },
+      features: {
+        enableBetaFeatures: true,
+        enableAnalytics: true
+      }
+    }
+  }
+
+  // Development
+  return {
+    api: {
+      baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+      timeout: 5000,
+      retries: 1
+    },
+    features: {
+      enableBetaFeatures: true,
+      enableAnalytics: false
+    }
+  }
+}
+
+// ===== app/scope.ts =====
+import { createScope } from '@pumped-fn/core-next'
+import { apiConfig, featureFlags } from './config'
+import { getEnvConfig } from './env'
+
+const config = getEnvConfig()
+
+export const appScope = createScope({
+  tags: [
+    apiConfig(config.api),
+    featureFlags(config.features)
+  ]
+})
+
+// ===== Using in resources =====
+export const apiClient = provide((controller) => {
+  const config = apiConfig.get(controller.scope)
+  const features = featureFlags.get(controller.scope)
+
+  const client = {
+    get: async (path: string) => {
+      const res = await fetch(`${config.baseUrl}${path}`, {
+        signal: AbortSignal.timeout(config.timeout)
+      })
+      return res.json()
+    }
+  }
+
+  // Conditional feature behavior
+  if (features.enableAnalytics) {
+    // Wrap client with analytics
+  }
+
+  return client
+})
+```
+
+**Benefits:**
+- Single source of truth for environment config
+- Type-safe configuration with Zod validation
+- Easy testing (inject test config via tags)
+- No hardcoded environment strings in resources
+
+**Testing:**
+```typescript
+test('uses correct API config', async () => {
+  const testScope = createScope({
+    tags: [
+      apiConfig({
+        baseUrl: 'http://test-api:3000',
+        timeout: 1000,
+        retries: 0
+      })
+    ]
+  })
+
+  const client = await testScope.resolve(apiClient)
+  // Client uses test config
+})
+```
 
 ---
 
@@ -625,6 +921,109 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
 
 ---
 
+### ❌ ANTI-PATTERN 5: Premature Escape (Resolving Too Early)
+
+**Symptom:** Calling `scope.resolve()` in app initialization, passing resolved values to components
+**Impact:** Components can't be tested independently → no way to inject mocks via preset()
+**Detection:** Look for resolved values stored in state/context instead of executors
+
+**Why critical:** Once resolved, you lose ability to swap implementations. Tests can't inject mocks.
+
+```typescript
+// ❌ WRONG: Resolve too early
+// app/main.tsx
+const appScope = createScope({
+  tags: [apiBaseUrl('https://api.example.com')]
+})
+
+const apiClient = await appScope.resolve(apiClientExecutor)  // Escape too early!
+const userRepo = await appScope.resolve(userRepository)
+
+function App() {
+  return (
+    <AppContext.Provider value={{ api: apiClient, userRepo }}>  // Pass resolved values
+      <Dashboard />
+    </AppContext.Provider>
+  )
+}
+
+function Dashboard() {
+  const { userRepo } = useContext(AppContext)  // Can't swap in tests
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    userRepo.findById('123').then(setUser)
+  }, [userRepo])
+
+  return <div>{user?.name}</div>
+}
+
+// test.tsx - Testing is now HARD
+test('shows user', () => {
+  // Can't inject test scope - already resolved to real API!
+  render(<App />) // Uses real API client
+})
+
+// ✅ CORRECT: Keep executors, resolve in components
+// app/main.tsx
+const appScope = createScope({
+  tags: [apiBaseUrl('https://api.example.com')]
+})
+
+function App() {
+  return (
+    <ScopeProvider scope={appScope}>  // Pass scope, not resolved values
+      <Dashboard />
+    </ScopeProvider>
+  )
+}
+
+function Dashboard() {
+  const [user] = useResolves(currentUser)  // Resolves automatically
+  return <div>{user.name}</div>
+}
+
+// test.tsx - Testing is EASY
+test('shows user', () => {
+  const mockUserRepo = derive({}, () => ({
+    findById: async (id: string) => ({ id, name: 'Test User' })
+  }))
+
+  const testScope = createScope({
+    presets: [preset(userRepository, mockUserRepo)]  // Inject test implementation
+  })
+
+  render(
+    <ScopeProvider scope={testScope}>
+      <Dashboard />
+    </ScopeProvider>
+  )
+
+  expect(screen.getByText('Test User')).toBeInTheDocument()
+})
+```
+
+**Key principle:** Resolve in components via hooks (useResolves), not in app initialization. Keep executors unresolved as long as possible.
+
+**Acceptable early resolve:** Loading critical resources before React renders.
+
+```typescript
+// ✅ VALID: Pre-load critical config
+appScope.run(async () => {
+  // Pre-load critical resources needed for app boot
+  await appScope.resolve(configLoader)
+
+  // But pass scope to React, not resolved values
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <ScopeProvider scope={appScope}>
+      <App />
+    </ScopeProvider>
+  )
+})
+```
+
+---
+
 ## Testing Strategy
 
 ### Rule: Mock resource layer, not individual calls
@@ -695,6 +1094,152 @@ test('shows read-only UI when user lacks editor role', () => {
 - Graph resolves derived state automatically
 - No need to mock currentUser, userPermissions, canEdit - they derive from apiClient
 - Different scenarios = different preset() combinations
+
+---
+
+## Promised Utilities for Parallel Loading
+
+### Using Promised.all() for Parallel Resolution
+
+**Problem:** Loading multiple resources sequentially is slow.
+
+```typescript
+// ❌ SLOW: Sequential loading
+function Dashboard() {
+  const [user] = useResolves(currentUser)
+  const [posts] = useResolves(posts)
+  const [permissions] = useResolves(userPermissions)
+  // Loads one after another: ~300ms total
+}
+```
+
+**Solution:** Use `Promised.all()` for parallel loading.
+
+```typescript
+import { Promised } from '@pumped-fn/core-next'
+import { useScope } from '@pumped-fn/react'
+
+function Dashboard() {
+  const scope = useScope()
+  const [data, setData] = useState<[User, Post[], string[]] | null>(null)
+
+  useEffect(() => {
+    Promised.all([
+      scope.resolve(currentUser),
+      scope.resolve(posts),
+      scope.resolve(userPermissions)
+    ]).then(setData)
+  }, [scope])
+
+  if (!data) return <Loading />
+
+  const [user, postList, permissions] = data
+  // All loaded in parallel: ~100ms total
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>Posts: {postList.length}</p>
+      <p>Permissions: {permissions.join(', ')}</p>
+    </div>
+  )
+}
+```
+
+### Error Handling with Promised.allSettled()
+
+**Problem:** One failed request breaks entire loading.
+
+**Solution:** Use `allSettled()` with `.partition()` to handle partial failures.
+
+```typescript
+import { Promised } from '@pumped-fn/core-next'
+
+function Dashboard() {
+  const scope = useScope()
+  const [data, setData] = useState<{
+    user?: User
+    posts?: Post[]
+    error?: string
+  }>({})
+
+  useEffect(() => {
+    const load = async () => {
+      const results = await Promised.allSettled([
+        scope.resolve(currentUser),
+        scope.resolve(posts)
+      ])
+
+      // IMPORTANT: Destructure immediately to access values
+      const { fulfilled, rejected } = await results.partition()
+
+      if (rejected.length > 0) {
+        setData({ error: 'Failed to load some data' })
+      } else {
+        const [user, postList] = fulfilled
+        setData({ user, posts: postList })
+      }
+    }
+
+    load()
+  }, [scope])
+
+  if (data.error) return <Error message={data.error} />
+  if (!data.user) return <Loading />
+
+  return (
+    <div>
+      <h1>{data.user.name}</h1>
+      {data.posts ? (
+        <p>Posts: {data.posts.length}</p>
+      ) : (
+        <p>Posts failed to load</p>
+      )}
+    </div>
+  )
+}
+```
+
+### Promised.try() for Error Boundaries
+
+**Pattern:** Wrap async operations with error handling.
+
+```typescript
+import { Promised } from '@pumped-fn/core-next'
+
+function DataLoader() {
+  const scope = useScope()
+
+  useEffect(() => {
+    Promised.try(async () => {
+      const user = await scope.resolve(currentUser)
+      const posts = await scope.resolve(posts)
+      return { user, posts }
+    })
+      .then(data => {
+        // Success
+        console.log('Loaded:', data)
+      })
+      .catch(error => {
+        // Error
+        console.error('Failed:', error)
+      })
+  }, [scope])
+
+  return <div>Loading...</div>
+}
+```
+
+### When to Use Each
+
+| Pattern | Use Case |
+|---------|----------|
+| `Promised.all()` | Load multiple resources in parallel, fail fast |
+| `Promised.allSettled()` | Load multiple resources, handle partial failures |
+| `Promised.try()` | Wrap async operations with error handling |
+| `useResolves()` | Simple single resource loading (recommended default) |
+
+**Recommendation:** Start with `useResolves()` for simple cases. Use `Promised.all()` when you need explicit parallel loading control.
 
 ---
 
@@ -1190,3 +1735,55 @@ When designing React apps with pumped-fn, ensure:
 **File structure:** Prefer flat structure. Add folders only when obvious need (>10 related files).
 
 **Promised API:** All operations (`resolve`, `run`, `execute`) return `Promised<T>` with chainable `.map()`, `.mapError()`, `.flatMap()` operators.
+
+**Parallel loading:** Use `Promised.all()` for parallel resolution, `Promised.allSettled()` with `.partition()` for partial failure handling.
+
+**Scope lifecycle:** One app, one scope. Dispose on unmount. Use HMR singleton pattern in development.
+
+---
+
+## Related Skills & Architecture
+
+### Business Logic Layer
+
+**This skill covers:** UI layer (React components, state projection, testing UI)
+
+**For backend/business logic**, see the [pumped-fn-typescript skill](../pumped-fn-typescript/README.md) which covers:
+- **Flows**: Business operations with journal keys (`ctx.exec`, `ctx.run`)
+- **Resources**: DB pools, API clients, external services
+- **Testing**: Integration tests, flow composition
+- **Extensions**: Logging, tracing, metrics
+
+### Three-Tier Architecture
+
+```
+┌─────────────────────────────────────┐
+│   pumped-fn-typescript (Backend)    │
+│                                      │
+│  Resources (DB, APIs)                │
+│       ↓                              │
+│  Flows (Business Logic)              │
+│       ↓                              │
+│  Interaction Points (HTTP routes)    │
+└──────────────┬──────────────────────┘
+               │ HTTP/GraphQL/RPC
+               ↓
+┌─────────────────────────────────────┐
+│   pumped-fn-react (Frontend)         │
+│                                      │
+│  Resource Layer (API client)         │
+│       ↓                              │
+│  Feature State (derived data)        │
+│       ↓                              │
+│  UI Projection (React components)    │
+└─────────────────────────────────────┘
+```
+
+**Key separation:**
+- **Backend (TypeScript skill):** Flows, database access, business rules
+- **Frontend (React skill):** API client, derived state, UI projection
+
+**Communication:**
+- Frontend calls backend via API client (resource layer)
+- Backend exposes flows via HTTP/GraphQL endpoints
+- Both use pumped-fn patterns for testability
