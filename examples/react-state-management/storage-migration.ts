@@ -6,31 +6,30 @@ import { provide, derive, tag, custom, createScope } from '@pumped-fn/core-next'
 // ===== Step 1: Define Storage Interface =====
 
 type Storage = {
-  get: <T>(key: string) => T | null | Promise<T | null>
-  set: <T>(key: string, value: T) => void | Promise<void>
-  list: <T>(prefix: string) => T[] | Promise<T[]>
+  get: <T>(key: string) => Promise<T | null>
+  set: <T>(key: string, value: T) => Promise<void>
+  list: <T>(prefix: string) => Promise<T[]>
 }
 
-export const storageImpl = tag(custom<Storage>(), {
-  label: 'storage.impl'
-})
+type StorageProfile = 'local' | 'indexeddb' | 'remote'
 
-export const storage = provide((controller) =>
-  storageImpl.get(controller.scope)
-)
+export const storageProfile = tag(custom<StorageProfile>(), {
+  label: 'storage.profile',
+  default: 'local' as StorageProfile
+})
 
 // ===== Step 2: Implementations =====
 
 // Phase 1: localStorage (Prototype)
-export const localStorageImpl: Storage = {
-  get: <T>(key: string): T | null => {
+const localStorageImpl = provide<Storage>(() => ({
+  get: async <T>(key: string): Promise<T | null> => {
     const item = localStorage.getItem(key)
     return item ? JSON.parse(item) : null
   },
-  set: <T>(key: string, value: T): void => {
+  set: async <T>(key: string, value: T): Promise<void> => {
     localStorage.setItem(key, JSON.stringify(value))
   },
-  list: <T>(prefix: string): T[] => {
+  list: async <T>(prefix: string): Promise<T[]> => {
     const items: T[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
@@ -41,10 +40,10 @@ export const localStorageImpl: Storage = {
     }
     return items
   }
-}
+}))
 
 // Phase 2: IndexedDB (Scale)
-export const indexedDBImpl: Storage = {
+const indexedDBImpl = provide<Storage>(() => ({
   get: async <T>(key: string): Promise<T | null> => {
     // Simplified - real implementation needs proper IDB setup
     return null
@@ -56,7 +55,7 @@ export const indexedDBImpl: Storage = {
     // Simplified
     return []
   }
-}
+}))
 
 // Phase 3: Remote API (Production)
 type APIClient = {
@@ -64,21 +63,43 @@ type APIClient = {
   post: <T>(path: string, body: unknown) => Promise<T>
 }
 
-export const remoteStorageImpl = (api: APIClient): Storage => ({
-  get: async <T>(key: string): Promise<T | null> => {
-    try {
-      return await api.get<T>(`/storage/${key}`)
-    } catch {
-      return null
+const apiClient = tag(custom<APIClient>(), {
+  label: 'api.client'
+})
+
+const remoteStorageImpl = provide<Storage>((controller) => {
+  const client = apiClient.get(controller.scope)
+
+  return {
+    get: async <T>(key: string): Promise<T | null> => {
+      try {
+        return await client.get<T>(`/storage/${key}`)
+      } catch {
+        return null
+      }
+    },
+    set: async <T>(key: string, value: T): Promise<void> => {
+      await client.post(`/storage/${key}`, value)
+    },
+    list: async <T>(prefix: string): Promise<T[]> => {
+      return await client.get<T[]>(`/storage?prefix=${prefix}`)
     }
-  },
-  set: async <T>(key: string, value: T): Promise<void> => {
-    await api.post(`/storage/${key}`, value)
-  },
-  list: async <T>(prefix: string): Promise<T[]> => {
-    return await api.get<T[]>(`/storage?prefix=${prefix}`)
   }
 })
+
+// ===== Step 2b: Profile-Based Selector using .lazy =====
+
+export const storage = derive(
+  {
+    local: localStorageImpl.lazy,
+    indexeddb: indexedDBImpl.lazy,
+    remote: remoteStorageImpl.lazy
+  },
+  async (accessors, controller): Promise<Storage> => {
+    const profile = storageProfile.get(controller.scope)
+    return await accessors[profile].resolve()
+  }
+)
 
 // ===== Step 3: Business Logic (UNCHANGED across all phases) =====
 
@@ -88,7 +109,6 @@ type Note = {
   createdAt: string
 }
 
-// ⚠️ CRITICAL: Always await, even though localStorage is sync
 export const notes = derive(storage, async (store) => {
   const result = await store.get<Note[]>('notes')
   return result ?? []
@@ -116,24 +136,28 @@ export const addNote = derive(storage, (store) => {
 
 // Prototype phase
 export const prototypeScope = createScope({
-  tags: [storageImpl(localStorageImpl)]
+  tags: [storageProfile('local')]
 })
 
 // Scale phase
 export const scaledScope = createScope({
-  tags: [storageImpl(indexedDBImpl)]
+  tags: [storageProfile('indexeddb')]
 })
 
 // Production phase (requires API client)
 export function createProductionScope(api: APIClient) {
   return createScope({
-    tags: [storageImpl(remoteStorageImpl(api))]
+    tags: [
+      storageProfile('remote'),
+      apiClient(api)
+    ]
   })
 }
 
 // ===== Key Points =====
 
 // 1. Business logic (notes, noteCount, addNote) NEVER changes
-// 2. Only swap tag in scope creation
-// 3. Always await, even for sync operations
-// 4. Same interface across all implementations
+// 2. Use .lazy to get Accessors, only chosen implementation resolves
+// 3. Profile tag determines which storage implementation is used
+// 4. Zero waste - only the selected implementation runs
+// 5. Same interface across all implementations

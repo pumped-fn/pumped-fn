@@ -447,10 +447,11 @@ type Storage = {
   set: <T>(key: string, value: T) => Promise<void>
 }
 
-// Define storage profile
-export const storageProfile = tag(custom<'memory' | 'indexeddb' | 'remote'>(), {
+type StorageProfile = 'memory' | 'indexeddb' | 'remote'
+
+export const storageProfile = tag(custom<StorageProfile>(), {
   label: 'storage.profile',
-  default: 'memory'
+  default: 'memory' as StorageProfile
 })
 
 // Implementation 1: In-memory
@@ -472,24 +473,23 @@ const indexedDBStorage = provide<Storage>(() => {
 })
 
 // Implementation 3: Remote API
-const remoteStorage = derive(apiClient, (client) => {
+const remoteStorage = provide<Storage>((controller) => {
+  const client = apiClient.get(controller.scope)
   return {
     get: async (key) => client.get(`/storage/${key}`),
     set: async (key, value) => client.post(`/storage/${key}`, value)
-  } as Storage
+  }
 })
 
 // Profile-based selector using .lazy
 export const storage = derive(
   {
-    memory: memoryStorage.lazy,      // Get Accessor, not value
+    memory: memoryStorage.lazy,
     indexeddb: indexedDBStorage.lazy,
     remote: remoteStorage.lazy
   },
-  async (accessors, controller) => {
+  async (accessors, controller): Promise<Storage> => {
     const profile = storageProfile.get(controller.scope)
-
-    // Choose which Accessor to resolve based on profile
     return await accessors[profile].resolve()
   }
 )
@@ -516,6 +516,13 @@ const prodScope = createScope({
 - Without `.lazy`: All storage implementations resolve eagerly (waste)
 - With `.lazy`: Get Accessors, only resolve the chosen one
 - Executor checks profile from scope, then calls `accessor.resolve()`
+
+**Type Safety for Literal Unions:**
+- Extract union as type alias: `type StorageProfile = 'memory' | 'indexeddb' | 'remote'`
+- Use type alias in tag: `tag(custom<StorageProfile>())`
+- Type-annotate default: `default: 'memory' as StorageProfile`
+- Tag's `.get()` returns the correct union type automatically
+- Never use type casting - type aliases + proper generics = full type safety
 
 **Testing:**
 ```typescript
