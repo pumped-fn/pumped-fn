@@ -334,6 +334,17 @@ export declare namespace Core {
     resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
 
+    run<T, D extends Core.DependencyLike>(
+      dependencies: D,
+      callback: (deps: Core.InferOutput<D>) => T | Promise<T>
+    ): Promised<T>;
+
+    run<T, D extends Core.DependencyLike, Args extends readonly unknown[]>(
+      dependencies: D,
+      callback: (deps: Core.InferOutput<D>, ...args: Args) => T | Promise<T>,
+      args: Args
+    ): Promised<T>;
+
     update<T>(
       executor: Executor<T>,
       updateFn: T | ((current: T) => T)

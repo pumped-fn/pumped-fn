@@ -106,6 +106,16 @@ Quick lookup for four core elements and their patterns.
 - Mock dependencies without changing code
 - Test-specific configurations via meta
 
+## Entrypoint Pattern
+
+**Pattern**: One-shot dependency resolution at interaction points
+**Example**: `examples/scope-run.ts`
+**Key Points**:
+- Use `scope.run(deps, callback)` for ephemeral execution
+- Dependencies cached, callback runs fresh each time
+- Pass extra params via array: `scope.run(deps, callback, [param1, param2])`
+- Reduces boilerplate at HTTP/CLI/cron entrypoints
+
 ## Basic Patterns
 
 **Pattern**: Simple executor and scope setup

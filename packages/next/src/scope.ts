@@ -13,6 +13,7 @@ import {
   FactoryExecutionError,
   DependencyResolutionError,
   ErrorContext,
+  executorSymbol,
   type Flow,
 } from "./types";
 import { Promised } from "./promises";
@@ -740,6 +741,53 @@ class BaseScope implements Core.Scope {
     this["~ensureNotDisposed"]();
     const accessor = this["~makeAccessor"](executor);
     return accessor.resolve(force).map(() => accessor as Core.Accessor<T>);
+  }
+
+  run<T, D extends Core.DependencyLike>(
+    dependencies: D,
+    callback: (deps: Core.InferOutput<D>) => T | Promise<T>
+  ): Promised<T>;
+  run<T, D extends Core.DependencyLike, Args extends readonly unknown[]>(
+    dependencies: D,
+    callback: (deps: Core.InferOutput<D>, ...args: Args) => T | Promise<T>,
+    args: Args
+  ): Promised<T>;
+  run<T, D extends Core.DependencyLike, Args extends readonly unknown[]>(
+    dependencies: D,
+    callback: (deps: Core.InferOutput<D>, ...args: Args) => T | Promise<T>,
+    args?: Args
+  ): Promised<T> {
+    this["~ensureNotDisposed"]();
+
+    const dummyExecutor = {
+      [executorSymbol]: "main" as const,
+      factory: undefined,
+      dependencies,
+      tags: {},
+    } as unknown as UE;
+
+    return Promised.create(
+      (async () => {
+        const deps = dependencies as
+          | Core.UExecutor
+          | Core.UExecutor[]
+          | Record<string, Core.UExecutor>
+          | undefined;
+
+        const resolvedDeps = await this["~resolveDependencies"](
+          deps,
+          dummyExecutor
+        );
+
+        if (args !== undefined && args.length > 0) {
+          return await callback(resolvedDeps as Core.InferOutput<D>, ...args);
+        }
+        return await callback(
+          resolvedDeps as Core.InferOutput<D>,
+          ...([] as unknown as Args)
+        );
+      })()
+    );
   }
 
   update<T>(

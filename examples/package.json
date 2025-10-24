@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev:basic-handler": "tsx http-server/basic-handler.ts",
+    "dev:scope-run": "tsx http-server/scope-run.ts",
     "dev:tags-foundation": "tsx http-server/tags-foundation.ts",
     "dev:type-inference": "tsx http-server/type-inference.ts",
     "dev:promised-comprehensive": "tsx http-server/promised-comprehensive.ts",
