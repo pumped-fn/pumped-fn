@@ -2,10 +2,32 @@
 name: Pumped-fn TypeScript
 description: Auto-activating guidance for @pumped-fn/core-next ensuring type-safe, pattern-consistent code
 when_to_use: when brainstorming architecture for applications needing observable operations, dependency management, testable flows, composition of reusable components, or framework integration (OR when package.json contains @pumped-fn/core-next)
-version: 3.1.0
+version: 3.2.0
 ---
 
 # Pumped-fn TypeScript Skill
+
+## ACTIVATION CHECK (READ THIS FIRST)
+
+<EXTREMELY_IMPORTANT>
+**Before any brainstorming, architecture discussion, or implementation:**
+
+Check if `@pumped-fn/core-next` exists in package.json dependencies.
+
+**If YES (which it does in this project):**
+- ALL architecture discussions MUST use pumped-fn patterns
+- ALL designs MUST include: Resources, Flows, Scope, Tags
+- ALL implementations MUST follow this skill's guidance
+
+**Red flags you forgot to use this skill:**
+- Designing CLI/server/cron without mentioning Resources, Flows, or Scope
+- Using plain functions instead of flow() for business logic
+- Direct dependency injection without executors
+- Configuration via global imports instead of tags
+- No mention of testability via preset()
+
+**If you see these red flags → STOP. Read this skill and redesign using pumped-fn patterns.**
+</EXTREMELY_IMPORTANT>
 
 ## Overview
 
