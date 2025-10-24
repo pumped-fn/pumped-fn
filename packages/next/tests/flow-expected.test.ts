@@ -179,7 +179,7 @@ describe("Flow API - New Patterns", () => {
       expect(result.result).toBe(15);
     });
 
-    test("flow.define().handler() separates definition from implementation", async () => {
+    test("flow(config).handler() separates definition from implementation", async () => {
       const squareDefinition = flow({
         name: "square",
         input: custom<{ x: number }>(),
