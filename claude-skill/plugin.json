@@ -1,18 +1,22 @@
 {
   "name": "pumped-fn",
-  "version": "3.2.0",
-  "description": "Comprehensive TypeScript guidance for @pumped-fn/core-next - auto-activating skill with pattern enforcement, troubleshooting, code review, testing support, and anti-pattern detection",
+  "version": "1.1.0",
+  "description": "Comprehensive guidance for @pumped-fn ecosystem - TypeScript backend patterns and React frontend architecture with auto-activation, pattern enforcement, and testability strategies",
   "author": "lagz0ne",
   "repository": "https://github.com/lagz0ne/pumped-fn",
   "homepage": "https://github.com/lagz0ne/pumped-fn/tree/main/claude-skill",
   "skills": [
-    "skills/pumped-fn-typescript"
+    "skills/pumped-fn-typescript",
+    "skills/pumped-fn-react"
   ],
   "tags": [
     "typescript",
+    "react",
     "graph-resolution",
     "dependency-injection",
     "reactive-programming",
+    "state-management",
+    "frontend-architecture",
     "code-quality"
   ],
   "minClaudeCodeVersion": "0.1.0"
