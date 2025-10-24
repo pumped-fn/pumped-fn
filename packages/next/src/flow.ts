@@ -16,7 +16,7 @@ function isErrorEntry(
 function wrapWithExtensions<T>(
   extensions: Extension.Extension[] | undefined,
   baseExecutor: () => Promised<T>,
-  dataStore: Tag.Store,
+  scope: Core.Scope,
   operation: Extension.Operation
 ): () => Promised<T> {
   if (!extensions || extensions.length === 0) {
@@ -28,11 +28,11 @@ function wrapWithExtensions<T>(
     if (extension.wrap) {
       const current = executor;
       executor = () => {
-        const result = extension.wrap!(dataStore, current, operation);
+        const result = extension.wrap!(scope, current, operation);
         return result instanceof Promised ? result : Promised.create(result);
       };
     }
-  } 
+  }
   return executor;
 }
 
@@ -211,7 +211,7 @@ class FlowContext implements Flow.Context {
       if (extension.wrap) {
         const current = executor;
         executor = () => {
-          const result = extension.wrap!(this, current, operation);
+          const result = extension.wrap!(this.scope, current, operation);
           return result instanceof Promised ? result : Promised.create(result);
         };
       }
@@ -712,7 +712,7 @@ function execute<S, I>(
       const executor = wrapWithExtensions(
         options?.extensions,
         executeCore,
-        context,
+        context.scope,
         {
           kind: "execute",
           flow,

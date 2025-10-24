@@ -50,9 +50,22 @@ To make change to the library, there are some details that'll need to be address
 
 Making API change in packages/next meant
 
-- Potential change to docs
-- Potential change to examples
-- Potential change to test
-- Potential change to SKILL (claude-skill)
+- Potential change to docs (docs/guides/)
+- Potential change to examples (examples/)
+- Potential change to test (packages/next/tests/)
+- **CRITICAL: Potential change to SKILL (claude-skill/skills/pumped-fn-typescript/SKILL.md)**
 
 To keep things compact, economic, those should be planned as needed
+
+## Checklist for API changes
+
+When changing public API (types, function signatures, etc):
+
+1. Update implementation in packages/next/src/
+2. Update tests in packages/next/tests/
+3. Update examples in examples/
+4. Update documentation in docs/guides/
+5. **ALWAYS check and update claude-skill/skills/pumped-fn-typescript/SKILL.md** - this is critical for skill accuracy
+6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
+7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
+8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`

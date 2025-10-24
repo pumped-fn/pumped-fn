@@ -690,7 +690,7 @@ export namespace Extension {
     init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
 
     wrap?<T>(
-      context: import("./tag-types").Tag.Store,
+      scope: Core.Scope,
       next: () => Promised<T>,
       operation: Operation
     ): Promise<T> | Promised<T>;

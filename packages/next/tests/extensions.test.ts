@@ -14,7 +14,7 @@ describe("Extension Operation Tracking", () => {
 
     const journalCaptureExtension = extension({
       name: "journal-capture",
-      wrap: (_ctx, next, operation) => {
+      wrap: (_scope, next, operation) => {
         if (operation.kind === "journal") {
           const record: JournalRecord = {
             key: operation.key,
@@ -62,7 +62,7 @@ describe("Extension Operation Tracking", () => {
 
     const inputCaptureExtension = extension({
       name: "input-capture",
-      wrap: (_ctx, next, operation) => {
+      wrap: (_scope, next, operation) => {
         if (operation.kind === "execute" || operation.kind === "subflow") {
           capturedFlowInputs.push({
             operation: `${operation.kind}:${operation.definition.name}`,
@@ -115,7 +115,7 @@ describe("Extension Operation Tracking", () => {
 
     const comprehensiveTracker = extension({
       name: "tracker",
-      wrap: (_ctx, next, operation) => {
+      wrap: (_scope, next, operation) => {
         const record: OperationRecord = { kind: operation.kind };
 
         if (operation.kind === "execute") {

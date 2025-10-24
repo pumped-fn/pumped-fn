@@ -662,7 +662,6 @@ class BaseScope implements Core.Scope {
 
   private wrapWithExtensions<T>(
     baseExecutor: () => Promised<T>,
-    dataStore: import("./tag-types").Tag.Store,
     operation: Extension.Operation
   ): () => Promised<T> {
     let executor = baseExecutor;
@@ -670,7 +669,7 @@ class BaseScope implements Core.Scope {
       if (extension.wrap) {
         const current = executor;
         executor = () => {
-          const result = extension.wrap!<T>(dataStore, current, operation);
+          const result = extension.wrap!<T>(this, current, operation);
           return result instanceof Promised ? result : Promised.create(result);
         };
       }
@@ -722,7 +721,6 @@ class BaseScope implements Core.Scope {
 
     const resolver = this.wrapWithExtensions(
       coreResolve,
-      BaseScope.emptyDataStore,
       {
         kind: "resolve",
         executor,
@@ -839,7 +837,7 @@ class BaseScope implements Core.Scope {
       return coreUpdate().map(() => this.accessor(e).get() as T);
     };
 
-    const updater = this.wrapWithExtensions(baseUpdater, BaseScope.emptyDataStore, {
+    const updater = this.wrapWithExtensions(baseUpdater, {
       kind: "resolve",
       operation: "update",
       executor: e,

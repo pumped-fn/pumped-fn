@@ -15,7 +15,7 @@ import { extension, flow, createScope } from '@pumped-fn/core-next'
 
 const logger = extension({
   name: 'logging',
-  wrap: async (ctx, next, operation) => {
+  wrap: async (scope, next, operation) => {
     console.log(`Starting ${operation.kind}`)
     const result = await next()
     console.log(`Finished ${operation.kind}`)
@@ -37,7 +37,7 @@ import { extension, createScope } from '@pumped-fn/core-next'
 
 const auth = extension({
   name: 'auth',
-  wrap: async (ctx, next, operation) => {
+  wrap: async (scope, next, operation) => {
     console.log('Auth check')
     return next()
   }
@@ -45,7 +45,7 @@ const auth = extension({
 
 const timing = extension({
   name: 'timing',
-  wrap: async (ctx, next, operation) => {
+  wrap: async (scope, next, operation) => {
     const start = Date.now()
     const result = await next()
     console.log(`Took ${Date.now() - start}ms`)
@@ -71,8 +71,9 @@ const requestId = tag(custom<string>(), { label: 'request.id' })
 
 const logger = extension({
   name: 'logging',
-  wrap: async (ctx, next, operation) => {
-    const reqId = requestId.find(ctx) || 'no-id'
+  wrap: async (scope, next, operation) => {
+    const ctx = 'context' in operation ? operation.context : undefined
+    const reqId = ctx ? requestId.find(ctx) : 'no-id'
     console.log(`[${reqId}] ${operation.kind}`)
     return next()
   }
@@ -88,7 +89,7 @@ import { extension } from '@pumped-fn/core-next'
 
 const errorHandler = extension({
   name: 'error-handler',
-  wrap: async (ctx, next, operation) => {
+  wrap: async (scope, next, operation) => {
     try {
       return await next()
     } catch (error) {
@@ -108,7 +109,7 @@ import { extension } from '@pumped-fn/core-next'
 
 const executeOnly = extension({
   name: 'execute-only',
-  wrap: async (ctx, next, operation) => {
+  wrap: async (scope, next, operation) => {
     if (operation.kind !== 'execute') {
       return next()
     }

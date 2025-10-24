@@ -1170,7 +1170,7 @@ const processOrder = flow({
 
 ```typescript
 const loggingExtension: Extension = {
-  wrap: (ctx, next, operation) => {
+  wrap: (scope, next, operation) => {
     if (operation.kind === 'execute') {
       console.log(`[FLOW START] ${operation.flowName}`)
       return next().finally(() => {

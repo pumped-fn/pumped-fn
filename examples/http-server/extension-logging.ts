@@ -16,8 +16,9 @@ import { requestId } from './shared/tags'
 
 const loggingExtension = extension({
   name: 'logging',
-  wrap: async (ctx, next, operation) => {
-    const reqId = requestId.find(ctx) || 'no-id'
+  wrap: async (scope, next, operation) => {
+    const ctx = 'context' in operation ? operation.context : undefined
+    const reqId = ctx ? requestId.find(ctx) : 'no-id'
     console.log(`[${reqId}] Starting ${operation.kind}`)
 
     const startTime = Date.now()
