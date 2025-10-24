@@ -39,28 +39,28 @@ export namespace TestTypes {
 
 export const testFlows = {
   basic: (name: string) =>
-    flow.define({
+    flow({
       name,
       input: custom<TestTypes.BasicInput>(),
       output: custom<TestTypes.SuccessResult<string>>(),
     }),
 
   math: (name: string) =>
-    flow.define({
+    flow({
       name,
       input: custom<TestTypes.MathInput>(),
       output: custom<TestTypes.SuccessResult<number>>(),
     }),
 
   user: (name: string) =>
-    flow.define({
+    flow({
       name,
       input: custom<{ userId: string }>(),
       output: custom<{ user: TestTypes.User }>(),
     }),
 
   validation: (name: string) =>
-    flow.define({
+    flow({
       name,
       input: custom<{ email: string }>(),
       output: custom<{ valid: boolean }>(),
@@ -71,7 +71,7 @@ export const testFlows = {
     input: StandardSchemaV1<TInput, unknown>,
     output: StandardSchemaV1<TSuccess, unknown>
   ) =>
-    flow.define({
+    flow({
       name,
       input,
       output,

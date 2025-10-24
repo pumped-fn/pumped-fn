@@ -131,12 +131,12 @@ describe("Flow API - New Patterns", () => {
     test("flow combines dependencies with definition metadata", async () => {
       const loggerService = provide(() => ({ log: vi.fn() }));
       const upperCaseWithLogging = flow(
-        loggerService,
         {
           name: "logger-flow",
           input: custom<string>(),
           output: custom<string>(),
         },
+        loggerService,
         (logger, _ctx, input) => {
           logger.log(`Processing: ${input}`);
           return input.toUpperCase();

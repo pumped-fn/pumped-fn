@@ -3,14 +3,16 @@ import { flow, custom, type Flow } from "../src/index";
 
 describe("Flow Type Inference", () => {
   test("InferInput and InferOutput extract types from defined flow", () => {
-    const userFlow = flow({
-      name: "testFlow",
-      input: custom<{ id: number }>(),
-      output: custom<{ id: number; name: string }>(),
-      handler: async (ctx, input) => {
-        return { id: input.id, name: "test" };
+    const userFlow = flow(
+      {
+        name: "testFlow",
+        input: custom<{ id: number }>(),
+        output: custom<{ id: number; name: string }>(),
       },
-    });
+      async (_ctx, input) => {
+        return { id: input.id, name: "test" };
+      }
+    );
 
     type InputType = Flow.InferInput<typeof userFlow>;
     type OutputType = Flow.InferOutput<typeof userFlow>;
@@ -55,16 +57,14 @@ describe("Flow Type Inference", () => {
     expect(validOutput.result).toBe("HELLO");
   });
 
-  test("InferInput works with flow.define().handler() pattern", () => {
-    const sumFlow = flow
-      .define({
-        name: "defineTest",
-        input: custom<{ a: number; b: number }>(),
-        output: custom<{ sum: number }>(),
-      })
-      .handler(async (ctx, input) => {
-        return { sum: input.a + input.b };
-      });
+  test("InferInput works with flow(config).handler() pattern", () => {
+    const sumFlow = flow({
+      name: "defineTest",
+      input: custom<{ a: number; b: number }>(),
+      output: custom<{ sum: number }>(),
+    }).handler(async (_ctx, input) => {
+      return { sum: input.a + input.b };
+    });
 
     type InputType = Flow.InferInput<typeof sumFlow>;
     type OutputType = Flow.InferOutput<typeof sumFlow>;
@@ -81,14 +81,16 @@ describe("Flow Type Inference", () => {
       { id: string },
       { id: string; data: string }
     > => {
-      return flow({
-        name: "annotated",
-        input: custom<{ id: string }>(),
-        output: custom<{ id: string; data: string }>(),
-        handler: async (ctx, input) => {
-          return { id: input.id, data: "processed" };
+      return flow(
+        {
+          name: "annotated",
+          input: custom<{ id: string }>(),
+          output: custom<{ id: string; data: string }>(),
         },
-      });
+        async (_ctx, input) => {
+          return { id: input.id, data: "processed" };
+        }
+      );
     };
 
     const processingFlow = createProcessingFlow();
@@ -103,16 +105,14 @@ describe("Flow Type Inference", () => {
   });
 
   test("flow exposes definition property with metadata", () => {
-    const versionedFlow = flow
-      .define({
-        name: "withDefinition",
-        version: "2.0.0",
-        input: custom<{ count: number }>(),
-        output: custom<{ doubled: number }>(),
-      })
-      .handler(async (ctx, input) => {
-        return { doubled: input.count * 2 };
-      });
+    const versionedFlow = flow({
+      name: "withDefinition",
+      version: "2.0.0",
+      input: custom<{ count: number }>(),
+      output: custom<{ doubled: number }>(),
+    }).handler(async (_ctx, input) => {
+      return { doubled: input.count * 2 };
+    });
 
     expect(versionedFlow.definition).toBeDefined();
     expect(versionedFlow.definition.name).toBe("withDefinition");

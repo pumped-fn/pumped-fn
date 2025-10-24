@@ -120,59 +120,20 @@ class FlowDefinition<S, I> {
 }
 
 type DefineConfig<S, I> = {
-  name: string;
+  name?: string;
   version?: string;
   input: StandardSchemaV1<I>;
   output: StandardSchemaV1<S>;
   tags?: Tag.Tagged[];
 };
 
-type FlowConfigWithHandler<S, I> = DefineConfig<S, I> & {
-  handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
-};
-
-type FlowConfigWithDeps<S, I, D extends Core.DependencyLike> = DefineConfig<
-  S,
-  I
-> & {
-  dependencies: D;
-  handler: (
-    deps: Core.InferOutput<D>,
-    ctx: Flow.Context,
-    input: I
-  ) => Promise<S> | S;
-};
-
-type FlowConfigInferred<S, I> = {
-  name: string;
-  version?: string;
-  input?: StandardSchemaV1<I>;
-  output?: StandardSchemaV1<S>;
-  tags?: Tag.Tagged[];
-  handler: (ctx: Flow.Context, input: I) => Promise<S> | S;
-};
-
-type FlowConfigInferredWithDeps<S, I, D extends Core.DependencyLike> = {
-  name: string;
-  version?: string;
-  input?: StandardSchemaV1<I>;
-  output?: StandardSchemaV1<S>;
-  tags?: Tag.Tagged[];
-  dependencies: D;
-  handler: (
-    deps: Core.InferOutput<D>,
-    ctx: Flow.Context,
-    input: I
-  ) => Promise<S> | S;
-};
-
 function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
   return new FlowDefinition(
-    config.name,
+    config.name || "anonymous",
     config.version || "1.0.0",
     config.input,
     config.output,
-    config.tags
+    config.tags || []
   );
 }
 
@@ -777,32 +738,16 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
 ): Flow.Flow<I, S>;
 
 function flowImpl<S, I>(
-  config: FlowConfigWithHandler<S, I>
-): Flow.Flow<I, S>;
-
-function flowImpl<S, I, D extends Core.DependencyLike>(
-  config: FlowConfigWithDeps<S, I, D>
-): Flow.Flow<I, S>;
-
-function flowImpl<S = unknown, I = unknown>(
-  config: FlowConfigInferred<S, I>
-): Flow.Flow<I, S>;
-
-function flowImpl<
-  S = unknown,
-  I = unknown,
-  D extends Core.DependencyLike = never
->(
-  config: FlowConfigInferredWithDeps<S, I, D>
-): Flow.Flow<I, S>;
+  config: DefineConfig<S, I>
+): FlowDefinition<S, I>;
 
 function flowImpl<S, I>(
-  definition: DefineConfig<S, I>,
+  config: DefineConfig<S, I>,
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
 ): Flow.Flow<I, S>;
 
 function flowImpl<S, I, D extends Core.DependencyLike>(
-  definition: DefineConfig<S, I>,
+  config: DefineConfig<S, I>,
   dependencies: D,
   handler: (
     deps: Core.InferOutput<D>,
@@ -812,28 +757,12 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
 ): Flow.Flow<I, S>;
 
 function flowImpl<S, I, D extends Core.DependencyLike>(
-  dependencies: D,
-  definition: DefineConfig<S, I>,
-  handler: (
-    deps: Core.InferOutput<D>,
-    ctx: Flow.Context,
-    input: I
-  ) => Promise<S> | S
-): Flow.Flow<I, S>;
-
-function flowImpl<S, I>(definition: DefineConfig<S, I>): FlowDefinition<S, I>;
-
-function flowImpl<S, I, D extends Core.DependencyLike>(
-  definitionOrConfigOrDepsOrHandler:
+  first:
     | DefineConfig<S, I>
-    | FlowConfigWithHandler<S, I>
-    | FlowConfigWithDeps<S, I, D>
-    | FlowConfigInferred<S, I>
-    | FlowConfigInferredWithDeps<S, I, D>
     | D
     | ((ctx: Flow.Context, input: I) => Promise<S> | S)
     | ((ctx?: Flow.Context) => Promise<S> | S),
-  dependenciesOrHandler?:
+  second?:
     | D
     | ((ctx: Flow.Context, input: I) => Promise<S> | S)
     | ((
@@ -841,141 +770,90 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
         ctx: Flow.Context,
         input: I
       ) => Promise<S> | S),
-  handlerFn?: (
+  third?: (
     deps: Core.InferOutput<D>,
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
 ): Flow.Flow<I, S> | FlowDefinition<S, I> {
-  if (typeof definitionOrConfigOrDepsOrHandler === "function") {
-    const handler = definitionOrConfigOrDepsOrHandler as (
-      ctx: Flow.Context,
-      input: I
-    ) => Promise<S> | S;
+  if (typeof first === "function") {
+    const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S;
     const def = define({
-      name: "anonymous",
-      version: "1.0.0",
       input: custom<I>(),
       output: custom<S>(),
     });
     return def.handler(handler);
   }
 
-  const firstArg = definitionOrConfigOrDepsOrHandler as
-    | DefineConfig<S, I>
-    | FlowConfigWithHandler<S, I>
-    | FlowConfigWithDeps<S, I, D>
-    | FlowConfigInferred<S, I>
-    | FlowConfigInferredWithDeps<S, I, D>
-    | D;
-
-  if (
-    !("name" in firstArg) &&
-    dependenciesOrHandler &&
-    typeof dependenciesOrHandler === "object" &&
-    "name" in dependenciesOrHandler &&
-    handlerFn
-  ) {
-    const dependencies = firstArg as D;
-    const definition = dependenciesOrHandler as unknown as Partial<
-      DefineConfig<S, I>
-    > & { name: string };
-
-    const hasInput = "input" in definition && definition.input !== undefined;
-    const hasOutput =
-      "output" in definition && definition.output !== undefined;
-
-    const def = define({
-      name: definition.name,
-      version: definition.version,
-      input: hasInput ? definition.input! : custom<I>(),
-      output: hasOutput ? definition.output! : custom<S>(),
-      tags: definition.tags,
-    });
-
-    return def.handler(dependencies, handlerFn);
-  }
-
-  if (typeof dependenciesOrHandler === "function" && !("name" in firstArg)) {
-    const dependencies = firstArg as D;
-    const handler = dependenciesOrHandler as (
+  if (isExecutor(first)) {
+    if (typeof second !== "function") {
+      throw new Error("flow(deps, handler) requires handler as second argument");
+    }
+    const dependencies = first as D;
+    const handler = second as (
       deps: Core.InferOutput<D>,
       ctx: Flow.Context,
       input: I
     ) => Promise<S> | S;
     const def = define({
-      name: "anonymous",
-      version: "1.0.0",
       input: custom<I>(),
       output: custom<S>(),
     });
     return def.handler(dependencies, handler);
   }
 
-  if ("handler" in firstArg) {
-    const config = firstArg as
-      | FlowConfigWithHandler<S, I>
-      | FlowConfigWithDeps<S, I, D>
-      | FlowConfigInferred<S, I>
-      | FlowConfigInferredWithDeps<S, I, D>;
+  if (typeof first === "object" && first !== null) {
+    const hasInputOutput = "input" in first && "output" in first;
 
-    const hasInput = "input" in config && config.input !== undefined;
-    const hasOutput = "output" in config && config.output !== undefined;
+    if (hasInputOutput) {
+      const config = first as DefineConfig<S, I>;
 
-    const def = define({
-      name: config.name,
-      version: config.version,
-      input: hasInput ? config.input! : custom<I>(),
-      output: hasOutput ? config.output! : custom<S>(),
-      tags: config.tags,
-    });
+      if ("handler" in config || "dependencies" in config) {
+        throw new Error("Config object cannot contain 'handler' or 'dependencies' properties. Use flow(config, handler) or flow(config, deps, handler) instead.");
+      }
 
-    if ("dependencies" in config) {
-      const depsConfig = config as
-        | FlowConfigWithDeps<S, I, D>
-        | FlowConfigInferredWithDeps<S, I, D>;
-      return def.handler(depsConfig.dependencies, depsConfig.handler);
-    } else {
-      const handlerConfig = config as
-        | FlowConfigWithHandler<S, I>
-        | FlowConfigInferred<S, I>;
-      return def.handler(handlerConfig.handler);
+      const def = define(config);
+
+      if (!second) {
+        return def;
+      }
+
+      if (typeof second === "function") {
+        return def.handler(second as (ctx: Flow.Context, input: I) => Promise<S> | S);
+      }
+
+      if (isExecutor(second)) {
+        if (!third) {
+          throw new Error("flow(config, deps, handler) requires handler as third argument");
+        }
+        return def.handler(second as D, third);
+      }
+
+      throw new Error("Invalid flow() call: second argument must be handler function or dependencies");
     }
+
+    if (typeof second === "function") {
+      const dependencies = first as D;
+      const handler = second as (
+        deps: Core.InferOutput<D>,
+        ctx: Flow.Context,
+        input: I
+      ) => Promise<S> | S;
+      const def = define({
+        input: custom<I>(),
+        output: custom<S>(),
+      });
+      return def.handler(dependencies, handler);
+    }
+
+    throw new Error("Invalid flow() call: object dependencies require handler function as second argument");
   }
 
-  const definition = firstArg as
-    | DefineConfig<S, I>
-    | Partial<DefineConfig<S, I>>;
-
-  const hasInput = "input" in definition && definition.input !== undefined;
-  const hasOutput =
-    "output" in definition && definition.output !== undefined;
-
-  const def = define({
-    name: definition.name || "anonymous",
-    version: definition.version,
-    input: hasInput ? definition.input! : custom<I>(),
-    output: hasOutput ? definition.output! : custom<S>(),
-    tags: definition.tags,
-  });
-
-  if (!dependenciesOrHandler) {
-    return def;
-  }
-
-  if (typeof dependenciesOrHandler === "function") {
-    return def.handler(
-      dependenciesOrHandler as (ctx: Flow.Context, input: I) => Promise<S> | S
-    );
-  } else {
-    return def.handler(dependenciesOrHandler as D, handlerFn!);
-  }
+  throw new Error("Invalid flow() call: first argument must be handler, dependencies, or config object");
 }
 
 export const flow: typeof flowImpl & {
-  define: typeof define;
   execute: typeof execute;
 } = Object.assign(flowImpl, {
-  define: define,
   execute: execute,
 });
