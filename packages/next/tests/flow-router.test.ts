@@ -2,41 +2,49 @@ import { describe, test, expect } from "vitest";
 import { flow, custom, type Flow } from "../src/index";
 
 describe("Flow Router Utilities", () => {
-  const addTodoFlow = flow({
-    name: "addTodo",
-    input: custom<{ title: string; description: string }>(),
-    output: custom<{ id: string; title: string; description: string }>(),
-    handler: async (ctx, input) => {
+  const addTodoFlow = flow(
+    {
+      name: "addTodo",
+      input: custom<{ title: string; description: string }>(),
+      output: custom<{ id: string; title: string; description: string }>(),
+    },
+    async (_ctx, input) => {
       return { id: "1", ...input };
-    },
-  });
+    }
+  );
 
-  const getTodoFlow = flow({
-    name: "getTodo",
-    input: custom<{ id: string }>(),
-    output: custom<{ id: string; title: string; description: string }>(),
-    handler: async (ctx, input) => {
+  const getTodoFlow = flow(
+    {
+      name: "getTodo",
+      input: custom<{ id: string }>(),
+      output: custom<{ id: string; title: string; description: string }>(),
+    },
+    async (_ctx, input) => {
       return { id: input.id, title: "Test", description: "Test description" };
-    },
-  });
+    }
+  );
 
-  const addUserFlow = flow({
-    name: "addUser",
-    input: custom<{ name: string; email: string }>(),
-    output: custom<{ id: string; name: string; email: string }>(),
-    handler: async (ctx, input) => {
+  const addUserFlow = flow(
+    {
+      name: "addUser",
+      input: custom<{ name: string; email: string }>(),
+      output: custom<{ id: string; name: string; email: string }>(),
+    },
+    async (_ctx, input) => {
       return { id: "u1", ...input };
-    },
-  });
+    }
+  );
 
-  const getUserFlow = flow({
-    name: "getUser",
-    input: custom<{ id: string }>(),
-    output: custom<{ id: string; name: string; email: string }>(),
-    handler: async (ctx, input) => {
-      return { id: input.id, name: "John", email: "john@example.com" };
+  const getUserFlow = flow(
+    {
+      name: "getUser",
+      input: custom<{ id: string }>(),
+      output: custom<{ id: string; name: string; email: string }>(),
     },
-  });
+    async (_ctx, input) => {
+      return { id: input.id, name: "John", email: "john@example.com" };
+    }
+  );
 
   const todoRouter = {
     addTodo: addTodoFlow,
