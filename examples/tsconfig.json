@@ -11,8 +11,9 @@
     "module": "ESNext",
     "target": "ESNext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "jsx": "react"
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/*.test.ts", "node_modules", "dist"]
 }

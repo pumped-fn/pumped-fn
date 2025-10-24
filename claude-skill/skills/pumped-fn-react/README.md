@@ -113,33 +113,20 @@ test('shows editor UI when user has permissions', () => {
 
 See SKILL.md for detailed corrections.
 
-## Validation Status
-
-**✅ PRODUCTION READY** - Round 3 validation complete (2025-10-24)
-
-- **3/3 agents achieved perfect scores (110/110)**
-- **All critical issues resolved**
-- **100% async handling correctness**
-- **100% Core.InferOutput adoption**
-
-See `VALIDATION-ROUND3.md` for complete results.
-
 ## Files
 
-- `SKILL.md` - Complete pattern documentation
-- `pattern-reference.md` - Quick cheat sheet with patterns
+- `SKILL.md` - Complete pattern documentation (1100+ lines)
+- `pattern-reference.md` - Quick cheat sheet with common patterns
 - `PROMISED-API.md` - Promised chainability guide
-- `VALIDATION-ROUND3.md` - Final validation results (110/110)
-- `VALIDATION-ROUND2.md` - Round 2 validation (107.67/100)
-- `VALIDATION-RESULTS.md` - Round 1 validation (106.67/100)
-- `skill-validation-quiz.md` - Self-assessment quiz
-- `examples/resource-layer.tsx` - API clients, WebSocket, SSE
-- `examples/feature-state.ts` - Business logic layer
-- `examples/ui-components.tsx` - React component patterns
-- `examples/app-initialization.tsx` - Scope setup
-- `examples/testing-patterns.test.tsx` - Testing strategies
-- `examples/protocol-abstraction.ts` - RPC transport injection
-- `examples/progressive-migration.ts` - localStorage → IndexedDB → API migration
+
+## Examples
+
+Working, typechecked examples in `examples/react-state-management/`:
+
+- `three-layer-architecture.ts` - Complete Resource → Feature → UI pattern
+- `storage-migration.ts` - Progressive migration (localStorage → IndexedDB → API)
+
+Run `pnpm --filter @pumped-fn/examples typecheck` to verify.
 
 ## Testing Strategy
 

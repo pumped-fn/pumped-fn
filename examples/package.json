@@ -11,10 +11,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/core-next": "workspace:*"
+    "@pumped-fn/core-next": "workspace:*",
+    "@pumped-fn/react": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "react": "^18.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.9.3"
   }
