@@ -1,6 +1,6 @@
 {
   "name": "pumped-fn",
-  "version": "1.0.0",
+  "version": "3.2.0",
   "description": "Comprehensive TypeScript guidance for @pumped-fn/core-next - auto-activating skill with pattern enforcement, troubleshooting, code review, testing support, and anti-pattern detection",
   "author": "lagz0ne",
   "repository": "https://github.com/lagz0ne/pumped-fn",
