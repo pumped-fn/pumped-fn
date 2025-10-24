@@ -2,7 +2,7 @@
 name: Pumped-fn TypeScript
 description: Auto-activating guidance for @pumped-fn/core-next ensuring type-safe, pattern-consistent code
 when_to_use: when brainstorming architecture for applications needing observable operations, dependency management, testable flows, composition of reusable components, or framework integration (OR when package.json contains @pumped-fn/core-next)
-version: 3.2.0
+version: 3.3.0
 ---
 
 # Pumped-fn TypeScript Skill
@@ -658,6 +658,77 @@ preset()             ↓
 ## Implementation Reference
 
 ### Quick API Reference
+
+#### Flow Creation: Two Clear Patterns
+
+**Choose based on your use case:**
+
+**1. Inference-based (Simple Cases)**
+Use when you want quick flows without ceremony. Types inferred from handler.
+
+```typescript
+// Without dependencies
+const simpleFlow = flow((ctx, input: string) => {
+  return ctx.run('process', () => input.toUpperCase())
+})
+
+// With dependencies
+const flowWithDeps = flow({
+  userRepo: userRepository,
+  emailSvc: emailService
+}, async (deps, ctx, input: { email: string }) => {
+  const user = await ctx.run('find-user', async () => {
+    return deps.userRepo.findByEmail(input.email)
+  })
+
+  await ctx.run('send-notification', async () => {
+    return deps.emailSvc.send(input.email, 'Welcome!')
+  })
+
+  return { ok: true, user }
+})
+```
+
+**2. Schema-based (RPC/Isomorphic)**
+Use when you need explicit input/output schemas for validation, documentation, or RPC.
+
+```typescript
+import { z } from 'zod'
+
+// Two-step: reusable definition
+const getUserDef = flow({
+  name: 'getUser',
+  input: z.string(),
+  output: z.object({ id: z.string(), email: z.string() })
+})
+
+const handler1 = getUserDef.handler((ctx, id) => {
+  return ctx.run('fetch', () => ({ id, email: 'user@example.com' }))
+})
+
+const handler2 = getUserDef.handler({ db: dbPool }, async (deps, ctx, id) => {
+  return ctx.run('query', async () => deps.db.query('SELECT ...', [id]))
+})
+
+// One-step: direct use
+const createUser = flow({
+  name: 'createUser',
+  input: z.object({ email: z.string(), name: z.string() }),
+  output: z.object({ id: z.string(), email: z.string() })
+}, { userRepo: userRepository }, async (deps, ctx, input) => {
+  const user = await ctx.run('save', async () => {
+    return deps.userRepo.create(input)
+  })
+  return user
+})
+```
+
+**When to use each:**
+
+- **Inference-based**: Internal flows, simple operations, prototype code, no RPC needs
+- **Schema-based**: Public APIs, RPC endpoints, validation requirements, documentation generation
+
+**Note:** Both patterns support the same runtime features (dependencies, journaling, extensions, composition).
 
 #### Tags (Schema-Flexible)
 
