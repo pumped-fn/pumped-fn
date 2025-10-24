@@ -1,3 +1,8 @@
+# Pumped-fn Project Instructions
+
+> Pumped-fn skill active: Pattern enforcement, concepts, testing strategies handled by skill.
+> This file: Project-specific overrides and workflow requirements.
+
 # Upmost important
 
 Sacrifice English grammar for conciseness. Concrete and straightforward.
@@ -24,7 +29,6 @@ Use ast-grep where possible to search and replace code
 - **NEVER** add comments, most of the time those are codesmells (that's why it'll require comments)
 - group types using namespace, less cluttered
 - combine tests where possible, test running quite quickly, add test error message so it'll be easy to track from the stdout
-- with dependency of @pumped-fn/core-next, when using derive, prefer using destructure on factory function call where possible
 - cleanup redundant codes, dead codes
 - use `import { type ...}` where it's needed
 - never use inline `import()`
@@ -40,40 +44,15 @@ The library is meant to be GENERIC, it has its core, and extensions (plugins, mi
 - ALWAYS use pnpm, read to understand the project setting before hand
 - use linebreak smartly to separate area of code with different meanings
 
-# Concept
+# Making changes
 
-<principles>
-- the library is designed around the concept of graph resolution. Each node of graph is called "executor".
-Executor holds a factory function which can be resolved into value. Executor also hold upstream declaration,
-  those will be resolved prior to the Executor.
-- node doesn't resolve themselves, they'll be resolve in an unit called "Scope". Scope is in charge of
-actualize the graph. Actualization is the process to detect depenedency, resolve each and every in order. By
-  default, all values are cached per resolution
-- a scope let user update a value of an executor, as the scope knows the upstream and downstream graph,
-it'll reinvoke the actualization accordingly. That's called reactivity. However, by default, the reactivity
-only happen if a node has a "reactive" upstream. To do that, a node declare to use ".reactive" instead of
-just normal one. There's an API for that
-- a scope is used for a long running operation, like a server, a cron. It should be there to hold the
-reference of long-running resources like database connection, service connections, configs, server
-references etc. System normally has short-span and long-span operation. Short-span operations are handled
-by flows executing directly on the scope, with flow context providing data isolation between executions.
-Disposing the flow cleans up flow-specific resources without affecting the scope.
-- a flow is the unit to support short-span operation. Each flow will have a root context, a map like data
-structure. Each flow can execute sub-flow, recursively, each execution will create a fork version of root
-context so each flow can store its own data. Sub flow can be executed in sequental or parallel mode, the
-data context needs to be organized accordingly, as such, the main flow must control all of those sub
-executions somehow
-- an extension (current called plugin), is the way the library adding extended functionality by allowing
-extra cross-cuts to existing functionalities. For example, opening a transaction per flow, log all of
-executions, etc
-- a meta is decorative information that will be used to.
-  + decorate a node (executor)
-  + decorate a scope (as the way to pass configuration to resources as well as plugins)
-  + decorate a flow (as the way to pass configuration to executions as well as plugins)
-</principles>
-<benefits>
-- graph resolutions make access to any node of the graph easily. User doesn't need to know the whole graph,
-they can focus on the node they want
-- changing the graph can be easy, given at the time of access, we know the graph. As such, it'll be natural
-for testing, we can just swap implemenation with the mock to emulate situations
-</benefits>
+To make change to the library, there are some details that'll need to be addressed as a completed workflow
+
+Making API change in packages/next meant
+
+- Potential change to docs
+- Potential change to examples
+- Potential change to test
+- Potential change to SKILL (claude-skill)
+
+To keep things compact, economic, those should be planned as needed
