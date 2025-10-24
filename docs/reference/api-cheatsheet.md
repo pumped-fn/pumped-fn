@@ -141,17 +141,28 @@ const handler = flow({ db, config }, (deps, ctx, input) => {
 })
 ```
 
-### flow.define()
+### flow() with schema (RPC pattern)
 ```typescript
 import { custom } from '@pumped-fn/core-next'
 
-const handler = flow.define({
+// Two-step: reusable definition
+const def = flow({
   name: 'handleRequest',
   input: custom<Request>(),
   output: custom<Response>()
-}).handler((ctx, input) => {
+})
+
+const handler = def.handler((ctx, input) => {
   return { status: 200 }
 })
+
+// One-step: direct use
+const handler2 = flow(
+  { name: 'handleRequest', input: custom<Request>(), output: custom<Response>() },
+  (ctx, input) => {
+    return { status: 200 }
+  }
+)
 ```
 
 ### flow.execute()

@@ -33,6 +33,58 @@ await scope.dispose()
 
 Scope `db` persists across executions. Flow context isolated per request.
 
+## Flow Creation Patterns
+
+### Inference-based (simple cases)
+
+Use when you don't need runtime validation or RPC:
+
+```ts twoslash
+import { flow } from '@pumped-fn/core-next'
+
+// Without dependencies
+const simple = flow((ctx, input: string) => input.toUpperCase())
+
+// With dependencies
+const db = { query: async (sql: string) => [] }
+const withDeps = flow({ db }, (deps, ctx, id: string) => {
+  return deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+})
+```
+
+### Schema-based (RPC/isomorphic)
+
+Use when you need runtime validation or type sharing across network:
+
+```ts twoslash
+import { flow, custom } from '@pumped-fn/core-next'
+import { z } from 'zod'
+
+// Two-step: reusable definition
+const getDef = flow({
+  name: 'getUser',
+  input: z.string(),
+  output: z.object({ id: z.string(), name: z.string() })
+})
+
+const db = { query: async (sql: string) => ({ id: '1', name: 'User' }) }
+
+const serverHandler = getDef.handler({ db }, (deps, ctx, id) => {
+  return deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+})
+
+const clientHandler = getDef.handler((ctx, id) => {
+  return fetch(`/api/users/${id}`).then(r => r.json())
+})
+
+// One-step: direct use
+const handler = flow(
+  { name: 'getUser', input: z.string(), output: z.object({ id: z.string(), name: z.string() }) },
+  { db },
+  (deps, ctx, id) => deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+)
+```
+
 ## Context Operations
 
 ### ctx.exec - Sequential Subflow Execution
