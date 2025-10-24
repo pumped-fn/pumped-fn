@@ -22,6 +22,377 @@ Supporting: **Tags** (configuration/data boundaries) + **Extensions** (cross-cut
 
 **Auto-activates when:** package.json contains `@pumped-fn/core-next` in dependencies
 
+## Critical Anti-Patterns (READ THIS FIRST)
+
+These mistakes compromise portability, testability, and reliability. Check for these patterns BEFORE writing code.
+
+### ❌ ANTI-PATTERN 1: Multiple Scopes (Resource Duplication)
+
+**Symptom**: Creating scope inside handlers, middleware, loops
+**Impact**: Singleton resources duplicated → memory leaks, connection exhaustion, faults
+**Detection**: Look for `createScope()` inside request handlers, middleware, or loops
+
+**Why critical:** Scope holds singletons (DB pools, connections). Multiple scopes = multiple singletons = resource waste.
+
+**Corrections by environment:**
+
+**Self-controlled servers (Express, Hono, Fastify):**
+
+```typescript
+// ❌ WRONG: New scope every request
+app.post('/users', async (req, res) => {
+  const scope = createScope() // Creates new DB pool each request!
+  const result = await flow.execute(createUser, req.body, { scope })
+  res.json(result)
+})
+
+// ✅ CORRECT: Server as resource, one scope per app
+const server = provide((controller) => {
+  const scope = createScope({
+    tags: [dbConfig({ host: 'localhost', port: 5432, database: 'app' })]
+  })
+
+  const app = express()
+  app.set('scope', scope)
+
+  app.post('/users', async (req, res) => {
+    const scope = req.app.get('scope')
+    const result = await flow.execute(createUser, req.body, { scope })
+    res.json(result)
+  })
+
+  controller.cleanup(async () => {
+    await scope.dispose()
+  })
+
+  return app
+})
+
+// Usage
+const app = await mainScope.resolve(server)
+app.listen(3000)
+```
+
+**Meta-frameworks (TanStack Start, Next.js, SvelteKit):**
+
+```typescript
+// ❌ WRONG: New scope per request
+createMiddleware().server(async ({ next }) => {
+  const scope = createScope() // Memory leak!
+  return next({ context: { scope } })
+})
+
+// ✅ CORRECT: One scope at module init, inject via middleware
+const appScope = createScope({
+  tags: [dbConfig({ host: 'localhost', port: 5432, database: 'app' })]
+})
+
+createMiddleware().server(async ({ next }) => {
+  return next({ context: { scope: appScope } })
+})
+
+// Handler gets scope from context
+export const Route = createFileRoute('/users')({
+  loader: async ({ context }) => {
+    return flow.execute(getUsers, {}, { scope: context.scope })
+  }
+})
+```
+
+**CLI applications:**
+
+```typescript
+// ❌ WRONG: Global scope export (breaks test isolation)
+export const scope = createScope({
+  tags: [dbConfig({...})]
+})
+
+program.command('sync').action(async () => {
+  await flow.execute(syncData, {}, { scope })
+})
+
+// ✅ CORRECT: Singleton via closure
+function createCLI() {
+  const scope = createScope({
+    tags: [dbConfig({ host: 'localhost', port: 5432, database: 'app' })]
+  })
+
+  const program = new Command()
+
+  program.command('sync').action(async () => {
+    await flow.execute(syncData, {}, { scope })
+  })
+
+  program.command('cleanup').action(async () => {
+    await flow.execute(cleanupData, {}, { scope })
+  })
+
+  return {
+    program,
+    dispose: () => scope.dispose()
+  }
+}
+
+// main.ts
+const cli = createCLI()
+await cli.program.parseAsync()
+await cli.dispose()
+
+// test.ts - easy to test with different scope
+const testCli = createCLI() // Can inject test config via tags
+```
+
+**Key rule:** One app, one scope. Exceptions: Lambda (per invocation), CLI (per command execution).
+
+---
+
+### ❌ ANTI-PATTERN 2: Built-ins in Resources (Breaks Portability)
+
+**Symptom**: Using `process.env`, `process.argv`, `__dirname`, `__filename`, `import.meta.env` inside `provide()` or `derive()` bodies
+**Impact**: Code tied to specific runtime/bundler → fails in Deno/Bun/browser/edge → untestable (mocking globals)
+**Detection**: Search for built-in references inside executor factory functions
+
+**Why critical:** Built-ins are runtime-specific. Code becomes non-portable and requires global mocking in tests.
+
+```typescript
+// ❌ WRONG: Node.js-specific built-ins
+export const database = provide((controller) => {
+  const db = new Database({
+    host: process.env.DB_HOST,        // Won't work in Deno/browser/edge
+    file: __dirname + '/data.db'      // Won't work in Deno/browser/edge
+  })
+  return db
+})
+
+export const config = provide((controller) => {
+  const args = process.argv.slice(2)  // Node.js only
+  return parseArgs(args)
+})
+
+// ❌ WRONG: Bundler-specific built-ins
+export const apiClient = provide((controller) => {
+  const url = import.meta.env.VITE_API_URL  // Vite only
+  return createClient(url)
+})
+
+// ✅ CORRECT: Parse built-ins at entry point, pass via tags
+
+// config.ts - Define tag schemas
+export const dbConfig = tag(custom<{
+  host: string
+  port: number
+  database: string
+}>(), { label: 'config.database' })
+
+export const dataDir = tag(custom<string>(), { label: 'config.dataDir' })
+
+export const apiUrl = tag(custom<string>(), { label: 'config.apiUrl' })
+
+// resources.ts - Use tags, not built-ins
+export const database = provide((controller) => {
+  const config = dbConfig.get(controller.scope)
+  const dir = dataDir.get(controller.scope)
+
+  const db = new Database({
+    host: config.host,
+    port: config.port,
+    database: config.database,
+    file: `${dir}/data.db`
+  })
+
+  controller.cleanup(async () => {
+    await db.close()
+  })
+
+  return db
+})
+
+export const apiClient = provide((controller) => {
+  const url = apiUrl.get(controller.scope)
+  return createClient(url)
+})
+
+// main.ts (Node.js entry point) - Built-ins HERE only
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+const scope = createScope({
+  tags: [
+    dbConfig({
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT) || 5432,
+      database: process.env.DB_NAME || 'app'
+    }),
+    dataDir(__dirname),
+    apiUrl(process.env.API_URL || 'http://localhost:3000')
+  ]
+})
+
+// main.ts (Deno entry point) - Different built-ins, same resources
+const scope = createScope({
+  tags: [
+    dbConfig({
+      host: Deno.env.get('DB_HOST') || 'localhost',
+      port: Number(Deno.env.get('DB_PORT')) || 5432,
+      database: Deno.env.get('DB_NAME') || 'app'
+    }),
+    dataDir(new URL('.', import.meta.url).pathname),
+    apiUrl(Deno.env.get('API_URL') || 'http://localhost:3000')
+  ]
+})
+
+// test.ts (Testing) - No globals needed
+const testScope = createScope({
+  tags: [
+    dbConfig({ host: 'test-db', port: 5432, database: 'test' }),
+    dataDir('/tmp/test-data'),
+    apiUrl('http://mock-api:3000')
+  ]
+})
+
+const db = await testScope.resolve(database) // Works without mocking process.env!
+```
+
+**Symptom check**: If you're mocking `process.env`, `__dirname`, or `import.meta.env` in tests, you're doing it wrong.
+
+**Key rule:** Built-ins stay at entry points (main.ts). Resources use tags for configuration.
+
+---
+
+### ❌ ANTI-PATTERN 3: Premature Escape (Passing Resolved Values)
+
+**Symptom**: Calling `scope.resolve()` early, passing resolved values to functions/constructors
+**Impact**: Components can't be tested independently → no way to inject mocks via preset()
+**Detection**: Look for resolved values passed around instead of executors
+
+**Why critical:** Once resolved, you lose ability to swap implementations. Tests can't inject mocks.
+
+```typescript
+// ❌ WRONG: Too early escape
+
+// main.ts
+const scope = createScope({
+  tags: [dbConfig({...})]
+})
+
+const db = await scope.resolve(database)           // Escape too early
+const userRepo = await scope.resolve(userRepository)
+
+const app = express()
+app.set('db', db)                                  // Pass resolved value
+app.set('userRepo', userRepo)
+
+app.post('/users', async (req, res) => {
+  const repo = req.app.get('userRepo')             // Can't swap in tests
+  const user = await repo.create(req.body)
+  res.json(user)
+})
+
+// test.ts - Testing is now HARD
+test('create user', async () => {
+  // Can't inject test scope - already resolved to real DB!
+  // Have to mock at a different layer or use real DB
+  const response = await request(app)
+    .post('/users')
+    .send({ email: 'test@example.com' })
+})
+
+// ✅ CORRECT: Keep resolve close to usage point
+
+// main.ts
+const scope = createScope({
+  tags: [dbConfig({...})]
+})
+
+const app = express()
+app.set('scope', scope)                            // Pass scope, not resolved
+
+app.post('/users', async (req, res) => {
+  const scope = req.app.get('scope')
+  const result = await flow.execute(createUser, req.body, { scope })
+  res.json(result)
+})
+
+// flows.ts
+const createUser = flow({
+  userRepo: userRepository                         // Declare dependency
+}, async (deps, ctx, input) => {
+  const validated = await ctx.run('validate-input', () => {
+    if (!validateEmail(input.email)) {
+      return { ok: false as const, reason: 'invalid_email' }
+    }
+    return { ok: true as const, data: input }
+  })
+
+  if (!validated.ok) {
+    return validated
+  }
+
+  const user = await ctx.run('save-user', async () => {
+    return deps.userRepo.create(validated.data)    // Resolved automatically
+  })
+
+  return { ok: true, user }
+})
+
+// test.ts - Testing is EASY
+test('create user', async () => {
+  const mockUserRepo = derive({}, () => ({
+    create: async (data: any) => ({ id: '123', ...data })
+  }))
+
+  const testScope = createScope({
+    initialValues: [
+      preset(userRepository, mockUserRepo)         // Inject test implementation
+    ]
+  })
+
+  const result = await flow.execute(createUser,
+    { email: 'test@example.com', name: 'Test User' },
+    { scope: testScope }
+  )
+
+  expect(result.ok).toBe(true)
+  expect(result.user.id).toBe('123')
+})
+
+// ✅ CORRECT: Explicit resolve only when framework requires it
+
+// Example: Background job needs direct DB access
+const scope = createScope({
+  tags: [dbConfig({...})]
+})
+
+const db = await scope.resolve(database)           // Resolve close to usage
+
+setInterval(async () => {
+  await db.query('DELETE FROM sessions WHERE expired < NOW()')
+}, 60000)
+
+// Still testable!
+test('cleanup job', async () => {
+  const mockDb = provide(() => ({
+    query: async (sql: string) => ({ rowCount: 5 })
+  }))
+
+  const testScope = createScope({
+    initialValues: [preset(database, mockDb)]
+  })
+
+  const db = await testScope.resolve(database)
+  const result = await db.query('DELETE FROM sessions WHERE expired < NOW()')
+  expect(result.rowCount).toBe(5)
+})
+```
+
+**Key principle**: Resolve and escape should stay close together. Most components work with executors. Only escape at interaction boundaries (framework integration, direct access needs).
+
+**Preferred pattern**: Use flows with declared dependencies. Let the library resolve automatically.
+
+---
+
 ## Architecture Decision Guide
 
 ### When to Apply Pumped-fn Patterns
