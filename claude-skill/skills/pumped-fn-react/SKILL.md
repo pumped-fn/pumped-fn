@@ -359,146 +359,175 @@ appScope.run(async () => {
 
 ### Pattern 1b: Environment-Based Configuration
 
-**Rule:** Use tags for environment-specific config (dev/staging/prod).
+**Rule:** Use tags to inject environment values. Keep executors neutral.
 
 ```typescript
-// ===== app/config.ts =====
+// ===== config.ts =====
 import { tag, custom } from '@pumped-fn/core-next'
-import { z } from 'zod'
 
-// Option 1: With Zod validation (runtime safety)
-export const apiConfig = tag(z.object({
-  baseUrl: z.string().url(),
-  timeout: z.number().positive(),
-  retries: z.number().int().min(0).max(5)
-}), {
-  label: 'api.config',
-  default: {
-    baseUrl: 'http://localhost:3000',
-    timeout: 5000,
-    retries: 3
-  }
+export const apiBaseUrl = tag(custom<string>(), {
+  label: 'api.baseUrl',
+  default: 'http://localhost:3000'
 })
 
-// Option 2: Simple custom type (no validation)
-export const featureFlags = tag(custom<{
-  enableBetaFeatures: boolean
-  enableAnalytics: boolean
-}>(), {
-  label: 'features',
-  default: {
-    enableBetaFeatures: false,
-    enableAnalytics: true
-  }
+export const apiTimeout = tag(custom<number>(), {
+  label: 'api.timeout',
+  default: 5000
 })
 
-// ===== app/env.ts =====
-// Environment detection
-const isDev = import.meta.env.DEV
-const isProd = import.meta.env.PROD
-const isStaging = import.meta.env.VITE_ENV === 'staging'
-
-export function getEnvConfig() {
-  if (isProd) {
-    return {
-      api: {
-        baseUrl: 'https://api.production.com',
-        timeout: 10000,
-        retries: 5
-      },
-      features: {
-        enableBetaFeatures: false,
-        enableAnalytics: true
-      }
-    }
-  }
-
-  if (isStaging) {
-    return {
-      api: {
-        baseUrl: 'https://api.staging.com',
-        timeout: 8000,
-        retries: 3
-      },
-      features: {
-        enableBetaFeatures: true,
-        enableAnalytics: true
-      }
-    }
-  }
-
-  // Development
-  return {
-    api: {
-      baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-      timeout: 5000,
-      retries: 1
-    },
-    features: {
-      enableBetaFeatures: true,
-      enableAnalytics: false
-    }
+// ===== scope.ts =====
+const config = {
+  dev: {
+    apiBaseUrl: 'http://localhost:3000',
+    apiTimeout: 5000
+  },
+  staging: {
+    apiBaseUrl: 'https://api.staging.com',
+    apiTimeout: 8000
+  },
+  prod: {
+    apiBaseUrl: 'https://api.production.com',
+    apiTimeout: 10000
   }
 }
 
-// ===== app/scope.ts =====
-import { createScope } from '@pumped-fn/core-next'
-import { apiConfig, featureFlags } from './config'
-import { getEnvConfig } from './env'
-
-const config = getEnvConfig()
+const env = import.meta.env.VITE_ENV || 'dev'
+const envConfig = config[env as keyof typeof config]
 
 export const appScope = createScope({
   tags: [
-    apiConfig(config.api),
-    featureFlags(config.features)
+    apiBaseUrl(envConfig.apiBaseUrl),
+    apiTimeout(envConfig.apiTimeout)
   ]
 })
 
 // ===== Using in resources =====
 export const apiClient = provide((controller) => {
-  const config = apiConfig.get(controller.scope)
-  const features = featureFlags.get(controller.scope)
+  const baseUrl = apiBaseUrl.get(controller.scope)
+  const timeout = apiTimeout.get(controller.scope)
 
-  const client = {
+  return {
     get: async (path: string) => {
-      const res = await fetch(`${config.baseUrl}${path}`, {
-        signal: AbortSignal.timeout(config.timeout)
+      const res = await fetch(`${baseUrl}${path}`, {
+        signal: AbortSignal.timeout(timeout)
       })
       return res.json()
     }
   }
-
-  // Conditional feature behavior
-  if (features.enableAnalytics) {
-    // Wrap client with analytics
-  }
-
-  return client
 })
 ```
 
-**Benefits:**
-- Single source of truth for environment config
-- Type-safe configuration with Zod validation
-- Easy testing (inject test config via tags)
-- No hardcoded environment strings in resources
-
 **Testing:**
 ```typescript
-test('uses correct API config', async () => {
+test('uses injected config', async () => {
   const testScope = createScope({
     tags: [
-      apiConfig({
-        baseUrl: 'http://test-api:3000',
-        timeout: 1000,
-        retries: 0
-      })
+      apiBaseUrl('http://test-api:3000'),
+      apiTimeout(1000)
     ]
   })
 
   const client = await testScope.resolve(apiClient)
   // Client uses test config
+})
+```
+
+---
+
+### Pattern 1c: Conditional Engines (Profile Pattern)
+
+**Rule:** Use `.lazy` + profile tag for situational engine selection.
+
+**When:** Multiple implementations of same interface (mock vs real, SQLite vs Postgres, localStorage vs API).
+
+```typescript
+// ===== storage.ts =====
+type Storage = {
+  get: <T>(key: string) => Promise<T | null>
+  set: <T>(key: string, value: T) => Promise<void>
+}
+
+// Define storage profile
+export const storageProfile = tag(custom<'memory' | 'indexeddb' | 'remote'>(), {
+  label: 'storage.profile',
+  default: 'memory'
+})
+
+// Implementation 1: In-memory
+const memoryStorage = provide<Storage>(() => {
+  const store = new Map<string, unknown>()
+  return {
+    get: async (key) => store.get(key) ?? null,
+    set: async (key, value) => { store.set(key, value) }
+  }
+})
+
+// Implementation 2: IndexedDB
+const indexedDBStorage = provide<Storage>(() => {
+  // IndexedDB implementation
+  return {
+    get: async (key) => { /* ... */ },
+    set: async (key, value) => { /* ... */ }
+  }
+})
+
+// Implementation 3: Remote API
+const remoteStorage = derive(apiClient, (client) => {
+  return {
+    get: async (key) => client.get(`/storage/${key}`),
+    set: async (key, value) => client.post(`/storage/${key}`, value)
+  } as Storage
+})
+
+// Profile-based selector using .lazy
+export const storage = derive(
+  {
+    memory: memoryStorage.lazy,      // Get Accessor, not value
+    indexeddb: indexedDBStorage.lazy,
+    remote: remoteStorage.lazy
+  },
+  async (accessors, controller) => {
+    const profile = storageProfile.get(controller.scope)
+
+    // Choose which Accessor to resolve based on profile
+    return await accessors[profile].resolve()
+  }
+)
+```
+
+**Usage:**
+```typescript
+// Business logic stays the same
+export const notes = derive(storage, async (store) => {
+  return await store.get<Note[]>('notes') ?? []
+})
+
+// Change behavior via tag
+const devScope = createScope({
+  tags: [storageProfile('memory')]
+})
+
+const prodScope = createScope({
+  tags: [storageProfile('remote')]
+})
+```
+
+**Why `.lazy`:**
+- Without `.lazy`: All storage implementations resolve eagerly (waste)
+- With `.lazy`: Get Accessors, only resolve the chosen one
+- Executor checks profile from scope, then calls `accessor.resolve()`
+
+**Testing:**
+```typescript
+test('uses memory storage in test', async () => {
+  const scope = createScope({
+    tags: [storageProfile('memory')]  // Fast, isolated
+  })
+
+  const store = await scope.resolve(storage)
+  await store.set('key', 'value')
+
+  expect(await store.get('key')).toBe('value')
 })
 ```
 
