@@ -832,6 +832,20 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       throw new Error("Invalid flow() call: second argument must be handler function or dependencies");
     }
 
+    const isValidDependencyObject = (obj: object): boolean => {
+      const values = Object.values(obj);
+      if (values.length === 0) {
+        return true;
+      }
+      return values.every(value =>
+        typeof value === "function" || isExecutor(value)
+      );
+    };
+
+    if (!isValidDependencyObject(first)) {
+      throw new Error("Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions");
+    }
+
     if (typeof second === "function") {
       const dependencies = first as D;
       const handler = second as (
