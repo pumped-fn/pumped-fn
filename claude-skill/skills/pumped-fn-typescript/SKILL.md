@@ -2,7 +2,7 @@
 name: Pumped-fn TypeScript
 description: Auto-activating guidance for @pumped-fn/core-next ensuring type-safe, pattern-consistent code
 when_to_use: when brainstorming architecture for applications needing observable operations, dependency management, testable flows, composition of reusable components, or framework integration (OR when package.json contains @pumped-fn/core-next)
-version: 3.0.0
+version: 3.1.0
 ---
 
 # Pumped-fn TypeScript Skill
