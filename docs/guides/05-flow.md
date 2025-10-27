@@ -40,15 +40,15 @@ Scope `db` persists across executions. Flow context isolated per request.
 Use when you don't need runtime validation or RPC:
 
 ```ts twoslash
-import { flow } from '@pumped-fn/core-next'
+import { flow, provide } from '@pumped-fn/core-next'
 
 // Without dependencies
 const simple = flow((ctx, input: string) => input.toUpperCase())
 
 // With dependencies
-const db = { query: async (sql: string) => [] }
-const withDeps = flow({ db }, (deps, ctx, id: string) => {
-  return deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+const db = provide(() => ({ query: async (sql: string) => [] }))
+const withDeps = flow(db, (deps, ctx, id: string) => {
+  return deps.query(`SELECT * FROM users WHERE id = ${id}`)
 })
 ```
 
@@ -57,31 +57,32 @@ const withDeps = flow({ db }, (deps, ctx, id: string) => {
 Use when you need runtime validation or type sharing across network:
 
 ```ts twoslash
-import { flow, custom } from '@pumped-fn/core-next'
-import { z } from 'zod'
+import { flow, custom, provide } from '@pumped-fn/core-next'
+
+type User = { id: string; name: string }
 
 // Two-step: reusable definition
 const getDef = flow({
   name: 'getUser',
-  input: z.string(),
-  output: z.object({ id: z.string(), name: z.string() })
+  input: custom<string>(),
+  output: custom<User>()
 })
 
-const db = { query: async (sql: string) => ({ id: '1', name: 'User' }) }
+const db = provide(() => ({ query: async (sql: string) => ({ id: '1', name: 'User' } as User) }))
 
-const serverHandler = getDef.handler({ db }, (deps, ctx, id) => {
-  return deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+const serverHandler = getDef.handler(db, (deps, ctx, id) => {
+  return deps.query(`SELECT * FROM users WHERE id = ${id}`)
 })
 
 const clientHandler = getDef.handler((ctx, id) => {
-  return fetch(`/api/users/${id}`).then(r => r.json())
+  return fetch(`/api/users/${id}`).then(r => r.json() as Promise<User>)
 })
 
 // One-step: direct use
 const handler = flow(
-  { name: 'getUser', input: z.string(), output: z.object({ id: z.string(), name: z.string() }) },
-  { db },
-  (deps, ctx, id) => deps.db.query(`SELECT * FROM users WHERE id = ${id}`)
+  { name: 'getUser', input: custom<string>(), output: custom<User>() },
+  db,
+  (deps, ctx, id) => deps.query(`SELECT * FROM users WHERE id = ${id}`)
 )
 ```
 

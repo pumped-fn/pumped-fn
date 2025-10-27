@@ -30,8 +30,8 @@ const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 
 const transactionExtension = extension({
   name: 'transaction',
-  wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'execute') {
+  wrap: async (scope, next, operation) => {
+    if (operation.kind !== 'subflow' && operation.kind !== 'journal') {
       return next()
     }
 
@@ -44,7 +44,9 @@ const transactionExtension = extension({
       }
     }
 
-    ctx.set(transaction, txn)
+    if ('context' in operation) {
+      operation.context.set(transaction, txn)
+    }
 
     try {
       const result = await next()
@@ -94,12 +96,12 @@ const registerUser = flow(async (ctx, input: {
   email: string
   bio: string
 }) => {
-  const user = await ctx.exec(createUser, {
+  const user = await ctx.exec('create-user', createUser, {
     name: input.name,
     email: input.email
   })
 
-  const profile = await ctx.exec(createProfile, {
+  const profile = await ctx.exec('create-profile', createProfile, {
     userId: user.id,
     bio: input.bio
   })
@@ -121,8 +123,8 @@ const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 const parentFlow = flow(async (ctx, input: any) => {
   const txn = ctx.get(transaction)
 
-  await ctx.exec(childFlow1, input)
-  await ctx.exec(childFlow2, input)
+  await ctx.exec('child-flow-1', childFlow1, input)
+  await ctx.exec('child-flow-2', childFlow2, input)
 
   // All operations in same transaction
   // Commit happens after parentFlow completes
