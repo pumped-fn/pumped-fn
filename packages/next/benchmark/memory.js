@@ -97,11 +97,8 @@ const memoryBenchmarks = {
   },
 
   "Flow execution without journaling": async () => {
-    const testFlow = flow({
-      name: "test-flow",
-      handler: (ctx, input) => {
-        return input * 2;
-      },
+    const testFlow = flow((ctx, input) => {
+      return input * 2;
     });
 
     const scope = createScope();
@@ -122,13 +119,10 @@ const memoryBenchmarks = {
   },
 
   "Flow execution with journaling": async () => {
-    const testFlow = flow({
-      name: "test-flow-journal",
-      handler: async (ctx, input) => {
-        await ctx.run("step1", () => input * 2);
-        await ctx.run("step2", () => input * 3);
-        return input * 4;
-      },
+    const testFlow = flow(async (ctx, input) => {
+      await ctx.run("step1", () => input * 2);
+      await ctx.run("step2", () => input * 3);
+      return input * 4;
     });
 
     const scope = createScope();

@@ -20,10 +20,18 @@ import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 
-type CacheEntry = {
+type ExecutorState = {
   accessor: Core.Accessor<unknown>;
   value?: Core.ResolveState<unknown>;
+  cleanups?: Set<Core.Cleanup>;
+  onUpdateCallbacks?: Set<OnUpdateFn>;
+  onUpdateExecutors?: Set<UE>;
+  onErrors?: Set<Core.ErrorCallback<unknown>>;
+  resolutionChain?: Set<UE>;
+  resolutionDepth?: number;
 };
+
+type CacheEntry = ExecutorState;
 
 type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
@@ -44,7 +52,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
   private currentPromised: Promised<unknown> | null = null;
-  private cachedResolvedPromised: Promised<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
   constructor(scope: BaseScope, requestor: UE, tags: import("./tag-types").Tag.Tagged[] | undefined) {
@@ -54,12 +61,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     this.resolve = this.createResolveFunction();
 
-    const existing = this.scope["cache"].get(requestor);
-    if (!existing || !existing.accessor) {
-      this.scope["cache"].set(requestor, {
-        accessor: this,
-        value: existing?.value,
-      });
+    const state = this.scope["getOrCreateState"](requestor);
+    if (!state.accessor) {
+      state.accessor = this;
     }
   }
 
@@ -70,14 +74,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
 
-      this.scope["cache"].set(this.requestor, {
-        accessor: this,
-        value: {
-          kind: "resolved",
-          value: immediateValue,
-          promised: Promised.create(Promise.resolve(immediateValue)),
-        },
-      });
+      const state = this.scope["getOrCreateState"](this.requestor);
+      state.accessor = this;
+      state.value = {
+        kind: "resolved",
+        value: immediateValue,
+        promised: Promised.create(Promise.resolve(immediateValue)),
+      };
 
       return immediateValue;
     }
@@ -97,19 +100,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const processedResult = await this.processChangeEvents(result);
 
-    this.scope["cache"].set(this.requestor, {
-      accessor: this,
-      value: {
-        kind: "resolved",
-        value: processedResult,
-        promised: Promised.create(Promise.resolve(processedResult)),
-      },
-    });
+    const state = this.scope["getOrCreateState"](this.requestor);
+    state.accessor = this;
+    state.value = {
+      kind: "resolved",
+      value: processedResult,
+      promised: Promised.create(Promise.resolve(processedResult)),
+    };
 
     this.scope["~removeFromResolutionChain"](this.requestor);
     this.currentPromise = null;
     this.currentPromised = null;
-    this.cachedResolvedPromised = null;
 
     return processedResult;
   }
@@ -121,15 +122,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
       const { enhancedError, errorContext, originalError } =
         this.enhanceResolutionError(error);
 
-      this.scope["cache"].set(this.requestor, {
-        accessor: this,
-        value: {
-          kind: "rejected",
-          error: originalError,
-          context: errorContext,
-          enhancedError: enhancedError,
-        },
-      });
+      const state = this.scope["getOrCreateState"](this.requestor);
+      state.accessor = this;
+      state.value = {
+        kind: "rejected",
+        error: originalError,
+        context: errorContext,
+        enhancedError: enhancedError,
+      };
 
       this.scope["~removeFromResolutionChain"](this.requestor);
       this.scope["~triggerError"](enhancedError, this.requestor);
@@ -162,10 +162,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
       this.currentPromise = this.resolveWithErrorHandling();
 
-      this.scope["cache"].set(this.requestor, {
-        accessor: this,
-        value: { kind: "pending", promise: this.currentPromise },
-      });
+      const state = this.scope["getOrCreateState"](this.requestor);
+      state.accessor = this;
+      state.value = { kind: "pending", promise: this.currentPromise };
 
       this.currentPromised = Promised.create(this.currentPromise);
       return this.currentPromised;
@@ -176,13 +175,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     cached: Core.ResolveState<unknown>
   ): Promised<unknown> | never {
     if (cached.kind === "resolved") {
-      if (cached.promised) {
-        return cached.promised;
-      }
-      if (!this.cachedResolvedPromised) {
-        this.cachedResolvedPromised = Promised.create(Promise.resolve(cached.value));
-      }
-      return this.cachedResolvedPromised;
+      return cached.promised;
     }
 
     if (cached.kind === "rejected") {
@@ -385,10 +378,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private createController(): Core.Controller {
     return {
       cleanup: (cleanup: Core.Cleanup) => {
-        const currentSet =
-          this.scope["cleanups"].get(this.requestor) ?? new Set();
-        this.scope["cleanups"].set(this.requestor, currentSet);
-        currentSet.add(cleanup);
+        const state = this.scope["getOrCreateState"](this.requestor);
+        const cleanups = this.scope["ensureCleanups"](state);
+        cleanups.add(cleanup);
       },
       release: () => this.scope.release(this.requestor),
       reload: () => this.scope.resolve(this.requestor, true).map(() => undefined),
@@ -407,16 +399,7 @@ function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
 
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
-  protected cache: Map<UE, CacheEntry> = new Map();
-  protected cleanups: Map<UE, Set<Core.Cleanup>> = new Map<
-    UE,
-    Set<Core.Cleanup>
-  >();
-  protected onUpdateCallbacks: Map<UE, Set<OnUpdateFn>> = new Map<
-    UE,
-    Set<OnUpdateFn>
-  >();
-  protected onUpdateExecutors: Map<UE, Set<UE>> = new Map<UE, Set<UE>>();
+  protected cache: Map<UE, ExecutorState> = new Map();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -426,13 +409,9 @@ class BaseScope implements Core.Scope {
     release: new Set<Core.ReleaseCallback>(),
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
-  protected onErrors: Map<UE, Set<Core.ErrorCallback<unknown>>> = new Map<
-    UE,
-    Set<Core.ErrorCallback<unknown>>
-  >();
   private isDisposing = false;
 
-  private resolutionChain: Map<UE, Set<UE>> = new Map();
+  private readonly CIRCULAR_CHECK_THRESHOLD = 15;
 
   protected extensions: Extension.Extension[] = [];
   private reversedExtensions: Extension.Extension[] = [];
@@ -465,11 +444,56 @@ class BaseScope implements Core.Scope {
     }
   }
 
+  protected getOrCreateState(executor: UE): ExecutorState {
+    let state = this.cache.get(executor);
+    if (!state) {
+      state = { accessor: null as any };
+      this.cache.set(executor, state);
+    }
+    return state;
+  }
+
+  protected ensureCleanups(state: ExecutorState): Set<Core.Cleanup> {
+    if (!state.cleanups) {
+      state.cleanups = new Set();
+    }
+    return state.cleanups;
+  }
+
+  protected ensureCallbacks(state: ExecutorState): Set<OnUpdateFn> {
+    if (!state.onUpdateCallbacks) {
+      state.onUpdateCallbacks = new Set();
+    }
+    return state.onUpdateCallbacks;
+  }
+
+  protected ensureExecutors(state: ExecutorState): Set<UE> {
+    if (!state.onUpdateExecutors) {
+      state.onUpdateExecutors = new Set();
+    }
+    return state.onUpdateExecutors;
+  }
+
+  protected ensureErrors(state: ExecutorState): Set<Core.ErrorCallback<unknown>> {
+    if (!state.onErrors) {
+      state.onErrors = new Set();
+    }
+    return state.onErrors;
+  }
+
+  protected ensureResolutionChain(state: ExecutorState): Set<UE> {
+    if (!state.resolutionChain) {
+      state.resolutionChain = new Set();
+    }
+    return state.resolutionChain;
+  }
+
   protected "~checkCircularDependency"(
     executor: UE,
     resolvingExecutor: UE
   ): void {
-    const currentChain = this.resolutionChain.get(resolvingExecutor);
+    const state = this.cache.get(resolvingExecutor);
+    const currentChain = state?.resolutionChain;
     if (currentChain && currentChain.has(executor)) {
       const chainArray = Array.from(currentChain);
       const dependencyChain = errors.buildDependencyChain(chainArray);
@@ -492,63 +516,66 @@ class BaseScope implements Core.Scope {
   }
 
   protected "~addToResolutionChain"(executor: UE, resolvingExecutor: UE): void {
-    const currentChain =
-      this.resolutionChain.get(resolvingExecutor) || new Set();
-    currentChain.add(executor);
-    this.resolutionChain.set(resolvingExecutor, currentChain);
+    const state = this.getOrCreateState(resolvingExecutor);
+    const chain = this.ensureResolutionChain(state);
+    chain.add(executor);
   }
 
   protected "~removeFromResolutionChain"(executor: UE): void {
-    this.resolutionChain.delete(executor);
+    const state = this.cache.get(executor);
+    if (state) {
+      delete state.resolutionDepth;
+      delete state.resolutionChain;
+    }
   }
 
   protected "~propagateResolutionChain"(
     fromExecutor: UE,
     toExecutor: UE
   ): void {
-    const fromChain = this.resolutionChain.get(fromExecutor);
-    if (fromChain) {
-      const newChain = new Set(fromChain);
+    const fromState = this.cache.get(fromExecutor);
+    if (fromState?.resolutionChain) {
+      const toState = this.getOrCreateState(toExecutor);
+      const newChain = new Set(fromState.resolutionChain);
       newChain.add(fromExecutor);
-      this.resolutionChain.set(toExecutor, newChain);
+      toState.resolutionChain = newChain;
     }
   }
 
   protected async "~triggerCleanup"(e: UE): Promise<void> {
-    const cs = this.cleanups.get(e);
-    if (cs) {
-      for (const c of Array.from(cs.values()).reverse()) {
+    const state = this.cache.get(e);
+    if (state?.cleanups) {
+      for (const c of Array.from(state.cleanups.values()).reverse()) {
         await c();
       }
+      delete state.cleanups;
     }
   }
 
   protected async "~triggerUpdate"(e: UE): Promise<void> {
-    const ce = this.cache.get(e);
-    if (!ce) {
+    const state = this.cache.get(e);
+    if (!state) {
       throw new Error("Executor is not yet resolved");
     }
 
-    const executors = this.onUpdateExecutors.get(e);
-    if (executors) {
-      for (const t of Array.from(executors.values())) {
-        if (this.cleanups.has(t)) {
+    if (state.onUpdateExecutors) {
+      for (const t of Array.from(state.onUpdateExecutors.values())) {
+        const depState = this.cache.get(t);
+        if (depState?.cleanups) {
           this["~triggerCleanup"](t);
         }
 
-        const a = this.cache.get(t);
-        await a!.accessor.resolve(true);
+        await depState!.accessor.resolve(true);
 
-        if (this.onUpdateExecutors.has(t) || this.onUpdateCallbacks.has(t)) {
+        if (depState!.onUpdateExecutors || depState!.onUpdateCallbacks) {
           await this["~triggerUpdate"](t);
         }
       }
     }
 
-    const callbacks = this.onUpdateCallbacks.get(e);
-    if (callbacks) {
-      for (const cb of Array.from(callbacks.values())) {
-        await cb(ce.accessor);
+    if (state.onUpdateCallbacks) {
+      for (const cb of Array.from(state.onUpdateCallbacks.values())) {
+        await cb(state.accessor);
       }
     }
   }
@@ -560,9 +587,9 @@ class BaseScope implements Core.Scope {
       | DependencyResolutionError,
     executor: UE
   ): Promise<void> {
-    const executorCallbacks = this.onErrors.get(executor);
-    if (executorCallbacks) {
-      for (const callback of Array.from(executorCallbacks.values())) {
+    const state = this.cache.get(executor);
+    if (state?.onErrors) {
+      for (const callback of Array.from(state.onErrors.values())) {
         try {
           await callback(error, executor, this);
         } catch (callbackError) {
@@ -596,9 +623,28 @@ class BaseScope implements Core.Scope {
   ): Promise<unknown> {
     const e = getExecutor(ie);
 
-    this["~checkCircularDependency"](e, ref);
+    if (e === ref) {
+      const executorName = errors.getExecutorName(e);
+      throw errors.createDependencyError(
+        errors.codes.CIRCULAR_DEPENDENCY,
+        executorName,
+        [executorName],
+        executorName,
+        undefined,
+        { circularPath: `${executorName} -> ${executorName}`, detectedAt: executorName }
+      );
+    }
 
-    this["~propagateResolutionChain"](ref, e);
+    const refState = this.cache.get(ref);
+    const currentDepth = (refState?.resolutionDepth ?? 0) + 1;
+
+    const state = this.getOrCreateState(e);
+    state.resolutionDepth = currentDepth;
+
+    if (currentDepth > this.CIRCULAR_CHECK_THRESHOLD) {
+      this["~checkCircularDependency"](e, ref);
+      this["~propagateResolutionChain"](ref, e);
+    }
 
     const a = this["~makeAccessor"](e);
 
@@ -607,9 +653,9 @@ class BaseScope implements Core.Scope {
     }
 
     if (isReactiveExecutor(ie)) {
-      const c = this.onUpdateExecutors.get(ie.executor) ?? new Set();
-      this.onUpdateExecutors.set(ie.executor, c);
-      c.add(ref);
+      const parentState = this.getOrCreateState(ie.executor);
+      const executors = this.ensureExecutors(parentState);
+      executors.add(ref);
     }
 
     await a.resolve(false);
@@ -820,14 +866,13 @@ class BaseScope implements Core.Scope {
           }
         }
 
-        this.cache.set(e, {
-          accessor,
-          value: {
-            kind: "resolved",
-            value,
-            promised: Promised.create(Promise.resolve(value)),
-          },
-        });
+        const state = this.getOrCreateState(e);
+        state.accessor = accessor;
+        state.value = {
+          kind: "resolved",
+          value,
+          promised: Promised.create(Promise.resolve(value)),
+        };
       
         await this["~triggerUpdate"](e);
       })());
@@ -855,8 +900,8 @@ class BaseScope implements Core.Scope {
     this["~ensureNotDisposed"]();
 
     const coreRelease = async (): Promise<void> => {
-      const ce = this.cache.get(e);
-      if (!ce && !s) {
+      const state = this.cache.get(e);
+      if (!state && !s) {
         throw new Error("Executor is not yet resolved");
       }
 
@@ -866,15 +911,11 @@ class BaseScope implements Core.Scope {
         await event("release", e, this);
       }
 
-      const executors = this.onUpdateExecutors.get(e);
-      if (executors) {
-        for (const t of Array.from(executors.values())) {
+      if (state?.onUpdateExecutors) {
+        for (const t of Array.from(state.onUpdateExecutors.values())) {
           await this.release(t, true);
         }
-        this.onUpdateExecutors.delete(e);
       }
-
-      this.onUpdateCallbacks.delete(e);
 
       this.cache.delete(e);
     };
@@ -899,14 +940,9 @@ class BaseScope implements Core.Scope {
 
       this.disposed = true;
       this.cache.clear();
-      this.cleanups.clear();
-      this.onUpdateCallbacks.clear();
-      this.onUpdateExecutors.clear();
       this.onEvents.change.clear();
       this.onEvents.release.clear();
       this.onEvents.error.clear();
-      this.onErrors.clear();
-      this.resolutionChain.clear();
     })());
   }
 
@@ -919,18 +955,18 @@ class BaseScope implements Core.Scope {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    const ou = this.onUpdateCallbacks.get(e) ?? new Set();
-    this.onUpdateCallbacks.set(e, ou);
-    ou.add(cb as OnUpdateFn);
+    const state = this.getOrCreateState(e as UE);
+    const callbacks = this.ensureCallbacks(state);
+    callbacks.add(cb as OnUpdateFn);
 
     return () => {
       this["~ensureNotDisposed"]();
 
-      const ou = this.onUpdateCallbacks.get(e);
-      if (ou) {
-        ou.delete(cb as OnUpdateFn);
-        if (ou.size === 0) {
-          this.onUpdateCallbacks.delete(e);
+      const state = this.cache.get(e as UE);
+      if (state?.onUpdateCallbacks) {
+        state.onUpdateCallbacks.delete(cb as OnUpdateFn);
+        if (state.onUpdateCallbacks.size === 0) {
+          delete state.onUpdateCallbacks;
         }
       }
     };
@@ -986,17 +1022,17 @@ class BaseScope implements Core.Scope {
 
     if (callback) {
       const executor = executorOrCallback;
-      const errorCallbacks = this.onErrors.get(executor) ?? new Set();
-      this.onErrors.set(executor, errorCallbacks);
+      const state = this.getOrCreateState(executor as UE);
+      const errorCallbacks = this.ensureErrors(state);
       errorCallbacks.add(callback as Core.ErrorCallback<unknown>);
 
       return () => {
         this["~ensureNotDisposed"]();
-        const callbacks = this.onErrors.get(executor);
-        if (callbacks) {
-          callbacks.delete(callback as Core.ErrorCallback<unknown>);
-          if (callbacks.size === 0) {
-            this.onErrors.delete(executor);
+        const state = this.cache.get(executor as UE);
+        if (state?.onErrors) {
+          state.onErrors.delete(callback as Core.ErrorCallback<unknown>);
+          if (state.onErrors.size === 0) {
+            delete state.onErrors;
           }
         }
       };
