@@ -145,6 +145,8 @@ log.log('Hello')
 import { provide, derive, tag, custom } from '@pumped-fn/core-next'
 
 // 1. Server interface
+type RouteHandler = (req: any, res: any) => void | Promise<void>
+
 interface Server {
   listen(port: number): Promise<void>
   route(path: string, handler: RouteHandler): void
