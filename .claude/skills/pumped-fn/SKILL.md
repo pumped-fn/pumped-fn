@@ -139,6 +139,26 @@ grep -l "typecheck.*ZERO errors" references/*.md
    - Use validation checklist (references/validation.md)
    - Run affected tests identified in step 2
 
+### Module Authoring Mode (Creating Reusable Components)
+
+**Detection:**
+- User mentions: "reusable", "package", "library", "module", "publish"
+- User asks: "How do I make this reusable?", "Can this be a package?"
+- Code patterns: Creating executors meant for npm distribution
+
+**Workflow:**
+1. Load references/authoring.md
+2. Identify pattern type: Reusable Resource vs Extension Package
+3. Apply configurability patterns (interface + tags + lazy loading)
+4. Ensure proper exports structure (interface, tags, main, backends)
+5. Validate composition and testability
+
+**Key requirements for modules:**
+- Configuration via exported tags (not hardcoded)
+- Dynamic imports for optional dependencies (no side effects)
+- All backends exported (required for preset() testing)
+- Interface-first design (hide implementation details)
+
 ## Critical Questions Framework
 
 **Purpose:** Gather requirements to generate deterministic, zero-violation architecture.
