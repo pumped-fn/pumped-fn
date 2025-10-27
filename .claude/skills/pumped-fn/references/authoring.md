@@ -124,3 +124,111 @@ log.log('Hello')
 - Dynamic imports prevent side effects
 - `.lazy` + `resolve()` enable runtime selection
 - Consumer controls everything via scope tags
+
+---
+
+### Pattern 2: Extension Package (Framework Adapters)
+
+**What:** Extensions that integrate pumped-fn with frameworks
+
+**Example:** Generic web server adapter (supports fastify, express, hono)
+
+**Key principles:**
+- Framework as peer dependency
+- Interface for adapter (hide framework specifics)
+- Consumer selects framework via tags
+- Same lazy loading pattern as Pattern 1
+
+**Structure:**
+
+```typescript
+import { provide, derive, tag, custom } from '@pumped-fn/core-next'
+
+// 1. Server interface
+interface Server {
+  listen(port: number): Promise<void>
+  route(path: string, handler: RouteHandler): void
+}
+
+// 2. Configuration tags
+export const serverConfig = {
+  framework: tag(custom<'fastify' | 'express' | 'hono'>(), {
+    label: 'server.framework',
+    default: 'fastify'
+  }),
+  port: tag(custom<number>(), {
+    label: 'server.port',
+    default: 3000
+  })
+}
+
+// 3. Framework adapters (lazy loaded)
+const fastifyAdapter = provide(async ({ scope }): Promise<Server> => {
+  const port = serverConfig.port.find(scope) ?? 3000
+  const fastify = await import('fastify')
+  const app = fastify.default()
+
+  return {
+    listen: async (p: number) => { await app.listen({ port: p }) },
+    route: (path, handler) => { app.get(path, handler) }
+  }
+})
+
+const expressAdapter = provide(async ({ scope }): Promise<Server> => {
+  const express = await import('express')
+  const app = express.default()
+
+  return {
+    listen: async (p: number) => {
+      return new Promise((resolve) => app.listen(p, () => resolve()))
+    },
+    route: (path, handler) => { app.get(path, handler) }
+  }
+})
+
+// Similar for honoAdapter...
+
+// 4. Main server selector
+export const server = derive(
+  {
+    fastify: fastifyAdapter.lazy,
+    express: expressAdapter.lazy,
+    hono: honoAdapter.lazy
+  },
+  async (adapters, { scope }): Promise<Server> => {
+    const framework = serverConfig.framework.find(scope) ?? 'fastify'
+
+    switch (framework) {
+      case 'express':
+        return await adapters.express.resolve()
+      case 'hono':
+        return await adapters.hono.resolve()
+      default:
+        return await adapters.fastify.resolve()
+    }
+  }
+)
+```
+
+**Consumer usage:**
+
+```typescript
+import { createScope } from '@pumped-fn/core-next'
+import { server, serverConfig } from '@myorg/pumped-server'
+
+const scope = createScope({
+  tags: [
+    serverConfig.framework('express'),
+    serverConfig.port(8080)
+  ]
+})
+
+const srv = await scope.resolve(server)  // Only express loads
+await srv.listen(8080)
+```
+
+**Key takeaways:**
+- Same pattern as resources, different domain
+- Framework-specific code hidden behind interface
+- Consumer choice via tags
+- Only selected framework loads
