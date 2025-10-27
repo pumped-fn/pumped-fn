@@ -3031,3 +3031,1010 @@ What environment?
 ├─ Meta-framework (Next.js, etc.) → Module-level scope (singleton)
 └─ Serverless (Lambda, edge) → One scope per invocation
 ```
+
+---
+
+## Anti-Pattern Detection & Corrections
+
+**Purpose:** Automated validation to catch violations before code delivery. Zero violations guarantee.
+
+**Process:** Run validation checks, detect patterns, block delivery until all pass.
+
+---
+
+### Anti-Pattern 1: Multiple Scopes in Request Handlers
+
+**Violation:**
+```typescript
+app.post('/users', async (req, res) => {
+  const scope = createScope()
+  const result = await scope.exec(createUser, req.body)
+  await scope.dispose()
+  res.json(result)
+})
+```
+
+**Detection:**
+```bash
+grep -r "createScope()" src/routes/ src/api/ src/handlers/
+```
+
+**Correction:**
+```typescript
+const scope = createScope()
+app.set('scope', scope)
+
+app.post('/users', async (req, res) => {
+  const scope = req.app.get('scope')
+  const result = await scope.exec(createUser, req.body)
+  res.json(result)
+})
+```
+
+**Why:** Creating scope per request wastes resources, breaks connection pooling, causes memory leaks.
+
+---
+
+### Anti-Pattern 2: Built-ins in Executors
+
+**Violation:**
+```typescript
+const dbPool = provide(() => createPool({
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '5432')
+}))
+```
+
+**Detection:**
+```bash
+grep -r "process.env" src/resource-* src/flow-* src/repo-*
+grep -r "import.meta.env" src/resource-* src/flow-* src/repo-*
+```
+
+**Correction:**
+```typescript
+import { tag, custom } from '@pumped-fn/core-next'
+
+const dbConfig = tag(custom<{
+  host: string
+  port: number
+}>(), { label: 'config.database' })
+
+const dbPool = provide((controller) => {
+  const config = dbConfig.get(controller.scope)
+  return createPool({
+    host: config.host,
+    port: config.port
+  })
+})
+
+const scope = createScope({
+  tags: [
+    dbConfig({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432')
+    })
+  ]
+})
+```
+
+**Why:** Built-ins in executors prevent testing, break testability, couple code to environment.
+
+---
+
+### Anti-Pattern 3: Premature Scope Escape
+
+**Violation:**
+```typescript
+const scope = createScope()
+const db = await scope.resolve(dbPool)
+const userRepo = await scope.resolve(userRepository)
+
+app.post('/users', async (req, res) => {
+  const user = await userRepo.create(req.body)
+  res.json(user)
+})
+```
+
+**Detection:**
+```bash
+grep -r "scope.resolve(" src/main.ts src/index.ts src/app.ts
+```
+
+**Correction:**
+```typescript
+const scope = createScope()
+app.set('scope', scope)
+
+app.post('/users', async (req, res) => {
+  const scope = req.app.get('scope')
+  const result = await scope.exec(createUser, {
+    email: req.body.email,
+    name: req.body.name
+  })
+  res.json(result)
+})
+```
+
+**Why:** Premature resolution breaks observability, loses journaling, makes flows untraceable.
+
+---
+
+### Anti-Pattern 4: Missing Journaling
+
+**Violation:**
+```typescript
+const createUser = flow(
+  { db: dbPool },
+  ({ db }) => async (ctx, input) => {
+    const id = randomUUID()
+    const user = await db.query('INSERT INTO users ...', [id, input.email])
+    return { success: true, user }
+  }
+)
+```
+
+**Detection:**
+```bash
+grep -l "flow(" src/flow-*.ts | xargs grep -L "ctx.run\|ctx.exec"
+```
+
+**Correction:**
+```typescript
+const createUser = flow(
+  { db: dbPool },
+  ({ db }) => async (ctx, input) => {
+    const id = await ctx.run('generate-id', () => randomUUID())
+    const user = await ctx.run('insert-user', () =>
+      db.query('INSERT INTO users ...', [id, input.email])
+    )
+    return { success: true, user }
+  }
+)
+```
+
+**Why:** Missing journaling breaks observability, loses operation tracking, makes debugging impossible.
+
+---
+
+### Anti-Pattern 5: Type Safety Violations
+
+**Violation:**
+```typescript
+const userRepo = derive(dbPool, (db: any) => ({
+  findById: async (id: string) => {
+    const result = await db.query('...')
+    return result as User
+  }
+}))
+```
+
+**Detection:**
+```bash
+grep -r ": any\|: unknown\| as " src/**/*.ts --include="*.ts" --exclude="*.test.ts"
+```
+
+**Correction:**
+```typescript
+type DbPool = {
+  query: <T>(sql: string, params: any[]) => Promise<T[]>
+}
+
+const userRepo = derive(dbPool, (db: DbPool) => ({
+  findById: async (id: string): Promise<User | null> => {
+    const rows = await db.query<User>('SELECT * FROM users WHERE id = $1', [id])
+    return rows[0] || null
+  }
+}))
+```
+
+**Why:** Type violations break compile-time safety, hide bugs, cause runtime errors.
+
+---
+
+### Anti-Pattern 6: Excessive Mocking
+
+**Violation:**
+```typescript
+import { vi } from 'vitest'
+
+vi.mock('uuid', () => ({ randomUUID: () => 'test-id' }))
+vi.mock('../database', () => ({ query: vi.fn() }))
+
+test('createUser', async () => {
+  const result = await createUser(...)
+})
+```
+
+**Detection:**
+```bash
+grep -r "vi.mock\|jest.mock" src/**/*.test.ts | wc -l
+```
+
+**Correction:**
+```typescript
+import { preset, createScope } from '@pumped-fn/core-next'
+
+test('createUser', async () => {
+  const mockDb = { query: vi.fn(() => Promise.resolve([...])) }
+
+  const scope = createScope({
+    presets: [preset(dbPool, mockDb)]
+  })
+
+  const result = await scope.exec(createUser, { email: 'test@example.com', name: 'Test' })
+
+  expect(mockDb.query).toHaveBeenCalled()
+  await scope.dispose()
+})
+```
+
+**Why:** Global mocks break isolation, couple tests, make tests brittle.
+
+---
+
+## Validation Checklist
+
+**Purpose:** Ensure zero violations before code delivery. Block delivery if any check fails.
+
+---
+
+### Pre-Generation Checklist
+
+**Before generating ANY code, verify:**
+
+☐ **Architecture map strategy determined**
+  - Where will `.pumped-fn/map.yaml` be located?
+  - What categories need tracking (resources, flows, api, utils)?
+  - Which components are critical (core dependencies)?
+
+☐ **Tags identified for runtime config**
+  - What varies between environments (DB host, API keys, feature flags)?
+  - Which values come from outside (CLI args, request context, env vars)?
+  - Tag definitions planned (custom types, labels)?
+
+☐ **Scope strategy decided**
+  - Application type known (HTTP server, CLI, Lambda, React, etc.)?
+  - When is scope created (startup, per-command, per-invocation)?
+  - When is scope disposed (shutdown, finally, never)?
+
+☐ **Discriminated union outputs planned**
+  - All flows return `{ success: true/false, ... }`?
+  - Error types enumerated (INVALID_EMAIL, NOT_FOUND, etc.)?
+  - Success/error branches type-safe?
+
+☐ **Journaling plan defined**
+  - Which operations need ctx.run() keys?
+  - Which flows call sub-flows via ctx.exec()?
+  - Operation keys meaningful (validate-email, insert-user)?
+
+☐ **Test strategy chosen**
+  - Resources: preset() or integration tests?
+  - Flows: always preset()?
+  - Utilities: direct unit tests?
+
+☐ **Observability extension planned**
+  - Logging requirements (basic, structured, LLM-optimized)?
+  - Metrics needed (duration, errors, counts)?
+  - Tracing required (correlation IDs, distributed traces)?
+
+---
+
+### Post-Generation Checklist
+
+**After generating code, run validation:**
+
+☐ **Type safety verified**
+```bash
+pnpm tsc --noEmit
+# Must pass with ZERO errors
+```
+
+☐ **No process.env in executors**
+```bash
+grep -r "process.env\|import.meta.env" src/resource-*.ts src/flow-*.ts src/repo-*.ts
+# Must return ZERO matches
+```
+
+☐ **Single scope verified**
+```bash
+grep -c "createScope()" src/routes/ src/api/ src/handlers/
+# Must return 0 (scope created at app level only)
+
+grep -c "createScope()" src/main.ts src/index.ts src/app.ts
+# Must return 1 (exactly one scope)
+```
+
+☐ **All flows journaled**
+```bash
+grep -l "flow(" src/flow-*.ts | while read file; do
+  if ! grep -q "ctx.run\|ctx.exec" "$file"; then
+    echo "Missing journaling: $file"
+  fi
+done
+# Must return ZERO files
+```
+
+☐ **Tests use preset (no global mocks)**
+```bash
+grep -r "vi.mock\|jest.mock" src/**/*.test.ts
+# Must return ZERO matches (or very few, with justification)
+
+grep -c "preset(" src/**/*.test.ts
+# Should be > 0 (tests use preset for mocking)
+```
+
+☐ **Flat structure enforced**
+```bash
+find src -type d -mindepth 2
+# Should return ZERO directories (or <10 files justify subdirs)
+```
+
+☐ **Files under 500 lines**
+```bash
+find src -name "*.ts" -exec wc -l {} \; | awk '$1 > 500 { print $2 " has " $1 " lines" }'
+# Must return ZERO files
+```
+
+☐ **Architecture map updated**
+```bash
+grep "new-component-pattern" .pumped-fn/map.yaml
+# New components reflected in map
+```
+
+---
+
+### Runtime Validation Commands
+
+**During development, run these commands frequently:**
+
+**Type checking:**
+```bash
+pnpm tsc --noEmit
+```
+
+**Tests:**
+```bash
+pnpm test
+```
+
+**Build:**
+```bash
+pnpm build
+```
+
+**Verify architecture map:**
+```bash
+cat .pumped-fn/map.yaml
+```
+
+**Check file sizes:**
+```bash
+find src -name "*.ts" -exec wc -l {} \; | sort -rn | head -10
+```
+
+**Check nesting:**
+```bash
+find src -type f -name "*.ts" | awk -F/ '{print NF-1}' | sort -u
+```
+
+---
+
+### Zero Violations Guarantee
+
+**IF ANY validation check fails:**
+1. STOP code delivery
+2. Fix violations
+3. Re-run all checks
+4. Only proceed when ALL checks pass
+
+**DO NOT:**
+- Deliver code with any type errors
+- Commit code with process.env in executors
+- Create PR with missing journaling
+- Merge code with excessive file sizes
+- Ignore validation failures
+
+**Example enforcement:**
+```typescript
+// Before committing, run validation script:
+// scripts/validate.sh
+
+#!/bin/bash
+set -e
+
+echo "Running type check..."
+pnpm tsc --noEmit
+
+echo "Running tests..."
+pnpm test
+
+echo "Checking for process.env in executors..."
+if grep -r "process.env" src/resource-*.ts src/flow-*.ts src/repo-*.ts; then
+  echo "ERROR: Found process.env in executors"
+  exit 1
+fi
+
+echo "Checking for missing journaling..."
+for file in src/flow-*.ts; do
+  if ! grep -q "ctx.run\|ctx.exec" "$file"; then
+    echo "ERROR: Missing journaling in $file"
+    exit 1
+  fi
+done
+
+echo "Checking file sizes..."
+if find src -name "*.ts" -exec wc -l {} \; | awk '$1 > 500 { exit 1 }'; then
+  echo "All files under 500 lines"
+else
+  echo "ERROR: Files exceed 500 lines"
+  exit 1
+fi
+
+echo "All validations passed!"
+```
+
+---
+
+## Coding Style Rules
+
+**Purpose:** Enforce consistent, maintainable code structure across all generated code.
+
+**Integration:** These rules are embedded in all templates and enforced via validation.
+
+---
+
+### File Organization
+
+**Flat structure by default:**
+```
+src/
+  resource-database.ts
+  resource-redis.ts
+  resource-stripe.ts
+  repo-user.ts
+  repo-post.ts
+  flow-user-create.ts
+  flow-user-login.ts
+  flow-post-create.ts
+  util-validate.ts
+  util-format.ts
+  api-users.ts
+  api-posts.ts
+  main.ts
+```
+
+**Only create subdirectories when >10 related files:**
+```
+src/
+  resources/
+    database.ts
+    redis.ts
+    stripe.ts
+    sendgrid.ts
+    ...12 total files
+  repositories/
+    user.ts
+    post.ts
+    comment.ts
+    ...8 total files
+  flows/
+    user-create.ts
+    user-login.ts
+    post-create.ts
+    ...15 total files
+```
+
+**File naming conventions:**
+- Resources: `resource-{name}.ts` or `resources/{name}.ts`
+- Repositories: `repo-{entity}.ts` or `repositories/{entity}.ts`
+- Flows: `flow-{operation}.ts` or `flows/{operation}.ts`
+- Utilities: `util-{purpose}.ts` or `utils/{purpose}.ts`
+- API routes: `api-{resource}.ts` or `api/{resource}.ts`
+- Tests: `{name}.test.ts` (colocated with source)
+
+---
+
+### File Size Limits
+
+**Hard limit: 500 lines per file**
+
+**When approaching limit:**
+1. Split into logical modules
+2. Extract shared utilities
+3. Use re-export pattern for convenience
+
+**Example split:**
+```typescript
+// Before (600 lines)
+// user-flows.ts
+export const createUser = flow(...)
+export const updateUser = flow(...)
+export const deleteUser = flow(...)
+export const loginUser = flow(...)
+export const logoutUser = flow(...)
+export const resetPassword = flow(...)
+
+// After (3 files, <500 lines each)
+// flow-user-crud.ts
+export const createUser = flow(...)
+export const updateUser = flow(...)
+export const deleteUser = flow(...)
+
+// flow-user-auth.ts
+export const loginUser = flow(...)
+export const logoutUser = flow(...)
+export const resetPassword = flow(...)
+
+// flows.ts (re-export for convenience)
+export * from './flow-user-crud'
+export * from './flow-user-auth'
+```
+
+---
+
+### Naming Conventions
+
+**Resources (instances, camelCase):**
+```typescript
+const dbPool = provide(...)
+const redisCache = provide(...)
+const stripeClient = provide(...)
+const emailService = provide(...)
+```
+
+**Repositories (instances, camelCase with Repo suffix):**
+```typescript
+const userRepo = derive(...)
+const postRepo = derive(...)
+const commentRepo = derive(...)
+```
+
+**Flows (operations, camelCase verbs):**
+```typescript
+const createUser = flow(...)
+const processPayment = flow(...)
+const sendEmail = flow(...)
+const validateInput = flow(...)
+```
+
+**Utilities (functions, camelCase verbs):**
+```typescript
+const validateEmail = (email: string): boolean => ...
+const formatCurrency = (amount: number): string => ...
+const parseDate = (input: string): Date => ...
+```
+
+**Types (PascalCase):**
+```typescript
+type User = { ... }
+type Order = { ... }
+type PaymentResult = { ... }
+
+namespace UserRepo {
+  export type User = { ... }
+  export type CreateInput = { ... }
+}
+```
+
+**Tags (instances, camelCase):**
+```typescript
+const apiKey = tag(custom<string>())
+const dbHost = tag(custom<string>())
+const requestId = tag(custom<string>())
+```
+
+---
+
+### Code Organization
+
+**Group related code via namespaces:**
+```typescript
+export namespace CreateUser {
+  export type Input = {
+    email: string
+    name: string
+  }
+
+  export type Success = {
+    success: true
+    user: User
+  }
+
+  export type Error =
+    | { success: false; reason: 'INVALID_EMAIL' }
+    | { success: false; reason: 'EMAIL_EXISTS' }
+
+  export type Result = Success | Error
+}
+
+export const createUser = flow(
+  { userRepo },
+  ({ userRepo }) => async (ctx, input: CreateUser.Input): Promise<CreateUser.Result> => {
+    // Implementation
+  }
+)
+```
+
+**Use linebreaks to separate logical sections:**
+```typescript
+const createOrder = flow(
+  { db: dbPool, stripe: stripeClient },
+  ({ db, stripe }) => async (ctx, input) => {
+    const validation = await ctx.run('validate-input', () => {
+      if (input.items.length === 0) return { ok: false as const, reason: 'NO_ITEMS' as const }
+      if (input.total <= 0) return { ok: false as const, reason: 'INVALID_TOTAL' as const }
+      return { ok: true as const }
+    })
+
+    if (!validation.ok) {
+      return { success: false, reason: validation.reason }
+    }
+
+    const orderId = await ctx.run('generate-id', () => randomUUID())
+
+    const payment = await ctx.run('process-payment', () =>
+      stripe.charge({ amount: input.total, currency: 'USD' })
+    )
+
+    if (!payment.success) {
+      return { success: false, reason: 'PAYMENT_FAILED' }
+    }
+
+    const order = await ctx.run('insert-order', () =>
+      db.query('INSERT INTO orders ...', [orderId, input.userId, input.total])
+    )
+
+    return { success: true, order }
+  }
+)
+```
+
+---
+
+### Communication Style
+
+**Sacrifice grammar for conciseness:**
+
+**Bad (verbose, grammatically correct):**
+```
+I am going to proceed with implementing the user authentication flow.
+First, I will create the database resource for managing connections.
+Then, I will implement the user repository for data access operations.
+After that, I will create the login flow with validation and session management.
+Finally, I will write comprehensive tests to ensure correctness.
+```
+
+**Good (concise, direct):**
+```
+Implementing user auth flow:
+1. Create database resource (connection pool)
+2. Implement user repository (findByEmail, create)
+3. Create login flow (validate credentials, create session)
+4. Write tests (preset mocks, verify discriminated unions)
+```
+
+**Examples:**
+
+| Bad | Good |
+|-----|------|
+| "I am currently analyzing the codebase structure" | "Analyzing codebase structure" |
+| "I will now proceed to generate the flow layer" | "Generating flow layer" |
+| "The validation has been completed successfully" | "Validation passed" |
+| "I have identified a potential issue with type safety" | "Type safety violation found" |
+| "Let me check if there are any errors" | "Checking for errors" |
+
+**In code comments (avoid):**
+```typescript
+// Bad (comments that state the obvious)
+const user = await ctx.run('fetch-user', () => {
+  // Query the database for user by ID
+  return userRepo.findById(id)
+})
+
+// Good (no comments, self-explanatory code)
+const user = await ctx.run('fetch-user', () =>
+  userRepo.findById(id)
+)
+```
+
+**Exception:** Comments allowed for:
+- Complex algorithms requiring explanation
+- Non-obvious business rules
+- Workarounds for external library bugs
+- API documentation (JSDoc)
+
+---
+
+### Complete Code Examples
+
+**Minimal HTTP server (all patterns applied):**
+
+```typescript
+// resource-database.ts
+import { provide, tag, custom } from '@pumped-fn/core-next'
+import { Pool } from 'pg'
+
+export const dbConfig = tag(custom<{
+  host: string
+  port: number
+  database: string
+  user: string
+  password: string
+}>(), { label: 'config.database' })
+
+export const dbPool = provide((controller) => {
+  const config = dbConfig.get(controller.scope)
+  const pool = new Pool(config)
+
+  controller.cleanup(async () => {
+    await pool.end()
+  })
+
+  return {
+    query: async <T>(sql: string, params: any[]): Promise<T[]> => {
+      const result = await pool.query(sql, params)
+      return result.rows
+    }
+  }
+})
+
+// repo-user.ts
+import { derive } from '@pumped-fn/core-next'
+import { dbPool } from './resource-database'
+
+export namespace UserRepo {
+  export type User = {
+    id: string
+    email: string
+    name: string
+  }
+
+  export type CreateInput = {
+    email: string
+    name: string
+  }
+}
+
+export const userRepo = derive({ db: dbPool }, ({ db }) => ({
+  findByEmail: async (email: string): Promise<UserRepo.User | null> => {
+    const rows = await db.query<UserRepo.User>(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    )
+    return rows[0] || null
+  },
+
+  create: async (input: UserRepo.CreateInput): Promise<UserRepo.User> => {
+    const rows = await db.query<UserRepo.User>(
+      'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING *',
+      [input.email, input.name]
+    )
+    return rows[0]
+  }
+}))
+
+// flow-user-create.ts
+import { flow } from '@pumped-fn/core-next'
+import { userRepo, type UserRepo } from './repo-user'
+
+export namespace CreateUser {
+  export type Input = {
+    email: string
+    name: string
+  }
+
+  export type Success = {
+    success: true
+    user: UserRepo.User
+  }
+
+  export type Error =
+    | { success: false; reason: 'INVALID_EMAIL' }
+    | { success: false; reason: 'EMAIL_EXISTS' }
+
+  export type Result = Success | Error
+}
+
+export const createUser = flow(
+  { userRepo },
+  ({ userRepo }) => async (ctx, input: CreateUser.Input): Promise<CreateUser.Result> => {
+    const validation = await ctx.run('validate-email', () => {
+      if (!input.email.includes('@')) {
+        return { ok: false as const, reason: 'INVALID_EMAIL' as const }
+      }
+      return { ok: true as const }
+    })
+
+    if (!validation.ok) {
+      return { success: false, reason: validation.reason }
+    }
+
+    const existing = await ctx.run('check-existing', () =>
+      userRepo.findByEmail(input.email)
+    )
+
+    if (existing !== null) {
+      return { success: false, reason: 'EMAIL_EXISTS' }
+    }
+
+    const user = await ctx.run('create-user', () =>
+      userRepo.create(input)
+    )
+
+    return { success: true, user }
+  }
+)
+
+// app.ts
+import express from 'express'
+import { createScope } from '@pumped-fn/core-next'
+import { dbConfig } from './resource-database'
+import { createUser } from './flow-user-create'
+
+export function createApp() {
+  const scope = createScope({
+    tags: [
+      dbConfig({
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME || 'app',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres'
+      })
+    ]
+  })
+
+  const app = express()
+  app.use(express.json())
+  app.set('scope', scope)
+
+  app.post('/users', async (req, res) => {
+    const scope = req.app.get('scope')
+    const result = await scope.exec(createUser, {
+      email: req.body.email,
+      name: req.body.name
+    })
+
+    if (!result.success) {
+      const statusMap = {
+        INVALID_EMAIL: 400,
+        EMAIL_EXISTS: 409
+      }
+      return res.status(statusMap[result.reason]).json({ error: result.reason })
+    }
+
+    res.status(201).json(result.user)
+  })
+
+  return { app, scope }
+}
+
+// main.ts
+import { createApp } from './app'
+
+async function main() {
+  const { app, scope } = createApp()
+
+  const server = app.listen(3000, () => {
+    console.log('Server listening on port 3000')
+  })
+
+  const shutdown = async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve())
+    })
+    await scope.dispose()
+    process.exit(0)
+  }
+
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
+}
+
+main().catch((error) => {
+  console.error('Failed to start:', error)
+  process.exit(1)
+})
+
+// flow-user-create.test.ts
+import { describe, test, expect, beforeEach, afterEach } from 'vitest'
+import { createScope, preset, type Scope } from '@pumped-fn/core-next'
+import { userRepo, type UserRepo } from './repo-user'
+import { createUser } from './flow-user-create'
+
+describe('createUser flow', () => {
+  let scope: Scope
+
+  beforeEach(() => {
+    const mockUserRepo = {
+      findByEmail: async (email: string): Promise<UserRepo.User | null> => null,
+      create: async (input: UserRepo.CreateInput): Promise<UserRepo.User> => ({
+        id: 'test-id',
+        email: input.email,
+        name: input.name
+      })
+    }
+
+    scope = createScope({
+      presets: [preset(userRepo, mockUserRepo)]
+    })
+  })
+
+  afterEach(async () => {
+    await scope.dispose()
+  })
+
+  test('creates user with valid input', async () => {
+    const result = await scope.exec(createUser, {
+      email: 'test@example.com',
+      name: 'Test User'
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.user.email).toBe('test@example.com')
+    }
+  })
+
+  test('rejects invalid email', async () => {
+    const result = await scope.exec(createUser, {
+      email: 'invalid',
+      name: 'Test User'
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.reason).toBe('INVALID_EMAIL')
+    }
+  })
+})
+```
+
+**Architecture map (.pumped-fn/map.yaml):**
+```yaml
+structure:
+  resources: src/resource-*.ts
+  repos: src/repo-*.ts
+  flows: src/flow-*.ts
+  api: src/app.ts
+
+critical:
+  - resource-database
+  - flow-user-create
+
+patterns:
+  test: "*.test.ts"
+```
+
+**File count: 6 files, all <200 lines**
+**Type safety: 100% (no any/unknown/casting)**
+**Journaling: All flows use ctx.run/ctx.exec**
+**Testing: preset() pattern, zero global mocks**
+**Scope: Single scope, created once**
+
+---
+
+## Summary
+
+This unified skill provides:
+
+1. **Activation & Installation** - Auto-activates for TypeScript projects, guides installation
+2. **Critical Questions Framework** - Gathers requirements, generates deterministic architecture
+3. **Core API Decision Trees** - Fast API selection via 9 decision trees
+4. **Architecture Generation Templates** - 7 copy-paste templates for scaffolding
+5. **Environment-Specific Guidance** - Scope patterns for HTTP, CLI, Lambda, React, etc.
+6. **Anti-Pattern Detection** - 6 automated checks to prevent violations
+7. **Observability & Troubleshooting** - Extension architecture, LLM-optimized logs (covered in templates)
+8. **Validation Checklist** - Pre/post-generation validation, zero violations guarantee
+9. **Coding Style Rules** - File organization, naming, size limits, communication style
+
+**Zero violations guarantee:** All validation checks must pass before code delivery.
+
+**Success metrics:**
+- Deterministic output (same questions → same architecture)
+- 100% testable (preset pattern, no global mocks)
+- 100% traceable (all flows journaled)
+- Files <500 lines (enforced)
+- Type-safe (no any/unknown/casting)
+- LLM-parseable logs (<500 tokens per trace)
