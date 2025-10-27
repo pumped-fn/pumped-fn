@@ -280,6 +280,7 @@ Then proceed to use decision trees and templates from reference files.
 | **environments.md** | Environment-specific integration patterns (HTTP, CLI, Cron, Events, React, Next.js, Lambda) | ~2800 words | When integrating with specific frameworks |
 | **anti-patterns.md** | 6 common anti-patterns with detection + fixes (Multiple Scopes, Built-ins, Premature Escape, Missing Journaling, Type Safety, Excessive Mocking) | ~650 words | During code review or when debugging issues |
 | **validation.md** | Pre/post-generation validation checklists with grep commands (typecheck, anti-pattern detection, scope count, etc.) | ~680 words | After generating code, before committing |
+| **authoring.md** | 3 module authoring patterns (Reusable Resource, Extension Package, Composition/Exports) with optional dependencies | ~2600 words | When creating reusable/publishable components, libraries, or extensions |
 
 **How to use:**
 1. Identify task type (greenfield, add feature, modify, debug, etc.)
