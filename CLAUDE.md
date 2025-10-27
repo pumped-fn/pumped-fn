@@ -3,6 +3,43 @@
 > Pumped-fn skill active: Pattern enforcement, concepts, testing strategies handled by skill.
 > This file: Project-specific overrides and workflow requirements.
 
+# Skills
+
+Project-scoped skills in `.claude/skills/`:
+
+## Pumped-fn Specific Skills
+
+- **pumped-fn** - Comprehensive guidance for building observable, testable TypeScript applications with @pumped-fn
+  - Auto-activates for TypeScript projects
+  - Covers entire development lifecycle (design, architecture, implementation, testing, troubleshooting)
+  - Decision trees for API selection (provide, derive, flow, tags, Promised, scope)
+  - Environment-specific guidance (HTTP, CLI, cron, React, Lambda)
+  - Anti-pattern detection and corrections
+  - Source of truth for marketplace skill
+
+## Superpowers Skills (Upstream Copies)
+
+- test-driven-development
+- systematic-debugging
+- verification-before-completion
+- requesting-code-review
+- brainstorming, writing-plans, executing-plans
+- using-git-worktrees
+- defense-in-depth
+- condition-based-waiting
+
+## Skill Use Cases
+
+1. **Implementing features/extensions** - Skills guide correct pattern usage
+2. **Creating examples** - Skills enforce consistency across examples
+3. **Marketplace source** - pumped-fn-* skills published via claude-skill/plugin.json
+4. **Project troubleshooting** - Skills catch anti-patterns and violations
+
+## Updating Skills
+
+Use `pnpm update-skills` to sync superpowers skills from upstream.
+Manual review required before committing updates.
+
 # Upmost important
 
 Sacrifice English grammar for conciseness. Concrete and straightforward.
@@ -53,7 +90,7 @@ Making API change in packages/next meant
 - Potential change to docs (docs/guides/)
 - Potential change to examples (examples/)
 - Potential change to test (packages/next/tests/)
-- **CRITICAL: Potential change to SKILL (claude-skill/skills/pumped-fn-typescript/SKILL.md)**
+- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-fn/SKILL.md)**
 
 To keep things compact, economic, those should be planned as needed
 
@@ -65,7 +102,7 @@ When changing public API (types, function signatures, etc):
 2. Update tests in packages/next/tests/
 3. Update examples in examples/
 4. Update documentation in docs/guides/
-5. **ALWAYS check and update claude-skill/skills/pumped-fn-typescript/SKILL.md** - this is critical for skill accuracy
+5. **ALWAYS check and update .claude/skills/pumped-fn/SKILL.md** - this is critical for skill accuracy
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`

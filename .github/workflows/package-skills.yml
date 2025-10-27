@@ -5,12 +5,12 @@ on:
     branches:
       - main
     paths:
-      - '.claude/skills/**'
-      - 'claude-skill/skills/**'
+      - '.claude/skills/pumped-fn/**'
+      - 'claude-skill/skills/pumped-fn/**'
   pull_request:
     paths:
-      - '.claude/skills/**'
-      - 'claude-skill/skills/**'
+      - '.claude/skills/pumped-fn/**'
+      - 'claude-skill/skills/pumped-fn/**'
 
 jobs:
   package-skills:
@@ -44,10 +44,10 @@ jobs:
             CHANGED_FILES=$(git diff --name-only $BASE $HEAD)
           fi
 
-          # Extract unique skill directories
+          # Extract unique pumped-fn skill directories only
           SKILL_DIRS=$(echo "$CHANGED_FILES" | \
-            grep -E '^(\.claude/skills/|claude-skill/skills/)' | \
-            sed -E 's|(\.claude/skills/[^/]+)/.*|\1|; s|(claude-skill/skills/[^/]+)/.*|\1|' | \
+            grep -E '^(\.claude/skills/pumped-fn|claude-skill/skills/pumped-fn)' | \
+            sed -E 's|(\.claude/skills/pumped-fn)/.*|\1|; s|(claude-skill/skills/pumped-fn)/.*|\1|' | \
             sort -u)
 
           if [ -z "$SKILL_DIRS" ]; then

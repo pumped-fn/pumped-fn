@@ -2,18 +2,18 @@
 
 ## package-skills.yml
 
-Automatically packages Claude Code skills as zip files when skill files are modified.
+Automatically packages pumped-fn skill as zip file when skill files are modified.
 
 ### Triggers
 
-- **Push to main**: When `.claude/skills/**` or `claude-skill/skills/**` changes
-- **Pull requests**: When skill files are modified in PRs
+- **Push to main**: When `.claude/skills/pumped-fn/**` or `claude-skill/skills/pumped-fn/**` changes
+- **Pull requests**: When pumped-fn skill files are modified in PRs
 
 ### Behavior
 
-1. **Detects changed skills**: Identifies which skill directories were modified
-2. **Validates structure**: Ensures `SKILL.md` exists in each skill directory
-3. **Creates zip files**: Packages each skill directory in standard format
+1. **Detects pumped-fn skill changes**: Monitors only pumped-fn skill directory (excludes superpowers copies)
+2. **Validates structure**: Ensures `SKILL.md` exists in skill directory
+3. **Creates zip file**: Packages pumped-fn skill directory in standard format
    - Format: `skill-name.zip` containing `skill-name/SKILL.md` and all skill files
    - Structure matches Claude Code skill directory layout
 4. **Uploads artifacts**: Stores zips as GitHub Actions artifacts (90-day retention)
@@ -74,8 +74,10 @@ act push -W .github/workflows/package-skills.yml
 ### Configuration
 
 **Paths monitored**:
-- `.claude/skills/**` - Project-scoped skills (committed to repo)
-- `claude-skill/skills/**` - Marketplace skills (plugin distribution)
+- `.claude/skills/pumped-fn/**` - Project-scoped pumped-fn skill
+- `claude-skill/skills/pumped-fn/**` - Marketplace pumped-fn skill (plugin distribution)
+
+**Note**: Only pumped-fn skills are packaged. Superpowers skills (copied from upstream) are excluded.
 
 **Artifacts retention**: 90 days (configurable in workflow)
 

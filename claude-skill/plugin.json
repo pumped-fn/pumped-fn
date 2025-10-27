@@ -4,10 +4,10 @@
   "description": "Comprehensive guidance for @pumped-fn ecosystem - TypeScript backend patterns and React frontend architecture with auto-activation, pattern enforcement, and testability strategies",
   "author": "lagz0ne",
   "repository": "https://github.com/lagz0ne/pumped-fn",
-  "homepage": "https://github.com/lagz0ne/pumped-fn/tree/main/claude-skill",
+  "homepage": "https://github.com/lagz0ne/pumped-fn/tree/main/.claude/skills",
   "skills": [
-    "skills/pumped-fn-typescript",
-    "skills/pumped-fn-react"
+    ".claude/skills/pumped-fn-typescript",
+    ".claude/skills/pumped-fn-react"
   ],
   "tags": [
     "typescript",

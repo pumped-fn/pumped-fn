@@ -18,6 +18,7 @@
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:status": "changeset status --verbose",
     "release": "pnpm verify && pnpm changeset:publish",
+    "update-skills": "bash scripts/update-skills.sh",
     "test:ci": "act -j test",
     "test:release": "act -j release --secret-file .secrets",
     "test:docs": "act -j build -W .github/workflows/deploy-docs.yml"
