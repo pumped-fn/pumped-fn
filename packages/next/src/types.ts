@@ -212,7 +212,7 @@ export declare namespace Core {
   export type ResolvedState<T> = {
     kind: "resolved";
     value: T;
-    promised?: Promised<T>;
+    promised: Promised<T>;
   };
   export type RejectedState = {
     kind: "rejected";

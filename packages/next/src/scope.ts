@@ -44,7 +44,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
   private currentPromised: Promised<unknown> | null = null;
-  private cachedResolvedPromised: Promised<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
   constructor(scope: BaseScope, requestor: UE, tags: import("./tag-types").Tag.Tagged[] | undefined) {
@@ -109,7 +108,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
     this.scope["~removeFromResolutionChain"](this.requestor);
     this.currentPromise = null;
     this.currentPromised = null;
-    this.cachedResolvedPromised = null;
 
     return processedResult;
   }
@@ -176,13 +174,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     cached: Core.ResolveState<unknown>
   ): Promised<unknown> | never {
     if (cached.kind === "resolved") {
-      if (cached.promised) {
-        return cached.promised;
-      }
-      if (!this.cachedResolvedPromised) {
-        this.cachedResolvedPromised = Promised.create(Promise.resolve(cached.value));
-      }
-      return this.cachedResolvedPromised;
+      return cached.promised;
     }
 
     if (cached.kind === "rejected") {
@@ -433,6 +425,8 @@ class BaseScope implements Core.Scope {
   private isDisposing = false;
 
   private resolutionChain: Map<UE, Set<UE>> = new Map();
+  private resolutionDepth: Map<UE, number> = new Map();
+  private readonly CIRCULAR_CHECK_THRESHOLD = 15;
 
   protected extensions: Extension.Extension[] = [];
   private reversedExtensions: Extension.Extension[] = [];
@@ -499,6 +493,7 @@ class BaseScope implements Core.Scope {
   }
 
   protected "~removeFromResolutionChain"(executor: UE): void {
+    this.resolutionDepth.delete(executor);
     this.resolutionChain.delete(executor);
   }
 
@@ -596,9 +591,25 @@ class BaseScope implements Core.Scope {
   ): Promise<unknown> {
     const e = getExecutor(ie);
 
-    this["~checkCircularDependency"](e, ref);
+    if (e === ref) {
+      const executorName = errors.getExecutorName(e);
+      throw errors.createDependencyError(
+        errors.codes.CIRCULAR_DEPENDENCY,
+        executorName,
+        [executorName],
+        executorName,
+        undefined,
+        { circularPath: `${executorName} -> ${executorName}`, detectedAt: executorName }
+      );
+    }
 
-    this["~propagateResolutionChain"](ref, e);
+    const currentDepth = (this.resolutionDepth.get(ref) ?? 0) + 1;
+    this.resolutionDepth.set(e, currentDepth);
+
+    if (currentDepth > this.CIRCULAR_CHECK_THRESHOLD) {
+      this["~checkCircularDependency"](e, ref);
+      this["~propagateResolutionChain"](ref, e);
+    }
 
     const a = this["~makeAccessor"](e);
 
@@ -906,6 +917,7 @@ class BaseScope implements Core.Scope {
       this.onEvents.release.clear();
       this.onEvents.error.clear();
       this.onErrors.clear();
+      this.resolutionDepth.clear();
       this.resolutionChain.clear();
     })());
   }
