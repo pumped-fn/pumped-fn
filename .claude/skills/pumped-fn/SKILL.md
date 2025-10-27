@@ -99,6 +99,12 @@ grep -l "Anti-Pattern.*Built-ins" references/*.md
 # Finding validation
 grep -l "Pre-Generation Checklist" references/*.md
 grep -l "typecheck.*ZERO errors" references/*.md
+
+# Finding module authoring guidance
+grep -l "Pattern 1.*Reusable Resource" references/*.md
+grep -l "Pattern 2.*Extension Package" references/*.md
+grep -l "Pattern 3.*Composition and Exports" references/*.md
+grep -l "preset.*original executor" references/*.md
 ```
 
 ## Workflow
