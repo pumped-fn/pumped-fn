@@ -30,8 +30,8 @@ const transaction = tag(custom<Transaction>(), { label: 'db.transaction' })
 
 const transactionExtension = extension({
   name: 'transaction',
-  wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'execute') {
+  wrap: async (scope, next, operation) => {
+    if (operation.kind !== 'subflow' && operation.kind !== 'journal') {
       return next()
     }
 
@@ -44,7 +44,9 @@ const transactionExtension = extension({
       }
     }
 
-    ctx.set(transaction, txn)
+    if ('context' in operation) {
+      operation.context.set(transaction, txn)
+    }
 
     try {
       const result = await next()
