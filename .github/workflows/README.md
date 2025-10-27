@@ -17,7 +17,7 @@ Automatically packages pumped-fn skill as zip file when skill files are modified
    - Format: `skill-name.zip` containing `skill-name/SKILL.md` and all skill files
    - Structure matches Claude Code skill directory layout
 4. **Uploads artifacts**: Stores zips as GitHub Actions artifacts (90-day retention)
-5. **Commits to repo** (main branch only): Pushes packaged zips to `dist/skills/`
+5. **Creates GitHub Release** (main branch only): Auto-generates release with skill zips attached and installation instructions
 
 ### Zip File Format
 
@@ -34,11 +34,17 @@ pumped-fn.zip
 
 ### Usage
 
-#### Install Skills from Artifacts
+#### Install Skills from GitHub Releases
 
-Download zip from GitHub Actions artifacts:
+Download latest skill zip from releases:
 
 ```bash
+# Find latest release
+gh release list --limit 5
+
+# Download specific release
+gh release download skills-20251027-120000 --pattern "pumped-fn.zip"
+
 # Extract to personal skills directory
 unzip pumped-fn.zip -d ~/.claude/skills/
 
@@ -46,13 +52,14 @@ unzip pumped-fn.zip -d ~/.claude/skills/
 unzip pumped-fn.zip -d .claude/skills/
 ```
 
-#### Install Skills from Repository
+Or download manually from [Releases page](https://github.com/pumped-fn/pumped-fn/releases).
 
-If zips are committed to `dist/skills/`:
+#### Install Skills from Artifacts (PR builds)
+
+For pull request builds, download from GitHub Actions artifacts:
 
 ```bash
-# Download directly from repository
-curl -L https://github.com/your-org/pumped-fn/raw/main/dist/skills/pumped-fn.zip -o pumped-fn.zip
+# Navigate to Actions tab, select workflow run, download artifact
 unzip pumped-fn.zip -d ~/.claude/skills/
 ```
 
@@ -81,7 +88,7 @@ act push -W .github/workflows/package-skills.yml
 
 **Artifacts retention**: 90 days (configurable in workflow)
 
-**Skip CI**: Commits include `[skip ci]` to prevent recursive workflows
+**Release tags**: Auto-generated as `skills-YYYYMMDD-HHMMSS` (timestamp-based)
 
 ### Troubleshooting
 
@@ -93,6 +100,7 @@ act push -W .github/workflows/package-skills.yml
 - Ensure `SKILL.md` exists in skill directory
 - Verify frontmatter is valid YAML (name, description, when_to_use)
 
-**Missing artifacts**:
+**Missing artifacts or releases**:
 - Check Actions tab for workflow run logs
 - Artifacts retained for 90 days, check retention period
+- Releases are only created on main branch pushes (not PRs)
