@@ -1,0 +1,140 @@
+name: Package Skills
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.claude/skills/pumped-fn/**'
+      - 'claude-skill/skills/pumped-fn/**'
+  pull_request:
+    paths:
+      - '.claude/skills/pumped-fn/**'
+      - 'claude-skill/skills/pumped-fn/**'
+
+jobs:
+  package-skills:
+    name: Package Changed Skills
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed skills
+        id: changes
+        run: |
+          # Get changed skill directories
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          # Handle initial commit case
+          if [ "$BASE" == "0000000000000000000000000000000000000000" ]; then
+            CHANGED_FILES=$(git ls-tree -r --name-only HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only $BASE $HEAD)
+          fi
+
+          # Extract unique pumped-fn skill directories only
+          SKILL_DIRS=$(echo "$CHANGED_FILES" | \
+            grep -E '^(\.claude/skills/pumped-fn|claude-skill/skills/pumped-fn)' | \
+            sed -E 's|(\.claude/skills/pumped-fn)/.*|\1|; s|(claude-skill/skills/pumped-fn)/.*|\1|' | \
+            sort -u)
+
+          if [ -z "$SKILL_DIRS" ]; then
+            echo "No skill changes detected"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changed skills:"
+            echo "$SKILL_DIRS"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            # Convert to JSON array for matrix
+            SKILL_ARRAY=$(echo "$SKILL_DIRS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "skills=$SKILL_ARRAY" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create skill zips
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          mkdir -p dist/skills
+
+          # Process each changed skill
+          echo '${{ steps.changes.outputs.skills }}' | jq -r '.[]' | while read SKILL_DIR; do
+            if [ ! -d "$SKILL_DIR" ]; then
+              echo "Warning: $SKILL_DIR not found, skipping"
+              continue
+            fi
+
+            # Validate SKILL.md exists
+            if [ ! -f "$SKILL_DIR/SKILL.md" ]; then
+              echo "Error: $SKILL_DIR/SKILL.md not found, skipping"
+              continue
+            fi
+
+            # Extract skill name from directory
+            SKILL_NAME=$(basename "$SKILL_DIR")
+
+            # Create temporary directory with skill structure
+            TEMP_DIR=$(mktemp -d)
+            cp -r "$SKILL_DIR" "$TEMP_DIR/$SKILL_NAME"
+
+            # Create zip with skill directory at root
+            # Format: skill-name.zip containing skill-name/SKILL.md, skill-name/...
+            cd "$TEMP_DIR"
+            zip -r "$SKILL_NAME.zip" "$SKILL_NAME"
+            cd -
+
+            # Move to dist
+            mv "$TEMP_DIR/$SKILL_NAME.zip" "dist/skills/"
+
+            # Cleanup
+            rm -rf "$TEMP_DIR"
+
+            echo "Packaged: $SKILL_NAME.zip"
+          done
+
+      - name: Upload skill artifacts
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-${{ github.sha }}
+          path: dist/skills/*.zip
+          retention-days: 90
+
+      - name: Commit and push zips (main branch only)
+        if: steps.changes.outputs.has_changes == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create dist/skills directory if needed
+          mkdir -p dist/skills
+
+          # Check if there are new/updated zips
+          if [ -n "$(ls -A dist/skills/*.zip 2>/dev/null)" ]; then
+            git add dist/skills/*.zip
+
+            if git diff --cached --quiet; then
+              echo "No changes to skill zips"
+            else
+              git commit -m "chore(skills): update packaged skill zips [skip ci]"
+              git push
+            fi
+          fi
+
+      - name: Summary
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          echo "## Packaged Skills" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -lh dist/skills/*.zip | awk '{print "- " $9 " (" $5 ")"}' >> $GITHUB_STEP_SUMMARY

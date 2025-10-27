@@ -362,7 +362,7 @@ const createUser = flow({
 // test.ts - Testing is EASY
 test('create user', async () => {
   const mockUserRepo = derive({}, () => ({
-    create: async (data: any) => ({ id: '123', ...data })
+    create: async (data: unknown) => ({ id: '123', ...data as object })
   }))
 
   const testScope = createScope({
@@ -765,7 +765,7 @@ const dbPool = provide((controller) => {
   })
 
   return {
-    query: async (sql: string, params: any[]) => {
+    query: async (sql: string, params: unknown[]) => {
       return pool.query(sql, params)
     }
   }
@@ -1240,13 +1240,16 @@ const processOrder = flow({
 ### 6. Extensions (Cross-Cutting Observation)
 
 ```typescript
-const loggingExtension: Extension = {
-  wrap: (scope, next, operation) => {
+import { extension } from '@pumped-fn/core-next'
+
+const loggingExtension = extension({
+  name: 'logging',
+  wrap: async (scope, next, operation) => {
     if (operation.kind === 'execute') {
       console.log(`[FLOW START] ${operation.flowName}`)
-      return next().finally(() => {
-        console.log(`[FLOW END] ${operation.flowName}`)
-      })
+      const result = await next()
+      console.log(`[FLOW END] ${operation.flowName}`)
+      return result
     }
 
     if (operation.kind === 'journal') {
@@ -1255,7 +1258,7 @@ const loggingExtension: Extension = {
 
     return next()
   }
-}
+})
 
 await flow.execute(processOrder, input, {
   scope,
@@ -1399,6 +1402,412 @@ const user = data as User  // Dangerous if data isn't actually User
 - **Testing-friendly**: Emphasize preset() and mock strategies
 - **Pragmatic**: Balance tracking overhead with visibility needs
 
+## Section 7: Observability & Troubleshooting
+
+### Extension Architecture
+
+Extensions intercept operations via wrap() pattern with three hook types:
+
+**Hook Types:**
+- **execute** - Flow lifecycle (start, end, context)
+- **journal** - Operations (ctx.run/exec steps)
+- **resolve** - Resource resolution
+
+**Basic extension pattern:**
+
+```typescript
+import { extension } from '@pumped-fn/core-next'
+
+const loggingExtension = extension({
+  name: 'logging',
+  wrap: async (scope, next, operation) => {
+    if (operation.kind === 'execute') {
+      console.log(`[FLOW START] ${operation.flowName}`)
+      const result = await next()
+      console.log(`[FLOW END] ${operation.flowName}`)
+      return result
+    }
+
+    if (operation.kind === 'journal') {
+      console.log(`  [STEP] ${operation.key}`)
+    }
+
+    if (operation.kind === 'resolve') {
+      console.log(`[RESOLVE] ${operation.executorName}`)
+    }
+
+    return next()
+  }
+})
+
+await flow.execute(processOrder, input, {
+  scope,
+  extensions: [loggingExtension]
+})
+```
+
+### LLM-Optimized Log Format
+
+**JSONL format for compact, parseable logs:**
+
+```jsonl
+{"t":"2025-10-27T10:30:00.123Z","type":"flow_start","flow":"createUser","cid":"req-abc"}
+{"t":"2025-10-27T10:30:00.125Z","type":"op","key":"validate-email","cid":"req-abc"}
+{"t":"2025-10-27T10:30:00.150Z","type":"flow_end","flow":"createUser","dur":27,"ok":true,"cid":"req-abc"}
+```
+
+**Benefits:**
+- Compact field names (t, op, dur, cid) save tokens
+- Correlation IDs (cid) link operations across flows
+- One event per line (easy grep/filter)
+- Full request trace typically <500 tokens
+- LLM can parse and analyze efficiently
+
+**Implementation example:**
+
+```typescript
+const jsonlLogger = extension({
+  name: 'jsonl-logger',
+  wrap: async (scope, next, operation) => {
+    const cid = correlationId.tryGet(scope) || 'unknown'
+    const timestamp = new Date().toISOString()
+
+    if (operation.kind === 'execute') {
+      const start = Date.now()
+      const log = { t: timestamp, type: 'flow_start', flow: operation.flowName, cid }
+      fs.appendFileSync('logs/flows.jsonl', JSON.stringify(log) + '\n')
+
+      try {
+        const result = await next()
+        const dur = Date.now() - start
+        const endLog = { t: new Date().toISOString(), type: 'flow_end', flow: operation.flowName, dur, ok: true, cid }
+        fs.appendFileSync('logs/flows.jsonl', JSON.stringify(endLog) + '\n')
+        return result
+      } catch (error) {
+        const dur = Date.now() - start
+        const errorLog = { t: new Date().toISOString(), type: 'flow_end', flow: operation.flowName, dur, ok: false, error: (error as Error).message, cid }
+        fs.appendFileSync('logs/errors.jsonl', JSON.stringify(errorLog) + '\n')
+        throw error
+      }
+    }
+
+    if (operation.kind === 'journal') {
+      const log = { t: timestamp, type: 'op', key: operation.key, cid }
+      fs.appendFileSync('logs/flows.jsonl', JSON.stringify(log) + '\n')
+    }
+
+    return next()
+  }
+})
+```
+
+### Smart Log Extraction Workflow
+
+**Problem:** Full codebase context = thousands of tokens wasted
+
+**Solution:** Graph-guided extraction using correlation IDs
+
+**Workflow:**
+```
+Issue reported
+  ↓
+Extract correlation ID from error
+  ↓
+grep logs/flows.jsonl for cid
+  ↓
+Get full trace (<500 tokens)
+  ↓
+Identify problem operation
+  ↓
+Read only relevant flow file
+  ↓
+Analyze and fix
+```
+
+**Example extraction:**
+
+```bash
+# User reports: "User creation failed for req-abc"
+grep '"cid":"req-abc"' logs/flows.jsonl
+
+# Output:
+# {"t":"...","type":"flow_start","flow":"createUser","cid":"req-abc"}
+# {"t":"...","type":"op","key":"validate-email","cid":"req-abc"}
+# {"t":"...","type":"op","key":"check-existing","cid":"req-abc"}
+# {"t":"...","type":"flow_end","flow":"createUser","dur":150,"ok":false,"cid":"req-abc"}
+
+# Problem identified: no error details logged
+# Fix: Add discriminated union error details to journaling
+```
+
+### File-Based Logging Strategy
+
+**Recommended structure:**
+
+```
+logs/
+  flows.jsonl         # All flow executions
+  errors.jsonl        # Error traces only
+  performance.jsonl   # Slow operations (>100ms)
+```
+
+**Separation benefits:**
+- Quick error analysis (grep errors.jsonl)
+- Performance profiling (grep performance.jsonl)
+- Full audit trail (flows.jsonl)
+- Easy rotation (logrotate per file)
+
+**Performance tracking extension:**
+
+```typescript
+const performanceLogger = extension({
+  name: 'performance',
+  wrap: async (scope, next, operation) => {
+    if (operation.kind === 'execute') {
+      const start = Date.now()
+      const result = await next()
+      const dur = Date.now() - start
+
+      if (dur > 100) {
+        const cid = correlationId.tryGet(scope) || 'unknown'
+        const log = {
+          t: new Date().toISOString(),
+          type: 'slow_flow',
+          flow: operation.flowName,
+          dur,
+          cid
+        }
+        fs.appendFileSync('logs/performance.jsonl', JSON.stringify(log) + '\n')
+      }
+
+      return result
+    }
+
+    return next()
+  }
+})
+```
+
+### Correlation ID Pattern
+
+**Tag definition:**
+
+```typescript
+import { tag, custom } from '@pumped-fn/core-next'
+
+export const correlationId = tag(custom<string>(), {
+  label: 'flow.correlationId'
+})
+```
+
+**Usage in flows:**
+
+```typescript
+const createUser = flow({
+  userRepo: userRepository
+}, async (deps, ctx, input: { email: string }) => {
+  const cid = `req-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  ctx.set(correlationId, cid)
+
+  const result = await ctx.run('validate', () => {
+    return validateEmail(input.email) ? { ok: true } : { ok: false, reason: 'invalid_email' }
+  })
+
+  return result
+})
+```
+
+**HTTP integration:**
+
+```typescript
+app.post('/users', async (req, res) => {
+  const scope = req.app.get('scope')
+  const cid = req.headers['x-correlation-id'] || `req-${Date.now()}`
+
+  const result = await flow.execute(createUser, req.body, {
+    scope,
+    tags: [correlationId(cid)],
+    extensions: [jsonlLogger, performanceLogger]
+  })
+
+  res.setHeader('X-Correlation-ID', cid)
+  res.json(result)
+})
+```
+
+### Troubleshooting Patterns
+
+**Pattern 1: Trace request through system**
+
+```bash
+# Extract full trace
+grep '"cid":"req-abc123"' logs/flows.jsonl
+
+# See all operations
+grep '"cid":"req-abc123"' logs/flows.jsonl | grep '"type":"op"'
+
+# Check duration
+grep '"cid":"req-abc123"' logs/flows.jsonl | grep 'flow_end' | jq '.dur'
+```
+
+**Pattern 2: Find slow operations**
+
+```bash
+# All slow flows
+cat logs/performance.jsonl | jq -r '[.flow, .dur] | @tsv'
+
+# Specific flow performance
+grep '"flow":"createUser"' logs/performance.jsonl | jq '.dur' | awk '{sum+=$1; count++} END {print sum/count}'
+```
+
+**Pattern 3: Error analysis**
+
+```bash
+# All errors
+cat logs/errors.jsonl | jq -r '.error' | sort | uniq -c
+
+# Specific error pattern
+grep 'invalid_email' logs/errors.jsonl | jq '.cid'
+```
+
+### Extension Composition
+
+**Combine multiple extensions:**
+
+```typescript
+const scope = createScope({
+  tags: [dbConfig({ host: 'localhost', port: 5432, database: 'app' })]
+})
+
+await flow.execute(processOrder, input, {
+  scope,
+  extensions: [
+    jsonlLogger,        // Logs all operations
+    performanceLogger,  // Tracks slow flows
+    metricsExtension,   // Exports to Prometheus
+    tracingExtension    // OpenTelemetry spans
+  ]
+})
+```
+
+**Execution order:** Extensions wrap in array order (first = outermost)
+
+### Production Logging Setup
+
+**Complete production-ready logging:**
+
+```typescript
+import { createWriteStream } from 'fs'
+import { extension, tag, custom } from '@pumped-fn/core-next'
+
+const flowsStream = createWriteStream('logs/flows.jsonl', { flags: 'a' })
+const errorsStream = createWriteStream('logs/errors.jsonl', { flags: 'a' })
+const perfStream = createWriteStream('logs/performance.jsonl', { flags: 'a' })
+
+export const correlationId = tag(custom<string>(), { label: 'flow.correlationId' })
+
+const productionLogger = extension({
+  name: 'production-logger',
+  wrap: async (scope, next, operation) => {
+    const cid = correlationId.tryGet(scope) || 'unknown'
+    const timestamp = new Date().toISOString()
+
+    if (operation.kind === 'execute') {
+      const start = Date.now()
+      flowsStream.write(JSON.stringify({
+        t: timestamp,
+        type: 'flow_start',
+        flow: operation.flowName,
+        cid
+      }) + '\n')
+
+      try {
+        const result = await next()
+        const dur = Date.now() - start
+
+        flowsStream.write(JSON.stringify({
+          t: new Date().toISOString(),
+          type: 'flow_end',
+          flow: operation.flowName,
+          dur,
+          ok: true,
+          cid
+        }) + '\n')
+
+        if (dur > 100) {
+          perfStream.write(JSON.stringify({
+            t: new Date().toISOString(),
+            type: 'slow_flow',
+            flow: operation.flowName,
+            dur,
+            cid
+          }) + '\n')
+        }
+
+        return result
+      } catch (error) {
+        const dur = Date.now() - start
+        const errorLog = {
+          t: new Date().toISOString(),
+          type: 'flow_end',
+          flow: operation.flowName,
+          dur,
+          ok: false,
+          error: (error as Error).message,
+          stack: (error as Error).stack,
+          cid
+        }
+
+        errorsStream.write(JSON.stringify(errorLog) + '\n')
+        flowsStream.write(JSON.stringify(errorLog) + '\n')
+
+        throw error
+      }
+    }
+
+    if (operation.kind === 'journal') {
+      flowsStream.write(JSON.stringify({
+        t: timestamp,
+        type: 'op',
+        key: operation.key,
+        cid
+      }) + '\n')
+    }
+
+    return next()
+  }
+})
+
+process.on('SIGTERM', () => {
+  flowsStream.end()
+  errorsStream.end()
+  perfStream.end()
+})
+
+export { productionLogger }
+```
+
+**Usage:**
+
+```typescript
+const app = express()
+app.set('scope', scope)
+
+app.post('/users', async (req, res) => {
+  const scope = req.app.get('scope')
+  const cid = req.headers['x-correlation-id'] || `req-${Date.now()}`
+
+  const result = await flow.execute(createUser, req.body, {
+    scope,
+    tags: [correlationId(cid)],
+    extensions: [productionLogger]
+  })
+
+  res.setHeader('X-Correlation-ID', cid)
+  res.json(result)
+})
+```
+
 ## Remember
 
 - Use journal keys for all ctx.exec and ctx.run calls
@@ -1408,3 +1817,6 @@ const user = data as User  // Dangerous if data isn't actually User
 - Extensions make operations observable without code changes
 - Max 3 levels of flow depth
 - Discriminated unions for all flow outcomes
+- Use JSONL logging for LLM-parseable traces
+- Track correlation IDs through entire request lifecycle
+- Separate logs by type (flows, errors, performance)
