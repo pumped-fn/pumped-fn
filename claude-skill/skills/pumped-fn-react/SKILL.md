@@ -625,6 +625,248 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
 
 ---
 
+### ❌ ANTI-PATTERN 5: Type Safety Violations (Manual Type Extraction)
+
+**Symptom:** Using `ReturnType`, `Awaited`, manual type extraction instead of `Core.InferOutput`
+**Impact:** Type errors, broken inference, complex type gymnastics, maintenance burden
+**Detection:** Search for `ReturnType<typeof executor>`, `Awaited<...>`, manual conditional types
+
+```typescript
+// ❌ WRONG: Manual type extraction
+const currentUser = provide((controller) =>
+  apiClient.get(controller.scope).get('/me')
+)
+
+type User = Awaited<ReturnType<typeof currentUser>>
+// Error: ReturnType doesn't work with executors
+
+// ❌ WRONG: Complex manual inference
+type User = ReturnType<typeof currentUser> extends Promise<infer T> ? T : never
+// Brittle, breaks with Promised<T>
+
+// ❌ WRONG: Inline types (duplication)
+function UserProfile() {
+  const [user] = useResolves<{
+    id: string
+    name: string
+    email: string
+  }>(currentUser)  // Duplicates executor's type
+}
+
+// ✅ CORRECT: Use Core.InferOutput
+import { type Core } from '@pumped-fn/core-next'
+
+type User = Core.InferOutput<typeof currentUser>
+
+function UserProfile() {
+  const [user] = useResolves(currentUser)
+  // Type inferred automatically, no annotation needed
+  return <div>{user.name}</div>
+}
+
+// ✅ CORRECT: For component props
+type UserProfileProps = {
+  user: Core.InferOutput<typeof currentUser>
+}
+
+function UserProfile({ user }: UserProfileProps) {
+  return <div>{user.name}</div>
+}
+
+// ✅ CORRECT: For arrays/records
+const executors = [currentUser, posts, permissions]
+type Results = Core.InferOutput<typeof executors>
+// Results = [User, Post[], string[]]
+```
+
+**Validation check:** If you're writing complex type gymnastics or duplicating types, you're doing it wrong. `Core.InferOutput<T>` handles all executor types correctly.
+
+**Why this matters:**
+- `Core.InferOutput` automatically unwraps `Promised<T>` and `Promise<T>`
+- Works with all executor modifiers (`.reactive`, `.lazy`, `.static`)
+- If inference fails, usage is wrong (not a type system issue)
+- Single source of truth for types
+
+---
+
+### ❌ ANTI-PATTERN 6: Excessive Mocking (Missing Journaling)
+
+**Symptom:** Mocking individual executors instead of resource layer, no test journals
+**Impact:** Brittle tests, can't verify business logic flow, missed integration issues
+**Detection:** Look for `vi.fn()` or `jest.fn()` mocking non-resource executors, missing `ctx.run()` journaling
+
+```typescript
+// ❌ WRONG: Mock individual executors
+test('create post', async () => {
+  const mockCurrentUser = provide(() => ({ id: '1', name: 'Alice' }))
+  const mockCanEdit = derive({}, () => true)
+  const mockPosts = provide(() => [])
+
+  const scope = createScope({
+    presets: [
+      preset(currentUser, mockCurrentUser),
+      preset(canEditPosts, mockCanEdit),
+      preset(posts, mockPosts)
+    ]
+  })
+
+  // Too many mocks! What if business logic changes?
+})
+
+// ❌ WRONG: No journaling, can't verify flow
+const createPost = flow({
+  userRepo: userRepository,
+  postRepo: postRepository
+}, async (deps, ctx, input) => {
+  const user = await deps.userRepo.findById(input.userId)
+  if (!user) return { ok: false, reason: 'user_not_found' }
+
+  const post = await deps.postRepo.create({
+    title: input.title,
+    authorId: user.id
+  })
+
+  return { ok: true, post }
+})
+
+test('create post', async () => {
+  // How do we verify the flow? No journals!
+  const result = await flow.execute(createPost, input, { scope })
+  // Can only check final result, not intermediate steps
+})
+
+// ✅ CORRECT: Mock resource layer only
+test('create post - editor role', async () => {
+  const mockApi = {
+    get: vi.fn(async (path: string) => {
+      if (path === '/me') {
+        return {
+          id: '1',
+          name: 'Alice',
+          roles: [{ permissions: ['posts.edit'] }]
+        }
+      }
+    }),
+    post: vi.fn(async (path: string, body: unknown) => {
+      if (path === '/posts') {
+        return { id: '123', ...body }
+      }
+    })
+  }
+
+  const scope = createScope({
+    presets: [preset(apiClient, mockApi)]
+  })
+
+  // Graph resolves currentUser, canEditPosts, posts automatically
+  render(
+    <ScopeProvider scope={scope}>
+      <PostEditor />
+    </ScopeProvider>
+  )
+
+  // Business logic tested through real derivation chain
+})
+
+// ✅ CORRECT: Use journaling to verify flow
+const createPost = flow({
+  userRepo: userRepository,
+  postRepo: postRepository
+}, async (deps, ctx, input) => {
+  const user = await ctx.run('find-user', async () => {
+    return deps.userRepo.findById(input.userId)
+  })
+
+  if (!user) {
+    return await ctx.run('user-not-found', () => {
+      return { ok: false as const, reason: 'user_not_found' }
+    })
+  }
+
+  const post = await ctx.run('create-post', async () => {
+    return deps.postRepo.create({
+      title: input.title,
+      authorId: user.id
+    })
+  })
+
+  return await ctx.run('success', () => {
+    return { ok: true as const, post }
+  })
+})
+
+test('create post - user not found', async () => {
+  const mockUserRepo = derive({}, () => ({
+    findById: async (id: string) => null
+  }))
+
+  const scope = createScope({
+    presets: [preset(userRepository, mockUserRepo)]
+  })
+
+  const execution = flow.execute(createPost,
+    { userId: '999', title: 'Test' },
+    { scope }
+  )
+
+  const result = await execution
+
+  // Verify flow path
+  const journal = await execution.journal()
+  expect(journal.map(e => e.name)).toEqual([
+    'find-user',
+    'user-not-found'
+  ])
+
+  expect(result.ok).toBe(false)
+  expect(result.reason).toBe('user_not_found')
+})
+
+test('create post - success', async () => {
+  const mockUserRepo = derive({}, () => ({
+    findById: async (id: string) => ({ id, name: 'Alice' })
+  }))
+
+  const mockPostRepo = derive({}, () => ({
+    create: async (data: any) => ({ id: '123', ...data })
+  }))
+
+  const scope = createScope({
+    presets: [
+      preset(userRepository, mockUserRepo),
+      preset(postRepository, mockPostRepo)
+    ]
+  })
+
+  const execution = flow.execute(createPost,
+    { userId: '1', title: 'Test Post' },
+    { scope }
+  )
+
+  const result = await execution
+
+  // Verify flow path
+  const journal = await execution.journal()
+  expect(journal.map(e => e.name)).toEqual([
+    'find-user',
+    'create-post',
+    'success'
+  ])
+
+  expect(result.ok).toBe(true)
+  expect(result.post.title).toBe('Test Post')
+})
+```
+
+**Validation check:**
+- Are you mocking more than 1-2 executors? Mock resource layer instead.
+- Can you verify business logic flow? Add `ctx.run()` journaling.
+- Do tests break when refactoring? You're testing implementation, not behavior.
+
+**Key principle:** Mock infrastructure (API clients, DB), not business logic. Use journals to verify execution flow.
+
+---
+
 ## Testing Strategy
 
 ### Rule: Mock resource layer, not individual calls
