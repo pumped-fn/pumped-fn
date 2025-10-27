@@ -2,6 +2,21 @@ import { type StandardSchemaV1 } from "./types";
 import { validate } from "./ssch";
 import { tagSymbol, type Tag } from "./tag-types";
 
+const tagCacheMap = new WeakMap<Tag.Source, Map<symbol, unknown[]>>();
+
+function buildTagCache(tags: Tag.Tagged[]): Map<symbol, unknown[]> {
+  const map = new Map<symbol, unknown[]>();
+  for (const tagged of tags) {
+    const existing = map.get(tagged.key);
+    if (existing) {
+      existing.push(tagged.value);
+    } else {
+      map.set(tagged.key, [tagged.value]);
+    }
+  }
+  return map;
+}
+
 function isStore(source: Tag.Source): source is Tag.Store {
   return (
     typeof source === "object" &&
@@ -36,9 +51,15 @@ function extract<T>(
     return value === undefined ? undefined : validate(schema, value);
   }
 
-  const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
-  const tagged = tags.find((t: Tag.Tagged) => t.key === key);
-  return tagged ? validate(schema, tagged.value) : undefined;
+  let cache = tagCacheMap.get(source);
+  if (!cache) {
+    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
+    cache = buildTagCache(tags);
+    tagCacheMap.set(source, cache);
+  }
+
+  const values = cache.get(key);
+  return values && values.length > 0 ? validate(schema, values[0]) : undefined;
 }
 
 function collect<T>(
@@ -51,8 +72,15 @@ function collect<T>(
     return value === undefined ? [] : [validate(schema, value)];
   }
 
-  const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
-  return tags.filter((t: Tag.Tagged) => t.key === key).map((t: Tag.Tagged) => validate(schema, t.value));
+  let cache = tagCacheMap.get(source);
+  if (!cache) {
+    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
+    cache = buildTagCache(tags);
+    tagCacheMap.set(source, cache);
+  }
+
+  const values = cache.get(key);
+  return values ? values.map(v => validate(schema, v)) : [];
 }
 
 function write<T>(
