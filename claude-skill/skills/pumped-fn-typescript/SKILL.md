@@ -362,7 +362,7 @@ const createUser = flow({
 // test.ts - Testing is EASY
 test('create user', async () => {
   const mockUserRepo = derive({}, () => ({
-    create: async (data: any) => ({ id: '123', ...data })
+    create: async (data: unknown) => ({ id: '123', ...data as object })
   }))
 
   const testScope = createScope({
@@ -765,7 +765,7 @@ const dbPool = provide((controller) => {
   })
 
   return {
-    query: async (sql: string, params: any[]) => {
+    query: async (sql: string, params: unknown[]) => {
       return pool.query(sql, params)
     }
   }
@@ -1240,13 +1240,16 @@ const processOrder = flow({
 ### 6. Extensions (Cross-Cutting Observation)
 
 ```typescript
-const loggingExtension: Extension = {
-  wrap: (scope, next, operation) => {
+import { extension } from '@pumped-fn/core-next'
+
+const loggingExtension = extension({
+  name: 'logging',
+  wrap: async (scope, next, operation) => {
     if (operation.kind === 'execute') {
       console.log(`[FLOW START] ${operation.flowName}`)
-      return next().finally(() => {
-        console.log(`[FLOW END] ${operation.flowName}`)
-      })
+      const result = await next()
+      console.log(`[FLOW END] ${operation.flowName}`)
+      return result
     }
 
     if (operation.kind === 'journal') {
@@ -1255,7 +1258,7 @@ const loggingExtension: Extension = {
 
     return next()
   }
-}
+})
 
 await flow.execute(processOrder, input, {
   scope,
