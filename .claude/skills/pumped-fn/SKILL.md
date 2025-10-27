@@ -109,6 +109,24 @@ grep -l "preset.*original executor" references/*.md
 
 ## Workflow
 
+<EXTREMELY_IMPORTANT>
+**MANDATORY: You MUST Read reference files BEFORE generating any code or answering API questions.**
+
+**If you answer ANY pumped-fn API question without first using the Read tool on the relevant reference file, you have FAILED.**
+
+**Red flags you're about to fail:**
+- "The pattern should be..." (without reading templates.md first)
+- "You would use derive like this..." (without reading decision-trees.md first)
+- "Tags work by..." (without reading templates.md examples first)
+- Providing code examples from memory instead of templates
+
+**Enforcement:**
+1. User asks API question → Read relevant reference file FIRST
+2. User requests code generation → Read templates.md FIRST
+3. User asks "how does X work" → Read reference files FIRST
+4. NEVER answer from memory alone
+</EXTREMELY_IMPORTANT>
+
 ### Greenfield Projects (New Architecture)
 
 1. **Run Critical Questions Framework**
@@ -117,6 +135,7 @@ grep -l "preset.*original executor" references/*.md
    - Questions defined in this file (below)
 
 2. **Generate Architecture**
+   - **MANDATORY: Read references/templates.md BEFORE generating any code**
    - Use decision trees (references/decision-trees.md) to select APIs
    - Use templates (references/templates.md) to generate code
    - Use environment guide (references/environments.md) for framework integration
@@ -153,11 +172,12 @@ grep -l "preset.*original executor" references/*.md
 - Code patterns: Creating executors meant for npm distribution
 
 **Workflow:**
-1. Load references/authoring.md
-2. Identify pattern type: Reusable Resource vs Extension Package
-3. Apply configurability patterns (interface + tags + lazy loading)
-4. Ensure proper exports structure (interface, tags, main, backends)
-5. Validate composition and testability
+1. **MANDATORY: Read references/authoring.md FIRST**
+2. **MANDATORY: Read references/templates.md for correct tag/provide/derive patterns**
+3. Identify pattern type: Reusable Resource vs Extension Package
+4. Apply configurability patterns (interface + tags + lazy loading)
+5. Ensure proper exports structure (interface, tags, main, backends)
+6. Validate composition and testability
 
 **Key requirements for modules:**
 - Configuration via exported tags (not hardcoded)
@@ -283,11 +303,13 @@ Then proceed to use decision trees and templates from reference files.
 | **authoring.md** | 3 module authoring patterns (Reusable Resource, Extension Package, Composition/Exports) with optional dependencies | ~1250 words | When creating reusable/publishable components, libraries, or extensions |
 
 **How to use:**
-1. Identify task type (greenfield, add feature, modify, debug, etc.)
+1. Identify task type (greenfield, add feature, modify, debug, module authoring, etc.)
 2. Follow workflow above to determine which reference files needed
-3. Read relevant reference file(s) using Read tool
-4. Apply patterns from reference files
+3. **MANDATORY: Use Read tool on reference files BEFORE answering/generating code**
+4. Apply patterns EXACTLY as shown in reference files
 5. Validate using validation.md checklist
+
+**FAILURE MODE: Answering from memory = WRONG API usage = User catches mistake = Skill failure**
 
 ## Coding Style Rules
 
@@ -299,10 +321,32 @@ Then proceed to use decision trees and templates from reference files.
 - Test files colocated: `flow-create-user.test.ts`
 
 ### Naming Conventions
+- **Everything uses camelCase** (resources, flows, executors, variables)
 - Resources: `dbPool`, `redisCache`, `stripeClient`
 - Flows: `createUser`, `processPayment`, `sendEmail` (verb-noun)
 - Executors: camelCase matching file name
 - ctx.run() keys: kebab-case describing operation: `'generate-id'`, `'insert-user'`
+- **Config grouping pattern**: `<module>Config = { ...parts using tags }`
+  ```typescript
+  // Group related config tags into single object
+  const logConfig = {
+    level: tag(custom<'debug' | 'info' | 'error'>(), { label: 'log.level' }),
+    format: tag(custom<'json' | 'pretty'>(), { label: 'log.format' })
+  }
+
+  const dbConfig = {
+    host: tag(custom<string>(), { label: 'db.host' }),
+    port: tag(custom<number>(), { label: 'db.port' }),
+    database: tag(custom<string>(), { label: 'db.database' })
+  }
+
+  // Access in provide/derive via controller.scope
+  const logger = provide((controller) => {
+    const level = logConfig.level.get(controller.scope)
+    const format = logConfig.format.get(controller.scope)
+    // ...
+  })
+  ```
 
 ### Code Organization
 - Group imports: external packages, @pumped-fn, local executors, types
