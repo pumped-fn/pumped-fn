@@ -110,27 +110,54 @@ jobs:
           path: dist/skills/*.zip
           retention-days: 90
 
-      - name: Commit and push zips (main branch only)
+      - name: Create GitHub Release with skill zips
         if: steps.changes.outputs.has_changes == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Generate release tag based on timestamp
+          TAG="skills-$(date +%Y%m%d-%H%M%S)"
 
-          # Create dist/skills directory if needed
-          mkdir -p dist/skills
+          # Create release notes
+          RELEASE_NOTES="## Packaged Skills
 
-          # Check if there are new/updated zips
-          if [ -n "$(ls -A dist/skills/*.zip 2>/dev/null)" ]; then
-            git add dist/skills/*.zip
+          Auto-generated release containing packaged Claude Code skills.
 
-            if git diff --cached --quiet; then
-              echo "No changes to skill zips"
-            else
-              git commit -m "chore(skills): update packaged skill zips [skip ci]"
-              git push
-            fi
-          fi
+          **Trigger**: Changes to pumped-fn skill files
+          **Commit**: ${{ github.sha }}
+          **Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ### Installation
+
+          Download the skill zip and extract to your skills directory:
+
+          \`\`\`bash
+          # Personal skills
+          unzip pumped-fn.zip -d ~/.claude/skills/
+
+          # Project skills
+          unzip pumped-fn.zip -d .claude/skills/
+          \`\`\`
+
+          ### Skills included:
+          "
+
+          # List packaged skills
+          for zip in dist/skills/*.zip; do
+            SKILL_NAME=$(basename "$zip" .zip)
+            SIZE=$(du -h "$zip" | cut -f1)
+            RELEASE_NOTES="${RELEASE_NOTES}
+          - **${SKILL_NAME}** (${SIZE})"
+          done
+
+          # Create release
+          gh release create "$TAG" \
+            dist/skills/*.zip \
+            --title "Skills Release $TAG" \
+            --notes "$RELEASE_NOTES" \
+            --latest=false
+
+          echo "Created release: $TAG"
 
       - name: Summary
         if: steps.changes.outputs.has_changes == 'true'

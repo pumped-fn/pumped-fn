@@ -22,8 +22,6 @@ Copied from superpowers marketplace for consistency across team:
 ### Pumped-fn Specific Skills
 
 - **pumped-fn** - Comprehensive guidance for building observable, testable TypeScript applications with @pumped-fn (auto-activates for TypeScript projects)
-- ~~**pumped-fn-typescript**~~ - DEPRECATED: Use unified `pumped-fn` skill instead
-- ~~**pumped-fn-react**~~ - DEPRECATED: Use unified `pumped-fn` skill instead
 
 ## Updating Upstream Skills
 
