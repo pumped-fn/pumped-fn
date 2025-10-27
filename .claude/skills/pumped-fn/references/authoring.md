@@ -44,7 +44,7 @@ export const logConfig = {
 }
 
 // 3. Each backend reads config from scope
-const consoleLogger = provide(({ scope }): Logger => {
+export const consoleLogger = provide(({ scope }): Logger => {
   const level = logConfig.level.find(scope) ?? 'info'
   return {
     log: (msg: string) => console.log(`[${level}]`, msg),
@@ -52,7 +52,7 @@ const consoleLogger = provide(({ scope }): Logger => {
   }
 })
 
-const winstonLogger = provide(async ({ scope }): Promise<Logger> => {
+export const winstonLogger = provide(async ({ scope }): Promise<Logger> => {
   const level = logConfig.level.find(scope) ?? 'info'
 
   const winston = await import('winston')
@@ -67,7 +67,7 @@ const winstonLogger = provide(async ({ scope }): Promise<Logger> => {
   }
 })
 
-const pinoLogger = provide(async ({ scope }): Promise<Logger> => {
+export const pinoLogger = provide(async ({ scope }): Promise<Logger> => {
   const level = logConfig.level.find(scope) ?? 'info'
 
   const pino = await import('pino')
@@ -165,7 +165,7 @@ export const serverConfig = {
 }
 
 // 3. Framework adapters (lazy loaded)
-const fastifyAdapter = provide(async ({ scope }): Promise<Server> => {
+export const fastifyAdapter = provide(async ({ scope }): Promise<Server> => {
   const port = serverConfig.port.find(scope) ?? 3000
   const fastify = await import('fastify')
   const app = fastify.default()
@@ -176,7 +176,7 @@ const fastifyAdapter = provide(async ({ scope }): Promise<Server> => {
   }
 })
 
-const expressAdapter = provide(async ({ scope }): Promise<Server> => {
+export const expressAdapter = provide(async ({ scope }): Promise<Server> => {
   const express = await import('express')
   const app = express.default()
 
@@ -188,7 +188,7 @@ const expressAdapter = provide(async ({ scope }): Promise<Server> => {
   }
 })
 
-// Similar for honoAdapter...
+// Similar for export const honoAdapter...
 
 // 4. Main server selector
 export const server = derive(
