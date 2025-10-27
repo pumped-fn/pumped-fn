@@ -1,5 +1,42 @@
 # @pumped-fn/core-next
 
+## 0.5.80
+
+### Patch Changes
+
+- 4c115a3: Performance optimizations: +37-86% improvements across all hot paths
+
+  - **Cached resolve**: +37% faster (1.98M → 2.72M ops/sec)
+  - **Reactive updates**: +12-86% faster (14.8k → 429k ops/sec)
+  - **Memory**: Reduced cold start allocations by 90-95%
+  - **Bundle size**: Unchanged (60.47 kB)
+
+  Key changes:
+
+  - Made `ResolvedState.promised` required to eliminate fallback allocations
+  - Consolidated 7 Maps into unified `ExecutorState` structure
+  - Fixed critical state preservation bugs in resolution paths
+  - Added depth-based lazy circular dependency checking
+
+  No breaking changes - 100% backward compatible.
+
+- 7b1d5ba: Performance: WeakMap-based tag lookup caching (+6-151% improvements)
+
+  Implemented lazy Map-based caching for tag lookups using WeakMap:
+
+  - Cache automatically built on first lookup per source
+  - Stores values as arrays to support both single (`find`) and multiple (`some`) lookups
+  - WeakMap ensures automatic garbage collection when sources are no longer referenced
+
+  Performance improvements:
+
+  - Small arrays: +14-18% faster
+  - Medium arrays: +6-151% faster (huge improvement for last-match scenarios)
+  - Repeated lookups: +16% faster
+  - Collect multiple values: +52% faster
+
+  No breaking changes - 100% backward compatible.
+
 ## 0.5.79
 
 ### Patch Changes

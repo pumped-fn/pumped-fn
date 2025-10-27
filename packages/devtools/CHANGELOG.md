@@ -1,5 +1,13 @@
 # @pumped-fn/devtools
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [4c115a3]
+- Updated dependencies [7b1d5ba]
+  - @pumped-fn/core-next@0.5.80
+
 ## 0.2.1
 
 ### Patch Changes
