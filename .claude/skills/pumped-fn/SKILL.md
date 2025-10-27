@@ -400,7 +400,7 @@ const createUser = flow(
 const validateEmail = (email: string): boolean => /^.+@.+\..+$/.test(email)
 
 // EXTENSION - System behavior
-const logger = wrap<LoggerExtension>({
+const logger = wrap({
   execute: ({ flow, input }) => console.log(`Flow: ${flow.name}`, input)
 })
 ```
@@ -923,13 +923,13 @@ test('logger extension logs flow execution', async () => {
     extensions: [logger]
   })
 
-  const flow = flow({ db: dbPool }, ({ db }) => async (ctx) => ({ success: true as const }))
-  const exec = await scope.resolve(flow)
-  const ctx = scope.createFlowContext(flow)
+  const testFlow = flow({ db: dbPool }, ({ db }) => async (ctx) => ({ success: true as const }))
+  const exec = await scope.resolve(testFlow)
+  const ctx = scope.createFlowContext(testFlow)
   await exec(ctx)
 
   expect(logs).toHaveLength(1)
-  expect(logs[0].flow).toBe(flow)
+  expect(logs[0].flow).toBe(testFlow)
   await scope.dispose()
 })
 ```
@@ -977,9 +977,9 @@ const loadDashboard = flow(
   { userRepo, postRepo, commentRepo },
   ({ userRepo, postRepo, commentRepo }) => async (ctx, userId: string) => {
     const [user, posts, comments] = await Promised.all([
-      scope.resolve(userRepo).then(r => r.findById(userId)),
-      scope.resolve(postRepo).then(r => r.findByUser(userId)),
-      scope.resolve(commentRepo).then(r => r.findByUser(userId))
+      userRepo.findById(userId),
+      postRepo.findByUser(userId),
+      commentRepo.findByUser(userId)
     ])
 
     return { success: true as const, dashboard: { user, posts, comments } }
@@ -991,9 +991,9 @@ const syncExternalSystems = flow(
   { stripe, sendgrid, slack },
   ({ stripe, sendgrid, slack }) => async (ctx, data: SyncData) => {
     const results = await Promised.allSettled([
-      scope.resolve(stripe).then(s => s.syncCustomer(data.customerId)),
-      scope.resolve(sendgrid).then(s => s.syncContact(data.email)),
-      scope.resolve(slack).then(s => s.notifyChannel(data.message))
+      stripe.syncCustomer(data.customerId),
+      sendgrid.syncContact(data.email),
+      slack.notifyChannel(data.message)
     ])
 
     const succeeded = results.filter(r => r.status === 'fulfilled')
