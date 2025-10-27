@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/core-next": minor
+"@pumped-fn/core-next": patch
 ---
 
 Performance optimizations: +37-86% improvements across all hot paths
