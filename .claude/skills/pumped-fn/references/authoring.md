@@ -234,3 +234,144 @@ await srv.listen(8080)
 - Framework-specific code hidden behind interface
 - Consumer choice via tags
 - Only selected framework loads
+
+---
+
+### Pattern 3: Composition and Exports
+
+**What:** How to organize exports for reusability without compromising testing
+
+**Key principles:**
+- Export interface (contract for consumers)
+- Export config tags (consumer control)
+- Export main executor (primary API)
+- Export individual backends (REQUIRED for preset() testing)
+- Never export internals/implementation details
+
+**How backends read configuration:**
+
+```typescript
+// Each backend reads tags from scope via controller
+const pinoLogger = provide(async ({ scope }): Promise<Logger> => {
+  // Read config from scope using tags
+  const level = logConfig.level.find(scope) ?? 'info'
+
+  const pino = await import('pino')
+  const pinoLogger = pino({ level })
+
+  return {
+    log: (msg: string) => pinoLogger.info(msg),
+    error: (msg: string) => pinoLogger.error(msg)
+  }
+})
+
+// Consumer controls config via scope tags
+const scope = createScope({
+  tags: [
+    logConfig.backend('pino'),
+    logConfig.level('debug')  // Backend reads this
+  ]
+})
+```
+
+**Export structure:**
+
+```typescript
+// index.ts
+
+// 1. Interface (contract)
+export interface Logger {
+  log(msg: string): void
+  error(msg: string): void
+}
+
+// 2. Configuration tags (consumer control)
+export const logConfig = {
+  backend: tag(custom<'console' | 'winston' | 'pino'>(), {
+    label: 'log.backend',
+    default: 'console'
+  }),
+  level: tag(custom<'info' | 'debug' | 'error'>(), {
+    label: 'log.level',
+    default: 'info'
+  })
+}
+
+// 3. Main executor (primary API)
+export const logger = derive(...)
+
+// 4. Individual backends (REQUIRED for testing/override)
+export const consoleLogger = provide(({ scope }): Logger => {
+  const level = logConfig.level.find(scope) ?? 'info'
+  // ...
+})
+export const winstonLogger = provide(async ({ scope }): Promise<Logger> => {
+  const level = logConfig.level.find(scope) ?? 'info'
+  // ...
+})
+export const pinoLogger = provide(async ({ scope }): Promise<Logger> => {
+  const level = logConfig.level.find(scope) ?? 'info'
+  // ...
+})
+```
+
+**Why export backends:**
+- **Required for testing:** Consumers need original executor to use `preset()` for mocking
+- Consumers can test with specific backend directly
+- Consumers can override/extend specific backend
+- Consumers can compose custom variants with subset of backends
+
+**Testing by consumers:**
+
+```typescript
+import { logger, logConfig, pinoLogger } from '@myorg/pumped-logger'
+import { preset, derive } from '@pumped-fn/core-next'
+
+// preset requires original executor
+const testLogger = derive(
+  {
+    pino: preset(pinoLogger, (): Logger => ({
+      log: vi.fn(),
+      error: vi.fn()
+    })).lazy
+  },
+  async (backends) => await backends.pino.resolve()
+)
+
+const scope = createScope({ tags: [logConfig.backend('pino')] })
+const log = await scope.resolve(testLogger)
+```
+
+**Composability by consumers:**
+
+```typescript
+import { consoleLogger, winstonLogger, logConfig } from '@myorg/pumped-logger'
+
+// Create custom logger with only console + winston
+const customLogger = derive(
+  {
+    console: consoleLogger.lazy,
+    winston: winstonLogger.lazy
+  },
+  async (backends, { scope }) => {
+    const backend = logConfig.backend.find(scope) ?? 'console'
+    return backend === 'winston'
+      ? await backends.winston.resolve()
+      : await backends.console.resolve()
+  }
+)
+```
+
+---
+
+### Checklist: Reusable Component Structure
+
+☐ Interface exported (defines contract)
+☐ Config tags exported (consumer control)
+☐ Backends read config via `tag.find(scope)` in factory
+☐ Main executor exported (primary API)
+☐ **Individual backends exported (REQUIRED for preset() in consumer tests)**
+☐ No implementation details exported
+☐ All exports use interface types (not concrete implementations)
+☐ Consumers can preset() individual components for testing
+☐ Consumers can compose custom variants from exported pieces
