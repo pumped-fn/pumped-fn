@@ -2,7 +2,27 @@
 
 Graph-based dependency injection with complete type inference.
 
+**Quick Navigation:** [API Reference](#reference) · [Getting Started](#getting-started) · [Core Guides](#core-guides) · [Patterns](#patterns)
+
+---
+
+## Quick Start
+
+| If you want to...             | Start here                                                    |
+|-------------------------------|---------------------------------------------------------------|
+| **Learn the basics**          | [Getting Started](#getting-started) (read in order 1-4)       |
+| **Find API syntax**           | [API Cheatsheet](./reference/api-cheatsheet.md)               |
+| **Build HTTP server**         | [HTTP Server Setup](./patterns/http-server-setup.md)          |
+| **Test with mocks**           | [Testing Strategies](./patterns/testing-strategies.md)        |
+| **Add logging/tracing**       | [Extensions](./guides/09-extensions.md)                       |
+| **Handle errors properly**    | [Error Handling](./guides/10-error-handling.md)               |
+| **Fix TypeScript errors**     | [Error Solutions](./reference/error-solutions.md)             |
+
+---
+
 ## Getting Started
+
+Read these in order to understand core concepts:
 
 1. **[Executors and Dependencies](./guides/01-executors-and-dependencies.md)** - Create executors with `provide()` and `derive()`
 2. **[Tags: The Type System](./guides/02-tags-the-type-system.md)** - Type-safe runtime data access
@@ -11,29 +31,40 @@ Graph-based dependency injection with complete type inference.
 
 ## Core Guides
 
-- [Executors and Dependencies](./guides/01-executors-and-dependencies.md)
-- [Tags: The Type System](./guides/02-tags-the-type-system.md)
-- [Scope Lifecycle](./guides/03-scope-lifecycle.md)
-- [Type Inference Patterns](./guides/04-type-inference-patterns.md)
-- [Flow](./guides/05-flow.md)
-- [Promised API](./guides/07-promised-api.md)
-- [Reactive Patterns](./guides/08-reactive-patterns.md)
-- [Extensions](./guides/09-extensions.md)
-- [Error Handling](./guides/10-error-handling.md)
+### Fundamentals
+- [Executors and Dependencies](./guides/01-executors-and-dependencies.md) - Build dependency graphs
+- [Tags: The Type System](./guides/02-tags-the-type-system.md) - Type-safe runtime data
+- [Scope Lifecycle](./guides/03-scope-lifecycle.md) - Resource management
+- [Type Inference Patterns](./guides/04-type-inference-patterns.md) - Zero-annotation TypeScript
+
+### Advanced
+- [Flow](./guides/05-flow.md) - Ephemeral execution contexts
+- [Promised API](./guides/07-promised-api.md) - Lazy composition
+- [Reactive Patterns](./guides/08-reactive-patterns.md) - Reactive value updates
+- [Extensions](./guides/09-extensions.md) - Cross-cutting concerns
+- [Error Handling](./guides/10-error-handling.md) - Error boundaries and recovery
+
+---
 
 ## Patterns
 
-- [HTTP Server Setup](./patterns/http-server-setup.md)
-- [Database Transactions](./patterns/database-transactions.md)
-- [Testing Strategies](./patterns/testing-strategies.md)
-- [Middleware Composition](./patterns/middleware-composition.md)
+Real-world implementation patterns:
+
+- [HTTP Server Setup](./patterns/http-server-setup.md) - Complete server lifecycle
+- [Database Transactions](./patterns/database-transactions.md) - Transaction-per-flow pattern
+- [Testing Strategies](./patterns/testing-strategies.md) - Graph-based testing with presets
+- [Middleware Composition](./patterns/middleware-composition.md) - Extension pipelines
+
+---
 
 ## Reference
 
-- [API Cheatsheet](./reference/api-cheatsheet.md)
-- [Type Verification](./reference/type-verification.md)
-- [Common Mistakes](./reference/common-mistakes.md)
-- [Error Solutions](./reference/error-solutions.md)
+Quick lookups and troubleshooting:
+
+- [API Cheatsheet](./reference/api-cheatsheet.md) - **Quick API reference with decision tree**
+- [Common Mistakes](./reference/common-mistakes.md) - Anti-patterns and fixes
+- [Error Solutions](./reference/error-solutions.md) - TypeScript error mappings
+- [Type Verification](./reference/type-verification.md) - Type safety verification
 
 ## Philosophy
 

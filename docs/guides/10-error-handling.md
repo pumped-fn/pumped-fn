@@ -159,6 +159,7 @@ const wrapper = flow(async (ctx, input: { value: number }) => {
 
 ## See Also
 
-- [Flow](./05-flow.md)
-- [Extensions](./09-extensions.md)
-- [Scope Lifecycle](./03-scope-lifecycle.md)
+- [Flow](./05-flow.md) - Execution contexts
+- [Extensions](./09-extensions.md) - Error boundaries
+- [Scope Lifecycle](./03-scope-lifecycle.md) - Resource cleanup
+- [API Cheatsheet](../reference/api-cheatsheet.md) - Error handling patterns

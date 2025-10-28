@@ -139,6 +139,7 @@ function waitForInFlightRequests() {
 
 ## See Also
 
-- [Scope Lifecycle](../guides/03-scope-lifecycle.md)
-- [Extensions](../guides/09-extensions.md)
-- [Middleware Composition](./middleware-composition.md)
+- [Scope Lifecycle](../guides/03-scope-lifecycle.md) - Resource management
+- [Extensions](../guides/09-extensions.md) - Cross-cutting concerns
+- [Middleware Composition](./middleware-composition.md) - Extension patterns
+- [API Cheatsheet](../reference/api-cheatsheet.md) - Quick reference

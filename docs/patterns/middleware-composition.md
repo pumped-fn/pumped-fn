@@ -195,6 +195,7 @@ const productionExtensions = [
 
 ## See Also
 
-- [Extensions](../guides/09-extensions.md)
-- [Error Handling](../guides/10-error-handling.md)
-- [HTTP Server Setup](./http-server-setup.md)
+- [Extensions](../guides/09-extensions.md) - Extension concepts
+- [Error Handling](../guides/10-error-handling.md) - Error boundaries
+- [HTTP Server Setup](./http-server-setup.md) - Production usage
+- [API Cheatsheet](../reference/api-cheatsheet.md) - extension() patterns

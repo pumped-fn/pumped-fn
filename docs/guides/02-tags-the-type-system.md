@@ -159,3 +159,4 @@ const config = tag(custom<AppConfig>(), { label: 'config' })
 - [Flow](./05-flow.md) - Tag-based context in flows
 - [Scope Lifecycle](./03-scope-lifecycle.md) - Tag initialization at scope creation
 - [Extensions](./09-extensions.md) - Tags in cross-cutting concerns
+- [API Cheatsheet](../reference/api-cheatsheet.md) - Quick reference for tag API

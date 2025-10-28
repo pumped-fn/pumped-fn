@@ -6,6 +6,44 @@ keywords: [api, reference, cheatsheet]
 
 # API Cheatsheet
 
+## Quick Start: Which API Do I Need?
+
+| I need to...                    | Use this API      | Signature                    |
+|---------------------------------|-------------------|------------------------------|
+| Create value (no dependencies)  | `provide()`       | `() => T`                    |
+| Create value (with dependencies)| `derive()`        | `(deps) => T`                |
+| Manage resource lifecycle       | `createScope()`   | `{ tags, presets, ext }`     |
+| Handle request/task/job         | `flow()`          | `(ctx, args) => result`      |
+| Pass type-safe runtime data     | `tag()`           | `get()/set()/find()`         |
+| Mock dependencies in tests      | `preset()`        | `(executor, mockValue)`      |
+| Dynamic resource pools          | `multi.provide()` | `(key) => executor`          |
+| Add logging/tracing             | `extension()`     | `wrap(scope, next, op)`      |
+| Lazy composition/error handling | `Promised`        | `.map()/.switch()/.catch()`  |
+
+**Jump to:** [provide](#provide) · [derive](#derive) · [createScope](#createscope) · [flow](#flow) · [tag](#tag) · [preset](#preset) · [Promised](#promised) · [extension](#extension) · [multi](#multi-executors) · [Patterns](#common-patterns)
+
+---
+
+## Critical Rules
+
+⚠️ **NEVER** use `ctx.get()` or `scope.resolve()` inside executors
+→ Declare dependencies explicitly in arrays
+
+⚠️ **NEVER** escape `provide`/`derive` with conditional logic
+→ Use `.lazy` for conditional resolution
+
+⚠️ **NEVER** use classes
+→ Use object closures with captured state
+
+⚠️ **NEVER** import with file extensions
+
+✓ **ALWAYS** use `derive([deps], ([deps]) => factory)` array syntax
+✓ **ALWAYS** make dependencies explicit in arrays
+✓ Use `scope` for long-lived resources, `flow` for short-lived operations
+✓ Use `preset()` for test mocking
+
+---
+
 ## Executors
 
 ### provide()
@@ -260,6 +298,120 @@ const service = derive({ db }, ({ db }) => ({
 }))
 ```
 
+## Multi-Executors
+
+### multi.provide()
+```typescript
+import { multi, custom } from '@pumped-fn/core-next'
+
+// Dynamic executor pools (e.g., per-tenant DB)
+const tenantDb = multi.provide({
+  keySchema: custom<string>()
+}, (tenantId: string) => {
+  return provide(() => ({
+    tenantId,
+    query: async (sql: string) => []
+  }))
+})
+
+const db1 = await scope.resolve(tenantDb('tenant-1'))
+const db2 = await scope.resolve(tenantDb('tenant-2'))
+
+// Cleanup
+await tenantDb.release(scope)
+```
+
+---
+
+## Common Patterns
+
+### Error Handling (Discriminated Unions)
+```typescript
+type Result<T, E = string> =
+  | { ok: true; data: T }
+  | { ok: false; error: E }
+
+const handler = flow(async (ctx, input: string): Promise<Result<number>> => {
+  const parsed = parseInt(input, 10)
+  if (isNaN(parsed)) {
+    return { ok: false, error: 'Invalid number' }
+  }
+  return { ok: true, data: parsed }
+})
+
+// Convert infrastructure errors
+const safe = Promised.create(riskyOp())
+  .map(data => ({ ok: true as const, data }))
+  .catch(error => ({ ok: false as const, error: String(error) }))
+```
+
+### HTTP Server Setup
+```typescript
+const config = provide(() => ({ port: 3000 }))
+const db = derive(config, (cfg) => createConnection(cfg))
+const routes = derive({ db, config }, (deps) => createRouter(deps))
+
+const scope = createScope()
+const router = await scope.resolve(routes)
+const server = createServer(router)
+```
+
+### Testing with Presets
+```typescript
+test('service queries database', async () => {
+  const mockDb = { query: vi.fn(async () => [{ id: '1' }]) }
+
+  const scope = createScope({
+    presets: [preset(db, mockDb)]
+  })
+
+  const svc = await scope.resolve(service)
+  await svc.getUser('123')
+
+  expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM users WHERE id = ?', ['123'])
+  await scope.dispose()
+})
+```
+
+### Multi-Tenant Resources
+```typescript
+const tenantDb = multi.provide({
+  keySchema: custom<string>()
+}, (tenantId: string) => {
+  return provide(() => createTenantConnection(tenantId))
+})
+
+const handler = flow({ tenantDb }, async (deps, ctx, req) => {
+  const tenantId = extractTenantId(req)
+  const db = await ctx.scope.resolve(deps.tenantDb(tenantId))
+  return db.query('SELECT * FROM users')
+})
+```
+
+### Logging/Tracing Extension
+```typescript
+const logging = extension({
+  name: 'logging',
+  wrap: async (scope, next, operation) => {
+    const start = Date.now()
+    console.log(`[${operation.kind}] Starting`)
+
+    try {
+      const result = await next()
+      console.log(`[${operation.kind}] Done in ${Date.now() - start}ms`)
+      return result
+    } catch (error) {
+      console.log(`[${operation.kind}] Failed after ${Date.now() - start}ms`)
+      throw error
+    }
+  }
+})
+
+const scope = createScope({ extensions: [logging] })
+```
+
+---
+
 ## Verification
 
 ```bash
@@ -275,3 +427,5 @@ pnpm -F @pumped-fn/core-next test
 - [Type Verification](./type-verification.md)
 - [Common Mistakes](./common-mistakes.md)
 - [Error Solutions](./error-solutions.md)
+- [Full Guides](../guides/) - In-depth explanations
+- [Patterns](../patterns/) - Production use cases

@@ -1,6 +1,10 @@
 # Pumped Functions - Graph-Based Architecture
 
-Resolve your entire application with a single function call. No wiring, no initialization order, no manual dependency management.
+Type-safe dependency injection with automatic graph resolution. Resolve your entire application with a single function call—no wiring, no initialization order, no manual dependency management.
+
+**Quick Start:** [Install](#start-in-a-minute-or-maybe-a-little-bit-more) · [API Cheatsheet](./reference/api-cheatsheet.md) · [Guides](#getting-started) · [Patterns](#patterns)
+
+---
 
 ## Why Graph Resolution?
 
@@ -112,6 +116,16 @@ const prodScope = createScope(preset(config, prodConfig));
 const result = await scope.resolve(application);
 ```
 
+## Core Concepts
+
+| Concept | Purpose | When to Use |
+|---------|---------|-------------|
+| **Executors** (`provide`, `derive`) | Declare dependencies and factories | Define your application structure |
+| **Scope** (`createScope`) | Manage resource lifecycle | Long-lived resources (DB, services) |
+| **Flow** (`flow`) | Handle ephemeral operations | Requests, jobs, CLI commands |
+| **Tags** (`tag`) | Type-safe runtime data | Request context, user IDs, config |
+| **Extensions** (`extension`) | Cross-cutting concerns | Logging, tracing, transactions |
+
 ## Code Organization Benefits
 
 - **Natural Separation**: Each component declares only what it needs
@@ -119,6 +133,8 @@ const result = await scope.resolve(application);
 - **Easy Refactoring**: Change dependencies without touching consumers
 - **Composable Design**: Mix and match components across projects
 - **Type Safety**: Full TypeScript support with inference
+
+---
 
 ## Documentation
 

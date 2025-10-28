@@ -231,3 +231,4 @@ const handler = flow(async (ctx, input: number) => {
 - [Promised API](./07-promised-api.md) - Lazy composition primitives
 - [Tags: The Type System](./02-tags-the-type-system.md) - Context storage mechanism
 - [Error Handling](./10-error-handling.md) - Comprehensive error strategies
+- [API Cheatsheet](../reference/api-cheatsheet.md) - Quick reference for flow API

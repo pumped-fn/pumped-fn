@@ -203,3 +203,4 @@ pnpm -F @pumped-fn/core-next typecheck:full
 - [Scope Lifecycle](./03-scope-lifecycle.md) - Managing scopes
 - [Tags: The Type System](./02-tags-the-type-system.md) - Type-safe metadata
 - [Type Inference Patterns](./04-type-inference-patterns.md) - Zero-annotation typing
+- [API Cheatsheet](../reference/api-cheatsheet.md) - Quick reference for all APIs

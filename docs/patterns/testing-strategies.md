@@ -165,6 +165,7 @@ async function runTest() {
 
 ## See Also
 
-- [Scope Lifecycle](../guides/03-scope-lifecycle.md)
-- [Flow](../guides/05-flow.md)
-- [Extensions](../guides/09-extensions.md)
+- [Scope Lifecycle](../guides/03-scope-lifecycle.md) - Test isolation
+- [Flow](../guides/05-flow.md) - Testing flows
+- [Extensions](../guides/09-extensions.md) - Testing extensions
+- [API Cheatsheet](../reference/api-cheatsheet.md) - preset() reference

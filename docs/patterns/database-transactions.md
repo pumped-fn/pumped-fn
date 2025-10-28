@@ -179,6 +179,7 @@ If error is thrown, extension automatically rolls back both queries.
 
 ## See Also
 
-- [Extensions](../guides/09-extensions.md)
-- [Flow](../guides/05-flow.md)
-- [Error Handling](../guides/10-error-handling.md)
+- [Extensions](../guides/09-extensions.md) - Transaction extensions
+- [Flow](../guides/05-flow.md) - Flow-scoped transactions
+- [Error Handling](../guides/10-error-handling.md) - Rollback strategies
+- [API Cheatsheet](../reference/api-cheatsheet.md) - extension() reference
