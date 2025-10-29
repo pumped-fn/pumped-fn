@@ -29,6 +29,7 @@ type ExecutorState = {
   onErrors?: Set<Core.ErrorCallback<unknown>>;
   resolutionChain?: Set<UE>;
   resolutionDepth?: number;
+  updateQueue?: Promise<void>;
 };
 
 type CacheEntry = ExecutorState;
@@ -54,7 +55,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private currentPromised: Promised<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
-  constructor(scope: BaseScope, requestor: UE, tags: import("./tag-types").Tag.Tagged[] | undefined) {
+  constructor(
+    scope: BaseScope,
+    requestor: UE,
+    tags: import("./tag-types").Tag.Tagged[] | undefined
+  ) {
     this.scope = scope;
     this.requestor = requestor;
     this.tags = tags;
@@ -68,8 +73,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveCore(): Promise<unknown> {
-    const { factory, dependencies, immediateValue } =
-      this.processReplacer();
+    const { factory, dependencies, immediateValue } = this.processReplacer();
 
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -360,9 +364,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     return this.scope.release(this.requestor, soft);
   }
 
-  update(
-    updateFn: unknown | ((current: unknown) => unknown)
-  ): Promised<void> {
+  update(updateFn: unknown | ((current: unknown) => unknown)): Promised<void> {
     return this.scope.update(this.requestor, updateFn);
   }
 
@@ -383,7 +385,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
         cleanups.add(cleanup);
       },
       release: () => this.scope.release(this.requestor),
-      reload: () => this.scope.resolve(this.requestor, true).map(() => undefined),
+      reload: () =>
+        this.scope.resolve(this.requestor, true).map(() => undefined),
       scope: this.scope,
     };
   }
@@ -474,7 +477,9 @@ class BaseScope implements Core.Scope {
     return state.onUpdateExecutors;
   }
 
-  protected ensureErrors(state: ExecutorState): Set<Core.ErrorCallback<unknown>> {
+  protected ensureErrors(
+    state: ExecutorState
+  ): Set<Core.ErrorCallback<unknown>> {
     if (!state.onErrors) {
       state.onErrors = new Set();
     }
@@ -631,7 +636,10 @@ class BaseScope implements Core.Scope {
         [executorName],
         executorName,
         undefined,
-        { circularPath: `${executorName} -> ${executorName}`, detectedAt: executorName }
+        {
+          circularPath: `${executorName} -> ${executorName}`,
+          detectedAt: executorName,
+        }
       );
     }
 
@@ -754,10 +762,7 @@ class BaseScope implements Core.Scope {
     return [...this.registry];
   }
 
-  resolve<T>(
-    executor: Core.Executor<T>,
-    force: boolean = false
-  ): Promised<T> {
+  resolve<T>(executor: Core.Executor<T>, force: boolean = false): Promised<T> {
     this["~ensureNotDisposed"]();
 
     const coreResolve = (): Promised<T> => {
@@ -765,15 +770,12 @@ class BaseScope implements Core.Scope {
       return accessor.resolve(force).map(() => accessor.get() as T);
     };
 
-    const resolver = this.wrapWithExtensions(
-      coreResolve,
-      {
-        kind: "resolve",
-        executor,
-        scope: this,
-        operation: "resolve",
-      }
-    );
+    const resolver = this.wrapWithExtensions(coreResolve, {
+      kind: "resolve",
+      executor,
+      scope: this,
+      operation: "resolve",
+    });
 
     return resolver();
   }
@@ -834,48 +836,52 @@ class BaseScope implements Core.Scope {
     );
   }
 
-  update<T>(
-    e: Core.Executor<T>,
-    u: T | ((current: T) => T)
-  ): Promised<void> {
+  update<T>(e: Core.Executor<T>, u: T | ((current: T) => T)): Promised<void> {
     if (this.isDisposing) {
       return Promised.create(Promise.resolve());
     }
 
     this["~ensureNotDisposed"]();
 
-    const coreUpdate = (): Promised<void> => {
-      return Promised.create((async () => {
-        this["~triggerCleanup"](e);
-        const accessor = this["~makeAccessor"](e);
-      
-        let value: T | undefined;
-      
-        if (typeof u === "function") {
-          const fn = u as (current: T) => T;
-          value = fn(accessor.get() as T);
-        } else {
-          value = u;
-        }
-      
-        const events = this.onEvents.change;
-        for (const event of events) {
-          const updated = await event("update", e, value, this);
-          if (updated !== undefined && e === updated.executor) {
-            value = updated.value as T;
-          }
-        }
+    const state = this.getOrCreateState(e);
+    const previousQueue = state.updateQueue || Promise.resolve();
 
-        const state = this.getOrCreateState(e);
-        state.accessor = accessor;
-        state.value = {
-          kind: "resolved",
-          value,
-          promised: Promised.create(Promise.resolve(value)),
-        };
-      
-        await this["~triggerUpdate"](e);
-      })());
+    const coreUpdate = (): Promised<void> => {
+      return Promised.create(
+        (async () => {
+          await previousQueue;
+
+          this["~triggerCleanup"](e);
+          const accessor = this["~makeAccessor"](e);
+
+          let value: T | undefined;
+
+          if (typeof u === "function") {
+            const fn = u as (current: T) => T;
+            value = fn(accessor.get() as T);
+          } else {
+            value = u;
+          }
+
+          const events = this.onEvents.change;
+          for (const event of events) {
+            const updated = await event("update", e, value, this);
+            if (updated !== undefined && e === updated.executor) {
+              value = updated.value as T;
+            }
+          }
+
+          const currentState = this.getOrCreateState(e);
+          currentState.accessor = accessor;
+          currentState.value = {
+            kind: "resolved",
+            value,
+            promised: Promised.create(Promise.resolve(value)),
+          };
+
+          await this["~triggerUpdate"](e);
+        })()
+      );
     };
 
     const baseUpdater = (): Promised<T> => {
@@ -889,7 +895,10 @@ class BaseScope implements Core.Scope {
       scope: this,
     });
 
-    return updater().map(() => undefined);
+    const updatePromise = updater().map(() => undefined);
+    state.updateQueue = updatePromise.toPromise();
+
+    return updatePromise;
   }
 
   set<T>(e: Core.Executor<T>, value: T): Promised<void> {
@@ -927,23 +936,25 @@ class BaseScope implements Core.Scope {
     this["~ensureNotDisposed"]();
     this.isDisposing = true;
 
-    return Promised.create((async () => {
-      const extensionDisposeEvents = this.extensions.map(
-        (ext) => ext.dispose?.(this) ?? Promise.resolve()
-      );
-      await Promise.all(extensionDisposeEvents);
+    return Promised.create(
+      (async () => {
+        const extensionDisposeEvents = this.extensions.map(
+          (ext) => ext.dispose?.(this) ?? Promise.resolve()
+        );
+        await Promise.all(extensionDisposeEvents);
 
-      const currents = this.cache.keys();
-      for (const current of currents) {
-        await this.release(current, true);
-      }
+        const currents = this.cache.keys();
+        for (const current of currents) {
+          await this.release(current, true);
+        }
 
-      this.disposed = true;
-      this.cache.clear();
-      this.onEvents.change.clear();
-      this.onEvents.release.clear();
-      this.onEvents.error.clear();
-    })());
+        this.disposed = true;
+        this.cache.clear();
+        this.onEvents.change.clear();
+        this.onEvents.release.clear();
+        this.onEvents.error.clear();
+      })()
+    );
   }
 
   onUpdate<T>(
@@ -1056,7 +1067,10 @@ class BaseScope implements Core.Scope {
       const idx = this.extensions.indexOf(extension);
       if (idx !== -1) {
         this.extensions.splice(idx, 1);
-        this.reversedExtensions.splice(this.reversedExtensions.length - 1 - idx, 1);
+        this.reversedExtensions.splice(
+          this.reversedExtensions.length - 1 - idx,
+          1
+        );
       }
     };
   }
@@ -1071,7 +1085,13 @@ class BaseScope implements Core.Scope {
     options?: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
+        [
+          (
+            | import("./tag-types").Tag.Tag<any, false>
+            | import("./tag-types").Tag.Tag<any, true>
+          ),
+          any
+        ]
       >;
       presets?: Core.Preset<unknown>[];
       tags?: import("./tag-types").Tag.Tagged[];
@@ -1085,7 +1105,13 @@ class BaseScope implements Core.Scope {
     options: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
+        [
+          (
+            | import("./tag-types").Tag.Tag<any, false>
+            | import("./tag-types").Tag.Tag<any, true>
+          ),
+          any
+        ]
       >;
       presets?: Core.Preset<unknown>[];
       tags?: import("./tag-types").Tag.Tagged[];
@@ -1099,7 +1125,13 @@ class BaseScope implements Core.Scope {
     options?: {
       extensions?: Extension.Extension[];
       initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
+        [
+          (
+            | import("./tag-types").Tag.Tag<any, false>
+            | import("./tag-types").Tag.Tag<any, true>
+          ),
+          any
+        ]
       >;
       presets?: Core.Preset<unknown>[];
       tags?: import("./tag-types").Tag.Tagged[];
