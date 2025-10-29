@@ -1,6 +1,6 @@
 import type { Core, Extension, Flow, StandardSchemaV1 } from "./types";
 import { createExecutor, isExecutor } from "./executor";
-import { createScope } from "./scope";
+import { createScope, type ScopeOption } from "./scope";
 import { validate } from "./ssch";
 import { type Tag } from "./tag-types";
 import { tag } from "./tag";
@@ -593,10 +593,9 @@ function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options: {
-    scope?: Core.Scope;
+    scope: Core.Scope;
     extensions?: Extension.Extension[];
     initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeTags?: Tag.Tagged[];
     tags?: Tag.Tagged[];
     details: true;
   }
@@ -606,10 +605,9 @@ function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options?: {
-    scope?: Core.Scope;
+    scope: Core.Scope;
     extensions?: Extension.Extension[];
     initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeTags?: Tag.Tagged[];
     tags?: Tag.Tagged[];
     details?: false;
   }
@@ -618,17 +616,69 @@ function execute<S, I>(
 function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
-  options?: {
-    scope?: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
+  options: Omit<ScopeOption, 'tags'> & {
     scopeTags?: Tag.Tagged[];
-    tags?: Tag.Tagged[];
-    details?: boolean;
+    executionTags?: Tag.Tagged[];
+    details: true;
   }
+): Promised<Flow.ExecutionDetails<S>>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
+  input: I,
+  options?: Omit<ScopeOption, 'tags'> & {
+    scopeTags?: Tag.Tagged[];
+    executionTags?: Tag.Tagged[];
+    details?: false;
+  }
+): Promised<S>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
+  input: I,
+  options?:
+    | {
+        scope: Core.Scope;
+        extensions?: Extension.Extension[];
+        initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
+        tags?: Tag.Tagged[];
+        executionTags?: Tag.Tagged[];
+        details?: boolean;
+      }
+    | (Omit<ScopeOption, 'tags'> & {
+        scopeTags?: Tag.Tagged[];
+        executionTags?: Tag.Tagged[];
+        details?: boolean;
+      })
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  const scope = options?.scope || createScope({ tags: options?.scopeTags });
-  const shouldDisposeScope = !options?.scope;
+  let scope: Core.Scope;
+  let shouldDisposeScope: boolean;
+  let contextTags: Tag.Tagged[] | undefined;
+  let additionalExtensions: Extension.Extension[] | undefined;
+
+  if (options && 'scope' in options) {
+    scope = options.scope;
+    shouldDisposeScope = false;
+    contextTags = options.tags;
+    additionalExtensions = options.extensions;
+  } else {
+    scope = options
+      ? createScope({
+          initialValues: options.initialValues,
+          registry: options.registry,
+          extensions: options.extensions,
+          tags: options.scopeTags,
+        })
+      : createScope();
+    shouldDisposeScope = true;
+    contextTags = options?.executionTags;
+    additionalExtensions = options?.extensions;
+  }
+
+  const scopeExtensions = (scope as any).extensions as Extension.Extension[] | undefined;
+  const executeExtensions = scopeExtensions && additionalExtensions
+    ? [...scopeExtensions, ...additionalExtensions]
+    : scopeExtensions || additionalExtensions;
 
   let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
   const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
@@ -638,10 +688,10 @@ function execute<S, I>(
   );
 
   const promise = (async () => {
-    const context = new FlowContext(scope, options?.extensions || [], options?.tags);
+    const context = new FlowContext(scope, additionalExtensions || [], contextTags);
 
     try {
-      if (options?.initialContext) {
+      if (options && 'scope' in options && options.initialContext) {
         for (const [accessor, value] of options.initialContext) {
           accessor.set(context, value);
         }
@@ -670,10 +720,16 @@ function execute<S, I>(
         throw new Error("Flow definition not found in executor metadata");
       }
 
+      const scopeWithTags = contextTags
+        ? Object.create(scope, {
+            tags: { value: contextTags, enumerable: true, configurable: true },
+          })
+        : scope;
+
       const executor = wrapWithExtensions(
-        options?.extensions,
+        executeExtensions,
         executeCore,
-        context.scope,
+        scopeWithTags,
         {
           kind: "execute",
           flow,
