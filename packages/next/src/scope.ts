@@ -953,7 +953,7 @@ class BaseScope implements Core.Scope {
     return Promised.create(coreRelease());
   }
 
-  dispose(): Promised<void> {
+  dispose(options?: { gracePeriod?: number }): Promised<void> {
     this["~ensureNotDisposed"]();
     this.isDisposing = true;
 

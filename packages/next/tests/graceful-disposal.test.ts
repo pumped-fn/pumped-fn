@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createScope, ScopeDisposingError, GracePeriodExceededError } from "../src/scope";
+import { Promised } from "../src/promises";
 
 describe("Graceful Disposal - Task 1: Types and Errors", () => {
   describe("ScopeState type", () => {
@@ -42,5 +43,29 @@ describe("Graceful Disposal - Task 1: Types and Errors", () => {
       expect(error.name).toBe("GracePeriodExceededError");
       expect(error).toBeInstanceOf(Error);
     });
+  });
+});
+
+describe("Graceful Disposal - Task 2: dispose() Signature", () => {
+  it("should allow dispose() without options", async () => {
+    const s = createScope();
+    const result = s.dispose();
+    expect(result).toBeInstanceOf(Promised);
+    await result;
+  });
+
+  it("should allow dispose() with gracePeriod option", async () => {
+    const s = createScope();
+    const result = s.dispose({ gracePeriod: 1000 });
+    expect(result).toBeInstanceOf(Promised);
+    await result;
+  });
+
+  it("should return Promised<void>", async () => {
+    const s = createScope();
+    const result = s.dispose({ gracePeriod: 5000 });
+    expect(result).toBeInstanceOf(Promised);
+    const awaitedResult = await result;
+    expect(awaitedResult).toBeUndefined();
   });
 });

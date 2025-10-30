@@ -353,7 +353,7 @@ export declare namespace Core {
 
     release(executor: Executor<any>, soft?: boolean): Promised<void>;
 
-    dispose(): Promised<void>;
+    dispose(options?: { gracePeriod?: number }): Promised<void>;
 
     onUpdate<T>(
       executor: Executor<T>,
