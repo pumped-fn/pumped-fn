@@ -4,6 +4,8 @@ import { type Core } from "../src/types";
 import { createCancellationExtension } from "../src/cancellation";
 import { createScope } from "../src/scope";
 import { provide, derive } from "../src";
+import { flow } from "../src/flow";
+import { custom } from "../src/ssch";
 
 describe("AbortError", () => {
   it("creates error with reason", () => {
@@ -200,9 +202,6 @@ describe("Long-running cancellation", () => {
       const ext = createCancellationExtension();
       const scope = createScope({ extensions: [ext] });
 
-      const { flow } = await import("../src/flow");
-      const { custom } = await import("../src/ssch");
-
       const longRunningFlow = flow(
         { input: custom<void>(), output: custom<string>() },
         async (ctx) => {
@@ -222,9 +221,6 @@ describe("Long-running cancellation", () => {
     it("cancels flow with ctx.run when aborted", async () => {
       const ext = createCancellationExtension();
       const scope = createScope({ extensions: [ext] });
-
-      const { flow } = await import("../src/flow");
-      const { custom } = await import("../src/ssch");
 
       const flowWithRun = flow(
         { input: custom<void>(), output: custom<string>() },
