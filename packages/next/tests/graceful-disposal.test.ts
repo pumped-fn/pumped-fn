@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createScope } from "../src/scope";
+import { createScope, ScopeDisposingError, GracePeriodExceededError } from "../src/scope";
 
 describe("Graceful Disposal - Task 1: Types and Errors", () => {
   describe("ScopeState type", () => {
@@ -23,6 +23,24 @@ describe("Graceful Disposal - Task 1: Types and Errors", () => {
       const pendingResolutions = (s as any).pendingResolutions;
       expect(pendingResolutions).toBeInstanceOf(Set);
       expect(pendingResolutions.size).toBe(0);
+    });
+  });
+
+  describe("ScopeDisposingError", () => {
+    it("should instantiate with correct message and name", () => {
+      const error = new ScopeDisposingError();
+      expect(error.message).toBe("Scope is disposing, operation canceled");
+      expect(error.name).toBe("ScopeDisposingError");
+      expect(error).toBeInstanceOf(Error);
+    });
+  });
+
+  describe("GracePeriodExceededError", () => {
+    it("should instantiate with correct message and name", () => {
+      const error = new GracePeriodExceededError(5000);
+      expect(error.message).toBe("Operation exceeded grace period of 5000ms");
+      expect(error.name).toBe("GracePeriodExceededError");
+      expect(error).toBeInstanceOf(Error);
     });
   });
 });

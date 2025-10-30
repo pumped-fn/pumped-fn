@@ -41,14 +41,14 @@ type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
 type ScopeState = 'active' | 'disposing' | 'disposed';
 
-class ScopeDisposingError extends Error {
+export class ScopeDisposingError extends Error {
   constructor() {
     super('Scope is disposing, operation canceled');
     this.name = 'ScopeDisposingError';
   }
 }
 
-class GracePeriodExceededError extends Error {
+export class GracePeriodExceededError extends Error {
   constructor(gracePeriod: number) {
     super(`Operation exceeded grace period of ${gracePeriod}ms`);
     this.name = 'GracePeriodExceededError';
