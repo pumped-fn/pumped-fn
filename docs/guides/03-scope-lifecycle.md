@@ -132,15 +132,15 @@ function performWork() { return { result: "done" }; }
 ### Process Signal Integration
 
 ```ts twoslash
-import { createScope, createCancellationExtension, type CancellationExtension } from "@pumped-fn/core-next";
+import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
 
+const cancellationExt = createCancellationExtension();
 const scope = createScope({
-  extensions: [createCancellationExtension()],
+  extensions: [cancellationExt],
 });
 
 process.on("SIGTERM", async () => {
-  const ext = scope["extensions"].find(e => e.name === "cancellation") as CancellationExtension;
-  ext?.controller.abort("SIGTERM");
+  cancellationExt.controller.abort("SIGTERM");
 
   await scope.dispose().toPromise();
 });

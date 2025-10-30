@@ -1,7 +1,8 @@
 import { createScope, provide, derive, createCancellationExtension, Promised } from "@pumped-fn/core-next";
 
+const cancellationExt = createCancellationExtension();
 const appScope = createScope({
-  extensions: [createCancellationExtension()],
+  extensions: [cancellationExt],
 });
 
 const dbConnection = provide((controller) => {
@@ -36,13 +37,7 @@ async function handleRequest() {
 process.on("SIGTERM", async () => {
   console.log("Received SIGTERM, initiating graceful shutdown");
 
-  const ext = appScope["extensions"].find(
-    (e) => e.name === "cancellation"
-  ) as any;
-
-  if (ext) {
-    ext.controller.abort("SIGTERM");
-  }
+  cancellationExt.controller.abort("SIGTERM");
 
   setTimeout(async () => {
     await appScope.dispose().toPromise();

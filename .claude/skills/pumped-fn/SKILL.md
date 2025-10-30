@@ -437,10 +437,13 @@ const result = await scope.exec(myFlow, input, {
 ```typescript
 import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
 
+const cancellationExt = createCancellationExtension();
 const scope = createScope({
-  extensions: [createCancellationExtension()],
+  extensions: [cancellationExt],
 });
 ```
+
+**Pattern:** Keep extension reference at creation time for type-safe access to abort controller.
 
 ### Factory Cancellation
 
@@ -475,12 +478,29 @@ const child = createScope({
 });
 ```
 
+### Process Signal Integration
+
+```typescript
+import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
+
+const cancellationExt = createCancellationExtension();
+const scope = createScope({
+  extensions: [cancellationExt],
+});
+
+process.on("SIGTERM", async () => {
+  cancellationExt.controller.abort("SIGTERM");
+  await scope.dispose().toPromise();
+});
+```
+
 ### Properties
 
 - Parent abort cascades to children automatically
 - Complete in-flight operations, reject new operations
 - Factories opt-in via `controller.signal`
 - Automatic disposal integration
+- **Keep extension reference at creation time** for type-safe controller access
 
 ## Summary
 
