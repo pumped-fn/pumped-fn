@@ -366,6 +366,66 @@ Then proceed to use decision trees and templates from reference files.
 - No TODOs or "add this later"
 - Every example must pass typecheck
 
+## API Changes and Migration
+
+### flow.execute() Options (Breaking Change)
+
+**New discriminated union (scope XOR extensions):**
+
+```typescript
+// Option 1: Use existing scope + execution tags
+await flow.execute(myFlow, input, {
+  scope: existingScope,
+  executionTags: [requestId('req-123')]
+})
+
+// Option 2: Create temporary scope with extensions + tags
+await flow.execute(myFlow, input, {
+  extensions: [loggingExtension],
+  scopeTags: [appConfig()],
+  executionTags: [requestId('req-123')]
+})
+```
+
+**Migration from old API:**
+
+Old (INVALID - causes type error):
+```typescript
+await flow.execute(myFlow, input, {
+  scope: existingScope,
+  extensions: [ext],  // Type error: can't mix scope + extensions
+  tags: [tag]
+})
+```
+
+New (CORRECT):
+```typescript
+// If you need different extensions, create new scope
+const scope = createScope({ extensions: [ext] })
+await flow.execute(myFlow, input, {
+  scope,
+  executionTags: [tag]  // Renamed: tags → executionTags
+})
+```
+
+**Key changes:**
+- `tags` option renamed to `executionTags` (attaches to flow execution context)
+- New `scopeTags` option (attaches to created scope when using extensions)
+- Can't mix `scope` + `extensions` (discriminated union enforces XOR)
+- `flow.execute()` now delegates to `scope.exec()` internally
+- Scope extensions now properly wrap all flow operations
+
+**Recommended pattern (unchanged):**
+```typescript
+// Create scope at app initialization
+const scope = createScope({ extensions: [logger, metrics] })
+
+// Use scope.exec() in request handlers
+const result = await scope.exec(myFlow, input, {
+  tags: [requestId('req-123')]  // scope.exec still uses 'tags'
+})
+```
+
 ## Summary
 
 **This skill provides:**
