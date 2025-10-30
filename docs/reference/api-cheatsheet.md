@@ -117,9 +117,24 @@ const service = await promised
 
 ### scope.dispose()
 ```typescript
-// Cleanup all resources
 await scope.dispose()
+
+await scope.dispose({ gracePeriod: 10000 })
+
+await scope.dispose({ gracePeriod: 0 })
 ```
+
+**Options:**
+- `gracePeriod?: number` - Time in milliseconds to wait for active operations (default: 5000ms)
+
+**Behavior:**
+- Transitions to disposing state
+- Cancels pending operations immediately (throws `ScopeDisposingError`)
+- Waits up to gracePeriod for active operations
+- Runs cleanup callbacks
+- Transitions to disposed state
+
+See [Graceful Disposal Guide](../guides/graceful-disposal.md)
 
 ## Tags
 
