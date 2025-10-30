@@ -33,6 +33,12 @@ export * as standardSchema from "./ssch";
 export * as multi from "./multi";
 export * as errors from "./errors";
 
+export {
+  createCancellationExtension,
+  type CancellationExtension,
+} from "./cancellation";
+export { AbortError } from "./errors";
+
 export const name: Tag.Tag<string, false> = tag(custom<string>(), {
   label: "pumped-fn/name",
 });
