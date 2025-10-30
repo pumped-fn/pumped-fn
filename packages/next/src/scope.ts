@@ -20,6 +20,7 @@ import { type Tag } from "./tag-types";
 import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta, wrapWithExtensions } from "./flow";
+import { type CancellationExtension } from "./cancellation";
 import { validate } from "./ssch";
 
 type ExecutorState = {
@@ -380,7 +381,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private createController(): Core.Controller {
-    return {
+    const baseController: Core.Controller = {
       cleanup: (cleanup: Core.Cleanup) => {
         const state = this.scope["getOrCreateState"](this.requestor);
         const cleanups = this.scope["ensureCleanups"](state);
@@ -391,6 +392,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
         this.scope.resolve(this.requestor, true).map(() => undefined),
       scope: this.scope,
     };
+
+    for (const ext of this.scope["extensions"]) {
+      if (ext.name === "cancellation" && "controller" in ext) {
+        baseController.signal = (ext as CancellationExtension).controller.signal;
+      }
+    }
+
+    return baseController;
   }
 }
 

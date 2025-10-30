@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { AbortError } from "../src/errors";
 import { type Core } from "../src/types";
 import { createCancellationExtension } from "../src/cancellation";
+import { createScope } from "../src/scope";
+import { provide } from "../src";
 
 describe("AbortError", () => {
   it("creates error with reason", () => {
@@ -72,5 +74,44 @@ describe("createCancellationExtension", () => {
 
     expect(ext.controller.signal.aborted).toBe(true);
     expect(ext.controller.signal.reason).toBe("test reason");
+  });
+});
+
+describe("Extension wrap", () => {
+  it("rejects new operations after abort", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    const executor = provide(() => "value");
+
+    ext.controller.abort("shutdown");
+
+    await expect(scope.resolve(executor).toPromise()).rejects.toThrow(
+      AbortError
+    );
+    await expect(scope.resolve(executor).toPromise()).rejects.toThrow(
+      "Operation aborted"
+    );
+  });
+
+  it("allows in-flight operations to complete", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    let resolveOp: (value: string) => void;
+    const operationPromise = new Promise<string>((resolve) => {
+      resolveOp = resolve;
+    });
+
+    const executor = provide(() => operationPromise);
+
+    const resolution = scope.resolve(executor);
+
+    ext.controller.abort("shutdown");
+
+    resolveOp!("completed");
+
+    const result = await resolution.toPromise();
+    expect(result).toBe("completed");
   });
 });
