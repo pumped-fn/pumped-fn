@@ -168,6 +168,7 @@ export declare namespace Core {
     release: () => Promised<void>;
     reload: () => Promised<void>;
     scope: Scope;
+    signal?: AbortSignal;
   };
 
   export type Kind = "main" | "reactive" | "lazy" | "static";
