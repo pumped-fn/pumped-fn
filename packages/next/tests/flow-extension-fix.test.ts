@@ -68,4 +68,105 @@ describe("Flow Extension Wrapping Fix", () => {
 
     expect(capturedTags).toBeDefined();
   });
+
+  test("scope extensions wrap ctx.exec subflow operations", async () => {
+    const operations: string[] = [];
+
+    const trackingExtension = extension({
+      name: "tracker",
+      wrap: (_scope, next, operation) => {
+        operations.push(operation.kind);
+        return next();
+      },
+    });
+
+    const scope = createScope({ extensions: [trackingExtension] });
+
+    const childFlow = flow((_ctx, input: number) => input + 1);
+    const parentFlow = flow(async (ctx, input: number) => {
+      const result = await ctx.exec(childFlow, input);
+      return result * 2;
+    });
+
+    const result = await flow.execute(parentFlow, 5, { scope });
+
+    expect(result).toBe(12);
+    expect(operations).toContain("execute");
+    expect(operations).toContain("subflow");
+  });
+
+  test("scope extensions wrap ctx.run journal operations", async () => {
+    const operations: string[] = [];
+
+    const trackingExtension = extension({
+      name: "tracker",
+      wrap: (_scope, next, operation) => {
+        operations.push(operation.kind);
+        return next();
+      },
+    });
+
+    const scope = createScope({ extensions: [trackingExtension] });
+
+    const journaledFlow = flow(async (ctx, input: number) => {
+      const doubled = await ctx.run("double", () => input * 2);
+      return doubled + 1;
+    });
+
+    const result = await flow.execute(journaledFlow, 5, { scope });
+
+    expect(result).toBe(11);
+    expect(operations).toContain("execute");
+    expect(operations).toContain("journal");
+  });
+
+  test("scopeTags attach to scope, executionTags to execution", async () => {
+    let capturedScopeTags: unknown;
+    let capturedExecutionTags: unknown;
+
+    const scopeTagSymbol = Symbol("scope-tag");
+    const executionTagSymbol = Symbol("execution-tag");
+
+    const tagCaptureExtension = extension({
+      name: "tag-capture",
+      wrap: (scope, next, _operation) => {
+        capturedScopeTags = scope.tags;
+        return next();
+      },
+    });
+
+    const simpleFlow = flow((ctx, input: number) => {
+      capturedExecutionTags = ctx.tags;
+      return input * 2;
+    });
+
+    await flow.execute(simpleFlow, 5, {
+      extensions: [tagCaptureExtension],
+      scopeTags: [{ key: scopeTagSymbol, value: "scope-value" }],
+      executionTags: [{ key: executionTagSymbol, value: "execution-value" }],
+    });
+
+    expect(capturedScopeTags).toBeDefined();
+    expect(capturedExecutionTags).toBeDefined();
+  });
+
+  test("temporary scope is disposed after execution", async () => {
+    const disposeEvents: string[] = [];
+
+    const lifecycleExtension = extension({
+      name: "lifecycle",
+      init: () => {
+        disposeEvents.push("init");
+      },
+      dispose: async () => {
+        disposeEvents.push("dispose");
+      },
+    });
+
+    const simpleFlow = flow((_ctx, input: number) => input * 2);
+
+    await flow.execute(simpleFlow, 5, { extensions: [lifecycleExtension] });
+
+    expect(disposeEvents).toEqual(["init", "dispose"]);
+  });
 });
