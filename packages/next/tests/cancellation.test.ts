@@ -115,6 +115,24 @@ describe("Extension wrap", () => {
 
     await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
   });
+
+  it("does not cancel in-flight operations that complete before abort", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    const fastOperation = provide(() => {
+      return new Promise<string>((resolve) => {
+        setTimeout(() => resolve("completed"), 10);
+      });
+    });
+
+    const resolution = scope.resolve(fastOperation);
+
+    setTimeout(() => ext.controller.abort("shutdown"), 50);
+
+    const result = await resolution.toPromise();
+    expect(result).toBe("completed");
+  });
 });
 
 describe("Extension dispose", () => {
