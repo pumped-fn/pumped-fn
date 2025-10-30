@@ -91,6 +91,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveCore(): Promise<unknown> {
+    if (this.scope["scopeState"] === "disposing") {
+      throw new ScopeDisposingError();
+    }
+    if (this.scope["scopeState"] === "disposed") {
+      throw new Error("Scope is disposed");
+    }
+
     const { factory, dependencies, immediateValue } = this.processReplacer();
 
     if (immediateValue !== undefined) {
@@ -109,10 +116,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const controller = this.createController();
 
+    const trackedPromise = this.currentPromise!;
+
     const resolvedDependencies = await this.scope["~resolveDependencies"](
       dependencies,
       this.requestor
     );
+
+    this.scope["~moveToActive"](trackedPromise);
 
     const result = await this.executeFactory(
       factory,
@@ -138,9 +149,23 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveWithErrorHandling(): Promise<unknown> {
+    const trackedPromise = this.currentPromise!;
+    this.scope["~trackPending"](trackedPromise);
+
     try {
-      return await this.resolveCore();
+      const result = await this.resolveCore();
+      this.scope["~untrackExecution"](trackedPromise);
+      return result;
     } catch (error) {
+      this.scope["~untrackExecution"](trackedPromise);
+
+      if (error instanceof ScopeDisposingError) {
+        throw error;
+      }
+      if (error instanceof Error && error.message === "Scope is disposed") {
+        throw error;
+      }
+
       const { enhancedError, errorContext, originalError } =
         this.enhanceResolutionError(error);
 
@@ -434,6 +459,7 @@ class BaseScope implements Core.Scope {
   private scopeState: ScopeState = 'active';
   private activeExecutions: Set<Promise<unknown>> = new Set();
   private pendingResolutions: Set<Promise<unknown>> = new Set();
+  private trackingDisabled = false;
 
   private readonly CIRCULAR_CHECK_THRESHOLD = 15;
 
@@ -512,6 +538,23 @@ class BaseScope implements Core.Scope {
       state.resolutionChain = new Set();
     }
     return state.resolutionChain;
+  }
+
+  private "~trackPending"(promise: Promise<unknown>): void {
+    if (this.trackingDisabled) return;
+    this.pendingResolutions.add(promise);
+  }
+
+  private "~moveToActive"(promise: Promise<unknown>): void {
+    if (this.trackingDisabled) return;
+    this.pendingResolutions.delete(promise);
+    this.activeExecutions.add(promise);
+  }
+
+  private "~untrackExecution"(promise: Promise<unknown>): void {
+    if (this.trackingDisabled) return;
+    this.pendingResolutions.delete(promise);
+    this.activeExecutions.delete(promise);
   }
 
   protected "~checkCircularDependency"(
@@ -1155,6 +1198,13 @@ class BaseScope implements Core.Scope {
     input: I,
     executionTags?: Tag.Tagged[]
   ): Promised<S> {
+    if (this.scopeState === "disposing") {
+      return Promised.create(Promise.reject(new ScopeDisposingError()));
+    }
+    if (this.scopeState === "disposed") {
+      return Promised.create(Promise.reject(new Error("Scope is disposed")));
+    }
+
     let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
     const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
       (resolve) => {
@@ -1162,12 +1212,15 @@ class BaseScope implements Core.Scope {
       }
     );
 
+    let trackedPromise!: Promise<S>;
+
     const promise = (async () => {
       const context = new FlowContext(this, this.extensions, executionTags);
 
       try {
         const executeCore = (): Promised<S> => {
-          return this.resolve(flow).map(async (handler) => {
+          this.trackingDisabled = true;
+          const result = this.resolve(flow).map(async (handler) => {
             const definition = flowDefinitionMeta.find(flow);
             if (!definition) {
               throw new Error("Flow definition not found in executor metadata");
@@ -1176,12 +1229,16 @@ class BaseScope implements Core.Scope {
 
             context.initializeExecutionContext(definition.name, false);
 
+            this.trackingDisabled = false;
+            this["~moveToActive"](trackedPromise);
+
             const result = await handler(context, validated);
 
             validate(definition.output, result);
 
             return result;
           });
+          return result;
         };
 
         const definition = flowDefinitionMeta.find(flow);
@@ -1206,13 +1263,18 @@ class BaseScope implements Core.Scope {
         );
 
         const result = await executor();
+        this["~untrackExecution"](trackedPromise);
         resolveSnapshot(context.createSnapshot());
         return result;
       } catch (error) {
+        this["~untrackExecution"](trackedPromise);
         resolveSnapshot(context.createSnapshot());
         throw error;
       }
     })();
+
+    trackedPromise = promise;
+    this["~trackPending"](trackedPromise);
 
     return Promised.create(promise, snapshotPromise);
   }

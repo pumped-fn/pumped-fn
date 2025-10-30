@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createScope, ScopeDisposingError, GracePeriodExceededError } from "../src/scope";
+import { provide } from "../src/executor";
 import { Promised } from "../src/promises";
 
 describe("Graceful Disposal - Task 1: Types and Errors", () => {
@@ -67,5 +68,162 @@ describe("Graceful Disposal - Task 2: dispose() Signature", () => {
     expect(result).toBeInstanceOf(Promised);
     const awaitedResult = await result;
     expect(awaitedResult).toBeUndefined();
+  });
+});
+
+describe("Graceful Disposal - Task 3: State Checks", () => {
+  describe("resolve() state validation", () => {
+    it("should throw ScopeDisposingError when scope is disposing", async () => {
+      const s = createScope();
+      const executor = provide(() => "test");
+
+      (s as any).scopeState = "disposing";
+
+      await expect(s.resolve(executor)).rejects.toThrow(ScopeDisposingError);
+      await expect(s.resolve(executor)).rejects.toThrow("Scope is disposing, operation canceled");
+    });
+
+    it("should throw error when scope is disposed", async () => {
+      const s = createScope();
+      const executor = provide(() => "test");
+
+      (s as any).scopeState = "disposed";
+
+      await expect(s.resolve(executor)).rejects.toThrow("Scope is disposed");
+    });
+
+    it("should work normally when scope is active", async () => {
+      const s = createScope();
+      const executor = provide(() => "test");
+
+      const result = await s.resolve(executor);
+      expect(result).toBe("test");
+    });
+  });
+
+  describe("exec() state validation", () => {
+    it("should throw ScopeDisposingError when scope is disposing", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+      const flowExecutor = flow(() => "test");
+
+      (s as any).scopeState = "disposing";
+
+      await expect(s.exec(flowExecutor)).rejects.toThrow(ScopeDisposingError);
+    });
+
+    it("should throw error when scope is disposed", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+      const flowExecutor = flow(() => "test");
+
+      (s as any).scopeState = "disposed";
+
+      await expect(s.exec(flowExecutor)).rejects.toThrow("Scope is disposed");
+    });
+
+    it("should work normally when scope is active", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+      const flowExecutor = flow(() => "test");
+
+      const result = await s.exec(flowExecutor);
+      expect(result).toBe("test");
+    });
+  });
+});
+
+describe("Graceful Disposal - Task 4: Operation Tracking", () => {
+  describe("resolve() operation tracking", () => {
+    it("should move operation to active during factory execution", async () => {
+      const s = createScope();
+      let capturedActiveSize = -1;
+
+      const executor = provide(() => {
+        capturedActiveSize = (s as any).activeExecutions.size;
+        return "test";
+      });
+
+      await s.resolve(executor);
+
+      expect(capturedActiveSize).toBeGreaterThan(0);
+    });
+
+    it("should remove operation after completion", async () => {
+      const s = createScope();
+      const executor = provide(() => "test");
+
+      await s.resolve(executor);
+
+      const activeSize = (s as any).activeExecutions.size;
+      const pendingSize = (s as any).pendingResolutions.size;
+
+      expect(activeSize).toBe(0);
+      expect(pendingSize).toBe(0);
+    });
+
+    it("should cleanup on error", async () => {
+      const s = createScope();
+      const executor = provide(() => {
+        throw new Error("test error");
+      });
+
+      await expect(s.resolve(executor)).rejects.toThrow("test error");
+
+      const activeSize = (s as any).activeExecutions.size;
+      const pendingSize = (s as any).pendingResolutions.size;
+
+      expect(activeSize).toBe(0);
+      expect(pendingSize).toBe(0);
+    });
+  });
+
+  describe("exec() operation tracking", () => {
+    it("should move operation to active during handler execution", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      let capturedActiveSize = -1;
+      const flowExecutor = flow(() => {
+        capturedActiveSize = (s as any).activeExecutions.size;
+        return "test";
+      });
+
+      await s.exec(flowExecutor);
+
+      expect(capturedActiveSize).toBeGreaterThan(0);
+    });
+
+    it("should remove operation after completion", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      const flowExecutor = flow(() => "test");
+
+      await s.exec(flowExecutor);
+
+      const activeSize = (s as any).activeExecutions.size;
+      const pendingSize = (s as any).pendingResolutions.size;
+
+      expect(activeSize).toBe(0);
+      expect(pendingSize).toBe(0);
+    });
+
+    it("should cleanup on error", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      const flowExecutor = flow(() => {
+        throw new Error("test error");
+      });
+
+      await expect(s.exec(flowExecutor)).rejects.toThrow("test error");
+
+      const activeSize = (s as any).activeExecutions.size;
+      const pendingSize = (s as any).pendingResolutions.size;
+
+      expect(activeSize).toBe(0);
+      expect(pendingSize).toBe(0);
+    });
   });
 });
