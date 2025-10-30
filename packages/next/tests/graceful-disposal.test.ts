@@ -522,6 +522,29 @@ describe("Graceful Disposal - Task 5: Two-Phase Disposal", () => {
       expect(flowCompleted).toBe(true);
     });
 
+    it("should timeout flow execution after grace period", async () => {
+      const s = createScope();
+      let flowStarted = false;
+      let flowCompleted = false;
+
+      const slowFlowExecutor = flow(async () => {
+        flowStarted = true;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        flowCompleted = true;
+        return "slow-flow";
+      });
+
+      s.exec(slowFlowExecutor);
+
+      while (!flowStarted) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      await s.dispose({ gracePeriod: 50 });
+
+      expect(flowCompleted).toBe(false);
+    });
+
     it("should reject new flow executions after disposal starts", async () => {
       const s = createScope();
 
