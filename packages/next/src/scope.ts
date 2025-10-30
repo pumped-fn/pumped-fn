@@ -387,10 +387,10 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   get(): unknown {
-    this.scope["~ensureNotDisposed"]();
     const cacheEntry = this.scope["cache"].get(this.requestor)?.value;
 
     if (!cacheEntry || cacheEntry.kind === "pending") {
+      this.scope["~ensureNotDisposed"]();
       throw new Error("Executor is not resolved");
     }
 
@@ -1014,6 +1014,7 @@ class BaseScope implements Core.Scope {
               setTimeout(resolve, gracePeriod)
             );
             await Promise.race([allSettled, timeout]);
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
           }
         }
 
