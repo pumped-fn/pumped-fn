@@ -118,9 +118,9 @@ createExecutor(factory, dependencies, tags)
 const scope = createScope({ tags: [appConfig()] })  // 1 tag
 
 // Level 1: Parent flow
-flow.execute(parentFlow, input, { 
-  scope, 
-  tags: [customTag1(), customTag2()]  // 2 tags
+flow.execute(parentFlow, input, {
+  scope,
+  executionTags: [customTag1(), customTag2()]  // 2 tags
 })
 
 // Level 2: Child flow via ctx.exec()

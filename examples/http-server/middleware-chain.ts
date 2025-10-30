@@ -51,7 +51,7 @@ async function main() {
 
   const result = await flow.execute(handler, { action: 'getData' }, {
     scope,
-    tags: [
+    executionTags: [
       requestId('req-123'),
       userId('user-456')
     ]

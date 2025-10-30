@@ -371,16 +371,6 @@ export declare namespace Core {
       flow: Core.Executor<Flow.Handler<S, I>>,
       input?: I,
       options?: {
-        extensions?: Extension.Extension[];
-        initialContext?: Array<
-          [
-            (
-              | import("./tag-types").Tag.Tag<any, false>
-              | import("./tag-types").Tag.Tag<any, true>
-            ),
-            any
-          ]
-        >;
         tags?: Tag.Tagged[];
         details?: false;
       }
@@ -390,16 +380,6 @@ export declare namespace Core {
       flow: Core.Executor<Flow.Handler<S, I>>,
       input: I | undefined,
       options: {
-        extensions?: Extension.Extension[];
-        initialContext?: Array<
-          [
-            (
-              | import("./tag-types").Tag.Tag<any, false>
-              | import("./tag-types").Tag.Tag<any, true>
-            ),
-            any
-          ]
-        >;
         tags?: Tag.Tagged[];
         details: true;
       }

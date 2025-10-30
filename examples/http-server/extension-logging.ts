@@ -46,7 +46,7 @@ async function main() {
 
   const result = await flow.execute(businessLogic, { value: 42 }, {
     scope,
-    tags: [requestId('req-001')]
+    executionTags: [requestId('req-001')]
   })
 
   console.log('Result:', result)

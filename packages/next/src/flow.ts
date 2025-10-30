@@ -1,6 +1,6 @@
 import type { Core, Extension, Flow, StandardSchemaV1 } from "./types";
 import { createExecutor, isExecutor } from "./executor";
-import { createScope } from "./scope";
+import { createScope, type ScopeOption } from "./scope";
 import { validate } from "./ssch";
 import { type Tag } from "./tag-types";
 import { tag } from "./tag";
@@ -36,7 +36,7 @@ function wrapWithExtensions<T>(
   return executor;
 }
 
-const flowDefinitionMeta = tag(custom<Flow.Definition<any, any>>(), {
+const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(custom<Flow.Definition<any, any>>(), {
   label: "flow.definition",
 });
 
@@ -148,7 +148,7 @@ class FlowContext implements Flow.Context {
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext
+    private parent?: FlowContext | undefined
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
@@ -180,7 +180,7 @@ class FlowContext implements Flow.Context {
     return executor;
   }
 
-  initializeExecutionContext(flowName: string, isParallel: boolean = false) {
+  initializeExecutionContext(flowName: string, isParallel: boolean = false): void {
     const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
     const parentFlowName = this.parent
       ? this.parent.find(flowMeta.flowName)
@@ -593,11 +593,8 @@ function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options: {
-    scope?: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeTags?: Tag.Tagged[];
-    tags?: Tag.Tagged[];
+    scope: Core.Scope;
+    executionTags?: Tag.Tagged[];
     details: true;
   }
 ): Promised<Flow.ExecutionDetails<S>>;
@@ -606,11 +603,8 @@ function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
   options?: {
-    scope?: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    scopeTags?: Tag.Tagged[];
-    tags?: Tag.Tagged[];
+    scope: Core.Scope;
+    executionTags?: Tag.Tagged[];
     details?: false;
   }
 ): Promised<S>;
@@ -618,106 +612,85 @@ function execute<S, I>(
 function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
-  options?: {
-    scope?: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
+  options: Omit<ScopeOption, 'tags'> & {
     scopeTags?: Tag.Tagged[];
-    tags?: Tag.Tagged[];
-    details?: boolean;
+    executionTags?: Tag.Tagged[];
+    details: true;
   }
+): Promised<Flow.ExecutionDetails<S>>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
+  input: I,
+  options?: Omit<ScopeOption, 'tags'> & {
+    scopeTags?: Tag.Tagged[];
+    executionTags?: Tag.Tagged[];
+    details?: false;
+  }
+): Promised<S>;
+
+function execute<S, I>(
+  flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
+  input: I,
+  options?:
+    | {
+        scope: Core.Scope;
+        executionTags?: Tag.Tagged[];
+        details?: boolean;
+      }
+    | (Omit<ScopeOption, 'tags'> & {
+        scopeTags?: Tag.Tagged[];
+        executionTags?: Tag.Tagged[];
+        details?: boolean;
+      })
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  const scope = options?.scope || createScope({ tags: options?.scopeTags });
-  const shouldDisposeScope = !options?.scope;
-
-  let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
-  const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
-    (resolve) => {
-      resolveSnapshot = resolve;
+  if (options && 'scope' in options) {
+    if (options.details === true) {
+      return options.scope.exec(flow, input, {
+        tags: options.executionTags,
+        details: true,
+      });
     }
-  );
-
-  const promise = (async () => {
-    const context = new FlowContext(scope, options?.extensions || [], options?.tags);
-
-    try {
-      if (options?.initialContext) {
-        for (const [accessor, value] of options.initialContext) {
-          accessor.set(context, value);
-        }
-      }
-
-      const executeCore = (): Promised<S> => {
-        return scope.resolve(flow).map(async (handler) => {
-          const definition = flowDefinitionMeta.find(flow);
-          if (!definition) {
-            throw new Error("Flow definition not found in executor metadata");
-          }
-          const validated = validate(definition.input, input);
-
-          context.initializeExecutionContext(definition.name, false);
-
-          const result = await handler(context, validated);
-
-          validate(definition.output, result);
-
-          return result;
-        });
-      };
-
-      const definition = flowDefinitionMeta.find(flow);
-      if (!definition) {
-        throw new Error("Flow definition not found in executor metadata");
-      }
-
-      const executor = wrapWithExtensions(
-        options?.extensions,
-        executeCore,
-        context.scope,
-        {
-          kind: "execute",
-          flow,
-          definition,
-          input,
-          flowName: definition.name || context.find(flowMeta.flowName),
-          depth: context.get(flowMeta.depth),
-          isParallel: context.get(flowMeta.isParallel),
-          parentFlowName: context.find(flowMeta.parentFlowName),
-        }
-      );
-
-      const result = await executor();
-      resolveSnapshot(context.createSnapshot());
-      return result;
-    } catch (error) {
-      resolveSnapshot(context.createSnapshot());
-      throw error;
-    } finally {
-      if (shouldDisposeScope) {
-        await scope.dispose();
-      }
-    }
-  })();
-
-  if (options?.details) {
-    const detailsPromise = Promised.try(async (): Promise<Flow.ExecutionDetails<S>> => {
-      const [result, ctx] = await Promise.all([promise, snapshotPromise]);
-      if (!ctx) {
-        throw new Error("Execution context not available");
-      }
-      return { success: true as const, result, ctx };
-    }).catch(async (error) => {
-      const ctx = await snapshotPromise;
-      if (!ctx) {
-        throw new Error("Execution context not available");
-      }
-      return { success: false as const, error, ctx };
+    return options.scope.exec(flow, input, {
+      tags: options.executionTags,
     });
-
-    return Promised.create(detailsPromise, snapshotPromise);
   }
 
-  return Promised.create(promise, snapshotPromise);
+  const scope = options
+    ? createScope({
+        initialValues: options.initialValues,
+        registry: options.registry,
+        extensions: options.extensions,
+        tags: options.scopeTags,
+      })
+    : createScope();
+
+  const shouldDisposeScope = true;
+
+  if (options?.details === true) {
+    const result = scope.exec(flow, input, {
+      tags: options.executionTags,
+      details: true,
+    });
+    if (shouldDisposeScope) {
+      return Promised.create(
+        result.then((r) => scope.dispose().then(() => r)),
+        result.ctx()
+      ) as Promised<Flow.ExecutionDetails<S>>;
+    }
+    return result;
+  }
+
+  const result = scope.exec(flow, input, {
+    tags: options?.executionTags,
+  });
+  if (shouldDisposeScope) {
+    return Promised.create(
+      result.then((r) => scope.dispose().then(() => r)),
+      result.ctx()
+    ) as Promised<S>;
+  }
+  return result;
 }
 
 function flowImpl<I, S>(
@@ -871,3 +844,5 @@ export const flow: typeof flowImpl & {
 } = Object.assign(flowImpl, {
   execute: execute,
 });
+
+export { FlowContext, flowDefinitionMeta, wrapWithExtensions };

@@ -208,11 +208,16 @@ const handler2 = flow(
 // Execute flow
 const result = await flow.execute(handler, input)
 
-// With options
+// With existing scope
 const result = await flow.execute(handler, input, {
   scope: existingScope,
+  executionTags: [requestId("req-123")]
+})
+
+// Create temporary scope with extensions
+const result = await flow.execute(handler, input, {
   extensions: [loggingExtension],
-  tags: [requestId("req-123")]
+  executionTags: [requestId("req-123")]
 })
 ```
 

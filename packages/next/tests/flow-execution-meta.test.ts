@@ -23,7 +23,7 @@ describe("Flow Execution Meta", () => {
     });
 
     const result = await flow.execute(getRequestId, undefined, {
-      tags: [requestId({ requestId: "req-123" })],
+      executionTags: [requestId({ requestId: "req-123" })],
     });
 
     expect(result).toEqual({ requestId: "req-123" });
@@ -36,10 +36,10 @@ describe("Flow Execution Meta", () => {
     });
 
     const firstExecution = await flow.execute(getRequestId, undefined, {
-      tags: [requestId({ requestId: "req-1" })],
+      executionTags: [requestId({ requestId: "req-1" })],
     });
     const secondExecution = await flow.execute(getRequestId, undefined, {
-      tags: [requestId({ requestId: "req-2" })],
+      executionTags: [requestId({ requestId: "req-2" })],
     });
 
     expect(firstExecution).toEqual({ requestId: "req-1" });
@@ -57,7 +57,7 @@ describe("Flow Execution Meta", () => {
 
     const result = await flow.execute(readBothMetas, undefined, {
       scopeTags: [appConfig({ env: "test" })],
-      tags: [requestId({ requestId: "req-abc" })],
+      executionTags: [requestId({ requestId: "req-abc" })],
     });
 
     expect(result).toEqual({
@@ -79,7 +79,7 @@ describe("Flow Execution Meta", () => {
 
     const result = await flow.execute(inspectScope, undefined, {
       scope: existingScope,
-      tags: [requestId({ requestId: "req-xyz" })],
+      executionTags: [requestId({ requestId: "req-xyz" })],
     });
 
     expect(result.scopeTags).toBeUndefined();
