@@ -42,24 +42,29 @@ describe("Flow Extension Wrapping Fix", () => {
     expect(operations).toContain("execute");
   });
 
-  test("executionTags are passed to flow execution", async () => {
+  test("scope tags are accessible in extensions", async () => {
     let capturedTags: unknown;
 
     const tagCaptureExtension = extension({
       name: "tag-capture",
-      wrap: (scope, next, operation) => {
-        if (operation.kind === "execute") {
-          capturedTags = scope.tags;
-        }
+      wrap: (scope, next, _operation) => {
+        capturedTags = scope.tags;
         return next();
       },
     });
 
     const testTag = tag(custom<{ value: string }>(), { label: "test.tag" });
-    const scope = createScope({ extensions: [tagCaptureExtension] });
+    const executionTag = tag(custom<{ execution: string }>(), { label: "execution.tag" });
+    const scope = createScope({
+      extensions: [tagCaptureExtension],
+      tags: [testTag({ value: "scope-value" })]
+    });
     const simpleFlow = flow((_ctx, input: number) => input * 2);
 
-    await flow.execute(simpleFlow, 5, { scope, tags: [testTag({ value: "test-value" })] });
+    await flow.execute(simpleFlow, 5, {
+      scope,
+      executionTags: [executionTag({ execution: "exec-value" })]
+    });
 
     expect(capturedTags).toBeDefined();
   });

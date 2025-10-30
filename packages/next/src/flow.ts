@@ -36,7 +36,7 @@ function wrapWithExtensions<T>(
   return executor;
 }
 
-const flowDefinitionMeta = tag(custom<Flow.Definition<any, any>>(), {
+const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(custom<Flow.Definition<any, any>>(), {
   label: "flow.definition",
 });
 
@@ -148,7 +148,7 @@ class FlowContext implements Flow.Context {
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext
+    private parent?: FlowContext | undefined
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
@@ -180,7 +180,7 @@ class FlowContext implements Flow.Context {
     return executor;
   }
 
-  initializeExecutionContext(flowName: string, isParallel: boolean = false) {
+  initializeExecutionContext(flowName: string, isParallel: boolean = false): void {
     const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
     const parentFlowName = this.parent
       ? this.parent.find(flowMeta.flowName)
@@ -594,9 +594,7 @@ function execute<S, I>(
   input: I,
   options: {
     scope: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    tags?: Tag.Tagged[];
+    executionTags?: Tag.Tagged[];
     details: true;
   }
 ): Promised<Flow.ExecutionDetails<S>>;
@@ -606,9 +604,7 @@ function execute<S, I>(
   input: I,
   options?: {
     scope: Core.Scope;
-    extensions?: Extension.Extension[];
-    initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-    tags?: Tag.Tagged[];
+    executionTags?: Tag.Tagged[];
     details?: false;
   }
 ): Promised<S>;
@@ -639,9 +635,6 @@ function execute<S, I>(
   options?:
     | {
         scope: Core.Scope;
-        extensions?: Extension.Extension[];
-        initialContext?: Array<[Tag.Tag<any, false> | Tag.Tag<any, true>, any]>;
-        tags?: Tag.Tagged[];
         executionTags?: Tag.Tagged[];
         details?: boolean;
       }
@@ -681,7 +674,8 @@ function execute<S, I>(
     });
     if (shouldDisposeScope) {
       return Promised.create(
-        result.then((r) => scope.dispose().then(() => r))
+        result.then((r) => scope.dispose().then(() => r)),
+        result.ctx()
       ) as Promised<Flow.ExecutionDetails<S>>;
     }
     return result;
@@ -692,7 +686,8 @@ function execute<S, I>(
   });
   if (shouldDisposeScope) {
     return Promised.create(
-      result.then((r) => scope.dispose().then(() => r))
+      result.then((r) => scope.dispose().then(() => r)),
+      result.ctx()
     ) as Promised<S>;
   }
   return result;
@@ -849,3 +844,5 @@ export const flow: typeof flowImpl & {
 } = Object.assign(flowImpl, {
   execute: execute,
 });
+
+export { FlowContext, flowDefinitionMeta, wrapWithExtensions };

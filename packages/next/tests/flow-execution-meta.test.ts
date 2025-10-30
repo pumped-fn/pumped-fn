@@ -79,7 +79,7 @@ describe("Flow Execution Meta", () => {
 
     const result = await flow.execute(inspectScope, undefined, {
       scope: existingScope,
-      tags: [requestId({ requestId: "req-xyz" })],
+      executionTags: [requestId({ requestId: "req-xyz" })],
     });
 
     expect(result.scopeTags).toBeUndefined();

@@ -19,7 +19,8 @@ import {
 import { type Tag } from "./tag-types";
 import { Promised } from "./promises";
 import * as errors from "./errors";
-import { flow as flowApi } from "./flow";
+import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta, wrapWithExtensions } from "./flow";
+import { validate } from "./ssch";
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;
@@ -1095,22 +1096,92 @@ class BaseScope implements Core.Scope {
     this["~ensureNotDisposed"]();
 
     if (options?.details === true) {
-      return flowApi.execute(flow, input as I, {
-        scope: this,
-        extensions: undefined,
-        initialContext: undefined,
-        tags: options.tags,
-        details: true,
-      });
+      const result = this["~executeFlow"](flow, input as I, options.tags);
+      return Promised.create(
+        result.then(async (r) => {
+          const ctx = await result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: true as const, result: r, ctx };
+        }).catch(async (error) => {
+          const ctx = await result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: false as const, error, ctx };
+        })
+      );
     }
 
-    return flowApi.execute(flow, input as I, {
-      scope: this,
-      extensions: undefined,
-      initialContext: undefined,
-      tags: options?.tags,
-      details: false,
-    });
+    return this["~executeFlow"](flow, input as I, options?.tags);
+  }
+
+  private "~executeFlow"<S, I>(
+    flow: Core.Executor<Flow.Handler<S, I>>,
+    input: I,
+    executionTags?: Tag.Tagged[]
+  ): Promised<S> {
+    let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
+    const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
+      (resolve) => {
+        resolveSnapshot = resolve;
+      }
+    );
+
+    const promise = (async () => {
+      const context = new FlowContext(this, this.extensions, executionTags);
+
+      try {
+        const executeCore = (): Promised<S> => {
+          return this.resolve(flow).map(async (handler) => {
+            const definition = flowDefinitionMeta.find(flow);
+            if (!definition) {
+              throw new Error("Flow definition not found in executor metadata");
+            }
+            const validated = validate(definition.input, input);
+
+            context.initializeExecutionContext(definition.name, false);
+
+            const result = await handler(context, validated);
+
+            validate(definition.output, result);
+
+            return result;
+          });
+        };
+
+        const definition = flowDefinitionMeta.find(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+
+        const executor = wrapWithExtensions(
+          this.extensions,
+          executeCore,
+          this,
+          {
+            kind: "execute",
+            flow,
+            definition,
+            input,
+            flowName: definition.name || context.find(flowMeta.flowName),
+            depth: context.get(flowMeta.depth),
+            isParallel: context.get(flowMeta.isParallel),
+            parentFlowName: context.find(flowMeta.parentFlowName),
+          }
+        );
+
+        const result = await executor();
+        resolveSnapshot(context.createSnapshot());
+        return result;
+      } catch (error) {
+        resolveSnapshot(context.createSnapshot());
+        throw error;
+      }
+    })();
+
+    return Promised.create(promise, snapshotPromise);
   }
 }
 
