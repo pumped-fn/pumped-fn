@@ -71,6 +71,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
   private currentPromised: Promised<unknown> | null = null;
+  private outerTrackedPromise: Promise<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
   constructor(
@@ -90,7 +91,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
   }
 
-  private async resolveCore(trackedPromise: Promise<unknown>): Promise<unknown> {
+  private async resolveCore(): Promise<unknown> {
     if (this.scope["scopeState"] === "disposing") {
       throw new ScopeDisposingError();
     }
@@ -121,7 +122,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
       this.requestor
     );
 
-    this.scope["~moveToActive"](trackedPromise);
+    if (this.outerTrackedPromise) {
+      this.scope["~moveToActive"](this.outerTrackedPromise);
+    }
 
     const result = await this.executeFactory(
       factory,
@@ -147,16 +150,10 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveWithErrorHandling(): Promise<unknown> {
-    const trackedPromise = this.currentPromise!;
-    this.scope["~trackPending"](trackedPromise);
-
     try {
-      const result = await this.resolveCore(trackedPromise);
-      this.scope["~untrackExecution"](trackedPromise);
+      const result = await this.resolveCore();
       return result;
     } catch (error) {
-      this.scope["~untrackExecution"](trackedPromise);
-
       if (error instanceof ScopeDisposingError) {
         throw error;
       }
@@ -827,9 +824,17 @@ class BaseScope implements Core.Scope {
   resolve<T>(executor: Core.Executor<T>, force: boolean = false): Promised<T> {
     this["~ensureNotDisposed"]();
 
+    let trackedPromise: Promise<T> | null = null;
+
     const coreResolve = (): Promised<T> => {
       const accessor = this["~makeAccessor"](executor);
-      return accessor.resolve(force).map(() => accessor.get() as T);
+      const innerResolution = accessor.resolve(force);
+      const outerResolution = innerResolution.map(() => accessor.get() as T);
+
+      trackedPromise = outerResolution.toPromise();
+      (accessor as any).outerTrackedPromise = trackedPromise;
+
+      return outerResolution;
     };
 
     const resolver = this.wrapWithExtensions(coreResolve, {
@@ -839,7 +844,16 @@ class BaseScope implements Core.Scope {
       operation: "resolve",
     });
 
-    return resolver();
+    const result = resolver();
+    const finalPromise = trackedPromise || result.toPromise();
+
+    this["~trackPending"](finalPromise);
+    finalPromise.then(
+      () => this["~untrackExecution"](finalPromise),
+      () => this["~untrackExecution"](finalPromise)
+    );
+
+    return result;
   }
 
   resolveAccessor<T>(
