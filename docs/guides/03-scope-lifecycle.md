@@ -76,6 +76,76 @@ try {
 }
 ```
 
+## Graceful Shutdown
+
+The `CancellationExtension` provides graceful shutdown capabilities using `AbortController`:
+
+```ts twoslash
+import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
+
+const appScope = createScope({
+  extensions: [createCancellationExtension()],
+});
+```
+
+### Signal Propagation
+
+Parent scope abort cascades to children:
+
+```ts twoslash
+import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
+
+const parentExt = createCancellationExtension();
+const parent = createScope({
+  extensions: [parentExt],
+});
+
+const child = createScope({
+  extensions: [createCancellationExtension(parentExt.controller.signal)],
+});
+
+parentExt.controller.abort();
+```
+
+### Factory Cancellation
+
+Factories access signal via controller:
+
+```ts twoslash
+import { provide, AbortError } from "@pumped-fn/core-next";
+
+const worker = provide((controller) => {
+  controller.signal?.addEventListener("abort", () => {
+    // Clean cancellation
+  });
+
+  if (controller.signal?.aborted) {
+    throw new AbortError();
+  }
+
+  return performWork();
+});
+
+function performWork() { return { result: "done" }; }
+```
+
+### Process Signal Integration
+
+```ts twoslash
+import { createScope, createCancellationExtension, type CancellationExtension } from "@pumped-fn/core-next";
+
+const scope = createScope({
+  extensions: [createCancellationExtension()],
+});
+
+process.on("SIGTERM", async () => {
+  const ext = scope["extensions"].find(e => e.name === "cancellation") as CancellationExtension;
+  ext?.controller.abort("SIGTERM");
+
+  await scope.dispose().toPromise();
+});
+```
+
 ## Complete Example
 
 <<< @/../examples/http-server/scope-lifecycle.ts
