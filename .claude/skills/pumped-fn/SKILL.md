@@ -426,6 +426,62 @@ const result = await scope.exec(myFlow, input, {
 })
 ```
 
+## Graceful Shutdown Pattern
+
+**When to use:** HTTP servers, CLI apps, background jobs requiring clean shutdown
+
+**API:** `createCancellationExtension(parentSignal?: AbortSignal)`
+
+### Extension Setup
+
+```typescript
+import { createScope, createCancellationExtension } from "@pumped-fn/core-next";
+
+const scope = createScope({
+  extensions: [createCancellationExtension()],
+});
+```
+
+### Factory Cancellation
+
+```typescript
+import { provide, AbortError } from "@pumped-fn/core-next";
+
+const worker = provide((controller) => {
+  controller.signal?.addEventListener("abort", () => {
+    // Cancel work
+  });
+
+  if (controller.signal?.aborted) {
+    throw new AbortError();
+  }
+
+  return work();
+});
+
+function work() { return { result: "done" }; }
+```
+
+### Hierarchical Cancellation
+
+```typescript
+const parentExt = createCancellationExtension();
+const parent = createScope({
+  extensions: [parentExt],
+});
+
+const child = createScope({
+  extensions: [createCancellationExtension(parentExt.controller.signal)],
+});
+```
+
+### Properties
+
+- Parent abort cascades to children automatically
+- Complete in-flight operations, reject new operations
+- Factories opt-in via `controller.signal`
+- Automatic disposal integration
+
 ## Summary
 
 **This skill provides:**
