@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AbortError } from "../src/errors";
 import { type Core } from "../src/types";
+import { createCancellationExtension } from "../src/cancellation";
 
 describe("AbortError", () => {
   it("creates error with reason", () => {
@@ -43,5 +44,33 @@ describe("Controller signal type", () => {
     };
 
     expect(controller.signal).toBeUndefined();
+  });
+});
+
+describe("createCancellationExtension", () => {
+  it("creates extension without parent signal", () => {
+    const ext = createCancellationExtension();
+
+    expect(ext.name).toBe("cancellation");
+    expect(ext.controller).toBeInstanceOf(AbortController);
+    expect(ext.controller.signal.aborted).toBe(false);
+  });
+
+  it("creates extension with parent signal", () => {
+    const parent = new AbortController();
+    const ext = createCancellationExtension(parent.signal);
+
+    expect(ext.controller).toBeInstanceOf(AbortController);
+    expect(ext.controller.signal.aborted).toBe(false);
+  });
+
+  it("aborts when parent aborts", () => {
+    const parent = new AbortController();
+    const ext = createCancellationExtension(parent.signal);
+
+    parent.abort("test reason");
+
+    expect(ext.controller.signal.aborted).toBe(true);
+    expect(ext.controller.signal.reason).toBe("test reason");
   });
 });
