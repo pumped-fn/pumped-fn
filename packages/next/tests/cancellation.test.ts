@@ -137,3 +137,63 @@ describe("Extension dispose", () => {
     expect(ext.controller.signal.reason).toBe("manual");
   });
 });
+
+describe("Factory signal integration", () => {
+  it("provides signal to factory", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    let receivedSignal: AbortSignal | undefined;
+    const executor = provide((controller) => {
+      receivedSignal = controller.signal;
+      return "value";
+    });
+
+    await scope.resolve(executor).toPromise();
+
+    expect(receivedSignal).toBeDefined();
+    expect(receivedSignal).toBe(ext.controller.signal);
+  });
+
+  it("factory can check abort state", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    let wasAborted = false;
+    const executor = provide((controller) => {
+      wasAborted = controller.signal?.aborted || false;
+      return "value";
+    });
+
+    ext.controller.abort();
+
+    await expect(scope.resolve(executor).toPromise()).rejects.toThrow(
+      AbortError
+    );
+    expect(wasAborted).toBe(false);
+  });
+
+  it("factory can listen to abort events", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    let aborted = false;
+    const executor = provide((controller) => {
+      controller.signal?.addEventListener("abort", () => {
+        aborted = true;
+      });
+
+      return new Promise((resolve) => {
+        setTimeout(() => resolve("value"), 100);
+      });
+    });
+
+    const resolution = scope.resolve(executor);
+
+    setTimeout(() => ext.controller.abort(), 10);
+
+    await resolution.toPromise();
+
+    expect(aborted).toBe(true);
+  });
+});
