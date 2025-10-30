@@ -42,5 +42,12 @@ export function createCancellationExtension(
 
       return next();
     },
+
+    dispose(scope: Core.Scope): void {
+      if (!aborted && !controller.signal.aborted) {
+        controller.abort("Scope disposed");
+        aborted = true;
+      }
+    },
   };
 }

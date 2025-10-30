@@ -115,3 +115,25 @@ describe("Extension wrap", () => {
     expect(result).toBe("completed");
   });
 });
+
+describe("Extension dispose", () => {
+  it("aborts controller when scope disposes", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    await scope.dispose().toPromise();
+
+    expect(ext.controller.signal.aborted).toBe(true);
+    expect(ext.controller.signal.reason).toBe("Scope disposed");
+  });
+
+  it("does not abort twice", async () => {
+    const ext = createCancellationExtension();
+    const scope = createScope({ extensions: [ext] });
+
+    ext.controller.abort("manual");
+    await scope.dispose().toPromise();
+
+    expect(ext.controller.signal.reason).toBe("manual");
+  });
+});
