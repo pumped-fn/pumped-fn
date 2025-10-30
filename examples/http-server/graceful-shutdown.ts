@@ -19,19 +19,18 @@ const dbConnection = provide((controller) => {
   return { query: (sql: string) => console.log("Query:", sql) };
 });
 
-const requestHandler = derive(dbConnection, (db, controller) => {
-  if (controller.signal?.aborted) {
-    return { status: 503, body: "Service shutting down" };
-  }
-
+const requestHandler = derive(dbConnection, (db) => {
   db.query("SELECT * FROM users");
-
   return { status: 200, body: "OK" };
 });
 
 async function handleRequest() {
-  const result = await appScope.resolve(requestHandler).toPromise();
-  console.log("Response:", result);
+  try {
+    const result = await appScope.resolve(requestHandler).toPromise();
+    console.log("Response:", result);
+  } catch (error) {
+    console.log("Request cancelled:", (error as Error).message);
+  }
 }
 
 process.on("SIGTERM", async () => {

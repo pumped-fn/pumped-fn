@@ -40,7 +40,32 @@ export function createCancellationExtension(
         return Promised.create(Promise.reject(new AbortError(controller.signal.reason)));
       }
 
-      return next();
+      const result = next();
+
+      const cancelablePromise = new Promise<T>((resolve, reject) => {
+        const abortHandler = () => {
+          reject(new AbortError(controller.signal.reason));
+        };
+
+        controller.signal.addEventListener("abort", abortHandler, { once: true });
+
+        result.toPromise().then(
+          (value) => {
+            controller.signal.removeEventListener("abort", abortHandler);
+            if (controller.signal.aborted) {
+              reject(new AbortError(controller.signal.reason));
+            } else {
+              resolve(value);
+            }
+          },
+          (error) => {
+            controller.signal.removeEventListener("abort", abortHandler);
+            reject(error);
+          }
+        );
+      });
+
+      return Promised.create(cancelablePromise);
     },
 
     dispose(scope: Core.Scope): void {

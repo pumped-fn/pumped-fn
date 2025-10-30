@@ -94,7 +94,7 @@ describe("Extension wrap", () => {
     );
   });
 
-  it("allows in-flight operations to complete", async () => {
+  it("cancels in-flight operations immediately", async () => {
     const ext = createCancellationExtension();
     const scope = createScope({ extensions: [ext] });
 
@@ -111,8 +111,7 @@ describe("Extension wrap", () => {
 
     resolveOp!("completed");
 
-    const result = await resolution.toPromise();
-    expect(result).toBe("completed");
+    await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
   });
 });
 
@@ -173,17 +172,16 @@ describe("Factory signal integration", () => {
     expect(wasAborted).toBe(false);
   });
 
-  it("factory can listen to abort events", async () => {
+  it("factory can listen to abort events for cleanup", async () => {
     const ext = createCancellationExtension();
     const scope = createScope({ extensions: [ext] });
 
     const executor = provide((controller) => {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         const timeout = setTimeout(() => resolve("value"), 100);
 
         controller.signal?.addEventListener("abort", () => {
           clearTimeout(timeout);
-          reject(new AbortError());
         });
       });
     });
@@ -203,7 +201,7 @@ describe("Long-running cancellation", () => {
       const scope = createScope({ extensions: [ext] });
 
       const longRunningWork = provide((controller) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const intervalId = setInterval(() => {
             if (controller.signal?.aborted) {
               clearInterval(intervalId);
@@ -212,7 +210,6 @@ describe("Long-running cancellation", () => {
 
           controller.signal?.addEventListener("abort", () => {
             clearInterval(intervalId);
-            reject(new AbortError(controller.signal?.reason));
           });
 
           setTimeout(() => {
@@ -272,14 +269,13 @@ describe("Long-running cancellation", () => {
       const scope = createScope({ extensions: [ext] });
 
       const dataFetcher = provide((controller) => {
-        return new Promise<{ data: string }>((resolve, reject) => {
+        return new Promise<{ data: string }>((resolve) => {
           const timeout = setTimeout(() => {
             resolve({ data: "fetched" });
           }, 100);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
-            reject(new AbortError());
           });
         });
       });
@@ -301,12 +297,11 @@ describe("Long-running cancellation", () => {
 
       const createOperation = (id: number) =>
         provide((controller) => {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(`op-${id}`), 150);
 
             controller.signal?.addEventListener("abort", () => {
               clearTimeout(timeout);
-              reject(new AbortError());
             });
           });
         });
@@ -332,23 +327,21 @@ describe("Long-running cancellation", () => {
       const childScope = createScope({ extensions: [childExt] });
 
       const parentWork = provide((controller) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const timeout = setTimeout(() => resolve("parent done"), 200);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
-            reject(new AbortError());
           });
         });
       });
 
       const childWork = provide((controller) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const timeout = setTimeout(() => resolve("child done"), 200);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
-            reject(new AbortError());
           });
         });
       });
@@ -380,12 +373,11 @@ describe("Long-running cancellation", () => {
       });
 
       const childWork = provide((controller) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const timeout = setTimeout(() => resolve("child done"), 200);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
-            reject(new AbortError());
           });
         });
       });
@@ -425,17 +417,11 @@ describe("Long-running cancellation", () => {
       const scope = createScope({ extensions: [ext] });
 
       const executor = provide((controller) => {
-        return new Promise((resolve, reject) => {
-          if (controller.signal?.aborted) {
-            reject(new AbortError());
-            return;
-          }
-
+        return new Promise((resolve) => {
           const timeout = setTimeout(() => resolve("done"), 100);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
-            reject(new AbortError());
           });
         });
       });
