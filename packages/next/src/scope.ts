@@ -16,6 +16,7 @@ import {
   executorSymbol,
   type Flow,
 } from "./types";
+import { type Tag } from "./tag-types";
 import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
@@ -1069,12 +1070,7 @@ class BaseScope implements Core.Scope {
     flow: Core.Executor<Flow.Handler<S, I>>,
     input?: I,
     options?: {
-      extensions?: Extension.Extension[];
-      initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
-      >;
-      presets?: Core.Preset<unknown>[];
-      tags?: import("./tag-types").Tag.Tagged[];
+      tags?: Tag.Tagged[];
       details?: false;
     }
   ): Promised<S>;
@@ -1083,12 +1079,7 @@ class BaseScope implements Core.Scope {
     flow: Core.Executor<Flow.Handler<S, I>>,
     input: I | undefined,
     options: {
-      extensions?: Extension.Extension[];
-      initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
-      >;
-      presets?: Core.Preset<unknown>[];
-      tags?: import("./tag-types").Tag.Tagged[];
+      tags?: Tag.Tagged[];
       details: true;
     }
   ): Promised<Flow.ExecutionDetails<S>>;
@@ -1097,12 +1088,7 @@ class BaseScope implements Core.Scope {
     flow: Core.Executor<Flow.Handler<S, I>>,
     input?: I,
     options?: {
-      extensions?: Extension.Extension[];
-      initialContext?: Array<
-        [import("./tag-types").Tag.Tag<any, false> | import("./tag-types").Tag.Tag<any, true>, any]
-      >;
-      presets?: Core.Preset<unknown>[];
-      tags?: import("./tag-types").Tag.Tagged[];
+      tags?: Tag.Tagged[];
       details?: boolean;
     }
   ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
@@ -1111,8 +1097,8 @@ class BaseScope implements Core.Scope {
     if (options?.details === true) {
       return flowApi.execute(flow, input as I, {
         scope: this,
-        extensions: options.extensions,
-        initialContext: options.initialContext,
+        extensions: undefined,
+        initialContext: undefined,
         tags: options.tags,
         details: true,
       });
@@ -1120,8 +1106,8 @@ class BaseScope implements Core.Scope {
 
     return flowApi.execute(flow, input as I, {
       scope: this,
-      extensions: options?.extensions,
-      initialContext: options?.initialContext,
+      extensions: undefined,
+      initialContext: undefined,
       tags: options?.tags,
       details: false,
     });
