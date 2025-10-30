@@ -651,129 +651,51 @@ function execute<S, I>(
         details?: boolean;
       })
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
-  let scope: Core.Scope;
-  let shouldDisposeScope: boolean;
-  let contextTags: Tag.Tagged[] | undefined;
-  let additionalExtensions: Extension.Extension[] | undefined;
-
   if (options && 'scope' in options) {
-    scope = options.scope;
-    shouldDisposeScope = false;
-    contextTags = options.tags;
-    additionalExtensions = options.extensions;
-  } else {
-    scope = options
-      ? createScope({
-          initialValues: options.initialValues,
-          registry: options.registry,
-          extensions: options.extensions,
-          tags: options.scopeTags,
-        })
-      : createScope();
-    shouldDisposeScope = true;
-    contextTags = options?.executionTags;
-    additionalExtensions = options?.extensions;
-  }
-
-  const scopeExtensions = (scope as any).extensions as Extension.Extension[] | undefined;
-  const executeExtensions = scopeExtensions && additionalExtensions
-    ? [...scopeExtensions, ...additionalExtensions]
-    : scopeExtensions || additionalExtensions;
-
-  let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
-  const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
-    (resolve) => {
-      resolveSnapshot = resolve;
+    if (options.details === true) {
+      return options.scope.exec(flow, input, {
+        tags: options.executionTags,
+        details: true,
+      });
     }
-  );
-
-  const promise = (async () => {
-    const context = new FlowContext(scope, additionalExtensions || [], contextTags);
-
-    try {
-      if (options && 'scope' in options && options.initialContext) {
-        for (const [accessor, value] of options.initialContext) {
-          accessor.set(context, value);
-        }
-      }
-
-      const executeCore = (): Promised<S> => {
-        return scope.resolve(flow).map(async (handler) => {
-          const definition = flowDefinitionMeta.find(flow);
-          if (!definition) {
-            throw new Error("Flow definition not found in executor metadata");
-          }
-          const validated = validate(definition.input, input);
-
-          context.initializeExecutionContext(definition.name, false);
-
-          const result = await handler(context, validated);
-
-          validate(definition.output, result);
-
-          return result;
-        });
-      };
-
-      const definition = flowDefinitionMeta.find(flow);
-      if (!definition) {
-        throw new Error("Flow definition not found in executor metadata");
-      }
-
-      const scopeWithTags = contextTags
-        ? Object.create(scope, {
-            tags: { value: contextTags, enumerable: true, configurable: true },
-          })
-        : scope;
-
-      const executor = wrapWithExtensions(
-        executeExtensions,
-        executeCore,
-        scopeWithTags,
-        {
-          kind: "execute",
-          flow,
-          definition,
-          input,
-          flowName: definition.name || context.find(flowMeta.flowName),
-          depth: context.get(flowMeta.depth),
-          isParallel: context.get(flowMeta.isParallel),
-          parentFlowName: context.find(flowMeta.parentFlowName),
-        }
-      );
-
-      const result = await executor();
-      resolveSnapshot(context.createSnapshot());
-      return result;
-    } catch (error) {
-      resolveSnapshot(context.createSnapshot());
-      throw error;
-    } finally {
-      if (shouldDisposeScope) {
-        await scope.dispose();
-      }
-    }
-  })();
-
-  if (options?.details) {
-    const detailsPromise = Promised.try(async (): Promise<Flow.ExecutionDetails<S>> => {
-      const [result, ctx] = await Promise.all([promise, snapshotPromise]);
-      if (!ctx) {
-        throw new Error("Execution context not available");
-      }
-      return { success: true as const, result, ctx };
-    }).catch(async (error) => {
-      const ctx = await snapshotPromise;
-      if (!ctx) {
-        throw new Error("Execution context not available");
-      }
-      return { success: false as const, error, ctx };
+    return options.scope.exec(flow, input, {
+      tags: options.executionTags,
     });
-
-    return Promised.create(detailsPromise, snapshotPromise);
   }
 
-  return Promised.create(promise, snapshotPromise);
+  const scope = options
+    ? createScope({
+        initialValues: options.initialValues,
+        registry: options.registry,
+        extensions: options.extensions,
+        tags: options.scopeTags,
+      })
+    : createScope();
+
+  const shouldDisposeScope = true;
+
+  if (options?.details === true) {
+    const result = scope.exec(flow, input, {
+      tags: options.executionTags,
+      details: true,
+    });
+    if (shouldDisposeScope) {
+      return Promised.create(
+        result.then((r) => scope.dispose().then(() => r))
+      ) as Promised<Flow.ExecutionDetails<S>>;
+    }
+    return result;
+  }
+
+  const result = scope.exec(flow, input, {
+    tags: options?.executionTags,
+  });
+  if (shouldDisposeScope) {
+    return Promised.create(
+      result.then((r) => scope.dispose().then(() => r))
+    ) as Promised<S>;
+  }
+  return result;
 }
 
 function flowImpl<I, S>(
