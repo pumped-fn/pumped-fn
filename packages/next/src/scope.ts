@@ -1220,25 +1220,29 @@ class BaseScope implements Core.Scope {
       try {
         const executeCore = (): Promised<S> => {
           this.trackingDisabled = true;
-          const result = this.resolve(flow).map(async (handler) => {
-            const definition = flowDefinitionMeta.find(flow);
-            if (!definition) {
-              throw new Error("Flow definition not found in executor metadata");
-            }
-            const validated = validate(definition.input, input);
+          try {
+            const result = this.resolve(flow).map(async (handler) => {
+              const definition = flowDefinitionMeta.find(flow);
+              if (!definition) {
+                throw new Error("Flow definition not found in executor metadata");
+              }
+              const validated = validate(definition.input, input);
 
-            context.initializeExecutionContext(definition.name, false);
+              context.initializeExecutionContext(definition.name, false);
 
-            this.trackingDisabled = false;
-            this["~moveToActive"](trackedPromise);
+              this.trackingDisabled = false;
+              this["~moveToActive"](trackedPromise);
 
-            const result = await handler(context, validated);
+              const result = await handler(context, validated);
 
-            validate(definition.output, result);
+              validate(definition.output, result);
 
+              return result;
+            });
             return result;
-          });
-          return result;
+          } finally {
+            this.trackingDisabled = false;
+          }
         };
 
         const definition = flowDefinitionMeta.find(flow);

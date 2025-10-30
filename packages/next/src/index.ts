@@ -16,7 +16,12 @@ export {
   isStaticExecutor,
 } from "./executor";
 
-export { createScope, type ScopeOption } from "./scope";
+export {
+  createScope,
+  type ScopeOption,
+  ScopeDisposingError,
+  GracePeriodExceededError,
+} from "./scope";
 
 export { tag } from "./tag";
 export type { Tag } from "./tag-types";
