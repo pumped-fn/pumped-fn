@@ -179,12 +179,14 @@ describe("Factory signal integration", () => {
 
     let aborted = false;
     const executor = provide((controller) => {
-      controller.signal?.addEventListener("abort", () => {
-        aborted = true;
-      });
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => resolve("value"), 100);
 
-      return new Promise((resolve) => {
-        setTimeout(() => resolve("value"), 100);
+        controller.signal?.addEventListener("abort", () => {
+          aborted = true;
+          clearTimeout(timeout);
+          reject(new AbortError());
+        });
       });
     });
 
@@ -192,8 +194,7 @@ describe("Factory signal integration", () => {
 
     setTimeout(() => ext.controller.abort(), 10);
 
-    await resolution.toPromise();
-
+    await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
     expect(aborted).toBe(true);
   });
 });
