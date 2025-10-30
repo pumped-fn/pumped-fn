@@ -39,6 +39,22 @@ type CacheEntry = ExecutorState;
 type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
+type ScopeState = 'active' | 'disposing' | 'disposed';
+
+class ScopeDisposingError extends Error {
+  constructor() {
+    super('Scope is disposing, operation canceled');
+    this.name = 'ScopeDisposingError';
+  }
+}
+
+class GracePeriodExceededError extends Error {
+  constructor(gracePeriod: number) {
+    super(`Operation exceeded grace period of ${gracePeriod}ms`);
+    this.name = 'GracePeriodExceededError';
+  }
+}
+
 interface ReplacerResult {
   factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>;
   dependencies:
@@ -415,6 +431,9 @@ class BaseScope implements Core.Scope {
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
   private isDisposing = false;
+  private scopeState: ScopeState = 'active';
+  private activeExecutions: Set<Promise<unknown>> = new Set();
+  private pendingResolutions: Set<Promise<unknown>> = new Set();
 
   private readonly CIRCULAR_CHECK_THRESHOLD = 15;
 
