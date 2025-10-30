@@ -261,3 +261,11 @@ export function getExecutorName(executor: unknown): string {
 export function buildDependencyChain(executorStack: unknown[]): string[] {
   return executorStack.map(getExecutorName);
 }
+
+export class AbortError extends Error {
+  constructor(reason?: unknown) {
+    super("Operation aborted");
+    this.name = "AbortError";
+    this.cause = reason;
+  }
+}
