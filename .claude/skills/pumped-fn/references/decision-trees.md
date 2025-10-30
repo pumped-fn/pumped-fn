@@ -321,6 +321,90 @@ function App() {
 
 **Key insight:** Scope = unit of resource lifecycle. Match scope lifetime to your execution model.
 
+### Graceful Disposal
+
+**Purpose:** Allow active operations to complete before cleanup during scope disposal.
+
+**Two-Phase Disposal:**
+
+1. **Disposing Phase** - Reject new operations, allow active operations to complete
+2. **Disposed Phase** - Run cleanup callbacks, clear all resources
+
+**API:**
+
+```typescript
+await scope.dispose({ gracePeriod: 5000 })
+```
+
+- Default grace period: 5000ms (if no option provided)
+- Set to 0 for immediate disposal
+- Custom grace periods for different environments
+
+**Behavior:**
+
+- **Pending operations** (not yet started): Canceled immediately, throw `ScopeDisposingError`
+- **Active operations** (already executing): Get full grace period to complete
+- **After disposal**: All operations throw "Scope is disposed"
+
+**Examples:**
+
+```typescript
+const scope = createScope()
+
+await scope.dispose()
+
+const scope = createScope()
+
+await scope.dispose({ gracePeriod: 10000 })
+
+const scope = createScope()
+
+await scope.dispose({ gracePeriod: 0 })
+
+const scope = createScope()
+const server = await scope.resolve(httpServer)
+
+process.on('SIGTERM', async () => {
+  server.close()
+  await scope.dispose({ gracePeriod: 30000 })
+  process.exit(0)
+})
+```
+
+**Error Handling:**
+
+```typescript
+import { ScopeDisposingError } from '@pumped-fn/core-next'
+
+try {
+  await scope.resolve(executor)
+} catch (error) {
+  if (error instanceof ScopeDisposingError) {
+    console.log('Operation canceled due to disposal')
+  }
+}
+```
+
+**Testing:**
+
+Use short grace periods (0ms) in tests for fast cleanup verification:
+
+```typescript
+test('cleanup runs', async () => {
+  const scope = createScope()
+  const cleanup = vi.fn()
+
+  const executor = provide(() => ({ value: 'test' }), {
+    cleanup: async () => cleanup()
+  })
+
+  await scope.resolve(executor)
+  await scope.dispose({ gracePeriod: 0 })
+
+  expect(cleanup).toHaveBeenCalled()
+})
+```
+
 ---
 
 ### Decision Tree 6: Tags vs Direct Values
