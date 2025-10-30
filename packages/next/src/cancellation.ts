@@ -7,11 +7,37 @@ export interface CancellationExtension extends Extension.Extension {
   aborted: boolean;
 }
 
+export interface CancellationOptions {
+  parentSignal?: AbortSignal;
+  timeout?: number;
+}
+
 export function createCancellationExtension(
   parentSignal?: AbortSignal
+): CancellationExtension;
+
+export function createCancellationExtension(
+  options?: CancellationOptions
+): CancellationExtension;
+
+export function createCancellationExtension(
+  parentSignalOrOptions?: AbortSignal | CancellationOptions
 ): CancellationExtension {
   const controller = new AbortController();
   let aborted = false;
+
+  let parentSignal: AbortSignal | undefined;
+  let timeout: number | undefined;
+
+  if (parentSignalOrOptions && typeof parentSignalOrOptions === "object") {
+    if ("addEventListener" in parentSignalOrOptions) {
+      parentSignal = parentSignalOrOptions as AbortSignal;
+    } else {
+      const options = parentSignalOrOptions as CancellationOptions;
+      parentSignal = options.parentSignal;
+      timeout = options.timeout;
+    }
+  }
 
   if (parentSignal) {
     parentSignal.addEventListener("abort", () => {
@@ -45,7 +71,13 @@ export function createCancellationExtension(
       const result = next();
 
       const cancelablePromise = new Promise<T>((resolve, reject) => {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let timedOut = false;
+
         const abortHandler = () => {
+          if (timeoutId !== undefined) {
+            clearTimeout(timeoutId);
+          }
           reject(new AbortError(controller.signal.reason));
         };
 
@@ -53,8 +85,22 @@ export function createCancellationExtension(
           once: true,
         });
 
+        if (timeout !== undefined && timeout > 0) {
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            controller.signal.removeEventListener("abort", abortHandler);
+            reject(new AbortError(`Operation timeout after ${timeout}ms`));
+          }, timeout);
+        }
+
         result.toPromise().then(
           (value) => {
+            if (timeoutId !== undefined) {
+              clearTimeout(timeoutId);
+            }
+            if (timedOut) {
+              return;
+            }
             controller.signal.removeEventListener("abort", abortHandler);
             if (controller.signal.aborted) {
               reject(new AbortError(controller.signal.reason));
@@ -63,6 +109,12 @@ export function createCancellationExtension(
             }
           },
           (error) => {
+            if (timeoutId !== undefined) {
+              clearTimeout(timeoutId);
+            }
+            if (timedOut) {
+              return;
+            }
             controller.signal.removeEventListener("abort", abortHandler);
             reject(error);
           }

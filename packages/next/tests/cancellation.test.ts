@@ -481,7 +481,7 @@ describe("Long-running cancellation", () => {
     });
   });
 
-  describe("Abort during resolution", () => {
+    describe("Abort during resolution", () => {
     it("handles abort during factory execution", async () => {
       const ext = createCancellationExtension();
       const scope = createScope({ extensions: [ext] });
@@ -522,6 +522,71 @@ describe("Long-running cancellation", () => {
       await scope.release(executor).toPromise();
 
       expect(cleanupRan).toBe(true);
+    });
+  });
+
+  describe("Timeout", () => {
+    it("does not abort operations that complete before timeout", async () => {
+      const ext = createCancellationExtension({ timeout: 100 });
+      const scope = createScope({ extensions: [ext] });
+
+      const fastOperation = provide(() => {
+        return new Promise<string>((resolve) => {
+          setTimeout(() => resolve("completed"), 10);
+        });
+      });
+
+      const result = await scope.resolve(fastOperation).toPromise();
+      expect(result).toBe("completed");
+    });
+
+    it("aborts operations that exceed timeout", async () => {
+      const ext = createCancellationExtension({ timeout: 50 });
+      const scope = createScope({ extensions: [ext] });
+
+      const slowOperation = provide(() => {
+        return new Promise<string>((resolve) => {
+          setTimeout(() => resolve("completed"), 200);
+        });
+      });
+
+      try {
+        await scope.resolve(slowOperation).toPromise();
+        throw new Error("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(AbortError);
+        expect((error as AbortError).cause).toBe("Operation timeout after 50ms");
+      }
+    });
+
+    it("timeout does not affect subsequent operations after first timeout", async () => {
+      const ext = createCancellationExtension({ timeout: 50 });
+      const scope = createScope({ extensions: [ext] });
+
+      const slowOperation = provide(() => {
+        return new Promise<string>((resolve) => {
+          setTimeout(() => resolve("completed"), 200);
+        });
+      });
+
+      const fastOperation = provide(() => {
+        return new Promise<string>((resolve) => {
+          setTimeout(() => resolve("fast"), 10);
+        });
+      });
+
+      try {
+        await scope.resolve(slowOperation).toPromise();
+        throw new Error("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(AbortError);
+        expect((error as AbortError).cause).toContain("Operation timeout");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const result = await scope.resolve(fastOperation).toPromise();
+      expect(result).toBe("fast");
     });
   });
 });
