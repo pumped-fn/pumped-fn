@@ -124,8 +124,8 @@ describe("Flow Extension Wrapping Fix", () => {
     let capturedScopeTags: unknown;
     let capturedExecutionTags: unknown;
 
-    const scopeTagSymbol = Symbol("scope-tag");
-    const executionTagSymbol = Symbol("execution-tag");
+    const scopeTag = tag(custom<{ value: string }>(), { label: "scope.tag" });
+    const executionTag = tag(custom<{ value: string }>(), { label: "execution.tag" });
 
     const tagCaptureExtension = extension({
       name: "tag-capture",
@@ -142,8 +142,8 @@ describe("Flow Extension Wrapping Fix", () => {
 
     await flow.execute(simpleFlow, 5, {
       extensions: [tagCaptureExtension],
-      scopeTags: [{ key: scopeTagSymbol, value: "scope-value" }],
-      executionTags: [{ key: executionTagSymbol, value: "execution-value" }],
+      scopeTags: [scopeTag({ value: "scope-value" })],
+      executionTags: [executionTag({ value: "execution-value" })],
     });
 
     expect(capturedScopeTags).toBeDefined();
