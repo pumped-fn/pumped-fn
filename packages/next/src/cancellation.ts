@@ -32,12 +32,14 @@ export function createCancellationExtension(
     },
 
     wrap<T>(
-      scope: Core.Scope,
+      _scope: Core.Scope,
       next: () => Promised<T>,
-      operation: Extension.Operation
+      _operation: Extension.Operation
     ): Promised<T> {
       if (aborted || controller.signal.aborted) {
-        return Promised.create(Promise.reject(new AbortError(controller.signal.reason)));
+        return Promised.create(
+          Promise.reject(new AbortError(controller.signal.reason))
+        );
       }
 
       const result = next();
@@ -47,7 +49,9 @@ export function createCancellationExtension(
           reject(new AbortError(controller.signal.reason));
         };
 
-        controller.signal.addEventListener("abort", abortHandler, { once: true });
+        controller.signal.addEventListener("abort", abortHandler, {
+          once: true,
+        });
 
         result.toPromise().then(
           (value) => {
@@ -68,7 +72,7 @@ export function createCancellationExtension(
       return Promised.create(cancelablePromise);
     },
 
-    dispose(scope: Core.Scope): void {
+    dispose(_scope: Core.Scope): void {
       if (!aborted && !controller.signal.aborted) {
         controller.abort("Scope disposed");
         aborted = true;

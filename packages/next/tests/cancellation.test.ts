@@ -195,6 +195,62 @@ describe("Factory signal integration", () => {
 });
 
 describe("Long-running cancellation", () => {
+  describe("Flow cancellation", () => {
+    it("cancels flow execution when aborted", async () => {
+      const ext = createCancellationExtension();
+      const scope = createScope({ extensions: [ext] });
+
+      const { flow } = await import("../src/flow");
+      const { custom } = await import("../src/ssch");
+
+      const longRunningFlow = flow(
+        { input: custom<void>(), output: custom<string>() },
+        async (ctx) => {
+          return new Promise<string>((resolve) => {
+            setTimeout(() => resolve("completed"), 200);
+          });
+        }
+      );
+
+      const execution = scope.exec(longRunningFlow, undefined);
+
+      setTimeout(() => ext.controller.abort("timeout"), 50);
+
+      await expect(execution.toPromise()).rejects.toThrow("Operation aborted");
+    });
+
+    it("cancels flow with ctx.run when aborted", async () => {
+      const ext = createCancellationExtension();
+      const scope = createScope({ extensions: [ext] });
+
+      const { flow } = await import("../src/flow");
+      const { custom } = await import("../src/ssch");
+
+      const flowWithRun = flow(
+        { input: custom<void>(), output: custom<string>() },
+        async (ctx) => {
+          await ctx.run("step1", async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return "step1 done";
+          });
+
+          await ctx.run("step2", async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return "step2 done";
+          });
+
+          return "all done";
+        }
+      );
+
+      const execution = scope.exec(flowWithRun, undefined);
+
+      setTimeout(() => ext.controller.abort("cancel"), 50);
+
+      await expect(execution.toPromise()).rejects.toThrow("Operation aborted");
+    });
+  });
+
   describe("Executor cancellation", () => {
     it("cancels long-running executor and stops work", async () => {
       const ext = createCancellationExtension();
