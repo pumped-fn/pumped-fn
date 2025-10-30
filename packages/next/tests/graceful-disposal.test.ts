@@ -545,3 +545,224 @@ describe("Graceful Disposal - Task 5: Two-Phase Disposal", () => {
     });
   });
 });
+
+describe("Graceful Disposal - Edge Cases", () => {
+  describe("Dispose with no in-flight operations", () => {
+    it("should dispose immediately when no operations are running", async () => {
+      const s = createScope();
+
+      expect((s as any).activeExecutions.size).toBe(0);
+      expect((s as any).pendingResolutions.size).toBe(0);
+
+      const startTime = Date.now();
+      await s.dispose({ gracePeriod: 5000 });
+      const elapsed = Date.now() - startTime;
+
+      expect((s as any).scopeState).toBe("disposed");
+      expect(elapsed).toBeLessThan(100);
+    });
+
+    it("should dispose scope that only had completed operations", async () => {
+      const s = createScope();
+      const executor = provide(() => "test");
+
+      await s.resolve(executor);
+
+      expect((s as any).activeExecutions.size).toBe(0);
+      expect((s as any).pendingResolutions.size).toBe(0);
+
+      await s.dispose();
+
+      expect((s as any).scopeState).toBe("disposed");
+    });
+  });
+
+  describe("Multiple dispose calls", () => {
+    it("should throw error when calling dispose on already disposed scope", async () => {
+      const s = createScope();
+
+      await s.dispose({ gracePeriod: 100 });
+
+      expect((s as any).scopeState).toBe("disposed");
+
+      expect(() => s.dispose({ gracePeriod: 100 })).toThrow("Scope is disposed");
+    });
+
+    it("should handle concurrent dispose calls", async () => {
+      const s = createScope();
+
+      const dispose1 = s.dispose({ gracePeriod: 100 });
+      const dispose2 = s.dispose({ gracePeriod: 100 });
+
+      await Promise.all([dispose1, dispose2]);
+
+      expect((s as any).scopeState).toBe("disposed");
+    });
+
+    it("should not restart disposal if already disposing", async () => {
+      const s = createScope();
+      let executionStarted = false;
+      let executionCompleted = false;
+
+      const slowExecutor = provide(async () => {
+        executionStarted = true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        executionCompleted = true;
+        return "slow";
+      });
+
+      s.resolve(slowExecutor);
+
+      while (!executionStarted) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      const dispose1 = s.dispose({ gracePeriod: 200 });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const dispose2 = s.dispose({ gracePeriod: 200 });
+
+      await Promise.all([dispose1, dispose2]);
+
+      expect((s as any).scopeState).toBe("disposed");
+      expect(executionCompleted).toBe(true);
+    });
+  });
+
+  describe("Reject exec during disposal", () => {
+    it("should reject exec calls when scope is disposing", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      const slowFlow = flow(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return "slow";
+      });
+
+      s.exec(slowFlow);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const disposePromise = s.dispose({ gracePeriod: 200 });
+
+      const newFlow = flow(() => "new");
+
+      await expect(s.exec(newFlow)).rejects.toThrow(ScopeDisposingError);
+      await expect(s.exec(newFlow)).rejects.toThrow("Scope is disposing, operation canceled");
+
+      await disposePromise;
+    });
+
+    it("should reject exec calls when scope is disposed", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      await s.dispose();
+
+      const flowExecutor = flow(() => "test");
+
+      expect(() => s.exec(flowExecutor)).toThrow("Scope is disposed");
+    });
+  });
+
+  describe("Zero grace period edge cases", () => {
+    it("should immediately timeout active operations with gracePeriod=0", async () => {
+      const s = createScope();
+      let executionStarted = false;
+      let executionCompleted = false;
+
+      const executor = provide(async () => {
+        executionStarted = true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        executionCompleted = true;
+        return "done";
+      });
+
+      s.resolve(executor);
+
+      while (!executionStarted) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      const startTime = Date.now();
+      await s.dispose({ gracePeriod: 0 });
+      const elapsed = Date.now() - startTime;
+
+      expect(executionCompleted).toBe(false);
+      expect((s as any).scopeState).toBe("disposed");
+      expect(elapsed).toBeLessThan(50);
+    });
+
+    it("should dispose immediately with gracePeriod=0 and no operations", async () => {
+      const s = createScope();
+
+      const startTime = Date.now();
+      await s.dispose({ gracePeriod: 0 });
+      const elapsed = Date.now() - startTime;
+
+      expect((s as any).scopeState).toBe("disposed");
+      expect(elapsed).toBeLessThan(50);
+    });
+  });
+
+  describe("Mixed resolve and exec operations", () => {
+    it("should handle disposal with both resolve and exec operations active", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+      const started: string[] = [];
+      const completed: string[] = [];
+
+      const resolveOp = provide(async () => {
+        started.push("resolve");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        completed.push("resolve");
+        return "resolved";
+      });
+
+      const flowOp = flow(async () => {
+        started.push("flow");
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        completed.push("flow");
+        return "flowed";
+      });
+
+      s.resolve(resolveOp);
+      s.exec(flowOp);
+
+      while (started.length < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      await s.dispose({ gracePeriod: 150 });
+
+      expect(completed).toContain("resolve");
+      expect(completed).toContain("flow");
+      expect((s as any).scopeState).toBe("disposed");
+    });
+
+    it("should reject both resolve and exec after disposal starts", async () => {
+      const s = createScope();
+      const { flow } = await import("../src/flow");
+
+      const slowResolve = provide(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return "slow-resolve";
+      });
+
+      s.resolve(slowResolve);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const disposePromise = s.dispose({ gracePeriod: 200 });
+
+      const newResolve = provide(() => "new-resolve");
+      const newFlow = flow(() => "new-flow");
+
+      await expect(s.resolve(newResolve)).rejects.toThrow(ScopeDisposingError);
+      await expect(s.exec(newFlow)).rejects.toThrow(ScopeDisposingError);
+
+      await disposePromise;
+    });
+  });
+});
