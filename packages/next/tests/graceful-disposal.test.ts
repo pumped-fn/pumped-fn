@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { createScope, ScopeDisposingError, GracePeriodExceededError } from "../src/scope";
+import {
+  createScope,
+  ScopeDisposingError,
+  GracePeriodExceededError,
+} from "../src/scope";
 import { provide } from "../src/executor";
 import { Promised } from "../src/promises";
+import { flow } from "../src/flow";
 
 describe("Graceful Disposal - Task 1: Types and Errors", () => {
   describe("ScopeState type", () => {
@@ -80,7 +85,9 @@ describe("Graceful Disposal - Task 3: State Checks", () => {
       (s as any).scopeState = "disposing";
 
       await expect(s.resolve(executor)).rejects.toThrow(ScopeDisposingError);
-      await expect(s.resolve(executor)).rejects.toThrow("Scope is disposing, operation canceled");
+      await expect(s.resolve(executor)).rejects.toThrow(
+        "Scope is disposing, operation canceled"
+      );
     });
 
     it("should throw error when scope is disposed", async () => {
@@ -104,7 +111,6 @@ describe("Graceful Disposal - Task 3: State Checks", () => {
   describe("exec() state validation", () => {
     it("should throw ScopeDisposingError when scope is disposing", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
       const flowExecutor = flow(() => "test");
 
       (s as any).scopeState = "disposing";
@@ -114,7 +120,6 @@ describe("Graceful Disposal - Task 3: State Checks", () => {
 
     it("should throw error when scope is disposed", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
       const flowExecutor = flow(() => "test");
 
       (s as any).scopeState = "disposed";
@@ -124,7 +129,6 @@ describe("Graceful Disposal - Task 3: State Checks", () => {
 
     it("should work normally when scope is active", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
       const flowExecutor = flow(() => "test");
 
       const result = await s.exec(flowExecutor);
@@ -181,7 +185,6 @@ describe("Graceful Disposal - Task 4: Operation Tracking", () => {
   describe("exec() operation tracking", () => {
     it("should move operation to active during handler execution", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       let capturedActiveSize = -1;
       const flowExecutor = flow(() => {
@@ -196,7 +199,6 @@ describe("Graceful Disposal - Task 4: Operation Tracking", () => {
 
     it("should remove operation after completion", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       const flowExecutor = flow(() => "test");
 
@@ -211,7 +213,6 @@ describe("Graceful Disposal - Task 4: Operation Tracking", () => {
 
     it("should cleanup on error", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       const flowExecutor = flow(() => {
         throw new Error("test error");
@@ -500,7 +501,6 @@ describe("Graceful Disposal - Task 5: Two-Phase Disposal", () => {
   describe("Flow execution during disposal", () => {
     it("should wait for active flow executions", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
       let flowStarted = false;
       let flowCompleted = false;
 
@@ -524,7 +524,6 @@ describe("Graceful Disposal - Task 5: Two-Phase Disposal", () => {
 
     it("should reject new flow executions after disposal starts", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       const flowExecutor1 = flow(async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -585,7 +584,9 @@ describe("Graceful Disposal - Edge Cases", () => {
 
       expect((s as any).scopeState).toBe("disposed");
 
-      expect(() => s.dispose({ gracePeriod: 100 })).toThrow("Scope is disposed");
+      expect(() => s.dispose({ gracePeriod: 100 })).toThrow(
+        "Scope is disposed"
+      );
     });
 
     it("should handle concurrent dispose calls", async () => {
@@ -633,7 +634,6 @@ describe("Graceful Disposal - Edge Cases", () => {
   describe("Reject exec during disposal", () => {
     it("should reject exec calls when scope is disposing", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       const slowFlow = flow(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -649,14 +649,15 @@ describe("Graceful Disposal - Edge Cases", () => {
       const newFlow = flow(() => "new");
 
       await expect(s.exec(newFlow)).rejects.toThrow(ScopeDisposingError);
-      await expect(s.exec(newFlow)).rejects.toThrow("Scope is disposing, operation canceled");
+      await expect(s.exec(newFlow)).rejects.toThrow(
+        "Scope is disposing, operation canceled"
+      );
 
       await disposePromise;
     });
 
     it("should reject exec calls when scope is disposed", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       await s.dispose();
 
@@ -709,7 +710,6 @@ describe("Graceful Disposal - Edge Cases", () => {
   describe("Mixed resolve and exec operations", () => {
     it("should handle disposal with both resolve and exec operations active", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
       const started: string[] = [];
       const completed: string[] = [];
 
@@ -743,7 +743,6 @@ describe("Graceful Disposal - Edge Cases", () => {
 
     it("should reject both resolve and exec after disposal starts", async () => {
       const s = createScope();
-      const { flow } = await import("../src/flow");
 
       const slowResolve = provide(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
