@@ -90,7 +90,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
   }
 
-  private async resolveCore(): Promise<unknown> {
+  private async resolveCore(trackedPromise: Promise<unknown>): Promise<unknown> {
     if (this.scope["scopeState"] === "disposing") {
       throw new ScopeDisposingError();
     }
@@ -115,8 +115,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
 
     const controller = this.createController();
-
-    const trackedPromise = this.currentPromise!;
 
     const resolvedDependencies = await this.scope["~resolveDependencies"](
       dependencies,
@@ -153,7 +151,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
     this.scope["~trackPending"](trackedPromise);
 
     try {
-      const result = await this.resolveCore();
+      const result = await this.resolveCore(trackedPromise);
       this.scope["~untrackExecution"](trackedPromise);
       return result;
     } catch (error) {
@@ -998,21 +996,44 @@ class BaseScope implements Core.Scope {
 
   dispose(options?: { gracePeriod?: number }): Promised<void> {
     this["~ensureNotDisposed"]();
-    this.isDisposing = true;
 
     return Promised.create(
       (async () => {
+        const gracePeriod = options?.gracePeriod ?? 5000;
+
+        this.scopeState = 'disposing';
+        this.isDisposing = true;
+
+        this.pendingResolutions.clear();
+
+        if (this.activeExecutions.size > 0) {
+          const activePromises = Array.from(this.activeExecutions).filter(p => p !== null);
+          if (activePromises.length > 0) {
+            const allSettled = Promise.allSettled(activePromises);
+            const timeout = new Promise<void>((resolve) =>
+              setTimeout(resolve, gracePeriod)
+            );
+            await Promise.race([allSettled, timeout]);
+          }
+        }
+
         const extensionDisposeEvents = this.extensions.map(
           (ext) => ext.dispose?.(this) ?? Promise.resolve()
         );
         await Promise.all(extensionDisposeEvents);
 
-        const currents = this.cache.keys();
+        const currents = Array.from(this.cache.keys());
         for (const current of currents) {
-          await this.release(current, true);
+          const state = this.cache.get(current);
+          if (state?.cleanups) {
+            for (const cleanup of Array.from(state.cleanups.values()).reverse()) {
+              await cleanup();
+            }
+          }
         }
 
         this.disposed = true;
+        this.scopeState = 'disposed';
         this.cache.clear();
         this.onEvents.change.clear();
         this.onEvents.release.clear();
