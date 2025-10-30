@@ -50,7 +50,7 @@ interface ReplacerResult {
 }
 
 class AccessorImpl implements Core.Accessor<unknown> {
-  public tags: import("./tag-types").Tag.Tagged[] | undefined;
+  public tags: Tag.Tagged[] | undefined;
   private scope: BaseScope;
   private requestor: UE;
   private currentPromise: Promise<unknown> | null = null;
@@ -60,7 +60,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   constructor(
     scope: BaseScope,
     requestor: UE,
-    tags: import("./tag-types").Tag.Tagged[] | undefined
+    tags: Tag.Tagged[] | undefined
   ) {
     this.scope = scope;
     this.requestor = requestor;
@@ -422,9 +422,9 @@ class BaseScope implements Core.Scope {
   private reversedExtensions: Extension.Extension[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
-  public tags: import("./tag-types").Tag.Tagged[] | undefined;
+  public tags: Tag.Tagged[] | undefined;
 
-  private static readonly emptyDataStore: import("./tag-types").Tag.Store = {
+  private static readonly emptyDataStore: Tag.Store = {
     get: () => undefined,
     set: () => undefined,
   };
@@ -1203,7 +1203,7 @@ export type ScopeOption = {
   initialValues?: Core.Preset<unknown>[];
   registry?: Core.Executor<unknown>[];
   extensions?: Extension.Extension[];
-  tags?: import("./tag-types").Tag.Tagged[];
+  tags?: Tag.Tagged[];
 };
 
 export function createScope(): Core.Scope;
