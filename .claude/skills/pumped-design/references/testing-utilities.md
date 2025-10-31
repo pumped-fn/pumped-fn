@@ -133,7 +133,7 @@ Executor-wrapped built-ins need `preset()` for mocking.
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { provide, derive, preset, createScope, type Scope } from '@pumped-fn/core-next'
+import { provide, derive, preset, createScope, Core } from '@pumped-fn/core-next'
 import { readFile } from 'node:fs/promises'
 
 // Executor wrapping Node.js built-in
@@ -149,7 +149,7 @@ export const loadJsonFile = derive(
 )
 
 describe('loadJsonFile', () => {
-  let scope: Scope
+  let scope: Core.Scope
 
   beforeEach(() => {
     // Mock fsRead with preset()

@@ -28,7 +28,7 @@ Use extensions when:
 ## Code Template
 
 ```typescript
-import { extension, type Extension } from '@pumped-fn/core-next'
+import { extension } from '@pumped-fn/core-next'
 
 // Basic logging extension
 export const loggingExtension = extension({
