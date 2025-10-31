@@ -297,22 +297,16 @@ export declare namespace Core {
   ) => void | Promised<void>;
 
   export type ErrorCallback<T = unknown> = (
-    error:
-      | ExecutorResolutionError
-      | FactoryExecutionError
-      | DependencyResolutionError,
+    error: ExecutorError,
     executor: Executor<T>,
     scope: Scope
-  ) => void | Promised<void>;
+  ) => MaybePromised<void>;
 
   export type GlobalErrorCallback = (
-    error:
-      | ExecutorResolutionError
-      | FactoryExecutionError
-      | DependencyResolutionError,
+    error: ExecutorError,
     executor: AnyExecutor,
     scope: Scope
-  ) => void | Promised<void>;
+  ) => MaybePromised<void>;
 
   export type WrapContext = {
     operation: "resolve" | "update";
@@ -684,13 +678,7 @@ export namespace Extension {
       operation: Operation
     ): Promise<T> | Promised<T>;
 
-    onError?(
-      error:
-        | ExecutorResolutionError
-        | FactoryExecutionError
-        | DependencyResolutionError,
-      scope: Core.Scope
-    ): void;
+    onError?(error: ExecutorError, scope: Core.Scope): void;
 
     dispose?(scope: Core.Scope): MaybePromised<void>;
   }
