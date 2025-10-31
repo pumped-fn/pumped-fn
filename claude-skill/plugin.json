@@ -1,6 +1,6 @@
 {
   "name": "pumped-design",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns - provides phased design process, catalog-based navigation, and layer-specific testing strategies",
   "author": "lagz0ne",
   "repository": "https://github.com/lagz0ne/pumped-fn",
