@@ -136,6 +136,11 @@ export class DependencyResolutionError extends ExecutorResolutionError {
   }
 }
 
+export type ExecutorError =
+  | ExecutorResolutionError
+  | FactoryExecutionError
+  | DependencyResolutionError;
+
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
