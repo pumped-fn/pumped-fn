@@ -30,5 +30,5 @@ Real-world implementation patterns with complete examples, trade-offs, and best 
 ## See Also
 
 - [API Cheatsheet](../reference/api-cheatsheet.md) - Quick API reference
-- [Core Guides](../guides/) - Learn fundamental concepts
+- [Core Guides](../guides/01-executors-and-dependencies.md) - Learn fundamental concepts
 - [Common Mistakes](../reference/common-mistakes.md) - Anti-patterns to avoid

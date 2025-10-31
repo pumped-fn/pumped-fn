@@ -432,5 +432,5 @@ pnpm -F @pumped-fn/core-next test
 - [Type Verification](./type-verification.md)
 - [Common Mistakes](./common-mistakes.md)
 - [Error Solutions](./error-solutions.md)
-- [Full Guides](../guides/) - In-depth explanations
+- [Full Guides](../guides/01-executors-and-dependencies.md) - In-depth explanations
 - [Patterns](../patterns/) - Production use cases
