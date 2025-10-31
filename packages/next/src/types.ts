@@ -1,11 +1,11 @@
 import { type Promised } from "./promises";
 import { type Tag } from "./tag-types";
 
-export type MaybePromised<T> = T | Promise<T> | Promised<T>;
-
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
+
+export type MaybePromised<T> = T | Promise<T> | Promised<T>;
 
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly "~standard": StandardSchemaV1.Props<Input, Output>;
@@ -142,7 +142,6 @@ export type ExecutorError =
   | ExecutorResolutionError
   | FactoryExecutionError
   | DependencyResolutionError;
-
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
