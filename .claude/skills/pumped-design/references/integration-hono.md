@@ -88,7 +88,7 @@ app.post('/users', async (c) => {
 
 ```typescript
 import { Hono } from 'hono'
-import { createScope, type Scope } from '@pumped-fn/core-next'
+import { createScope, Core } from '@pumped-fn/core-next'
 import { dbConfig } from './resources'
 import { createUser, getUser, updateUser, deleteUser } from './flows'
 
@@ -374,11 +374,11 @@ Extend Hono context with scope type:
 
 ```typescript
 import { Hono } from 'hono'
-import { type Scope } from '@pumped-fn/core-next'
+import { Core } from '@pumped-fn/core-next'
 
 type Env = {
   Variables: {
-    scope: Scope
+    scope: Core.Scope
     userId?: string
   }
 }

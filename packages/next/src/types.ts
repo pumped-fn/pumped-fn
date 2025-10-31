@@ -5,6 +5,8 @@ export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
 
+export type MaybePromised<T> = T | Promise<T> | Promised<T>;
+
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly "~standard": StandardSchemaV1.Props<Input, Output>;
 }
@@ -136,6 +138,10 @@ export class DependencyResolutionError extends ExecutorResolutionError {
   }
 }
 
+export type ExecutorError =
+  | ExecutorResolutionError
+  | FactoryExecutionError
+  | DependencyResolutionError;
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
@@ -160,6 +166,7 @@ export declare namespace Core {
   ) => GeneratorOutput<Y, T>;
   export type RecordLike = Record<string, unknown>;
   export type UExecutor = BaseExecutor<unknown>;
+  export type AnyExecutor = Executor<unknown>;
 
   export type Cleanup = () => void | Promised<void>;
 
@@ -266,8 +273,8 @@ export declare namespace Core {
     : T extends Lazy<infer U> | Static<infer U>
     ? Accessor<Awaited<U>>
     : T extends
-        | ReadonlyArray<Core.BaseExecutor<unknown>>
-        | Record<string, Core.BaseExecutor<unknown>>
+        | ReadonlyArray<UExecutor>
+        | Record<string, UExecutor>
     ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
 
@@ -277,46 +284,40 @@ export declare namespace Core {
 
   export type ChangeCallback = (
     event: "resolve" | "update",
-    executor: Executor<unknown>,
+    executor: AnyExecutor,
     resolved: unknown,
     scope: Scope
   ) => EventCallbackResult | Promised<EventCallbackResult>;
 
   export type ReleaseCallback = (
     event: "release",
-    executor: Executor<unknown>,
+    executor: AnyExecutor,
     scope: Scope
   ) => void | Promised<void>;
 
   export type ErrorCallback<T = unknown> = (
-    error:
-      | ExecutorResolutionError
-      | FactoryExecutionError
-      | DependencyResolutionError,
+    error: ExecutorError,
     executor: Executor<T>,
     scope: Scope
-  ) => void | Promised<void>;
+  ) => MaybePromised<void>;
 
   export type GlobalErrorCallback = (
-    error:
-      | ExecutorResolutionError
-      | FactoryExecutionError
-      | DependencyResolutionError,
-    executor: Executor<unknown>,
+    error: ExecutorError,
+    executor: AnyExecutor,
     scope: Scope
-  ) => void | Promised<void>;
+  ) => MaybePromised<void>;
 
   export type WrapContext = {
     operation: "resolve" | "update";
-    executor: Executor<unknown>;
+    executor: AnyExecutor;
     scope: Scope;
   };
 
-  export type SingleDependencyLike = Core.BaseExecutor<unknown>;
+  export type SingleDependencyLike = UExecutor;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<Core.BaseExecutor<unknown>>
-    | Record<string, Core.BaseExecutor<unknown>>;
+    | ReadonlyArray<UExecutor>
+    | Record<string, UExecutor>;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =
@@ -328,8 +329,8 @@ export declare namespace Core {
 
   export interface Scope extends Tag.Container {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
-    entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
-    registeredExecutors(): Core.Executor<unknown>[];
+    entries(): [AnyExecutor, Accessor<unknown>][];
+    registeredExecutors(): AnyExecutor[];
 
     resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
@@ -435,6 +436,7 @@ export namespace Flow {
   }
 
   export type UFlow = Core.Executor<Handler<any, any>>;
+  export type UHandler = Handler<any, any>;
 
   export interface Flow<I, O> extends Core.Executor<Handler<O, I>> {
     definition: Definition<O, I>;
@@ -667,7 +669,7 @@ export namespace Extension {
   export interface Extension {
     name: string;
 
-    init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    init?(scope: Core.Scope): MaybePromised<void>;
 
     wrap?<T>(
       scope: Core.Scope,
@@ -675,15 +677,9 @@ export namespace Extension {
       operation: Operation
     ): Promise<T> | Promised<T>;
 
-    onError?(
-      error:
-        | ExecutorResolutionError
-        | FactoryExecutionError
-        | DependencyResolutionError,
-      scope: Core.Scope
-    ): void;
+    onError?(error: ExecutorError, scope: Core.Scope): void;
 
-    dispose?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    dispose?(scope: Core.Scope): MaybePromised<void>;
   }
 }
 
