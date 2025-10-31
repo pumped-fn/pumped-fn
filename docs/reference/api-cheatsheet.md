@@ -139,27 +139,27 @@ const retryCount = tag(custom<number>(), {
 
 ### Tag access
 ```typescript
-// .get() - throws if not found
-const value = tag.get(container)  // T
+// .extractFrom() - throws if not found
+const value = tag.extractFrom(container)  // T
 
-// .find() - returns undefined
-const value = tag.find(container)  // T | undefined
+// .readFrom() - returns undefined
+const value = tag.readFrom(container)  // T | undefined
 
-// .set() - type-safe
-tag.set(container, value)  // value must match T
+// .injectTo() - type-safe
+tag.injectTo(store, value)  // value must match T
 ```
 
 ### Tag usage
 ```typescript
 // In scope
-const config = appConfig.get(scope)
+const config = appConfig.extractFrom(scope)
 
 // In flow context
-const userId = userId.get(ctx)
+const userId = userId.extractFrom(ctx)
 ctx.set(userId, "123")
 
 // In any container
-const value = tag.find(store)
+const value = tag.readFrom(store)
 ```
 
 ## Flow

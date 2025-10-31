@@ -12,14 +12,14 @@ Common anti-patterns and how to fix them.
 
 **❌ Don't:**
 ```typescript
-const value = tag.get(ctx) as UserData
+const value = tag.extractFrom(ctx) as UserData
 const result: any = await scope.resolve(executor)
 ```
 
 **✅ Do:**
 ```typescript
 const userTag = tag(custom<UserData>(), { label: 'user' })
-const value = userTag.get(ctx)
+const value = userTag.extractFrom(ctx)
 
 const result = await scope.resolve(executor)
 ```

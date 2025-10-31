@@ -27,7 +27,7 @@ const requestId = tag(custom<string>(), { label: 'request.id' })
 const authMiddleware = extension({
   name: 'auth',
   wrap: async (ctx, next, operation) => {
-    const id = userId.find(ctx)
+    const id = userId.readFrom(ctx)
 
     if (!id) {
       throw new Error('Unauthorized: Missing user ID')
@@ -41,7 +41,7 @@ const authMiddleware = extension({
 const loggingMiddleware = extension({
   name: 'logging',
   wrap: async (ctx, next, operation) => {
-    const reqId = requestId.find(ctx) || 'no-id'
+    const reqId = requestId.readFrom(ctx) || 'no-id'
     console.log(`[${reqId}] Start ${operation.kind}`)
 
     const start = Date.now()
@@ -58,7 +58,7 @@ const errorMiddleware = extension({
     try {
       return await next()
     } catch (error) {
-      const reqId = requestId.find(ctx) || 'no-id'
+      const reqId = requestId.readFrom(ctx) || 'no-id'
       console.error(`[${reqId}] Error:`, (error as Error).message)
       throw error
     }
@@ -121,7 +121,7 @@ const responseHeaders = tag(custom<Record<string, string>>(), {
 const headersMiddleware = extension({
   name: 'headers',
   wrap: async (ctx, next, operation) => {
-    const headers = responseHeaders.get(ctx)
+    const headers = responseHeaders.extractFrom(ctx)
     headers['X-Request-ID'] = `req-${Date.now()}`
     headers['X-Powered-By'] = 'pumped-fn'
 
@@ -147,7 +147,7 @@ const rateLimits = new Map<string, number[]>()
 const rateLimitMiddleware = extension({
   name: 'rate-limit',
   wrap: async (ctx, next, operation) => {
-    const id = userId.find(ctx)
+    const id = userId.readFrom(ctx)
     if (!id) return next()
 
     const now = Date.now()

@@ -15,17 +15,17 @@ Common TypeScript errors and how to fix them.
 Type 'unknown' is not assignable to type 'UserData'
 ```
 
-**Cause:** Tag not found in container, `.get()` returns `unknown`.
+**Cause:** Tag not found in container, `.extractFrom()` returns `unknown`.
 
 **Solution:**
 ```typescript
-// Ensure tag is set before .get()
+// Ensure tag is set before .extractFrom()
 const scope = createScope({
   tags: [userDataTag({ id: '123' })]
 })
 
-// Or use .find() for optional access
-const data = userDataTag.find(ctx)
+// Or use .readFrom() for optional access
+const data = userDataTag.readFrom(ctx)
 if (!data) {
   throw new Error('User data not found')
 }
@@ -165,23 +165,23 @@ flow((ctx, input) => {
 Object is possibly 'undefined'
 ```
 
-**Cause:** Using `.find()` without null check.
+**Cause:** Using `.readFrom()` without null check.
 
 **Solution:**
 ```typescript
 // ❌ No null check
-const value = tag.find(ctx)
+const value = tag.readFrom(ctx)
 return value.property // Error!
 
 // ✅ Check before use
-const value = tag.find(ctx)
+const value = tag.readFrom(ctx)
 if (!value) {
   throw new Error('Tag not found')
 }
 return value.property
 
-// Or use .get() which throws
-const value = tag.get(ctx)
+// Or use .extractFrom() which throws
+const value = tag.extractFrom(ctx)
 return value.property
 ```
 
