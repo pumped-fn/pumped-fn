@@ -160,6 +160,7 @@ export declare namespace Core {
   ) => GeneratorOutput<Y, T>;
   export type RecordLike = Record<string, unknown>;
   export type UExecutor = BaseExecutor<unknown>;
+  export type AnyExecutor = Executor<unknown>;
 
   export type Cleanup = () => void | Promised<void>;
 
