@@ -6,7 +6,7 @@
 # Skills
 
 - _IMPORTANT:_ Always use skill superpowers:brainstorming for all operations. If there's no skill like that, ask user to install obra/superpowers-marketplace prior to moving toward
-- Current project skills is in `skills/`
+- Current project skills is in `.claude/skills/`
 
 ## Pumped-design Skill
 
