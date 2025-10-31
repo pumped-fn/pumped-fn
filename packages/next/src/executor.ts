@@ -75,26 +75,26 @@ export function createExecutor<T>(
 }
 
 export function isLazyExecutor(
-  executor: Core.BaseExecutor<unknown>
+  executor: Core.UExecutor
 ): executor is Core.Lazy<unknown> {
   return executor[executorSymbol] === "lazy";
 }
 
 export function isReactiveExecutor(
-  executor: Core.BaseExecutor<unknown>
+  executor: Core.UExecutor
 ): executor is Core.Reactive<unknown> {
   return executor[executorSymbol] === "reactive";
 }
 
 export function isStaticExecutor(
-  executor: Core.BaseExecutor<unknown>
+  executor: Core.UExecutor
 ): executor is Core.Static<unknown> {
   return executor[executorSymbol] === "static";
 }
 
 export function isMainExecutor(
   executor: unknown
-): executor is Core.Executor<unknown> {
+): executor is Core.AnyExecutor {
   return isExecutor(executor) && executor[executorSymbol] === "main";
 }
 

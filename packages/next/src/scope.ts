@@ -394,12 +394,12 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 }
 
-function getExecutor(e: Core.UExecutor): Core.Executor<unknown> {
+function getExecutor(e: Core.UExecutor): Core.AnyExecutor {
   if (isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)) {
     return e.executor;
   }
 
-  return e as Core.Executor<unknown>;
+  return e as Core.AnyExecutor;
 }
 
 class BaseScope implements Core.Scope {
