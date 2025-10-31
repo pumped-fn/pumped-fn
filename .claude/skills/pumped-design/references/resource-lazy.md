@@ -1,22 +1,32 @@
 ---
 name: resource-lazy
 tags: resource, add, lazy, conditional, reactive, static, update, accessor
-description: Lazy loading and reactive resources. Use .reactive for resources that can be updated, .lazy for conditional initialization, .static for immutable dependencies. Includes scope.update() and accessor patterns for reactive state.
+description: Lazy, reactive, and static dependency modifiers. Use .lazy for conditional resolution, .reactive for updateable resources, .static for immutable dependencies. Includes scope.update() and accessor patterns.
 ---
 
 # Resource: Lazy and Reactive Patterns
 
+## Core Concept: All Executors Are Lazy By Default
+
+**IMPORTANT:** All executors are lazy by default—they only initialize when included in a dependency graph being resolved.
+
+The `.lazy`, `.reactive`, and `.static` modifiers control HOW dependencies are resolved:
+
+- **Normal dependency**: Auto-resolved when parent resolves; factory receives the **value**
+- **Lazy (.lazy)**: NOT auto-resolved; factory receives an **Accessor** to conditionally resolve
+- **Reactive (.reactive)**: Auto-resolved; factory receives the **value**; supports updates
+- **Static (.static)**: Auto-resolved; factory receives an **Accessor**; immutable
+
 ## When to Use
 
-Use lazy/reactive resource patterns when:
+Use these patterns when:
 
+- **Lazy (.lazy)**: Conditional dependencies based on config/feature flags (console logger in dev, pino in prod)
 - **Reactive (.reactive)**: Resources that can be updated after initialization (config, feature flags, user preferences)
-- **Lazy (.lazy)**: Resources that should only initialize when first accessed (expensive operations, optional features)
-- **Static (.static)**: Resources that should never change (constants, immutable config)
+- **Static (.static)**: Immutable dependencies where you want accessor without reactivity overhead
 
 **Don't use for:**
-- Simple resources without update requirements (use basic `provide()`)
-- Resources that need complex lifecycle (use basic `provide()` with controller)
+- Simple resources without special requirements (use basic dependency)
 - Business logic (belongs in flows)
 
 ---
@@ -203,35 +213,160 @@ const value3 = accessor.get()  // 2 (updated)
 
 ---
 
-## Lazy Resources
+## Lazy Dependencies
 
-Lazy resources initialize only when first accessed:
+**What `.lazy` actually does:**
+- Prevents automatic resolution of the dependency
+- Factory receives `Accessor<T>` instead of `T`
+- Parent can conditionally resolve based on runtime conditions
+
+**Key semantics:**
+- **Without `.lazy`**: Dependency auto-resolved → factory receives value
+- **With `.lazy`**: Dependency NOT auto-resolved → factory receives accessor
+
+### Example 1: Configuration-Based Resolution
 
 ```typescript
-// ❌ Basic resource - initializes immediately
-const dbPool = provide(() => {
-  console.log('Initializing DB pool')
-  return new Pool()
+const consoleLogger = provide(() => {
+  console.log('Initializing console logger')
+  return { log: (msg: string) => console.log(msg) }
 })
 
-// ✅ Lazy resource - initializes on first access
-const dbPool = provide(() => {
-  console.log('Initializing DB pool')
-  return new Pool()
-}).lazy
+const pinoLogger = provide(() => {
+  console.log('Initializing pino logger')
+  return { log: (msg: string) => console.log(`[PINO] ${msg}`) }
+})
+
+const appConfig = provide(() => ({
+  env: process.env.NODE_ENV || 'development'
+}))
+
+// ✅ Correct: Using .lazy for conditional resolution
+const logger = derive(
+  {
+    console: consoleLogger.lazy,  // Receives Accessor<Logger>
+    pino: pinoLogger.lazy,        // Receives Accessor<Logger>
+    config: appConfig              // Receives Config (auto-resolved)
+  },
+  async ({ console, pino, config }) => {
+    // Only resolve the logger needed for current environment
+    if (config.env === 'development') {
+      return await console.resolve()  // Only consoleLogger initializes
+    } else {
+      return await pino.resolve()     // Only pinoLogger initializes
+    }
+  }
+)
 
 const scope = createScope()
-// No output yet
+const log = await scope.resolve(logger)
+// Output: "Initializing console logger" (in dev)
+// Only ONE logger was initialized, not both
+```
 
-const pool = await scope.resolve(dbPool)
-// Output: "Initializing DB pool"
+**Alternative: Using scope-based tag resolution**
+
+For cleaner config handling, use scope's tag resolution instead of passing config as dependency:
+
+```typescript
+import { tag } from '@pumped-fn/core-next'
+
+const envTag = tag<string>()
+
+const consoleLogger = provide(() => ({ log: (msg: string) => console.log(msg) }))
+const pinoLogger = provide(() => ({ log: (msg: string) => console.log(`[PINO] ${msg}`) }))
+
+const logger = derive(
+  { console: consoleLogger.lazy, pino: pinoLogger.lazy },
+  async ({ console, pino }, ctl) => {
+    const env = ctl.scope.tag(envTag) ?? 'development'
+    return env === 'development'
+      ? await console.resolve()
+      : await pino.resolve()
+  }
+)
+
+// Usage with tagged scope
+const scope = createScope({ tags: [envTag.of('production')] })
+const log = await scope.resolve(logger)
+// Output: "Initializing pino logger"
+```
+
+### Example 2: Optional Feature Flags
+
+```typescript
+const mlModel = provide(() => {
+  console.log('Loading expensive ML model...')
+  return { predict: (x: number) => x * 2 }
+})
+
+const featureFlags = provide(() => ({
+  mlEnabled: false
+}))
+
+const predictionService = derive(
+  {
+    model: mlModel.lazy,      // Receives Accessor<MLModel>
+    flags: featureFlags        // Receives FeatureFlags (auto-resolved)
+  },
+  async ({ model, flags }) => {
+    if (flags.mlEnabled) {
+      const m = await model.resolve()
+      return { predict: (x: number) => m.predict(x) }
+    }
+    // ML model never initialized if feature disabled
+    return { predict: (x: number) => x }
+  }
+)
+```
+
+### Example 3: Testing Benefits
+
+Lazy dependencies reduce test pollution by not initializing unused dependencies:
+
+```typescript
+const dbConnection = provide(() => {
+  console.log('Connecting to database...')
+  return { query: async () => [] }
+})
+
+const cacheConnection = provide(() => {
+  console.log('Connecting to cache...')
+  return { get: async () => null }
+})
+
+const userService = derive(
+  {
+    db: dbConnection.lazy,      // Receives Accessor<DB>
+    cache: cacheConnection.lazy // Receives Accessor<Cache>
+  },
+  async ({ db, cache }) => {
+    return {
+      getUser: async (id: string, useCache: boolean) => {
+        if (useCache) {
+          const c = await cache.resolve()
+          const cached = await c.get()
+          if (cached) return cached
+        }
+        const d = await db.resolve()
+        return await d.query()
+      }
+    }
+  }
+)
+
+// In tests:
+const scope = createScope()
+const service = await scope.resolve(userService)
+// No "Connecting to..." output yet
+// Connections only initialize when getUser() is called with useCache=true/false
 ```
 
 **Use cases for lazy:**
-- Expensive resources only needed conditionally
-- Optional features
-- Resources with slow initialization
-- Feature flags
+- Conditional dependencies based on configuration
+- Optional features controlled by feature flags
+- Reducing test pollution (dependencies only resolve when needed)
+- Explicit dependency resolution control
 
 ---
 
@@ -316,26 +451,34 @@ await scope.update(config, (c) => ({ port: 4000 }))  // Works
 
 ---
 
-### Problem: "Lazy resource initializes immediately"
+### Problem: "Lazy dependency resolves automatically"
 
-**Symptom:** Lazy resource runs initialization code before being accessed
+**Symptom:** Lazy dependency initializes even though it shouldn't based on conditions
 
-**Cause:** Not using `.lazy` modifier
+**Cause:** Not using `.lazy` modifier or using `resolves()` helper which auto-resolves all dependencies
 
 **Solution:**
 
 ```typescript
-// ❌ Wrong: No .lazy
-const dbPool = provide(() => {
-  console.log('Init')  // Runs immediately
-  return new Pool()
-})
+// ❌ Wrong: No .lazy - both loggers initialize
+const logger = derive(
+  { console: consoleLogger, pino: pinoLogger, config: appConfig },
+  async ({ console, pino, config }) => {
+    // Too late - both already initialized!
+    return config.env === 'dev' ? console : pino
+  }
+)
 
-// ✅ Correct: Use .lazy
-const dbPool = provide(() => {
-  console.log('Init')  // Runs on first access
-  return new Pool()
-}).lazy
+// ✅ Correct: Use .lazy - only needed logger initializes
+const logger = derive(
+  { console: consoleLogger.lazy, pino: pinoLogger.lazy, config: appConfig },
+  async ({ console, pino, config }) => {
+    if (config.env === 'dev') {
+      return await console.resolve()  // Only this one initializes
+    }
+    return await pino.resolve()
+  }
+)
 ```
 
 ---
