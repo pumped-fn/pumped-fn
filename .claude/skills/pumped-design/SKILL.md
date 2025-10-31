@@ -1,6 +1,13 @@
 ---
 name: pumped-design
 description: Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns - provides phased design process, catalog-based navigation, and layer-specific testing strategies
+activate_when:
+  - file_pattern: "package.json"
+    contains: "@pumped-fn"
+  - file_pattern: "**/entrypoint.*.ts"
+  - file_pattern: "**/resource.*.ts"
+  - file_pattern: "**/flow.*.ts"
+  - directory_exists: "docs/catalog"
 ---
 
 # Pumped-fn Application Design Skill
@@ -13,18 +20,25 @@ Structured approach for building maintainable pumped-fn backend applications wit
 
 ## When to Use
 
+**Auto-activates when:**
+- package.json contains "@pumped-fn"
+- Files matching entrypoint.*.ts, resource.*.ts, flow.*.ts exist
+- docs/catalog/ directory exists
+
 | Scenario | Use This Skill |
 |----------|---------------|
+| Migrating app to pumped-fn | Yes - Apply organizational patterns |
 | Designing new backend app | Yes - Follow phased design process |
 | Adding features | Yes - Navigate catalog, identify affected flows |
 | Troubleshooting flows | Yes - Use catalog mermaid diagrams |
 | Organizing tests | Yes - Layer-specific testing strategy |
 | Code reviews | Yes - Enforce naming conventions |
 
-**Do NOT use for:**
-- Frontend applications (use pumped-fn skill)
-- Library/module authoring (use pumped-fn skill's authoring.md)
-- Generic TypeScript questions (use pumped-fn skill)
+**Scope:**
+- Backend applications using @pumped-fn
+- Server-side patterns (HTTP, CLI, cron, Lambda)
+- Resource management, flow orchestration
+- Testing backend workflows
 
 ## Sub-skill Routing
 
