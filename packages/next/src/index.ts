@@ -2,7 +2,24 @@ import { tag } from "./tag";
 import { type Tag } from "./tag-types";
 import { custom } from "./ssch";
 
-export * from "./types";
+export type {
+  Core,
+  Flow,
+  Extension,
+  Multi,
+  StandardSchemaV1,
+  MaybePromised,
+  ExecutorError,
+} from "./types";
+
+export {
+  SchemaError,
+  ExecutorResolutionError,
+  FactoryExecutionError,
+  DependencyResolutionError,
+  FlowError,
+  FlowValidationError,
+} from "./types";
 
 export {
   provide,
