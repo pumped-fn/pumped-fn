@@ -1,6 +1,8 @@
 import { type Promised } from "./promises";
 import { type Tag } from "./tag-types";
 
+export type MaybePromised<T> = T | Promise<T> | Promised<T>;
+
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
@@ -674,7 +676,7 @@ export namespace Extension {
   export interface Extension {
     name: string;
 
-    init?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    init?(scope: Core.Scope): MaybePromised<void>;
 
     wrap?<T>(
       scope: Core.Scope,
@@ -690,7 +692,7 @@ export namespace Extension {
       scope: Core.Scope
     ): void;
 
-    dispose?(scope: Core.Scope): void | Promise<void> | Promised<void>;
+    dispose?(scope: Core.Scope): MaybePromised<void>;
   }
 }
 
