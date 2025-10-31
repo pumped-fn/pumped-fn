@@ -9,7 +9,7 @@ export interface CancellationExtension extends Extension.Extension {
 
 export interface CancellationOptions {
   parentSignal?: AbortSignal;
-  timeout?: number;
+  deadline?: number;
 }
 
 export function createCancellationExtension(
@@ -25,9 +25,10 @@ export function createCancellationExtension(
 ): CancellationExtension {
   const controller = new AbortController();
   let aborted = false;
+  let deadlineExceeded = false;
 
   let parentSignal: AbortSignal | undefined;
-  let timeout: number | undefined;
+  let deadline: number | undefined;
 
   if (parentSignalOrOptions && typeof parentSignalOrOptions === "object") {
     if ("addEventListener" in parentSignalOrOptions) {
@@ -35,7 +36,7 @@ export function createCancellationExtension(
     } else {
       const options = parentSignalOrOptions as CancellationOptions;
       parentSignal = options.parentSignal;
-      timeout = options.timeout;
+      deadline = options.deadline;
     }
   }
 
@@ -43,11 +44,21 @@ export function createCancellationExtension(
     parentSignal.addEventListener("abort", () => {
       controller.abort(parentSignal.reason);
       aborted = true;
+      if (deadline !== undefined && deadline > 0) {
+        setTimeout(() => {
+          deadlineExceeded = true;
+        }, deadline);
+      }
     });
   }
 
   controller.signal.addEventListener("abort", () => {
     aborted = true;
+    if (deadline !== undefined && deadline > 0) {
+      setTimeout(() => {
+        deadlineExceeded = true;
+      }, deadline);
+    }
   });
 
   return {
@@ -62,61 +73,72 @@ export function createCancellationExtension(
       next: () => Promised<T>,
       _operation: Extension.Operation
     ): Promised<T> {
-      if (aborted || controller.signal.aborted) {
-        return Promised.create(
-          Promise.reject(new AbortError(controller.signal.reason))
-        );
+      const hasDeadline = deadline !== undefined && deadline > 0;
+      const isAlreadyAborted = aborted || controller.signal.aborted;
+
+      if (isAlreadyAborted) {
+        if (deadlineExceeded) {
+          return Promised.create(
+            Promise.reject(new AbortError("Deadline exceeded"))
+          );
+        }
+        if (!hasDeadline) {
+          return Promised.create(
+            Promise.reject(new AbortError(controller.signal.reason))
+          );
+        }
       }
 
       const result = next();
 
       const cancelablePromise = new Promise<T>((resolve, reject) => {
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        let timedOut = false;
+        let abortHandler: (() => void) | null = null;
+        let deadlineTimer: any = null;
+        let settled = false;
 
-        const abortHandler = () => {
-          if (timeoutId !== undefined) {
-            clearTimeout(timeoutId);
+        const cleanup = () => {
+          if (abortHandler) {
+            controller.signal.removeEventListener("abort", abortHandler);
           }
-          reject(new AbortError(controller.signal.reason));
+          if (deadlineTimer) {
+            clearTimeout(deadlineTimer);
+          }
         };
 
-        controller.signal.addEventListener("abort", abortHandler, {
-          once: true,
-        });
+        abortHandler = () => {
+          if (hasDeadline) {
+            deadlineTimer = setTimeout(() => {
+              if (!settled) {
+                cleanup();
+                settled = true;
+                reject(new AbortError("Deadline exceeded"));
+              }
+            }, deadline);
+          }
+        };
 
-        if (timeout !== undefined && timeout > 0) {
-          timeoutId = setTimeout(() => {
-            timedOut = true;
-            controller.signal.removeEventListener("abort", abortHandler);
-            reject(new AbortError(`Operation timeout after ${timeout}ms`));
-          }, timeout);
+        if (isAlreadyAborted && hasDeadline && !deadlineExceeded) {
+          abortHandler();
+        } else if (!isAlreadyAborted) {
+          controller.signal.addEventListener("abort", abortHandler, {
+            once: true,
+          });
         }
 
         result.toPromise().then(
           (value) => {
-            if (timeoutId !== undefined) {
-              clearTimeout(timeoutId);
-            }
-            if (timedOut) {
-              return;
-            }
-            controller.signal.removeEventListener("abort", abortHandler);
-            if (controller.signal.aborted) {
-              reject(new AbortError(controller.signal.reason));
-            } else {
+            if (!settled) {
+              cleanup();
+              settled = true;
               resolve(value);
             }
           },
           (error) => {
-            if (timeoutId !== undefined) {
-              clearTimeout(timeoutId);
+            if (!settled) {
+              cleanup();
+              settled = true;
+              reject(error);
             }
-            if (timedOut) {
-              return;
-            }
-            controller.signal.removeEventListener("abort", abortHandler);
-            reject(error);
           }
         );
       });

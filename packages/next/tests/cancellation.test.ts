@@ -96,7 +96,7 @@ describe("Extension wrap", () => {
     );
   });
 
-  it("cancels in-flight operations immediately", async () => {
+  it("allows in-flight operations to complete without deadline", async () => {
     const ext = createCancellationExtension();
     const scope = createScope({ extensions: [ext] });
 
@@ -113,7 +113,8 @@ describe("Extension wrap", () => {
 
     resolveOp!("completed");
 
-    await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
+    const result = await resolution.toPromise();
+    expect(result).toBe("completed");
   });
 
   it("does not cancel in-flight operations that complete before abort", async () => {
@@ -193,12 +194,12 @@ describe("Factory signal integration", () => {
   });
 
   it("factory can listen to abort events for cleanup", async () => {
-    const ext = createCancellationExtension();
+    const ext = createCancellationExtension({ deadline: 50 });
     const scope = createScope({ extensions: [ext] });
 
     const executor = provide((controller) => {
       return new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve("value"), 100);
+        const timeout = setTimeout(() => resolve("value"), 200);
 
         controller.signal?.addEventListener("abort", () => {
           clearTimeout(timeout);
@@ -216,8 +217,8 @@ describe("Factory signal integration", () => {
 
 describe("Long-running cancellation", () => {
   describe("Flow cancellation", () => {
-    it("cancels flow execution when aborted", async () => {
-      const ext = createCancellationExtension();
+    it("cancels flow execution when aborted with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const longRunningFlow = flow(
@@ -231,13 +232,13 @@ describe("Long-running cancellation", () => {
 
       const execution = scope.exec(longRunningFlow, undefined);
 
-      setTimeout(() => ext.controller.abort("timeout"), 50);
+      setTimeout(() => ext.controller.abort("timeout"), 10);
 
       await expect(execution.toPromise()).rejects.toThrow("Operation aborted");
     });
 
-    it("cancels flow with ctx.run when aborted", async () => {
-      const ext = createCancellationExtension();
+    it("cancels flow with ctx.run when aborted with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const flowWithRun = flow(
@@ -259,15 +260,15 @@ describe("Long-running cancellation", () => {
 
       const execution = scope.exec(flowWithRun, undefined);
 
-      setTimeout(() => ext.controller.abort("cancel"), 50);
+      setTimeout(() => ext.controller.abort("cancel"), 10);
 
       await expect(execution.toPromise()).rejects.toThrow("Operation aborted");
     });
   });
 
   describe("Executor cancellation", () => {
-    it("cancels long-running executor and stops work", async () => {
-      const ext = createCancellationExtension();
+    it("cancels long-running executor with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const longRunningWork = provide((controller) => {
@@ -291,7 +292,7 @@ describe("Long-running cancellation", () => {
 
       const resolution = scope.resolve(longRunningWork);
 
-      setTimeout(() => ext.controller.abort("timeout"), 50);
+      setTimeout(() => ext.controller.abort("timeout"), 10);
 
       await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
     });
@@ -334,15 +335,15 @@ describe("Long-running cancellation", () => {
       expect(iterations).toBeGreaterThan(0);
     });
 
-    it("dependent executor cancels when dependency is aborted", async () => {
-      const ext = createCancellationExtension();
+    it("dependent executor cancels with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const dataFetcher = provide((controller) => {
         return new Promise<{ data: string }>((resolve) => {
           const timeout = setTimeout(() => {
             resolve({ data: "fetched" });
-          }, 100);
+          }, 200);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
@@ -356,19 +357,19 @@ describe("Long-running cancellation", () => {
 
       const resolution = scope.resolve(dataProcessor);
 
-      setTimeout(() => ext.controller.abort("cancel"), 50);
+      setTimeout(() => ext.controller.abort("cancel"), 10);
 
       await expect(resolution.toPromise()).rejects.toThrow("Operation aborted");
     });
 
-    it("multiple concurrent executors cancel together", async () => {
-      const ext = createCancellationExtension();
+    it("multiple concurrent executors cancel with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const createOperation = (id: number) =>
         provide((controller) => {
           return new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(`op-${id}`), 150);
+            const timeout = setTimeout(() => resolve(`op-${id}`), 200);
 
             controller.signal?.addEventListener("abort", () => {
               clearTimeout(timeout);
@@ -380,7 +381,7 @@ describe("Long-running cancellation", () => {
       const op2 = scope.resolve(createOperation(2));
       const op3 = scope.resolve(createOperation(3));
 
-      setTimeout(() => ext.controller.abort("cancel all"), 50);
+      setTimeout(() => ext.controller.abort("cancel all"), 10);
 
       await expect(op1.toPromise()).rejects.toThrow("Operation aborted");
       await expect(op2.toPromise()).rejects.toThrow("Operation aborted");
@@ -389,11 +390,14 @@ describe("Long-running cancellation", () => {
   });
 
   describe("Hierarchical cancellation", () => {
-    it("parent abort cancels child scope with long-running work", async () => {
-      const parentExt = createCancellationExtension();
+    it("parent abort cancels child scope with deadline", async () => {
+      const parentExt = createCancellationExtension({ deadline: 50 });
       const parentScope = createScope({ extensions: [parentExt] });
 
-      const childExt = createCancellationExtension(parentExt.controller.signal);
+      const childExt = createCancellationExtension({
+        parentSignal: parentExt.controller.signal,
+        deadline: 50,
+      });
       const childScope = createScope({ extensions: [childExt] });
 
       const parentWork = provide((controller) => {
@@ -419,7 +423,7 @@ describe("Long-running cancellation", () => {
       const parentResolution = parentScope.resolve(parentWork);
       const childResolution = childScope.resolve(childWork);
 
-      setTimeout(() => parentExt.controller.abort("shutdown"), 50);
+      setTimeout(() => parentExt.controller.abort("shutdown"), 10);
 
       await expect(parentResolution.toPromise()).rejects.toThrow(
         "Operation aborted"
@@ -429,11 +433,14 @@ describe("Long-running cancellation", () => {
       );
     });
 
-    it("child abort does not affect parent scope", async () => {
+    it("child abort with deadline does not affect parent scope", async () => {
       const parentExt = createCancellationExtension();
       const parentScope = createScope({ extensions: [parentExt] });
 
-      const childExt = createCancellationExtension(parentExt.controller.signal);
+      const childExt = createCancellationExtension({
+        parentSignal: parentExt.controller.signal,
+        deadline: 50,
+      });
       const childScope = createScope({ extensions: [childExt] });
 
       const parentWork = provide(() => {
@@ -455,7 +462,7 @@ describe("Long-running cancellation", () => {
       const parentResolution = parentScope.resolve(parentWork);
       const childResolution = childScope.resolve(childWork);
 
-      setTimeout(() => childExt.controller.abort("child only"), 50);
+      setTimeout(() => childExt.controller.abort("child only"), 10);
 
       await expect(childResolution.toPromise()).rejects.toThrow(
         "Operation aborted"
@@ -482,13 +489,13 @@ describe("Long-running cancellation", () => {
   });
 
     describe("Abort during resolution", () => {
-    it("handles abort during factory execution", async () => {
-      const ext = createCancellationExtension();
+    it("handles abort during factory execution with deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const executor = provide((controller) => {
         return new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve("done"), 100);
+          const timeout = setTimeout(() => resolve("done"), 200);
 
           controller.signal?.addEventListener("abort", () => {
             clearTimeout(timeout);
@@ -525,23 +532,27 @@ describe("Long-running cancellation", () => {
     });
   });
 
-  describe("Timeout", () => {
-    it("does not abort operations that complete before timeout", async () => {
-      const ext = createCancellationExtension({ timeout: 100 });
+  describe("Deadline", () => {
+    it("allows in-flight operations to complete before deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 100 });
       const scope = createScope({ extensions: [ext] });
 
-      const fastOperation = provide(() => {
+      const operation = provide(() => {
         return new Promise<string>((resolve) => {
-          setTimeout(() => resolve("completed"), 10);
+          setTimeout(() => resolve("completed"), 50);
         });
       });
 
-      const result = await scope.resolve(fastOperation).toPromise();
+      const resolution = scope.resolve(operation);
+
+      setTimeout(() => ext.controller.abort("shutdown"), 10);
+
+      const result = await resolution.toPromise();
       expect(result).toBe("completed");
     });
 
-    it("aborts operations that exceed timeout", async () => {
-      const ext = createCancellationExtension({ timeout: 50 });
+    it("rejects in-flight operations exceeding deadline", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const slowOperation = provide(() => {
@@ -550,17 +561,22 @@ describe("Long-running cancellation", () => {
         });
       });
 
+      const resolution = scope.resolve(slowOperation);
+
+      setTimeout(() => ext.controller.abort("shutdown"), 10);
+
       try {
-        await scope.resolve(slowOperation).toPromise();
+        await resolution.toPromise();
         throw new Error("Should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(AbortError);
-        expect((error as AbortError).cause).toBe("Operation timeout after 50ms");
+        expect((error as AbortError).message).toBe("Operation aborted");
+        expect((error as AbortError).cause).toBe("Deadline exceeded");
       }
     });
 
-    it("timeout does not affect subsequent operations after first timeout", async () => {
-      const ext = createCancellationExtension({ timeout: 50 });
+    it("new operations after deadline exceeded are rejected", async () => {
+      const ext = createCancellationExtension({ deadline: 50 });
       const scope = createScope({ extensions: [ext] });
 
       const slowOperation = provide(() => {
@@ -569,24 +585,25 @@ describe("Long-running cancellation", () => {
         });
       });
 
-      const fastOperation = provide(() => {
-        return new Promise<string>((resolve) => {
-          setTimeout(() => resolve("fast"), 10);
-        });
-      });
+      const fastOperation = provide(() => "fast");
+
+      const slowResolution = scope.resolve(slowOperation);
+
+      setTimeout(() => ext.controller.abort("shutdown"), 10);
+
+      await expect(slowResolution.toPromise()).rejects.toThrow(
+        "Operation aborted"
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
       try {
-        await scope.resolve(slowOperation).toPromise();
+        await scope.resolve(fastOperation).toPromise();
         throw new Error("Should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(AbortError);
-        expect((error as AbortError).cause).toContain("Operation timeout");
+        expect((error as AbortError).cause).toBe("Deadline exceeded");
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const result = await scope.resolve(fastOperation).toPromise();
-      expect(result).toBe("fast");
     });
   });
 });
