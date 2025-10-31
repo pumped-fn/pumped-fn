@@ -1,44 +1,37 @@
 # Pumped-fn Project Instructions
 
-> Pumped-fn skill active: Pattern enforcement, concepts, testing strategies handled by skill.
+> Pumped-design skill active: Pattern enforcement, architecture, testing strategies handled by skill.
 > This file: Project-specific overrides and workflow requirements.
 
 # Skills
 
-Project-scoped skills in `.claude/skills/`:
+Project-scoped skill in `.claude/skills/`:
 
-## Pumped-fn Specific Skills
+## Pumped-design Skill
 
-- **pumped-fn** - Comprehensive guidance for building observable, testable TypeScript applications with @pumped-fn
-  - Auto-activates for TypeScript projects
-  - Covers entire development lifecycle (design, architecture, implementation, testing, troubleshooting)
-  - Decision trees for API selection (provide, derive, flow, tags, Promised, scope)
-  - Environment-specific guidance (HTTP, CLI, cron, React, Lambda)
-  - Anti-pattern detection and corrections
-  - Source of truth for marketplace skill
-
-## Superpowers Skills (Upstream Copies)
-
-- test-driven-development
-- systematic-debugging
-- verification-before-completion
-- requesting-code-review
-- brainstorming, writing-plans, executing-plans
-- using-git-worktrees
-- defense-in-depth
-- condition-based-waiting
+- **pumped-design** - Design, navigate, troubleshoot, and test pumped-fn backend applications
+  - Strict organizational patterns (entrypoints, resources, flows, utilities)
+  - Sub-skill architecture with on-demand pattern loading
+  - Layer-specific testing strategies
+  - Framework integration guides (Hono, Next.js, TanStack Start)
+  - AI-assisted catalog system with mermaid diagrams
+  - Type-safe error handling patterns
+  - Source of truth for marketplace plugin
 
 ## Skill Use Cases
 
-1. **Implementing features/extensions** - Skills guide correct pattern usage
-2. **Creating examples** - Skills enforce consistency across examples
-3. **Marketplace source** - pumped-fn-* skills published via claude-skill/plugin.json
-4. **Project troubleshooting** - Skills catch anti-patterns and violations
+1. **Designing applications** - Phased design process with brainstorming integration
+2. **Implementing features** - Sub-skills guide correct pattern usage
+3. **Troubleshooting flows** - Catalog navigation with mermaid diagrams
+4. **Testing** - Layer-specific strategies (utilities, flows, integration)
+5. **Code reviews** - Enforce naming conventions and patterns
 
-## Updating Skills
+## External Skills
 
-Use `pnpm update-skills` to sync superpowers skills from upstream.
-Manual review required before committing updates.
+Use superpowers plugin from marketplace for general development workflows:
+- test-driven-development, systematic-debugging, verification-before-completion
+- requesting-code-review, brainstorming, writing-plans, executing-plans
+- using-git-worktrees, defense-in-depth, condition-based-waiting
 
 # Upmost important
 
@@ -85,12 +78,12 @@ The library is meant to be GENERIC, it has its core, and extensions (plugins, mi
 
 To make change to the library, there are some details that'll need to be addressed as a completed workflow
 
-Making API change in packages/next meant
+Making API change in packages/next means:
 
 - Potential change to docs (docs/guides/)
 - Potential change to examples (examples/)
 - Potential change to test (packages/next/tests/)
-- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-fn/SKILL.md)**
+- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-design/references/)**
 
 To keep things compact, economic, those should be planned as needed
 
@@ -102,7 +95,7 @@ When changing public API (types, function signatures, etc):
 2. Update tests in packages/next/tests/
 3. Update examples in examples/
 4. Update documentation in docs/guides/
-5. **ALWAYS check and update .claude/skills/pumped-fn/SKILL.md** - this is critical for skill accuracy
+5. **ALWAYS check and update .claude/skills/pumped-design/references/** - critical for skill accuracy
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`

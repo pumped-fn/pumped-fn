@@ -11,44 +11,38 @@
   },
   "plugins": [
     {
-      "name": "pumped-fn",
+      "name": "pumped-design",
       "source": "./claude-skill",
-      "description": "Comprehensive guidance for @pumped-fn ecosystem - TypeScript backend patterns, React frontend architecture, and structured application design with auto-activation, pattern enforcement, and testability strategies",
-      "version": "1.2.0",
+      "description": "Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns - provides phased design process, catalog-based navigation, and layer-specific testing strategies",
+      "version": "1.3.0",
       "author": {
         "name": "lagz0ne",
         "email": "duke@silentium.io"
       },
-      "homepage": "https://github.com/pumped-fn/pumped-fn",
+      "homepage": "https://github.com/pumped-fn/pumped-fn/tree/main/.claude/skills/pumped-design",
       "repository": "https://github.com/pumped-fn/pumped-fn",
       "license": "MIT",
       "keywords": [
         "typescript",
-        "react",
-        "graph-resolution",
-        "dependency-injection",
-        "reactive-programming",
-        "state-management",
         "backend-architecture",
         "application-design",
+        "testing-strategy",
         "code-quality",
         "pumped-fn",
-        "best-practices",
-        "testing",
-        "type-safety"
+        "design-patterns",
+        "resource-management",
+        "flow-orchestration",
+        "best-practices"
       ],
       "category": "code-quality",
       "tags": [
         "typescript",
-        "react",
-        "graph-resolution",
-        "dependency-injection",
-        "reactive-programming",
-        "state-management",
         "backend-architecture",
         "application-design",
         "testing-strategy",
-        "code-quality"
+        "code-quality",
+        "pumped-fn",
+        "design-patterns"
       ]
     }
   ]

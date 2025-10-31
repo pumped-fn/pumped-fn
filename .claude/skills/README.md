@@ -1,62 +1,53 @@
 # Project-Scoped Skills
 
-This directory contains skills for the pumped-fn project, committed to version control and shared with all team members.
+This directory contains the pumped-design skill for the pumped-fn project.
 
-## Skills Overview
+## Pumped-design Skill
 
-### Superpowers Skills (Upstream Copies)
+**pumped-design** - Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns.
 
-Copied from superpowers marketplace for consistency across team:
+### Features
 
-- **test-driven-development** - Write tests first, watch fail, implement
-- **systematic-debugging** - 4-phase framework: root cause, patterns, hypothesis, implementation
-- **verification-before-completion** - Run verification commands before claiming success
-- **requesting-code-review** - Review implementation against plan/requirements
-- **brainstorming** - Refine ideas through Socratic questioning
-- **writing-plans** - Create detailed implementation plans
-- **executing-plans** - Execute plans in batches with review checkpoints
-- **using-git-worktrees** - Create isolated worktrees for feature work
-- **defense-in-depth** - Validation at multiple system layers
-- **condition-based-waiting** - Replace timeouts with condition polling
+- Strict organizational patterns (entrypoints, resources, flows, utilities)
+- Sub-skill architecture with 14 specialized reference guides
+- Layer-specific testing strategies
+- Framework integration guides (Hono, Next.js, TanStack Start)
+- AI-assisted catalog system with mermaid diagrams
+- Type-safe error handling patterns
 
-### Pumped-fn Specific Skills
+### Structure
 
-- **pumped-fn** - Comprehensive guidance for building observable, testable TypeScript applications with @pumped-fn (auto-activates for TypeScript projects)
-
-## Updating Upstream Skills
-
-Superpowers skills are copied from plugin cache. To update:
-
-```bash
-# Copy latest version from plugin cache
-cp -r ~/.claude/plugins/cache/superpowers/skills/<skill-name> .claude/skills/
-
-# Check what changed
-git diff .claude/skills/<skill-name>/
-
-# Commit if beneficial
-git add .claude/skills/<skill-name>/
-git commit -m "chore(skills): update <skill-name> from upstream"
+```
+pumped-design/
+├── SKILL.md                           # Main routing skill
+└── references/                        # Sub-skills loaded on-demand
+    ├── coding-standards.md            # Type safety, naming, style
+    ├── resource-basic.md              # Standalone resources
+    ├── resource-derived.md            # Resources with dependencies
+    ├── resource-lazy.md               # Lazy/conditional resources
+    ├── flow-subflows.md               # Flow orchestration
+    ├── flow-context.md                # Context operations
+    ├── integration-hono.md            # Hono server integration
+    ├── integration-nextjs.md          # Next.js integration
+    ├── integration-tanstack.md        # TanStack Start integration
+    ├── testing-utilities.md           # Unit testing patterns
+    ├── testing-flows.md               # Flow integration testing
+    ├── testing-integration.md         # E2E testing
+    ├── extension-basics.md            # Cross-cutting concerns
+    └── entrypoint-patterns.md         # Entrypoint structure
 ```
 
-**When to update:**
-- Major skill improvements announced
-- Bug fixes in skill logic
-- New patterns added to workflow
-- Quarterly review (manual check)
+### Usage
 
-**Plugin cache location:** `~/.claude/plugins/cache/superpowers/skills/`
+The skill uses YAML frontmatter tags for AI-driven sub-skill routing. When working with pumped-fn applications, the main SKILL.md determines which references/ sub-skills to load based on task context.
 
-## Skill Priority
+### External Skills
 
-Project-scoped skills take precedence over plugin skills with the same name. This allows customization while maintaining upstream sync.
+General development workflows use superpowers plugin from marketplace:
+- test-driven-development, systematic-debugging, verification-before-completion
+- requesting-code-review, brainstorming, writing-plans, executing-plans
+- using-git-worktrees, defense-in-depth, condition-based-waiting
 
-## Adding New Skills
+### Marketplace
 
-1. Create skill directory: `.claude/skills/<skill-name>/`
-2. Add `SKILL.md` with frontmatter and content
-3. Test with subagents before committing
-4. Update this README
-5. Commit to share with team
-
-See [Claude Code Skills Documentation](https://docs.claude.com/en/docs/claude-code/skills) for skill authoring guide.
+This skill is published to marketplace as the pumped-design plugin. See `.claude-plugin/marketplace.json` and `claude-skill/plugin.json` for configuration.
