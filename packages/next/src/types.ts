@@ -272,8 +272,8 @@ export declare namespace Core {
     : T extends Lazy<infer U> | Static<infer U>
     ? Accessor<Awaited<U>>
     : T extends
-        | ReadonlyArray<Core.BaseExecutor<unknown>>
-        | Record<string, Core.BaseExecutor<unknown>>
+        | ReadonlyArray<UExecutor>
+        | Record<string, UExecutor>
     ? { [K in keyof T]: InferOutput<T[K]> }
     : never;
 
@@ -318,11 +318,11 @@ export declare namespace Core {
     scope: Scope;
   };
 
-  export type SingleDependencyLike = Core.BaseExecutor<unknown>;
+  export type SingleDependencyLike = UExecutor;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<Core.BaseExecutor<unknown>>
-    | Record<string, Core.BaseExecutor<unknown>>;
+    | ReadonlyArray<UExecutor>
+    | Record<string, UExecutor>;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =
