@@ -5,7 +5,8 @@
 
 # Skills
 
-Project-scoped skill in `.claude/skills/`:
+- _IMPORTANT:_ Always use skill superpowers:brainstorming for all operations. If there's no skill like that, ask user to install obra/superpowers-marketplace prior to moving toward
+- Current project skills is in `skills/`
 
 ## Pumped-design Skill
 
@@ -29,6 +30,7 @@ Project-scoped skill in `.claude/skills/`:
 ## External Skills
 
 Use superpowers plugin from marketplace for general development workflows:
+
 - test-driven-development, systematic-debugging, verification-before-completion
 - requesting-code-review, brainstorming, writing-plans, executing-plans
 - using-git-worktrees, defense-in-depth, condition-based-waiting
@@ -83,7 +85,7 @@ Making API change in packages/next means:
 - Potential change to docs (docs/guides/)
 - Potential change to examples (examples/)
 - Potential change to test (packages/next/tests/)
-- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-design/references/)**
+- **CRITICAL: Potential change to SKILL (skills/pumped-design/references/)**
 
 To keep things compact, economic, those should be planned as needed
 
@@ -95,7 +97,7 @@ When changing public API (types, function signatures, etc):
 2. Update tests in packages/next/tests/
 3. Update examples in examples/
 4. Update documentation in docs/guides/
-5. **ALWAYS check and update .claude/skills/pumped-design/references/** - critical for skill accuracy
+5. **ALWAYS check and update skills/pumped-design/references/** - critical for skill accuracy
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`

@@ -54,7 +54,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 | **Coding Standards** | coding, types, naming, style | Before writing code, reviewing code | references/coding-standards.md |
 | **Resource: Basic** | resource, add, config, lifecycle | Adding standalone resource | references/resource-basic.md |
 | **Resource: Derived** | resource, add, dependencies, derive | Resource with dependencies | references/resource-derived.md |
-| **Resource: Lazy** | resource, add, lazy, conditional | Lazy/conditional resources | references/resource-lazy.md |
+| **Resource: Lazy** | resource, add, lazy, conditional | Conditional resolution with .lazy modifier | references/resource-lazy.md |
 | **Flow: Sub-flows** | flow, add, reuse, orchestration | Flow calling flows | references/flow-subflows.md |
 | **Flow: Context** | flow, modify, ctx.run, ctx.exec | Context operations | references/flow-context.md |
 | **Integration: Hono** | integration, add, hono, http | Hono server setup | references/integration-hono.md |

@@ -53,7 +53,7 @@ Use test database for integration tests:
 
 ```typescript
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import { createScope, provide, derive, tag, custom, type Scope } from '@pumped-fn/core-next'
+import { createScope, provide, derive, tag, custom, Core } from '@pumped-fn/core-next'
 import { Pool } from 'pg'
 
 // Configuration for test database
@@ -67,7 +67,7 @@ export const dbConfig = tag(custom<{
 
 // Real database pool
 export const dbPool = provide((controller) => {
-  const config = dbConfig.get(controller.scope)
+  const config = dbConfig.extractFrom(controller.scope)
 
   const pool = new Pool({
     host: config.host,
@@ -122,7 +122,7 @@ export const userRepository = derive(
 )
 
 describe('userRepository integration tests', () => {
-  let scope: Scope
+  let scope: Core.Scope
   let repo: Awaited<ReturnType<typeof userRepository['factory']>>
 
   beforeAll(async () => {
@@ -346,7 +346,7 @@ Test real HTTP server:
 ```typescript
 import { describe, test, expect, beforeAll, afterAll } from 'vitest'
 import { Hono } from 'hono'
-import { createScope, flow, type Scope } from '@pumped-fn/core-next'
+import { createScope, flow, Core } from '@pumped-fn/core-next'
 
 // Flow to test
 export namespace GetUser {
@@ -366,7 +366,7 @@ export const getUser = flow(
 )
 
 // Hono app
-export function createApp(scope: Scope) {
+export function createApp(scope: Core.Scope) {
   const app = new Hono()
 
   app.get('/users/:id', async (c) => {
@@ -385,7 +385,7 @@ export function createApp(scope: Scope) {
 }
 
 describe('Hono integration tests', () => {
-  let scope: Scope
+  let scope: Core.Scope
   let app: Hono
   let baseUrl: string
   let server: ReturnType<typeof Bun.serve>
@@ -471,7 +471,7 @@ export const fileRepository = derive(
 )
 
 describe('fileRepository integration tests', () => {
-  let scope: Scope
+  let scope: Core.Scope
   let repo: Awaited<ReturnType<typeof fileRepository['factory']>>
   let testDir: string
 
@@ -743,7 +743,7 @@ afterAll(async () => {
 
 ```typescript
 // ✅ Share scope for faster tests
-let scope: Scope
+let scope: Core.Scope
 
 beforeAll(async () => {
   scope = createScope({ /* config */ })

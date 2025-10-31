@@ -1,6 +1,6 @@
 # Project-Scoped Skills
 
-This directory contains the pumped-design skill for the pumped-fn project.
+Project skills are located in the `skills/` directory at project root.
 
 ## Pumped-design Skill
 

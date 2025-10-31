@@ -56,7 +56,7 @@ export namespace ProcessOrder {
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { flow, createScope, preset, derive, type Scope } from '@pumped-fn/core-next'
+import { flow, createScope, preset, derive, Core } from '@pumped-fn/core-next'
 
 // Reusable validation flow
 export namespace ValidateOrder {
@@ -88,7 +88,7 @@ export const validateOrder = flow(
 )
 
 describe('validateOrder flow (reusable)', () => {
-  let scope: Scope
+  let scope: Core.Scope
 
   beforeEach(() => {
     scope = createScope()
@@ -165,7 +165,7 @@ Use `preset()` to mock dependencies:
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { flow, derive, createScope, preset, type Scope } from '@pumped-fn/core-next'
+import { flow, derive, createScope, preset, Core } from '@pumped-fn/core-next'
 
 // Mock repository interface
 export type UserRepository = {
@@ -218,7 +218,7 @@ export const createUser = flow(
 )
 
 describe('createUser flow', () => {
-  let scope: Scope
+  let scope: Core.Scope
 
   beforeEach(() => {
     const mockUserRepo: UserRepository = {
@@ -289,7 +289,7 @@ Test parent flow, sub-flow tested separately:
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { flow, createScope, type Scope } from '@pumped-fn/core-next'
+import { flow, createScope, Core } from '@pumped-fn/core-next'
 
 // Sub-flow (tested separately)
 export namespace ValidateEmail {
@@ -338,7 +338,7 @@ export const registerUser = flow(
 )
 
 describe('validateEmail sub-flow (reusable)', () => {
-  let scope: Scope
+  let scope: Core.Scope
 
   beforeEach(() => {
     scope = createScope()
@@ -368,7 +368,7 @@ describe('validateEmail sub-flow (reusable)', () => {
 })
 
 describe('registerUser flow (parent)', () => {
-  let scope: Scope
+  let scope: Core.Scope
 
   beforeEach(() => {
     scope = createScope()

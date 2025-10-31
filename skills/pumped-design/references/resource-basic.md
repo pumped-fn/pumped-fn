@@ -37,7 +37,7 @@ export const dbConfig = tag(custom<{
 
 // Basic resource with lifecycle
 export const dbPool = provide((controller) => {
-  const config = dbConfig.get(controller.scope)
+  const config = dbConfig.extractFrom(controller.scope)
 
   const pool = new Pool({
     host: config.host,
@@ -138,8 +138,8 @@ export const apiUrl = tag(custom<string>(), { label: 'config.apiUrl' })
 export const apiKey = tag(custom<string>(), { label: 'config.apiKey' })
 
 export const externalApi = provide((controller) => {
-  const url = apiUrl.get(controller.scope)
-  const key = apiKey.get(controller.scope)
+  const url = apiUrl.extractFrom(controller.scope)
+  const key = apiKey.extractFrom(controller.scope)
 
   return {
     get: async <T>(path: string): Promise<T> => {
@@ -269,7 +269,7 @@ export const apiClient = provide(() => {
 export const apiKey = tag(custom<string>(), { label: 'config.apiKey' })
 
 export const apiClient = provide((controller) => {
-  const key = apiKey.get(controller.scope)
+  const key = apiKey.extractFrom(controller.scope)
   return { get: (path) => fetch(path, { headers: { 'Authorization': key }}) }
 })
 
