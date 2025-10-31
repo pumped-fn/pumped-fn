@@ -436,6 +436,7 @@ export namespace Flow {
   }
 
   export type UFlow = Core.Executor<Handler<any, any>>;
+  export type UHandler = Handler<any, any>;
 
   export interface Flow<I, O> extends Core.Executor<Handler<O, I>> {
     definition: Definition<O, I>;
