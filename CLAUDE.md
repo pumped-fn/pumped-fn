@@ -85,7 +85,7 @@ Making API change in packages/next means:
 - Potential change to docs (docs/guides/)
 - Potential change to examples (examples/)
 - Potential change to test (packages/next/tests/)
-- **CRITICAL: Potential change to SKILL (skills/pumped-design/references/)**
+- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-design/references/)**
 
 To keep things compact, economic, those should be planned as needed
 
@@ -97,7 +97,7 @@ When changing public API (types, function signatures, etc):
 2. Update tests in packages/next/tests/
 3. Update examples in examples/
 4. Update documentation in docs/guides/
-5. **ALWAYS check and update skills/pumped-design/references/** - critical for skill accuracy
+5. **ALWAYS check and update .claude/skills/pumped-design/references/** - critical for skill accuracy
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`

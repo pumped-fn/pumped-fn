@@ -104,7 +104,7 @@ The skill focuses on the three hardest concepts:
 
 For more details:
 - [Pumped-fn Documentation](https://github.com/lagz0ne/pumped-fn/tree/main/docs)
-- [Skill Reference](skills/pumped-design/references/README.md)
+- [Skill Reference](.claude/skills/pumped-design/references/README.md)
 
 ## Version
 
