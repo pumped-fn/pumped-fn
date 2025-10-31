@@ -283,14 +283,14 @@ export declare namespace Core {
 
   export type ChangeCallback = (
     event: "resolve" | "update",
-    executor: Executor<unknown>,
+    executor: AnyExecutor,
     resolved: unknown,
     scope: Scope
   ) => EventCallbackResult | Promised<EventCallbackResult>;
 
   export type ReleaseCallback = (
     event: "release",
-    executor: Executor<unknown>,
+    executor: AnyExecutor,
     scope: Scope
   ) => void | Promised<void>;
 
@@ -308,13 +308,13 @@ export declare namespace Core {
       | ExecutorResolutionError
       | FactoryExecutionError
       | DependencyResolutionError,
-    executor: Executor<unknown>,
+    executor: AnyExecutor,
     scope: Scope
   ) => void | Promised<void>;
 
   export type WrapContext = {
     operation: "resolve" | "update";
-    executor: Executor<unknown>;
+    executor: AnyExecutor;
     scope: Scope;
   };
 
@@ -334,8 +334,8 @@ export declare namespace Core {
 
   export interface Scope extends Tag.Container {
     accessor<T>(executor: Core.Executor<T>, eager?: boolean): Accessor<T>;
-    entries(): [Core.Executor<unknown>, Core.Accessor<unknown>][];
-    registeredExecutors(): Core.Executor<unknown>[];
+    entries(): [AnyExecutor, Accessor<unknown>][];
+    registeredExecutors(): AnyExecutor[];
 
     resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
