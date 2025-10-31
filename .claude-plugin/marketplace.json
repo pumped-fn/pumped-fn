@@ -6,20 +6,19 @@
   },
   "metadata": {
     "description": "Official marketplace for pumped-fn Claude Code plugins",
-    "version": "1.0.0",
-    "pluginRoot": "claude-skill"
+    "version": "1.4.0"
   },
   "plugins": [
     {
       "name": "pumped-design",
-      "source": "./claude-skill",
+      "source": "./",
       "description": "Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns - provides phased design process, catalog-based navigation, and layer-specific testing strategies",
       "version": "1.4.0",
       "author": {
         "name": "lagz0ne",
         "email": "duke@silentium.io"
       },
-      "homepage": "https://github.com/pumped-fn/pumped-fn/tree/main/.claude/skills/pumped-design",
+      "homepage": "https://github.com/pumped-fn/pumped-fn/tree/main/skills/pumped-design",
       "repository": "https://github.com/pumped-fn/pumped-fn",
       "license": "MIT",
       "keywords": [

@@ -3,10 +3,10 @@
   "version": "1.4.0",
   "description": "Design, navigate, troubleshoot, and test pumped-fn backend applications using strict organizational patterns - provides phased design process, catalog-based navigation, and layer-specific testing strategies",
   "author": "lagz0ne",
-  "repository": "https://github.com/lagz0ne/pumped-fn",
-  "homepage": "https://github.com/lagz0ne/pumped-fn/tree/main/.claude/skills/pumped-design",
+  "repository": "https://github.com/pumped-fn/pumped-fn",
+  "homepage": "https://github.com/pumped-fn/pumped-fn/tree/main/skills/pumped-design",
   "skills": [
-    ".claude/skills/pumped-design"
+    "skills/pumped-design"
   ],
   "tags": [
     "typescript",
