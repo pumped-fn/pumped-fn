@@ -197,10 +197,10 @@ class FlowContext implements Flow.Context {
     if (
       typeof accessorOrKey === "object" &&
       accessorOrKey !== null &&
-      "get" in accessorOrKey
+      "extractFrom" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
-      return accessor.get(this);
+      return accessor.extractFrom(this);
     }
     const key = accessorOrKey;
     if (this.contextData.has(key)) {
@@ -221,7 +221,7 @@ class FlowContext implements Flow.Context {
   find<T>(accessor: Tag.Tag<T, false>): T | undefined;
   find<T>(accessor: Tag.Tag<T, true>): T;
   find<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T | undefined {
-    return accessor.find(this);
+    return accessor.readFrom(this);
   }
 
   set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
@@ -230,10 +230,10 @@ class FlowContext implements Flow.Context {
       accessorOrKey !== null &&
       accessorOrKey !== undefined &&
       (typeof accessorOrKey === "object" || typeof accessorOrKey === "function") &&
-      "set" in accessorOrKey
+      "injectTo" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
-      accessor.set(this, value as T);
+      accessor.injectTo(this, value as T);
       return;
     }
     const key = accessorOrKey;
@@ -346,7 +346,7 @@ class FlowContext implements Flow.Context {
 
           return Promised.try(async () => {
             const handler = await this.scope.resolve(flow);
-            const definition = flowDefinitionMeta.find(flow);
+            const definition = flowDefinitionMeta.readFrom(flow);
             if (!definition) {
               throw new Error("Flow definition not found in executor metadata");
             }
@@ -377,7 +377,7 @@ class FlowContext implements Flow.Context {
           });
         };
 
-        const definition = flowDefinitionMeta.find(flow);
+        const definition = flowDefinitionMeta.readFrom(flow);
         if (!definition) {
           throw new Error("Flow definition not found in executor metadata");
         }
@@ -408,7 +408,7 @@ class FlowContext implements Flow.Context {
 
       const executeCore = (): Promised<Flow.InferOutput<F>> => {
         return this.scope.resolve(flow).map(async (handler) => {
-          const definition = flowDefinitionMeta.find(flow);
+          const definition = flowDefinitionMeta.readFrom(flow);
           if (!definition) {
             throw new Error("Flow definition not found in executor metadata");
           }
@@ -425,7 +425,7 @@ class FlowContext implements Flow.Context {
         });
       };
 
-      const definition = flowDefinitionMeta.find(flow);
+      const definition = flowDefinitionMeta.readFrom(flow);
       if (!definition) {
         throw new Error("Flow definition not found in executor metadata");
       }
@@ -543,7 +543,7 @@ class FlowContext implements Flow.Context {
     input: unknown
   ): Promised<T> {
     const executeCore = (): Promised<T> => Promised.create(handler(context));
-    const definition = flowDefinitionMeta.find(flow);
+    const definition = flowDefinitionMeta.readFrom(flow);
     if (!definition) {
       throw new Error("Flow definition not found in executor metadata");
     }
@@ -579,16 +579,23 @@ class FlowContext implements Flow.Context {
     return {
       context: {
         get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T {
-          return accessor.get(dataStore);
+          return accessor.extractFrom(dataStore);
         },
         find<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T | undefined {
-          return accessor.find(dataStore);
+          return accessor.readFrom(dataStore);
         },
       },
     };
   }
 }
 
+/**
+ * Executes flow with input, creating or using existing scope.
+ * @param flow - Flow executor to run
+ * @param input - Input value for flow
+ * @param options - Scope config or existing scope + execution options
+ * @example flow.execute(myFlow, { userId: 1 })
+ */
 function execute<S, I>(
   flow: Core.Executor<Flow.Handler<S, I>> | Flow.Flow<I, S>,
   input: I,
@@ -693,6 +700,18 @@ function execute<S, I>(
   return result;
 }
 
+/**
+ * Creates flow executor.
+ * @example
+ * // No deps, simple handler
+ * flow((ctx, input: number) => input * 2)
+ *
+ * // With dependencies
+ * flow([dbExecutor], ([db], ctx, input) => db.query(input))
+ *
+ * // With schema validation
+ * flow({ input: z.number(), output: z.string() }, (ctx, n) => String(n))
+ */
 function flowImpl<I, S>(
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
 ): Flow.Flow<I, S>;

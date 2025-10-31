@@ -18,7 +18,7 @@ const loggingExtension = extension({
   name: 'logging',
   wrap: async (scope, next, operation) => {
     const ctx = 'context' in operation ? operation.context : undefined
-    const reqId = ctx ? requestId.find(ctx) : 'no-id'
+    const reqId = ctx ? requestId.readFrom(ctx) : 'no-id'
     console.log(`[${reqId}] Starting ${operation.kind}`)
 
     const startTime = Date.now()

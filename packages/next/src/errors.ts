@@ -235,7 +235,7 @@ export function createSystemError(
 }
 
 export function getExecutorName(executor: unknown): string {
-  const executorName = name.find(executor as Tag.Container);
+  const executorName = name.readFrom(executor as Tag.Container);
   if (executorName) return executorName;
 
   if (executor && typeof executor === "object" && "factory" in executor) {

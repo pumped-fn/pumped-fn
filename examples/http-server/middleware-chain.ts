@@ -17,7 +17,7 @@ import { requestId, userId } from './shared/tags'
 const authMiddleware = extension({
   name: 'auth',
   wrap: async (ctx, next, operation) => {
-    const id = userId.find(ctx)
+    const id = userId.readFrom(ctx)
     if (!id) {
       throw new Error('Unauthorized')
     }

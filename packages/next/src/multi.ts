@@ -60,9 +60,9 @@ class MultiExecutorImpl<T, K, PoolIdType = unknown> {
     return Promised.create((async () => {
       const entries = scope.entries();
       for (const [executor] of entries) {
-        const check = this.poolId.some
-          ? this.poolId.some(executor)
-          : this.poolId.find(executor);
+        const check = this.poolId.collectFrom
+          ? this.poolId.collectFrom(executor)
+          : this.poolId.readFrom(executor);
         if (check && (Array.isArray(check) ? check.length > 0 : check)) {
           await scope.release(executor);
         }

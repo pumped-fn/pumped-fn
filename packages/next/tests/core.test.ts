@@ -12,7 +12,7 @@ describe("Core Functionality", () => {
       const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
       const store = new Map();
 
-      const result = numberTag.find(store);
+      const result = numberTag.readFrom(store);
 
       expect(result).toBe(42);
     });
@@ -21,8 +21,8 @@ describe("Core Functionality", () => {
       const stringTag = tag(custom<string>(), { label: "test.string" });
       const store = new Map();
 
-      stringTag.set(store, "hello");
-      const result = stringTag.find(store);
+      stringTag.injectTo(store, "hello");
+      const result = stringTag.readFrom(store);
 
       expect(result).toBe("hello");
     });
@@ -31,7 +31,7 @@ describe("Core Functionality", () => {
       const optionalTag = tag(custom<string>(), { label: "test.optional" });
       const store = new Map();
 
-      const result = optionalTag.find(store);
+      const result = optionalTag.readFrom(store);
 
       expect(result).toBeUndefined();
     });
@@ -40,7 +40,7 @@ describe("Core Functionality", () => {
       const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
       const store = new Map();
 
-      const updateOperation = () => numberTag.set(store, 123);
+      const updateOperation = () => numberTag.injectTo(store, 123);
 
       expect(updateOperation).not.toThrow();
     });

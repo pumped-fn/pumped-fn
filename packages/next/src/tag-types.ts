@@ -23,6 +23,11 @@ export declare namespace Tag {
 
   export type Source = Store | Container | Tagged[];
 
+  /**
+   * Tag for attaching metadata to executors/flows/scopes.
+   * @typeParam T - Value type
+   * @typeParam HasDefault - When true, tag has default value (affects find return type)
+   */
   export interface Tag<T, HasDefault extends boolean = false> {
     readonly key: symbol;
     readonly schema: StandardSchemaV1<T>;
@@ -32,12 +37,15 @@ export declare namespace Tag {
     (value?: HasDefault extends true ? T : never): Tagged<T>;
     (value: T): Tagged<T>;
 
-    get(source: Source): T;
-    find(source: Source): HasDefault extends true ? T : T | undefined;
-    some(source: Source): T[];
+    /** Extracts value from source, throws if missing and no default */
+    extractFrom(source: Source): T;
+    /** Reads value from source, returns undefined if missing (unless HasDefault=true) */
+    readFrom(source: Source): HasDefault extends true ? T : T | undefined;
+    /** Collects all values with this key from source */
+    collectFrom(source: Source): T[];
 
-    set(target: Store, value: T): void;
-    set(target: Container | Tagged[], value: T): Tagged<T>;
+    /** Writes value to store */
+    injectTo(target: Store, value: T): void;
 
     entry(value?: HasDefault extends true ? T : never): [symbol, T];
     entry(value: T): [symbol, T];

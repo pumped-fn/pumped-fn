@@ -43,13 +43,13 @@ Cannot find name 'ctx'
 **Solution:**
 ```typescript
 // ❌ Wrong - ctx doesn't exist in executors
-const executor = provide((controller) => appConfig.get(controller.scope))
+const executor = provide((controller) => appConfig.extractFrom(controller.scope))
 
 // ✅ Right - get tag from scope, not ctx
 const executor = derive.tag(appConfig, (cfg) => cfg)
 
-// Or use scope.get() directly
-const cfg = appConfig.get(scope)
+// Or use scope.extractFrom() directly
+const cfg = appConfig.extractFrom(scope)
 ```
 
 ## Argument of type 'X' is not assignable to parameter of type 'Y'

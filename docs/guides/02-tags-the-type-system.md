@@ -20,7 +20,7 @@ const scope = createScope({
   tags: [appConfig({ port: 3000, env: 'prod' })]
 })
 
-const config = appConfig.get(scope)
+const config = appConfig.extractFrom(scope)
 const port = config.port
 
 const handler = flow((ctx, input: string) => {
@@ -45,7 +45,7 @@ Define once in shared module. Import everywhere.
 
 ## Use Tags
 
-**`.get()`** - Required values. Throws if missing.
+**`.extractFrom()`** - Required values. Throws if missing.
 
 ```ts twoslash
 import { tag, custom, createScope } from '@pumped-fn/core-next'
@@ -57,10 +57,10 @@ const scope = createScope({
   tags: [appConfig({ port: 3000 })]
 })
 
-const config = appConfig.get(scope)
+const config = appConfig.extractFrom(scope)
 ```
 
-**`.find()`** - Optional values. Returns undefined if missing.
+**`.readFrom()`** - Optional values. Returns undefined if missing.
 
 ```ts twoslash
 import { tag, custom, flow } from '@pumped-fn/core-next'
@@ -68,7 +68,7 @@ import { tag, custom, flow } from '@pumped-fn/core-next'
 const userId = tag(custom<string>(), { label: 'user.id' })
 
 const handler = flow((ctx) => {
-  const id = userId.find(ctx)
+  const id = userId.readFrom(ctx)
   if (id) {
     return { userId: id }
   }
@@ -124,7 +124,7 @@ const scope = createScope({
   ]
 })
 
-const config = dbConfig.get(scope)
+const config = dbConfig.extractFrom(scope)
 ```
 
 ## Common Mistakes

@@ -14,7 +14,7 @@ Reactive executors re-execute when upstream dependencies change via `scope.updat
 import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const config = tag(custom<{ env: string }>(), { label: 'config' })
-const source = provide((controller) => config.get(controller.scope))
+const source = provide((controller) => config.extractFrom(controller.scope))
 
 const reactive = derive(source.reactive, (cfg) => {
   console.log('Config changed:', cfg.env)
@@ -38,7 +38,7 @@ Only executors using `.reactive` re-execute on updates:
 import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const data = tag(custom<number>(), { label: 'data' })
-const source = provide((controller) => data.get(controller.scope))
+const source = provide((controller) => data.extractFrom(controller.scope))
 
 const normal = derive(source, (n) => n * 2)
 const reactive = derive(source.reactive, (n) => n * 2)
@@ -65,7 +65,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const appConfig = tag(custom<{ logLevel: string }>(), { label: 'config' })
 
-const configSource = provide((controller) => appConfig.get(controller.scope))
+const configSource = provide((controller) => appConfig.extractFrom(controller.scope))
 
 const logger = derive(configSource.reactive, (cfg) => ({
   log: (msg: string) => {
@@ -83,7 +83,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const cacheKey = tag(custom<string>(), { label: 'cache.key' })
 
-const keySource = provide((controller) => cacheKey.get(controller.scope))
+const keySource = provide((controller) => cacheKey.extractFrom(controller.scope))
 
 const cache = derive(keySource.reactive, (key) => {
   console.log('Loading cache for:', key)

@@ -111,6 +111,12 @@ export function isPreset(input: unknown): input is Core.Preset<unknown> {
   );
 }
 
+/**
+ * Creates executor without dependencies.
+ * @param factory - Receives controller, returns value
+ * @param tags - Optional metadata tags
+ * @example provide((ctl) => new Database())
+ */
 export function provide<T>(
   factory: Core.NoDependencyFn<T>,
   ...tags: Tag.Tagged[]
@@ -118,31 +124,44 @@ export function provide<T>(
   return createExecutor(factory, undefined, tags);
 }
 
+/**
+ * Creates executor depending on other executors.
+ * @param dependencies - Single executor, array, or record of executors
+ * @param factory - Receives resolved deps + controller, returns value
+ * @param tags - Optional metadata tags
+ * @example derive([dbExecutor], ([db], ctl) => new UserRepo(db))
+ */
 export function derive<T, D extends Core.DependencyLike>(
-  pdependencies: { [K in keyof D]: D[K] },
-  pfactory: Core.DependentFn<T, Core.InferOutput<D>>,
+  dependencies: { [K in keyof D]: D[K] },
+  factory: Core.DependentFn<T, Core.InferOutput<D>>,
   ...tags: Tag.Tagged[]
 ): Core.Executor<T> {
-  const factory: Core.DependentFn<T, unknown> = (deps, ctl) =>
-    pfactory(deps as Core.InferOutput<D>, ctl);
+  const wrappedFactory: Core.DependentFn<T, unknown> = (deps, ctl) =>
+    factory(deps as Core.InferOutput<D>, ctl);
 
-  const dependencies = pdependencies as
+  const typedDependencies = dependencies as
     | Core.UExecutor
     | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>;
 
-  return createExecutor(factory, dependencies, tags);
+  return createExecutor(wrappedFactory, typedDependencies, tags);
 }
 
+/**
+ * Override executor value in scope.
+ * @param targetExecutor - Executor to override
+ * @param overrideValue - Static value or executor providing value
+ * @example preset(configExecutor, { port: 3000 })
+ */
 export function preset<T>(
-  e: Core.Executor<T> | Escapable<T>,
-  v: T | Core.Executor<T>
+  targetExecutor: Core.Executor<T> | Escapable<T>,
+  overrideValue: T | Core.Executor<T>
 ): Core.Preset<T> {
-  const executor = isExecutor(e) ? e : e.escape();
+  const executor = isExecutor(targetExecutor) ? targetExecutor : targetExecutor.escape();
 
   return {
     [executorSymbol]: "preset",
-    value: v,
+    value: overrideValue,
     executor,
   };
 }

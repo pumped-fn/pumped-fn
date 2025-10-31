@@ -249,7 +249,7 @@ test("test scope option", async () => {
     init: (scope) => {
       return new Promised((async () => {
         for (const executor of scope.registeredExecutors()) {
-          if (eagerTag.find(executor)) {
+          if (eagerTag.readFrom(executor)) {
             await scope.resolve(executor);
           }
         }

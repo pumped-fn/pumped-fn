@@ -198,6 +198,12 @@ class TagImpl<T, HasDefault extends boolean = false> {
   }
 }
 
+/**
+ * Creates metadata tag for executors/flows/scopes.
+ * @param schema - Validation schema (use custom<T>() for no validation)
+ * @param options - Label and optional default value
+ * @example tag(custom<number>(), { label: "retry", default: 3 })
+ */
 export function tag<T>(schema: StandardSchemaV1<T>): Tag.Tag<T, false>;
 export function tag<T>(
   schema: StandardSchemaV1<T>,
@@ -243,10 +249,10 @@ export function tag<T>(
     configurable: false,
   });
 
-  fn.get = impl.get.bind(impl);
-  fn.find = impl.find.bind(impl);
-  fn.some = impl.some.bind(impl);
-  fn.set = impl.set.bind(impl) as typeof impl.set;
+  fn.extractFrom = impl.get.bind(impl);
+  fn.readFrom = impl.find.bind(impl);
+  fn.collectFrom = impl.some.bind(impl);
+  fn.injectTo = impl.set.bind(impl);
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
   (fn as any).partial = <D extends Partial<T>>(d: D): D => {

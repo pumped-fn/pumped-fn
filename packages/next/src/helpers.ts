@@ -6,6 +6,13 @@ import {
 } from "./executor";
 import { Core } from "./types";
 
+/**
+ * Resolves multiple executors in parallel from scope.
+ * @param scope - Scope to resolve from
+ * @param executors - Array or record of executors to resolve
+ * @returns Promise of resolved values matching input structure
+ * @example resolves(scope, [dbExecutor, cacheExecutor])
+ */
 export async function resolves<
   T extends
     | Array<Core.Executor<unknown> | Escapable<unknown>>

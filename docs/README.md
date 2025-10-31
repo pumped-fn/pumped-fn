@@ -95,7 +95,7 @@ import { provide, derive, createScope, tag, custom } from '@pumped-fn/core-next'
 
 const appConfig = tag(custom<{ port: number }>(), { label: 'app.config' })
 
-const config = provide((controller) => appConfig.get(controller.scope))
+const config = provide((controller) => appConfig.extractFrom(controller.scope))
 const db = derive(config, (cfg) => createConnection(cfg))
 const userService = derive({ db, config }, ({ db, config }) => ({
   getUser: (id: string) => db.query('...')

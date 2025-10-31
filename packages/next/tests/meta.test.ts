@@ -35,8 +35,8 @@ describe("Meta System", () => {
       const executor = provide(() => {}, nameTag("test"));
 
       expect(nameTag("test").value).toBe("test");
-      expect(nameTag.find(executor)).toBe("test");
-      expect(nameTag.some(executor)).toEqual(["test"]);
+      expect(nameTag.readFrom(executor)).toBe("test");
+      expect(nameTag.collectFrom(executor)).toEqual(["test"]);
     });
 
     test("tag supports boolean marker tags", async () => {
@@ -44,7 +44,7 @@ describe("Meta System", () => {
 
       const executor = provide(() => null, markerTag());
 
-      expect(markerTag.find(executor)).toBe(true);
+      expect(markerTag.readFrom(executor)).toBe(true);
     });
   });
 
@@ -60,10 +60,10 @@ describe("Meta System", () => {
       expect(scope.tags).toBeDefined();
       expect(scope.tags).toHaveLength(2);
 
-      const environmentConfig = configTag.get(scope);
+      const environmentConfig = configTag.extractFrom(scope);
       expect(environmentConfig).toBe("production");
 
-      const debugMode = debugTag.get(scope);
+      const debugMode = debugTag.extractFrom(scope);
       expect(debugMode).toBe("off");
     });
 
@@ -73,7 +73,7 @@ describe("Meta System", () => {
       });
 
       const environmentAwareExecutor = provide((controller) => {
-        const environment = configTag.get(controller.scope);
+        const environment = configTag.extractFrom(controller.scope);
         return `Running in ${environment}`;
       });
 
@@ -91,8 +91,8 @@ describe("Meta System", () => {
       const executor = provide(() => {}, nameTag("test"));
 
       expect(taggedValue.value).toBe("test");
-      expect(nameTag.find([taggedValue])).toBe("test");
-      expect(nameTag.find(executor)).toBe("test");
+      expect(nameTag.readFrom([taggedValue])).toBe("test");
+      expect(nameTag.readFrom(executor)).toBe("test");
     });
 
     test("tag some() collects multiple values", () => {
@@ -100,7 +100,7 @@ describe("Meta System", () => {
 
       const taggedArray = [nameTag("John"), nameTag("Jane")];
 
-      expect(nameTag.some(taggedArray)).toEqual(["John", "Jane"]);
+      expect(nameTag.collectFrom(taggedArray)).toEqual(["John", "Jane"]);
     });
 
     test("tag callable creates tagged values", () => {

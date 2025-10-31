@@ -25,8 +25,8 @@ const port = tag(custom<number>(), { label: 'server.port', default: 3000 })
 const dbHost = tag(custom<string>(), { label: 'db.host', default: 'localhost' })
 
 const config = provide((controller) => ({
-  port: port.get(controller.scope),
-  dbHost: dbHost.get(controller.scope)
+  port: port.extractFrom(controller.scope),
+  dbHost: dbHost.extractFrom(controller.scope)
 }))
 
 const db = derive(config, (cfg) => ({

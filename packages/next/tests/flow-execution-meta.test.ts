@@ -6,7 +6,7 @@ describe("Flow Execution Meta", () => {
   test("scopeMeta applies configuration to newly created scope", async () => {
     const appConfig = tag(custom<{ env: string }>(), { label: "app.config" });
     const readConfig = flow((context) => {
-      return appConfig.get(context.scope);
+      return appConfig.extractFrom(context.scope);
     });
 
     const result = await flow.execute(readConfig, undefined, {
@@ -19,7 +19,7 @@ describe("Flow Execution Meta", () => {
   test("execution meta accessible from flow context", async () => {
     const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const getRequestId = flow((context) => {
-      return requestId.get(context);
+      return requestId.extractFrom(context);
     });
 
     const result = await flow.execute(getRequestId, undefined, {
@@ -32,7 +32,7 @@ describe("Flow Execution Meta", () => {
   test("execution meta isolated between concurrent executions", async () => {
     const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const getRequestId = flow((context) => {
-      return requestId.get(context);
+      return requestId.extractFrom(context);
     });
 
     const firstExecution = await flow.execute(getRequestId, undefined, {
@@ -50,8 +50,8 @@ describe("Flow Execution Meta", () => {
     const appConfig = tag(custom<{ env: string }>(), { label: "app.config" });
     const requestId = tag(custom<{ requestId: string }>(), { label: "request.id" });
     const readBothMetas = flow((context) => {
-      const scopeConfig = appConfig.get(context.scope);
-      const execTag = requestId.get(context);
+      const scopeConfig = appConfig.extractFrom(context.scope);
+      const execTag = requestId.extractFrom(context);
       return { scope: scopeConfig, exec: execTag };
     });
 
@@ -73,7 +73,7 @@ describe("Flow Execution Meta", () => {
 
     const inspectScope = flow((context) => {
       const scopeTags = context.scope.tags;
-      const execTag = requestId.get(context);
+      const execTag = requestId.extractFrom(context);
       return { scopeTags, execTag };
     });
 

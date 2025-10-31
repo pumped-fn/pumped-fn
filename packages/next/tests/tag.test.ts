@@ -17,7 +17,7 @@ describe("Tag System", () => {
     const emailTag = tag(custom<string>());
 
     store.set(emailTag.key, "test@example.com");
-    expect(emailTag.find(store)).toBe("test@example.com");
+    expect(emailTag.readFrom(store)).toBe("test@example.com");
   });
 
   test("detects Tagged array source type", () => {
@@ -26,7 +26,7 @@ describe("Tag System", () => {
       emailTag("test@example.com"),
     ];
 
-    expect(emailTag.find(tagged)).toBe("test@example.com");
+    expect(emailTag.readFrom(tagged)).toBe("test@example.com");
   });
 
   test("detects Container source type", () => {
@@ -37,37 +37,37 @@ describe("Tag System", () => {
       ],
     };
 
-    expect(emailTag.find(container)).toBe("test@example.com");
+    expect(emailTag.readFrom(container)).toBe("test@example.com");
   });
 });
 
 describe("Tag Creation and Retrieval", () => {
-  test("tag without default requires value for get", () => {
+  test("tag without default requires value for extractFrom", () => {
     const emailTag = tag(custom<string>());
     const store = new Map<symbol, unknown>();
 
-    expect(() => emailTag.get(store)).toThrow();
+    expect(() => emailTag.extractFrom(store)).toThrow();
   });
 
-  test("tag without default returns undefined for find", () => {
+  test("tag without default returns undefined for readFrom", () => {
     const emailTag = tag(custom<string>());
     const store = new Map<symbol, unknown>();
 
-    expect(emailTag.find(store)).toBeUndefined();
+    expect(emailTag.readFrom(store)).toBeUndefined();
   });
 
-  test("tag with default never throws on get", () => {
+  test("tag with default never throws on extractFrom", () => {
     const portTag = tag(custom<number>(), { default: 3000 });
     const store = new Map<symbol, unknown>();
 
-    expect(portTag.get(store)).toBe(3000);
+    expect(portTag.extractFrom(store)).toBe(3000);
   });
 
-  test("tag with default returns default for find", () => {
+  test("tag with default returns default for readFrom", () => {
     const portTag = tag(custom<number>(), { default: 3000 });
     const store = new Map<symbol, unknown>();
 
-    expect(portTag.find(store)).toBe(3000);
+    expect(portTag.readFrom(store)).toBe(3000);
   });
 
   test("tag retrieves stored value", () => {
@@ -75,7 +75,7 @@ describe("Tag Creation and Retrieval", () => {
     const store = new Map<symbol, unknown>();
 
     store.set(emailTag.key, "test@example.com");
-    expect(emailTag.get(store)).toBe("test@example.com");
+    expect(emailTag.extractFrom(store)).toBe("test@example.com");
   });
 });
 
@@ -144,37 +144,20 @@ describe("Tag Entry Method", () => {
     const portTag = tag(custom<number>(), { default: 3000 });
     const store = new Map([portTag.entry()]);
 
-    expect(portTag.get(store)).toBe(3000);
+    expect(portTag.extractFrom(store)).toBe(3000);
   });
 });
 
-describe("Tag Set Method", () => {
-  test("set mutates Store", () => {
+describe("Tag InjectTo Method", () => {
+  test("injectTo mutates Store", () => {
     const emailTag = tag(custom<string>());
     const store = new Map<symbol, unknown>();
 
-    emailTag.set(store, "test@example.com");
-    expect(emailTag.get(store)).toBe("test@example.com");
+    emailTag.injectTo(store, "test@example.com");
+    expect(emailTag.extractFrom(store)).toBe("test@example.com");
   });
 
-  test("set with Container returns Tagged", () => {
-    const emailTag = tag(custom<string>());
-    const container: Tag.Container = { tags: [] };
-
-    const tagged = emailTag.set(container, "test@example.com");
-    expect(tagged.value).toBe("test@example.com");
-    expect(tagged.key).toBe(emailTag.key);
-  });
-
-  test("set with Tagged array returns Tagged", () => {
-    const emailTag = tag(custom<string>());
-    const tags: Tag.Tagged[] = [];
-
-    const tagged = emailTag.set(tags, "test@example.com");
-    expect(tagged.value).toBe("test@example.com");
-  });
-
-  test("set validates value via schema", () => {
+  test("injectTo validates value via schema", () => {
     const numberTag = tag({
       "~standard": {
         vendor: "test",
@@ -189,12 +172,12 @@ describe("Tag Set Method", () => {
     });
     const store = new Map<symbol, unknown>();
 
-    expect(() => numberTag.set(store, "invalid" as unknown as number)).toThrow();
+    expect(() => numberTag.injectTo(store, "invalid" as unknown as number)).toThrow();
   });
 });
 
-describe("Tag Some Method", () => {
-  test("some returns all matching values from array", () => {
+describe("Tag CollectFrom Method", () => {
+  test("collectFrom returns all matching values from array", () => {
     const emailTag = tag(custom<string>());
     const tags: Tag.Tagged<string>[] = [
       emailTag("test1@example.com"),
@@ -202,29 +185,29 @@ describe("Tag Some Method", () => {
       emailTag("test3@example.com"),
     ];
 
-    expect(emailTag.some(tags)).toEqual([
+    expect(emailTag.collectFrom(tags)).toEqual([
       "test1@example.com",
       "test2@example.com",
       "test3@example.com",
     ]);
   });
 
-  test("some returns single value from Store", () => {
+  test("collectFrom returns single value from Store", () => {
     const emailTag = tag(custom<string>());
     const store = new Map<symbol, unknown>();
     store.set(emailTag.key, "test@example.com");
 
-    expect(emailTag.some(store)).toEqual(["test@example.com"]);
+    expect(emailTag.collectFrom(store)).toEqual(["test@example.com"]);
   });
 
-  test("some returns empty array when no match", () => {
+  test("collectFrom returns empty array when no match", () => {
     const emailTag = tag(custom<string>());
     const store = new Map<symbol, unknown>();
 
-    expect(emailTag.some(store)).toEqual([]);
+    expect(emailTag.collectFrom(store)).toEqual([]);
   });
 
-  test("some filters by key in mixed array", () => {
+  test("collectFrom filters by key in mixed array", () => {
     const emailTag = tag(custom<string>());
     const nameTag = tag(custom<string>(), { label: "name" });
 
@@ -234,7 +217,7 @@ describe("Tag Some Method", () => {
       emailTag("another@example.com"),
     ];
 
-    expect(emailTag.some(tags)).toEqual([
+    expect(emailTag.collectFrom(tags)).toEqual([
       "test@example.com",
       "another@example.com",
     ]);

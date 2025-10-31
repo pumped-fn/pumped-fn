@@ -1149,7 +1149,7 @@ class BaseScope implements Core.Scope {
       try {
         const executeCore = (): Promised<S> => {
           return this.resolve(flow).map(async (handler) => {
-            const definition = flowDefinitionMeta.find(flow);
+            const definition = flowDefinitionMeta.readFrom(flow);
             if (!definition) {
               throw new Error("Flow definition not found in executor metadata");
             }
@@ -1165,7 +1165,7 @@ class BaseScope implements Core.Scope {
           });
         };
 
-        const definition = flowDefinitionMeta.find(flow);
+        const definition = flowDefinitionMeta.readFrom(flow);
         if (!definition) {
           throw new Error("Flow definition not found in executor metadata");
         }
@@ -1206,6 +1206,11 @@ export type ScopeOption = {
   tags?: Tag.Tagged[];
 };
 
+/**
+ * Creates new scope for resolving executors.
+ * @param opt - Options: initialValues, registry, extensions, tags
+ * @example createScope({ initialValues: [preset(configExecutor, dev)] })
+ */
 export function createScope(): Core.Scope;
 export function createScope(opt: ScopeOption): Core.Scope;
 export function createScope(...presets: Core.Preset<unknown>[]): Core.Scope;

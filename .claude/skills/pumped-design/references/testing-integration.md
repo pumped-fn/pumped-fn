@@ -67,7 +67,7 @@ export const dbConfig = tag(custom<{
 
 // Real database pool
 export const dbPool = provide((controller) => {
-  const config = dbConfig.get(controller.scope)
+  const config = dbConfig.extractFrom(controller.scope)
 
   const pool = new Pool({
     host: config.host,

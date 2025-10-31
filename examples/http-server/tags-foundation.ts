@@ -5,7 +5,7 @@
  * Demonstrates:
  * - Tag creation with types
  * - Tag attachment to scopes
- * - Tag retrieval (get vs find)
+ * - Tag retrieval (extractFrom vs readFrom)
  * - Type safety through tags
  *
  * Verify: pnpm -F @pumped-fn/examples typecheck
@@ -38,7 +38,7 @@ function withTags() {
     ]
   })
 
-  const config = appConfig.get(scope)
+  const config = appConfig.extractFrom(scope)
   // config is AppConfig - fully typed
   console.log(`Server port: ${config.port}`)
 }
@@ -55,7 +55,7 @@ const withDefault = tag(custom<number>(), {
 })
 // #endregion tag-creation
 
-// #region get-vs-find
+// #region extractFrom-vs-readFrom
 function tagAccessPatterns() {
   const scope = createScope({
     tags: [
@@ -67,23 +67,23 @@ function tagAccessPatterns() {
     ]
   })
 
-  // .get() throws if not found - use for required values
-  const config = appConfig.get(scope)
+  // .extractFrom() throws if not found - use for required values
+  const config = appConfig.extractFrom(scope)
   console.log('Config:', config.port)
 
-  // .find() returns undefined - use for optional values
-  const reqId = requestId.find(scope)
+  // .readFrom() returns undefined - use for optional values
+  const reqId = requestId.readFrom(scope)
   if (reqId) {
     console.log('Request ID:', reqId)
   } else {
     console.log('No request ID set')
   }
 
-  // .find() with default returns default value
-  const retryCount = withDefault.find(scope)
+  // .readFrom() with default returns default value
+  const retryCount = withDefault.readFrom(scope)
   console.log('Retry count:', retryCount)
 }
-// #endregion get-vs-find
+// #endregion extractFrom-vs-readFrom
 
 // #region tag-usage-everywhere
 function tagsInDifferentContexts() {
@@ -99,13 +99,13 @@ function tagsInDifferentContexts() {
   })
 
   // Tags work with scope
-  const log = logger.get(scope)
+  const log = logger.extractFrom(scope)
   log.info('Using tag with scope')
 
-  // Tags work with any container implementing get/set
+  // Tags work with any container implementing Store interface
   const store = new Map()
-  requestId.set(store, 'req-123')
-  const id = requestId.find(store)
+  requestId.injectTo(store, 'req-123')
+  const id = requestId.readFrom(store)
   console.log('From Map:', id)
 }
 // #endregion tag-usage-everywhere

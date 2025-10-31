@@ -14,7 +14,7 @@
 import { provide, derive, createScope, Promised } from '@pumped-fn/core-next'
 import { appConfig } from './shared/tags'
 
-const config = provide((controller) => appConfig.get(controller.scope))
+const config = provide((controller) => appConfig.extractFrom(controller.scope))
 
 const cachedData = derive(config, (cfg) => ({
   environment: cfg.env,

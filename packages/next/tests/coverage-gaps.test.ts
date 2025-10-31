@@ -95,7 +95,7 @@ describe("Coverage Gaps", () => {
       const acc = tag(custom<number>(), { label: "test.key" });
       const store = new Map();
 
-      expect(() => acc.get(store)).toThrow("Value not found for key:");
+      expect(() => acc.extractFrom(store)).toThrow("Value not found for key:");
     });
 
     test("tag.entry returns symbol and value tuple", () => {
@@ -120,8 +120,8 @@ describe("Coverage Gaps", () => {
       const acc = tag(custom<string>());
       const store = new Map();
 
-      acc.set(store, "value");
-      const result = acc.find(store);
+      acc.injectTo(store, "value");
+      const result = acc.readFrom(store);
 
       expect(result).toBe("value");
     });
@@ -131,7 +131,7 @@ describe("Coverage Gaps", () => {
       const otherTag = tag(custom<string>(), { label: "test.other" });
       const tagArray = [otherTag("test-value")];
 
-      const result = acc.find(tagArray);
+      const result = acc.readFrom(tagArray);
 
       expect(result).toBeUndefined();
     });
@@ -141,7 +141,7 @@ describe("Coverage Gaps", () => {
       const otherTag = tag(custom<number>(), { label: "test.other" });
       const exec = provide(() => 1, otherTag(42));
 
-      const result = acc.find(exec);
+      const result = acc.readFrom(exec);
 
       expect(result).toBeUndefined();
     });
@@ -150,7 +150,7 @@ describe("Coverage Gaps", () => {
       const acc = tag(custom<string>(), { label: "test.set" });
       const exec = provide(() => 1);
 
-      const tagged = acc.set(exec.tags ?? [], "value");
+      const tagged = acc("value");
 
       expect(tagged.value).toBe("value");
     });
@@ -158,9 +158,9 @@ describe("Coverage Gaps", () => {
     test("tag.get retrieves value from datastore", () => {
       const acc = tag(custom<number>(), { label: "test.get" });
       const store = new Map();
-      acc.set(store, 999);
+      acc.injectTo(store, 999);
 
-      const result = acc.get(store);
+      const result = acc.extractFrom(store);
 
       expect(result).toBe(999);
     });
@@ -405,7 +405,7 @@ describe("Coverage Gaps", () => {
       const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      const result = testTag.some(exec);
+      const result = testTag.collectFrom(exec);
 
       expect(result).toEqual([]);
     });
@@ -414,7 +414,7 @@ describe("Coverage Gaps", () => {
       const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      const result = testTag.find(exec);
+      const result = testTag.readFrom(exec);
 
       expect(result).toBeUndefined();
     });
@@ -423,7 +423,7 @@ describe("Coverage Gaps", () => {
       const testTag = tag(custom<string>(), { label: "test" });
       const exec = provide(() => 1);
 
-      expect(() => testTag.get(exec)).toThrow();
+      expect(() => testTag.extractFrom(exec)).toThrow();
     });
 
     test("tag.partial creates partial tags", () => {

@@ -59,7 +59,7 @@ const tracer = extension({
   name: 'tracer',
   wrap: async (scope, next, operation) => {
     const ctx = 'context' in operation ? operation.context : undefined
-    const tid = ctx ? traceId.find(ctx) : generateTraceId()
+    const tid = ctx ? traceId.readFrom(ctx) : generateTraceId()
 
     if (operation.kind === 'execute') {
       // Root span
@@ -136,7 +136,7 @@ const tracer = extension({
   name: 'tracer',
   wrap: async (scope, next, operation) => {
     const ctx = 'context' in operation ? operation.context : undefined
-    const traceId = ctx ? requestId.find(ctx) : generateId()
+    const traceId = ctx ? requestId.readFrom(ctx) : generateId()
     const spanId = generateSpanId()
 
     const span = {
