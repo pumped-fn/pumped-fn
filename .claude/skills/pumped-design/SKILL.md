@@ -64,6 +64,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 | **Testing: Flows** | testing, flow, integration, branches | Integration testing flows | references/testing-flows.md |
 | **Testing: Integration** | testing, integration, e2e | E2E testing | references/testing-integration.md |
 | **Extension: Basics** | extension, add, cross-cutting, wrap | Creating extensions | references/extension-basics.md |
+| **Extension: Authoring** | extension, author, create, stateful, integration, devtools | Authoring reusable extensions | references/extension-authoring.md |
 | **Entrypoint: Patterns** | entrypoint, add, scope, lifecycle | Entrypoint structure | references/entrypoint-patterns.md |
 
 **Examples:**
@@ -71,6 +72,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 - "Flow cleanup issue" → `flow-context.md`, `resource-basic.md`
 - "Integrate Hono" → `coding-standards.md`, `integration-hono.md`
 - "Test my flow" → `coding-standards.md`, `testing-flows.md`
+- "Create stateful extension" → `coding-standards.md`, `extension-authoring.md`
 
 ## Quick Reference
 
