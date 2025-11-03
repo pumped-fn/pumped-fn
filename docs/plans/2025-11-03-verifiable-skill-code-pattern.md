@@ -130,17 +130,35 @@ import { extension, type Extension, type Core } from '@pumped-fn/core-next'
 
 ## Current Limitations
 
-### Module Resolution (TODO)
+### Module Resolution (Investigated - Blocked)
 
-TypeScript path resolution from examples/ to packages/ needs configuration work:
-- `link:` in package.json doesn't create node_modules
-- `paths` in tsconfig.json not resolving correctly
-- May need pnpm workspace adjustments
+TypeScript module resolution from examples/ to packages/ is blocked by symlink resolution.
 
-**Workaround for now:**
-- Examples are structurally correct TypeScript
-- Will typecheck once module resolution fixed
-- Still valuable as grep-able reference implementations
+**Root Cause:**
+- pnpm workspace with `workspace:*` creates symlink: `node_modules/@pumped-fn/core-next -> ../../../../../packages/next`
+- TypeScript package exports point to `dist/`: `"exports": { ".": { "types": "./dist/index.d.ts" } }`
+- Symlink resolves but TypeScript can't find `dist/` through it
+- Running `pnpm build` creates `packages/next/dist/` but TypeScript still fails module resolution
+
+**Attempted Solutions:**
+1. ❌ `link:` in package.json - doesn't create proper node_modules structure
+2. ❌ `workspace:*` protocol - creates symlink but TS can't resolve through it
+3. ❌ `paths` in tsconfig - doesn't work with `moduleResolution: "bundler"`
+4. ❌ `moduleResolution: "node"` - still can't find exports through symlink
+
+**Possible Solutions (not yet tried):**
+- Post-build script to copy `dist/` into skill examples node_modules
+- Use TypeScript project references instead of workspace protocol
+- Move skill examples into `packages/next/examples/` where imports work
+- Use relative imports to dist (ugly: `../../../../../packages/next/dist/index.js`)
+
+**Current Value Despite Block:**
+- ✅ Examples are structurally correct TypeScript with correct imports
+- ✅ Examples use correct Tag API (manually verified)
+- ✅ Examples are grep-able by AI for reference
+- ✅ Pattern documented for future skills
+- ✅ Workspace setup works, just needs resolution fix
+- ⏳ Typechecking blocked pending module resolution solution
 
 ### Future Improvements
 
