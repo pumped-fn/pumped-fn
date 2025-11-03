@@ -609,6 +609,33 @@ export namespace Flow {
       input: InferInput<F>
     ): Promised<InferOutput<F>>;
 
+    exec<F extends UFlow>(config: {
+      flow: F;
+      input: InferInput<F>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<InferOutput<F>>;
+
+    exec<T>(config: {
+      fn: () => T | Promise<T>;
+      params?: never;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<T>;
+
+    exec<Fn extends (...args: any[]) => any>(config: {
+      fn: Fn;
+      params: Parameters<Fn>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<ReturnType<Fn>>;
+
     parallel<T extends readonly Promised<any>[]>(
       promises: [...T]
     ): Promised<

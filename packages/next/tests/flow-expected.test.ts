@@ -650,4 +650,58 @@ describe("Flow API - New Patterns", () => {
       expect(execution.status).toBe("completed");
     });
   });
+
+  describe("ctx.exec with config API", () => {
+    test("ctx.exec with flow config", async () => {
+      const childFlow = flow((_ctx, input: number) => input * 2);
+      const parentFlow = flow(async (ctx, input: number) => {
+        const result = await ctx.exec({
+          flow: childFlow,
+          input: input + 1,
+          key: "double",
+          timeout: 1000
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: 5 });
+      const result = await execution.result;
+
+      expect(result).toBe(12);
+    });
+
+    test("ctx.exec with function no params", async () => {
+      const parentFlow = flow(async (ctx) => {
+        const result = await ctx.exec({
+          fn: () => 42,
+          key: "compute"
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: undefined });
+      const result = await execution.result;
+
+      expect(result).toBe(42);
+    });
+
+    test("ctx.exec with function and params", async () => {
+      const parentFlow = flow(async (ctx, input: number) => {
+        const result = await ctx.exec({
+          fn: (a: number, b: number) => a + b,
+          params: [input, 10],
+          key: "add"
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: 5 });
+      const result = await execution.result;
+
+      expect(result).toBe(15);
+    });
+  });
 });

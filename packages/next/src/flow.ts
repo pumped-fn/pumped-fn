@@ -327,11 +327,147 @@ class FlowContext implements Flow.Context {
     input: Flow.InferInput<F>
   ): Promised<Flow.InferOutput<F>>;
 
+  exec<F extends Flow.UFlow>(config: {
+    flow: F;
+    input: Flow.InferInput<F>;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<Flow.InferOutput<F>>;
+
+  exec<T>(config: {
+    fn: () => T | Promise<T>;
+    params?: never;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<T>;
+
+  exec<Fn extends (...args: any[]) => any>(config: {
+    fn: Fn;
+    params: Parameters<Fn>;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<ReturnType<Fn>>;
+
   exec<F extends Flow.UFlow>(
-    keyOrFlow: string | F,
-    flowOrInput: F | Flow.InferInput<F>,
+    keyOrFlowOrConfig: string | F | { flow?: F; fn?: any; input?: Flow.InferInput<F>; params?: any[]; key?: string; timeout?: number; retry?: number; tags?: Tag.Tagged[] },
+    flowOrInput?: F | Flow.InferInput<F>,
     inputOrUndefined?: Flow.InferInput<F>
-  ): Promised<Flow.InferOutput<F>> {
+  ): Promised<any> {
+    if (typeof keyOrFlowOrConfig === "object" && keyOrFlowOrConfig !== null && !("factory" in keyOrFlowOrConfig)) {
+      const config = keyOrFlowOrConfig;
+
+      this.throwIfAborted();
+
+      const childAbort = new AbortController();
+
+      if (this.signal.aborted) {
+        childAbort.abort(this.signal.reason);
+      } else {
+        this.signal.addEventListener("abort", () => {
+          childAbort.abort(this.signal.reason);
+        }, { once: true });
+      }
+
+      if (config.timeout) {
+        setTimeout(() => {
+          if (!childAbort.signal.aborted) {
+            childAbort.abort(new Error(`Operation timeout after ${config.timeout}ms`));
+          }
+        }, config.timeout);
+      }
+
+      if ("flow" in config) {
+        const flow = config.flow as F;
+        const input = config.input as Flow.InferInput<F>;
+
+        if (config.key) {
+          if (!this.journal) {
+            this.journal = new Map();
+          }
+
+          const flowName = this.find(flowMeta.flowName) || "unknown";
+          const depth = this.get(flowMeta.depth);
+          const journalKey = `${flowName}:${depth}:${config.key}`;
+
+          const promise = (async () => {
+            const journal = this.journal!;
+
+            if (journal.has(journalKey)) {
+              const entry = journal.get(journalKey);
+              if (isErrorEntry(entry)) {
+                throw entry.error;
+              }
+              return entry as Flow.InferOutput<F>;
+            }
+
+            this.throwIfAborted();
+
+            const handler = await this.scope.resolve(flow);
+            const definition = flowDefinitionMeta.readFrom(flow);
+
+            if (definition) {
+              const validated = validate(definition.input, input);
+              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
+              childContext.initializeExecutionContext(definition.name, false);
+
+              try {
+                const result = await handler(childContext, validated);
+                validate(definition.output, result);
+                journal.set(journalKey, result);
+                return result;
+              } catch (error) {
+                journal.set(journalKey, { __error: true, error });
+                throw error;
+              }
+            } else {
+              throw new Error("Flow definition not found");
+            }
+          })();
+
+          return Promised.create(promise);
+        } else {
+          return this.scope.resolve(flow).map(async (handler) => {
+            this.throwIfAborted();
+
+            const definition = flowDefinitionMeta.readFrom(flow);
+            if (definition) {
+              const validated = validate(definition.input, input);
+              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
+              childContext.initializeExecutionContext(definition.name, false);
+
+              const result = await handler(childContext, validated);
+              validate(definition.output, result);
+              return result;
+            } else {
+              throw new Error("Flow definition not found");
+            }
+          });
+        }
+      } else if ("fn" in config) {
+        const fn = config.fn;
+        const params = "params" in config ? config.params || [] : [];
+
+        if (config.key) {
+          return this.run(config.key, fn, ...params);
+        } else {
+          this.throwIfAborted();
+          return Promised.try(async () => {
+            const result = await fn(...params);
+            return result;
+          });
+        }
+      } else {
+        throw new Error("Invalid config: must have either 'flow' or 'fn'");
+      }
+    }
+
+    const keyOrFlow = keyOrFlowOrConfig as string | F;
     if (typeof keyOrFlow === "string") {
       if (!this.journal) {
         this.journal = new Map();
