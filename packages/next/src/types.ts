@@ -618,6 +618,21 @@ export namespace Flow {
   export type ExecutionDetails<T> =
     | { success: true; result: T; ctx: ExecutionData }
     | { success: false; error: unknown; ctx: ExecutionData };
+
+  export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+  export interface FlowExecution<T> {
+    readonly result: Promised<T>;
+    readonly id: string;
+    readonly flowName: string | undefined;
+    readonly status: ExecutionStatus;
+    readonly ctx: ExecutionData;
+    readonly abort: AbortController;
+
+    onStatusChange(
+      callback: (status: ExecutionStatus, execution: FlowExecution<T>) => void | Promise<void>
+    ): Core.Cleanup;
+  }
 }
 
 export namespace Extension {
