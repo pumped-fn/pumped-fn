@@ -13,14 +13,43 @@ Skill markdown files can contain code errors. These TypeScript files:
 
 ```
 skill-examples/
-├── package.json          # References @pumped-fn/core-next
-├── tsconfig.json         # Strict typechecking config
-├── correlation-tracker.ts  # Extension authoring: Guided example
-├── rate-limiter.ts        # Extension authoring: Stateful pattern
-├── apm-integration.ts     # Extension authoring: Integration pattern
-├── tenant-isolation.ts    # Extension authoring: Context propagation
-└── README.md             # This file
+├── package.json               # References @pumped-fn/core-next
+├── tsconfig.json              # Strict typechecking config
+├── flows-context.ts           # Flow context patterns
+├── flows-subflows.ts          # Flow subflows and orchestration
+├── resources-basic.ts         # Basic resources
+├── resources-derived.ts       # Derived resources with dependencies
+├── resources-lazy.ts          # Lazy resources and caching
+├── entrypoints.ts             # Scope lifecycle and structure
+├── integrations-hono.ts       # Hono integration
+├── integrations-nextjs.ts     # Next.js integration
+├── integrations-tanstack.ts   # TanStack Start integration
+├── testing-utilities.ts       # Utility testing patterns
+├── testing-flows.ts           # Flow testing patterns
+├── testing-integration.ts     # Integration testing patterns
+├── extensions.ts              # Extension basics + advanced patterns
+└── README.md                  # This file
 ```
+
+## File Inventory
+
+| File | LOC | Source Skills |
+|------|-----|---------------|
+| flows-context.ts | 364 | flow-context |
+| flows-subflows.ts | 373 | flow-subflows |
+| resources-basic.ts | 190 | resource-basic |
+| resources-derived.ts | 276 | resource-derived |
+| resources-lazy.ts | 302 | resource-lazy |
+| entrypoints.ts | 419 | entrypoint-patterns |
+| integrations-hono.ts | 482 | integration-hono |
+| integrations-nextjs.ts | 323 | integration-nextjs |
+| integrations-tanstack.ts | 206 | integration-tanstack |
+| testing-utilities.ts | 435 | testing-utilities |
+| testing-flows.ts | 407 | testing-flows |
+| testing-integration.ts | 242 | testing-integration |
+| extensions.ts | 490 | extension-basics, extension-authoring |
+
+**Total:** 4,509 LOC extracted from 250+ code blocks across 14 sub-skills
 
 ## Usage
 
