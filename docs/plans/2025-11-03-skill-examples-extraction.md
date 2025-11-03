@@ -1,7 +1,7 @@
 # Skill Examples Extraction Plan
 
 **Date:** 2025-11-03
-**Status:** Complete (Task 10 pending: markdown updates)
+**Status:** Complete
 **Author:** Claude + User
 
 ## Problem
@@ -107,7 +107,7 @@ Based on extension-authoring extraction:
 - ✅ All code blocks extracted to TypeScript files
 - ✅ Max 500 LOC per file maintained
 - ✅ All files typecheck with `pnpm --filter "@pumped-fn/skill-examples" typecheck`
-- ⏳ Skill markdown updated with grep references (Task 10)
+- ✅ Skill markdown updated with grep references (79 references added)
 - ✅ File headers reference source skills
 
 ## Final File Inventory
