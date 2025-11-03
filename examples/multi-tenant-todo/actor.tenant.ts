@@ -1,9 +1,10 @@
-import { provide, Promised, flow } from '@pumped-fn/core-next'
+import { multi, custom, Promised, flow } from '@pumped-fn/core-next'
 import type { Todo, TenantMessage } from './types'
 import { handleCreateTodo, handleUpdateTodo, handleDeleteTodo } from './flow.message-handler'
 
-export const createTenantActor = (tenantId: string) => {
-  return provide((controller) => {
+export const tenantActor = multi.provide(
+  { keySchema: custom<string>() },
+  (tenantId, controller) => {
     const state: Todo.State = {
       tenantId,
       todos: new Map()
@@ -89,5 +90,5 @@ export const createTenantActor = (tenantId: string) => {
 
       getTodos: () => Array.from(state.todos.values())
     }
-  })
-}
+  }
+)

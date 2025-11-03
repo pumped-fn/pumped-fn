@@ -1215,21 +1215,28 @@ class BaseScope implements Core.Scope {
       this.executions.delete(executionId);
     });
 
-    Promise.resolve().then(() => {
-      execution["~setStatus"]("running");
-    });
+    execution["~setStatus"]("running");
 
     flowPromise
-      .then(() => {
+      .then(async () => {
+        const ctx = await flowPromise.ctx();
+        if (ctx) {
+          execution["~setCtx"](ctx);
+        }
         execution["~setStatus"]("completed");
-        if (timeoutId) clearTimeout(timeoutId);
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        const ctx = await flowPromise.ctx();
+        if (ctx) {
+          execution["~setCtx"](ctx);
+        }
         if (abortController.signal.aborted) {
           execution["~setStatus"]("cancelled");
         } else {
           execution["~setStatus"]("failed");
         }
+      })
+      .finally(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
 

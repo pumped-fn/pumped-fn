@@ -1,5 +1,7 @@
-import { createScope, Promised } from '@pumped-fn/core-next'
-import { actorRegistry, type TenantActor } from './resource.registry'
+import { createScope, Promised, type Core } from '@pumped-fn/core-next'
+import { tenantActor } from './actor.tenant'
+
+type TenantActor = Core.InferOutput<ReturnType<typeof tenantActor>>
 
 async function waitForProcessing(
   actor: TenantActor,
@@ -24,13 +26,11 @@ async function main() {
   console.log('Multi-Tenant Todo Actor System\n')
 
   const scope = createScope()
-  const registry = await scope.resolve(actorRegistry)
 
-  console.log('Spawning tenant actors...')
-  const tenant1 = await registry.spawn('tenant-alice')
-  const tenant2 = await registry.spawn('tenant-bob')
-
-  console.log('Active tenants:', registry.list())
+  console.log('Creating tenant actors...')
+  const tenant1 = await scope.resolve(tenantActor('tenant-alice'))
+  const tenant2 = await scope.resolve(tenantActor('tenant-bob'))
+  console.log('Tenants: alice, bob')
   console.log()
 
   console.log('Alice creates todos...')

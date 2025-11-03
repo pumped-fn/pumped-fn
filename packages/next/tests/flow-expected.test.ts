@@ -639,12 +639,14 @@ describe("Flow API - New Patterns", () => {
 
       expect(execution.id).toBeDefined();
       expect(typeof execution.id).toBe("string");
-      expect(execution.status).toBe("pending");
+      expect(execution.status).toBe("running");
       expect(execution.abort).toBeInstanceOf(AbortController);
       expect(execution.result).toBeDefined();
 
       const result = await execution.result;
       expect(result).toBe(10);
+
+      await new Promise(resolve => setTimeout(resolve, 0));
       expect(execution.status).toBe("completed");
     });
   });

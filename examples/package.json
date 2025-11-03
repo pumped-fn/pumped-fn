@@ -10,7 +10,8 @@
     "dev:promised-comprehensive": "tsx http-server/promised-comprehensive.ts",
     "dev:multi-tenant-todo": "tsx multi-tenant-todo/main.ts",
     "test:multi-tenant-todo": "vitest run multi-tenant-todo",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit --project tsconfig.test.json"
   },
   "dependencies": {
     "@pumped-fn/core-next": "workspace:*"

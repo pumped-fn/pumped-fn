@@ -651,7 +651,7 @@ export namespace Flow {
     readonly id: string;
     readonly flowName: string | undefined;
     readonly status: ExecutionStatus;
-    readonly ctx: ExecutionData;
+    readonly ctx: ExecutionData | undefined;
     readonly abort: AbortController;
 
     onStatusChange(

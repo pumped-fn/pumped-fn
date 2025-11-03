@@ -34,8 +34,8 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
     return this._status;
   }
 
-  get ctx(): Flow.ExecutionData {
-    return this._ctx!;
+  get ctx(): Flow.ExecutionData | undefined {
+    return this._ctx ?? undefined;
   }
 
   "~setStatus"(newStatus: Flow.ExecutionStatus): void {
@@ -48,6 +48,10 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
         console.error('Error in status change callback:', err);
       });
     }
+  }
+
+  "~setCtx"(ctx: Flow.ExecutionData): void {
+    this._ctx = ctx;
   }
 
   onStatusChange(callback: StatusCallback<T>): Core.Cleanup {

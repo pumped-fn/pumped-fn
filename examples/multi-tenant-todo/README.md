@@ -8,7 +8,7 @@ Example demonstrating actor pattern implementation with pumped-fn where each ten
 - Each tenant is an isolated actor with encapsulated state
 - Actors process messages sequentially via internal queue
 - Message handlers are type-safe flows with discriminated unions
-- Registry supervises actor lifecycle and provides spawn/kill operations
+- Built-in pooling via `multi.provide()` manages actor lifecycle
 
 **Message Flow:**
 1. Client sends message to actor via `send()`
@@ -24,18 +24,13 @@ Example demonstrating actor pattern implementation with pumped-fn where each ten
 - `Todo.State` - Tenant state (tenantId, todos Map)
 - `TenantMessage.*` - Message types (CREATE_TODO, UPDATE_TODO, DELETE_TODO, GET_TODOS)
 
-**actor.tenant.ts** - Tenant actor resource
-- Created via `provide()` with isolated state per tenant
+**actor.tenant.ts** - Tenant actor pool
+- Created via `multi.provide()` with key-based pooling
+- Each tenant ID gets dedicated actor instance with isolated state
 - Internal message queue for sequential processing
 - Integrates flow handlers for message processing
 - Cleanup handler drains queue on disposal
-
-**resource.registry.ts** - Actor registry
-- Supervises tenant actor lifecycle
-- `spawn()` - Creates new tenant actor with dedicated scope
-- `get()` - Retrieves existing actor by tenant ID
-- `list()` - Lists all active tenant IDs
-- `kill()` - Disposes actor and its scope
+- Automatic caching: same tenant ID = same actor instance
 
 **flow.message-handler.ts** - Flow-based handlers
 - `handleCreateTodo` - Validates and creates todo (checks empty title, duplicate ID)
@@ -50,10 +45,11 @@ Example demonstrating actor pattern implementation with pumped-fn where each ten
 
 ## Patterns Demonstrated
 
-**Resource Pattern:**
-- Tenant actors created via `provide()`
-- Registry manages actor lifecycle with dedicated scopes per tenant
+**Multi-Resource Pattern:**
+- Tenant actors created via `multi.provide()` with key-based pooling
+- Built-in pool management handles caching and lifecycle
 - Proper cleanup with `controller.cleanup()` ensuring queue drainage
+- Key schema validation ensures type-safe tenant IDs
 
 **Flow Pattern:**
 - Message handlers as reusable flows with `flow()`
@@ -82,17 +78,19 @@ pnpm -F @pumped-fn/examples typecheck
 
 ## Key Features
 
-**Isolation:** Each tenant has completely isolated state managed in separate scope
+**Isolation:** Each tenant has completely isolated state via multi.provide() key-based pooling
 
 **Type Safety:** All messages and handlers fully typed with discriminated unions
 
-**Testability:** Flows can be tested independently with preset state, actor behavior tested separately
+**Testability:** Flows tested independently with preset state, actor behavior tested separately
 
 **Cleanup:** Graceful shutdown drains message queues before disposal via `controller.cleanup()`
 
 **Scalability:** Easy to add new message types as flows without changing actor structure
 
 **Error Handling:** Flow handlers return typed errors (EMPTY_TITLE, DUPLICATE_ID, TODO_NOT_FOUND)
+
+**Simplicity:** No manual pool management - multi.provide() handles caching and lifecycle automatically
 
 ## Testing Strategy
 
@@ -103,7 +101,7 @@ pnpm -F @pumped-fn/examples typecheck
 
 **Integration Tests:**
 - Actor message processing with queue behavior
-- Registry spawn/kill operations with scope lifecycle
+- Multi-resource pooling with automatic caching
 - Flow integration with actor state updates
 
 **Manual Testing:**
