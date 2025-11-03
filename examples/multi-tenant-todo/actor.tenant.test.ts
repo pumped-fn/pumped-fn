@@ -15,4 +15,75 @@ describe('Tenant Actor', () => {
 
     await scope.dispose()
   })
+
+  test('processes CREATE_TODO message', async () => {
+    const scope = createScope()
+    const actor = await scope.resolve(createTenantActor('tenant-1'))
+
+    actor.send({
+      type: 'CREATE_TODO',
+      payload: { id: 'todo-1', title: 'Write tests' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    const todos = actor.getTodos()
+    expect(todos).toHaveLength(1)
+    expect(todos[0]).toMatchObject({
+      id: 'todo-1',
+      title: 'Write tests',
+      completed: false
+    })
+
+    await scope.dispose()
+  })
+
+  test('processes UPDATE_TODO message', async () => {
+    const scope = createScope()
+    const actor = await scope.resolve(createTenantActor('tenant-1'))
+
+    actor.send({
+      type: 'CREATE_TODO',
+      payload: { id: 'todo-1', title: 'Write tests' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    actor.send({
+      type: 'UPDATE_TODO',
+      payload: { id: 'todo-1', completed: true }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    const todos = actor.getTodos()
+    expect(todos[0].completed).toBe(true)
+    expect(todos[0].title).toBe('Write tests')
+
+    await scope.dispose()
+  })
+
+  test('processes DELETE_TODO message', async () => {
+    const scope = createScope()
+    const actor = await scope.resolve(createTenantActor('tenant-1'))
+
+    actor.send({
+      type: 'CREATE_TODO',
+      payload: { id: 'todo-1', title: 'Write tests' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    actor.send({
+      type: 'DELETE_TODO',
+      payload: { id: 'todo-1' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    const todos = actor.getTodos()
+    expect(todos).toHaveLength(0)
+
+    await scope.dispose()
+  })
 })
