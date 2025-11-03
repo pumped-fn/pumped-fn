@@ -76,9 +76,6 @@ interface Core.Scope {
 
   // Extension registration
   useExtension(extension: Extension): Cleanup
-
-  // Tag access
-  tags?: Tag.Tagged[]
 }
 ```
 
@@ -99,9 +96,9 @@ Extensions intercept 5 operation kinds via `wrap()`:
 ```typescript
 type Operation =
   | { kind: "execute"; definition: Definition; input: unknown; ... }
-  | { kind: "journal"; key: string; params?: readonly unknown[]; ... }
-  | { kind: "subflow"; definition: Definition; input: unknown; ... }
-  | { kind: "parallel"; mode: "parallel" | "parallelSettled"; promiseCount: number; ... }
+  | { kind: "journal"; key: string; params?: readonly unknown[]; context: Tag.Store; ... }
+  | { kind: "subflow"; definition: Definition; input: unknown; context: Tag.Store; ... }
+  | { kind: "parallel"; mode: "parallel" | "parallelSettled"; promiseCount: number; context: Tag.Store; ... }
   | { kind: "resolve"; executor: Executor<unknown>; operation: "resolve" | "update"; scope: Scope }
 ```
 
@@ -115,41 +112,42 @@ type Operation =
 **Flow Context (`ctx` in flow body):**
 - Available only inside flow execution
 - Methods: `run()`, `exec()`, `parallel()`, `get()`, `set()`
-- Cannot resolve resources (flows are pure)
+- Tag API: `ctx.get(tag)`, `ctx.set(tag, value)` - uses Tag object
 
-**Scope (`scope` in extension):**
-- Available throughout extension lifecycle
-- Access to full runtime: resources, flows, executors
-- Can resolve dependencies, register hooks, dispose
+**Extension operation.context (Tag.Store):**
+- Available on `journal`, `subflow`, `parallel` operations only
+- Methods: `get(key)`, `set(key, value)`
+- Tag API: `context.get(tag.key)`, `context.set(tag.key, value)` - uses symbol key
 
-**Rule:** Use `ctx` in flows, `scope` in extensions.
+**Rule:** Flow ctx uses Tag objects, extension context uses symbol keys.
 
 ### Tag System for Context Propagation
 
-Tags propagate data through execution hierarchy:
+Tags propagate data through execution hierarchy. Only `journal`, `subflow`, and `parallel` have `context: Tag.Store`:
 
 ```typescript
-import { createTag } from '@pumped-fn/core-next'
+import { tag, custom } from '@pumped-fn/core-next'
 
-const requestIdTag = createTag<string>('request-id')
+const requestIdTag = tag(custom<string>(), { label: 'request-id' })
 
 const tracingExtension = extension({
   name: 'tracing',
-  init: (scope) => {
-    // Tags available in scope
-  },
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
-      const requestId = operation.context?.get(requestIdTag) ?? generateId()
-      // Set tag for child operations
-      operation.context?.set(requestIdTag, requestId)
+    // Only journal, subflow, parallel have context
+    if (operation.kind === 'journal' || operation.kind === 'subflow' || operation.kind === 'parallel') {
+      const requestId = operation.context.get(requestIdTag.key) as string | undefined
+
+      if (!requestId) {
+        const newId = `req-${Date.now()}`
+        operation.context.set(requestIdTag.key, newId)
+      }
     }
     return next()
   }
 })
 ```
 
-**Pattern:** Read tag from parent, propagate to children via `operation.context`.
+**Pattern:** Use `context.get(tag.key)` and `context.set(tag.key, value)` with Tag.Store.
 
 ---
 
@@ -160,15 +158,16 @@ const tracingExtension = extension({
 **Goal:** Track requests across flows using correlation IDs with proper lifecycle.
 
 ```typescript
-import { extension, createTag } from '@pumped-fn/core-next'
+import { extension } from '@pumped-fn/core-next'
 import type { Extension, Core } from '@pumped-fn/core-next/types'
-
-const correlationIdTag = createTag<string>('correlation-id', { required: true })
 
 type CorrelationStore = {
   activeRequests: Map<string, { startTime: number; flowName: string }>
   disposed: boolean
 }
+
+// WeakMap for extension state (scope → state)
+const stateMap = new WeakMap<Core.Scope, CorrelationStore>()
 
 export const correlationExtension = extension({
   name: 'correlation-tracker',
@@ -178,29 +177,21 @@ export const correlationExtension = extension({
       activeRequests: new Map(),
       disposed: false
     }
-
-    // Attach to scope for wrap() access
-    scope.tags = scope.tags || []
-    const storeTag = createTag<CorrelationStore>('correlation-store', { required: true })
-    scope.tags.push({ tag: storeTag, value: store })
-
-    return undefined
+    stateMap.set(scope, store)
   },
 
   wrap: <T>(scope: Core.Scope, next: () => Promised<T>, operation: Extension.Operation): Promise<T> | Promised<T> => {
+    const store = stateMap.get(scope)
+
+    if (!store || store.disposed) {
+      // Graceful degradation: extension state unavailable
+      console.warn('[correlation] Store unavailable, skipping tracking')
+      return next()
+    }
+
     // Type-safe operation handling
     if (operation.kind === 'execute') {
-      const storeTag = createTag<CorrelationStore>('correlation-store', { required: true })
-      const store = scope.tags?.find(t => t.tag === storeTag)?.value as CorrelationStore | undefined
-
-      if (!store || store.disposed) {
-        // Graceful degradation: extension state unavailable
-        console.warn('[correlation] Store unavailable, skipping tracking')
-        return next()
-      }
-
-      const correlationId = operation.context?.find(correlationIdTag) ??
-                           `corr-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
       // Track request start
       store.activeRequests.set(correlationId, {
@@ -234,9 +225,7 @@ export const correlationExtension = extension({
   },
 
   dispose: async (scope) => {
-    const storeTag = createTag<CorrelationStore>('correlation-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as CorrelationStore | undefined
-
+    const store = stateMap.get(scope)
     if (store) {
       // Cleanup: warn about incomplete requests
       if (store.activeRequests.size > 0) {
@@ -244,6 +233,7 @@ export const correlationExtension = extension({
       }
       store.activeRequests.clear()
       store.disposed = true
+      stateMap.delete(scope)
     }
   }
 } satisfies Extension.Extension)
@@ -251,20 +241,20 @@ export const correlationExtension = extension({
 
 ### Pattern Breakdown
 
-**1. Init - Setup State**
+**1. Init - Setup State with WeakMap**
 ```typescript
+const stateMap = new WeakMap<Core.Scope, MyState>()
+
 init: (scope) => {
   const store = { /* state */ }
-  // Attach to scope via tags
-  scope.tags = scope.tags || []
-  scope.tags.push({ tag: storeTag, value: store })
+  stateMap.set(scope, store)
 }
 ```
 
 **2. Wrap - Access State with Error Handling**
 ```typescript
 wrap: (scope, next, operation) => {
-  const store = /* retrieve from scope.tags */
+  const store = stateMap.get(scope)
 
   if (!store || store.disposed) {
     // CRITICAL: Graceful degradation
@@ -281,10 +271,11 @@ wrap: (scope, next, operation) => {
 **3. Dispose - Cleanup State**
 ```typescript
 dispose: (scope) => {
-  const store = /* retrieve from scope.tags */
+  const store = stateMap.get(scope)
   if (store) {
     store.activeRequests.clear()
     store.disposed = true
+    stateMap.delete(scope)
   }
 }
 ```
@@ -301,8 +292,9 @@ wrap: (scope, next, operation) => {
   }
 
   if (operation.kind === 'journal') {
-    // TypeScript knows: operation.key, operation.params exist
+    // TypeScript knows: operation.key, operation.params, operation.context exist
     const key = operation.key
+    const context = operation.context  // Tag.Store
   }
 
   return next()
@@ -322,7 +314,7 @@ wrap: (scope, next, operation) => {
 wrap: (scope, next, operation) => {
   try {
     // Extension logic that might fail
-    const result = externalService.track(operation)
+    externalService.track(operation)
   } catch (error) {
     // Log but don't throw
     console.error('[extension] Tracking failed:', error)
@@ -334,7 +326,7 @@ wrap: (scope, next, operation) => {
 
 // ❌ Wrong: Throwing from extension
 wrap: (scope, next, operation) => {
-  const result = externalService.track(operation)  // Might throw!
+  externalService.track(operation)  // Might throw!
   return next()  // Flow breaks if tracking fails
 }
 ```
@@ -343,7 +335,7 @@ wrap: (scope, next, operation) => {
 
 **Unit test - Extension logic:**
 ```typescript
-import { describe, test, expect, vi } from 'vitest'
+import { describe, test, expect } from 'vitest'
 import { createScope, flow } from '@pumped-fn/core-next'
 import { correlationExtension } from './correlation'
 
@@ -386,27 +378,28 @@ test('correlation extension handles flow errors gracefully', async () => {
 ### Stateful: Rate Limiter
 
 ```typescript
+import { extension } from '@pumped-fn/core-next'
+import type { Extension, Core } from '@pumped-fn/core-next/types'
+
 type RateLimitConfig = { maxRequests: number; windowMs: number }
 type RateLimitStore = { requests: Map<string, number[]>; config: RateLimitConfig }
+
+const stateMap = new WeakMap<Core.Scope, RateLimitStore>()
 
 export const rateLimiterExtension = (config: RateLimitConfig) => extension({
   name: 'rate-limiter',
 
   init: (scope) => {
-    const store: RateLimitStore = {
+    stateMap.set(scope, {
       requests: new Map(),
       config
-    }
-    const storeTag = createTag<RateLimitStore>('rate-limit-store', { required: true })
-    scope.tags = scope.tags || []
-    scope.tags.push({ tag: storeTag, value: store })
+    })
   },
 
   wrap: (scope, next, operation) => {
     if (operation.kind !== 'execute') return next()
 
-    const storeTag = createTag<RateLimitStore>('rate-limit-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as RateLimitStore | undefined
+    const store = stateMap.get(scope)
     if (!store) return next()
 
     const flowKey = operation.definition.name
@@ -427,38 +420,41 @@ export const rateLimiterExtension = (config: RateLimitConfig) => extension({
   },
 
   dispose: (scope) => {
-    const storeTag = createTag<RateLimitStore>('rate-limit-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as RateLimitStore | undefined
-    if (store) store.requests.clear()
+    const store = stateMap.get(scope)
+    if (store) {
+      store.requests.clear()
+      stateMap.delete(scope)
+    }
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ### Integration: APM (Application Performance Monitoring)
 
 ```typescript
+import { extension } from '@pumped-fn/core-next'
+import type { Extension, Core } from '@pumped-fn/core-next/types'
+
 type APMClient = { startTransaction: (name: string) => APMTransaction }
 type APMTransaction = { end: () => void; setError: (error: unknown) => void }
 type APMStore = { client: APMClient; activeTransactions: Map<string, APMTransaction> }
+
+const stateMap = new WeakMap<Core.Scope, APMStore>()
 
 export const apmExtension = (client: APMClient) => extension({
   name: 'apm',
 
   init: (scope) => {
-    const store: APMStore = {
+    stateMap.set(scope, {
       client,
       activeTransactions: new Map()
-    }
-    const storeTag = createTag<APMStore>('apm-store', { required: true })
-    scope.tags = scope.tags || []
-    scope.tags.push({ tag: storeTag, value: store })
+    })
   },
 
   wrap: (scope, next, operation) => {
     if (operation.kind !== 'execute') return next()
 
-    const storeTag = createTag<APMStore>('apm-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as APMStore | undefined
+    const store = stateMap.get(scope)
     if (!store) return next()
 
     const transactionId = `${operation.definition.name}-${Date.now()}`
@@ -488,8 +484,7 @@ export const apmExtension = (client: APMClient) => extension({
   },
 
   dispose: async (scope) => {
-    const storeTag = createTag<APMStore>('apm-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as APMStore | undefined
+    const store = stateMap.get(scope)
     if (!store) return
 
     // End all active transactions
@@ -501,22 +496,26 @@ export const apmExtension = (client: APMClient) => extension({
       }
     }
     store.activeTransactions.clear()
+    stateMap.delete(scope)
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ### Context Propagation: Multi-tenant Isolation
 
 ```typescript
-const tenantIdTag = createTag<string>('tenant-id', { required: true })
+import { tag, custom, extension } from '@pumped-fn/core-next'
+import type { Extension } from '@pumped-fn/core-next/types'
+
+const tenantIdTag = tag(custom<string>(), { label: 'tenant-id' })
 
 export const tenantIsolationExtension = extension({
   name: 'tenant-isolation',
 
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute' || operation.kind === 'subflow') {
-      // Ensure tenant ID propagates through hierarchy
-      const tenantId = operation.context?.find(tenantIdTag)
+    // Only journal, subflow, parallel have context
+    if (operation.kind === 'journal' || operation.kind === 'subflow') {
+      const tenantId = operation.context.get(tenantIdTag.key) as string | undefined
 
       if (!tenantId) {
         return Promise.reject(new Error('Tenant ID required but not found'))
@@ -528,43 +527,44 @@ export const tenantIsolationExtension = extension({
       }
 
       // Log access for audit
-      console.log(`[tenant] ${tenantId} executing ${operation.definition.name}`)
+      const flowName = operation.kind === 'subflow' ? operation.definition.name : 'journal'
+      console.log(`[tenant] ${tenantId} executing ${flowName}`)
     }
 
     return next()
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ### Policy Enforcement: Authorization
 
 ```typescript
+import { tag, custom, extension } from '@pumped-fn/core-next'
+import type { Extension, Core } from '@pumped-fn/core-next/types'
+
 type AuthPolicy = (flowName: string, input: unknown, userId: string) => boolean
 type AuthStore = { policy: AuthPolicy }
 
-const userIdTag = createTag<string>('user-id', { required: true })
+const stateMap = new WeakMap<Core.Scope, AuthStore>()
+const userIdTag = tag(custom<string>(), { label: 'user-id' })
 
 export const authExtension = (policy: AuthPolicy) => extension({
   name: 'authorization',
 
   init: (scope) => {
-    const store: AuthStore = { policy }
-    const storeTag = createTag<AuthStore>('auth-store', { required: true })
-    scope.tags = scope.tags || []
-    scope.tags.push({ tag: storeTag, value: store })
+    stateMap.set(scope, { policy })
   },
 
   wrap: (scope, next, operation) => {
     if (operation.kind !== 'execute') return next()
 
-    const storeTag = createTag<AuthStore>('auth-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as AuthStore | undefined
+    const store = stateMap.get(scope)
     if (!store) return next()
 
-    const userId = operation.context?.find(userIdTag)
-    if (!userId) {
-      return Promise.reject(new Error('User ID required for authorization'))
-    }
+    // Try to get userId from execute operation (would need to be passed via tags on flow definition)
+    // For subflow/journal, would use operation.context.get(userIdTag.key)
+    // This is simplified - real implementation would propagate userId through context
+    const userId = 'default-user'  // Placeholder - should come from context or flow tags
 
     const allowed = store.policy(operation.definition.name, operation.input, userId)
     if (!allowed) {
@@ -572,13 +572,20 @@ export const authExtension = (policy: AuthPolicy) => extension({
     }
 
     return next()
+  },
+
+  dispose: (scope) => {
+    stateMap.delete(scope)
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ### Devtools: Execution Timeline Inspector
 
 ```typescript
+import { extension } from '@pumped-fn/core-next'
+import type { Extension, Core } from '@pumped-fn/core-next/types'
+
 type ExecutionEvent = {
   timestamp: number
   kind: string
@@ -588,22 +595,20 @@ type ExecutionEvent = {
 }
 type DevtoolsStore = { timeline: ExecutionEvent[]; enabled: boolean }
 
+const stateMap = new WeakMap<Core.Scope, DevtoolsStore>()
+
 export const devtoolsExtension = extension({
   name: 'devtools',
 
   init: (scope) => {
-    const store: DevtoolsStore = {
+    stateMap.set(scope, {
       timeline: [],
       enabled: process.env.NODE_ENV === 'development'
-    }
-    const storeTag = createTag<DevtoolsStore>('devtools-store', { required: true })
-    scope.tags = scope.tags || []
-    scope.tags.push({ tag: storeTag, value: store })
+    })
   },
 
   wrap: (scope, next, operation) => {
-    const storeTag = createTag<DevtoolsStore>('devtools-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as DevtoolsStore | undefined
+    const store = stateMap.get(scope)
     if (!store || !store.enabled) return next()
 
     const startTime = Date.now()
@@ -633,23 +638,27 @@ export const devtoolsExtension = extension({
   },
 
   dispose: (scope) => {
-    const storeTag = createTag<DevtoolsStore>('devtools-store', { required: true })
-    const store = scope.tags?.find(t => t.tag === storeTag)?.value as DevtoolsStore | undefined
+    const store = stateMap.get(scope)
     if (store) {
       // Export timeline before disposal
       console.log('[devtools] Execution timeline:', JSON.stringify(store.timeline, null, 2))
       store.timeline = []
+      stateMap.delete(scope)
     }
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ### Server Integration: HTTP Endpoint Exposure
 
 ```typescript
+import { extension } from '@pumped-fn/core-next'
+import type { Extension, Core, Flow } from '@pumped-fn/core-next/types'
 import type { Hono } from 'hono'
 
 type ServerStore = { app: Hono; routes: Map<string, Flow.UFlow> }
+
+const stateMap = new WeakMap<Core.Scope, ServerStore>()
 
 export const httpServerExtension = (app: Hono) => extension({
   name: 'http-server',
@@ -682,23 +691,28 @@ export const httpServerExtension = (app: Hono) => extension({
       }
     })
 
-    const storeTag = createTag<ServerStore>('server-store', { required: true })
-    scope.tags = scope.tags || []
-    scope.tags.push({ tag: storeTag, value: store })
+    stateMap.set(scope, store)
   },
 
   wrap: (scope, next, operation) => {
     if (operation.kind === 'execute') {
-      const storeTag = createTag<ServerStore>('server-store', { required: true })
-      const store = scope.tags?.find(t => t.tag === storeTag)?.value as ServerStore | undefined
+      const store = stateMap.get(scope)
       if (store) {
         // Auto-register flows as HTTP endpoints
         store.routes.set(operation.definition.name, operation.flow)
       }
     }
     return next()
+  },
+
+  dispose: (scope) => {
+    const store = stateMap.get(scope)
+    if (store) {
+      store.routes.clear()
+      stateMap.delete(scope)
+    }
   }
-})
+} satisfies Extension.Extension)
 ```
 
 ---
@@ -713,7 +727,8 @@ export const httpServerExtension = (app: Hono) => extension({
 | **Cleanup on dispose** | Prevent resource leaks | Clear maps, close connections, mark disposed |
 | **Stateless wrap preferred** | Simpler, less error-prone | Use stateless when possible (see extension-basics.md) |
 | **Scope for resources** | Extensions can access dependencies | Use scope.resolve() for DB, logger, etc. |
-| **Tags for context** | Propagate data through hierarchy | Use tag system, not global variables |
+| **WeakMap for state** | No memory leaks, no scope mutation | Use WeakMap<Scope, State> pattern |
+| **Context uses symbol keys** | Different from flow ctx API | operation.context.get(tag.key) |
 
 ---
 

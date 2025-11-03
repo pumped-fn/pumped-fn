@@ -1,0 +1,17 @@
+{
+  "name": "@pumped-fn/skill-extension-examples",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TypeScript examples for extension-authoring skill (typechecked)",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch"
+  },
+  "devDependencies": {
+    "@pumped-fn/core-next": "link:../../../packages/next",
+    "typescript": "^5.7.2",
+    "hono": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
