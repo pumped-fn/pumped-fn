@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import { flow } from '@pumped-fn/core-next'
-import { handleCreateTodo } from './flow.message-handler'
+import { handleCreateTodo, handleUpdateTodo, handleDeleteTodo } from './flow.message-handler'
 
 describe('Message Handler Flows', () => {
   test('handleCreateTodo validates and creates todo', async () => {
@@ -50,6 +50,75 @@ describe('Message Handler Flows', () => {
     expect(result).toEqual({
       success: false,
       reason: 'DUPLICATE_ID'
+    })
+  })
+
+  test('handleUpdateTodo updates existing todo', async () => {
+    const existingTodos = new Map([
+      ['todo-1', {
+        id: 'todo-1',
+        title: 'Original',
+        completed: false,
+        createdAt: 123
+      }]
+    ])
+
+    const result = await flow.execute(handleUpdateTodo, {
+      id: 'todo-1',
+      title: 'Updated',
+      completed: true,
+      currentTodos: existingTodos
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.todo.title).toBe('Updated')
+      expect(result.todo.completed).toBe(true)
+    }
+  })
+
+  test('handleUpdateTodo rejects non-existent todo', async () => {
+    const result = await flow.execute(handleUpdateTodo, {
+      id: 'todo-1',
+      currentTodos: new Map()
+    })
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'TODO_NOT_FOUND'
+    })
+  })
+
+  test('handleDeleteTodo deletes existing todo', async () => {
+    const existingTodos = new Map([
+      ['todo-1', {
+        id: 'todo-1',
+        title: 'To delete',
+        completed: false,
+        createdAt: 123
+      }]
+    ])
+
+    const result = await flow.execute(handleDeleteTodo, {
+      id: 'todo-1',
+      currentTodos: existingTodos
+    })
+
+    expect(result).toEqual({
+      success: true,
+      deletedId: 'todo-1'
+    })
+  })
+
+  test('handleDeleteTodo rejects non-existent todo', async () => {
+    const result = await flow.execute(handleDeleteTodo, {
+      id: 'todo-1',
+      currentTodos: new Map()
+    })
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'TODO_NOT_FOUND'
     })
   })
 })
