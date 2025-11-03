@@ -2,7 +2,7 @@ import { describe, test, expect } from "vitest";
 import { tag } from "../src/tag";
 import { custom } from "../src/ssch";
 import { tagSymbol, type Tag } from "../src/tag-types";
-import { inspect } from "util";
+import { inspect } from "node:util";
 
 describe("Tag System", () => {
   test("tag creates symbol-keyed accessor with schema", () => {
