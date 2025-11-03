@@ -1,5 +1,24 @@
 import { createScope, Promised } from '@pumped-fn/core-next'
-import { actorRegistry } from './resource.registry'
+import { actorRegistry, type TenantActor } from './resource.registry'
+
+async function waitForProcessing(
+  actor: TenantActor,
+  expectedCount: number,
+  timeoutMs = 5000
+): Promise<void> {
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < timeoutMs) {
+    if (actor.getTodos().length === expectedCount) {
+      return
+    }
+    await new Promise(resolve => setImmediate(resolve))
+  }
+
+  throw new Error(
+    `Timeout waiting for todo count ${expectedCount}, got ${actor.getTodos().length}`
+  )
+}
 
 async function main() {
   console.log('Multi-Tenant Todo Actor System\n')
@@ -31,7 +50,8 @@ async function main() {
     payload: { id: 'todo-1', title: 'Review PR' }
   })
 
-  await new Promise(resolve => setTimeout(resolve, 100))
+  await waitForProcessing(tenant1, 2)
+  await waitForProcessing(tenant2, 1)
 
   console.log('\nAlice todos:', tenant1.getTodos())
   console.log('Bob todos:', tenant2.getTodos())
@@ -42,7 +62,7 @@ async function main() {
     payload: { id: 'todo-1', completed: true }
   })
 
-  await new Promise(resolve => setTimeout(resolve, 100))
+  await waitForProcessing(tenant1, 2)
 
   console.log('Alice todos:', tenant1.getTodos())
 
@@ -52,7 +72,7 @@ async function main() {
     payload: { id: 'todo-1' }
   })
 
-  await new Promise(resolve => setTimeout(resolve, 100))
+  await waitForProcessing(tenant2, 0)
 
   console.log('Bob todos:', tenant2.getTodos())
 
