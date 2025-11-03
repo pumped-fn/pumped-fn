@@ -1,11 +1,7 @@
-import { provide, createScope, Promised } from '@pumped-fn/core-next'
+import { provide, createScope, Promised, type Core } from '@pumped-fn/core-next'
 import { createTenantActor } from './actor.tenant'
 
-export type TenantActor = {
-  send: (message: import('./types').TenantMessage.Message) => void
-  getState: () => import('./types').Todo.State
-  getTodos: () => import('./types').Todo.Item[]
-}
+export type TenantActor = Core.InferOutput<ReturnType<typeof createTenantActor>>
 
 export const actorRegistry = provide((controller) => {
   const actors = new Map<string, TenantActor>()
@@ -30,10 +26,15 @@ export const actorRegistry = provide((controller) => {
       const scope = createScope()
       scopes.set(tenantId, scope)
 
-      const actor = await scope.resolve(createTenantActor(tenantId))
-      actors.set(tenantId, actor)
-
-      return actor
+      try {
+        const actor = await scope.resolve(createTenantActor(tenantId))
+        actors.set(tenantId, actor)
+        return actor
+      } catch (error) {
+        await scope.dispose()
+        scopes.delete(tenantId)
+        throw error
+      }
     },
 
     get: (tenantId: string): TenantActor | undefined => {
