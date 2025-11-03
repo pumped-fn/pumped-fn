@@ -385,6 +385,28 @@ export declare namespace Core {
         details: true;
       }
     ): Promised<Flow.ExecutionDetails<S>>;
+
+    exec<S, I>(config: {
+      flow: Executor<Flow.Handler<S, I>>;
+      input?: I;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
+
+    exec<S, D extends DependencyLike>(config: {
+      dependencies: D;
+      fn: (deps: InferOutput<D>) => S | Promise<S>;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
+
+    exec<S, I, D extends DependencyLike>(config: {
+      dependencies: D;
+      fn: (deps: InferOutput<D>, input: I) => S | Promise<S>;
+      input: I;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
   }
 }
 

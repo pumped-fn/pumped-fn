@@ -21,6 +21,7 @@ import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta, wrapWithExtensions } from "./flow";
 import { validate } from "./ssch";
+import { FlowExecutionImpl } from "./flow-execution";
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;
@@ -405,6 +406,7 @@ function getExecutor(e: Core.UExecutor): Core.AnyExecutor {
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, ExecutorState> = new Map();
+  protected executions: Map<string, { execution: Flow.FlowExecution<unknown>; startTime: number }> = new Map();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -1099,42 +1101,146 @@ class BaseScope implements Core.Scope {
     }
   ): Promised<Flow.ExecutionDetails<S>>;
 
+  exec<S, I>(config: {
+    flow: Core.Executor<Flow.Handler<S, I>>;
+    input?: I;
+    timeout?: number;
+    tags?: Tag.Tagged[];
+  }): Flow.FlowExecution<S>;
+
+  exec<S, D extends Core.DependencyLike>(config: {
+    dependencies: D;
+    fn: (deps: Core.InferOutput<D>) => S | Promise<S>;
+    timeout?: number;
+    tags?: Tag.Tagged[];
+  }): Flow.FlowExecution<S>;
+
+  exec<S, I, D extends Core.DependencyLike>(config: {
+    dependencies: D;
+    fn: (deps: Core.InferOutput<D>, input: I) => S | Promise<S>;
+    input: I;
+    timeout?: number;
+    tags?: Tag.Tagged[];
+  }): Flow.FlowExecution<S>;
+
   exec<S, I = undefined>(
-    flow: Core.Executor<Flow.Handler<S, I>>,
+    configOrFlow:
+      | Core.Executor<Flow.Handler<S, I>>
+      | { flow: Core.Executor<Flow.Handler<S, I>>; input?: I; timeout?: number; tags?: Tag.Tagged[] }
+      | { dependencies: Core.DependencyLike; fn: (...args: any[]) => S | Promise<S>; input?: any; timeout?: number; tags?: Tag.Tagged[] },
     input?: I,
     options?: {
       tags?: Tag.Tagged[];
       details?: boolean;
     }
-  ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
+  ): Promised<S> | Promised<Flow.ExecutionDetails<S>> | Flow.FlowExecution<S> {
     this["~ensureNotDisposed"]();
 
-    if (options?.details === true) {
-      const result = this["~executeFlow"](flow, input as I, options.tags);
-      return Promised.create(
-        result.then(async (r) => {
-          const ctx = await result.ctx();
-          if (!ctx) {
-            throw new Error("Execution context not available");
-          }
-          return { success: true as const, result: r, ctx };
-        }).catch(async (error) => {
-          const ctx = await result.ctx();
-          if (!ctx) {
-            throw new Error("Execution context not available");
-          }
-          return { success: false as const, error, ctx };
-        })
-      );
+    if (typeof configOrFlow === "object" && "factory" in configOrFlow) {
+      const flow = configOrFlow as Core.Executor<Flow.Handler<S, I>>;
+
+      if (options?.details === true) {
+        const result = this["~executeFlow"](flow, input as I, options.tags);
+        return Promised.create(
+          result.then(async (r) => {
+            const ctx = await result.ctx();
+            if (!ctx) {
+              throw new Error("Execution context not available");
+            }
+            return { success: true as const, result: r, ctx };
+          }).catch(async (error) => {
+            const ctx = await result.ctx();
+            if (!ctx) {
+              throw new Error("Execution context not available");
+            }
+            return { success: false as const, error, ctx };
+          })
+        );
+      }
+
+      return this["~executeFlow"](flow, input as I, options?.tags);
     }
 
-    return this["~executeFlow"](flow, input as I, options?.tags);
+    const config = configOrFlow as any;
+    const executionId = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `exec-${Date.now()}-${Math.random()}`;
+    const abortController = new AbortController();
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (config.timeout) {
+      timeoutId = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          abortController.abort(new Error(`Flow execution timeout after ${config.timeout}ms`));
+        }
+      }, config.timeout);
+    }
+
+    let flowPromise: Promised<S>;
+    let flowName: string | undefined;
+
+    if ("flow" in config) {
+      flowPromise = this["~executeFlow"](config.flow, config.input as I, config.tags, abortController);
+      const definition = flowDefinitionMeta.readFrom(config.flow);
+      flowName = definition?.name;
+    } else {
+      flowPromise = Promised.create(
+        (async () => {
+          const deps = await this["~resolveDependencies"](
+            config.dependencies,
+            { [executorSymbol]: "main" as const } as any
+          );
+
+          if ("input" in config) {
+            return config.fn(deps, config.input);
+          } else {
+            return config.fn(deps);
+          }
+        })()
+      );
+      flowName = undefined;
+    }
+
+    const execution = new FlowExecutionImpl<S>({
+      id: executionId,
+      flowName,
+      abort: abortController,
+      result: flowPromise,
+      ctx: null,
+    });
+
+    this.executions.set(executionId, { execution, startTime: Date.now() });
+
+    flowPromise.finally(() => {
+      this.executions.delete(executionId);
+    });
+
+    Promise.resolve().then(() => {
+      execution["~setStatus"]("running");
+    });
+
+    flowPromise
+      .then(() => {
+        execution["~setStatus"]("completed");
+        if (timeoutId) clearTimeout(timeoutId);
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) {
+          execution["~setStatus"]("cancelled");
+        } else {
+          execution["~setStatus"]("failed");
+        }
+        if (timeoutId) clearTimeout(timeoutId);
+      });
+
+    return execution;
   }
 
   private "~executeFlow"<S, I>(
     flow: Core.Executor<Flow.Handler<S, I>>,
     input: I,
-    executionTags?: Tag.Tagged[]
+    executionTags?: Tag.Tagged[],
+    abortController?: AbortController
   ): Promised<S> {
     let resolveSnapshot!: (snapshot: Flow.ExecutionData | undefined) => void;
     const snapshotPromise = new Promise<Flow.ExecutionData | undefined>(
@@ -1144,7 +1250,7 @@ class BaseScope implements Core.Scope {
     );
 
     const promise = (async () => {
-      const context = new FlowContext(this, this.extensions, executionTags);
+      const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
 
       try {
         const executeCore = (): Promised<S> => {

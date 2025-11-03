@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, FlowError, provide, flowMeta, Promised, tag } from "../src";
+import { flow, FlowError, provide, flowMeta, Promised, tag, createScope } from "../src";
 import { custom } from "../src/ssch";
 
 describe("Flow API - New Patterns", () => {
@@ -627,6 +627,25 @@ describe("Flow API - New Patterns", () => {
 
       expect(result).toBe(42);
       expect(throwIfAbortedCalled).toBe(true);
+    });
+  });
+
+  describe("FlowExecution return type", () => {
+    test("scope.exec returns FlowExecution with metadata", async () => {
+      const testFlow = flow((ctx, input: number) => input * 2);
+      const scope = createScope();
+
+      const execution = scope.exec({ flow: testFlow, input: 5 });
+
+      expect(execution.id).toBeDefined();
+      expect(typeof execution.id).toBe("string");
+      expect(execution.status).toBe("pending");
+      expect(execution.abort).toBeInstanceOf(AbortController);
+      expect(execution.result).toBeDefined();
+
+      const result = await execution.result;
+      expect(result).toBe(10);
+      expect(execution.status).toBe("completed");
     });
   });
 });
