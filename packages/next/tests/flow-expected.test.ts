@@ -594,4 +594,39 @@ describe("Flow API - New Patterns", () => {
       }
     });
   });
+
+  describe("AbortController support", () => {
+    test("flow context provides abort signal", async () => {
+      let capturedSignal: AbortSignal | undefined;
+
+      const testFlow = flow((ctx) => {
+        capturedSignal = ctx.signal;
+        expect(ctx.signal).toBeDefined();
+        expect(ctx.signal.aborted).toBe(false);
+        return 42;
+      });
+
+      const result = await flow.execute(testFlow, undefined);
+
+      expect(result).toBe(42);
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal!.aborted).toBe(false);
+    });
+
+    test("flow context throwIfAborted method exists and is callable", async () => {
+      let throwIfAbortedCalled = false;
+
+      const testFlow = flow((ctx) => {
+        expect(typeof ctx.throwIfAborted).toBe("function");
+        ctx.throwIfAborted();
+        throwIfAbortedCalled = true;
+        return 42;
+      });
+
+      const result = await flow.execute(testFlow, undefined);
+
+      expect(result).toBe(42);
+      expect(throwIfAbortedCalled).toBe(true);
+    });
+  });
 });

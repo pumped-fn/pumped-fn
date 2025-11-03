@@ -551,6 +551,9 @@ export namespace Flow {
   export type C = {
     readonly scope: Core.Scope;
     readonly tags: Tag.Tagged[] | undefined;
+    readonly signal: AbortSignal;
+
+    throwIfAborted(): void;
 
     get<T>(
       accessor:

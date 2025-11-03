@@ -143,16 +143,29 @@ class FlowContext implements Flow.Context {
   public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
   public readonly tags: Tag.Tagged[] | undefined;
+  private abortController: AbortController;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext | undefined
+    private parent?: FlowContext | undefined,
+    abortController?: AbortController
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
     this.tags = tags;
+    this.abortController = abortController || new AbortController();
+  }
+
+  get signal(): AbortSignal {
+    return this.abortController.signal;
+  }
+
+  throwIfAborted(): void {
+    if (this.signal.aborted) {
+      throw new Error("Flow execution cancelled");
+    }
   }
 
   resolve<T>(executor: Core.Executor<T>): Promised<T> {
