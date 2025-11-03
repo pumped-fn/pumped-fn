@@ -14,14 +14,14 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
 
   private _status: Flow.ExecutionStatus = 'pending';
   private statusCallbacks = new Set<StatusCallback<T>>();
-  private _ctx: Flow.ExecutionData;
+  private _ctx: Flow.ExecutionData | null;
 
   constructor(config: {
     id: string;
     flowName: string | undefined;
     abort: AbortController;
     result: Promised<T>;
-    ctx: Flow.ExecutionData;
+    ctx: Flow.ExecutionData | null;
   }) {
     this.id = config.id;
     this.flowName = config.flowName;
@@ -35,10 +35,10 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
   }
 
   get ctx(): Flow.ExecutionData {
-    return this._ctx;
+    return this._ctx!;
   }
 
-  setStatus(newStatus: Flow.ExecutionStatus): void {
+  "~setStatus"(newStatus: Flow.ExecutionStatus): void {
     if (this._status === newStatus) return;
 
     this._status = newStatus;
