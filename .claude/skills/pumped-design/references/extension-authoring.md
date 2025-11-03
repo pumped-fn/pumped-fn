@@ -157,6 +157,8 @@ const tracingExtension = extension({
 
 **Goal:** Track requests across flows using correlation IDs with proper lifecycle.
 
+See: `correlationExtension` in skill-examples/extensions.ts
+
 ```typescript
 import { extension } from '@pumped-fn/core-next'
 import type { Extension, Core } from '@pumped-fn/core-next/types'
@@ -377,6 +379,8 @@ test('correlation extension handles flow errors gracefully', async () => {
 
 ### Stateful: Rate Limiter
 
+See: `rateLimiterExtension` in skill-examples/extensions.ts
+
 ```typescript
 import { extension } from '@pumped-fn/core-next'
 import type { Extension, Core } from '@pumped-fn/core-next/types'
@@ -430,6 +434,8 @@ export const rateLimiterExtension = (config: RateLimitConfig) => extension({
 ```
 
 ### Integration: APM (Application Performance Monitoring)
+
+See: `apmExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
@@ -502,6 +508,8 @@ export const apmExtension = (client: APMClient) => extension({
 ```
 
 ### Context Propagation: Multi-tenant Isolation
+
+See: `tenantIsolationExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { tag, custom, extension } from '@pumped-fn/core-next'

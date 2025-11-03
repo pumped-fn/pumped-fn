@@ -27,6 +27,9 @@ description: TanStack Start/Router integration patterns. Module-level scope sing
 
 ### 1. Create Module-level Scope
 
+
+See: `tanstackModuleScope` in skill-examples/integrations-tanstack.ts
+
 ```typescript
 // src/lib/scope.ts
 import { createScope } from '@pumped-fn/core-next'
@@ -49,6 +52,9 @@ export const appScope = createScope({
 ### 2. Loaders for Data Fetching
 
 Use scope in route loaders for SSR data:
+
+
+See: `tanstackListUsersFlow` in skill-examples/integrations-tanstack.ts
 
 ```typescript
 // src/routes/users.tsx
@@ -87,6 +93,9 @@ function UsersPage() {
 
 ### 3. Dynamic Route Loaders
 
+
+See: `tanstackGetUserFlow` in skill-examples/integrations-tanstack.ts
+
 ```typescript
 // src/routes/users/$userId.tsx
 import { createFileRoute } from '@tanstack/react-router'
@@ -122,6 +131,9 @@ function UserDetailPage() {
 ### 4. Actions for Mutations
 
 Use scope in server functions for mutations:
+
+
+See: `tanstackCreateUserFn` in skill-examples/integrations-tanstack.ts
 
 ```typescript
 // src/routes/users/index.tsx
@@ -192,6 +204,9 @@ function UsersPage() {
 ```
 
 ## Complete CRUD Example
+
+
+See: `tanstackDeleteUserFlow` in skill-examples/integrations-tanstack.ts
 
 ```typescript
 // src/routes/users.tsx
@@ -288,6 +303,9 @@ function UsersPage() {
 ```
 
 ## Search Params with Loaders
+
+
+See: `tanstackUsersSearchSchema` in skill-examples/integrations-tanstack.ts
 
 ```typescript
 // src/routes/users/index.tsx
@@ -538,6 +556,9 @@ function UsersPage() {
 
 ## Authentication with Before Load
 
+
+See: `tanstackGetDashboardFlow` in skill-examples/integrations-tanstack.ts
+
 ```typescript
 // src/routes/_authenticated.tsx
 import { createFileRoute, redirect } from '@tanstack/react-router'
@@ -562,6 +583,9 @@ export const Route = createFileRoute('/_authenticated')({
   }
 })
 ```
+
+
+See: `tanstackGetDashboardFlow` in skill-examples/integrations-tanstack.ts
 
 ```typescript
 // src/routes/_authenticated/dashboard.tsx

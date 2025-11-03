@@ -29,6 +29,9 @@ description: Next.js integration patterns. Module-level scope singleton, import 
 
 Create scope in shared module, import where needed:
 
+
+See: `nextjsListUsersFlow` in skill-examples/integrations-nextjs.ts
+
 ```typescript
 // src/lib/scope.ts
 import { createScope } from '@pumped-fn/core-next'
@@ -80,6 +83,9 @@ export default async function UsersPage() {
 ### 3. Server Actions for Mutations
 
 Use "use server" directive with scope:
+
+
+See: `nextjsCreateUserFlow` in skill-examples/integrations-nextjs.ts
 
 ```typescript
 // src/app/users/actions.ts
@@ -170,6 +176,9 @@ export function CreateUserForm() {
 
 ### Route Handlers with Scope
 
+
+See: `nextjsAppRouterPostHandler` in skill-examples/integrations-nextjs.ts
+
 ```typescript
 // src/app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server'
@@ -211,6 +220,9 @@ export async function POST(request: NextRequest) {
 ```
 
 ### Dynamic Route Handlers
+
+
+See: `nextjsGetUserFlow` in skill-examples/integrations-nextjs.ts
 
 ```typescript
 // src/app/api/users/[id]/route.ts
@@ -266,6 +278,9 @@ export async function DELETE(
 
 ## API Routes Pattern (Pages Router)
 
+
+See: `nextjsPagesApiHandler` in skill-examples/integrations-nextjs.ts
+
 ```typescript
 // pages/api/users/index.ts
 import { NextApiRequest, NextApiResponse } from 'next'
@@ -309,6 +324,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 ## Server-side Rendering (getServerSideProps)
 
+
+See: `nextjsGetServerSidePropsExample` in skill-examples/integrations-nextjs.ts
+
 ```typescript
 // pages/users/index.tsx
 import { GetServerSideProps } from 'next'
@@ -348,6 +366,9 @@ export default function UsersPage({ users, error }: { users: any[]; error: strin
 ```
 
 ## Static Site Generation (getStaticProps)
+
+
+See: `nextjsGetStaticPropsExample` in skill-examples/integrations-nextjs.ts
 
 ```typescript
 // pages/users/[id].tsx
@@ -393,6 +414,9 @@ export default function UserPage({ user }: { user: any }) {
 ```
 
 ## Middleware Pattern
+
+
+See: `nextjsValidateSessionFlow` in skill-examples/integrations-nextjs.ts
 
 ```typescript
 // src/middleware.ts

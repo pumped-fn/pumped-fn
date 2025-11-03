@@ -24,6 +24,9 @@ Use entrypoint patterns when:
 
 ### HTTP Server Entrypoint
 
+
+See: `httpServerEntrypoint` in skill-examples/entrypoints.ts
+
 ```typescript
 import { createScope } from '@pumped-fn/core-next'
 import { dbConfig, apiKey } from './resources'
@@ -92,6 +95,9 @@ process.on('SIGINT', shutdown)
 
 ### CLI Entrypoint
 
+
+See: `cliEntrypoint` in skill-examples/entrypoints.ts
+
 ```typescript
 import { Command } from 'commander'
 import { createScope } from '@pumped-fn/core-next'
@@ -141,6 +147,9 @@ program.parse()
 ```
 
 ### Lambda Entrypoint
+
+
+See: `lambdaEntrypoint` in skill-examples/entrypoints.ts
 
 ```typescript
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'

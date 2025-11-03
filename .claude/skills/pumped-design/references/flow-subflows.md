@@ -30,6 +30,9 @@ Use `ctx.exec()` for sub-flows when:
 
 ### Basic Sub-flow Execution
 
+
+See: `doubleNumber` in skill-examples/flows-subflows.ts
+
 ```typescript
 import { flow } from '@pumped-fn/core-next'
 
