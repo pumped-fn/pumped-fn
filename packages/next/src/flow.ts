@@ -374,8 +374,9 @@ class FlowContext implements Flow.Context {
         }, { once: true });
       }
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       if (config.timeout) {
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           if (!childAbort.signal.aborted) {
             childAbort.abort(new Error(`Operation timeout after ${config.timeout}ms`));
           }
@@ -424,6 +425,8 @@ class FlowContext implements Flow.Context {
               } catch (error) {
                 journal.set(journalKey, { __error: true, error });
                 throw error;
+              } finally {
+                if (timeoutId) clearTimeout(timeoutId);
               }
             } else {
               throw new Error("Flow definition not found");
@@ -441,9 +444,13 @@ class FlowContext implements Flow.Context {
               const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
               childContext.initializeExecutionContext(definition.name, false);
 
-              const result = await handler(childContext, validated);
-              validate(definition.output, result);
-              return result;
+              try {
+                const result = await handler(childContext, validated);
+                validate(definition.output, result);
+                return result;
+              } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+              }
             } else {
               throw new Error("Flow definition not found");
             }
@@ -458,8 +465,12 @@ class FlowContext implements Flow.Context {
         } else {
           this.throwIfAborted();
           return Promised.try(async () => {
-            const result = await fn(...params);
-            return result;
+            try {
+              const result = await fn(...params);
+              return result;
+            } finally {
+              if (timeoutId) clearTimeout(timeoutId);
+            }
           });
         }
       } else {
