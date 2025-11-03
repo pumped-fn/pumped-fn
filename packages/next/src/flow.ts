@@ -254,7 +254,13 @@ class FlowContext implements Flow.Context {
     return value;
   }
 
+  /**
+   * @deprecated Use ctx.exec({ fn, params, key }) instead
+   */
   run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+  /**
+   * @deprecated Use ctx.exec({ fn, params, key }) instead
+   */
   run<T, P extends readonly unknown[]>(
     key: string,
     fn: (...args: P) => Promise<T> | T,
@@ -266,6 +272,10 @@ class FlowContext implements Flow.Context {
     fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
     ...params: P
   ): Promised<T> {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV !== 'production') {
+      console.warn(`ctx.run() is deprecated. Use ctx.exec({ fn, params, key }) instead.`);
+    }
+
     if (!this.journal) {
       this.journal = new Map();
     }
