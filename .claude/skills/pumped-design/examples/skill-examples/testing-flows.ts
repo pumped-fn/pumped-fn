@@ -166,7 +166,7 @@ export namespace CreateUser {
 export const createUser = flow(
   { userRepo: userRepository },
   ({ userRepo }) =>
-    async (ctx, input: CreateUser.Input): Promise<CreateUser.Result> => {
+    async (ctx: Core.Context, input: CreateUser.Input): Promise<CreateUser.Result> => {
       const validation = await ctx.run('validate', () => {
         if (input.name.length < 2) {
           return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
@@ -209,9 +209,7 @@ export const flowWithDependenciesTests = () => {
         })
       }
 
-      scope = createScope({
-        presets: [preset(userRepository, mockUserRepo)]
-      })
+      scope = createScope(preset(userRepository, mockUserRepo))
     })
 
     afterEach(async () => {

@@ -180,9 +180,7 @@ export const executorTests = () => {
         }
       }
 
-      scope = createScope({
-        presets: [preset(fsRead, mockFs)]
-      })
+      scope = createScope(preset(fsRead, mockFs))
     })
 
     afterEach(async () => {

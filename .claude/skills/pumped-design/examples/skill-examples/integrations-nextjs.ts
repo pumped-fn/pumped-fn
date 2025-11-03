@@ -4,11 +4,17 @@
  * Extracted from integration-nextjs.md
  */
 
-import { createScope, flow, tag, type Flow } from '@pumped-fn/core-next'
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { NextRequest, NextResponse } from 'next/server'
-import type { GetServerSideProps, GetStaticProps, GetStaticPaths } from 'next'
-import { revalidatePath } from 'next/cache'
+import { createScope, flow, tag, type Flow, type Core } from '@pumped-fn/core-next'
+
+type NextApiRequest = { query: Record<string, string | string[] | undefined>; body: any; method?: string }
+type NextApiResponse = { status: (code: number) => NextApiResponse; json: (data: any) => void }
+type NextRequest = { url: string; nextUrl: { searchParams: URLSearchParams } }
+type NextResponse = { json: (data: any, init?: ResponseInit) => any }
+const NextResponse = { json: (data: any, init?: ResponseInit) => ({ data, init }) }
+type GetServerSideProps = (context: { params: any; req: any; res: any }) => Promise<{ props: any }>
+type GetStaticProps = (context: { params: any }) => Promise<{ props: any }>
+type GetStaticPaths = () => Promise<{ paths: any[]; fallback: boolean }>
+const revalidatePath = (path: string) => {}
 
 // ============================================================================
 // NEXT.JS INTEGRATION
@@ -22,18 +28,17 @@ import { revalidatePath } from 'next/cache'
  * Referenced in: integration-nextjs.md
  * Section: Create Module-level Scope
  */
-export const nextjsModuleScope = createScope({
-  tags: [
-    tag('db-config', {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'app',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres'
-    }),
-    tag('api-key', process.env.API_KEY || '')
-  ]
+const dbConfigTag = tag('db-config', {
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'app',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres'
 })
+
+const apiKeyTag = tag('api-key', process.env.API_KEY || '')
+
+export const nextjsModuleScope = createScope(dbConfigTag, apiKeyTag)
 
 /**
  * Next.js Server Component Flow
@@ -43,11 +48,8 @@ export const nextjsModuleScope = createScope({
  * Referenced in: integration-nextjs.md
  * Section: Server Components with Flow Execution
  */
-export const nextjsListUsersFlow = flow({
-  name: 'list-users',
-  handle: async (ctx, input: {}) => {
-    return { success: true, users: [{ id: '1', name: 'Alice', email: 'alice@example.com' }] }
-  }
+export const nextjsListUsersFlow = flow(async (ctx: Core.Context, input: {}) => {
+  return { success: true, users: [{ id: '1', name: 'Alice', email: 'alice@example.com' }] }
 })
 
 /**
@@ -58,25 +60,16 @@ export const nextjsListUsersFlow = flow({
  * Referenced in: integration-nextjs.md
  * Section: Server Actions for Mutations
  */
-export const nextjsCreateUserFlow = flow({
-  name: 'create-user',
-  handle: async (ctx, input: { email: string; name: string }) => {
-    return { success: true, user: { id: '1', email: input.email, name: input.name } }
-  }
+export const nextjsCreateUserFlow = flow(async (ctx: Core.Context, input: { email: string; name: string }) => {
+  return { success: true, user: { id: '1', email: input.email, name: input.name } }
 })
 
-export const nextjsUpdateUserFlow = flow({
-  name: 'update-user',
-  handle: async (ctx, input: { id: string; email: string; name: string }) => {
-    return { success: true, user: { id: input.id, email: input.email, name: input.name } }
-  }
+export const nextjsUpdateUserFlow = flow(async (ctx: Core.Context, input: { id: string; email: string; name: string }) => {
+  return { success: true, user: { id: input.id, email: input.email, name: input.name } }
 })
 
-export const nextjsDeleteUserFlow = flow({
-  name: 'delete-user',
-  handle: async (ctx, input: { id: string }) => {
-    return { success: true }
-  }
+export const nextjsDeleteUserFlow = flow(async (ctx: Core.Context, input: { id: string }) => {
+  return { success: true }
 })
 
 /**
@@ -136,11 +129,8 @@ export const nextjsAppRouterPostHandler = async (request: NextRequest, scope: an
  * Referenced in: integration-nextjs.md
  * Section: Dynamic Route Handlers
  */
-export const nextjsGetUserFlow = flow({
-  name: 'get-user',
-  handle: async (ctx, input: { id: string }) => {
-    return { success: true, user: { id: input.id, name: 'Alice', email: 'alice@example.com' } }
-  }
+export const nextjsGetUserFlow = flow(async (ctx: Core.Context, input: { id: string }) => {
+  return { success: true, user: { id: input.id, name: 'Alice', email: 'alice@example.com' } }
 })
 
 export const nextjsDynamicGetHandler = async (
@@ -309,11 +299,8 @@ export const nextjsGetStaticPropsExample: GetStaticProps = async ({ params }) =>
  * Referenced in: integration-nextjs.md
  * Section: Middleware Pattern
  */
-export const nextjsValidateSessionFlow = flow({
-  name: 'validate-session',
-  handle: async (ctx, input: { token: string }) => {
-    return { success: true, userId: 'user-123' }
-  }
+export const nextjsValidateSessionFlow = flow(async (ctx: Core.Context, input: { token: string }) => {
+  return { success: true, userId: 'user-123' }
 })
 
 export const nextjsMiddlewareHandler = async (request: NextRequest, scope: any) => {

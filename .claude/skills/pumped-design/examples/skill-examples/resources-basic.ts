@@ -5,7 +5,15 @@
  */
 
 import { provide, tag, custom, flow } from '@pumped-fn/core-next'
-import { Pool } from 'pg'
+
+type Pool = {
+  query: (sql: string, params: any[]) => Promise<{ rows: any[] }>
+  end: () => Promise<void>
+  connect: () => Promise<{
+    query: (sql: string, params?: any[]) => Promise<any>
+    release: () => void
+  }>
+}
 
 /**
  * Database Configuration Tag
@@ -32,16 +40,9 @@ export const dbConfig = tag(custom<{
 export const dbPool = provide((controller) => {
   const config = dbConfig.extractFrom(controller.scope)
 
-  const pool = new Pool({
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    max: 20
-  })
+  const pool = {} as Pool
 
-  controller.cleanup(async () => {
-    await pool.end()
-  })
+  controller.cleanup(() => pool.end())
 
   return {
     query: async <T>(sql: string, params: any[]): Promise<T[]> => {
@@ -116,11 +117,9 @@ export const basicConfigWithFlow = (() => {
  * Section: Example 4
  */
 export const dbPoolWithTransaction = provide((controller) => {
-  const pool = new Pool({ /* config */ })
+  const pool = {} as Pool
 
-  controller.cleanup(async () => {
-    await pool.end()
-  })
+  controller.cleanup(() => pool.end())
 
   return {
     query: async <T>(sql: string, params: any[]): Promise<T[]> => {
@@ -166,7 +165,7 @@ export const externalApiWithTags = (() => {
           headers: { 'Authorization': `Bearer ${key}` }
         })
         if (!response.ok) throw new Error(`API error: ${response.status}`)
-        return response.json()
+        return response.json() as Promise<T>
       }
     }
   })
@@ -183,11 +182,9 @@ export const externalApiWithTags = (() => {
  * Section: Lifecycle Management
  */
 export const dbPoolWithCleanup = provide((controller) => {
-  const pool = new Pool({ /* config */ })
+  const pool = {} as Pool
 
-  controller.cleanup(async () => {
-    await pool.end()
-  })
+  controller.cleanup(() => pool.end())
 
-  return { query: async (sql, params) => { /* ... */ } }
+  return { query: async (sql: string, params: any[]) => pool.query(sql, params) }
 })

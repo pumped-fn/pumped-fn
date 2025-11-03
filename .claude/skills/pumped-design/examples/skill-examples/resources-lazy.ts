@@ -184,7 +184,7 @@ export const lazyConditionalLogger = (() => {
  * Section: Lazy Dependencies - Alternative
  */
 export const lazyLoggerWithTags = (() => {
-  const envTag = tag<string>()
+  const envTag = tag<string>('env')
 
   const consoleLogger = provide(() => ({ log: (msg: string) => console.log(msg) }))
   const pinoLogger = provide(() => ({ log: (msg: string) => console.log(`[PINO] ${msg}`) }))
@@ -192,7 +192,7 @@ export const lazyLoggerWithTags = (() => {
   const logger = derive(
     { console: consoleLogger.lazy, pino: pinoLogger.lazy },
     async ({ console, pino }, ctl) => {
-      const env = ctl.scope.tag(envTag) ?? 'development'
+      const env = ctl.scope.tags.get(envTag.key) ?? 'development'
       return env === 'development'
         ? await console.resolve()
         : await pino.resolve()
@@ -295,7 +295,7 @@ export const lazyStaticResources = (() => {
 
   const apiClient = derive(
     config.static,
-    (cfg) => ({ url: cfg.apiUrl, timeout: cfg.timeout })
+    async (cfg) => ({ url: (await cfg()).apiUrl, timeout: (await cfg()).timeout })
   )
 
   return { config, apiClient }

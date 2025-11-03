@@ -44,7 +44,7 @@ export const resourceLifecycleTests = () => {
       const mockDbPool = provide((controller) => {
         const connection = { status: 'open' }
 
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupCalled = true
           connection.status = 'closed'
           connectionClosed = true
@@ -72,21 +72,21 @@ export const resourceLifecycleTests = () => {
       const cleanupOrder: string[] = []
 
       const resourceA = provide((controller) => {
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupOrder.push('A')
         })
         return { name: 'A' }
       })
 
       const resourceB = provide((controller) => {
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupOrder.push('B')
         })
         return { name: 'B' }
       })
 
       const resourceC = provide((controller) => {
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupOrder.push('C')
         })
         return { name: 'C' }
@@ -107,7 +107,7 @@ export const resourceLifecycleTests = () => {
       const cleanupCalls: string[] = []
 
       const failingResource = provide((controller) => {
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupCalls.push('failing')
           throw new Error('Cleanup failed')
         })
@@ -115,7 +115,7 @@ export const resourceLifecycleTests = () => {
       })
 
       const successResource = provide((controller) => {
-        controller.cleanup(async () => {
+        controller.cleanup(() => {
           cleanupCalls.push('success')
         })
         return {}
