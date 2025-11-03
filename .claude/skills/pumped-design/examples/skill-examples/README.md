@@ -1,6 +1,6 @@
-# Extension Authoring TypeScript Examples
+# Pumped-Design Skill TypeScript Examples
 
-TypeScript examples for the extension-authoring skill that are **typechecked** to ensure correctness.
+TypeScript examples for pumped-design skills that are **typechecked** to ensure correctness.
 
 ## Purpose
 
@@ -12,13 +12,13 @@ Skill markdown files can contain code errors. These TypeScript files:
 ## Structure
 
 ```
-extension-authoring/
+skill-examples/
 ├── package.json          # References @pumped-fn/core-next
 ├── tsconfig.json         # Strict typechecking config
-├── correlation-tracker.ts  # Part 2: Guided example
-├── rate-limiter.ts        # Part 3: Stateful pattern
-├── apm-integration.ts     # Part 3: Integration pattern
-├── tenant-isolation.ts    # Part 3: Context propagation
+├── correlation-tracker.ts  # Extension authoring: Guided example
+├── rate-limiter.ts        # Extension authoring: Stateful pattern
+├── apm-integration.ts     # Extension authoring: Integration pattern
+├── tenant-isolation.ts    # Extension authoring: Context propagation
 └── README.md             # This file
 ```
 
@@ -27,13 +27,18 @@ extension-authoring/
 ### Typecheck Examples
 
 ```bash
-cd .claude/skills/pumped-design/examples/extension-authoring
+cd .claude/skills/pumped-design/examples/skill-examples
 pnpm typecheck
+```
+
+Or from project root:
+```bash
+pnpm --filter "@pumped-fn/skill-examples" typecheck
 ```
 
 ### AI Usage Pattern
 
-When AI reads extension-authoring.md skill:
+When AI reads a pumped-design skill:
 1. Skill references file path (e.g., `correlation-tracker.ts`)
 2. AI can grep for `correlation-tracker.ts` to find exact implementation
 3. AI reads actual TypeScript file for correct, typechecked code

@@ -32,20 +32,20 @@ Store skill code examples as actual TypeScript files that can be typechecked aga
 
 ## Implementation Example
 
-See `.claude/skills/pumped-design/examples/extension-authoring/` for reference.
+See `.claude/skills/pumped-design/examples/skill-examples/` for reference.
 
 ### Directory Contents
 
 **package.json:**
 ```json
 {
-  "name": "@pumped-fn/skill-extension-examples",
+  "name": "@pumped-fn/skill-examples",
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@pumped-fn/core-next": "link:../../../packages/next",
+    "@pumped-fn/core-next": "workspace:*",
     "typescript": "^5.7.2"
   }
 }
@@ -91,10 +91,10 @@ packages:
 
 ```bash
 # Typecheck all skill examples
-pnpm --filter "@pumped-fn/skill-*" typecheck
+pnpm --filter "@pumped-fn/skill-examples" typecheck
 
-# Typecheck specific skill
-pnpm --filter @pumped-fn/skill-extension-examples typecheck
+# Watch mode
+pnpm --filter "@pumped-fn/skill-examples" typecheck:watch
 ```
 
 ## Benefits
@@ -141,7 +141,7 @@ import { extension, type Extension, type Core } from '@pumped-fn/core-next'
 pnpm-workspace.yaml:
 ```yaml
 packages:
-  - '.claude/skills/pumped-design/examples/extension-authoring'
+  - '.claude/skills/pumped-design/examples/skill-examples'
 ```
 
 package.json:
@@ -171,7 +171,7 @@ tsconfig.json:
 
 **Verification:**
 ```bash
-pnpm --filter "@pumped-fn/skill-extension-examples" typecheck
+pnpm --filter "@pumped-fn/skill-examples" typecheck
 # Passes with no errors
 ```
 
@@ -228,5 +228,5 @@ Pattern is successful when:
 
 ## Related
 
-- `.claude/skills/pumped-design/examples/extension-authoring/` - First implementation
-- `.claude/skills/pumped-design/references/extension-authoring.md` - References examples
+- `.claude/skills/pumped-design/examples/skill-examples/` - Implementation
+- `.claude/skills/pumped-design/references/extension-authoring.md` - First skill using pattern

@@ -1,8 +1,8 @@
 {
-  "name": "@pumped-fn/skill-extension-examples",
+  "name": "@pumped-fn/skill-examples",
   "version": "0.0.0",
   "private": true,
-  "description": "TypeScript examples for extension-authoring skill (typechecked)",
+  "description": "TypeScript examples for pumped-design skills (typechecked)",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
