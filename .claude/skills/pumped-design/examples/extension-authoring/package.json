@@ -9,7 +9,7 @@
     "typecheck:watch": "tsc --noEmit --watch"
   },
   "devDependencies": {
-    "@pumped-fn/core-next": "link:../../../packages/next",
+    "@pumped-fn/core-next": "workspace: *",
     "typescript": "^5.7.2",
     "hono": "^4.0.0",
     "@types/node": "^22.0.0"

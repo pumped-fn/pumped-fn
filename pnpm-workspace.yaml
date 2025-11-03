@@ -3,4 +3,4 @@ packages:
   - 'packages/devtools'
   - 'examples'
   - 'docs'
-  - '.claude/skills/*/examples/*'
+  - '.claude/skills/pumped-design/examples/extension-authoring'

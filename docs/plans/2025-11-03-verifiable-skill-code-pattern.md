@@ -128,44 +128,67 @@ import { extension, type Extension, type Core } from '@pumped-fn/core-next'
 \`\`\`
 ```
 
-## Current Limitations
+## Module Resolution - SOLVED
 
-### Module Resolution (Investigated - Blocked)
+**Working Solution:**
 
-TypeScript module resolution from examples/ to packages/ is blocked by symlink resolution.
+1. **Use `workspace:*` protocol** (not `link:`)
+2. **Use specific workspace path** (not glob pattern)
+3. **Run `pnpm install` and `pnpm build`** to ensure dist/ exists
 
-**Root Cause:**
-- pnpm workspace with `workspace:*` creates symlink: `node_modules/@pumped-fn/core-next -> ../../../../../packages/next`
-- TypeScript package exports point to `dist/`: `"exports": { ".": { "types": "./dist/index.d.ts" } }`
-- Symlink resolves but TypeScript can't find `dist/` through it
-- Running `pnpm build` creates `packages/next/dist/` but TypeScript still fails module resolution
+**Configuration:**
 
-**Attempted Solutions:**
-1. ❌ `link:` in package.json - doesn't create proper node_modules structure
-2. ❌ `workspace:*` protocol - creates symlink but TS can't resolve through it
-3. ❌ `paths` in tsconfig - doesn't work with `moduleResolution: "bundler"`
-4. ❌ `moduleResolution: "node"` - still can't find exports through symlink
+pnpm-workspace.yaml:
+```yaml
+packages:
+  - '.claude/skills/pumped-design/examples/extension-authoring'
+```
 
-**Possible Solutions (not yet tried):**
-- Post-build script to copy `dist/` into skill examples node_modules
-- Use TypeScript project references instead of workspace protocol
-- Move skill examples into `packages/next/examples/` where imports work
-- Use relative imports to dist (ugly: `../../../../../packages/next/dist/index.js`)
+package.json:
+```json
+{
+  "devDependencies": {
+    "@pumped-fn/core-next": "workspace:*"
+  }
+}
+```
 
-**Current Value Despite Block:**
-- ✅ Examples are structurally correct TypeScript with correct imports
-- ✅ Examples use correct Tag API (manually verified)
-- ✅ Examples are grep-able by AI for reference
-- ✅ Pattern documented for future skills
-- ✅ Workspace setup works, just needs resolution fix
-- ⏳ Typechecking blocked pending module resolution solution
+tsconfig.json:
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "esnext"
+  }
+}
+```
 
-### Future Improvements
+**Why It Works:**
+- `workspace:*` creates proper symlink to built package with dist/
+- Specific path (not glob) ensures pnpm resolves workspace correctly
+- `pnpm build` ensures packages/next/dist/ exists before typecheck
+- `moduleResolution: "node"` follows symlinks to find exports
 
-1. Fix module resolution (workspace or paths config)
+**Verification:**
+```bash
+pnpm --filter "@pumped-fn/skill-extension-examples" typecheck
+# Passes with no errors
+```
+
+**Previous Investigation (for reference):**
+
+Attempted solutions that didn't work:
+1. ❌ `link:../../../packages/next` - doesn't create proper node_modules structure
+2. ❌ Glob pattern in workspace.yaml - pnpm doesn't resolve correctly
+3. ❌ `moduleResolution: "bundler"` - doesn't follow symlinks properly
+
+## Future Improvements
+
+1. ✅ ~~Fix module resolution~~ - SOLVED (workspace:* + specific path + pnpm build)
 2. Add CI step to verify all skill examples typecheck
 3. Add unit tests for skill examples
 4. Generate skill markdown from TypeScript (single source of truth)
+5. Apply pattern to remaining 250 code blocks across 14 other sub-skills
 
 ## Adoption Guidelines
 
@@ -200,8 +223,8 @@ Pattern is successful when:
 - ✅ Examples are actual TypeScript files
 - ✅ Skill markdown references file paths
 - ✅ AI can grep for examples
-- ⏳ Examples typecheck (blocked by module resolution)
-- ⏳ CI fails if examples don't typecheck
+- ✅ Examples typecheck successfully
+- ⏳ CI fails if examples don't typecheck (pending CI setup)
 
 ## Related
 

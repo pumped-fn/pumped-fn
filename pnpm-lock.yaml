@@ -26,8 +26,8 @@ importers:
   .claude/skills/pumped-design/examples/extension-authoring:
     devDependencies:
       '@pumped-fn/core-next':
-        specifier: link:../../../packages/next
-        version: link:../../../packages/next
+        specifier: 'workspace: *'
+        version: link:../../../../../packages/next
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.0
