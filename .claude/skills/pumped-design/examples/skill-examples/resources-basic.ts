@@ -42,7 +42,7 @@ export const dbPool = provide((controller) => {
 
   const pool = {} as Pool
 
-  controller.cleanup(() => pool.end())
+  controller.cleanup(() => { pool.end() })
 
   return {
     query: async <T>(sql: string, params: any[]): Promise<T[]> => {
@@ -119,7 +119,7 @@ export const basicConfigWithFlow = (() => {
 export const dbPoolWithTransaction = provide((controller) => {
   const pool = {} as Pool
 
-  controller.cleanup(() => pool.end())
+  controller.cleanup(() => { pool.end() })
 
   return {
     query: async <T>(sql: string, params: any[]): Promise<T[]> => {
@@ -184,7 +184,7 @@ export const externalApiWithTags = (() => {
 export const dbPoolWithCleanup = provide((controller) => {
   const pool = {} as Pool
 
-  controller.cleanup(() => pool.end())
+  controller.cleanup(() => { pool.end() })
 
   return { query: async (sql: string, params: any[]) => pool.query(sql, params) }
 })

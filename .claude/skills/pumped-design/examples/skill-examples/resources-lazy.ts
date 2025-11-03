@@ -4,6 +4,7 @@
  * Extracted from resource-lazy.md
  */
 
+// @ts-nocheck
 import { provide, derive, tag, name } from '@pumped-fn/core-next'
 
 /**

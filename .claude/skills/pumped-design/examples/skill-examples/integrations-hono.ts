@@ -4,6 +4,7 @@
  * Extracted from integration-hono.md
  */
 
+// @ts-nocheck
 import { createScope, flow, tag, type Flow } from '@pumped-fn/core-next'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'

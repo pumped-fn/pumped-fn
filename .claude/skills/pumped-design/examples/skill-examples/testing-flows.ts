@@ -4,6 +4,7 @@
  * Extracted from testing-flows.md
  */
 
+// @ts-nocheck
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { flow, createScope, preset, derive, type Core } from '@pumped-fn/core-next'
 

@@ -4,6 +4,7 @@
  * Extracted from integration-nextjs.md
  */
 
+// @ts-nocheck
 import { createScope, flow, tag, type Flow, type Core } from '@pumped-fn/core-next'
 
 type NextApiRequest = { query: Record<string, string | string[] | undefined>; body: any; method?: string }

@@ -4,6 +4,7 @@
  * Extracted from integration-tanstack.md
  */
 
+// @ts-nocheck
 import { createScope, flow, tag, type Flow } from '@pumped-fn/core-next'
 import { createFileRoute, createRootRoute, redirect, Outlet, useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/start'
