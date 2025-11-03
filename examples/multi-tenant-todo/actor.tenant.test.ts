@@ -86,4 +86,29 @@ describe('Tenant Actor', () => {
 
     await scope.dispose()
   })
+
+  test('actor uses flow handlers for message processing', async () => {
+    const scope = createScope()
+    const actor = await scope.resolve(createTenantActor('tenant-1'))
+
+    actor.send({
+      type: 'CREATE_TODO',
+      payload: { id: 'todo-1', title: 'Test' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    actor.send({
+      type: 'CREATE_TODO',
+      payload: { id: 'todo-1', title: 'Duplicate' }
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    const todos = actor.getTodos()
+    expect(todos).toHaveLength(1)
+    expect(todos[0].title).toBe('Test')
+
+    await scope.dispose()
+  })
 })

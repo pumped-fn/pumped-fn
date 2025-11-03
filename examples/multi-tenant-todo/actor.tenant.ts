@@ -1,5 +1,6 @@
-import { provide, Promised } from '@pumped-fn/core-next'
+import { provide, Promised, flow } from '@pumped-fn/core-next'
 import type { Todo, TenantMessage } from './types'
+import { handleCreateTodo, handleUpdateTodo, handleDeleteTodo } from './flow.message-handler'
 
 export const createTenantActor = (tenantId: string) => {
   return provide((controller) => {
@@ -20,31 +21,41 @@ export const createTenantActor = (tenantId: string) => {
       if (message) {
         switch (message.type) {
           case 'CREATE_TODO': {
-            const todo: Todo.Item = {
+            const result = await flow.execute(handleCreateTodo, {
               id: message.payload.id,
               title: message.payload.title,
-              completed: false,
-              createdAt: Date.now()
+              currentTodos: state.todos
+            })
+
+            if (result.success) {
+              state.todos.set(result.todo.id, result.todo)
             }
-            state.todos.set(todo.id, todo)
             break
           }
 
           case 'UPDATE_TODO': {
-            const existing = state.todos.get(message.payload.id)
-            if (existing) {
-              const updated: Todo.Item = {
-                ...existing,
-                title: message.payload.title ?? existing.title,
-                completed: message.payload.completed ?? existing.completed
-              }
-              state.todos.set(message.payload.id, updated)
+            const result = await flow.execute(handleUpdateTodo, {
+              id: message.payload.id,
+              title: message.payload.title,
+              completed: message.payload.completed,
+              currentTodos: state.todos
+            })
+
+            if (result.success) {
+              state.todos.set(result.todo.id, result.todo)
             }
             break
           }
 
           case 'DELETE_TODO': {
-            state.todos.delete(message.payload.id)
+            const result = await flow.execute(handleDeleteTodo, {
+              id: message.payload.id,
+              currentTodos: state.todos
+            })
+
+            if (result.success) {
+              state.todos.delete(result.deletedId)
+            }
             break
           }
 
