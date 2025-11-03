@@ -6,7 +6,7 @@
  * - provide() for executors without dependencies
  * - derive() for executors with dependencies
  * - Type inference from destructuring
- * - ctx.run() for journaling resource operations
+ * - ctx.exec() for journaling resource operations
  *
  * Verify: pnpm -F @pumped-fn/examples typecheck
  * Run: pnpm -F @pumped-fn/examples dev:basic-handler
@@ -53,12 +53,15 @@ const userService = derive(
 )
 // #endregion derive-multi-deps
 
-// #region flow-with-ctx-run
+// #region flow-with-ctx-exec
 const getUserFlow = flow(
   { db: dbConnection },
   async (deps, ctx, userId: string) => {
-    const results = await ctx.run('query-user-by-id', async () => {
-      return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
+    const results = await ctx.exec({
+      fn: async () => {
+        return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
+      },
+      key: 'query-user-by-id'
     })
 
     if (results.length === 0) {
@@ -68,7 +71,7 @@ const getUserFlow = flow(
     return { ok: true as const, user: results[0] }
   }
 )
-// #endregion flow-with-ctx-run
+// #endregion flow-with-ctx-exec
 
 // #region scope-resolution
 async function main() {

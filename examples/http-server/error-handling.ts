@@ -22,7 +22,11 @@ const riskyOperation = flow((ctx, shouldFail: boolean) => {
 
 const handleWithRecovery = flow(async (ctx, input: boolean) => {
   try {
-    const result = await ctx.exec('risky-operation', riskyOperation, input)
+    const result = await ctx.exec({
+      flow: riskyOperation,
+      input,
+      key: 'risky-operation'
+    })
     return { status: 'ok', data: result }
   } catch (error) {
     console.error('Caught error:', error)
@@ -34,7 +38,11 @@ const withCleanup = flow(async (ctx, input: boolean) => {
   const resource = { allocated: true }
 
   try {
-    const result = await ctx.exec('risky-operation', riskyOperation, input)
+    const result = await ctx.exec({
+      flow: riskyOperation,
+      input,
+      key: 'risky-operation'
+    })
     return result
   } finally {
     console.log('Cleaning up resource')
