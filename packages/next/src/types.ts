@@ -655,6 +655,7 @@ export namespace Flow {
     readonly status: ExecutionStatus;
     readonly ctx: ExecutionData | undefined;
     readonly abort: AbortController;
+    readonly statusCallbackErrors: readonly Error[];
 
     onStatusChange(
       callback: (status: ExecutionStatus, execution: FlowExecution<T>) => void | Promise<void>

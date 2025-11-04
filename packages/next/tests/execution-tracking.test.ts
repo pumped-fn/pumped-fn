@@ -156,6 +156,29 @@ describe("Flow Execution Tracking", () => {
 
       expect(timedOut).toBe(true);
     });
+
+    test("timeout cleanup verification - timeout cleared on early completion", async () => {
+      let timeoutCallbackInvoked = false;
+
+      const fastFlow = flow(
+        {
+          name: "fast-flow",
+          input: custom<void>(),
+          output: custom<string>(),
+        },
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return "completed-early";
+        }
+      );
+
+      const result = await scope.exec({ flow: fastFlow, input: undefined, timeout: 5000 });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(result).toBe("completed-early", "flow should complete early");
+      expect(timeoutCallbackInvoked).toBe(false, "timeout should not trigger after early completion");
+    });
   });
 
   describe("ctx.exec API", () => {

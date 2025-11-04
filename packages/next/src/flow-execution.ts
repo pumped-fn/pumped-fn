@@ -20,6 +20,7 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
 
   private _status: Flow.ExecutionStatus = 'pending';
   private statusCallbacks = new Set<StatusCallback<T>>();
+  private callbackErrors: Error[] = [];
   private _ctx: Flow.ExecutionData | null;
   private statusTracking: StatusTracking<T> | null;
   private statusTrackingActive = false;
@@ -49,6 +50,10 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
     return this._ctx ?? undefined;
   }
 
+  get statusCallbackErrors(): readonly Error[] {
+    return this.callbackErrors;
+  }
+
   "~setStatus"(newStatus: Flow.ExecutionStatus): void {
     if (this._status === newStatus) return;
 
@@ -56,6 +61,8 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
 
     for (const callback of this.statusCallbacks) {
       Promise.resolve(callback(newStatus, this)).catch((err) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.callbackErrors.push(error);
         console.error('Error in status change callback:', err);
       });
     }
