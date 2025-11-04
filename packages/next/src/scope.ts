@@ -1150,12 +1150,19 @@ class BaseScope implements Core.Scope {
       flowName = undefined;
     }
 
+    const statusTracking = {
+      promise: flowPromise,
+      timeoutId: timeoutId ?? null,
+      abortController,
+    };
+
     const execution = new FlowExecutionImpl<S>({
       id: executionId,
       flowName,
       abort: abortController,
       result: flowPromise,
       ctx: null,
+      statusTracking,
     });
 
     this.executions.set(executionId, { execution, startTime: Date.now() });
@@ -1165,29 +1172,6 @@ class BaseScope implements Core.Scope {
     });
 
     execution["~setStatus"]("running");
-
-    flowPromise
-      .then(async () => {
-        const ctx = await flowPromise.ctx();
-        if (ctx) {
-          execution["~setCtx"](ctx);
-        }
-        execution["~setStatus"]("completed");
-      })
-      .catch(async (error) => {
-        const ctx = await flowPromise.ctx();
-        if (ctx) {
-          execution["~setCtx"](ctx);
-        }
-        if (abortController.signal.aborted) {
-          execution["~setStatus"]("cancelled");
-        } else {
-          execution["~setStatus"]("failed");
-        }
-      })
-      .finally(() => {
-        if (timeoutId) clearTimeout(timeoutId);
-      });
 
     return execution;
   }

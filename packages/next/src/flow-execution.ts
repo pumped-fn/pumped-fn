@@ -6,7 +6,13 @@ type StatusCallback<T> = (
   execution: Flow.FlowExecution<T>
 ) => void | Promise<void>;
 
-export class FlowExecutionImpl<T> implements Flow.FlowExecution<T>, PromiseLike<T> {
+type StatusTracking<T> = {
+  promise: Promised<T>;
+  timeoutId: ReturnType<typeof setTimeout> | null;
+  abortController: AbortController;
+};
+
+export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
   readonly result: Promised<T>;
   readonly id: string;
   readonly flowName: string | undefined;
@@ -15,6 +21,8 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T>, PromiseLike<
   private _status: Flow.ExecutionStatus = 'pending';
   private statusCallbacks = new Set<StatusCallback<T>>();
   private _ctx: Flow.ExecutionData | null;
+  private statusTracking: StatusTracking<T> | null;
+  private statusTrackingActive = false;
 
   constructor(config: {
     id: string;
@@ -22,15 +30,18 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T>, PromiseLike<
     abort: AbortController;
     result: Promised<T>;
     ctx: Flow.ExecutionData | null;
+    statusTracking?: StatusTracking<T>;
   }) {
     this.id = config.id;
     this.flowName = config.flowName;
     this.abort = config.abort;
     this._ctx = config.ctx;
     this.result = config.result;
+    this.statusTracking = config.statusTracking ?? null;
   }
 
   get status(): Flow.ExecutionStatus {
+    this["~ensureStatusTracking"]();
     return this._status;
   }
 
@@ -54,7 +65,34 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T>, PromiseLike<
     this._ctx = ctx;
   }
 
+  private "~ensureStatusTracking"(): void {
+    if (this.statusTrackingActive || !this.statusTracking) return;
+    this.statusTrackingActive = true;
+
+    const { promise, timeoutId, abortController } = this.statusTracking;
+
+    void promise
+      .then(async () => {
+        const ctx = await promise.ctx().catch(() => undefined);
+        if (ctx) this["~setCtx"](ctx);
+        this["~setStatus"]("completed");
+      })
+      .catch(async () => {
+        const ctx = await promise.ctx().catch(() => undefined);
+        if (ctx) this["~setCtx"](ctx);
+        if (abortController.signal.aborted) {
+          this["~setStatus"]("cancelled");
+        } else {
+          this["~setStatus"]("failed");
+        }
+      })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
+  }
+
   onStatusChange(callback: StatusCallback<T>): Core.Cleanup {
+    this["~ensureStatusTracking"]();
     this.statusCallbacks.add(callback);
     return () => {
       this.statusCallbacks.delete(callback);
