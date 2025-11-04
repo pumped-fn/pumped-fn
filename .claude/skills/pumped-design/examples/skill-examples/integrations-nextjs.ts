@@ -97,7 +97,7 @@ export const nextjsDeleteUserFlow = flow(async (ctx: Context, input: { id: strin
  * Section: Route Handlers with Scope
  */
 export const nextjsAppRouterGetHandler = async (request: NextRequest, scope: any) => {
-  const result = await scope.exec(nextjsListUsersFlow, {})
+  const result = await scope.exec({ flow: nextjsListUsersFlow })
 
   if (!result.success) {
     return NextResponse.json({ error: result.reason }, { status: 500 })
@@ -117,10 +117,10 @@ export const nextjsAppRouterGetHandler = async (request: NextRequest, scope: any
 export const nextjsAppRouterPostHandler = async (request: NextRequest, scope: any) => {
   const body = await request.json()
 
-  const result = await scope.exec(nextjsCreateUserFlow, {
+  const result = await scope.exec({ flow: nextjsCreateUserFlow, input: {
     email: body.email,
     name: body.name
-  })
+  } })
 
   if (!result.success) {
     const statusMap = {
@@ -170,11 +170,11 @@ export const nextjsDynamicPutHandler = async (
 ) => {
   const body = await request.json()
 
-  const result = await scope.exec(nextjsUpdateUserFlow, {
+  const result = await scope.exec({ flow: nextjsUpdateUserFlow, input: {
     id: params.id,
     email: body.email,
     name: body.name
-  })
+  } })
 
   if (!result.success) {
     return NextResponse.json({ error: result.reason }, { status: 400 })
@@ -207,7 +207,7 @@ export const nextjsDynamicDeleteHandler = async (
  */
 export const nextjsPagesApiHandler = async (req: NextApiRequest, res: NextApiResponse, scope: any) => {
   if (req.method === 'GET') {
-    const result = await scope.exec(nextjsListUsersFlow, {})
+    const result = await scope.exec({ flow: nextjsListUsersFlow })
 
     if (!result.success) {
       return res.status(500).json({ error: result.reason })
@@ -217,10 +217,10 @@ export const nextjsPagesApiHandler = async (req: NextApiRequest, res: NextApiRes
   }
 
   if (req.method === 'POST') {
-    const result = await scope.exec(nextjsCreateUserFlow, {
+    const result = await scope.exec({ flow: nextjsCreateUserFlow, input: {
       email: req.body.email,
       name: req.body.name
-    })
+    } })
 
     if (!result.success) {
       const statusMap = {
@@ -249,7 +249,7 @@ export const nextjsPagesApiHandler = async (req: NextApiRequest, res: NextApiRes
  */
 export const nextjsGetServerSidePropsExample: GetServerSideProps = async () => {
   const scope = nextjsModuleScope
-  const result = await scope.exec(nextjsListUsersFlow, {}) as any
+  const result = await scope.exec({ flow: nextjsListUsersFlow }) as any
 
   if (!result.success) {
     return {
@@ -272,7 +272,7 @@ export const nextjsGetServerSidePropsExample: GetServerSideProps = async () => {
  */
 export const nextjsGetStaticPathsExample = async () => {
   const scope = nextjsModuleScope
-  const result = await scope.exec(nextjsListUsersFlow, {})
+  const result = await scope.exec({ flow: nextjsListUsersFlow })
 
   if (!result.success) {
     return { paths: [], fallback: 'blocking' }
@@ -295,7 +295,7 @@ export const nextjsGetStaticPathsExample = async () => {
  */
 export const nextjsGetStaticPropsExample = async ({ params }: any) => {
   const scope = nextjsModuleScope
-  const result = await scope.exec(nextjsGetUserFlow, { id: params?.id as string })
+  const result = await scope.exec({ flow: nextjsGetUserFlow, input: { id: params?.id as string } })
 
   if (!result.success) {
     return { notFound: true }

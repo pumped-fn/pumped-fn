@@ -129,7 +129,7 @@ export const cliEntrypoint = () => {
       })
 
       try {
-        const result = await scope.exec(createUser, { email, name }) as FlowResult<{ user: any }>
+        const result = await scope.exec({ flow: createUser, input: { email, name } }) as FlowResult<{ user: any }>
         if (!result.success) {
           console.error(`Error: ${result.reason}`)
           process.exit(1)
@@ -163,7 +163,7 @@ export const lambdaEntrypoint = async (event: any): Promise<any> => {
   try {
     if (event.httpMethod === 'POST' && event.path === '/users') {
       const body = JSON.parse(event.body || '{}') as { email: string; name: string }
-      const result = await scope.exec(createUser, { email: body.email, name: body.name }) as FlowResult<{ user: any }>
+      const result = await scope.exec({ flow: createUser, input: { email: body.email, name: body.name } }) as FlowResult<{ user: any }>
 
       if (!result.success) {
         return { statusCode: 400, body: JSON.stringify({ error: result.reason }) }
@@ -248,7 +248,7 @@ export const cliWithFactory = () => {
   program.command('create-user').action(async (email: string, name: string) => {
     const scope = createAppScope()
     try {
-      await scope.exec(createUser, { email, name })
+      await scope.exec({ flow: createUser, input: { email, name } })
     } finally {
       await scope.dispose()
     }
@@ -345,11 +345,11 @@ export const cloudflareWorkerHandler = {
     })
     try {
       const url = new URL(request.url)
-      const result = await scope.exec(processRequest, {
+      const result = await scope.exec({ flow: processRequest, input: {
         path: url.pathname,
         method: request.method,
         body: request.method !== 'GET' ? await request.json() : undefined
-      }) as FlowResult<{ data: any }>
+      } }) as FlowResult<{ data: any }>
       if (!result.success) {
         return Response.json({ error: result.reason }, { status: 400 })
       }
@@ -377,7 +377,7 @@ export const nextjsAppScope = createScope({
 
 export const nextjsApiRoute = async (request: Request) => {
   const body = await request.json() as { email: string; name: string }
-  const result = await nextjsAppScope.exec(createUser, { email: body.email, name: body.name }) as FlowResult<{ user: any }>
+  const result = await nextjsAppScope.exec({ flow: createUser, input: { email: body.email, name: body.name } }) as FlowResult<{ user: any }>
   if (!result.success) {
     return Response.json({ error: result.reason }, { status: 400 })
   }

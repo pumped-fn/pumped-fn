@@ -68,13 +68,13 @@ export const reusableFlowTests = () => {
     })
 
     test('SUCCESS: accepts valid order', async () => {
-      const result = await scope.exec(validateOrder, {
+      const result = await scope.exec({ flow: validateOrder, input: {
         userId: 'user-1',
         items: [
           { id: 'item-1', quantity: 2 },
           { id: 'item-2', quantity: 1 }
         ]
-      })
+      } })
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -83,10 +83,10 @@ export const reusableFlowTests = () => {
     })
 
     test('ERROR: EMPTY_CART when no items', async () => {
-      const result = await scope.exec(validateOrder, {
+      const result = await scope.exec({ flow: validateOrder, input: {
         userId: 'user-1',
         items: []
-      })
+      } })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -95,10 +95,10 @@ export const reusableFlowTests = () => {
     })
 
     test('ERROR: INVALID_QUANTITY when quantity is zero', async () => {
-      const result = await scope.exec(validateOrder, {
+      const result = await scope.exec({ flow: validateOrder, input: {
         userId: 'user-1',
         items: [{ id: 'item-1', quantity: 0 }]
-      })
+      } })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -107,10 +107,10 @@ export const reusableFlowTests = () => {
     })
 
     test('ERROR: INVALID_QUANTITY when quantity is negative', async () => {
-      const result = await scope.exec(validateOrder, {
+      const result = await scope.exec({ flow: validateOrder, input: {
         userId: 'user-1',
         items: [{ id: 'item-1', quantity: -5 }]
-      })
+      } })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -217,10 +217,10 @@ export const flowWithDependenciesTests = () => {
     })
 
     test('SUCCESS: creates user with valid input', async () => {
-      const result = await scope.exec(createUser, {
+      const result = await scope.exec({ flow: createUser, input: {
         name: 'Alice',
         email: 'alice@example.com'
-      }) as any
+      } }) as any
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -229,10 +229,10 @@ export const flowWithDependenciesTests = () => {
     })
 
     test('ERROR: NAME_TOO_SHORT when name is 1 character', async () => {
-      const result = await scope.exec(createUser, {
+      const result = await scope.exec({ flow: createUser, input: {
         name: 'A',
         email: 'alice@example.com'
-      }) as any
+      } }) as any
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -241,10 +241,10 @@ export const flowWithDependenciesTests = () => {
     })
 
     test('ERROR: INVALID_EMAIL when email missing @', async () => {
-      const result = await scope.exec(createUser, {
+      const result = await scope.exec({ flow: createUser, input: {
         name: 'Alice',
         email: 'invalid-email.com'
-      }) as any
+      } }) as any
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -339,7 +339,7 @@ export const subflowTests = () => {
     })
 
     test('SUCCESS: validates and normalizes email', async () => {
-      const result = await scope.exec(validateEmail, 'User@EXAMPLE.COM')
+      const result = await scope.exec({ flow: validateEmail, input: 'User@EXAMPLE.COM' })
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -348,7 +348,7 @@ export const subflowTests = () => {
     })
 
     test('ERROR: INVALID_EMAIL when missing @', async () => {
-      const result = await scope.exec(validateEmail, 'not-an-email')
+      const result = await scope.exec({ flow: validateEmail, input: 'not-an-email' })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -369,10 +369,10 @@ export const subflowTests = () => {
     })
 
     test('SUCCESS: registers user with valid input', async () => {
-      const result = await scope.exec(registerUser, {
+      const result = await scope.exec({ flow: registerUser, input: {
         name: 'Alice',
         email: 'alice@example.com'
-      })
+      } })
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -381,10 +381,10 @@ export const subflowTests = () => {
     })
 
     test('ERROR: NAME_TOO_SHORT when name invalid', async () => {
-      const result = await scope.exec(registerUser, {
+      const result = await scope.exec({ flow: registerUser, input: {
         name: 'A',
         email: 'alice@example.com'
-      })
+      } })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -393,10 +393,10 @@ export const subflowTests = () => {
     })
 
     test('ERROR: INVALID_EMAIL propagated from sub-flow', async () => {
-      const result = await scope.exec(registerUser, {
+      const result = await scope.exec({ flow: registerUser, input: {
         name: 'Alice',
         email: 'invalid-email'
-      })
+      } })
 
       expect(result.success).toBe(false)
       if (!result.success) {

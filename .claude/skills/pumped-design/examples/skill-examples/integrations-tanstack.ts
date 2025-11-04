@@ -107,7 +107,7 @@ export const tanstackCreateUserFlow = flow(
  * Section: Actions for Mutations
  */
 export const tanstackCreateUserFn = createServerFn('POST', async (data: { email: string; name: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackCreateUserFlow, data) as any
+  const result = await tanstackModuleScope.exec({ flow: tanstackCreateUserFlow, input: data }) as any
 
   if (!result.success) {
     throw new Error(result.reason)
@@ -131,7 +131,7 @@ export const tanstackUpdateUserFlow = flow(
 )
 
 export const tanstackUpdateUserFn = createServerFn('PUT', async (data: { id: string; email: string; name: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackUpdateUserFlow, data) as any
+  const result = await tanstackModuleScope.exec({ flow: tanstackUpdateUserFlow, input: data }) as any
 
   if (!result.success) {
     throw new Error(result.reason)
@@ -155,7 +155,7 @@ export const tanstackDeleteUserFlow = flow(
 )
 
 export const tanstackDeleteUserFn = createServerFn('DELETE', async (data: { id: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackDeleteUserFlow, data) as any
+  const result = await tanstackModuleScope.exec({ flow: tanstackDeleteUserFlow, input: data }) as any
 
   if (!result.success) {
     throw new Error(result.reason)
