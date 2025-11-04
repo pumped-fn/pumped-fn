@@ -79,14 +79,16 @@ export const queryCache = derive([database], (db) => {
   const cache = new Map<string, unknown>()
 
   return {
-    query: async <T>(sql: string): Promise<T> => {
-      if (cache.has(sql)) return cache.get(sql) as T
+    query: async <T>(params: { sql: string; params?: unknown[] }): Promise<T> => {
+      const cacheKey = JSON.stringify(params)
+      if (cache.has(cacheKey)) return cache.get(cacheKey) as T
 
-      const result = await db.query(sql) as T
-      cache.set(sql, result)
+      const result = await db.query(params.sql) as T
+      cache.set(cacheKey, result)
       return result
     },
-    invalidate: (sql: string) => cache.delete(sql)
+    invalidate: (params: { sql: string; params?: unknown[] }) =>
+      cache.delete(JSON.stringify(params))
   }
 })
 ```
@@ -99,17 +101,133 @@ Derived state computed from other state.
 // state.cart-items.ts
 export const cartItems = provide(() => new Map<string, number>())
 
+// state.product-prices.ts
+export const productPrices = provide(() => new Map<string, number>([
+  ['item-1', 10.99],
+  ['item-2', 25.50],
+  ['item-3', 5.00]
+]))
+
 // state.cart-total.ts
 import { derive } from '@pumped-fn/core-next'
 import { cartItems } from './state.cart-items'
+import { productPrices } from './state.product-prices'
 
-export const cartTotal = derive(cartItems.reactive, (items) => {
+export const cartTotal = derive([cartItems.reactive, productPrices.reactive], (items, prices) => {
   let total = 0
   for (const [id, quantity] of items.entries()) {
-    total += quantity * getPriceForItem(id)
+    const price = prices.get(id) ?? 0
+    total += quantity * price
   }
   return total
 })
+```
+
+---
+
+## Type Safety
+
+### Inferring Types from Dependencies
+
+Type safety is automatic when deriving from properly typed dependencies:
+
+```typescript
+// State with explicit type
+export const userState = provide(() => ({
+  id: '',
+  name: '',
+  email: ''
+}))
+
+// Type is inferred: StateController<{ id: string; name: string; email: string }>
+export const userCtl = derive(userState.static, (ctl) => ctl)
+
+// Derived state automatically typed
+export const userName = derive(userState.reactive, (user) => {
+  // user is { id: string; name: string; email: string }
+  return user.name.toUpperCase()
+})
+```
+
+### Multiple Dependency Types
+
+When deriving from multiple dependencies, all types are inferred:
+
+```typescript
+export const cartTotal = derive(
+  [cartItems.reactive, productPrices.reactive],
+  (items, prices) => {
+    // items: Map<string, number>
+    // prices: Map<string, number>
+    let total = 0
+    for (const [id, quantity] of items.entries()) {
+      const price = prices.get(id) ?? 0
+      total += quantity * price
+    }
+    return total
+  }
+)
+// cartTotal type: number (inferred from return)
+```
+
+### Resource with State Dependencies
+
+Resources consuming state maintain full type safety:
+
+```typescript
+export const apiClient = derive([oauthTokensCtl], (tokensCtl) => ({
+  fetch: async (url: string) => {
+    // tokensCtl.get() returns { accessToken: string | null, ... }
+    const tokens = tokensCtl.get()
+    if (!tokens.accessToken) throw new Error('Not authenticated')
+
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` }
+    })
+  }
+}))
+// apiClient.fetch is async (url: string) => Promise<Response>
+```
+
+### Type Guards for Runtime Safety
+
+Combine TypeScript type guards with state validation:
+
+```typescript
+namespace Auth {
+  export type Authenticated = {
+    state: 'authenticated'
+    token: string
+    expiresAt: number
+  }
+
+  export type Unauthenticated = {
+    state: 'unauthenticated'
+  }
+
+  export type State = Authenticated | Unauthenticated
+
+  export const isAuthenticated = (s: State): s is Authenticated =>
+    s.state === 'authenticated'
+}
+
+export const authState = provide((): Auth.State => ({
+  state: 'unauthenticated'
+}))
+
+export const apiClient = derive([authState.static], (authCtl) => ({
+  fetch: async (url: string) => {
+    const auth = authCtl.get()
+    if (!Auth.isAuthenticated(auth)) {
+      throw new Error('Not authenticated')
+    }
+
+    // auth is now Authenticated type
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${auth.token}` }
+    })
+  }
+}))
 ```
 
 ---
@@ -160,10 +278,15 @@ import { queryCache } from './state.query-cache'
 
 export const getProduct = flow(async (ctx, productId: string) => {
   const cache = await ctx.resource(queryCache)
-  const product = await cache.query(`SELECT * FROM products WHERE id = '${productId}'`)
+  const product = await cache.query({
+    sql: 'SELECT * FROM products WHERE id = ?',
+    params: [productId]
+  })
   return product
 })
 ```
+
+**Security Note:** Always use parameterized queries to prevent SQL injection. Never concatenate user input into SQL strings.
 
 ---
 
