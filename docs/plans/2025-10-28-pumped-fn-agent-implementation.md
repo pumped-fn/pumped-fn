@@ -358,7 +358,7 @@ describe('validateCodeFlow', () => {
       const bad = new Promise((resolve) => resolve(1))
     `
 
-    const result = await scope.exec(validateCodeFlow, code)
+    const result = await scope.exec({ flow: validateCodeFlow, input: code })
 
     expect(result.success).toBe(false)
     expect(result.violations).toHaveLength(1)
@@ -372,7 +372,7 @@ describe('validateCodeFlow', () => {
       const config = provide(() => ({ port: 3000 }))
     `
 
-    const result = await scope.exec(validateCodeFlow, code)
+    const result = await scope.exec({ flow: validateCodeFlow, input: code })
 
     expect(result.success).toBe(true)
     expect(result.violations).toHaveLength(0)
@@ -437,7 +437,7 @@ async function main() {
     const bad = new Promise((resolve) => resolve(1))
   `
 
-  const result = await scope.exec(validateCodeFlow, testCode)
+  const result = await scope.exec({ flow: validateCodeFlow, input: testCode })
 
   console.log('Validation result:', result)
 

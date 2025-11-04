@@ -789,13 +789,13 @@ await scope.dispose()
 ```typescript
 // ❌ Wrong - no disposal
 const scope = createScope({ tags: [...] })
-await scope.exec(createUser, input)
+await scope.exec({ flow: createUser, input: input })
 // Scope never disposed!
 
 // ✅ Correct - disposed in finally
 const scope = createScope({ tags: [...] })
 try {
-  await scope.exec(createUser, input)
+  await scope.exec({ flow: createUser, input: input })
 } finally {
   await scope.dispose()
 }
@@ -917,7 +917,7 @@ const scope = createScope({
 export const handler = async (event: APIGatewayProxyEvent) => {
   const scope = createScope({ tags: [...] })  // Cold start overhead acceptable
   try {
-    return await scope.exec(processRequest, event)
+    return await scope.exec({ flow: processRequest, input: event })
   } finally {
     await scope.dispose()
   }
@@ -948,13 +948,13 @@ function main() {
 ```typescript
 // ❌ Wrong - no finally
 const scope = createScope({ tags: [...] })
-const result = await scope.exec(createUser, input)
+const result = await scope.exec({ flow: createUser, input: input })
 await scope.dispose()  // Skipped if exec throws!
 
 // ✅ Correct - dispose in finally
 const scope = createScope({ tags: [...] })
 try {
-  const result = await scope.exec(createUser, input)
+  const result = await scope.exec({ flow: createUser, input: input })
 } finally {
   await scope.dispose()
 }

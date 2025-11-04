@@ -567,7 +567,7 @@ describe('concurrent operations integration', () => {
     })
 
     const scope = createScope()
-    const durations = await scope.exec(parentFlow, undefined)
+    const durations = await scope.exec({ flow: parentFlow, input: undefined })
 
     // All flows started roughly at same time (concurrent)
     const maxTimeDiff = Math.max(...timestamps) - Math.min(...timestamps)
@@ -631,8 +631,8 @@ describe('concurrent operations integration', () => {
 
     const scope = createScope()
 
-    const sequentialTime = await scope.exec(sequentialFlow, undefined)
-    const parallelTime = await scope.exec(parallelFlow, undefined)
+    const sequentialTime = await scope.exec({ flow: sequentialFlow, input: undefined })
+    const parallelTime = await scope.exec({ flow: parallelFlow, input: undefined })
 
     // Sequential takes ~100ms, parallel takes ~50ms
     expect(sequentialTime).toBeGreaterThanOrEqual(90)

@@ -6,7 +6,7 @@ type StatusCallback<T> = (
   execution: Flow.FlowExecution<T>
 ) => void | Promise<void>;
 
-export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
+export class FlowExecutionImpl<T> implements Flow.FlowExecution<T>, PromiseLike<T> {
   readonly result: Promised<T>;
   readonly id: string;
   readonly flowName: string | undefined;
@@ -59,5 +59,12 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
     return () => {
       this.statusCallbacks.delete(callback);
     };
+  }
+
+  then<TResult1 = T, TResult2 = never>(
+    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.result.then(onfulfilled, onrejected);
   }
 }

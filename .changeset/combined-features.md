@@ -24,5 +24,19 @@ Add flow execution tracking and comprehensive extension authoring documentation
 - Pattern documented for future skill improvements
 
 **Breaking Changes:**
-- scope.exec() now returns FlowExecution<T> instead of Promised<T> directly (backward compatible via Promised auto-await)
+- Removed positional API: `scope.exec(flow, input, options)` → use `scope.exec({ flow, input, ...options })`
+- scope.exec() now returns FlowExecution<T> (thenable, fully backward compatible)
 - FlowExecutionImpl no longer exported (internal implementation detail)
+
+**Migration:**
+```ts
+// Before
+await scope.exec(myFlow, input)
+await scope.exec(myFlow, input, { tags: [tag1] })
+
+// After
+await scope.exec({ flow: myFlow, input })
+await scope.exec({ flow: myFlow, input, tags: [tag1] })
+```
+
+FlowExecution<T> is thenable, so existing await patterns continue to work.

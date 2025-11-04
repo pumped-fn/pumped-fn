@@ -168,12 +168,12 @@ export const concurrentOperationsTests = () => {
       })
 
       const scope = createScope()
-      const durations = await scope.exec(parentFlow, undefined)
+      const durations = await scope.exec({ flow: parentFlow })
 
       const maxTimeDiff = Math.max(...timestamps) - Math.min(...timestamps)
       expect(maxTimeDiff).toBeLessThan(50)
 
-      durations.forEach(duration => {
+      durations.forEach((duration: number) => {
         expect(duration).toBeGreaterThanOrEqual(90)
         expect(duration).toBeLessThan(150)
       })
@@ -230,8 +230,8 @@ export const concurrentOperationsTests = () => {
 
       const scope = createScope()
 
-      const sequentialTime = await scope.exec(sequentialFlow, undefined)
-      const parallelTime = await scope.exec(parallelFlow, undefined)
+      const sequentialTime = await scope.exec({ flow: sequentialFlow })
+      const parallelTime = await scope.exec({ flow: parallelFlow })
 
       expect(sequentialTime).toBeGreaterThanOrEqual(90)
       expect(parallelTime).toBeLessThan(sequentialTime)

@@ -37,14 +37,11 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      await scope.exec(testFlow, 1, {
-        tags: [trackingTag({ executionId: crypto.randomUUID() })],
+      await scope.exec({ flow: testFlow, input: 1, tags: [trackingTag({ executionId: crypto.randomUUID()  })],
       });
-      await scope.exec(testFlow, 2, {
-        tags: [trackingTag({ executionId: crypto.randomUUID() })],
+      await scope.exec({ flow: testFlow, input: 2, tags: [trackingTag({ executionId: crypto.randomUUID()  })],
       });
-      await scope.exec(testFlow, 3, {
-        tags: [trackingTag({ executionId: crypto.randomUUID() })],
+      await scope.exec({ flow: testFlow, input: 3, tags: [trackingTag({ executionId: crypto.randomUUID()  })],
       });
 
       expect(executionIds.size).toBe(3);
@@ -74,8 +71,7 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      await scope.exec(testFlow, undefined, {
-        tags: [statusTag({ status: "pending" })],
+      await scope.exec({ flow: testFlow, input: undefined, tags: [statusTag({ status: "pending"  })],
       });
 
       expect(statusChanges).toContain("pending");
@@ -109,9 +105,8 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      const executionPromise = scope.exec(longRunningFlow, undefined, {
-        tags: [abortTag(abortController.signal)],
-      });
+      const executionPromise = scope.exec({ flow: longRunningFlow, input: undefined, tags: [abortTag(abortController.signal)],
+       });
 
       setTimeout(() => abortController.abort(), 30);
 
@@ -144,9 +139,8 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      const executionPromise = scope.exec(slowFlow, undefined, {
-        tags: [timeoutTag(50)],
-      });
+      const executionPromise = scope.exec({ flow: slowFlow, input: undefined, tags: [timeoutTag(50)],
+       });
 
       await Promise.race([
         executionPromise,
@@ -184,12 +178,12 @@ describe("Flow Execution Tracking", () => {
           output: custom<number>(),
         },
         async (ctx, input) => {
-          const childResult = await ctx.exec(childFlow, input);
+          const childResult = await ctx.exec({ flow: childFlow, input: input });
           return childResult + 10;
         }
       );
 
-      const result = await scope.exec(parentFlow, 5);
+      const result = await scope.exec({ flow: parentFlow, input: 5 });
 
       expect(result).toBe(20);
     });
@@ -218,7 +212,7 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      const result = await scope.exec(testFlow, 5);
+      const result = await scope.exec({ flow: testFlow, input: 5 });
 
       expect(result).toBe(20);
       expect(executionLog).toEqual(["step1", "step2"]);
@@ -244,7 +238,7 @@ describe("Flow Execution Tracking", () => {
         },
         async (ctx) => {
           try {
-            await ctx.exec(errorFlow, undefined);
+            await ctx.exec({ flow: errorFlow, input: undefined });
             return "unexpected";
           } catch (error) {
             return `caught: ${(error as Error).message}`;
@@ -252,7 +246,7 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      const result = await scope.exec(parentFlow, undefined);
+      const result = await scope.exec({ flow: parentFlow, input: undefined });
 
       expect(result).toBe("caught: Child flow error");
     });
@@ -285,9 +279,8 @@ describe("Flow Execution Tracking", () => {
       abortController.abort();
 
       await expect(
-        scope.exec(checkAbortedFlow, undefined, {
-          tags: [abortTag(abortController.signal)],
-        })
+        scope.exec({ flow: checkAbortedFlow, input: undefined, tags: [abortTag(abortController.signal)],
+         })
       ).rejects.toThrow("Operation aborted");
     });
 
@@ -312,9 +305,8 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      const result = await scope.exec(checkNotAbortedFlow, undefined, {
-        tags: [abortTag(abortController.signal)],
-      });
+      const result = await scope.exec({ flow: checkNotAbortedFlow, input: undefined, tags: [abortTag(abortController.signal)],
+       });
 
       expect(result).toBe("completed");
     });
@@ -351,9 +343,8 @@ describe("Flow Execution Tracking", () => {
         statusChanges.push({ status, timestamp: Date.now() });
       };
 
-      await scope.exec(trackedFlow, 5, {
-        tags: [callbackTag(callback)],
-      });
+      await scope.exec({ flow: trackedFlow, input: 5, tags: [callbackTag(callback)],
+       });
 
       expect(statusChanges.length).toBe(3);
       expect(statusChanges.map((s) => s.status)).toEqual([
@@ -393,9 +384,8 @@ describe("Flow Execution Tracking", () => {
         capturedContext.push(context);
       };
 
-      await scope.exec(contextFlow, undefined, {
-        tags: [contextTag(callback)],
-      });
+      await scope.exec({ flow: contextFlow, input: undefined, tags: [contextTag(callback)],
+       });
 
       expect(capturedContext.length).toBeGreaterThan(0);
       expect(capturedContext[0]).toHaveProperty("flowName");
@@ -429,14 +419,10 @@ describe("Flow Execution Tracking", () => {
 
       const registry = new Set<string>();
 
-      await scope.exec(cleanupFlow, "test1", {
-        tags: [registryTag(registry)],
-      });
+      await scope.exec({ flow: cleanupFlow, input: "test1", tags: [registryTag(registry)] });
       const sizeAfterFirst = registry.size;
 
-      await scope.exec(cleanupFlow, "test2", {
-        tags: [registryTag(registry)],
-      });
+      await scope.exec({ flow: cleanupFlow, input: "test2", tags: [registryTag(registry)] });
       const sizeAfterSecond = registry.size;
 
       expect(sizeAfterFirst).toBe(1);
@@ -465,9 +451,7 @@ describe("Flow Execution Tracking", () => {
         }
       );
 
-      await tempScope.exec(registeredFlow, undefined, {
-        tags: [registryTag(registry)],
-      });
+      await tempScope.exec({ flow: registeredFlow, tags: [registryTag(registry)] });
 
       expect(registry.size).toBeGreaterThan(0);
 
@@ -495,9 +479,9 @@ describe("Flow Execution Tracking", () => {
       );
 
       const executions = await Promise.all([
-        scope.exec(concurrentFlow, 1, { tags: [idTag(crypto.randomUUID())] }),
-        scope.exec(concurrentFlow, 2, { tags: [idTag(crypto.randomUUID())] }),
-        scope.exec(concurrentFlow, 3, { tags: [idTag(crypto.randomUUID())] }),
+        scope.exec({ flow: concurrentFlow, input: 1, tags: [idTag(crypto.randomUUID())]  }),
+        scope.exec({ flow: concurrentFlow, input: 2, tags: [idTag(crypto.randomUUID())]  }),
+        scope.exec({ flow: concurrentFlow, input: 3, tags: [idTag(crypto.randomUUID())]  }),
       ]);
 
       expect(executions).toEqual([2, 4, 6]);

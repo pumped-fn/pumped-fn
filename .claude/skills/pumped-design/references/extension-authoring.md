@@ -689,7 +689,7 @@ export const httpServerExtension = (app: Hono) => extension({
       const input = await c.req.json()
 
       try {
-        const result = await scope.exec(flow, input)
+        const result = await scope.exec({ flow: flow, input: input })
         return c.json({ success: true, result })
       } catch (error) {
         return c.json({

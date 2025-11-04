@@ -822,15 +822,30 @@ function execute<S, I>(
       })
 ): Promised<S> | Promised<Flow.ExecutionDetails<S>> {
   if (options && 'scope' in options) {
-    if (options.details === true) {
-      return options.scope.exec(flow, input, {
-        tags: options.executionTags,
-        details: true,
-      });
-    }
-    return options.scope.exec(flow, input, {
+    const execution = options.scope.exec({
+      flow,
+      input,
       tags: options.executionTags,
     });
+
+    if (options.details === true) {
+      return Promised.create(
+        execution.result.then(async (r) => {
+          const ctx = await execution.result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: true as const, result: r, ctx };
+        }).catch(async (error) => {
+          const ctx = await execution.result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: false as const, error, ctx };
+        })
+      );
+    }
+    return execution.result;
   }
 
   const scope = options
@@ -843,31 +858,56 @@ function execute<S, I>(
     : createScope();
 
   const shouldDisposeScope = true;
-
-  if (options?.details === true) {
-    const result = scope.exec(flow, input, {
-      tags: options.executionTags,
-      details: true,
-    });
-    if (shouldDisposeScope) {
-      return Promised.create(
-        result.then((r) => scope.dispose().then(() => r)),
-        result.ctx()
-      ) as Promised<Flow.ExecutionDetails<S>>;
-    }
-    return result;
-  }
-
-  const result = scope.exec(flow, input, {
+  const execution = scope.exec({
+    flow,
+    input,
     tags: options?.executionTags,
   });
+
+  if (options?.details === true) {
+    if (shouldDisposeScope) {
+      return Promised.create(
+        execution.result.then(async (r) => {
+          await scope.dispose();
+          const ctx = await execution.result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: true as const, result: r, ctx };
+        }).catch(async (error) => {
+          await scope.dispose();
+          const ctx = await execution.result.ctx();
+          if (!ctx) {
+            throw new Error("Execution context not available");
+          }
+          return { success: false as const, error, ctx };
+        })
+      );
+    }
+    return Promised.create(
+      execution.result.then(async (r) => {
+        const ctx = await execution.result.ctx();
+        if (!ctx) {
+          throw new Error("Execution context not available");
+        }
+        return { success: true as const, result: r, ctx };
+      }).catch(async (error) => {
+        const ctx = await execution.result.ctx();
+        if (!ctx) {
+          throw new Error("Execution context not available");
+        }
+        return { success: false as const, error, ctx };
+      })
+    );
+  }
+
   if (shouldDisposeScope) {
     return Promised.create(
-      result.then((r) => scope.dispose().then(() => r)),
-      result.ctx()
+      execution.result.then((r) => scope.dispose().then(() => r)),
+      execution.result.ctx()
     ) as Promised<S>;
   }
-  return result;
+  return execution.result;
 }
 
 /**

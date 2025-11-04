@@ -404,7 +404,7 @@ export const honoValidationRoute = (app: Hono) => {
       }
     )
 
-    const result = await scope.exec(createUserFlow, body)
+    const result = await scope.exec({ flow: createUserFlow, input: body })
 
     if (!result.success) {
       return c.json({ error: result.reason }, 400)

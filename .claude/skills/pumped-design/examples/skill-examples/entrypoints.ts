@@ -36,13 +36,25 @@ const loggingExtension = {}
 const metricsExtension = {}
 const tracingExtension = {}
 
-type FlowResult<T> = { success: true } & T | { success: false; reason: string }
-type Flow<I, O> = any
+import { flow } from '@pumped-fn/core-next'
 
-const createUser: Flow<any, FlowResult<{ user: any }>> = {} as any
-const cleanupExpiredSessions: Flow<any, FlowResult<{}>> = {} as any
-const processOrderCreated: Flow<any, FlowResult<{}>> = {} as any
-const processRequest: Flow<any, FlowResult<{ data: any }>> = {} as any
+type FlowResult<T> = { success: true } & T | { success: false; reason: string }
+
+const createUser = flow((_ctx, input: { email: string; name: string }) => {
+  return { success: true, user: { id: '1', ...input } } as FlowResult<{ user: any }>
+})
+
+const cleanupExpiredSessions = flow((_ctx, input: { olderThan: Date }) => {
+  return { success: true } as FlowResult<{}>
+})
+
+const processOrderCreated = flow((_ctx, input: any) => {
+  return { success: true } as FlowResult<{}>
+})
+
+const processRequest = flow((_ctx, input: any) => {
+  return { success: true, data: {} } as FlowResult<{ data: any }>
+})
 
 /**
  * HTTP Server Entrypoint
@@ -257,9 +269,13 @@ export const cronEntrypoint = () => {
   })
 
   cron.schedule('0 * * * *', async () => {
-    const result = await scope.exec(cleanupExpiredSessions, {
-      olderThan: new Date(Date.now() - 24 * 60 * 60 * 1000)
-    }) as FlowResult<{}>
+    const result = await scope.exec({
+      flow: cleanupExpiredSessions,
+      input: { olderThan: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+
+
+    
     if (!result.success) {
       console.error('Cleanup failed:', result.reason)
     }
@@ -295,7 +311,7 @@ export const kafkaConsumerEntrypoint = async () => {
     eachMessage: async ({ topic, message }: { topic: string; message: any }) => {
       const value = JSON.parse(message.value?.toString() || '{}')
       try {
-        const result = await scope.exec(processOrderCreated, value) as FlowResult<{}>
+        const result = await scope.exec({ flow: processOrderCreated, input: value }) as FlowResult<{}>
         if (!result.success) {
           console.error(`Processing failed: ${result.reason}`)
         }
@@ -419,9 +435,9 @@ export const scopeRunMultipleExecutors = async () => {
  */
 export const correctDisposalPattern = async () => {
   const scope = createScope()
-  const input = { email: 'test@example.com', name: 'Test' }
+  const userData = { email: 'test@example.com', name: 'Test' }
   try {
-    await scope.exec(createUser, input)
+    await scope.exec({ flow: createUser, input: userData })
   } finally {
     await scope.dispose()
   }

@@ -340,7 +340,7 @@ app.post('/users', validateBody(createUserSchema), async (c) => {
   const scope = c.get('scope')
   const body = c.get('validatedBody')
 
-  const result = await scope.exec(createUser, body)
+  const result = await scope.exec({ flow: createUser, input: body })
 
   if (!result.success) {
     return c.json({ error: result.reason }, 400)

@@ -673,7 +673,7 @@ scope = createScope({
 
 // ✅ Correct - mock sub-flow's dependencies (if any)
 // Or use real sub-flow (preferred)
-const result = await scope.exec(registerUser, input)
+const result = await scope.exec({ flow: registerUser, input: input })
 ```
 
 ### Problem: Test depends on other tests

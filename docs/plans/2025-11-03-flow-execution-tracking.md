@@ -1269,7 +1269,7 @@ For users upgrading to this version:
 
 ```typescript
 // Before
-const result = await scope.exec(flow, input);
+const result = await scope.exec({ flow: flow, input: input });
 
 // After (recommended)
 const execution = scope.exec({ flow, input });

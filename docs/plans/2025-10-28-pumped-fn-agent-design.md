@@ -178,7 +178,7 @@ export const codeValidator = derive(
 
 **All files export executors (provide/derive/flow):**
 - Scope creation happens at interaction points (main.ts, tests)
-- Use `scope.exec(flow, param)` to execute flows
+- Use `scope.exec({ flow: flow, input: param })` to execute flows
 - Use `scope.resolve(executor).map(...)` for resources
 
 **Example:**
@@ -188,7 +188,7 @@ export const myFlow = flow(deps, (resolved, param) => async (ctx) => {...})
 
 // Caller creates scope and executes
 const scope = createScope()
-await scope.exec(myFlow, param)
+await scope.exec({ flow: myFlow, input: param })
 ```
 
 ## Next Steps

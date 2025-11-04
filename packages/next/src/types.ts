@@ -368,24 +368,6 @@ export declare namespace Core {
 
     useExtension(extension: Extension.Extension): Cleanup;
 
-    exec<S, I = undefined>(
-      flow: Core.Executor<Flow.Handler<S, I>>,
-      input?: I,
-      options?: {
-        tags?: Tag.Tagged[];
-        details?: false;
-      }
-    ): Promised<S>;
-
-    exec<S, I = undefined>(
-      flow: Core.Executor<Flow.Handler<S, I>>,
-      input: I | undefined,
-      options: {
-        tags?: Tag.Tagged[];
-        details: true;
-      }
-    ): Promised<Flow.ExecutionDetails<S>>;
-
     exec<S, I>(config: {
       flow: Executor<Flow.Handler<S, I>>;
       input?: I;
@@ -673,7 +655,7 @@ export namespace Flow {
 
   export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-  export interface FlowExecution<T> {
+  export interface FlowExecution<T> extends PromiseLike<T> {
     readonly result: Promised<T>;
     readonly id: string;
     readonly flowName: string | undefined;

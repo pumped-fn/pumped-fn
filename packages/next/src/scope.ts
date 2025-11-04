@@ -1083,24 +1083,6 @@ class BaseScope implements Core.Scope {
     return this.useExtension(extension);
   }
 
-  exec<S, I = undefined>(
-    flow: Core.Executor<Flow.Handler<S, I>>,
-    input?: I,
-    options?: {
-      tags?: Tag.Tagged[];
-      details?: false;
-    }
-  ): Promised<S>;
-
-  exec<S, I = undefined>(
-    flow: Core.Executor<Flow.Handler<S, I>>,
-    input: I | undefined,
-    options: {
-      tags?: Tag.Tagged[];
-      details: true;
-    }
-  ): Promised<Flow.ExecutionDetails<S>>;
-
   exec<S, I>(config: {
     flow: Core.Executor<Flow.Handler<S, I>>;
     input?: I;
@@ -1124,44 +1106,11 @@ class BaseScope implements Core.Scope {
   }): Flow.FlowExecution<S>;
 
   exec<S, I = undefined>(
-    configOrFlow:
-      | Core.Executor<Flow.Handler<S, I>>
+    config:
       | { flow: Core.Executor<Flow.Handler<S, I>>; input?: I; timeout?: number; tags?: Tag.Tagged[] }
-      | { dependencies: Core.DependencyLike; fn: (...args: any[]) => S | Promise<S>; input?: any; timeout?: number; tags?: Tag.Tagged[] },
-    input?: I,
-    options?: {
-      tags?: Tag.Tagged[];
-      details?: boolean;
-    }
-  ): Promised<S> | Promised<Flow.ExecutionDetails<S>> | Flow.FlowExecution<S> {
+      | { dependencies: Core.DependencyLike; fn: (...args: any[]) => S | Promise<S>; input?: any; timeout?: number; tags?: Tag.Tagged[] }
+  ): Flow.FlowExecution<S> {
     this["~ensureNotDisposed"]();
-
-    if (typeof configOrFlow === "object" && "factory" in configOrFlow) {
-      const flow = configOrFlow as Core.Executor<Flow.Handler<S, I>>;
-
-      if (options?.details === true) {
-        const result = this["~executeFlow"](flow, input as I, options.tags);
-        return Promised.create(
-          result.then(async (r) => {
-            const ctx = await result.ctx();
-            if (!ctx) {
-              throw new Error("Execution context not available");
-            }
-            return { success: true as const, result: r, ctx };
-          }).catch(async (error) => {
-            const ctx = await result.ctx();
-            if (!ctx) {
-              throw new Error("Execution context not available");
-            }
-            return { success: false as const, error, ctx };
-          })
-        );
-      }
-
-      return this["~executeFlow"](flow, input as I, options?.tags);
-    }
-
-    const config = configOrFlow as any;
     const executionId = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `exec-${Date.now()}-${Math.random()}`;
@@ -1187,7 +1136,7 @@ class BaseScope implements Core.Scope {
       flowPromise = Promised.create(
         (async () => {
           const deps = await this["~resolveDependencies"](
-            config.dependencies,
+            config.dependencies as Core.UExecutor | Core.UExecutor[] | Record<string, Core.UExecutor> | undefined,
             { [executorSymbol]: "main" as const } as any
           );
 
