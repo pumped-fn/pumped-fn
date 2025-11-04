@@ -64,7 +64,7 @@ export const processOrder = flow(
       return validated
     }
 
-    const orderId = await ctx.run('generate-id', () => `order-${Date.now()}`)
+    const orderId = await ctx.exec({ key: 'generate-id', fn: () => `order-${Date.now()}` })
 
     return { success: true, orderId, total: validated.total }
   }
@@ -132,28 +132,28 @@ export namespace CreateUserWithRepo {
 
 export const createUserWithRepo = flow(
   async (ctx, input: CreateUserWithRepo.Input): Promise<CreateUserWithRepo.Result> => {
-    const validation = await ctx.run('validate-input', () => {
+    const validation = await ctx.exec({ key: 'validate-input', fn: () => {
       if (!input.email.includes('@')) {
         return { ok: false as const, reason: 'INVALID_EMAIL' as const }
       }
       return { ok: true as const }
-    })
+    } })
 
     if (!validation.ok) {
       return { success: false, reason: validation.reason }
     }
 
-    const existing = await ctx.run('check-existing', async () => {
+    const existing = await ctx.exec({ key: 'check-existing', fn: async () => {
       return userRepository.findByEmail(input.email)
-    })
+    } })
 
     if (existing !== null) {
       return { success: false, reason: 'EMAIL_EXISTS' }
     }
 
-    const user = await ctx.run('create-user', async () => {
+    const user = await ctx.exec({ key: 'create-user', fn: async () => {
       return userRepository.create(input)
-    })
+    } })
 
     return { success: true, user }
   }
@@ -187,9 +187,9 @@ export const registerUser = flow(
 
     let emailSent = false
     if (input.sendWelcomeEmail) {
-      const emailResult = await ctx.run('send-welcome-email', async () => {
+      const emailResult = await ctx.exec({ key: 'send-welcome-email', fn: async () => {
         return { success: true as const }
-      })
+      } })
 
       if (!emailResult.success) {
         return { success: false, reason: 'EMAIL_SEND_FAILED' }

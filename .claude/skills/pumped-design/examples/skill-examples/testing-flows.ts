@@ -167,7 +167,7 @@ export const createUser = flow(
   { userRepo: userRepository },
   ({ userRepo }) =>
     async (ctx: any, input: CreateUser.Input): Promise<CreateUser.Result> => {
-      const validation = await ctx.run('validate', () => {
+      const validation = await ctx.exec({ key: 'validate', fn: () => {
         if (input.name.length < 2) {
           return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
         }
@@ -175,15 +175,14 @@ export const createUser = flow(
           return { ok: false as const, reason: 'INVALID_EMAIL' as const }
         }
         return { ok: true as const }
-      })
+      } })
 
       if (!validation.ok) {
         return { success: false, reason: validation.reason }
       }
 
-      const created = await ctx.run('create', () =>
-        userRepo.create({ name: input.name, email: input.email })
-      )
+      const created = await ctx.exec({ key: 'create', fn: () =>
+        userRepo.create({ name: input.name, email: input.email }) })
 
       return { success: true, userId: created.id }
     }

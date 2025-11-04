@@ -19,24 +19,24 @@ import { FlowError } from '@pumped-fn/core-next'
  * Section: ctx.run() - Journaled Operations > Pattern
  */
 export const processData = flow(async (ctx, input: string) => {
-  const validation = await ctx.run('validate', () => {
+  const validation = await ctx.exec({ key: 'validate', fn: () => {
     if (!input || input.trim() === '') {
       return { ok: false as const, reason: 'EMPTY' as const }
     }
     return { ok: true as const }
-  })
+  } })
 
   if (!validation.ok) {
     return { success: false, reason: validation.reason }
   }
 
-  const transformed = await ctx.run('transform', () => {
+  const transformed = await ctx.exec({ key: 'transform', fn: () => {
     return input.toUpperCase()
-  })
+  } })
 
-  const saved = await ctx.run('save', async () => {
+  const saved = await ctx.exec({ key: 'save', fn: async () => {
     return { id: 1, data: transformed }
-  })
+  } })
 
   return { success: true, result: saved }
 })
@@ -53,7 +53,7 @@ const fetchData = () => Promise.resolve("data")
 
 export const loadData = flow<{ url: string }, { data: string }>(
   async (ctx, _input) => {
-    const data = await ctx.run("fetch", () => fetchData())
+    const data = await ctx.exec({ key: "fetch", fn: () => fetchData() })
     return { data }
   }
 )
@@ -71,8 +71,8 @@ const incrementCounter = () => ++executionCount
 
 export const deduplicatedOps = flow<Record<string, never>, { value: number }>(
   async (ctx, _input) => {
-    const firstCall = await ctx.run("op", () => incrementCounter())
-    const secondCall = await ctx.run("op", () => incrementCounter())
+    const firstCall = await ctx.exec({ key: "op", fn: () => incrementCounter() })
+    const secondCall = await ctx.exec({ key: "op", fn: () => incrementCounter() })
     return { value: firstCall }
   }
 )
@@ -88,16 +88,14 @@ export const deduplicatedOps = flow<Record<string, never>, { value: number }>(
 const fetchMock = async (url: string) => ({ data: `response from ${url}` })
 
 export const fetchUserById = flow(async (ctx, userId: number) => {
-  const response = await ctx.run("fetch-user", () =>
-    fetchMock(`/users/${userId}`)
-  )
+  const response = await ctx.exec({ key: "fetch-user", fn: () =>
+    fetchMock(`/users/${userId}`) })
   return { userId, username: `user${userId}`, raw: response.data }
 })
 
 export const fetchPostsByUserId = flow(async (ctx, userId: number) => {
-  const response = await ctx.run("fetch-posts", () =>
-    fetchMock(`/posts?userId=${userId}`)
-  )
+  const response = await ctx.exec({ key: "fetch-posts", fn: () =>
+    fetchMock(`/posts?userId=${userId}`) })
   return { posts: [{ id: 1, title: "Post 1" }], raw: response.data }
 })
 
@@ -105,10 +103,10 @@ export const getUserWithPosts = flow(async (ctx, userId: number) => {
   const user = await ctx.exec(fetchUserById, userId)
   const posts = await ctx.exec(fetchPostsByUserId, userId)
 
-  const enriched = await ctx.run("enrich", () => ({
+  const enriched = await ctx.exec({ key: "enrich", fn: () => ({
     ...user,
     postCount: posts.posts.length
-  }))
+  }) })
 
   return enriched
 })
@@ -127,7 +125,7 @@ const userRepository = {
 }
 
 export const createUser = flow(async (ctx, input: { email: string; name: string }) => {
-  const validation = await ctx.run('validate-input', () => {
+  const validation = await ctx.exec({ key: 'validate-input', fn: () => {
     if (!input.email.includes('@')) {
       return { ok: false as const, reason: 'INVALID_EMAIL' as const }
     }
@@ -135,26 +133,26 @@ export const createUser = flow(async (ctx, input: { email: string; name: string 
       return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
     }
     return { ok: true as const }
-  })
+  } })
 
   if (!validation.ok) {
     return { success: false, reason: validation.reason }
   }
 
-  const existing = await ctx.run('check-existing', async () => {
+  const existing = await ctx.exec({ key: 'check-existing', fn: async () => {
     return userRepository.findByEmail(input.email)
-  })
+  } })
 
   if (existing !== null) {
     return { success: false, reason: 'EMAIL_EXISTS' }
   }
 
-  const user = await ctx.run('create-user', async () => {
+  const user = await ctx.exec({ key: 'create-user', fn: async () => {
     return userRepository.create({
       email: input.email,
       name: input.name
     })
-  })
+  } })
 
   return { success: true, user }
 })
@@ -302,9 +300,9 @@ export const storeCustomValue = flow(async (ctx, input: string) => {
  * Section: Built-in Context Metadata > Example: Accessing Journal
  */
 export const multiStepCalculation = flow(async (ctx, input: number) => {
-  const doubled = await ctx.run("double", () => input * 2)
-  const tripled = await ctx.run("triple", () => input * 3)
-  const combined = await ctx.run("sum", () => doubled + tripled)
+  const doubled = await ctx.exec({ key: "double", fn: () => input * 2 })
+  const tripled = await ctx.exec({ key: "triple", fn: () => input * 3 })
+  const combined = await ctx.exec({ key: "sum", fn: () => doubled + tripled })
   return combined
 })
 
@@ -317,8 +315,8 @@ export const multiStepCalculation = flow(async (ctx, input: number) => {
  * Section: inDetails() - Result with Context > Pattern
  */
 export const calculateBoth = flow(async (ctx, input: { x: number; y: number }) => {
-  const sum = await ctx.run('sum', () => input.x + input.y)
-  const product = await ctx.run('product', () => input.x * input.y)
+  const sum = await ctx.exec({ key: 'sum', fn: () => input.x + input.y })
+  const product = await ctx.exec({ key: 'product', fn: () => input.x * input.y })
   return { sum, product }
 })
 
@@ -331,7 +329,7 @@ export const calculateBoth = flow(async (ctx, input: { x: number; y: number }) =
  * Section: inDetails() > Example: Error with Context
  */
 export const operationWithError = flow(async (ctx, input: number) => {
-  await ctx.run("before-error", () => input * 2)
+  await ctx.exec({ key: "before-error", fn: () => input * 2 })
   throw new Error("test error")
 })
 
@@ -344,7 +342,7 @@ export const operationWithError = flow(async (ctx, input: number) => {
  * Section: Promised Chaining with Context > Pattern
  */
 export const doubleValue = flow(async (ctx, input: number) => {
-  await ctx.run("increment", () => input + 1)
+  await ctx.exec({ key: "increment", fn: () => input + 1 })
   return input * 2
 })
 
