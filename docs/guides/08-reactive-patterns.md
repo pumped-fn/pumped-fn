@@ -1,7 +1,7 @@
 ---
 title: Reactive Patterns
 description: Live updates with .reactive property
-keywords: [reactive, updates, scope.update]
+keywords: [reactive, updates, scope.update, state]
 ---
 
 # Reactive Patterns
@@ -107,3 +107,4 @@ const cache = derive(keySource.reactive, (key) => {
 - [Executors and Dependencies](./01-executors-and-dependencies.md)
 - [Scope Lifecycle](./03-scope-lifecycle.md)
 - [Tags: The Type System](./02-tags-the-type-system.md)
+- [State Patterns](./11-state-patterns.md) - In-memory reactive state
