@@ -12,6 +12,6 @@
     "@pumped-fn/core-next": "workspace:*",
     "typescript": "^5.7.2",
     "hono": "^4.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^20.19.24"
   }
 }
