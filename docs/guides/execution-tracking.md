@@ -76,3 +76,62 @@ execution.onStatusChange((status, exec) => {
 ```
 
 Status values: 'pending', 'running', 'completed', 'failed', 'cancelled'
+
+## Return Type & API Changes
+
+### scope.exec() Return Type
+
+**New return type:**
+```typescript
+interface FlowExecution<T> {
+  id: string;                     // Unique UUID
+  status: ExecutionStatus;        // Current status
+  flowName: string;               // Flow identifier
+  abort: AbortController;         // Cancellation control
+  result: Promised<T>;           // Execution result
+  ctx: Core.Context;             // Execution context
+  onStatusChange(callback: StatusCallback): void;
+  throwIfAborted(): void;
+}
+```
+
+**Backward compatibility:**
+```typescript
+// Old API (still works via Promised auto-await)
+const result = await scope.exec({ flow, input });
+
+// New API (recommended)
+const execution = scope.exec({ flow, input });
+const result = await execution.result;
+
+// Access execution metadata
+console.log(execution.id, execution.status);
+```
+
+### ctx.signal and ctx.throwIfAborted()
+
+Flows receive execution context with cancellation support:
+
+```typescript
+const myFlow = flow(async (ctx, input) => {
+  // Check if cancelled before expensive operation
+  ctx.throwIfAborted();
+
+  // Pass signal to external APIs
+  const response = await fetch(url, { signal: ctx.signal });
+
+  // Periodic cancellation checks in loops
+  for (const item of items) {
+    ctx.throwIfAborted();
+    await processItem(item);
+  }
+
+  return result;
+});
+```
+
+**Status transition triggers:**
+- `pending` → `running`: Flow execution starts
+- `running` → `completed`: Flow returns successfully
+- `running` → `failed`: Flow throws error
+- `running` → `cancelled`: abort() called or timeout exceeded
