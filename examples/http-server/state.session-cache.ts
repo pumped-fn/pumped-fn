@@ -47,8 +47,8 @@ export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
       return entry.value
     },
 
-    set: <T>(key: string, value: T, ttlMs: number): void => {
-      cacheCtl.update(c => {
+    set: async <T>(key: string, value: T, ttlMs: number): Promise<void> => {
+      await cacheCtl.update(c => {
         c.set(key, {
           value,
           expiresAt: Date.now() + ttlMs
@@ -57,15 +57,15 @@ export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
       })
     },
 
-    delete: (key: string): void => {
-      cacheCtl.update(c => {
+    delete: async (key: string): Promise<void> => {
+      await cacheCtl.update(c => {
         c.delete(key)
         return c
       })
     },
 
-    clear: (): void => {
-      cacheCtl.update(c => {
+    clear: async (): Promise<void> => {
+      await cacheCtl.update(c => {
         c.clear()
         return c
       })
