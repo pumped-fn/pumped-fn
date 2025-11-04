@@ -103,8 +103,17 @@ const validate = flow((ctx, id: string) => {
 const fetchData = flow((ctx, id: string) => ({ id, data: 'value' }))
 
 const handler = flow(async (ctx, input: string) => {
-  const validId = await ctx.exec('validate-input', validate, input)
-  const data = await ctx.exec('fetch-data', fetchData, validId)
+  const validId = await ctx.exec({
+    flow: validate,
+    input,
+    key: 'validate-input',
+    timeout: 5000
+  })
+  const data = await ctx.exec({
+    flow: fetchData,
+    input: validId,
+    key: 'fetch-data'
+  })
   return data
 })
 ```
@@ -121,8 +130,8 @@ const getPosts = flow((ctx, userId: string) => [{ id: '1', title: 'Post' }])
 
 const handler = flow(async (ctx, userId: string) => {
   const { results } = await ctx.parallel([
-    ctx.exec('get-user', getUser, userId),
-    ctx.exec('get-posts', getPosts, userId)
+    ctx.exec({ flow: getUser, input: userId, key: 'get-user' }),
+    ctx.exec({ flow: getPosts, input: userId, key: 'get-posts' })
   ])
   const [user, posts] = results
   return { user, posts }
@@ -165,7 +174,11 @@ const riskyOperation = flow((ctx, input: string): Result<number> => {
 })
 
 const handler = flow(async (ctx, input: string) => {
-  const result = await ctx.exec('risky-operation', riskyOperation, input)
+  const result = await ctx.exec({
+    flow: riskyOperation,
+    input,
+    key: 'risky-operation'
+  })
 
   if (!result.ok) {
     return { status: 'error', message: result.error }
@@ -213,9 +226,17 @@ const validate = flow((ctx, n: number) => {
 })
 
 const handler = flow(async (ctx, input: number) => {
-  const result = await ctx.exec('transform', transform, input)
+  const result = await ctx.exec({
+      flow: transform,
+      input,
+      key: 'transform'
+    })
     .map(n => n + 10)
-    .switch(n => ctx.exec('validate', validate, n))
+    .switch(n => ctx.exec({
+      flow: validate,
+      input: n,
+      key: 'validate'
+    }))
     .catch(error => -1)
 
   return { result }
