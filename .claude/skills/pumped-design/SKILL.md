@@ -7,6 +7,7 @@ activate_when:
   - file_pattern: "**/entrypoint.*.ts"
   - file_pattern: "**/resource.*.ts"
   - file_pattern: "**/flow.*.ts"
+  - file_pattern: "**/state.*.ts"
   - directory_exists: "docs/catalog"
 ---
 
@@ -22,7 +23,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 
 **Auto-activates when:**
 - package.json contains "@pumped-fn"
-- Files matching entrypoint.*.ts, resource.*.ts, flow.*.ts exist
+- Files matching entrypoint.*.ts, resource.*.ts, flow.*.ts, state.*.ts exist
 - docs/catalog/ directory exists
 
 | Scenario | Use This Skill |
@@ -55,6 +56,8 @@ Structured approach for building maintainable pumped-fn backend applications wit
 | **Resource: Basic** | resource, add, config, lifecycle | Adding standalone resource | references/resource-basic.md |
 | **Resource: Derived** | resource, add, dependencies, derive | Resource with dependencies | references/resource-derived.md |
 | **Resource: Lazy** | resource, add, lazy, conditional | Conditional resolution with .lazy modifier | references/resource-lazy.md |
+| **State: Basic** | state, add, reactive, lifecycle | Adding state | references/state-basic.md |
+| **State: Derived** | state, add, dependencies, composition | State with dependencies | references/state-derived.md |
 | **Flow: Sub-flows** | flow, add, reuse, orchestration | Flow calling flows | references/flow-subflows.md |
 | **Flow: Context** | flow, modify, ctx.run, ctx.exec | Context operations | references/flow-context.md |
 | **Integration: Hono** | integration, add, hono, http | Hono server setup | references/integration-hono.md |
@@ -79,6 +82,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 **File Naming:**
 - `entrypoint.*.ts` - Scope creation, env initialization
 - `resource.*.ts` - DB, logger, cache (provide/derive)
+- `state.*.ts` - Session data, reactive app state (provide/derive)
 - `flow.*.ts` - Business workflows (flow())
 - `util.*.ts` - Pure functions or executor wrappers
 
@@ -86,6 +90,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 - `util.*` → Unit tests, all edges, preset() for executors
 - `flow.*` → Integration tests, ALL branches (Success + Errors)
 - `resource.*` → Rarely tested
+- `state.*` → Rarely tested (test flows consuming state)
 - `entrypoint.*` → Smoke only
 
 **Key Patterns:**
@@ -143,7 +148,7 @@ return ctx.run('finalize', () => ({ success: true, orderId: charged.id }))
 ## Summary
 
 Lightweight routing skill - loads detailed patterns from references/ on-demand:
-- 14 sub-skills cover construction, integration, testing
+- 16 sub-skills cover construction, integration, testing
 - Frontmatter tags enable AI routing
 - Real examples from pumped-fn tests
 - Type-safe, testable, discoverable architecture
