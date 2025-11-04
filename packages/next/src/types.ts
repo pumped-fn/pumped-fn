@@ -573,13 +573,6 @@ export namespace Flow {
       value: T
     ): void;
 
-    run<T>(key: string, fn: () => Promised<T> | T): Promised<T>;
-    run<T, P extends readonly unknown[]>(
-      key: string,
-      fn: (...args: P) => Promised<T> | T,
-      ...params: P
-    ): Promised<T>;
-
     exec<F extends UFlow>(
       flow: F,
       input: InferInput<F>
@@ -655,7 +648,7 @@ export namespace Flow {
 
   export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-  export interface FlowExecution<T> extends PromiseLike<T> {
+  export interface FlowExecution<T> {
     readonly result: Promised<T>;
     readonly id: string;
     readonly flowName: string | undefined;
@@ -666,6 +659,11 @@ export namespace Flow {
     onStatusChange(
       callback: (status: ExecutionStatus, execution: FlowExecution<T>) => void | Promise<void>
     ): Core.Cleanup;
+
+    then<TResult1 = T, TResult2 = never>(
+      onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
+    ): PromiseLike<TResult1 | TResult2>;
   }
 }
 

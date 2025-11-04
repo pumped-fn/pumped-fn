@@ -254,78 +254,6 @@ class FlowContext implements Flow.Context {
     return value;
   }
 
-  /**
-   * @deprecated Use ctx.exec({ fn, params, key }) instead
-   */
-  run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
-  /**
-   * @deprecated Use ctx.exec({ fn, params, key }) instead
-   */
-  run<T, P extends readonly unknown[]>(
-    key: string,
-    fn: (...args: P) => Promise<T> | T,
-    ...params: P
-  ): Promised<T>;
-
-  run<T, P extends readonly unknown[]>(
-    key: string,
-    fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
-    ...params: P
-  ): Promised<T> {
-    if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV !== 'production') {
-      console.warn(`ctx.run() is deprecated. Use ctx.exec({ fn, params, key }) instead.`);
-    }
-
-    if (!this.journal) {
-      this.journal = new Map();
-    }
-
-    const flowName = this.find(flowMeta.flowName) || "unknown";
-    const depth = this.get(flowMeta.depth);
-    const journalKey = `${flowName}:${depth}:${key}`;
-
-    const promise = (async () => {
-      const journal = this.journal!;
-      const isReplay = journal.has(journalKey);
-
-      const executeCore = (): Promised<T> => {
-        if (isReplay) {
-          const entry = journal.get(journalKey);
-          if (isErrorEntry(entry)) {
-            throw entry.error;
-          }
-          return Promised.create(Promise.resolve(entry as T));
-        }
-
-        return Promised.try(async () => {
-          const result =
-            params.length > 0
-              ? await (fn as (...args: P) => Promise<T> | T)(...params)
-              : await (fn as () => Promise<T> | T)();
-          journal.set(journalKey, result);
-          return result;
-        }).catch((error) => {
-          journal.set(journalKey, { __error: true, error });
-          throw error;
-        });
-      };
-
-      const executor = this.wrapWithExtensions(executeCore, {
-        kind: "journal",
-        key,
-        flowName,
-        depth,
-        isReplay,
-        context: this,
-        params: params.length > 0 ? params : undefined,
-      });
-
-      return executor();
-    })();
-
-    return Promised.create(promise);
-  }
-
   exec<F extends Flow.UFlow>(
     flow: F,
     input: Flow.InferInput<F>
@@ -376,14 +304,6 @@ class FlowContext implements Flow.Context {
 
       const childAbort = new AbortController();
 
-      if (this.signal.aborted) {
-        childAbort.abort(this.signal.reason);
-      } else {
-        this.signal.addEventListener("abort", () => {
-          childAbort.abort(this.signal.reason);
-        }, { once: true });
-      }
-
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       if (config.timeout) {
         timeoutId = setTimeout(() => {
@@ -391,6 +311,16 @@ class FlowContext implements Flow.Context {
             childAbort.abort(new Error(`Operation timeout after ${config.timeout}ms`));
           }
         }, config.timeout);
+      }
+
+      if (this.signal.aborted) {
+        if (timeoutId) clearTimeout(timeoutId);
+        childAbort.abort(this.signal.reason);
+      } else {
+        this.signal.addEventListener("abort", () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          childAbort.abort(this.signal.reason);
+        }, { once: true });
       }
 
       if ("flow" in config) {
@@ -471,7 +401,55 @@ class FlowContext implements Flow.Context {
         const params = "params" in config ? config.params || [] : [];
 
         if (config.key) {
-          return this.run(config.key, fn, ...params);
+          if (!this.journal) {
+            this.journal = new Map();
+          }
+
+          const flowName = this.find(flowMeta.flowName) || "unknown";
+          const depth = this.get(flowMeta.depth);
+          const journalKey = `${flowName}:${depth}:${config.key}`;
+
+          const promise = (async () => {
+            const journal = this.journal!;
+            const isReplay = journal.has(journalKey);
+
+            const executeCore = (): Promised<unknown> => {
+              if (isReplay) {
+                const entry = journal.get(journalKey);
+                if (isErrorEntry(entry)) {
+                  throw entry.error;
+                }
+                return Promised.create(Promise.resolve(entry));
+              }
+
+              return Promised.try(async () => {
+                const result = await fn(...params);
+                journal.set(journalKey, result);
+                return result;
+              }).catch((error) => {
+                journal.set(journalKey, { __error: true, error });
+                throw error;
+              });
+            };
+
+            const executor = this.wrapWithExtensions(executeCore, {
+              kind: "journal",
+              key: config.key!,
+              flowName,
+              depth,
+              isReplay,
+              context: this,
+              params: params.length > 0 ? params : undefined,
+            });
+
+            try {
+              return await executor();
+            } finally {
+              if (timeoutId) clearTimeout(timeoutId);
+            }
+          })();
+
+          return Promised.create(promise);
         } else {
           this.throwIfAborted();
           return Promised.try(async () => {

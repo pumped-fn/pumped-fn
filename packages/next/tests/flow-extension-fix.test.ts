@@ -109,7 +109,7 @@ describe("Flow Extension Wrapping Fix", () => {
     const scope = createScope({ extensions: [trackingExtension] });
 
     const journaledFlow = flow(async (ctx, input: number) => {
-      const doubled = await ctx.run("double", () => input * 2);
+      const doubled = await ctx.exec({ key: "double", fn: () => input * 2 });
       return doubled + 1;
     });
 

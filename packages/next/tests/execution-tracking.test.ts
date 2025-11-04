@@ -198,15 +198,15 @@ describe("Flow Execution Tracking", () => {
           output: custom<number>(),
         },
         async (ctx, input) => {
-          const step1 = await ctx.run("step1", () => {
+          const step1 = await ctx.exec({ key: "step1", fn: () => {
             executionLog.push("step1");
             return input * 2;
-          });
+          } });
 
-          const step2 = await ctx.run("step2", (value: number) => {
+          const step2 = await ctx.exec({ key: "step2", fn: (value: number) => {
             executionLog.push("step2");
             return value + 10;
-          }, step1);
+          }, params: [step1] });
 
           return step2;
         }

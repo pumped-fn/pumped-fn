@@ -957,6 +957,7 @@ class BaseScope implements Core.Scope {
         this.onEvents.change.clear();
         this.onEvents.release.clear();
         this.onEvents.error.clear();
+        this.executions.clear();
       })()
     );
   }
