@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest'
 import { createScope } from '@pumped-fn/core-next'
 import { tenantActor } from './actor.tenant'
+import { waitForProcessing, waitForCondition } from './test-utils'
 import type { Todo } from './types'
 
 describe('Tenant Actor', () => {
@@ -25,7 +26,7 @@ describe('Tenant Actor', () => {
       payload: { id: 'todo-1', title: 'Write tests' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 1)
 
     const todos = actor.getTodos()
     expect(todos).toHaveLength(1)
@@ -47,14 +48,17 @@ describe('Tenant Actor', () => {
       payload: { id: 'todo-1', title: 'Write tests' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 1)
 
     actor.send({
       type: 'UPDATE_TODO',
       payload: { id: 'todo-1', completed: true }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => {
+      const todos = actor.getTodos()
+      return todos.length === 1 && todos[0].completed === true
+    })
 
     const todos = actor.getTodos()
     expect(todos[0].completed).toBe(true)
@@ -72,14 +76,14 @@ describe('Tenant Actor', () => {
       payload: { id: 'todo-1', title: 'Write tests' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 1)
 
     actor.send({
       type: 'DELETE_TODO',
       payload: { id: 'todo-1' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 0)
 
     const todos = actor.getTodos()
     expect(todos).toHaveLength(0)
@@ -96,14 +100,14 @@ describe('Tenant Actor', () => {
       payload: { id: 'todo-1', title: 'Test' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 1)
 
     actor.send({
       type: 'CREATE_TODO',
       payload: { id: 'todo-1', title: 'Duplicate' }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForProcessing(actor, 1)
 
     const todos = actor.getTodos()
     expect(todos).toHaveLength(1)

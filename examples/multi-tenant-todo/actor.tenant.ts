@@ -20,48 +20,52 @@ export const tenantActor = multi.provide(
       const message = messageQueue.shift()
 
       if (message) {
-        switch (message.type) {
-          case 'CREATE_TODO': {
-            const result = await flow.execute(handleCreateTodo, {
-              id: message.payload.id,
-              title: message.payload.title,
-              currentTodos: state.todos
-            })
+        try {
+          switch (message.type) {
+            case 'CREATE_TODO': {
+              const result = await flow.execute(handleCreateTodo, {
+                id: message.payload.id,
+                title: message.payload.title,
+                currentTodos: state.todos
+              })
 
-            if (result.success) {
-              state.todos.set(result.todo.id, result.todo)
+              if (result.success) {
+                state.todos.set(result.todo.id, result.todo)
+              }
+              break
             }
-            break
-          }
 
-          case 'UPDATE_TODO': {
-            const result = await flow.execute(handleUpdateTodo, {
-              id: message.payload.id,
-              title: message.payload.title,
-              completed: message.payload.completed,
-              currentTodos: state.todos
-            })
+            case 'UPDATE_TODO': {
+              const result = await flow.execute(handleUpdateTodo, {
+                id: message.payload.id,
+                title: message.payload.title,
+                completed: message.payload.completed,
+                currentTodos: state.todos
+              })
 
-            if (result.success) {
-              state.todos.set(result.todo.id, result.todo)
+              if (result.success) {
+                state.todos.set(result.todo.id, result.todo)
+              }
+              break
             }
-            break
-          }
 
-          case 'DELETE_TODO': {
-            const result = await flow.execute(handleDeleteTodo, {
-              id: message.payload.id,
-              currentTodos: state.todos
-            })
+            case 'DELETE_TODO': {
+              const result = await flow.execute(handleDeleteTodo, {
+                id: message.payload.id,
+                currentTodos: state.todos
+              })
 
-            if (result.success) {
-              state.todos.delete(result.deletedId)
+              if (result.success) {
+                state.todos.delete(result.deletedId)
+              }
+              break
             }
-            break
-          }
 
-          case 'GET_TODOS':
-            break
+            case 'GET_TODOS':
+              break
+          }
+        } catch (error) {
+          console.error(`[tenant-${tenantId}] Error processing message:`, error)
         }
       }
 

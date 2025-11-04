@@ -1,26 +1,6 @@
-import { createScope, Promised, type Core } from '@pumped-fn/core-next'
+import { createScope, Promised } from '@pumped-fn/core-next'
 import { tenantActor } from './actor.tenant'
-
-type TenantActor = Core.InferOutput<ReturnType<typeof tenantActor>>
-
-async function waitForProcessing(
-  actor: TenantActor,
-  expectedCount: number,
-  timeoutMs = 5000
-): Promise<void> {
-  const startTime = Date.now()
-
-  while (Date.now() - startTime < timeoutMs) {
-    if (actor.getTodos().length === expectedCount) {
-      return
-    }
-    await new Promise(resolve => setImmediate(resolve))
-  }
-
-  throw new Error(
-    `Timeout waiting for todo count ${expectedCount}, got ${actor.getTodos().length}`
-  )
-}
+import { waitForProcessing } from './test-utils'
 
 async function main() {
   console.log('Multi-Tenant Todo Actor System\n')

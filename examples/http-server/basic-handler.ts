@@ -57,11 +57,8 @@ const userService = derive(
 const getUserFlow = flow(
   { db: dbConnection },
   async (deps, ctx, userId: string) => {
-    const results = await ctx.exec({
-      fn: async () => {
-        return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
-      },
-      key: 'query-user-by-id'
+    const results = await ctx.run('query-user-by-id', async () => {
+      return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
     })
 
     if (results.length === 0) {
