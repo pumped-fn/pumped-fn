@@ -54,6 +54,9 @@ export namespace ProcessOrder {
 
 **Test reusable flows standalone** - they're public API
 
+
+See: `reusableFlowTests` in skill-examples/testing-flows.ts
+
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { flow, createScope, preset, derive, Core } from '@pumped-fn/core-next'
@@ -162,6 +165,9 @@ describe('validateOrder flow (reusable)', () => {
 ## Pattern: Testing Flows with Dependencies
 
 Use `preset()` to mock dependencies:
+
+
+See: `flowWithDependenciesTests` in skill-examples/testing-flows.ts
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
@@ -286,6 +292,9 @@ describe('createUser flow', () => {
 ## Pattern: Testing Flows with Sub-flows
 
 Test parent flow, sub-flow tested separately:
+
+
+See: `subflowTests` in skill-examples/testing-flows.ts
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
@@ -664,7 +673,7 @@ scope = createScope({
 
 // ✅ Correct - mock sub-flow's dependencies (if any)
 // Or use real sub-flow (preferred)
-const result = await scope.exec(registerUser, input)
+const result = await scope.exec({ flow: registerUser, input: input })
 ```
 
 ### Problem: Test depends on other tests

@@ -8,7 +8,10 @@
     "dev:tags-foundation": "tsx http-server/tags-foundation.ts",
     "dev:type-inference": "tsx http-server/type-inference.ts",
     "dev:promised-comprehensive": "tsx http-server/promised-comprehensive.ts",
-    "typecheck": "tsc --noEmit"
+    "dev:multi-tenant-todo": "tsx multi-tenant-todo/main.ts",
+    "test:multi-tenant-todo": "vitest run multi-tenant-todo",
+    "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit --project tsconfig.test.json"
   },
   "dependencies": {
     "@pumped-fn/core-next": "workspace:*"
@@ -16,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.5"
   }
 }

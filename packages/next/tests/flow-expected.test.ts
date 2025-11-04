@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { flow, FlowError, provide, flowMeta, Promised, tag } from "../src";
+import { flow, FlowError, provide, flowMeta, Promised, tag, createScope } from "../src";
 import { custom } from "../src/ssch";
 
 describe("Flow API - New Patterns", () => {
@@ -19,18 +19,16 @@ describe("Flow API - New Patterns", () => {
       const apiService = provide(() => ({ fetch: fetchMock }));
 
       const fetchUserById = flow(apiService, async (api, ctx, userId: number) => {
-        const response = await ctx.run("fetch-user", () =>
-          api.fetch(`/users/${userId}`)
-        );
+        const response = await ctx.exec({ key: "fetch-user", fn: () =>
+          api.fetch(`/users/${userId}`) });
         return { userId, username: `user${userId}`, raw: response.data };
       });
 
       const fetchPostsByUserId = flow(
         { api: apiService },
         async ({ api }, ctx, userId: number) => {
-          const response = await ctx.run("fetch-posts", () =>
-            api.fetch(`/posts?userId=${userId}`)
-          );
+          const response = await ctx.exec({ key: "fetch-posts", fn: () =>
+            api.fetch(`/posts?userId=${userId}`) });
           return { posts: [{ id: 1, title: "Post 1" }], raw: response.data };
         }
       );
@@ -46,10 +44,10 @@ describe("Flow API - New Patterns", () => {
         async ({ api: _api }, ctx, userId: number): Promise<UserWithPosts> => {
           const user = await ctx.exec(fetchUserById, userId);
           const posts = await ctx.exec(fetchPostsByUserId, userId);
-          const enriched = await ctx.run("enrich", () => ({
+          const enriched = await ctx.exec({ key: "enrich", fn: () => ({
             ...user,
             postCount: posts.posts.length,
-          }));
+          }) });
           return enriched;
         }
       );
@@ -200,7 +198,7 @@ describe("Flow API - New Patterns", () => {
       const fetchData = vi.fn(() => Promise.resolve("data"));
       const loadData = flow<{ url: string }, { data: string }>(
         async (ctx, _input) => {
-          const data = await ctx.run("fetch", () => fetchData());
+          const data = await ctx.exec({ key: "fetch", fn: () => fetchData() });
           return { data };
         }
       );
@@ -216,8 +214,8 @@ describe("Flow API - New Patterns", () => {
       const incrementCounter = vi.fn(() => ++executionCount);
       const deduplicatedOps = flow<Record<string, never>, { value: number }>(
         async (ctx, _input) => {
-          const firstCall = await ctx.run("op", () => incrementCounter());
-          await ctx.run("op", () => incrementCounter());
+          const firstCall = await ctx.exec({ key: "op", fn: () => incrementCounter() });
+          await ctx.exec({ key: "op", fn: () => incrementCounter() });
           return { value: firstCall };
         }
       );
@@ -399,7 +397,7 @@ describe("Flow API - New Patterns", () => {
   describe("Execution context access", () => {
     test("execution.ctx() provides metadata after completion", async () => {
       const processValue = flow(async (ctx, input: { value: number }) => {
-        await ctx.run("operation", () => input.value * 2);
+        await ctx.exec({ key: "operation", fn: () => input.value * 2 });
         return { result: input.value };
       });
 
@@ -416,8 +414,8 @@ describe("Flow API - New Patterns", () => {
 
     test("inDetails() returns result and context on success", async () => {
       const calculateBoth = flow(async (ctx, input: { x: number; y: number }) => {
-        const sum = await ctx.run("sum", () => input.x + input.y);
-        const product = await ctx.run("product", () => input.x * input.y);
+        const sum = await ctx.exec({ key: "sum", fn: () => input.x + input.y });
+        const product = await ctx.exec({ key: "product", fn: () => input.x * input.y });
         return { sum, product };
       });
 
@@ -436,9 +434,9 @@ describe("Flow API - New Patterns", () => {
 
     test("journal tracks all ctx.run operations", async () => {
       const multiStepCalculation = flow(async (ctx, input: number) => {
-        const doubled = await ctx.run("double", () => input * 2);
-        const tripled = await ctx.run("triple", () => input * 3);
-        const combined = await ctx.run("sum", () => doubled + tripled);
+        const doubled = await ctx.exec({ key: "double", fn: () => input * 2 });
+        const tripled = await ctx.exec({ key: "triple", fn: () => input * 3 });
+        const combined = await ctx.exec({ key: "sum", fn: () => doubled + tripled });
         return combined;
       });
 
@@ -473,7 +471,7 @@ describe("Flow API - New Patterns", () => {
 
     test("inDetails() preserves context on error", async () => {
       const operationWithError = flow(async (ctx, input: number) => {
-        await ctx.run("before-error", () => input * 2);
+        await ctx.exec({ key: "before-error", fn: () => input * 2 });
         throw new Error("test error");
       });
 
@@ -524,7 +522,7 @@ describe("Flow API - New Patterns", () => {
 
     test("inDetails() works after promise transformations", async () => {
       const doubleValue = flow(async (ctx, input: number) => {
-        await ctx.run("increment", () => input + 1);
+        await ctx.exec({ key: "increment", fn: () => input + 1 });
         return input * 2;
       });
 
@@ -542,7 +540,7 @@ describe("Flow API - New Patterns", () => {
 
     test("inDetails() discriminates success and failure types", async () => {
       const maybeFailFlow = flow(async (ctx, shouldFail: boolean) => {
-        await ctx.run("check", () => shouldFail);
+        await ctx.exec({ key: "check", fn: () => shouldFail });
         if (shouldFail) {
           throw new Error("failed");
         }
@@ -592,6 +590,116 @@ describe("Flow API - New Patterns", () => {
         expect(details.ctx).toBeDefined();
         expect(details.ctx.context.get(flowMeta.depth)).toBe(0);
       }
+    });
+  });
+
+  describe("AbortController support", () => {
+    test("flow context provides abort signal", async () => {
+      let capturedSignal: AbortSignal | undefined;
+
+      const testFlow = flow((ctx) => {
+        capturedSignal = ctx.signal;
+        expect(ctx.signal).toBeDefined();
+        expect(ctx.signal.aborted).toBe(false);
+        return 42;
+      });
+
+      const result = await flow.execute(testFlow, undefined);
+
+      expect(result).toBe(42);
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal!.aborted).toBe(false);
+    });
+
+    test("flow context throwIfAborted method exists and is callable", async () => {
+      let throwIfAbortedCalled = false;
+
+      const testFlow = flow((ctx) => {
+        expect(typeof ctx.throwIfAborted).toBe("function");
+        ctx.throwIfAborted();
+        throwIfAbortedCalled = true;
+        return 42;
+      });
+
+      const result = await flow.execute(testFlow, undefined);
+
+      expect(result).toBe(42);
+      expect(throwIfAbortedCalled).toBe(true);
+    });
+  });
+
+  describe("FlowExecution return type", () => {
+    test("scope.exec returns FlowExecution with metadata", async () => {
+      const testFlow = flow((ctx, input: number) => input * 2);
+      const scope = createScope();
+
+      const execution = scope.exec({ flow: testFlow, input: 5 });
+
+      expect(execution.id).toBeDefined();
+      expect(typeof execution.id).toBe("string");
+      expect(execution.status).toBe("running");
+      expect(execution.abort).toBeInstanceOf(AbortController);
+      expect(execution.result).toBeDefined();
+
+      const result = await execution.result;
+      expect(result).toBe(10);
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(execution.status).toBe("completed");
+    });
+  });
+
+  describe("ctx.exec with config API", () => {
+    test("ctx.exec with flow config", async () => {
+      const childFlow = flow((_ctx, input: number) => input * 2);
+      const parentFlow = flow(async (ctx, input: number) => {
+        const result = await ctx.exec({
+          flow: childFlow,
+          input: input + 1,
+          key: "double",
+          timeout: 1000
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: 5 });
+      const result = await execution.result;
+
+      expect(result).toBe(12);
+    });
+
+    test("ctx.exec with function no params", async () => {
+      const parentFlow = flow(async (ctx) => {
+        const result = await ctx.exec({
+          fn: () => 42,
+          key: "compute"
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: undefined });
+      const result = await execution.result;
+
+      expect(result).toBe(42);
+    });
+
+    test("ctx.exec with function and params", async () => {
+      const parentFlow = flow(async (ctx, input: number) => {
+        const result = await ctx.exec({
+          fn: (a: number, b: number) => a + b,
+          params: [input, 10],
+          key: "add"
+        });
+        return result;
+      });
+
+      const scope = createScope();
+      const execution = scope.exec({ flow: parentFlow, input: 5 });
+      const result = await execution.result;
+
+      expect(result).toBe(15);
     });
   });
 });

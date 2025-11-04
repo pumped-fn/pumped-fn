@@ -1,7 +1,7 @@
 ---
 name: flow-subflows
 tags: flow, add, reuse, orchestration, ctx.exec, composition, sub-flow, error-mapping
-description: Flow orchestration using ctx.exec() to call sub-flows. Sub-flows are called DIRECTLY via ctx.exec(subFlow, input) - NOT wrapped in ctx.run(). Covers error mapping, discriminated union outputs, and reusable vs non-reusable flow patterns.
+description: Flow orchestration using ctx.exec() to call sub-flows. Sub-flows are called via ctx.exec({ flow, input, key, timeout }) config object - NOT wrapped in ctx.run(). Covers error mapping, discriminated union outputs, and reusable vs non-reusable flow patterns.
 ---
 
 # Flow: Sub-flows and Orchestration
@@ -16,9 +16,9 @@ Use `ctx.exec()` for sub-flows when:
 - Creating testable flow hierarchies (test sub-flows independently)
 
 **Critical Pattern:**
-- Sub-flows are called via `ctx.exec(subFlow, input)` - **NOT** wrapped in `ctx.run()`
+- Sub-flows are called via `ctx.exec({ flow, input, key })` config object - **NOT** wrapped in `ctx.run()`
 - Use `ctx.run()` for direct operations (calculations, validations)
-- Use `ctx.exec()` for flow composition
+- Use `ctx.exec()` for flow composition with config (timeout, retry, tags)
 
 **Don't use for:**
 - Simple operations that don't need journaling (just use direct calls)
@@ -26,9 +26,12 @@ Use `ctx.exec()` for sub-flows when:
 
 ---
 
-## Core Pattern: ctx.exec(subFlow, input)
+## Core Pattern: ctx.exec({ flow, input, key })
 
 ### Basic Sub-flow Execution
+
+
+See: `doubleNumber` in skill-examples/flows-subflows.ts
 
 ```typescript
 import { flow } from '@pumped-fn/core-next'
@@ -66,10 +69,15 @@ export namespace ProcessOrder {
 
 export const processOrder = flow(
   async (ctx, input: ProcessOrder.Input): Promise<ProcessOrder.Result> => {
-    // ✅ CORRECT: ctx.exec() called directly, NOT in ctx.run()
-    const validated = await ctx.exec(validateOrder, {
-      items: input.items,
-      userId: input.userId
+    // ✅ CORRECT: ctx.exec() with config object, NOT in ctx.run()
+    const validated = await ctx.exec({
+      flow: validateOrder,
+      input: {
+        items: input.items,
+        userId: input.userId
+      },
+      key: 'validate-order',
+      timeout: 5000
     })
 
     // Type narrowing via discriminated union
@@ -86,7 +94,7 @@ export const processOrder = flow(
 ```
 
 **Key Points:**
-- `ctx.exec(validateOrder, input)` - direct call, returns the sub-flow result
+- `ctx.exec({ flow, input, key })` - config object with optional timeout, tags
 - Type narrowing works: `if (!validated.success)` proves error type
 - Parent flow can propagate or transform sub-flow errors
 
@@ -105,8 +113,12 @@ const doubleNumber = flow<{ n: number }, { doubled: number }>(
 
 const processValue = flow<{ value: number }, { result: number }>(
   async (ctx, input) => {
-    // ✅ ctx.exec() called directly
-    const doubled = await ctx.exec(doubleNumber, { n: input.value })
+    // ✅ ctx.exec() with config object
+    const doubled = await ctx.exec({
+      flow: doubleNumber,
+      input: { n: input.value },
+      key: 'double'
+    })
     return { result: doubled.doubled }
   }
 )
@@ -146,8 +158,16 @@ const getUserWithPosts = flow(
   { api: apiService },
   async ({ api: _api }, ctx, userId: number): Promise<UserWithPosts> => {
     // ✅ Multiple ctx.exec() calls orchestrate sub-flows
-    const user = await ctx.exec(fetchUserById, userId)
-    const posts = await ctx.exec(fetchPostsByUserId, userId)
+    const user = await ctx.exec({
+      flow: fetchUserById,
+      input: userId,
+      key: 'fetch-user'
+    })
+    const posts = await ctx.exec({
+      flow: fetchPostsByUserId,
+      input: userId,
+      key: 'fetch-posts'
+    })
 
     const enriched = await ctx.run("enrich", () => ({
       ...user,
@@ -173,7 +193,11 @@ const getBaseValue = flow<void, number>(() => {
 
 const incrementValue = flow<void, number>(async (ctx) => {
   // ✅ ctx.exec() with void input
-  const base = await ctx.exec(getBaseValue, undefined)
+  const base = await ctx.exec({
+    flow: getBaseValue,
+    input: undefined,
+    key: 'get-base'
+  })
   return base + 1
 })
 
@@ -235,9 +259,14 @@ export const registerUser = flow(
   { userRepo: userRepository },
   async ({ userRepo }, ctx, input: RegisterUser.Input): Promise<RegisterUser.Result> => {
     // ✅ ctx.exec() propagates discriminated union
-    const userResult = await ctx.exec(createUser, {
-      email: input.email,
-      name: input.name
+    const userResult = await ctx.exec({
+      flow: createUser,
+      input: {
+        email: input.email,
+        name: input.name
+      },
+      key: 'create-user',
+      timeout: 10000
     })
 
     // Type narrowing
@@ -292,7 +321,11 @@ const processInput = flow(
     | { success: true; result: string }
     | { success: false; reason: 'EMPTY' | 'INVALID' | 'PROCESSING_FAILED' }
   > => {
-    const validated = await ctx.exec(validateInput, input)
+    const validated = await ctx.exec({
+      flow: validateInput,
+      input,
+      key: 'validate-input'
+    })
 
     if (!validated.success) {
       return validated  // Error flows through unchanged
@@ -323,7 +356,11 @@ const getUserProfile = flow(
     | { success: true; profile: Profile }
     | { success: false; reason: 'USER_NOT_FOUND' | 'PROFILE_INCOMPLETE' }
   > => {
-    const userResult = await ctx.exec(fetchUser, userId)
+    const userResult = await ctx.exec({
+      flow: fetchUser,
+      input: userId,
+      key: 'fetch-user'
+    })
 
     if (!userResult.success) {
       // ✅ Transform sub-flow error to parent error
@@ -364,10 +401,18 @@ const processPayment = flow(
     | { success: true; transactionId: string }
     | { success: false; reason: 'INVALID_AMOUNT' | 'DECLINED' | 'INSUFFICIENT_FUNDS' }
   > => {
-    const validated = await ctx.exec(validatePayment, amount)
+    const validated = await ctx.exec({
+      flow: validatePayment,
+      input: amount,
+      key: 'validate'
+    })
     if (!validated.success) return validated
 
-    const charged = await ctx.exec(chargeCard, validated.validated)
+    const charged = await ctx.exec({
+      flow: chargeCard,
+      input: validated.validated,
+      key: 'charge'
+    })
     if (!charged.success) return charged
 
     return { success: true, transactionId: charged.transactionId }
@@ -402,12 +447,20 @@ export const validateEmail = flow(
 
 // Used by multiple parent flows
 const registerUser = flow(async (ctx, email: string) => {
-  const validated = await ctx.exec(validateEmail, email)
+  const validated = await ctx.exec({
+    flow: validateEmail,
+    input: email,
+    key: 'validate-email'
+  })
   // ...
 })
 
 const updateEmail = flow(async (ctx, email: string) => {
-  const validated = await ctx.exec(validateEmail, email)
+  const validated = await ctx.exec({
+    flow: validateEmail,
+    input: email,
+    key: 'validate-email'
+  })
   // ...
 })
 ```
@@ -432,7 +485,11 @@ const calculateOrderTotal = flow(
 
 // Only used by processOrder
 const processOrder = flow(async (ctx, items: OrderItem[]) => {
-  const { total, taxAmount } = await ctx.exec(calculateOrderTotal, items)
+  const { total, taxAmount } = await ctx.exec({
+    flow: calculateOrderTotal,
+    input: items,
+    key: 'calculate-total'
+  })
   // ...
 })
 ```
@@ -452,7 +509,11 @@ const processOrder = flow(async (ctx, items: OrderItem[]) => {
 // ✅ Level 1: Top-level flow
 const processOrder = flow(async (ctx, input) => {
   // ✅ Level 2: Direct sub-flow
-  const validated = await ctx.exec(validateOrder, input)
+  const validated = await ctx.exec({
+    flow: validateOrder,
+    input,
+    key: 'validate'
+  })
 
   // ✅ Level 3: Nested sub-flow (inside validateOrder)
   // validateOrder can call another sub-flow
@@ -481,11 +542,19 @@ const processOrder = flow(async (ctx, input) => {
 ```typescript
 // ❌ WRONG: Don't wrap ctx.exec() in ctx.run()
 const result = await ctx.run('validate', async () => {
-  return await ctx.exec(validateOrder, input)
+  return await ctx.exec({
+    flow: validateOrder,
+    input,
+    key: 'validate-order'
+  })
 })
 
 // ✅ CORRECT: ctx.exec() is already journaled
-const result = await ctx.exec(validateOrder, input)
+const result = await ctx.exec({
+  flow: validateOrder,
+  input,
+  key: 'validate'
+})
 ```
 
 **Why wrong?** `ctx.exec()` already creates a journal entry. Wrapping in `ctx.run()` creates unnecessary nesting and confuses the journal hierarchy.
@@ -499,22 +568,42 @@ const result = await ctx.run('validate', async () => {
 })
 
 // ✅ CORRECT: Use ctx.exec()
-const result = await ctx.exec(validateOrder, input)
+const result = await ctx.exec({
+  flow: validateOrder,
+  input,
+  key: 'validate'
+})
 ```
 
 ### ❌ Mixing Direct Calls with ctx.exec()
 
 ```typescript
 // ❌ WRONG: Inconsistent - some flows via ctx.exec(), some direct
-const validated = await ctx.exec(validateOrder, input)
+const validated = await ctx.exec({
+  flow: validateOrder,
+  input,
+  key: 'validate'
+})
 const processed = await processData(validated)  // Direct call
 
 // ✅ CORRECT: All flows via ctx.exec(), utilities direct
-const validated = await ctx.exec(validateOrder, input)
-const processed = await ctx.exec(processData, validated)
+const validated = await ctx.exec({
+  flow: validateOrder,
+  input,
+  key: 'validate'
+})
+const processed = await ctx.exec({
+  flow: processData,
+  input: validated,
+  key: 'process'
+})
 
 // ✅ ALSO CORRECT: Only reusable flows are flows, rest are utilities
-const validated = await ctx.exec(validateOrder, input)
+const validated = await ctx.exec({
+  flow: validateOrder,
+  input,
+  key: 'validate'
+})
 const processed = processDataUtil(validated)  // Direct utility call
 ```
 
@@ -554,7 +643,11 @@ const subFlow = flow(
 )
 
 const parentFlow = flow(async (ctx, input) => {
-  const result = await ctx.exec(subFlow, input)  // Error: db not found
+  const result = await ctx.exec({
+    flow: subFlow,
+    input,
+    key: 'sub-flow'
+  })  // Error: db not found
 })
 ```
 
@@ -565,7 +658,11 @@ const parentFlow = flow(async (ctx, input) => {
 const parentFlow = flow(
   { db: dbPool },  // Include child deps
   async ({ db }, ctx, input) => {
-    const result = await ctx.exec(subFlow, input)
+    const result = await ctx.exec({
+      flow: subFlow,
+      input,
+      key: 'sub-flow'
+    })
   }
 )
 ```
@@ -578,7 +675,10 @@ const parentFlow = flow(
 const getConfig = flow<void, Config>(() => { /* ... */ })
 
 const parent = flow(async (ctx, input) => {
-  const config = await ctx.exec(getConfig)  // Error: expected 2 args
+  const config = await ctx.exec({
+    flow: getConfig
+    // Error: input is required
+  })
 })
 ```
 
@@ -586,7 +686,11 @@ const parent = flow(async (ctx, input) => {
 
 ```typescript
 // ✅ Pass undefined explicitly
-const config = await ctx.exec(getConfig, undefined)
+const config = await ctx.exec({
+  flow: getConfig,
+  input: undefined,
+  key: 'get-config'
+})
 ```
 
 ---

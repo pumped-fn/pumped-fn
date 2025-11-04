@@ -34,6 +34,9 @@ Use context operations (`ctx`) when:
 
 ### Pattern
 
+
+See: `processData` in skill-examples/flows-context.ts
+
 ```typescript
 import { flow } from '@pumped-fn/core-next'
 
@@ -220,6 +223,9 @@ Execute multiple flows concurrently and wait for all to complete. All operations
 
 ### Pattern
 
+
+See: `processData` in skill-examples/flows-context.ts
+
 ```typescript
 import { flow } from '@pumped-fn/core-next'
 
@@ -298,6 +304,9 @@ const result = await flow.execute(combineResults, { val: 5 })
 Execute multiple operations concurrently, collecting both successes and failures. Continues even if some operations fail.
 
 ### Pattern
+
+
+See: `processData` in skill-examples/flows-context.ts
 
 ```typescript
 import { flow } from '@pumped-fn/core-next'
@@ -489,6 +498,9 @@ const journalKeys = Array.from(journal?.keys() || [])
 Get both the result AND context in a single call, with discriminated union for success/failure.
 
 ### Pattern
+
+
+See: `processData` in skill-examples/flows-context.ts
 
 ```typescript
 import { flow } from '@pumped-fn/core-next'

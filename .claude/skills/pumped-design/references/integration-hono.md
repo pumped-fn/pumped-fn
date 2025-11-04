@@ -28,6 +28,9 @@ description: Hono server integration patterns. One scope for application lifetim
 
 Create scope at application startup, not per-request:
 
+
+See: `honoEntrypointSetup` in skill-examples/integrations-hono.ts
+
 ```typescript
 import { Hono } from 'hono'
 import { createScope } from '@pumped-fn/core-next'
@@ -53,6 +56,9 @@ const scope = createScope({
 
 Attach scope to context for all routes:
 
+
+See: `honoScopeMiddleware` in skill-examples/integrations-hono.ts
+
 ```typescript
 app.use('*', async (c, next) => {
   c.set('scope', scope)
@@ -63,6 +69,9 @@ app.use('*', async (c, next) => {
 ### 3. Route Handlers with Flow Execution
 
 Transform request → flow input, execute via scope.exec(), map result → HTTP response:
+
+
+See: `honoRouteHandler` in skill-examples/integrations-hono.ts
 
 ```typescript
 import { createUser, type CreateUser } from './flows'
@@ -85,6 +94,9 @@ app.post('/users', async (c) => {
 ```
 
 ## Complete Working Example
+
+
+See: `honoCompleteExample` in skill-examples/integrations-hono.ts
 
 ```typescript
 import { Hono } from 'hono'
@@ -187,6 +199,9 @@ export default app
 
 Extract only what flows need from HTTP request:
 
+
+See: `honoRequestTransformationFlow` in skill-examples/integrations-hono.ts
+
 ```typescript
 app.post('/orders', async (c) => {
   const scope = c.get('scope')
@@ -215,6 +230,9 @@ app.post('/orders', async (c) => {
 ## Response Mapping Pattern
 
 Map discriminated union outputs to HTTP responses:
+
+
+See: `honoResponseMappingFlow` in skill-examples/integrations-hono.ts
 
 ```typescript
 app.post('/checkout', async (c) => {
@@ -253,6 +271,9 @@ app.post('/checkout', async (c) => {
 
 ### Authentication Middleware
 
+
+See: `honoAuthMiddleware` in skill-examples/integrations-hono.ts
+
 ```typescript
 import { verify } from 'jsonwebtoken'
 
@@ -290,6 +311,9 @@ app.get('/api/profile', async (c) => {
 
 ### Request Validation Middleware
 
+
+See: `honoValidationMiddleware` in skill-examples/integrations-hono.ts
+
 ```typescript
 import { z } from 'zod'
 
@@ -316,7 +340,7 @@ app.post('/users', validateBody(createUserSchema), async (c) => {
   const scope = c.get('scope')
   const body = c.get('validatedBody')
 
-  const result = await scope.exec(createUser, body)
+  const result = await scope.exec({ flow: createUser, input: body })
 
   if (!result.success) {
     return c.json({ error: result.reason }, 400)
@@ -327,6 +351,9 @@ app.post('/users', validateBody(createUserSchema), async (c) => {
 ```
 
 ### Error Handling Middleware
+
+
+See: `honoErrorMiddleware` in skill-examples/integrations-hono.ts
 
 ```typescript
 app.onError((error, c) => {
@@ -340,6 +367,9 @@ app.onError((error, c) => {
 ```
 
 ## Graceful Shutdown
+
+
+See: `honoGracefulShutdown` in skill-examples/integrations-hono.ts
 
 ```typescript
 import { serve } from '@hono/node-server'
@@ -371,6 +401,9 @@ console.log('Server listening on port 3000')
 ## Type-safe Context
 
 Extend Hono context with scope type:
+
+
+See: `honoTypedContext` in skill-examples/integrations-hono.ts
 
 ```typescript
 import { Hono } from 'hono'

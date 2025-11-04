@@ -51,6 +51,9 @@ description: End-to-end integration testing with real resources (test database, 
 
 Use test database for integration tests:
 
+
+See: `dbConfig` in skill-examples/testing-integration.ts
+
 ```typescript
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { createScope, provide, derive, tag, custom, Core } from '@pumped-fn/core-next'
@@ -225,6 +228,9 @@ describe('userRepository integration tests', () => {
 ## Pattern: Testing Resource Lifecycle
 
 Test resource initialization and cleanup:
+
+
+See: `resourceLifecycleTests` in skill-examples/testing-integration.ts
 
 ```typescript
 import { describe, test, expect } from 'vitest'
@@ -532,6 +538,9 @@ describe('fileRepository integration tests', () => {
 
 Test real concurrency issues:
 
+
+See: `concurrentOperationsTests` in skill-examples/testing-integration.ts
+
 ```typescript
 import { describe, test, expect } from 'vitest'
 import { createScope, flow } from '@pumped-fn/core-next'
@@ -558,7 +567,7 @@ describe('concurrent operations integration', () => {
     })
 
     const scope = createScope()
-    const durations = await scope.exec(parentFlow, undefined)
+    const durations = await scope.exec({ flow: parentFlow, input: undefined })
 
     // All flows started roughly at same time (concurrent)
     const maxTimeDiff = Math.max(...timestamps) - Math.min(...timestamps)
@@ -622,8 +631,8 @@ describe('concurrent operations integration', () => {
 
     const scope = createScope()
 
-    const sequentialTime = await scope.exec(sequentialFlow, undefined)
-    const parallelTime = await scope.exec(parallelFlow, undefined)
+    const sequentialTime = await scope.exec({ flow: sequentialFlow, input: undefined })
+    const parallelTime = await scope.exec({ flow: parallelFlow, input: undefined })
 
     // Sequential takes ~100ms, parallel takes ~50ms
     expect(sequentialTime).toBeGreaterThanOrEqual(90)

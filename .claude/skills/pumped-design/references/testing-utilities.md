@@ -28,6 +28,9 @@ description: Unit testing pure functions and executor-wrapped utilities with pre
 
 Pure functions have no dependencies and produce deterministic output.
 
+
+See: `pureFunctionTests` in skill-examples/testing-utilities.ts
+
 ```typescript
 import { describe, test, expect } from 'vitest'
 
@@ -130,6 +133,9 @@ describe('parseEmail', () => {
 ## Pattern: Testing Executor-Wrapped Built-ins
 
 Executor-wrapped built-ins need `preset()` for mocking.
+
+
+See: `executorTests` in skill-examples/testing-utilities.ts
 
 ```typescript
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
@@ -263,6 +269,9 @@ describe("Tag functionality", () => {
 
 Always test edge cases:
 
+
+See: `boundaryTests` in skill-examples/testing-utilities.ts
+
 ```typescript
 import { describe, test, expect } from 'vitest'
 
@@ -362,6 +371,9 @@ describe('calculateDiscount boundary conditions', () => {
 ## Pattern: Testing Type Narrowing
 
 Discriminated unions enable type-safe testing:
+
+
+See: `typeNarrowingTests` in skill-examples/testing-utilities.ts
 
 ```typescript
 import { describe, test, expect } from 'vitest'

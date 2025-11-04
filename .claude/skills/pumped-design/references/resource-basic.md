@@ -24,6 +24,9 @@ Use basic resources (`provide()`) when:
 
 ## Code Template
 
+
+See: `dbPool` in skill-examples/resources-basic.ts
+
 ```typescript
 import { provide, tag, custom } from '@pumped-fn/core-next'
 import { Pool } from 'pg'
@@ -67,6 +70,9 @@ export const dbPool = provide((controller) => {
 
 ### Example 1: Simple Resource (packages/next/tests/core.test.ts)
 
+
+See: `basicSimpleExecutor` in skill-examples/resources-basic.ts
+
 ```typescript
 const baseExecutor = provide(() => {
   executionOrder.push("base")
@@ -75,6 +81,9 @@ const baseExecutor = provide(() => {
 ```
 
 ### Example 2: Async Resource with Lifecycle (packages/next/tests/core.test.ts)
+
+
+See: `basicDbConnection` in skill-examples/resources-basic.ts
 
 ```typescript
 const dbConnection = provide(() => {
@@ -85,6 +94,9 @@ const dbConnection = provide(() => {
 
 ### Example 3: Resource with Configuration (packages/next/tests/core.test.ts)
 
+
+See: `basicConfigWithFlow` in skill-examples/resources-basic.ts
+
 ```typescript
 const config = provide(() => ({ multiplier: 3 }))
 
@@ -94,6 +106,9 @@ const multiplyFlow = flow(config, (deps, _ctx, input: number) => {
 ```
 
 ### Example 4: Resource with Cleanup (from templates.md)
+
+
+See: `dbPoolWithTransaction` in skill-examples/resources-basic.ts
 
 ```typescript
 const dbPool = provide((controller) => {
@@ -132,6 +147,9 @@ const dbPool = provide((controller) => {
 
 **ALWAYS use tags for configuration, NEVER access process.env directly inside resources.**
 
+
+See: `externalApiWithTags` in skill-examples/resources-basic.ts
+
 ```typescript
 // ✅ Correct: Configuration via tags
 export const apiUrl = tag(custom<string>(), { label: 'config.apiUrl' })
@@ -166,6 +184,9 @@ export const externalApi = provide(() => {
 ## Lifecycle Management
 
 Resources with cleanup must register via `controller.cleanup()`:
+
+
+See: `dbPoolWithCleanup` in skill-examples/resources-basic.ts
 
 ```typescript
 // ✅ Proper cleanup registration

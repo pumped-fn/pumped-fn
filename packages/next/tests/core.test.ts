@@ -164,7 +164,7 @@ describe("Core Functionality", () => {
         return input * deps.multiplier;
       });
 
-      const result = await scope.exec(multiplyFlow, 5);
+      const result = await scope.exec({ flow: multiplyFlow, input: 5 });
 
       expect(result).toBe(15);
 
@@ -181,42 +181,37 @@ describe("Core Functionality", () => {
         initialValues: [preset(configExecutor, { value: 20 })],
       });
 
-      const result = await scope.exec(flowWithConfig, 5);
+      const result = await scope.exec({ flow: flowWithConfig, input: 5 });
 
       expect(result).toBe(25);
 
       await scope.dispose();
     });
 
-    test("scope execution with details flag returns success result and context", async () => {
+    test("scope execution returns FlowExecution with result", async () => {
       const scope = createScope();
       const simpleFlow = flow((_ctx, input: number) => input * 2);
 
-      const details = await scope.exec(simpleFlow, 5, { details: true });
+      const execution = scope.exec({ flow: simpleFlow, input: 5 });
+      const result = await execution.result;
 
-      expect(details.success).toBe(true);
-      if (details.success) {
-        expect(details.result).toBe(10);
-        expect(details.ctx).toBeDefined();
-      }
+      expect(result).toBe(10);
+      expect(execution.id).toBeDefined();
+      expect(execution).toHaveProperty("result");
 
       await scope.dispose();
     });
 
-    test("scope execution with details flag returns error and context when flow throws", async () => {
+    test("scope execution tracks failure when flow throws", async () => {
       const scope = createScope();
       const failingFlow = flow((_ctx, _input: number): number => {
         throw new Error("Test error");
       });
 
-      const details = await scope.exec(failingFlow, 5, { details: true });
+      const execution = scope.exec({ flow: failingFlow, input: 5 });
 
-      expect(details.success).toBe(false);
-      if (!details.success) {
-        expect(details.error).toBeInstanceOf(Error);
-        expect((details.error as Error).message).toBe("Test error");
-        expect(details.ctx).toBeDefined();
-      }
+      await expect(execution.result).rejects.toThrow("Test error");
+      expect(execution.id).toBeDefined();
 
       await scope.dispose();
     });
@@ -225,7 +220,7 @@ describe("Core Functionality", () => {
       const scope = createScope();
       const noInputFlow = flow((_ctx) => "no input needed");
 
-      const result = await scope.exec(noInputFlow);
+      const result = await scope.exec({ flow: noInputFlow });
 
       expect(result).toBe("no input needed");
 
@@ -236,7 +231,7 @@ describe("Core Functionality", () => {
       const scope = createScope();
       const doubleFlow = flow((_ctx, input: number) => input * 2);
 
-      const result = await scope.exec(doubleFlow, 5);
+      const result = await scope.exec({ flow: doubleFlow, input: 5 });
 
       expect(result).toBe(10);
 
@@ -265,7 +260,7 @@ describe("Core Functionality", () => {
         return input * 2;
       });
 
-      const result = await scope.exec(testFlow, 5);
+      const result = await scope.exec({ flow: testFlow, input: 5 });
 
       expect(result).toBe(10);
       expect(dbConnectionCount).toBe(1);

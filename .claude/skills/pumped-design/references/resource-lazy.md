@@ -35,6 +35,9 @@ Use these patterns when:
 
 ### Basic Pattern
 
+
+See: `lazyReactiveCounter` in skill-examples/resources-lazy.ts
+
 ```typescript
 import { provide, derive, createScope } from '@pumped-fn/core-next'
 
@@ -59,6 +62,9 @@ const newValue = await scope.resolve(incrementedCounter)  // 2
 ### Why .reactive?
 
 When a derived resource depends on `counter.reactive`, it automatically re-computes when the counter is updated via `scope.update()`.
+
+
+See: `lazyReactiveDependency` in skill-examples/resources-lazy.ts
 
 ```typescript
 // ✅ Reactive dependency - re-computes on update
@@ -86,6 +92,9 @@ const value = await scope.resolve(derived)  // Stale
 
 ### Example 1: Basic Reactive Dependency (packages/next/tests/index.test.ts)
 
+
+See: `lazyNamedReactiveCounter` in skill-examples/resources-lazy.ts
+
 ```typescript
 const counter = provide(() => 0, name("counter"))
 const incrementedCounter = derive(
@@ -108,6 +117,9 @@ expect(updatedIncrementedValue).toBe(2)
 ```
 
 ### Example 2: Chained Reactive Dependencies (packages/next/tests/index.test.ts)
+
+
+See: `lazyChainedReactive` in skill-examples/resources-lazy.ts
 
 ```typescript
 const counter = provide(() => 0)
@@ -132,6 +144,9 @@ expect(doubleAccessor.get()).toBe(3)
 ```
 
 ### Example 3: Multiple Reactive Dependency Patterns (packages/next/tests/index.test.ts)
+
+
+See: `lazyMultipleReactivePatterns` in skill-examples/resources-lazy.ts
 
 ```typescript
 const counter = provide(() => 0)
@@ -191,6 +206,9 @@ await cleanup()  // Remove listener
 
 Accessors provide synchronous access to resolved reactive resources:
 
+
+See: `lazyAccessorPattern` in skill-examples/resources-lazy.ts
+
 ```typescript
 const counter = provide(() => 0)
 const derived = derive(counter.reactive, (count) => count * 2)
@@ -225,6 +243,9 @@ const value3 = accessor.get()  // 2 (updated)
 - **With `.lazy`**: Dependency NOT auto-resolved → factory receives accessor
 
 ### Example 1: Configuration-Based Resolution
+
+
+See: `lazyNamedReactiveCounter` in skill-examples/resources-lazy.ts
 
 ```typescript
 const consoleLogger = provide(() => {
@@ -268,6 +289,9 @@ const log = await scope.resolve(logger)
 
 For cleaner config handling, use scope's tag resolution instead of passing config as dependency:
 
+
+See: `lazyNamedReactiveCounter` in skill-examples/resources-lazy.ts
+
 ```typescript
 import { tag } from '@pumped-fn/core-next'
 
@@ -293,6 +317,9 @@ const log = await scope.resolve(logger)
 ```
 
 ### Example 2: Optional Feature Flags
+
+
+See: `lazyChainedReactive` in skill-examples/resources-lazy.ts
 
 ```typescript
 const mlModel = provide(() => {
@@ -323,6 +350,9 @@ const predictionService = derive(
 ### Example 3: Testing Benefits
 
 Lazy dependencies reduce test pollution by not initializing unused dependencies:
+
+
+See: `lazyMultipleReactivePatterns` in skill-examples/resources-lazy.ts
 
 ```typescript
 const dbConnection = provide(() => {
@@ -373,6 +403,9 @@ const service = await scope.resolve(userService)
 ## Static Resources
 
 Static resources are immutable - they never change and don't support updates:
+
+
+See: `lazyStaticResources` in skill-examples/resources-lazy.ts
 
 ```typescript
 const config = provide(() => ({

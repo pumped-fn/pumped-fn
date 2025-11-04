@@ -37,9 +37,9 @@ describe("Extension Operation Tracking", () => {
     });
 
     const mathCalculationFlow = flow(async (ctx, input: { x: number; y: number }) => {
-      const product = await ctx.run("multiply", (a: number, b: number) => a * b, input.x, input.y);
-      const sum = await ctx.run("add", (a: number, b: number) => a + b, input.x, input.y);
-      const combined = await ctx.run("combine", () => product + sum);
+      const product = await ctx.exec({ key: "multiply", fn: (a: number, b: number) => a * b, params: [input.x, input.y] });
+      const sum = await ctx.exec({ key: "add", fn: (a: number, b: number) => a + b, params: [input.x, input.y] });
+      const combined = await ctx.exec({ key: "combine", fn: () => product + sum });
 
       return { product, sum, combined };
     });
@@ -154,11 +154,11 @@ describe("Extension Operation Tracking", () => {
     }));
 
     const multiplyFlow = flow({ api: mockApi }, async ({ api }, ctx, input: number) => {
-      return await ctx.run("multiply-op", () => api.multiply(input));
+      return await ctx.exec({ key: "multiply-op", fn: () => api.multiply(input) });
     });
 
     const addFlow = flow({ api: mockApi }, async ({ api }, ctx, input: number) => {
-      return await ctx.run("add-op", () => api.add(input));
+      return await ctx.exec({ key: "add-op", fn: () => api.add(input) });
     });
 
     const parallelComputationFlow = flow({ api: mockApi }, async ({ api: _api }, ctx, input: number) => {
@@ -166,7 +166,7 @@ describe("Extension Operation Tracking", () => {
         .parallel([ctx.exec(multiplyFlow, input), ctx.exec(addFlow, input)])
         .then((r) => r.results);
 
-      const combined = await ctx.run("combine", () => multiplied + added);
+      const combined = await ctx.exec({ key: "combine", fn: () => multiplied + added });
 
       return { multiplied, added, combined };
     });
@@ -192,7 +192,7 @@ describe("Extension Operation Tracking", () => {
     capturedOperations.length = 0;
 
     const failingFlow = flow({ api: mockApi }, async ({ api }, ctx, _input: number) => {
-      await ctx.run("fail-op", () => api.fail());
+      await ctx.exec({ key: "fail-op", fn: () => api.fail() });
     });
 
     await expect(flow.execute(failingFlow, 1, { extensions: [comprehensiveTracker] })).rejects.toThrow(
@@ -230,22 +230,22 @@ describe("Extension Operation Tracking", () => {
     }));
 
     const validateOrderFlow = flow(ecommerceServices, async (services, ctx, order: Order) => {
-      return await ctx.run("validate", () => services.validateOrder(order));
+      return await ctx.exec({ key: "validate", fn: () => services.validateOrder(order) });
     });
 
     const checkInventoryFlow = flow(ecommerceServices, async (services, ctx, items: string[]) => {
-      return await ctx.run("check-inventory", () => services.checkInventory(items));
+      return await ctx.exec({ key: "check-inventory", fn: () => services.checkInventory(items) });
     });
 
     const chargePaymentFlow = flow(
       ecommerceServices,
       async (services, ctx, payment: { orderId: string; amount: number }) => {
-        return await ctx.run("charge", () => services.chargePayment(payment.orderId, payment.amount));
+        return await ctx.exec({ key: "charge", fn: () => services.chargePayment(payment.orderId, payment.amount) });
       }
     );
 
     const reserveInventoryFlow = flow(ecommerceServices, async (services, ctx, items: string[]) => {
-      return await ctx.run("reserve", () => services.reserveInventory(items));
+      return await ctx.exec({ key: "reserve", fn: () => services.reserveInventory(items) });
     });
 
     const processOrderFlow = flow(ecommerceServices, async (services, ctx, order: Order) => {
@@ -266,9 +266,8 @@ describe("Extension Operation Tracking", () => {
         throw new Error(`Inventory failed: ${(inventoryResult.reason as Error).message}`);
       }
 
-      const statusUpdate = await ctx.run("update-status", () =>
-        services.updateOrderStatus(order.orderId, "completed")
-      );
+      const statusUpdate = await ctx.exec({ key: "update-status", fn: () =>
+        services.updateOrderStatus(order.orderId, "completed") });
 
       return {
         orderId: order.orderId,

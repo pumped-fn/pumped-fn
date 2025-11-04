@@ -1,0 +1,232 @@
+# Verifiable Skill Code Pattern
+
+**Date:** 2025-11-03
+**Status:** Proposed
+**Author:** Claude + User
+
+## Problem
+
+Skills contain code examples that can become stale or incorrect:
+- No type checking on inline code in markdown
+- Easy for examples to drift from actual API
+- Hard to maintain code quality across skills
+- AI might use outdated patterns
+
+## Solution
+
+Store skill code examples as actual TypeScript files that can be typechecked against the library.
+
+## Pattern Structure
+
+```
+.claude/skills/
+  <skill-name>/
+    SKILL.md or references/*.md    # Skill documentation
+    examples/
+      <topic>/
+        package.json      # Links to actual library package
+        tsconfig.json     # Strict typechecking config
+        *.ts              # Typechecked example files
+        README.md         # Usage instructions
+```
+
+## Implementation Example
+
+See `.claude/skills/pumped-design/examples/skill-examples/` for reference.
+
+### Directory Contents
+
+**package.json:**
+```json
+{
+  "name": "@pumped-fn/skill-examples",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@pumped-fn/core-next": "workspace:*",
+    "typescript": "^5.7.2"
+  }
+}
+```
+
+**tsconfig.json:**
+```json
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "es2022"
+  },
+  "include": ["*.ts"]
+}
+```
+
+**Example file header:**
+```typescript
+/**
+ * <Example Name>
+ *
+ * <Description of what it demonstrates>
+ * Demonstrates: <Key patterns>
+ *
+ * Referenced in: <path-to-skill-file.md>
+ * Section: <section-name>
+ */
+```
+
+### Workspace Integration
+
+Add to `pnpm-workspace.yaml`:
+```yaml
+packages:
+  - '.claude/skills/*/examples/*'
+```
+
+### Verification
+
+```bash
+# Typecheck all skill examples
+pnpm --filter "@pumped-fn/skill-examples" typecheck
+
+# Watch mode
+pnpm --filter "@pumped-fn/skill-examples" typecheck:watch
+```
+
+## Benefits
+
+1. **Type Safety** - Examples guaranteed to compile
+2. **Grep-able** - AI can find examples by file name
+3. **Maintainable** - Breaking API changes caught by typecheck
+4. **Trustworthy** - Examples are real, working code
+5. **Testable** - Can add unit tests for examples
+
+## AI Usage Pattern
+
+When AI reads skill:
+1. Skill markdown references file path (e.g., `correlation-tracker.ts`)
+2. AI greps for `correlation-tracker.ts` in skill examples
+3. AI reads actual typechecked TypeScript file
+4. AI uses verified, current API patterns
+
+## Example References in Markdown
+
+In skill markdown:
+```markdown
+### Complete Example: Request Correlation Tracker
+
+See: `.claude/skills/pumped-design/examples/extension-authoring/correlation-tracker.ts`
+
+\`\`\`typescript
+// Reference implementation (typechecked)
+import { extension, type Extension, type Core } from '@pumped-fn/core-next'
+...
+\`\`\`
+```
+
+## Module Resolution - SOLVED
+
+**Working Solution:**
+
+1. **Use `workspace:*` protocol** (not `link:`)
+2. **Use specific workspace path** (not glob pattern)
+3. **Run `pnpm install` and `pnpm build`** to ensure dist/ exists
+
+**Configuration:**
+
+pnpm-workspace.yaml:
+```yaml
+packages:
+  - '.claude/skills/pumped-design/examples/skill-examples'
+```
+
+package.json:
+```json
+{
+  "devDependencies": {
+    "@pumped-fn/core-next": "workspace:*"
+  }
+}
+```
+
+tsconfig.json:
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "esnext"
+  }
+}
+```
+
+**Why It Works:**
+- `workspace:*` creates proper symlink to built package with dist/
+- Specific path (not glob) ensures pnpm resolves workspace correctly
+- `pnpm build` ensures packages/next/dist/ exists before typecheck
+- `moduleResolution: "node"` follows symlinks to find exports
+
+**Verification:**
+```bash
+pnpm --filter "@pumped-fn/skill-examples" typecheck
+# Passes with no errors
+```
+
+**Previous Investigation (for reference):**
+
+Attempted solutions that didn't work:
+1. ❌ `link:../../../packages/next` - doesn't create proper node_modules structure
+2. ❌ Glob pattern in workspace.yaml - pnpm doesn't resolve correctly
+3. ❌ `moduleResolution: "bundler"` - doesn't follow symlinks properly
+
+## Future Improvements
+
+1. ✅ ~~Fix module resolution~~ - SOLVED (workspace:* + specific path + pnpm build)
+2. Add CI step to verify all skill examples typecheck
+3. Add unit tests for skill examples
+4. Generate skill markdown from TypeScript (single source of truth)
+5. Apply pattern to remaining 250 code blocks across 14 other sub-skills
+
+## Adoption Guidelines
+
+### When to Use
+
+Use this pattern for:
+- API usage examples
+- Complete feature implementations
+- Complex patterns requiring type safety
+- Code that changes frequently
+
+### When NOT to Use
+
+Skip this pattern for:
+- Simple conceptual examples
+- Pseudo-code or simplified illustrations
+- Examples spanning multiple incompatible environments
+
+### Migration Path
+
+For existing skills:
+1. Create `examples/<topic>/` directory
+2. Extract code examples to `.ts` files
+3. Add package.json + tsconfig.json
+4. Run typecheck, fix errors
+5. Update skill markdown to reference files
+6. Add to pnpm workspace
+
+## Success Criteria
+
+Pattern is successful when:
+- ✅ Examples are actual TypeScript files
+- ✅ Skill markdown references file paths
+- ✅ AI can grep for examples
+- ✅ Examples typecheck successfully
+- ⏳ CI fails if examples don't typecheck (pending CI setup)
+
+## Related
+
+- `.claude/skills/pumped-design/examples/skill-examples/` - Implementation
+- `.claude/skills/pumped-design/references/extension-authoring.md` - First skill using pattern
