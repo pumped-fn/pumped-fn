@@ -37,7 +37,7 @@ describe("Devtools Extension", () => {
     })
 
     const testFlow = flow(async (ctx) => {
-      await ctx.run("test-operation", () => 42)
+      await ctx.exec({ key: "test-operation", fn: () => 42 })
       return { result: "test" }
     })
 
