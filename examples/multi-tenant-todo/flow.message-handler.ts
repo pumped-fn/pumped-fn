@@ -18,23 +18,23 @@ export namespace HandleCreateTodo {
 
 export const handleCreateTodo = flow(
   async (ctx, input: HandleCreateTodo.Input): Promise<HandleCreateTodo.Result> => {
-    const validation = await ctx.run('validate-input', () => {
+    const validation = await ctx.exec({ key: 'validate-input', fn: () => {
       if (!input.title || input.title.trim() === '') {
         return { ok: false as const, reason: 'EMPTY_TITLE' as const }
       }
-
+    
       if (input.currentTodos.has(input.id)) {
         return { ok: false as const, reason: 'DUPLICATE_ID' as const }
       }
-
+    
       return { ok: true as const }
-    })
+    } })
 
     if (!validation.ok) {
       return { success: false, reason: validation.reason }
     }
 
-    const todo = await ctx.run('create-todo', () => {
+    const todo = await ctx.exec({ key: 'create-todo', fn: () => {
       const item: Todo.Item = {
         id: input.id,
         title: input.title.trim(),
@@ -42,7 +42,7 @@ export const handleCreateTodo = flow(
         createdAt: Date.now()
       }
       return item
-    })
+    } })
 
     return { success: true, todo }
   }
@@ -64,22 +64,22 @@ export namespace HandleUpdateTodo {
 
 export const handleUpdateTodo = flow(
   async (ctx, input: HandleUpdateTodo.Input): Promise<HandleUpdateTodo.Result> => {
-    const existing = await ctx.run('find-todo', () => {
+    const existing = await ctx.exec({ key: 'find-todo', fn: () => {
       return input.currentTodos.get(input.id)
-    })
+    } })
 
     if (!existing) {
       return { success: false, reason: 'TODO_NOT_FOUND' }
     }
 
-    const updated = await ctx.run('update-todo', () => {
+    const updated = await ctx.exec({ key: 'update-todo', fn: () => {
       const item: Todo.Item = {
         ...existing,
         title: input.title ?? existing.title,
         completed: input.completed ?? existing.completed
       }
       return item
-    })
+    } })
 
     return { success: true, todo: updated }
   }
@@ -99,9 +99,9 @@ export namespace HandleDeleteTodo {
 
 export const handleDeleteTodo = flow(
   async (ctx, input: HandleDeleteTodo.Input): Promise<HandleDeleteTodo.Result> => {
-    const exists = await ctx.run('check-exists', () => {
+    const exists = await ctx.exec({ key: 'check-exists', fn: () => {
       return input.currentTodos.has(input.id)
-    })
+    } })
 
     if (!exists) {
       return { success: false, reason: 'TODO_NOT_FOUND' }

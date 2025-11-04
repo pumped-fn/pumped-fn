@@ -57,9 +57,9 @@ const userService = derive(
 const getUserFlow = flow(
   { db: dbConnection },
   async (deps, ctx, userId: string) => {
-    const results = await ctx.run('query-user-by-id', async () => {
+    const results = await ctx.exec({ key: 'query-user-by-id', fn: async () => {
       return deps.db.query('SELECT * FROM users WHERE id = ?', [userId])
-    })
+    } })
 
     if (results.length === 0) {
       return { ok: false as const, reason: 'user_not_found' as const }
