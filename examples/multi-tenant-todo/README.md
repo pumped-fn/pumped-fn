@@ -57,6 +57,16 @@ Example demonstrating actor pattern implementation with pumped-fn where each ten
 - Validation logic isolated in flow steps
 - Flows tested independently from actor infrastructure
 
+**flow.execute() vs scope.exec():**
+This example uses `flow.execute()` instead of `scope.exec()` for message handlers:
+- **Stateless execution** - Each handler runs in fresh isolated context
+- **Clear dependencies** - All inputs explicitly passed as parameters
+- **No lifecycle management** - No scope creation/disposal overhead per message
+- **Easier testing** - Each handler testable independently without scope setup
+- **Deterministic** - Same inputs always produce same outputs
+
+Use `scope.exec()` when you need shared context/tags across flows or dependency injection. Use `flow.execute()` for independent stateless operations like actor message handlers.
+
 **Actor Pattern:**
 - Isolated state per tenant (no shared state)
 - Sequential message processing via internal queue

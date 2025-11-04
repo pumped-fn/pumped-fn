@@ -282,7 +282,7 @@ export const correlationExtension = extension({
     }
 
     if (operation.kind === 'execute') {
-      const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const correlationId = `corr-${crypto.randomUUID()}`
 
       store.activeRequests.set(correlationId, {
         startTime: Date.now(),

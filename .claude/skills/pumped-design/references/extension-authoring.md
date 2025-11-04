@@ -121,6 +121,32 @@ type Operation =
 
 **Rule:** Flow ctx uses Tag objects, extension context uses symbol keys.
 
+**Visual Example - Both APIs in Same Extension:**
+
+```typescript
+const requestIdTag = tag(custom<string>(), { label: 'request-id' })
+
+const example = extension({
+  name: 'dual-api-example',
+  wrap: (scope, next, operation) => {
+    if (operation.kind === 'journal') {
+      const requestIdFromContext = operation.context.get(requestIdTag.key)
+
+      console.log('Extension context API:', requestIdFromContext)
+    }
+
+    return next().then((result) => {
+      if (operation.kind === 'journal' && operation.ctx) {
+        const requestIdFromCtx = operation.ctx.get(requestIdTag)
+
+        console.log('Flow ctx API:', requestIdFromCtx)
+      }
+      return result
+    })
+  }
+})
+```
+
 ### Tag System for Context Propagation
 
 Tags propagate data through execution hierarchy. Only `journal`, `subflow`, and `parallel` have `context: Tag.Store`:
