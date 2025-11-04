@@ -176,8 +176,8 @@ describe("Flow Execution Tracking", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(result).toBe("completed-early", "flow should complete early");
-      expect(timeoutCallbackInvoked).toBe(false, "timeout should not trigger after early completion");
+      expect(result).toBe("completed-early");
+      expect(timeoutCallbackInvoked).toBe(false);
     });
   });
 

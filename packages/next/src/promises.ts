@@ -10,6 +10,7 @@ export class Promised<T> implements PromiseLike<T> {
   ) {
     this.promise = promise instanceof Promised ? promise.promise : promise;
     this.executionDataPromise = executionDataPromise;
+    this.promise.catch(() => {});
   }
 
   static create<T>(
