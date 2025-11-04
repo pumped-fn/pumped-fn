@@ -182,11 +182,7 @@ const queryCache = derive([database], (db) => {
 
 ## Complete Example
 
-See examples/http-server:
-- `state.session-cache.ts` - Session cache with TTL
-- `state.oauth-tokens.ts` - OAuth token state
-- `resource.api-client.ts` - API client consuming token state
-- `flow.authenticated-request.ts` - Flow orchestrating state + resource
+Complete implementations demonstrating these patterns will be available in the examples directory once implemented.
 
 ## Key Points
 
@@ -201,4 +197,4 @@ See examples/http-server:
 
 - [Reactive Patterns](./08-reactive-patterns.md) - `.reactive` mechanics
 - [Executors and Dependencies](./01-executors-and-dependencies.md) - `provide/derive` API
-- [Flow Context](../../../.claude/skills/pumped-design/references/flow-context.md) - `ctx.resource()` usage
+- [Flow](./05-flow.md) - Flow context operations including `ctx.resource()`
