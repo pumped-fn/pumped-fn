@@ -4,10 +4,9 @@
  * Extracted from entrypoint-patterns.md
  */
 
-// @ts-nocheck
 import { createScope, provide, tag, custom, preset } from '@pumped-fn/core-next'
 
-type express = any
+type Express = any
 type Command = any
 type Hono = any
 type Fastify = any
@@ -19,14 +18,17 @@ const cron = { schedule: (pattern: string, fn: () => void) => {} }
 const expect = (val: any) => ({ toEqual: (expected: any) => {} })
 type app = any
 
-const dbConfig = tag(custom<{
-  host: string
-  port: number
-  database: string
-  user?: string
-  password?: string
-}>(), { label: 'config.database' })
+namespace Config {
+  export type Database = {
+    host: string
+    port: number
+    database: string
+    user?: string
+    password?: string
+  }
+}
 
+const dbConfig = tag(custom<Config.Database>(), { label: 'config.database' })
 const apiKey = tag(custom<string>(), { label: 'config.apiKey' })
 const logLevel = tag(custom<string>(), { label: 'config.logLevel' })
 
@@ -34,10 +36,13 @@ const loggingExtension = {}
 const metricsExtension = {}
 const tracingExtension = {}
 
-const createUser = {} as any
-const cleanupExpiredSessions = {} as any
-const processOrderCreated = {} as any
-const processRequest = {} as any
+type FlowResult<T> = { success: true } & T | { success: false; reason: string }
+type Flow<I, O> = any
+
+const createUser: Flow<any, FlowResult<{ user: any }>> = {} as any
+const cleanupExpiredSessions: Flow<any, FlowResult<{}>> = {} as any
+const processOrderCreated: Flow<any, FlowResult<{}>> = {} as any
+const processRequest: Flow<any, FlowResult<{ data: any }>> = {} as any
 
 /**
  * HTTP Server Entrypoint
@@ -49,8 +54,8 @@ const processRequest = {} as any
  */
 export const httpServerEntrypoint = () => {
   const app = {} as any
-  const scope = createScope(
-    preset(
+  const scope = createScope({
+    tags: [
       dbConfig({
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5432'),
@@ -59,14 +64,14 @@ export const httpServerEntrypoint = () => {
         password: process.env.DB_PASSWORD || 'postgres'
       }),
       apiKey(process.env.API_KEY || '')
-    )
-  )
+    ]
+  })
 
   app.set('scope', scope)
 
   app.post('/users', async (req: any, res: any) => {
     const scope = req.app.get('scope')
-    const result = await scope.exec(createUser, req.body)
+    const result = await scope.exec(createUser, req.body) as FlowResult<{ user: any }>
     if (!result.success) {
       return res.status(400).json({ error: result.reason })
     }
@@ -101,18 +106,18 @@ export const cliEntrypoint = () => {
     .argument('<email>', 'User email')
     .argument('<name>', 'User name')
     .action(async (email: string, name: string) => {
-      const scope = createScope(
-        preset(
+      const scope = createScope({
+        tags: [
           dbConfig({
             host: process.env.DB_HOST || 'localhost',
             port: parseInt(process.env.DB_PORT || '5432'),
             database: process.env.DB_NAME || 'app'
           })
-        )
-      )
+        ]
+      })
 
       try {
-        const result = await scope.exec(createUser, { email, name })
+        const result = await scope.exec(createUser, { email, name }) as FlowResult<{ user: any }>
         if (!result.success) {
           console.error(`Error: ${result.reason}`)
           process.exit(1)
@@ -133,20 +138,20 @@ export const cliEntrypoint = () => {
  * Section: Code Template - Lambda Entrypoint
  */
 export const lambdaEntrypoint = async (event: any): Promise<any> => {
-  const scope = createScope(
-    preset(
+  const scope = createScope({
+    tags: [
       dbConfig({
         host: process.env.DB_HOST!,
         port: parseInt(process.env.DB_PORT || '5432'),
         database: process.env.DB_NAME!
       })
-    )
-  )
+    ]
+  })
 
   try {
     if (event.httpMethod === 'POST' && event.path === '/users') {
-      const body = JSON.parse(event.body || '{}')
-      const result = await scope.exec(createUser, { email: body.email, name: body.name })
+      const body = JSON.parse(event.body || '{}') as { email: string; name: string }
+      const result = await scope.exec(createUser, { email: body.email, name: body.name }) as FlowResult<{ user: any }>
 
       if (!result.success) {
         return { statusCode: 400, body: JSON.stringify({ error: result.reason }) }
@@ -167,19 +172,19 @@ export const lambdaEntrypoint = async (event: any): Promise<any> => {
  * Referenced in: entrypoint-patterns.md
  * Section: Scope Creation Patterns
  */
-export const scopeCreationWithTags = createScope(
-  preset(
-    dbConfig({ host: process.env.DB_HOST || 'localhost', port: parseInt(process.env.DB_PORT || '5432') }),
+export const scopeCreationWithTags = createScope({
+  tags: [
+    dbConfig({ host: process.env.DB_HOST || 'localhost', port: parseInt(process.env.DB_PORT || '5432'), database: process.env.DB_NAME || 'app' }),
     apiKey(process.env.API_KEY || ''),
     logLevel(process.env.LOG_LEVEL || 'info')
-  )
-)
+  ]
+})
 
 export const scopeCreationWithExtensions = createScope()
 
-export const scopeCreationWithBoth = createScope(
-  preset(dbConfig({ host: process.env.DB_HOST || 'localhost' }))
-)
+export const scopeCreationWithBoth = createScope({
+  tags: [dbConfig({ host: process.env.DB_HOST || 'localhost', port: 5432, database: 'app' })]
+})
 
 /**
  * HTTP Framework Patterns
@@ -222,9 +227,9 @@ export const httpFrameworkPatterns = {
  * Section: Environment-Specific Patterns - CLI Optimization
  */
 export const cliWithFactory = () => {
-  const createAppScope = () => createScope(
-    preset(dbConfig({ host: process.env.DB_HOST || 'localhost' }))
-  )
+  const createAppScope = () => createScope({
+    tags: [dbConfig({ host: process.env.DB_HOST || 'localhost', port: 5432, database: 'app' })]
+  })
 
   const program = {} as any
 
@@ -247,14 +252,14 @@ export const cliWithFactory = () => {
  * Section: Environment-Specific Patterns - Scheduled Jobs
  */
 export const cronEntrypoint = () => {
-  const scope = createScope(
-    preset(dbConfig({ host: process.env.DB_HOST || 'localhost' }))
-  )
+  const scope = createScope({
+    tags: [dbConfig({ host: process.env.DB_HOST || 'localhost', port: 5432, database: 'app' })]
+  })
 
   cron.schedule('0 * * * *', async () => {
     const result = await scope.exec(cleanupExpiredSessions, {
       olderThan: new Date(Date.now() - 24 * 60 * 60 * 1000)
-    })
+    }) as FlowResult<{}>
     if (!result.success) {
       console.error('Cleanup failed:', result.reason)
     }
@@ -279,7 +284,9 @@ export const cronEntrypoint = () => {
 export const kafkaConsumerEntrypoint = async () => {
   const kafka = {} as any
   const consumer = {} as any
-  const scope = createScope(preset(dbConfig({ host: process.env.DB_HOST || 'localhost' })))
+  const scope = createScope({
+    tags: [dbConfig({ host: process.env.DB_HOST || 'localhost', port: 5432, database: 'app' })]
+  })
 
   await consumer.connect()
   await consumer.subscribe({ topic: 'orders', fromBeginning: false })
@@ -288,7 +295,7 @@ export const kafkaConsumerEntrypoint = async () => {
     eachMessage: async ({ topic, message }: { topic: string; message: any }) => {
       const value = JSON.parse(message.value?.toString() || '{}')
       try {
-        const result = await scope.exec(processOrderCreated, value)
+        const result = await scope.exec(processOrderCreated, value) as FlowResult<{}>
         if (!result.success) {
           console.error(`Processing failed: ${result.reason}`)
         }
@@ -317,14 +324,16 @@ export const kafkaConsumerEntrypoint = async () => {
  */
 export const cloudflareWorkerHandler = {
   async fetch(request: Request, env: any): Promise<Response> {
-    const scope = createScope(preset(apiKey(env.API_KEY)))
+    const scope = createScope({
+      tags: [apiKey(env.API_KEY)]
+    })
     try {
       const url = new URL(request.url)
       const result = await scope.exec(processRequest, {
         path: url.pathname,
         method: request.method,
         body: request.method !== 'GET' ? await request.json() : undefined
-      })
+      }) as FlowResult<{ data: any }>
       if (!result.success) {
         return Response.json({ error: result.reason }, { status: 400 })
       }
@@ -343,16 +352,16 @@ export const cloudflareWorkerHandler = {
  * Referenced in: entrypoint-patterns.md
  * Section: Environment-Specific Patterns - Next.js
  */
-export const nextjsAppScope = createScope(
-  preset(
-    dbConfig({ host: process.env.DB_HOST || 'localhost' }),
+export const nextjsAppScope = createScope({
+  tags: [
+    dbConfig({ host: process.env.DB_HOST || 'localhost', port: 5432, database: 'app' }),
     apiKey(process.env.API_KEY || '')
-  )
-)
+  ]
+})
 
 export const nextjsApiRoute = async (request: Request) => {
-  const body = await request.json()
-  const result = await nextjsAppScope.exec(createUser, { email: body.email, name: body.name })
+  const body = await request.json() as { email: string; name: string }
+  const result = await nextjsAppScope.exec(createUser, { email: body.email, name: body.name }) as FlowResult<{ user: any }>
   if (!result.success) {
     return Response.json({ error: result.reason }, { status: 400 })
   }
@@ -426,7 +435,7 @@ export const sharedHttpScope = () => {
 
   app.post('/users', async (req: any, res: any) => {
     const scope = req.app.get('scope')
-    const result = await scope.exec(createUser, req.body)
+    const result = await scope.exec(createUser, req.body) as FlowResult<{ user: any }>
     res.json(result)
   })
 }
@@ -439,13 +448,13 @@ export const envVarsValidation = () => {
     }
   }
 
-  const scope = createScope(
-    preset(
+  const scope = createScope({
+    tags: [
       dbConfig({
         host: process.env.DB_HOST!,
         port: parseInt(process.env.DB_PORT || '5432'),
         database: process.env.DB_NAME!
       })
-    )
-  )
+    ]
+  })
 }

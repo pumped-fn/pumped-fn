@@ -4,12 +4,39 @@
  * Extracted from integration-hono.md
  */
 
-// @ts-nocheck
-import { createScope, flow, tag, type Flow } from '@pumped-fn/core-next'
-import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
-import { verify } from 'jsonwebtoken'
-import { z } from 'zod'
+import { createScope, flow, tag, type Flow, custom } from '@pumped-fn/core-next'
+
+type HonoContext = {
+  set: (key: string, value: any) => void
+  get: (key: string) => any
+  req: {
+    json: () => Promise<any>
+    param: (name: string) => string
+    header: (name: string) => string | undefined
+  }
+  json: (data: any, status?: number) => any
+  cookies: { get: (name: string) => { value?: string } | undefined }
+}
+type HonoMiddleware = (c: HonoContext, next: () => Promise<void>) => Promise<void | any>
+type Hono = {
+  use: (path: string, handler: HonoMiddleware) => void
+  get: (path: string, handler: (c: HonoContext) => Promise<any>) => void
+  post: (path: string, ...handlers: any[]) => void
+  put: (path: string, handler: (c: HonoContext) => Promise<any>) => void
+  delete: (path: string, handler: (c: HonoContext) => Promise<any>) => void
+  onError: (handler: (error: Error, c: HonoContext) => any) => void
+  fetch: any
+}
+type ServeOptions = { fetch: any; port: number }
+type Server = { close: (callback: () => void) => void }
+const serve = (options: ServeOptions): Server => ({} as any)
+const verify = (token: string, secret: string): any => ({} as any)
+namespace z {
+  export const object = (schema: any) => ({ parse: (data: any) => data })
+  export const string = () => ({ email: () => ({ min: (n: number) => ({}) }), min: (n: number) => ({}) })
+  export const number = () => ({ optional: () => ({}) })
+  export type ZodSchema = any
+}
 
 // ============================================================================
 // HONO INTEGRATION
@@ -23,19 +50,32 @@ import { z } from 'zod'
  * Referenced in: integration-hono.md
  * Section: Entrypoint Setup
  */
+namespace Config {
+  export type Database = {
+    host: string
+    port: number
+    database: string
+    user?: string
+    password?: string
+  }
+}
+
+const dbConfigTag = tag(custom<Config.Database>(), { label: 'db-config' })
+const apiKeyTag = tag(custom<string>(), { label: 'api-key' })
+
 export const honoEntrypointSetup = () => {
-  const app = new Hono()
+  const app = {} as Hono
 
   const scope = createScope({
     tags: [
-      tag('db-config', {
+      dbConfigTag({
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5432'),
         database: process.env.DB_NAME || 'app',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres'
       }),
-      tag('api-key', process.env.API_KEY || '')
+      apiKeyTag(process.env.API_KEY || '')
     ]
   })
 
@@ -51,7 +91,7 @@ export const honoEntrypointSetup = () => {
  * Section: Scope Injection Middleware
  */
 export const honoScopeMiddleware = (app: Hono, scope: any) => {
-  app.use('*', async (c, next) => {
+  app.use('*', async (c: HonoContext, next: () => Promise<void>) => {
     c.set('scope', scope)
     await next()
   })
@@ -65,12 +105,11 @@ export const honoScopeMiddleware = (app: Hono, scope: any) => {
  * Referenced in: integration-hono.md
  * Section: Route Handlers with Flow Execution
  */
-export const honoRouteHandler = flow({
-  name: 'create-user',
-  handle: async (ctx, input: { email: string; name: string }) => {
+export const honoRouteHandler = flow(
+  async (ctx: any, input: { email: string; name: string }) => {
     return { success: true, user: { id: '1', email: input.email, name: input.name } }
   }
-})
+)
 
 /**
  * Hono Complete Working Example
@@ -81,11 +120,11 @@ export const honoRouteHandler = flow({
  * Section: Complete Working Example
  */
 export const honoCompleteExample = () => {
-  const app = new Hono()
+  const app: Hono = {} as any
 
   const scope = createScope({
     tags: [
-      tag('db-config', {
+      dbConfigTag({
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5432'),
         database: process.env.DB_NAME || 'app',
@@ -95,13 +134,13 @@ export const honoCompleteExample = () => {
     ]
   })
 
-  app.use('*', async (c, next) => {
+  app.use('*', async (c: HonoContext, next: () => Promise<void>) => {
     c.set('scope', scope)
     await next()
   })
 
-  app.post('/users', async (c) => {
-    const scope = c.get('scope')
+  app.post('/users', async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const body = await c.req.json()
 
     const result = await scope.exec(honoRouteHandler, {
@@ -115,22 +154,21 @@ export const honoCompleteExample = () => {
         EMAIL_EXISTS: 409,
         NAME_TOO_SHORT: 400
       }
-      return c.json({ error: result.reason }, statusMap[result.reason] || 400)
+      return c.json({ error: result.reason }, (statusMap as any)[result.reason] || 400)
     }
 
     return c.json(result.user, 201)
   })
 
-  app.get('/users/:id', async (c) => {
-    const scope = c.get('scope')
+  app.get('/users/:id', async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const id = c.req.param('id')
 
-    const getUserFlow = flow({
-      name: 'get-user',
-      handle: async (ctx, input: { id: string }) => {
+    const getUserFlow = flow(
+      async (ctx: any, input: { id: string }) => {
         return { success: true, user: { id: input.id, name: 'Alice', email: 'alice@example.com' } }
       }
-    })
+    )
 
     const result = await scope.exec(getUserFlow, { id })
 
@@ -142,16 +180,15 @@ export const honoCompleteExample = () => {
   })
 
   app.put('/users/:id', async (c) => {
-    const scope = c.get('scope')
+    const scope = c.get('scope') as any
     const id = c.req.param('id')
     const body = await c.req.json()
 
-    const updateUserFlow = flow({
-      name: 'update-user',
-      handle: async (ctx, input: { id: string; email: string; name: string }) => {
+    const updateUserFlow = flow(
+      async (ctx: any, input: { id: string; email: string; name: string }) => {
         return { success: true, user: { id: input.id, email: input.email, name: input.name } }
       }
-    })
+    )
 
     const result = await scope.exec(updateUserFlow, {
       id,
@@ -164,22 +201,21 @@ export const honoCompleteExample = () => {
         USER_NOT_FOUND: 404,
         INVALID_EMAIL: 400
       }
-      return c.json({ error: result.reason }, statusMap[result.reason] || 400)
+      return c.json({ error: result.reason }, (statusMap as any)[result.reason] || 400)
     }
 
     return c.json(result.user, 200)
   })
 
   app.delete('/users/:id', async (c) => {
-    const scope = c.get('scope')
+    const scope = c.get('scope') as any
     const id = c.req.param('id')
 
-    const deleteUserFlow = flow({
-      name: 'delete-user',
-      handle: async (ctx, input: { id: string }) => {
+    const deleteUserFlow = flow(
+      async (ctx: any, input: { id: string }) => {
         return { success: true }
       }
-    })
+    )
 
     const result = await scope.exec(deleteUserFlow, { id })
 
@@ -201,16 +237,15 @@ export const honoCompleteExample = () => {
  * Referenced in: integration-hono.md
  * Section: Request Transformation Pattern
  */
-export const honoRequestTransformationFlow = flow({
-  name: 'create-order',
-  handle: async (ctx, input: { userId: string; items: any[]; shippingAddress: any }) => {
+export const honoRequestTransformationFlow = flow(
+  async (ctx: any, input: { userId: string; items: any[]; shippingAddress: any }) => {
     return { success: true, order: { id: '1', userId: input.userId } }
   }
-})
+)
 
 export const honoRequestTransformationRoute = (app: Hono) => {
-  app.post('/orders', async (c) => {
-    const scope = c.get('scope')
+  app.post('/orders', async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const body = await c.req.json()
 
     const result = await scope.exec(honoRequestTransformationFlow, {
@@ -239,16 +274,15 @@ export const honoRequestTransformationRoute = (app: Hono) => {
  * Referenced in: integration-hono.md
  * Section: Response Mapping Pattern
  */
-export const honoResponseMappingFlow = flow({
-  name: 'process-checkout',
-  handle: async (ctx, input: { userId: string; cartId: string; paymentMethodId: string }) => {
+export const honoResponseMappingFlow = flow(
+  async (ctx: any, input: { userId: string; cartId: string; paymentMethodId: string }) => {
     return { success: true, orderId: '1', total: 100, estimatedDelivery: new Date() }
   }
-})
+)
 
 export const honoResponseMappingRoute = (app: Hono) => {
-  app.post('/checkout', async (c) => {
-    const scope = c.get('scope')
+  app.post('/checkout', async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const body = await c.req.json()
 
     const result = await scope.exec(honoResponseMappingFlow, {
@@ -266,8 +300,8 @@ export const honoResponseMappingRoute = (app: Hono) => {
         USER_NOT_FOUND: 404
       }
       return c.json(
-        { error: result.reason, message: result.message },
-        statusMap[result.reason] || 500
+        { error: result.reason, message: (result as any).message },
+        (statusMap as any)[result.reason] || 500
       )
     }
 
@@ -307,15 +341,14 @@ export const honoAuthMiddleware = (app: Hono) => {
   })
 
   app.get('/api/profile', async (c) => {
-    const scope = c.get('scope')
+    const scope = c.get('scope') as any
     const userId = c.get('userId')
 
-    const getProfileFlow = flow({
-      name: 'get-profile',
-      handle: async (ctx, input: { userId: string }) => {
+    const getProfileFlow = flow(
+      async (ctx: any, input: { userId: string }) => {
         return { success: true, profile: { userId: input.userId } }
       }
-    })
+    )
 
     const result = await scope.exec(getProfileFlow, { userId })
 
@@ -361,16 +394,15 @@ export const honoValidationMiddleware = () => {
 export const honoValidationRoute = (app: Hono) => {
   const { createUserSchema, validateBody } = honoValidationMiddleware()
 
-  app.post('/users', validateBody(createUserSchema), async (c) => {
-    const scope = c.get('scope')
+  app.post('/users', validateBody(createUserSchema), async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const body = c.get('validatedBody')
 
-    const createUserFlow = flow({
-      name: 'create-user',
-      handle: async (ctx, input: any) => {
+    const createUserFlow = flow(
+      async (ctx: any, input: any) => {
         return { success: true, user: { id: '1', ...input } }
       }
-    })
+    )
 
     const result = await scope.exec(createUserFlow, body)
 
@@ -450,25 +482,24 @@ export const honoTypedContext = () => {
     }
   }
 
-  const app = new Hono<Env>()
+  const app: Hono = {} as any
 
   const scope = createScope({ tags: [] })
 
-  app.use('*', async (c, next) => {
+  app.use('*', async (c: HonoContext, next: () => Promise<void>) => {
     c.set('scope', scope)
     await next()
   })
 
-  app.get('/users/:id', async (c) => {
-    const scope = c.get('scope')
+  app.get('/users/:id', async (c: HonoContext) => {
+    const scope = c.get('scope') as any
     const id = c.req.param('id')
 
-    const getUserFlow = flow({
-      name: 'get-user',
-      handle: async (ctx, input: { id: string }) => {
+    const getUserFlow = flow(
+      async (ctx: any, input: { id: string }) => {
         return { success: true, user: { id: input.id, name: 'Alice', email: 'alice@example.com' } }
       }
-    })
+    )
 
     const result = await scope.exec(getUserFlow, { id })
 

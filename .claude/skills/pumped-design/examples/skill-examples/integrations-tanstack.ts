@@ -4,11 +4,19 @@
  * Extracted from integration-tanstack.md
  */
 
-// @ts-nocheck
-import { createScope, flow, tag, type Flow } from '@pumped-fn/core-next'
-import { createFileRoute, createRootRoute, redirect, Outlet, useRouter } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/start'
-import { z } from 'zod'
+import { createScope, flow, tag, custom, type Flow } from '@pumped-fn/core-next'
+
+type createFileRoute = any
+type createRootRoute = any
+type redirect = any
+type Outlet = any
+type useRouter = any
+const createServerFn = (method: string, handler: any) => handler
+namespace z {
+  export const object = (schema: any) => ({ optional: () => ({}) })
+  export const string = () => ({ optional: () => ({}) })
+  export const number = () => ({ optional: () => ({}) })
+}
 
 // ============================================================================
 // TANSTACK START INTEGRATION
@@ -22,16 +30,29 @@ import { z } from 'zod'
  * Referenced in: integration-tanstack.md
  * Section: Create Module-level Scope
  */
+namespace Config {
+  export type Database = {
+    host: string
+    port: number
+    database: string
+    user?: string
+    password?: string
+  }
+}
+
+const dbConfigTag = tag(custom<Config.Database>(), { label: 'db-config' })
+const apiKeyTag = tag(custom<string>(), { label: 'api-key' })
+
 export const tanstackModuleScope = createScope({
   tags: [
-    tag('db-config', {
+    dbConfigTag({
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME || 'app',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres'
     }),
-    tag('api-key', process.env.API_KEY || '')
+    apiKeyTag(process.env.API_KEY || '')
   ]
 })
 
@@ -43,12 +64,11 @@ export const tanstackModuleScope = createScope({
  * Referenced in: integration-tanstack.md
  * Section: Loaders for Data Fetching
  */
-export const tanstackListUsersFlow = flow({
-  name: 'list-users',
-  handle: async (ctx, input: {}) => {
+export const tanstackListUsersFlow = flow(
+  async (ctx: any, input: {}) => {
     return { success: true, users: [{ id: '1', name: 'Alice', email: 'alice@example.com' }] }
   }
-})
+)
 
 /**
  * TanStack Get User Flow
@@ -58,12 +78,11 @@ export const tanstackListUsersFlow = flow({
  * Referenced in: integration-tanstack.md
  * Section: Dynamic Route Loaders
  */
-export const tanstackGetUserFlow = flow({
-  name: 'get-user',
-  handle: async (ctx, input: { id: string }) => {
+export const tanstackGetUserFlow = flow(
+  async (ctx: any, input: { id: string }) => {
     return { success: true, user: { id: input.id, name: 'Alice', email: 'alice@example.com', createdAt: new Date() } }
   }
-})
+)
 
 /**
  * TanStack Create User Flow
@@ -73,12 +92,11 @@ export const tanstackGetUserFlow = flow({
  * Referenced in: integration-tanstack.md
  * Section: Actions for Mutations
  */
-export const tanstackCreateUserFlow = flow({
-  name: 'create-user',
-  handle: async (ctx, input: { email: string; name: string }) => {
+export const tanstackCreateUserFlow = flow(
+  async (ctx: any, input: { email: string; name: string }) => {
     return { success: true, user: { id: '1', email: input.email, name: input.name } }
   }
-})
+)
 
 /**
  * TanStack Create User Server Function
@@ -89,7 +107,7 @@ export const tanstackCreateUserFlow = flow({
  * Section: Actions for Mutations
  */
 export const tanstackCreateUserFn = createServerFn('POST', async (data: { email: string; name: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackCreateUserFlow, data)
+  const result = await tanstackModuleScope.exec(tanstackCreateUserFlow, data) as any
 
   if (!result.success) {
     throw new Error(result.reason)
@@ -106,15 +124,14 @@ export const tanstackCreateUserFn = createServerFn('POST', async (data: { email:
  * Referenced in: integration-tanstack.md
  * Section: Complete CRUD Example
  */
-export const tanstackUpdateUserFlow = flow({
-  name: 'update-user',
-  handle: async (ctx, input: { id: string; email: string; name: string }) => {
+export const tanstackUpdateUserFlow = flow(
+  async (ctx: any, input: { id: string; email: string; name: string }) => {
     return { success: true, user: { id: input.id, email: input.email, name: input.name } }
   }
-})
+)
 
 export const tanstackUpdateUserFn = createServerFn('PUT', async (data: { id: string; email: string; name: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackUpdateUserFlow, data)
+  const result = await tanstackModuleScope.exec(tanstackUpdateUserFlow, data) as any
 
   if (!result.success) {
     throw new Error(result.reason)
@@ -131,15 +148,14 @@ export const tanstackUpdateUserFn = createServerFn('PUT', async (data: { id: str
  * Referenced in: integration-tanstack.md
  * Section: Complete CRUD Example
  */
-export const tanstackDeleteUserFlow = flow({
-  name: 'delete-user',
-  handle: async (ctx, input: { id: string }) => {
+export const tanstackDeleteUserFlow = flow(
+  async (ctx: any, input: { id: string }) => {
     return { success: true }
   }
-})
+)
 
 export const tanstackDeleteUserFn = createServerFn('DELETE', async (data: { id: string }) => {
-  const result = await tanstackModuleScope.exec(tanstackDeleteUserFlow, data)
+  const result = await tanstackModuleScope.exec(tanstackDeleteUserFlow, data) as any
 
   if (!result.success) {
     throw new Error(result.reason)
@@ -156,12 +172,11 @@ export const tanstackDeleteUserFn = createServerFn('DELETE', async (data: { id: 
  * Referenced in: integration-tanstack.md
  * Section: Search Params with Loaders
  */
-export const tanstackSearchUsersFlow = flow({
-  name: 'search-users',
-  handle: async (ctx, input: { query: string; page: number }) => {
+export const tanstackSearchUsersFlow = flow(
+  async (ctx: any, input: { query: string; page: number }) => {
     return { success: true, users: [], total: 0 }
   }
-})
+)
 
 /**
  * TanStack Search Schema
@@ -184,12 +199,11 @@ export const tanstackUsersSearchSchema = z.object({
  * Referenced in: integration-tanstack.md
  * Section: Authentication with Before Load
  */
-export const tanstackValidateSessionFlow = flow({
-  name: 'validate-session',
-  handle: async (ctx, input: { token: string }) => {
+export const tanstackValidateSessionFlow = flow(
+  async (ctx: any, input: { token: string }) => {
     return { success: true, userId: 'user-123' }
   }
-})
+)
 
 /**
  * TanStack Get Dashboard Flow
@@ -199,9 +213,8 @@ export const tanstackValidateSessionFlow = flow({
  * Referenced in: integration-tanstack.md
  * Section: Authentication with Before Load
  */
-export const tanstackGetDashboardFlow = flow({
-  name: 'get-user-dashboard',
-  handle: async (ctx, input: { userId: string }) => {
+export const tanstackGetDashboardFlow = flow(
+  async (ctx: any, input: { userId: string }) => {
     return { success: true, dashboard: { stats: [], activities: [] } }
   }
-})
+)

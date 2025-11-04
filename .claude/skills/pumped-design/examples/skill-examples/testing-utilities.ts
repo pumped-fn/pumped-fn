@@ -4,7 +4,6 @@
  * Extracted from testing-utilities.md
  */
 
-// @ts-nocheck
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { createScope, preset, provide, derive, type Core } from '@pumped-fn/core-next'
 import { readFile } from 'node:fs/promises'
@@ -181,7 +180,7 @@ export const executorTests = () => {
         }
       }
 
-      scope = createScope(preset(fsRead, mockFs))
+      scope = createScope(preset(fsRead, mockFs as any))
     })
 
     afterEach(async () => {

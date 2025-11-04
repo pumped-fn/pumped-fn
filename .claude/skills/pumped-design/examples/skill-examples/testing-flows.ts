@@ -4,7 +4,6 @@
  * Extracted from testing-flows.md
  */
 
-// @ts-nocheck
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { flow, createScope, preset, derive, type Core } from '@pumped-fn/core-next'
 
@@ -167,7 +166,7 @@ export namespace CreateUser {
 export const createUser = flow(
   { userRepo: userRepository },
   ({ userRepo }) =>
-    async (ctx: Core.Context, input: CreateUser.Input): Promise<CreateUser.Result> => {
+    async (ctx: any, input: CreateUser.Input): Promise<CreateUser.Result> => {
       const validation = await ctx.run('validate', () => {
         if (input.name.length < 2) {
           return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
@@ -221,7 +220,7 @@ export const flowWithDependenciesTests = () => {
       const result = await scope.exec(createUser, {
         name: 'Alice',
         email: 'alice@example.com'
-      })
+      }) as any
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -233,7 +232,7 @@ export const flowWithDependenciesTests = () => {
       const result = await scope.exec(createUser, {
         name: 'A',
         email: 'alice@example.com'
-      })
+      }) as any
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -245,7 +244,7 @@ export const flowWithDependenciesTests = () => {
       const result = await scope.exec(createUser, {
         name: 'Alice',
         email: 'invalid-email.com'
-      })
+      }) as any
 
       expect(result.success).toBe(false)
       if (!result.success) {

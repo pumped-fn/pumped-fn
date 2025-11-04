@@ -4,7 +4,6 @@
  * Extracted from resource-lazy.md
  */
 
-// @ts-nocheck
 import { provide, derive, tag, name } from '@pumped-fn/core-next'
 
 /**
@@ -184,8 +183,10 @@ export const lazyConditionalLogger = (() => {
  * Referenced in: resource-lazy.md
  * Section: Lazy Dependencies - Alternative
  */
+import { custom } from '@pumped-fn/core-next'
+
 export const lazyLoggerWithTags = (() => {
-  const envTag = tag<string>('env')
+  const envTag = tag(custom<string>(), { label: 'env' })
 
   const consoleLogger = provide(() => ({ log: (msg: string) => console.log(msg) }))
   const pinoLogger = provide(() => ({ log: (msg: string) => console.log(`[PINO] ${msg}`) }))
@@ -193,7 +194,7 @@ export const lazyLoggerWithTags = (() => {
   const logger = derive(
     { console: consoleLogger.lazy, pino: pinoLogger.lazy },
     async ({ console, pino }, ctl) => {
-      const env = ctl.scope.tags.get(envTag.key) ?? 'development'
+      const env = envTag.readFrom(ctl.scope) ?? 'development'
       return env === 'development'
         ? await console.resolve()
         : await pino.resolve()
@@ -296,7 +297,7 @@ export const lazyStaticResources = (() => {
 
   const apiClient = derive(
     config.static,
-    async (cfg) => ({ url: (await cfg()).apiUrl, timeout: (await cfg()).timeout })
+    async (cfg: any) => ({ url: cfg.apiUrl, timeout: cfg.timeout })
   )
 
   return { config, apiClient }
