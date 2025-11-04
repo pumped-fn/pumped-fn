@@ -143,16 +143,29 @@ class FlowContext implements Flow.Context {
   public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
   public readonly tags: Tag.Tagged[] | undefined;
+  private abortController: AbortController;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext | undefined
+    private parent?: FlowContext | undefined,
+    abortController?: AbortController
   ) {
     this.scope = scope;
     this.reversedExtensions = [...extensions].reverse();
     this.tags = tags;
+    this.abortController = abortController || new AbortController();
+  }
+
+  get signal(): AbortSignal {
+    return this.abortController.signal;
+  }
+
+  throwIfAborted(): void {
+    if (this.signal.aborted) {
+      throw new Error("Flow execution cancelled");
+    }
   }
 
   resolve<T>(executor: Core.Executor<T>): Promised<T> {
@@ -241,7 +254,13 @@ class FlowContext implements Flow.Context {
     return value;
   }
 
+  /**
+   * @deprecated Use ctx.exec({ fn, params, key }) instead
+   */
   run<T>(key: string, fn: () => Promise<T> | T): Promised<T>;
+  /**
+   * @deprecated Use ctx.exec({ fn, params, key }) instead
+   */
   run<T, P extends readonly unknown[]>(
     key: string,
     fn: (...args: P) => Promise<T> | T,
@@ -253,6 +272,10 @@ class FlowContext implements Flow.Context {
     fn: ((...args: P) => Promise<T> | T) | (() => Promise<T> | T),
     ...params: P
   ): Promised<T> {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV !== 'production') {
+      console.warn(`ctx.run() is deprecated. Use ctx.exec({ fn, params, key }) instead.`);
+    }
+
     if (!this.journal) {
       this.journal = new Map();
     }
@@ -314,11 +337,158 @@ class FlowContext implements Flow.Context {
     input: Flow.InferInput<F>
   ): Promised<Flow.InferOutput<F>>;
 
+  exec<F extends Flow.UFlow>(config: {
+    flow: F;
+    input: Flow.InferInput<F>;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<Flow.InferOutput<F>>;
+
+  exec<T>(config: {
+    fn: () => T | Promise<T>;
+    params?: never;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<T>;
+
+  exec<Fn extends (...args: any[]) => any>(config: {
+    fn: Fn;
+    params: Parameters<Fn>;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  }): Promised<ReturnType<Fn>>;
+
   exec<F extends Flow.UFlow>(
-    keyOrFlow: string | F,
-    flowOrInput: F | Flow.InferInput<F>,
+    keyOrFlowOrConfig: string | F | { flow?: F; fn?: any; input?: Flow.InferInput<F>; params?: any[]; key?: string; timeout?: number; retry?: number; tags?: Tag.Tagged[] },
+    flowOrInput?: F | Flow.InferInput<F>,
     inputOrUndefined?: Flow.InferInput<F>
-  ): Promised<Flow.InferOutput<F>> {
+  ): Promised<any> {
+    if (typeof keyOrFlowOrConfig === "object" && keyOrFlowOrConfig !== null && !("factory" in keyOrFlowOrConfig)) {
+      const config = keyOrFlowOrConfig;
+
+      this.throwIfAborted();
+
+      const childAbort = new AbortController();
+
+      if (this.signal.aborted) {
+        childAbort.abort(this.signal.reason);
+      } else {
+        this.signal.addEventListener("abort", () => {
+          childAbort.abort(this.signal.reason);
+        }, { once: true });
+      }
+
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      if (config.timeout) {
+        timeoutId = setTimeout(() => {
+          if (!childAbort.signal.aborted) {
+            childAbort.abort(new Error(`Operation timeout after ${config.timeout}ms`));
+          }
+        }, config.timeout);
+      }
+
+      if ("flow" in config) {
+        const flow = config.flow as F;
+        const input = config.input as Flow.InferInput<F>;
+
+        if (config.key) {
+          if (!this.journal) {
+            this.journal = new Map();
+          }
+
+          const flowName = this.find(flowMeta.flowName) || "unknown";
+          const depth = this.get(flowMeta.depth);
+          const journalKey = `${flowName}:${depth}:${config.key}`;
+
+          const promise = (async () => {
+            const journal = this.journal!;
+
+            if (journal.has(journalKey)) {
+              const entry = journal.get(journalKey);
+              if (isErrorEntry(entry)) {
+                throw entry.error;
+              }
+              return entry as Flow.InferOutput<F>;
+            }
+
+            this.throwIfAborted();
+
+            const handler = await this.scope.resolve(flow);
+            const definition = flowDefinitionMeta.readFrom(flow);
+
+            if (definition) {
+              const validated = validate(definition.input, input);
+              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
+              childContext.initializeExecutionContext(definition.name, false);
+
+              try {
+                const result = await handler(childContext, validated);
+                validate(definition.output, result);
+                journal.set(journalKey, result);
+                return result;
+              } catch (error) {
+                journal.set(journalKey, { __error: true, error });
+                throw error;
+              } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+              }
+            } else {
+              throw new Error("Flow definition not found");
+            }
+          })();
+
+          return Promised.create(promise);
+        } else {
+          return this.scope.resolve(flow).map(async (handler) => {
+            this.throwIfAborted();
+
+            const definition = flowDefinitionMeta.readFrom(flow);
+            if (definition) {
+              const validated = validate(definition.input, input);
+              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
+              childContext.initializeExecutionContext(definition.name, false);
+
+              try {
+                const result = await handler(childContext, validated);
+                validate(definition.output, result);
+                return result;
+              } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+              }
+            } else {
+              throw new Error("Flow definition not found");
+            }
+          });
+        }
+      } else if ("fn" in config) {
+        const fn = config.fn;
+        const params = "params" in config ? config.params || [] : [];
+
+        if (config.key) {
+          return this.run(config.key, fn, ...params);
+        } else {
+          this.throwIfAborted();
+          return Promised.try(async () => {
+            try {
+              const result = await fn(...params);
+              return result;
+            } finally {
+              if (timeoutId) clearTimeout(timeoutId);
+            }
+          });
+        }
+      } else {
+        throw new Error("Invalid config: must have either 'flow' or 'fn'");
+      }
+    }
+
+    const keyOrFlow = keyOrFlowOrConfig as string | F;
     if (typeof keyOrFlow === "string") {
       if (!this.journal) {
         this.journal = new Map();

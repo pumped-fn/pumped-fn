@@ -25,6 +25,9 @@ Use derived resources (`derive()`) when:
 
 ## Code Template
 
+
+See: `userRepository` in skill-examples/resources-derived.ts
+
 ```typescript
 import { derive } from '@pumped-fn/core-next'
 import { dbPool } from './resources'
@@ -69,6 +72,9 @@ export const userRepository = derive({ db: dbPool }, ({ db }) => ({
 
 ### Example 1: Simple Derived Resource (packages/next/tests/core.test.ts)
 
+
+See: `derivedSimpleDependency` in skill-examples/resources-derived.ts
+
 ```typescript
 const baseExecutor = provide(() => {
   executionOrder.push("base")
@@ -85,6 +91,9 @@ const dependentExecutor = derive(
 ```
 
 ### Example 2: Mixed Sync/Async Dependencies (packages/next/tests/core.test.ts)
+
+
+See: `derivedMixedDependencies` in skill-examples/resources-derived.ts
 
 ```typescript
 const syncDependency = provide(() => 1)
@@ -103,6 +112,9 @@ const combinedExecutor = derive(
 
 ### Example 3: Service with Database (packages/next/tests/core.test.ts)
 
+
+See: `derivedServiceWithDb` in skill-examples/resources-derived.ts
+
 ```typescript
 const dbConnection = provide(() => {
   dbConnectionCount++
@@ -117,6 +129,9 @@ const service = derive({ db: dbConnection }, ({ db }) => {
 
 ### Example 4: Multiple Named Dependencies (packages/next/tests/core.test.ts)
 
+
+See: `derivedMultipleDependencies` in skill-examples/resources-derived.ts
+
 ```typescript
 const dependencyA = provide(() => "a")
 const dependencyB = provide(() => "b")
@@ -129,6 +144,9 @@ const executorWithDependencies = derive(
 ```
 
 ### Example 5: Repository with Database Pool (from templates.md)
+
+
+See: `userRepositoryFullCrud` in skill-examples/resources-derived.ts
 
 ```typescript
 export const userRepository = derive({ db: dbPool }, ({ db }) => ({
@@ -196,6 +214,9 @@ export const userRepository = derive({ db: dbPool }, ({ db }) => ({
 
 ### Single Dependency
 
+
+See: `derivedSingleDependencyPatterns` in skill-examples/resources-derived.ts
+
 ```typescript
 // Object destructuring (recommended)
 const derived = derive({ base }, ({ base }) => base * 2)
@@ -205,6 +226,9 @@ const derived = derive(base, (val) => val * 2)
 ```
 
 ### Multiple Dependencies
+
+
+See: `derivedMultipleServices` in skill-examples/resources-derived.ts
 
 ```typescript
 // Always use object destructuring

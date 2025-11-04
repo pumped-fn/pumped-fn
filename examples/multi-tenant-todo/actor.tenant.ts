@@ -1,8 +1,10 @@
-import { provide, Promised } from '@pumped-fn/core-next'
+import { multi, custom, Promised, flow } from '@pumped-fn/core-next'
 import type { Todo, TenantMessage } from './types'
+import { handleCreateTodo, handleUpdateTodo, handleDeleteTodo } from './flow.message-handler'
 
-export const createTenantActor = (tenantId: string) => {
-  return provide((controller) => {
+export const tenantActor = multi.provide(
+  { keySchema: custom<string>() },
+  (tenantId, controller) => {
     const state: Todo.State = {
       tenantId,
       todos: new Map()
@@ -18,38 +20,52 @@ export const createTenantActor = (tenantId: string) => {
       const message = messageQueue.shift()
 
       if (message) {
-        switch (message.type) {
-          case 'CREATE_TODO': {
-            const todo: Todo.Item = {
-              id: message.payload.id,
-              title: message.payload.title,
-              completed: false,
-              createdAt: Date.now()
-            }
-            state.todos.set(todo.id, todo)
-            break
-          }
+        try {
+          switch (message.type) {
+            case 'CREATE_TODO': {
+              const result = await flow.execute(handleCreateTodo, {
+                id: message.payload.id,
+                title: message.payload.title,
+                currentTodos: state.todos
+              })
 
-          case 'UPDATE_TODO': {
-            const existing = state.todos.get(message.payload.id)
-            if (existing) {
-              const updated: Todo.Item = {
-                ...existing,
-                title: message.payload.title ?? existing.title,
-                completed: message.payload.completed ?? existing.completed
+              if (result.success) {
+                state.todos.set(result.todo.id, result.todo)
               }
-              state.todos.set(message.payload.id, updated)
+              break
             }
-            break
-          }
 
-          case 'DELETE_TODO': {
-            state.todos.delete(message.payload.id)
-            break
-          }
+            case 'UPDATE_TODO': {
+              const result = await flow.execute(handleUpdateTodo, {
+                id: message.payload.id,
+                title: message.payload.title,
+                completed: message.payload.completed,
+                currentTodos: state.todos
+              })
 
-          case 'GET_TODOS':
-            break
+              if (result.success) {
+                state.todos.set(result.todo.id, result.todo)
+              }
+              break
+            }
+
+            case 'DELETE_TODO': {
+              const result = await flow.execute(handleDeleteTodo, {
+                id: message.payload.id,
+                currentTodos: state.todos
+              })
+
+              if (result.success) {
+                state.todos.delete(result.deletedId)
+              }
+              break
+            }
+
+            case 'GET_TODOS':
+              break
+          }
+        } catch (error) {
+          console.error(`[tenant-${tenantId}] Error processing message:`, error)
         }
       }
 
@@ -78,5 +94,5 @@ export const createTenantActor = (tenantId: string) => {
 
       getTodos: () => Array.from(state.todos.values())
     }
-  })
-}
+  }
+)

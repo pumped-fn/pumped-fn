@@ -385,6 +385,28 @@ export declare namespace Core {
         details: true;
       }
     ): Promised<Flow.ExecutionDetails<S>>;
+
+    exec<S, I>(config: {
+      flow: Executor<Flow.Handler<S, I>>;
+      input?: I;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
+
+    exec<S, D extends DependencyLike>(config: {
+      dependencies: D;
+      fn: (deps: InferOutput<D>) => S | Promise<S>;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
+
+    exec<S, I, D extends DependencyLike>(config: {
+      dependencies: D;
+      fn: (deps: InferOutput<D>, input: I) => S | Promise<S>;
+      input: I;
+      timeout?: number;
+      tags?: Tag.Tagged[];
+    }): Flow.FlowExecution<S>;
   }
 }
 
@@ -551,6 +573,9 @@ export namespace Flow {
   export type C = {
     readonly scope: Core.Scope;
     readonly tags: Tag.Tagged[] | undefined;
+    readonly signal: AbortSignal;
+
+    throwIfAborted(): void;
 
     get<T>(
       accessor:
@@ -583,6 +608,33 @@ export namespace Flow {
       flow: F,
       input: InferInput<F>
     ): Promised<InferOutput<F>>;
+
+    exec<F extends UFlow>(config: {
+      flow: F;
+      input: InferInput<F>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<InferOutput<F>>;
+
+    exec<T>(config: {
+      fn: () => T | Promise<T>;
+      params?: never;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<T>;
+
+    exec<Fn extends (...args: any[]) => any>(config: {
+      fn: Fn;
+      params: Parameters<Fn>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<ReturnType<Fn>>;
 
     parallel<T extends readonly Promised<any>[]>(
       promises: [...T]
@@ -618,6 +670,21 @@ export namespace Flow {
   export type ExecutionDetails<T> =
     | { success: true; result: T; ctx: ExecutionData }
     | { success: false; error: unknown; ctx: ExecutionData };
+
+  export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+  export interface FlowExecution<T> {
+    readonly result: Promised<T>;
+    readonly id: string;
+    readonly flowName: string | undefined;
+    readonly status: ExecutionStatus;
+    readonly ctx: ExecutionData | undefined;
+    readonly abort: AbortController;
+
+    onStatusChange(
+      callback: (status: ExecutionStatus, execution: FlowExecution<T>) => void | Promise<void>
+    ): Core.Cleanup;
+  }
 }
 
 export namespace Extension {

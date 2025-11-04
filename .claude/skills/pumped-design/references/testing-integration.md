@@ -51,6 +51,9 @@ description: End-to-end integration testing with real resources (test database, 
 
 Use test database for integration tests:
 
+
+See: `dbConfig` in skill-examples/testing-integration.ts
+
 ```typescript
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { createScope, provide, derive, tag, custom, Core } from '@pumped-fn/core-next'
@@ -225,6 +228,9 @@ describe('userRepository integration tests', () => {
 ## Pattern: Testing Resource Lifecycle
 
 Test resource initialization and cleanup:
+
+
+See: `resourceLifecycleTests` in skill-examples/testing-integration.ts
 
 ```typescript
 import { describe, test, expect } from 'vitest'
@@ -531,6 +537,9 @@ describe('fileRepository integration tests', () => {
 ## Pattern: Testing Concurrent Operations
 
 Test real concurrency issues:
+
+
+See: `concurrentOperationsTests` in skill-examples/testing-integration.ts
 
 ```typescript
 import { describe, test, expect } from 'vitest'

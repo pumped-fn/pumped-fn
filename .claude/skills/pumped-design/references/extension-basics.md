@@ -27,6 +27,9 @@ Use extensions when:
 
 ## Code Template
 
+
+See: `loggingExtension` in skill-examples/extensions.ts
+
 ```typescript
 import { extension } from '@pumped-fn/core-next'
 
@@ -102,6 +105,9 @@ const metricsExtension = extension({
 
 Intercepts ctx.run() operations:
 
+
+See: `journalCaptureExtension` in skill-examples/extensions.ts
+
 ```typescript
 const journalCaptureExtension = extension({
   name: 'journal-capture',
@@ -131,6 +137,9 @@ const journalCaptureExtension = extension({
 
 Intercepts ctx.exec() operations:
 
+
+See: `parallelTrackerExtension` in skill-examples/extensions.ts
+
 ```typescript
 const subflowTrackerExtension = extension({
   name: 'subflow-tracker',
@@ -149,6 +158,9 @@ const subflowTrackerExtension = extension({
 ### Parallel Hook
 
 Intercepts ctx.parallel() and ctx.parallelSettled():
+
+
+See: `parallelTrackerExtension` in skill-examples/extensions.ts
 
 ```typescript
 const parallelTrackerExtension = extension({

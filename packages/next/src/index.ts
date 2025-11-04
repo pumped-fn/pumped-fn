@@ -40,6 +40,7 @@ export type { Tag } from "./tag-types";
 
 export { flow, flowMeta } from "./flow";
 export { Promised } from "./promises";
+export { FlowExecutionImpl } from "./flow-execution";
 
 export { extension } from "./extension";
 export { resolves } from "./helpers";
