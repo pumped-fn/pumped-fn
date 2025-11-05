@@ -178,6 +178,8 @@ src/
   resource.db.ts
   resource.logger.ts
   resource.cache.ts
+  state.session.ts
+  state.tokens.ts
   util.datetime.ts
   util.validation.ts
   util.crypto.ts
@@ -187,7 +189,7 @@ src/
 - Prefix-based alphabetical sorting (all `flow.*` together)
 - Shorter import paths: `./flow.order` vs `./flows/order`
 - Clear layer membership at a glance
-- Easy globbing: `flow.*.ts`, `resource.*.ts`
+- Easy globbing: `flow.*.ts`, `resource.*.ts`, `state.*.ts`
 
 ### Test Files Adjacent to Source
 
