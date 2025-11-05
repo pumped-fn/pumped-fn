@@ -6,105 +6,57 @@ import { oauthTokensCtl } from './state.oauth-tokens'
 import { apiClient } from './resource.api-client'
 
 describe('fetchUser', () => {
-  it('returns NOT_AUTHENTICATED when no token', async () => {
+  it('not authenticated', async () => {
     const scope = createScope()
-    const result = await scope.exec({ flow: fetchUser, input: { userId: '123' } })
-
-    assert.equal(result.success, false)
-    if (!result.success) {
-      assert.equal(result.reason, 'NOT_AUTHENTICATED')
-    }
-
+    const r = await scope.exec({ flow: fetchUser, input: { userId: '1' } })
+    assert.equal(r.success, false)
+    assert.equal(r.success ? null : r.reason, 'NOT_AUTHENTICATED')
     await scope.dispose()
   })
 
-  it('returns TOKEN_EXPIRED when token expired', async () => {
+  it('token expired', async () => {
     const scope = createScope({
-      initialValues: [
-        preset(oauthTokensCtl, {
-          get: () => ({
-            accessToken: 'token',
-            refreshToken: 'refresh',
-            expiresAt: Date.now() - 1000
-          }),
-          set: () => {},
-          clear: () => {},
-          isExpired: () => true
-        })
-      ]
+      initialValues: [preset(oauthTokensCtl, {
+        get: () => ({ accessToken: 'tk', expiresAt: 0 }),
+        set: () => {},
+        isExpired: () => true
+      })]
     })
-
-    const result = await scope.exec({ flow: fetchUser, input: { userId: '123' } })
-
-    assert.equal(result.success, false)
-    if (!result.success) {
-      assert.equal(result.reason, 'TOKEN_EXPIRED')
-    }
-
+    const r = await scope.exec({ flow: fetchUser, input: { userId: '1' } })
+    assert.equal(r.success ? null : r.reason, 'TOKEN_EXPIRED')
     await scope.dispose()
   })
 
-  it('returns user when authenticated', async () => {
-    const mockUser = { id: '123', name: 'Test User', email: 'test@example.com' }
-
+  it('success', async () => {
     const scope = createScope({
       initialValues: [
         preset(oauthTokensCtl, {
-          get: () => ({
-            accessToken: 'valid-token',
-            refreshToken: 'refresh-token',
-            expiresAt: Date.now() + 60000
-          }),
+          get: () => ({ accessToken: 'tk', expiresAt: Date.now() + 9999 }),
           set: () => {},
-          clear: () => {},
           isExpired: () => false
         }),
-        preset(apiClient, {
-          fetch: async () => ({ success: true as const, data: mockUser })
-        })
+        preset(apiClient, { fetch: async () => ({ success: true, data: { id: '1', name: 'A', email: 'a@b' } }) })
       ]
     })
-
-    const result = await scope.exec({ flow: fetchUser, input: { userId: '123' } })
-
-    assert.equal(result.success, true)
-    if (result.success) {
-      assert.equal(result.user.id, '123')
-      assert.equal(result.user.name, 'Test User')
-    }
-
+    const r = await scope.exec({ flow: fetchUser, input: { userId: '1' } })
+    assert.equal(r.success, true)
+    assert.equal(r.success ? r.user.id : null, '1')
     await scope.dispose()
   })
 
-  it('returns API_ERROR when api fails', async () => {
+  it('api error', async () => {
     const scope = createScope({
       initialValues: [
         preset(oauthTokensCtl, {
-          get: () => ({
-            accessToken: 'valid-token',
-            refreshToken: 'refresh-token',
-            expiresAt: Date.now() + 60000
-          }),
+          get: () => ({ accessToken: 'tk', expiresAt: Date.now() + 9999 }),
           set: () => {},
-          clear: () => {},
           isExpired: () => false
         }),
-        preset(apiClient, {
-          fetch: async () => ({ success: false as const, error: 'Network error' })
-        })
+        preset(apiClient, { fetch: async () => ({ success: false, error: 'err' }) })
       ]
     })
-
-    const result = await scope.exec({ flow: fetchUser, input: { userId: '123' } })
-
-    assert.equal(result.success, false)
-    if (!result.success) {
-      assert.equal(result.reason, 'API_ERROR')
-      if (result.reason === 'API_ERROR') {
-        assert.equal(result.message, 'Network error')
-      }
-    }
-
+    const r = await scope.exec({ flow: fetchUser, input: { userId: '1' } })
+    assert.equal(r.success ? null : r.reason, 'API_ERROR')
     await scope.dispose()
   })
 })

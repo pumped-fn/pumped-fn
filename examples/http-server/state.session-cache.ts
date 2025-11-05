@@ -1,81 +1,20 @@
-/**
- * @file state.session-cache.ts
- * Session cache state - ephemeral in-memory storage
- *
- * Demonstrates:
- * - provide() for state initialization
- * - derive().static for controller access
- * - controller.cleanup() for disposal
- * - TTL-based expiration
- * - Tag-based type-safe Map access
- *
- * Note: get() performs lazy cleanup (deletes expired entries on access)
- * to avoid background timer overhead. Expired entries remain until accessed.
- *
- * Verify: pnpm -F @pumped-fn/examples typecheck
- */
-
 import { provide, derive, tag, custom, type Tag } from '@pumped-fn/core-next'
 
-export namespace SessionCache {
-  export type Entry<T> = {
-    value: T
-    expiresAt: number
-  }
-}
-
-export const sessionCache = provide((controller) => {
-  const cache = new Map<symbol, SessionCache.Entry<unknown>>()
-
-  controller.cleanup(() => {
-    cache.clear()
-  })
-
-  return cache
+const sessionCache = provide((ctl) => {
+  const map = new Map<symbol, { value: unknown; exp: number }>()
+  ctl.cleanup(() => map.clear())
+  return map
 })
 
-export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
-  return {
-    get: <T>(key: Tag.Tag<T, false>): T | undefined => {
-      const cache = cacheCtl.get()
-      const entry = cache.get(key.key)
-      if (!entry) return undefined
-
-      if (Date.now() > entry.expiresAt) {
-        cacheCtl.update(c => {
-          c.delete(key.key)
-          return c
-        })
-        return undefined
-      }
-
-      return entry.value as T
-    },
-
-    set: async <T>(key: Tag.Tag<T, false>, value: T, ttlMs: number): Promise<void> => {
-      await cacheCtl.update(c => {
-        c.set(key.key, {
-          value,
-          expiresAt: Date.now() + ttlMs
-        })
-        return c
-      })
-    },
-
-    delete: async <T>(key: Tag.Tag<T, false>): Promise<void> => {
-      await cacheCtl.update(c => {
-        c.delete(key.key)
-        return c
-      })
-    },
-
-    clear: async (): Promise<void> => {
-      await cacheCtl.update(c => {
-        c.clear()
-        return c
-      })
-    }
+export const sessionCacheCtl = derive(sessionCache.static, (ctl) => ({
+  get: <T>(key: Tag.Tag<T, false>) => {
+    const e = ctl.get().get(key.key)
+    if (!e || Date.now() > e.exp) return undefined
+    return e.value as T
+  },
+  set: async <T>(key: Tag.Tag<T, false>, value: T, ttl: number) => {
+    await ctl.update(m => m.set(key.key, { value, exp: Date.now() + ttl }))
   }
-})
+}))
 
 export const cacheKey = <T>(label: string) => tag(custom<T>(), { label })
