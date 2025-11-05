@@ -139,26 +139,18 @@ await scope.dispose() // logs: Clearing cache
 ```ts twoslash
 import { provide, derive } from '@pumped-fn/core-next'
 
-type Tokens = { accessToken: string | null; refreshToken: string | null }
+const oauthTokens = provide(() => ({ accessToken: null as string | null }))
 
-const oauthTokens = provide((): Tokens => ({
-  accessToken: null,
-  refreshToken: null
-}))
-
-const oauthTokensCtl = derive(oauthTokens.static, ctl => ({
+const oauthTokensCtl = derive(oauthTokens.static, (ctl) => ({
   get: () => ctl.get(),
-  set: (tokens: Tokens) => ctl.set(tokens)
+  set: (token: string) => ctl.set({ accessToken: token })
 }))
 
-const apiClient = derive(oauthTokensCtl, (tokensCtl) => ({
+const apiClient = derive(oauthTokensCtl, (tokens) => ({
   fetch: async (url: string) => {
-    const { accessToken } = tokensCtl.get()
+    const { accessToken } = tokens.get()
     if (!accessToken) throw new Error('Not authenticated')
-
-    return fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
+    return fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
   }
 }))
 ```

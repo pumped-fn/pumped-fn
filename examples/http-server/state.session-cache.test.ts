@@ -9,17 +9,19 @@ describe('sessionCache', () => {
   it('stores and retrieves', async () => {
     const scope = createScope()
     const cache = await scope.resolve(sessionCacheCtl)
-    await cache.set(key, 'value', 60000)
+    await cache.set(key, 'value')
     assert.equal(cache.get(key), 'value')
     await scope.dispose()
   })
 
-  it('expires after TTL', async () => {
+  it('clears on dispose', async () => {
     const scope = createScope()
     const cache = await scope.resolve(sessionCacheCtl)
-    await cache.set(key, 'value', 1)
-    await new Promise(r => setTimeout(r, 10))
-    assert.equal(cache.get(key), undefined)
+    await cache.set(key, 'value')
     await scope.dispose()
+    const scope2 = createScope()
+    const cache2 = await scope2.resolve(sessionCacheCtl)
+    assert.equal(cache2.get(key), undefined)
+    await scope2.dispose()
   })
 })
