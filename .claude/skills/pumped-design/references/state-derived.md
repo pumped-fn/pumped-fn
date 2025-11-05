@@ -75,23 +75,24 @@ export const database = provide(() => ({
 import { derive } from '@pumped-fn/core-next'
 import { database } from './resource.database'
 
-export const queryCache = derive(database, (db) => {
+const queryCache = derive(database, (db) => {
   const cache = new Map<string, unknown>()
 
   return {
     query: async <T>(params: { sql: string; params?: unknown[] }): Promise<T> => {
-      const cacheKey = JSON.stringify(params)
-      if (cache.has(cacheKey)) return cache.get(cacheKey) as T
+      const key = JSON.stringify(params)
+      const cached = cache.get(key)
+      if (cached !== undefined) return cached as T
 
-      const result = await db.query(params.sql) as T
-      cache.set(cacheKey, result)
-      return result
-    },
-    invalidate: (params: { sql: string; params?: unknown[] }) =>
-      cache.delete(JSON.stringify(params))
+      const result = await db.query(params.sql)
+      cache.set(key, result)
+      return result as T
+    }
   }
 })
 ```
+
+**Note**: Generic query cache requires type assertions since database responses have dynamic shapes. Use Tag.Store pattern (see state-basic.md) for type-safe generic caches.
 
 ### Pattern 3: State Depending on State
 

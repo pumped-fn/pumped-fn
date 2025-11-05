@@ -76,23 +76,17 @@ const cache = provide((controller) => {
   return map
 })
 
-const cacheCtl = derive(cache.static, (ctl) => {
-  return {
-    get: <T>(key: Tag.Tag<T, false>): T | undefined => {
-      const entry = ctl.get().get(key.key)
-      return entry?.value as T | undefined
-    },
-    set: async <T>(key: Tag.Tag<T, false>, value: T): Promise<void> => {
-      await ctl.update(c => {
-        c.set(key.key, { value, timestamp: Date.now() })
-        return c
-      })
-    }
+const cacheCtl = derive(cache.static, (ctl) => ({
+  get: <T>(key: Tag.Tag<T, false>) => key.readFrom(ctl.get()),
+  set: async <T>(key: Tag.Tag<T, false>, value: T) => {
+    await ctl.update(store => { store.set(key.key, value); return store })
   }
-})
+}))
 
 export const cacheKey = <T>(label: string) => tag(custom<T>(), { label })
 ```
+
+**Type Safety**: Using `key.readFrom(store)` provides type-safe access without casting - tags validate at runtime and infer types at compile time.
 
 ## Reactive Consumption
 

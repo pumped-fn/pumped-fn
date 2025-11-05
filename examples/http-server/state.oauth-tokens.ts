@@ -2,7 +2,7 @@ import { provide, derive } from '@pumped-fn/core-next'
 
 type Tokens = { accessToken: string | null; expiresAt: number | null }
 
-const oauthTokens = provide(() => ({ accessToken: null, expiresAt: null } as Tokens))
+const oauthTokens = provide((): Tokens => ({ accessToken: null, expiresAt: null }))
 
 export const oauthTokensCtl = derive(oauthTokens.static, (ctl) => ({
   get: () => ctl.get(),
