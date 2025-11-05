@@ -9,6 +9,9 @@
  * - TTL-based expiration
  * - Tag-based type-safe Map access
  *
+ * Note: get() performs lazy cleanup (deletes expired entries on access)
+ * to avoid background timer overhead. Expired entries remain until accessed.
+ *
  * Verify: pnpm -F @pumped-fn/examples typecheck
  */
 

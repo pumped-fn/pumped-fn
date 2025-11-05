@@ -188,6 +188,8 @@ const queryCache = derive(database, (db) => {
 })
 ```
 
+**Security Note:** Always use parameterized queries to prevent SQL injection. Never concatenate user input into SQL strings.
+
 ## Complete Examples
 
 Working implementations demonstrating these patterns:
