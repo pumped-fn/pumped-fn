@@ -39,25 +39,21 @@ export namespace FetchUser {
 }
 
 export const fetchUser = flow(
-  async (ctx, input: FetchUser.Input): Promise<FetchUser.Result> => {
+  [oauthTokensCtl, apiClient] as const,
+  async ([tokensCtl, api], ctx, input: FetchUser.Input): Promise<FetchUser.Result> => {
     const tokens = await ctx.exec({
       key: 'check-tokens',
-      fn: async () => {
-        const tokensCtl = await ctx.scope.resolve(oauthTokensCtl)
-        return tokensCtl.get()
-      }
+      fn: () => tokensCtl.get()
     })
 
     if (!tokens.accessToken) {
       return { success: false, reason: 'NOT_AUTHENTICATED' }
     }
 
-    const tokensCtl = await ctx.scope.resolve(oauthTokensCtl)
     if (tokensCtl.isExpired()) {
       return { success: false, reason: 'TOKEN_EXPIRED' }
     }
 
-    const api = await ctx.scope.resolve(apiClient)
     const response = await ctx.exec({
       key: 'fetch-user',
       fn: () => api.fetch<FetchUser.User>(`/users/${input.userId}`)

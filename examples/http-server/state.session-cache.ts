@@ -7,11 +7,12 @@
  * - derive().static for controller access
  * - controller.cleanup() for disposal
  * - TTL-based expiration
+ * - Tag-based type-safe Map access
  *
  * Verify: pnpm -F @pumped-fn/examples typecheck
  */
 
-import { provide, derive } from '@pumped-fn/core-next'
+import { provide, derive, tag, custom, type Tag } from '@pumped-fn/core-next'
 
 export namespace SessionCache {
   export type Entry<T> = {
@@ -21,7 +22,7 @@ export namespace SessionCache {
 }
 
 export const sessionCache = provide((controller) => {
-  const cache = new Map<string, SessionCache.Entry<unknown>>()
+  const cache = new Map<symbol, SessionCache.Entry<unknown>>()
 
   controller.cleanup(() => {
     cache.clear()
@@ -32,24 +33,25 @@ export const sessionCache = provide((controller) => {
 
 export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
   return {
-    get: <T>(key: string): T | undefined => {
-      const entry = cacheCtl.get().get(key) as SessionCache.Entry<T> | undefined
+    get: <T>(key: Tag.Tag<T, false>): T | undefined => {
+      const cache = cacheCtl.get()
+      const entry = cache.get(key.key)
       if (!entry) return undefined
 
       if (Date.now() > entry.expiresAt) {
         cacheCtl.update(c => {
-          c.delete(key)
+          c.delete(key.key)
           return c
         })
         return undefined
       }
 
-      return entry.value
+      return entry.value as T
     },
 
-    set: async <T>(key: string, value: T, ttlMs: number): Promise<void> => {
+    set: async <T>(key: Tag.Tag<T, false>, value: T, ttlMs: number): Promise<void> => {
       await cacheCtl.update(c => {
-        c.set(key, {
+        c.set(key.key, {
           value,
           expiresAt: Date.now() + ttlMs
         })
@@ -57,9 +59,9 @@ export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
       })
     },
 
-    delete: async (key: string): Promise<void> => {
+    delete: async <T>(key: Tag.Tag<T, false>): Promise<void> => {
       await cacheCtl.update(c => {
-        c.delete(key)
+        c.delete(key.key)
         return c
       })
     },
@@ -72,3 +74,5 @@ export const sessionCacheCtl = derive(sessionCache.static, (cacheCtl) => {
     }
   }
 })
+
+export const cacheKey = <T>(label: string) => tag(custom<T>(), { label })

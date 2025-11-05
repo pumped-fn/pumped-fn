@@ -1,10 +1,14 @@
 # Add State Pattern Implementation Plan
 
+> **IMPORTANT:** This plan was executed and the implementation has been corrected post-review.
+> The plan contains outdated `ctx.resource()` API calls - actual implementation uses explicit dependency injection.
+> See corrected patterns in skill references and documentation.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add state pattern as conceptual layer for in-memory reactive data, distinct from external integrations (resources).
 
-**Architecture:** State uses same `provide/derive` API as resources but represents ephemeral, scope-bound reactive data (session cache, oauth tokens, app state). Flow orchestration remains mandatory entry point: `entrypoint → flow → state|resource`.
+**Architecture:** State uses same `provide/derive` API as resources but represents ephemeral, scope-bound reactive data (session cache, oauth tokens, app state). Flow orchestration remains mandatory entry point: `entrypoint → flow(deps) → state|resource`.
 
 **Tech Stack:** TypeScript, pumped-fn core, existing skill/docs infrastructure
 

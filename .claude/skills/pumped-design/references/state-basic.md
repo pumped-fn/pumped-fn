@@ -56,13 +56,17 @@ const counterCtl = derive(counter.static, (ctl) => {
 })
 ```
 
-### State with Lifecycle
+### State with Lifecycle and Tag-based Map
 
 ```typescript
-import { provide, derive } from '@pumped-fn/core-next'
+import { provide, derive, tag, custom, type Tag } from '@pumped-fn/core-next'
+
+namespace Cache {
+  export type Entry<T> = { value: T; timestamp: number }
+}
 
 const cache = provide((controller) => {
-  const map = new Map<string, unknown>()
+  const map = new Map<symbol, Cache.Entry<unknown>>()
 
   controller.cleanup(() => {
     console.log('Clearing cache on dispose')
@@ -74,42 +78,55 @@ const cache = provide((controller) => {
 
 const cacheCtl = derive(cache.static, (ctl) => {
   return {
-    get: <T>(key: string) => ctl.get().get(key) as T | undefined,
-    set: <T>(key: string, value: T) => {
-      ctl.update(c => {
-        c.set(key, value)
+    get: <T>(key: Tag.Tag<T, false>): T | undefined => {
+      const entry = ctl.get().get(key.key)
+      return entry?.value as T | undefined
+    },
+    set: async <T>(key: Tag.Tag<T, false>, value: T): Promise<void> => {
+      await ctl.update(c => {
+        c.set(key.key, { value, timestamp: Date.now() })
         return c
       })
     }
   }
 })
+
+export const cacheKey = <T>(label: string) => tag(custom<T>(), { label })
 ```
 
 ## Reactive Consumption
 
-Use `.reactive` property in flows to mark reactive dependencies. When state updates via `scope.update()` or controller mutations, reactive consumers re-execute.
+Use `.reactive` property as explicit dependency in flows. When state updates via controller mutations, reactive consumers re-execute.
 
 ```typescript
 import { flow } from '@pumped-fn/core-next'
 import { counter } from './state.counter'
 
-const displayCounter = flow(async (ctx) => {
-  const value = await ctx.resource(counter.reactive)
-  console.log('Counter:', value)
-  return value
-})
+const displayCounter = flow(
+  counter.reactive,
+  async (value, ctx) => {
+    console.log('Counter:', value)
+    return value
+  }
+)
 ```
 
 **Non-reactive access:**
 ```typescript
-// First resolution caches, never re-executes
-const value = await ctx.resource(counter)
+// Resolved once, never re-executes on updates
+const display = flow(
+  counter,
+  async (value, ctx) => value
+)
 ```
 
 **Reactive access:**
 ```typescript
 // Re-executes when counter updates
-const value = await ctx.resource(counter.reactive)
+const display = flow(
+  counter.reactive,
+  async (value, ctx) => value
+)
 ```
 
 ## Static Controller
@@ -143,12 +160,14 @@ const counterCtl = derive(counter.static, (ctl) => {
 - `ctl.update(fn)` - Applies function to current value, triggers subscribers
 - `ctl.subscribe(fn)` - Registers callback for value changes
 
-**In flows:**
+**In flows with explicit dependencies:**
 ```typescript
-const increment = flow(async (ctx) => {
-  const ctl = await ctx.resource(counterCtl)
-  ctl.update(n => n + 1)
-})
+const increment = flow(
+  counterCtl,
+  async (ctl, ctx) => {
+    ctl.update(n => n + 1)
+  }
+)
 ```
 
 ## Troubleshooting
@@ -157,27 +176,35 @@ const increment = flow(async (ctx) => {
 
 **Symptom:** Reactive consumer not re-executing on state changes
 
-**Solution:** Ensure using `.reactive` property:
+**Solution:** Use `.reactive` as explicit dependency:
 ```typescript
 // ❌ Wrong - not reactive
-const value = await ctx.resource(counter)
+const display = flow(
+  counter,
+  async (value, ctx) => value
+)
 
 // ✅ Correct - reactive
-const value = await ctx.resource(counter.reactive)
+const display = flow(
+  counter.reactive,
+  async (value, ctx) => value
+)
 ```
 
 ### Problem: "Cannot mutate state from entrypoint"
 
 **Symptom:** Need to update state outside flow
 
-**Solution:** Flows are mandatory orchestration point. Create flow:
+**Solution:** Flows are mandatory orchestration point. Create flow with controller dependency:
 ```typescript
-const updateState = flow(async (ctx, value) => {
-  const ctl = await ctx.resource(stateCtl)
-  ctl.set(value)
-})
+const updateState = flow(
+  stateCtl,
+  async (ctl, ctx, value) => {
+    ctl.set(value)
+  }
+)
 
-await scope.exec(updateState, newValue)
+await scope.exec({ flow: updateState, input: newValue })
 ```
 
 ### Problem: "Cleanup not running"
@@ -197,7 +224,7 @@ const state = provide((controller) => {
 
 - **State: Derived** - State with dependencies (composition)
 - **Resource: Basic** - Resources follow same API
-- **Flow: Context** - ctx.resource() for state access
+- **Flow: Basic** - Explicit dependency injection patterns
 - **Coding Standards** - File naming, type safety
 
 ## See Also

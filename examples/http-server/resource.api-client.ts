@@ -27,7 +27,7 @@ export namespace ApiClient {
   }
 }
 
-export const apiClient = derive([oauthTokensCtl], ([tokensCtl]) => {
+export const apiClient = derive(oauthTokensCtl, (tokensCtl) => {
   const config: ApiClient.Config = {
     baseUrl: process.env.API_BASE_URL || 'https://api.example.com'
   }

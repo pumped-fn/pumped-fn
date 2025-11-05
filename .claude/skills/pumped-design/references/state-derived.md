@@ -49,7 +49,7 @@ export const oauthTokensCtl = derive(oauthTokens.static, (ctl) => ({
 import { derive } from '@pumped-fn/core-next'
 import { oauthTokensCtl } from './state.oauth-tokens'
 
-export const apiClient = derive([oauthTokensCtl], (tokensCtl) => ({
+export const apiClient = derive(oauthTokensCtl, (tokensCtl) => ({
   fetch: async (url: string) => {
     const tokens = tokensCtl.get()
     if (!tokens.accessToken) throw new Error('Not authenticated')
@@ -75,7 +75,7 @@ export const database = provide(() => ({
 import { derive } from '@pumped-fn/core-next'
 import { database } from './resource.database'
 
-export const queryCache = derive([database], (db) => {
+export const queryCache = derive(database, (db) => {
   const cache = new Map<string, unknown>()
 
   return {
@@ -113,14 +113,17 @@ import { derive } from '@pumped-fn/core-next'
 import { cartItems } from './state.cart-items'
 import { productPrices } from './state.product-prices'
 
-export const cartTotal = derive([cartItems.reactive, productPrices.reactive], (items, prices) => {
-  let total = 0
-  for (const [id, quantity] of items.entries()) {
-    const price = prices.get(id) ?? 0
-    total += quantity * price
+export const cartTotal = derive(
+  [cartItems.reactive, productPrices.reactive] as const,
+  ([items, prices]) => {
+    let total = 0
+    for (const [id, quantity] of items.entries()) {
+      const price = prices.get(id) ?? 0
+      total += quantity * price
+    }
+    return total
   }
-  return total
-})
+)
 ```
 
 ---
@@ -238,7 +241,7 @@ export const apiClient = derive([authState.static], (authCtl) => ({
 
 **Architecture:**
 ```
-entrypoint → flow → state (tokens) → resource (api) → external API
+entrypoint → flow(deps: [state, resource]) → state (tokens) → resource (api) → external API
 ```
 
 **Implementation:**
@@ -248,26 +251,24 @@ import { flow } from '@pumped-fn/core-next'
 import { oauthTokensCtl } from './state.oauth-tokens'
 import { apiClient } from './resource.api-client'
 
-export const fetchUser = flow(async (ctx, userId: string) => {
-  // Check token state
-  const tokensCtl = await ctx.resource(oauthTokensCtl)
-  if (tokensCtl.isExpired()) {
-    return { success: false as const, reason: 'TOKEN_EXPIRED' as const }
+export const fetchUser = flow(
+  [oauthTokensCtl, apiClient] as const,
+  async ([tokensCtl, api], ctx, userId: string) => {
+    if (tokensCtl.isExpired()) {
+      return { success: false as const, reason: 'TOKEN_EXPIRED' as const }
+    }
+
+    const response = await api.fetch(`/users/${userId}`)
+    return { success: true as const, user: response }
   }
-
-  // Use API client (depends on token state)
-  const api = await ctx.resource(apiClient)
-  const response = await api.fetch(`/users/${userId}`)
-
-  return { success: true as const, user: response }
-})
+)
 ```
 
 ### Example: Cached Database Query Flow
 
 **Architecture:**
 ```
-entrypoint → flow → state (cache) → resource (db) → database
+entrypoint → flow(deps: [state]) → state (cache) → resource (db) → database
 ```
 
 **Implementation:**
@@ -276,14 +277,16 @@ entrypoint → flow → state (cache) → resource (db) → database
 import { flow } from '@pumped-fn/core-next'
 import { queryCache } from './state.query-cache'
 
-export const getProduct = flow(async (ctx, productId: string) => {
-  const cache = await ctx.resource(queryCache)
-  const product = await cache.query({
-    sql: 'SELECT * FROM products WHERE id = ?',
-    params: [productId]
-  })
-  return product
-})
+export const getProduct = flow(
+  queryCache,
+  async (cache, ctx, productId: string) => {
+    const product = await cache.query({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      params: [productId]
+    })
+    return product
+  }
+)
 ```
 
 **Security Note:** Always use parameterized queries to prevent SQL injection. Never concatenate user input into SQL strings.
@@ -300,12 +303,12 @@ export const getProduct = flow(async (ctx, productId: string) => {
 
 ```typescript
 // ❌ Circular - don't do this
-const state = derive([resource], (r) => r.data)
-const resource = derive([state], (s) => makeClient(s))
+const state = derive(resource, (r) => r.data)
+const resource = derive(state, (s) => makeClient(s))
 
 // ✅ Correct - resource depends on state
 const tokenState = provide(() => null)
-const apiClient = derive([tokenState.static], (ctl) => makeClient(ctl.get()))
+const apiClient = derive(tokenState.static, (ctl) => makeClient(ctl.get()))
 ```
 
 ### Problem: "Resource not reacting to state changes"
@@ -315,7 +318,7 @@ const apiClient = derive([tokenState.static], (ctl) => makeClient(ctl.get()))
 **Solution:** Resource derives from state controller, use `.get()` at call time:
 
 ```typescript
-export const apiClient = derive([oauthTokensCtl], (tokensCtl) => ({
+export const apiClient = derive(oauthTokensCtl, (tokensCtl) => ({
   fetch: async (url: string) => {
     // ✅ Get fresh token every call
     const token = tokensCtl.get().accessToken
@@ -330,7 +333,7 @@ export const apiClient = derive([oauthTokensCtl], (tokensCtl) => ({
 
 - **State: Basic** - Basic state patterns
 - **Resource: Derived** - Parallel patterns for resources
-- **Flow: Context** - Orchestration patterns
+- **Flow: Basic** - Explicit dependency injection patterns
 
 ## See Also
 

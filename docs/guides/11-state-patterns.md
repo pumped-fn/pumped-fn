@@ -42,7 +42,7 @@ const counterCtl = derive(counter.static, (ctl) => ({
 
 ## Reactive Consumption
 
-Use `.reactive` property to mark reactive dependencies. When state updates, reactive consumers re-execute.
+Use `.reactive` property as explicit dependency. When state updates, reactive consumers re-execute.
 
 ```ts twoslash
 import { flow, provide, derive, createScope } from '@pumped-fn/core-next'
@@ -50,32 +50,40 @@ import { flow, provide, derive, createScope } from '@pumped-fn/core-next'
 const counter = provide(() => 0)
 const counterCtl = derive(counter.static, ctl => ctl)
 
-const displayCounter = flow(async (ctx) => {
-  const value = await ctx.resource(counter.reactive)
-  console.log('Counter:', value)
-  return value
-})
+const displayCounter = flow(
+  counter.reactive,
+  async (value, ctx) => {
+    console.log('Counter:', value)
+    return value
+  }
+)
 
 const scope = createScope()
 
-await scope.exec(displayCounter) // logs: Counter: 0
+await scope.exec({ flow: displayCounter }) // logs: Counter: 0
 
 const ctl = await scope.resolve(counterCtl)
 ctl.update(n => n + 1)
 
-await scope.exec(displayCounter) // logs: Counter: 1
+await scope.exec({ flow: displayCounter }) // logs: Counter: 1
 ```
 
 **Non-reactive:**
 ```typescript
 // Cached, never re-executes
-const value = await ctx.resource(counter)
+const display = flow(
+  counter,
+  async (value, ctx) => value
+)
 ```
 
 **Reactive:**
 ```typescript
 // Re-executes on updates
-const value = await ctx.resource(counter.reactive)
+const display = flow(
+  counter.reactive,
+  async (value, ctx) => value
+)
 ```
 
 ## Static Controllers
@@ -166,7 +174,7 @@ const database = provide(() => ({
 }))
 
 // State: Query cache wrapping database
-const queryCache = derive([database], (db) => {
+const queryCache = derive(database, (db) => {
   const cache = new Map<string, unknown>()
 
   return {
@@ -180,9 +188,12 @@ const queryCache = derive([database], (db) => {
 })
 ```
 
-## Complete Example
+## Complete Examples
 
-Complete implementations demonstrating these patterns will be available in the examples directory once implemented.
+Working implementations demonstrating these patterns:
+- Session cache with TTL: `examples/http-server/state.session-cache.ts` + tests
+- OAuth tokens + API client: `examples/http-server/state.oauth-tokens.ts`, `resource.api-client.ts`
+- Flow orchestration: `examples/http-server/flow.authenticated-request.ts` + tests
 
 ## Key Points
 
@@ -197,4 +208,4 @@ Complete implementations demonstrating these patterns will be available in the e
 
 - [Reactive Patterns](./08-reactive-patterns.md) - `.reactive` mechanics
 - [Executors and Dependencies](./01-executors-and-dependencies.md) - `provide/derive` API
-- [Flow](./05-flow.md) - Flow context operations including `ctx.resource()`
+- [Flow](./05-flow.md) - Flow explicit dependency patterns
