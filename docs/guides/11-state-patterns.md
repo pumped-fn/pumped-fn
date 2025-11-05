@@ -139,19 +139,19 @@ await scope.dispose() // logs: Clearing cache
 ```ts twoslash
 import { provide, derive } from '@pumped-fn/core-next'
 
-// State: OAuth tokens
-const oauthTokens = provide(() => ({
-  accessToken: null as string | null,
-  refreshToken: null as string | null
+type Tokens = { accessToken: string | null; refreshToken: string | null }
+
+const oauthTokens = provide((): Tokens => ({
+  accessToken: null,
+  refreshToken: null
 }))
 
 const oauthTokensCtl = derive(oauthTokens.static, ctl => ({
   get: () => ctl.get(),
-  set: (tokens: { accessToken: string; refreshToken: string }) => ctl.set(tokens)
+  set: (tokens: Tokens) => ctl.set(tokens)
 }))
 
-// Resource: API client depending on token state
-const apiClient = derive([oauthTokensCtl], (tokensCtl) => ({
+const apiClient = derive(oauthTokensCtl, (tokensCtl) => ({
   fetch: async (url: string) => {
     const { accessToken } = tokensCtl.get()
     if (!accessToken) throw new Error('Not authenticated')
@@ -173,16 +173,17 @@ const database = provide(() => ({
   query: async (sql: string) => ({ rows: [] })
 }))
 
-// State: Query cache wrapping database
 const queryCache = derive(database, (db) => {
   const cache = new Map<string, unknown>()
 
   return {
     query: async <T>(sql: string): Promise<T> => {
-      if (cache.has(sql)) return cache.get(sql) as T
-      const result = await db.query(sql) as T
+      const cached = cache.get(sql)
+      if (cached !== undefined) return cached as T
+
+      const result = await db.query(sql)
       cache.set(sql, result)
-      return result
+      return result as T
     }
   }
 })
