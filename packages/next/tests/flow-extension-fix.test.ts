@@ -169,3 +169,99 @@ describe("Extension Wrapping Order", () => {
     ]);
   });
 });
+
+describe("Extension Operation Metadata", () => {
+  test("execute operation contains required metadata", async () => {
+    const { extension: tracker, operations } = createOperationTracker();
+    const scope = createScope({ extensions: [tracker] });
+    const testFlow = flow((_ctx, input: number) => input * 2);
+
+    await flow.execute(testFlow, 5, { scope });
+
+    const executeOp = operations.find((op) => op.kind === "execute");
+    expect(executeOp).toBeDefined();
+    expect(executeOp).toMatchObject({
+      kind: "execute",
+      flow: expect.any(Object),
+      definition: expect.any(Object),
+      input: 5,
+    });
+    expect(executeOp).toHaveProperty("depth");
+    expect(executeOp).toHaveProperty("isParallel");
+    expect(executeOp).toHaveProperty("flowName");
+    expect(executeOp).toHaveProperty("parentFlowName");
+  });
+
+  test("subflow operation contains required metadata", async () => {
+    const { extension: tracker, operations } = createOperationTracker();
+    const scope = createScope({ extensions: [tracker] });
+
+    const child = flow((_ctx, x: number) => x + 1);
+    const parent = flow(async (ctx, input: number) => {
+      return await ctx.exec(child, input);
+    });
+
+    await flow.execute(parent, 5, { scope });
+
+    const subflowOp = operations.find((op) => op.kind === "subflow");
+    expect(subflowOp).toBeDefined();
+    expect(subflowOp).toMatchObject({
+      kind: "subflow",
+      flow: expect.any(Object),
+      definition: expect.any(Object),
+      input: 5,
+    });
+    expect(subflowOp).toHaveProperty("depth");
+    expect(subflowOp).toHaveProperty("parentFlowName");
+    expect(subflowOp).toHaveProperty("journalKey");
+    expect(subflowOp).toHaveProperty("context");
+  });
+
+  test("journal operation contains required metadata", async () => {
+    const { extension: tracker, operations } = createOperationTracker();
+    const scope = createScope({ extensions: [tracker] });
+
+    const testFlow = flow(async (ctx, input: number) => {
+      return await ctx.exec({ fn: () => input * 2, key: "double" });
+    });
+
+    await flow.execute(testFlow, 5, { scope });
+
+    const journalOp = operations.find((op) => op.kind === "journal");
+    expect(journalOp).toBeDefined();
+    expect(journalOp).toMatchObject({
+      kind: "journal",
+      key: "double",
+      isReplay: false,
+    });
+    expect(journalOp).toHaveProperty("depth");
+    expect(journalOp).toHaveProperty("flowName");
+    expect(journalOp).toHaveProperty("context");
+  });
+
+  test("parallel operation contains required metadata", async () => {
+    const { extension: tracker, operations } = createOperationTracker();
+    const scope = createScope({ extensions: [tracker] });
+
+    const testFlow = flow(async (ctx, _input: number) => {
+      const { results } = await ctx.parallel([
+        ctx.exec({ fn: () => Promise.resolve(1) }),
+        ctx.exec({ fn: () => Promise.resolve(2) }),
+      ]);
+      return (results[0] as number) + (results[1] as number);
+    });
+
+    await flow.execute(testFlow, 5, { scope });
+
+    const parallelOp = operations.find((op) => op.kind === "parallel");
+    expect(parallelOp).toBeDefined();
+    expect(parallelOp).toMatchObject({
+      kind: "parallel",
+      mode: "parallel",
+      promiseCount: 2,
+    });
+    expect(parallelOp).toHaveProperty("depth");
+    expect(parallelOp).toHaveProperty("parentFlowName");
+    expect(parallelOp).toHaveProperty("context");
+  });
+});
