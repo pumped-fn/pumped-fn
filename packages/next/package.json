@@ -33,11 +33,11 @@
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
-    "@vitest/coverage-v8": "^4.0.5",
-    "tsdown": "^0.15.4",
+    "@types/node": "^20.19.24",
+    "@vitest/coverage-v8": "^4.0.8",
+    "tsdown": "^0.16.1",
     "typescript": "^5.9.2",
-    "vitest": "^4.0.5"
+    "vitest": "^4.0.8"
   },
   "engines": {
     "node": ">=18"
