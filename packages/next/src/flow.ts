@@ -28,6 +28,14 @@ export const flowMeta: {
   journal: tag(custom<ReadonlyMap<string, unknown>>(), { label: "flow.journal" }),
 };
 
+function getFlowDefinition(flow: Flow.UFlow): Flow.Definition<any, any> {
+  const definition = flowDefinitionMeta.readFrom(flow);
+  if (!definition) {
+    throw new Error("Flow definition not found in executor metadata");
+  }
+  return definition;
+}
+
 class FlowDefinition<S, I> {
   constructor(
     public readonly name: string,
@@ -166,6 +174,13 @@ class FlowContext implements Flow.Context {
     }
   }
 
+  private ensureJournal(): Map<string, unknown> {
+    if (!this.journal) {
+      this.journal = new Map();
+    }
+    return this.journal;
+  }
+
   resolve<T>(executor: Core.Executor<T>): Promised<T> {
     return this.scope.resolve(executor);
   }
@@ -293,9 +308,7 @@ class FlowContext implements Flow.Context {
 
     if (config.type === "fn") {
       if (config.key) {
-        if (!this.journal) {
-          this.journal = new Map();
-        }
+        this.ensureJournal();
 
         const flowName = this.find(flowMeta.flowName) || "unknown";
         const depth = this.get(flowMeta.depth);
@@ -310,19 +323,13 @@ class FlowContext implements Flow.Context {
     }
 
     if (config.key) {
-      if (!this.journal) {
-        this.journal = new Map();
-      }
+      const journal = this.ensureJournal() as Map<string, Flow.InferOutput<F> | { __error: true; error: unknown }>;
 
       const parentFlowName = this.find(flowMeta.flowName);
       const depth = this.get(flowMeta.depth);
       const journalKey = createJournalKey(parentFlowName || "unknown", depth, config.key);
-      const journal = this.journal as Map<string, Flow.InferOutput<F> | { __error: true; error: unknown }>;
 
-      const definition = flowDefinitionMeta.readFrom(config.flow);
-      if (!definition) {
-        throw new Error("Flow definition not found");
-      }
+      const definition = getFlowDefinition(config.flow);
 
       const executeCore = (): Promised<Flow.InferOutput<F>> => {
         return this.scope.resolve(config.flow).map(async (handler) => {
@@ -480,10 +487,7 @@ class FlowContext implements Flow.Context {
 
     const executeCore = (): Promised<Flow.InferOutput<F>> => {
       return this.scope.resolve(flow).map(async (handler) => {
-        const definition = flowDefinitionMeta.readFrom(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
+        const definition = getFlowDefinition(flow);
 
         const childContext = new FlowContext(this.scope, this.extensions, tags, this);
         childContext.initializeExecutionContext(definition.name, false);
@@ -497,10 +501,7 @@ class FlowContext implements Flow.Context {
       });
     };
 
-    const definition = flowDefinitionMeta.readFrom(flow);
-    if (!definition) {
-      throw new Error("Flow definition not found in executor metadata");
-    }
+    const definition = getFlowDefinition(flow);
 
     const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
       kind: "subflow",
@@ -612,10 +613,7 @@ class FlowContext implements Flow.Context {
     input: unknown
   ): Promised<T> {
     const executeCore = (): Promised<T> => Promised.create(handler(context));
-    const definition = flowDefinitionMeta.readFrom(flow);
-    if (!definition) {
-      throw new Error("Flow definition not found in executor metadata");
-    }
+    const definition = getFlowDefinition(flow);
 
     const executor = wrapWithExtensions(context['extensions'], executeCore, context.scope, {
       kind: "execute",
