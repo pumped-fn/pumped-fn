@@ -395,14 +395,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 }
 
-function getExecutor(e: Core.UExecutor): Core.AnyExecutor {
-  if (isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)) {
-    return e.executor;
-  }
-
-  return e as Core.AnyExecutor;
-}
-
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, ExecutorState> = new Map();
@@ -460,41 +452,34 @@ class BaseScope implements Core.Scope {
     return state;
   }
 
-  protected ensureCleanups(state: ExecutorState): Set<Core.Cleanup> {
-    if (!state.cleanups) {
-      state.cleanups = new Set();
+  private ensureSet<K extends keyof ExecutorState>(
+    state: ExecutorState,
+    key: K
+  ): NonNullable<ExecutorState[K]> {
+    if (!state[key]) {
+      state[key] = new Set() as ExecutorState[K];
     }
-    return state.cleanups;
+    return state[key]!;
+  }
+
+  protected ensureCleanups(state: ExecutorState): Set<Core.Cleanup> {
+    return this.ensureSet(state, 'cleanups');
   }
 
   protected ensureCallbacks(state: ExecutorState): Set<OnUpdateFn> {
-    if (!state.onUpdateCallbacks) {
-      state.onUpdateCallbacks = new Set();
-    }
-    return state.onUpdateCallbacks;
+    return this.ensureSet(state, 'onUpdateCallbacks');
   }
 
   protected ensureExecutors(state: ExecutorState): Set<UE> {
-    if (!state.onUpdateExecutors) {
-      state.onUpdateExecutors = new Set();
-    }
-    return state.onUpdateExecutors;
+    return this.ensureSet(state, 'onUpdateExecutors');
   }
 
-  protected ensureErrors(
-    state: ExecutorState
-  ): Set<Core.ErrorCallback<unknown>> {
-    if (!state.onErrors) {
-      state.onErrors = new Set();
-    }
-    return state.onErrors;
+  protected ensureErrors(state: ExecutorState): Set<Core.ErrorCallback<unknown>> {
+    return this.ensureSet(state, 'onErrors');
   }
 
   protected ensureResolutionChain(state: ExecutorState): Set<UE> {
-    if (!state.resolutionChain) {
-      state.resolutionChain = new Set();
-    }
-    return state.resolutionChain;
+    return this.ensureSet(state, 'resolutionChain');
   }
 
   protected "~checkCircularDependency"(
@@ -630,7 +615,9 @@ class BaseScope implements Core.Scope {
     ie: Core.UExecutor,
     ref: UE
   ): Promise<unknown> {
-    const e = getExecutor(ie);
+    const e = (isLazyExecutor(ie) || isReactiveExecutor(ie) || isStaticExecutor(ie))
+      ? ie.executor
+      : (ie as Core.AnyExecutor);
 
     if (e === ref) {
       const executorName = errors.getExecutorName(e);

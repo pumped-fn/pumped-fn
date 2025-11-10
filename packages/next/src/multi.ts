@@ -109,28 +109,33 @@ function createMultiExecutor<T, K, PoolIdType>(
   return multiExecutor;
 }
 
+function createMultiBase<T, K>(
+  option: Multi.Option<K>,
+  createNewExecutor: (key: K) => Core.Executor<T>,
+  tags: Tag.Tagged[]
+): Multi.MultiExecutor<T, K> {
+  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Tag.Tag<null, true>;
+  const keyPool = new Map<unknown, Core.Executor<T>>();
+  const providerTags = [poolId(null), ...tags];
+
+  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, providerTags);
+}
+
 export function provide<T, K>(
   option: Multi.Option<K>,
   valueFn: (key: K, controller: Core.Controller) => T | Promise<T>,
   ...tags: Tag.Tagged[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Tag.Tag<null, true>;
-  const keyPool = new Map<unknown, Core.Executor<T>>();
-
-  const createNewExecutor = (key: K) => {
-    return createValidatedExecutor(option, key, (validatedKey) =>
+  return createMultiBase(option, (key) =>
+    createValidatedExecutor(option, key, (validatedKey) =>
       createExecutor(
         (ctl: Core.Controller) => valueFn(validatedKey, ctl),
         undefined,
-        [poolId(null), ...tags]
+        tags
       )
-    );
-  };
-
-  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, [
-    poolId(null),
-    ...tags,
-  ]);
+    ),
+    tags
+  );
 }
 
 export function derive<T, K, D extends Core.DependencyLike>(
@@ -138,11 +143,8 @@ export function derive<T, K, D extends Core.DependencyLike>(
   valueFn: Multi.DependentFn<T, K, Core.InferOutput<D>>,
   ...tags: Tag.Tagged[]
 ): Multi.MultiExecutor<T, K> {
-  const poolId = tag(custom<null>(), { label: Symbol().toString(), default: null }) as Tag.Tag<null, true>;
-  const keyPool = new Map<unknown, Core.Executor<T>>();
-
-  const createNewExecutor = (key: K) => {
-    return createValidatedExecutor(option, key, (validatedKey) => {
+  return createMultiBase(option, (key) =>
+    createValidatedExecutor(option, key, (validatedKey) => {
       const factory: Core.DependentFn<T, unknown> = (dependencies, ctl) =>
         valueFn(dependencies as Core.InferOutput<D>, validatedKey, ctl);
 
@@ -152,8 +154,7 @@ export function derive<T, K, D extends Core.DependencyLike>(
         | Record<string, Core.UExecutor>;
 
       return createExecutor(factory, deps, tags);
-    });
-  };
-
-  return createMultiExecutor(option, poolId, keyPool, createNewExecutor, tags);
+    }),
+    tags
+  );
 }

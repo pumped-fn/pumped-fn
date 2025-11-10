@@ -20,46 +20,43 @@ export class Promised<T> implements PromiseLike<T> {
     return new Promised(promise, executionDataPromise);
   }
 
+  private wrap<U>(promise: Promise<U>): Promised<U> {
+    return Promised.create(promise, this.executionDataPromise);
+  }
+
   map<U>(fn: (value: T) => U | Promise<U>): Promised<U> {
-    return Promised.create(this.promise.then(fn),
-    this.executionDataPromise);
+    return this.wrap(this.promise.then(fn));
   }
 
   switch<U>(fn: (value: T) => Promised<U>): Promised<U> {
-    return Promised.create(this.promise.then(fn),
-    this.executionDataPromise);
+    return this.wrap(this.promise.then(fn));
   }
 
   mapError(fn: (error: unknown) => unknown): Promised<T> {
-    return Promised.create(this.promise.catch((error) => {
+    return this.wrap(this.promise.catch((error) => {
       throw fn(error);
-    }),
-    this.executionDataPromise);
+    }));
   }
 
   switchError(fn: (error: unknown) => Promised<T>): Promised<T> {
-    return Promised.create(this.promise.catch(fn),
-    this.executionDataPromise);
+    return this.wrap(this.promise.catch(fn));
   }
 
   then<TResult1 = T, TResult2 = never>(
     onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
   ): Promised<TResult1 | TResult2> {
-    return Promised.create(this.promise.then(onfulfilled, onrejected),
-    this.executionDataPromise);
+    return this.wrap(this.promise.then(onfulfilled, onrejected));
   }
 
   catch<TResult = never>(
     onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null | undefined
   ): Promised<T | TResult> {
-    return Promised.create(this.promise.catch(onrejected),
-    this.executionDataPromise);
+    return this.wrap(this.promise.catch(onrejected));
   }
 
   finally(onfinally?: (() => void) | null | undefined): Promised<T> {
-    return Promised.create(this.promise.finally(onfinally),
-    this.executionDataPromise);
+    return this.wrap(this.promise.finally(onfinally));
   }
 
   toPromise(): Promise<T> {
