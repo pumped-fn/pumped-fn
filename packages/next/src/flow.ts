@@ -6,12 +6,8 @@ import { type Tag } from "./tag-types";
 import { tag } from "./tag";
 import { custom } from "./ssch";
 import { Promised } from "./promises";
-
-function isErrorEntry(
-  entry: unknown
-): entry is { __error: true; error: unknown } {
-  return typeof entry === "object" && entry !== null && "__error" in entry;
-}
+import { createAbortWithTimeout } from "./internal/abort-utils";
+import { createJournalKey, checkJournalReplay, isErrorEntry } from "./internal/journal-utils";
 
 function wrapWithExtensions<T>(
   extensions: Extension.Extension[] | undefined,
@@ -675,6 +671,44 @@ class FlowContext implements Flow.Context {
       retry: undefined,
       tags: undefined,
     };
+  }
+
+  private executeJournaledFn<T>(
+    fn: (...args: any[]) => T | Promise<T>,
+    params: any[],
+    journalKey: string,
+    flowName: string,
+    depth: number
+  ): Promised<T> {
+    const journal = this.journal! as Map<string, unknown>;
+    const { isReplay, value } = checkJournalReplay<T>(journal as Map<string, T | { __error: true; error: unknown }>, journalKey);
+
+    if (isReplay) {
+      return Promised.create(Promise.resolve(value!));
+    }
+
+    const executeCore = (): Promised<T> => {
+      return Promised.try(async () => {
+        const result = await fn(...params);
+        journal.set(journalKey, result);
+        return result;
+      }).catch((error) => {
+        journal.set(journalKey, { __error: true, error });
+        throw error;
+      });
+    };
+
+    const executor = this.wrapWithExtensions(executeCore, {
+      kind: "journal",
+      key: journalKey.split(":")[2],
+      flowName,
+      depth,
+      isReplay,
+      context: this,
+      params: params.length > 0 ? params : undefined,
+    });
+
+    return Promised.create(executor());
   }
 
   parallel<T extends readonly Promised<any>[]>(
