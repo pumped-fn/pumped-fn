@@ -317,302 +317,100 @@ class FlowContext implements Flow.Context {
     flowOrInput?: F | Flow.InferInput<F>,
     inputOrUndefined?: Flow.InferInput<F>
   ): Promised<any> {
-    if (typeof keyOrFlowOrConfig === "object" && keyOrFlowOrConfig !== null && !("factory" in keyOrFlowOrConfig)) {
-      const config = keyOrFlowOrConfig;
+    this.throwIfAborted();
 
-      this.throwIfAborted();
+    const config = this.parseExecOverloads(keyOrFlowOrConfig, flowOrInput, inputOrUndefined);
+    const { controller, timeoutId } = createAbortWithTimeout(config.timeout, this.signal);
 
-      const childAbort = new AbortController();
-
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      if (config.timeout) {
-        timeoutId = setTimeout(() => {
-          if (!childAbort.signal.aborted) {
-            childAbort.abort(new Error(`Operation timeout after ${config.timeout}ms`));
-          }
-        }, config.timeout);
-      }
-
-      if (this.signal.aborted) {
+    const executeWithCleanup = async <T>(executor: () => Promise<T>): Promise<T> => {
+      try {
+        return await executor();
+      } finally {
         if (timeoutId) clearTimeout(timeoutId);
-        childAbort.abort(this.signal.reason);
-      } else {
-        this.signal.addEventListener("abort", () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          childAbort.abort(this.signal.reason);
-        }, { once: true });
       }
+    };
 
-      if ("flow" in config) {
-        const flow = config.flow as F;
-        const input = config.input as Flow.InferInput<F>;
-
-        if (config.key) {
-          if (!this.journal) {
-            this.journal = new Map();
-          }
-
-          const flowName = this.find(flowMeta.flowName) || "unknown";
-          const depth = this.get(flowMeta.depth);
-          const journalKey = `${flowName}:${depth}:${config.key}`;
-
-          const promise = (async () => {
-            const journal = this.journal!;
-
-            if (journal.has(journalKey)) {
-              const entry = journal.get(journalKey);
-              if (isErrorEntry(entry)) {
-                throw entry.error;
-              }
-              return entry as Flow.InferOutput<F>;
-            }
-
-            this.throwIfAborted();
-
-            const handler = await this.scope.resolve(flow);
-            const definition = flowDefinitionMeta.readFrom(flow);
-
-            if (definition) {
-              const validated = validate(definition.input, input);
-              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
-              childContext.initializeExecutionContext(definition.name, false);
-
-              try {
-                const result = await handler(childContext, validated);
-                validate(definition.output, result);
-                journal.set(journalKey, result);
-                return result;
-              } catch (error) {
-                journal.set(journalKey, { __error: true, error });
-                throw error;
-              } finally {
-                if (timeoutId) clearTimeout(timeoutId);
-              }
-            } else {
-              throw new Error("Flow definition not found");
-            }
-          })();
-
-          return Promised.create(promise);
-        } else {
-          return this.scope.resolve(flow).map(async (handler) => {
-            this.throwIfAborted();
-
-            const definition = flowDefinitionMeta.readFrom(flow);
-            if (definition) {
-              const validated = validate(definition.input, input);
-              const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, childAbort);
-              childContext.initializeExecutionContext(definition.name, false);
-
-              try {
-                const result = await handler(childContext, validated);
-                validate(definition.output, result);
-                return result;
-              } finally {
-                if (timeoutId) clearTimeout(timeoutId);
-              }
-            } else {
-              throw new Error("Flow definition not found");
-            }
-          });
+    if (config.type === "fn") {
+      if (config.key) {
+        if (!this.journal) {
+          this.journal = new Map();
         }
-      } else if ("fn" in config) {
-        const fn = config.fn;
-        const params = "params" in config ? config.params || [] : [];
 
-        if (config.key) {
-          if (!this.journal) {
-            this.journal = new Map();
-          }
+        const flowName = this.find(flowMeta.flowName) || "unknown";
+        const depth = this.get(flowMeta.depth);
+        const journalKey = createJournalKey(flowName, depth, config.key);
 
-          const flowName = this.find(flowMeta.flowName) || "unknown";
-          const depth = this.get(flowMeta.depth);
-          const journalKey = `${flowName}:${depth}:${config.key}`;
-
-          const promise = (async () => {
-            const journal = this.journal!;
-            const isReplay = journal.has(journalKey);
-
-            const executeCore = (): Promised<unknown> => {
-              if (isReplay) {
-                const entry = journal.get(journalKey);
-                if (isErrorEntry(entry)) {
-                  throw entry.error;
-                }
-                return Promised.create(Promise.resolve(entry));
-              }
-
-              return Promised.try(async () => {
-                const result = await fn(...params);
-                journal.set(journalKey, result);
-                return result;
-              }).catch((error) => {
-                journal.set(journalKey, { __error: true, error });
-                throw error;
-              });
-            };
-
-            const executor = this.wrapWithExtensions(executeCore, {
-              kind: "journal",
-              key: config.key!,
-              flowName,
-              depth,
-              isReplay,
-              context: this,
-              params: params.length > 0 ? params : undefined,
-            });
-
-            try {
-              return await executor();
-            } finally {
-              if (timeoutId) clearTimeout(timeoutId);
-            }
-          })();
-
-          return Promised.create(promise);
-        } else {
-          this.throwIfAborted();
-          return Promised.try(async () => {
-            try {
-              const result = await fn(...params);
-              return result;
-            } finally {
-              if (timeoutId) clearTimeout(timeoutId);
-            }
-          });
-        }
+        return Promised.create(
+          executeWithCleanup(async () => await this.executeJournaledFn(config.fn, config.params, journalKey, flowName, depth))
+        );
       } else {
-        throw new Error("Invalid config: must have either 'flow' or 'fn'");
+        return Promised.try(() => executeWithCleanup(() => config.fn(...config.params)));
       }
     }
 
-    const keyOrFlow = keyOrFlowOrConfig as string | F;
-    if (typeof keyOrFlow === "string") {
+    if (config.key) {
       if (!this.journal) {
         this.journal = new Map();
       }
 
-      const key = keyOrFlow;
-      const flow = flowOrInput as F;
-      const input = inputOrUndefined as Flow.InferInput<F>;
-
       const parentFlowName = this.find(flowMeta.flowName);
       const depth = this.get(flowMeta.depth);
-      const flowName = this.find(flowMeta.flowName) || "unknown";
-      const journalKey = `${flowName}:${depth}:${key}`;
+      const journalKey = createJournalKey(parentFlowName || "unknown", depth, config.key);
+      const journal = this.journal as Map<string, Flow.InferOutput<F> | { __error: true; error: unknown }>;
 
-      const promise = (async () => {
-        const journal = this.journal!;
-        const executeCore = (): Promised<Flow.InferOutput<F>> => {
-          if (journal.has(journalKey)) {
-            const entry = journal.get(journalKey);
-            if (isErrorEntry(entry)) {
-              throw entry.error;
-            }
-            return Promised.create(Promise.resolve(entry as Flow.InferOutput<F>));
-          }
-
-          return Promised.try(async () => {
-            const handler = await this.scope.resolve(flow);
-            const definition = flowDefinitionMeta.readFrom(flow);
-            if (!definition) {
-              throw new Error("Flow definition not found in executor metadata");
-            }
-
-            const childContext = new FlowContext(
-              this.scope,
-              this.extensions,
-              undefined,
-              this
-            );
-            childContext.initializeExecutionContext(definition.name, false);
-
-            const result = (await this.executeWithExtensions<
-              Flow.InferOutput<F>
-            >(
-              async (ctx) =>
-                handler(ctx, input) as Promise<Flow.InferOutput<F>>,
-              childContext,
-              flow,
-              input
-            )) as Flow.InferOutput<F>;
-
-            journal.set(journalKey, result);
-            return result;
-          }).catch((error) => {
-            journal.set(journalKey, { __error: true, error });
-            throw error;
-          });
-        };
-
-        const definition = flowDefinitionMeta.readFrom(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
-
-        const executor = this.wrapWithExtensions(executeCore, {
-          kind: "subflow",
-          flow,
-          definition,
-          input,
-          journalKey,
-          parentFlowName,
-          depth,
-          context: this,
-        });
-
-        return executor();
-      })();
-
-      return Promised.create(promise);
-    }
-
-    const flow = keyOrFlow as F;
-    const input = flowOrInput as Flow.InferInput<F>;
-
-    const promise = (async () => {
-      const parentFlowName = this.find(flowMeta.flowName);
-      const depth = this.get(flowMeta.depth);
+      const definition = flowDefinitionMeta.readFrom(config.flow);
+      if (!definition) {
+        throw new Error("Flow definition not found");
+      }
 
       const executeCore = (): Promised<Flow.InferOutput<F>> => {
-        return this.scope.resolve(flow).map(async (handler) => {
-          const definition = flowDefinitionMeta.readFrom(flow);
-          if (!definition) {
-            throw new Error("Flow definition not found in executor metadata");
+        return this.scope.resolve(config.flow).map(async (handler) => {
+          const { isReplay, value } = checkJournalReplay<Flow.InferOutput<F>>(journal, journalKey);
+
+          if (isReplay) {
+            return value!;
           }
 
-          const childContext = new FlowContext(this.scope, this.extensions, undefined, this);
+          this.throwIfAborted();
+
+          const validated = validate(definition.input, config.input);
+          const childContext = new FlowContext(this.scope, this.extensions, config.tags, this, controller);
           childContext.initializeExecutionContext(definition.name, false);
 
-          return (await this.executeWithExtensions<Flow.InferOutput<F>>(
-            async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
-            childContext,
-            flow,
-            input
-          )) as Flow.InferOutput<F>;
+          try {
+            const result = (await this.executeWithExtensions<Flow.InferOutput<F>>(
+              async (ctx) => (handler as Flow.Handler<Flow.InferOutput<F>, Flow.InferInput<F>>)(ctx, validated) as Promise<Flow.InferOutput<F>>,
+              childContext,
+              config.flow,
+              config.input
+            )) as Flow.InferOutput<F>;
+            validate(definition.output, result);
+            journal.set(journalKey, result);
+            return result;
+          } catch (error) {
+            journal.set(journalKey, { __error: true, error });
+            throw error;
+          }
         });
       };
 
-      const definition = flowDefinitionMeta.readFrom(flow);
-      if (!definition) {
-        throw new Error("Flow definition not found in executor metadata");
-      }
-
       const executor = this.wrapWithExtensions(executeCore, {
         kind: "subflow",
-        flow,
+        flow: config.flow,
         definition,
-        input,
-        journalKey: undefined,
+        input: config.input,
+        journalKey,
         parentFlowName,
         depth,
         context: this,
       });
 
-      return executor();
-    })();
+      return Promised.create(executeWithCleanup(async () => await executor()));
+    }
 
-    return Promised.create(promise);
+    return Promised.create(
+      executeWithCleanup(async () => await this.executeSubflow(config.flow, config.input, config.tags))
+    );
   }
 
   private parseExecOverloads<F extends Flow.UFlow>(
