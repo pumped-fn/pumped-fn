@@ -12,81 +12,82 @@ import {
 } from "../src/errors";
 import { tag } from "../src/tag";
 import { Promised } from "../src/promises";
+import { withScope } from "./helpers";
 
 describe("Coverage Gaps", () => {
   describe("helpers.ts - resolves function", () => {
     test("resolves array of executors", async () => {
-      const scope = createScope();
-      const exec1 = provide(() => 1);
-      const exec2 = provide(() => 2);
-      const exec3 = provide(() => 3);
+      await withScope(async (scope) => {
+        const exec1 = provide(() => 1);
+        const exec2 = provide(() => 2);
+        const exec3 = provide(() => 3);
 
-      const result = await resolves(scope, [exec1, exec2, exec3]);
+        const result = await resolves(scope, [exec1, exec2, exec3]);
 
-      expect(result).toEqual([1, 2, 3]);
-      await scope.dispose();
+        expect(result).toEqual([1, 2, 3]);
+      });
     });
 
     test("resolves object of executors", async () => {
-      const scope = createScope();
-      const exec1 = provide(() => 1);
-      const exec2 = provide(() => "hello");
+      await withScope(async (scope) => {
+        const exec1 = provide(() => 1);
+        const exec2 = provide(() => "hello");
 
-      const result = await resolves(scope, { a: exec1, b: exec2 });
+        const result = await resolves(scope, { a: exec1, b: exec2 });
 
-      expect(result).toEqual({ a: 1, b: "hello" });
-      await scope.dispose();
+        expect(result).toEqual({ a: 1, b: "hello" });
+      });
     });
 
     test("resolves array with escapable values", async () => {
-      const scope = createScope();
-      const exec1 = provide(() => 1);
-      const escapable = { escape: () => provide(() => 2) };
+      await withScope(async (scope) => {
+        const exec1 = provide(() => 1);
+        const escapable = { escape: () => provide(() => 2) };
 
-      const result = await resolves(scope, [exec1, escapable]);
+        const result = await resolves(scope, [exec1, escapable]);
 
-      expect(result).toEqual([1, 2]);
-      await scope.dispose();
+        expect(result).toEqual([1, 2]);
+      });
     });
 
     test("resolves object with escapable values", async () => {
-      const scope = createScope();
-      const escapable = { escape: () => provide(() => 42) };
+      await withScope(async (scope) => {
+        const escapable = { escape: () => provide(() => 42) };
 
-      const result = await resolves(scope, { value: escapable });
+        const result = await resolves(scope, { value: escapable });
 
-      expect(result).toEqual({ value: 42 });
-      await scope.dispose();
+        expect(result).toEqual({ value: 42 });
+      });
     });
 
     test("resolves lazy executor", async () => {
-      const scope = createScope();
-      const lazyExec = provide(() => 10).lazy;
+      await withScope(async (scope) => {
+        const lazyExec = provide(() => 10).lazy;
 
-      const result = await resolves(scope, [lazyExec] as any);
+        const result = await resolves(scope, [lazyExec] as any);
 
-      expect(result).toEqual([10]);
-      await scope.dispose();
+        expect(result).toEqual([10]);
+      });
     });
 
     test("resolves reactive executor", async () => {
-      const scope = createScope();
-      const reactiveExec = provide(() => 20).reactive;
+      await withScope(async (scope) => {
+        const reactiveExec = provide(() => 20).reactive;
 
-      const result = await resolves(scope, [reactiveExec] as any);
+        const result = await resolves(scope, [reactiveExec] as any);
 
-      expect(result).toEqual([20]);
-      await scope.dispose();
+        expect(result).toEqual([20]);
+      });
     });
 
     test("resolves static executor", async () => {
-      const scope = createScope();
-      const staticExec = provide(() => 30).static;
+      await withScope(async (scope) => {
+        const staticExec = provide(() => 30).static;
 
-      const result = await resolves(scope, [staticExec] as any);
+        const result = await resolves(scope, [staticExec] as any);
 
-      expect(result).toEqual([30]);
-      await scope.dispose();
+        expect(result).toEqual([30]);
+      });
     });
   });
 
