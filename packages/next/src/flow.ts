@@ -137,6 +137,30 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
   );
 }
 
+namespace ExecConfig {
+  export type Flow<F extends Flow.UFlow> = {
+    type: "flow";
+    flow: F;
+    input: Flow.InferInput<F>;
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  };
+
+  export type Fn<T> = {
+    type: "fn";
+    fn: (...args: any[]) => T | Promise<T>;
+    params: any[];
+    key?: string;
+    timeout?: number;
+    retry?: number;
+    tags?: Tag.Tagged[];
+  };
+
+  export type Normalized<T = any> = Flow<any> | Fn<T>;
+}
+
 class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
   private journal: Map<string, unknown> | null = null;
@@ -593,6 +617,64 @@ class FlowContext implements Flow.Context {
     })();
 
     return Promised.create(promise);
+  }
+
+  private parseExecOverloads<F extends Flow.UFlow>(
+    keyOrFlowOrConfig: string | F | { flow?: F; fn?: any; input?: Flow.InferInput<F>; params?: any[]; key?: string; timeout?: number; retry?: number; tags?: Tag.Tagged[] },
+    flowOrInput?: F | Flow.InferInput<F>,
+    inputOrUndefined?: Flow.InferInput<F>
+  ): ExecConfig.Normalized {
+    if (typeof keyOrFlowOrConfig === "object" && keyOrFlowOrConfig !== null && !("factory" in keyOrFlowOrConfig)) {
+      const config = keyOrFlowOrConfig;
+
+      if ("flow" in config) {
+        return {
+          type: "flow",
+          flow: config.flow as F,
+          input: config.input as Flow.InferInput<F>,
+          key: config.key,
+          timeout: config.timeout,
+          retry: config.retry,
+          tags: config.tags,
+        };
+      } else if ("fn" in config) {
+        return {
+          type: "fn",
+          fn: config.fn,
+          params: "params" in config ? config.params || [] : [],
+          key: config.key,
+          timeout: config.timeout,
+          retry: config.retry,
+          tags: config.tags,
+        };
+      } else {
+        throw new Error("Invalid config: must have either 'flow' or 'fn'");
+      }
+    }
+
+    const keyOrFlow = keyOrFlowOrConfig as string | F;
+
+    if (typeof keyOrFlow === "string") {
+      return {
+        type: "flow",
+        flow: flowOrInput as F,
+        input: inputOrUndefined as Flow.InferInput<F>,
+        key: keyOrFlow,
+        timeout: undefined,
+        retry: undefined,
+        tags: undefined,
+      };
+    }
+
+    return {
+      type: "flow",
+      flow: keyOrFlow as F,
+      input: flowOrInput as Flow.InferInput<F>,
+      key: undefined,
+      timeout: undefined,
+      retry: undefined,
+      tags: undefined,
+    };
   }
 
   parallel<T extends readonly Promised<any>[]>(
