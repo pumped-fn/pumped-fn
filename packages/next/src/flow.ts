@@ -711,6 +711,52 @@ class FlowContext implements Flow.Context {
     return Promised.create(executor());
   }
 
+  private executeSubflow<F extends Flow.UFlow>(
+    flow: F,
+    input: Flow.InferInput<F>,
+    tags?: Tag.Tagged[]
+  ): Promised<Flow.InferOutput<F>> {
+    const parentFlowName = this.find(flowMeta.flowName);
+    const depth = this.get(flowMeta.depth);
+
+    const executeCore = (): Promised<Flow.InferOutput<F>> => {
+      return this.scope.resolve(flow).map(async (handler) => {
+        const definition = flowDefinitionMeta.readFrom(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+
+        const childContext = new FlowContext(this.scope, this.extensions, tags, this);
+        childContext.initializeExecutionContext(definition.name, false);
+
+        return (await this.executeWithExtensions<Flow.InferOutput<F>>(
+          async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
+          childContext,
+          flow,
+          input
+        )) as Flow.InferOutput<F>;
+      });
+    };
+
+    const definition = flowDefinitionMeta.readFrom(flow);
+    if (!definition) {
+      throw new Error("Flow definition not found in executor metadata");
+    }
+
+    const executor = this.wrapWithExtensions(executeCore, {
+      kind: "subflow",
+      flow,
+      definition,
+      input,
+      journalKey: undefined,
+      parentFlowName,
+      depth,
+      context: this,
+    });
+
+    return Promised.create(executor());
+  }
+
   parallel<T extends readonly Promised<any>[]>(
     promises: [...T]
   ): Promised<
