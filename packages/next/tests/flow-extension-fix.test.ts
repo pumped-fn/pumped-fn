@@ -92,3 +92,80 @@ describe("Extension Operation Coverage", () => {
     });
   });
 });
+
+describe("Extension Wrapping Order", () => {
+  test("multiple extensions wrap in array order", async () => {
+    const trace: Array<{ name: string; phase: string; kind: string }> = [];
+
+    const outerExt = extension({
+      name: "outer",
+      wrap: (scope, next, operation) => {
+        trace.push({ name: "outer", phase: "before", kind: operation.kind });
+        const result = next();
+        trace.push({ name: "outer", phase: "after", kind: operation.kind });
+        return result;
+      },
+    });
+
+    const innerExt = extension({
+      name: "inner",
+      wrap: (scope, next, operation) => {
+        trace.push({ name: "inner", phase: "before", kind: operation.kind });
+        const result = next();
+        trace.push({ name: "inner", phase: "after", kind: operation.kind });
+        return result;
+      },
+    });
+
+    const scope = createScope({ extensions: [outerExt, innerExt] });
+    const simpleFlow = flow((_ctx, input: number) => input * 2);
+
+    await flow.execute(simpleFlow, 5, { scope });
+
+    const executeTraces = trace.filter((t) => t.kind === "execute");
+
+    expect(executeTraces).toEqual([
+      { name: "outer", phase: "before", kind: "execute" },
+      { name: "inner", phase: "before", kind: "execute" },
+      { name: "inner", phase: "after", kind: "execute" },
+      { name: "outer", phase: "after", kind: "execute" },
+    ]);
+  });
+
+  test("nested operations show correct wrapping depth", async () => {
+    const trace: Array<{ name: string; phase: string; kind: string }> = [];
+
+    const tracker = extension({
+      name: "tracker",
+      wrap: (scope, next, operation) => {
+        trace.push({ name: "tracker", phase: "before", kind: operation.kind });
+        const result = next();
+        trace.push({ name: "tracker", phase: "after", kind: operation.kind });
+        return result;
+      },
+    });
+
+    const scope = createScope({ extensions: [tracker] });
+
+    const childFlow = flow((_ctx, x: number) => x + 1);
+    const parentFlow = flow(async (ctx, input: number) => {
+      const result = await ctx.exec(childFlow, input);
+      return result * 2;
+    });
+
+    await flow.execute(parentFlow, 5, { scope });
+
+    expect(trace.map((t) => `${t.kind}-${t.phase}`)).toEqual([
+      "execute-before",
+      "resolve-before",
+      "resolve-after",
+      "execute-after",
+      "subflow-before",
+      "resolve-before",
+      "resolve-after",
+      "subflow-after",
+      "execute-before",
+      "execute-after",
+    ]);
+  });
+});
