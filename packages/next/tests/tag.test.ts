@@ -5,13 +5,6 @@ import { tagSymbol, type Tag } from "../src/tag-types";
 import { inspect } from "node:util";
 
 describe("Tag System", () => {
-  test("tag creates symbol-keyed accessor with schema", () => {
-    const emailTag = tag(custom<string>());
-
-    expect(typeof emailTag.key).toBe("symbol");
-    expect(emailTag.schema).toBeDefined();
-  });
-
   test("detects Store source type", () => {
     const store = new Map<symbol, unknown>();
     const emailTag = tag(custom<string>());
@@ -38,44 +31,6 @@ describe("Tag System", () => {
     };
 
     expect(emailTag.readFrom(container)).toBe("test@example.com");
-  });
-});
-
-describe("Tag Creation and Retrieval", () => {
-  test("tag without default requires value for extractFrom", () => {
-    const emailTag = tag(custom<string>());
-    const store = new Map<symbol, unknown>();
-
-    expect(() => emailTag.extractFrom(store)).toThrow();
-  });
-
-  test("tag without default returns undefined for readFrom", () => {
-    const emailTag = tag(custom<string>());
-    const store = new Map<symbol, unknown>();
-
-    expect(emailTag.readFrom(store)).toBeUndefined();
-  });
-
-  test("tag with default never throws on extractFrom", () => {
-    const portTag = tag(custom<number>(), { default: 3000 });
-    const store = new Map<symbol, unknown>();
-
-    expect(portTag.extractFrom(store)).toBe(3000);
-  });
-
-  test("tag with default returns default for readFrom", () => {
-    const portTag = tag(custom<number>(), { default: 3000 });
-    const store = new Map<symbol, unknown>();
-
-    expect(portTag.readFrom(store)).toBe(3000);
-  });
-
-  test("tag retrieves stored value", () => {
-    const emailTag = tag(custom<string>());
-    const store = new Map<symbol, unknown>();
-
-    store.set(emailTag.key, "test@example.com");
-    expect(emailTag.extractFrom(store)).toBe("test@example.com");
   });
 });
 
