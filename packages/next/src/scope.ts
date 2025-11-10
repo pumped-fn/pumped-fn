@@ -718,23 +718,6 @@ class BaseScope implements Core.Scope {
     }
   }
 
-  private wrapWithExtensions<T>(
-    baseExecutor: () => Promised<T>,
-    operation: Extension.Operation
-  ): () => Promised<T> {
-    let executor = baseExecutor;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const current = executor;
-        executor = () => {
-          const result = extension.wrap!<T>(this, current, operation);
-          return result instanceof Promised ? result : Promised.create(result);
-        };
-      }
-    }
-    return executor;
-  }
-
   protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
     let requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
@@ -774,7 +757,7 @@ class BaseScope implements Core.Scope {
       return accessor.resolve(force).map(() => accessor.get() as T);
     };
 
-    const resolver = this.wrapWithExtensions(coreResolve, {
+    const resolver = wrapWithExtensions(this.extensions, coreResolve, this, {
       kind: "resolve",
       executor,
       scope: this,
@@ -892,7 +875,7 @@ class BaseScope implements Core.Scope {
       return coreUpdate().map(() => this.accessor(e).get() as T);
     };
 
-    const updater = this.wrapWithExtensions(baseUpdater, {
+    const updater = wrapWithExtensions(this.extensions, baseUpdater, this, {
       kind: "resolve",
       operation: "update",
       executor: e,

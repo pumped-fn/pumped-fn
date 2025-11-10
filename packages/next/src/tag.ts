@@ -37,6 +37,16 @@ function isContainer(source: Tag.Source): source is Tag.Container {
   );
 }
 
+function getOrBuildCache(source: Tag.Source): Map<symbol, unknown[]> {
+  let cache = tagCacheMap.get(source);
+  if (!cache) {
+    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
+    cache = buildTagCache(tags);
+    tagCacheMap.set(source, cache);
+  }
+  return cache;
+}
+
 function extract<T>(
   source: Tag.Source,
   key: symbol,
@@ -51,13 +61,7 @@ function extract<T>(
     return value === undefined ? undefined : validate(schema, value);
   }
 
-  let cache = tagCacheMap.get(source);
-  if (!cache) {
-    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
-    cache = buildTagCache(tags);
-    tagCacheMap.set(source, cache);
-  }
-
+  const cache = getOrBuildCache(source);
   const values = cache.get(key);
   return values && values.length > 0 ? validate(schema, values[0]) : undefined;
 }
@@ -72,13 +76,7 @@ function collect<T>(
     return value === undefined ? [] : [validate(schema, value)];
   }
 
-  let cache = tagCacheMap.get(source);
-  if (!cache) {
-    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
-    cache = buildTagCache(tags);
-    tagCacheMap.set(source, cache);
-  }
-
+  const cache = getOrBuildCache(source);
   const values = cache.get(key);
   return values ? values.map(v => validate(schema, v)) : [];
 }
@@ -228,42 +226,27 @@ export function tag<T>(
     return createTagged(impl.key, impl.schema, validated, impl.label);
   }) as Tag.Tag<T, boolean>;
 
-  Object.defineProperty(fn, "key", {
-    value: impl.key,
-    writable: false,
-    configurable: false,
-  });
-  Object.defineProperty(fn, "schema", {
-    value: impl.schema,
-    writable: false,
-    configurable: false,
-  });
-  Object.defineProperty(fn, "label", {
-    value: impl.label,
-    writable: false,
-    configurable: false,
-  });
-  Object.defineProperty(fn, "default", {
-    value: impl.default,
-    writable: false,
-    configurable: false,
-  });
-
-  fn.extractFrom = impl.get.bind(impl);
-  fn.readFrom = impl.find.bind(impl);
-  fn.collectFrom = impl.some.bind(impl);
-  fn.injectTo = impl.set.bind(impl);
-  fn.entry = impl.entry.bind(impl);
-  fn.toString = impl.toString.bind(impl);
-  (fn as any).partial = <D extends Partial<T>>(d: D): D => {
-    return Object.assign({}, createTagged(impl.key, impl.schema, {} as T, impl.label), d);
-  };
-  Object.defineProperty(fn, Symbol.toStringTag, {
-    get: () => impl[Symbol.toStringTag],
-  });
   const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
-  Object.defineProperty(fn, inspectSymbol, {
-    value: (impl as any)[inspectSymbol].bind(impl),
+
+  Object.defineProperties(fn, {
+    key: { value: impl.key, writable: false, configurable: false },
+    schema: { value: impl.schema, writable: false, configurable: false },
+    label: { value: impl.label, writable: false, configurable: false },
+    default: { value: impl.default, writable: false, configurable: false },
+    extractFrom: { value: impl.get.bind(impl), writable: true, configurable: true },
+    readFrom: { value: impl.find.bind(impl), writable: true, configurable: true },
+    collectFrom: { value: impl.some.bind(impl), writable: true, configurable: true },
+    injectTo: { value: impl.set.bind(impl), writable: true, configurable: true },
+    entry: { value: impl.entry.bind(impl), writable: true, configurable: true },
+    toString: { value: impl.toString.bind(impl), writable: true, configurable: true },
+    partial: {
+      value: <D extends Partial<T>>(d: D): D =>
+        Object.assign({}, createTagged(impl.key, impl.schema, {} as T, impl.label), d),
+      writable: true,
+      configurable: true
+    },
+    [Symbol.toStringTag]: { get: () => impl[Symbol.toStringTag] },
+    [inspectSymbol]: { value: (impl as any)[inspectSymbol].bind(impl) }
   });
 
   return fn;

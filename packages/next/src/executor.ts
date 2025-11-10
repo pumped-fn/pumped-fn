@@ -74,23 +74,19 @@ export function createExecutor<T>(
   return executor;
 }
 
-export function isLazyExecutor(
-  executor: Core.UExecutor
-): executor is Core.Lazy<unknown> {
-  return executor[executorSymbol] === "lazy";
+function createExecutorTypeGuard<T extends Core.UExecutor>(
+  kind: Core.Kind
+): (executor: Core.UExecutor) => executor is T {
+  return (executor: Core.UExecutor): executor is T =>
+    executor[executorSymbol] === kind;
 }
 
-export function isReactiveExecutor(
-  executor: Core.UExecutor
-): executor is Core.Reactive<unknown> {
-  return executor[executorSymbol] === "reactive";
-}
-
-export function isStaticExecutor(
-  executor: Core.UExecutor
-): executor is Core.Static<unknown> {
-  return executor[executorSymbol] === "static";
-}
+export const isLazyExecutor: (executor: Core.UExecutor) => executor is Core.Lazy<unknown> =
+  createExecutorTypeGuard<Core.Lazy<unknown>>("lazy");
+export const isReactiveExecutor: (executor: Core.UExecutor) => executor is Core.Reactive<unknown> =
+  createExecutorTypeGuard<Core.Reactive<unknown>>("reactive");
+export const isStaticExecutor: (executor: Core.UExecutor) => executor is Core.Static<unknown> =
+  createExecutorTypeGuard<Core.Static<unknown>>("static");
 
 export function isMainExecutor(
   executor: unknown

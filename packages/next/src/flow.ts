@@ -8,29 +8,7 @@ import { custom } from "./ssch";
 import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay, isErrorEntry } from "./internal/journal-utils";
-
-function wrapWithExtensions<T>(
-  extensions: Extension.Extension[] | undefined,
-  baseExecutor: () => Promised<T>,
-  scope: Core.Scope,
-  operation: Extension.Operation
-): () => Promised<T> {
-  if (!extensions || extensions.length === 0) {
-    return baseExecutor;
-  }
-  let executor = baseExecutor;
-  for (let i = extensions.length - 1; i >= 0; i--) {
-    const extension = extensions[i];
-    if (extension.wrap) {
-      const current = executor;
-      executor = () => {
-        const result = extension.wrap!(scope, current, operation);
-        return result instanceof Promised ? result : Promised.create(result);
-      };
-    }
-  }
-  return executor;
-}
+import { wrapWithExtensions } from "./internal/extension-utils";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(custom<Flow.Definition<any, any>>(), {
   label: "flow.definition",
@@ -194,23 +172,6 @@ class FlowContext implements Flow.Context {
 
   accessor<T>(executor: Core.Executor<T>): Core.Accessor<T> {
     return this.scope.accessor(executor);
-  }
-
-  private wrapWithExtensions<T>(
-    baseExecutor: () => Promised<T>,
-    operation: Extension.Operation
-  ): () => Promised<T> {
-    let executor = baseExecutor;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const current = executor;
-        executor = () => {
-          const result = extension.wrap!(this.scope, current, operation);
-          return result instanceof Promised ? result : Promised.create(result);
-        };
-      }
-    }
-    return executor;
   }
 
   initializeExecutionContext(flowName: string, isParallel: boolean = false): void {
@@ -394,7 +355,7 @@ class FlowContext implements Flow.Context {
         });
       };
 
-      const executor = this.wrapWithExtensions(executeCore, {
+      const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
         kind: "subflow",
         flow: config.flow,
         definition,
@@ -496,7 +457,7 @@ class FlowContext implements Flow.Context {
       });
     };
 
-    const executor = this.wrapWithExtensions(executeCore, {
+    const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
       kind: "journal",
       key: journalKey.split(":")[2],
       flowName,
@@ -541,7 +502,7 @@ class FlowContext implements Flow.Context {
       throw new Error("Flow definition not found in executor metadata");
     }
 
-    const executor = this.wrapWithExtensions(executeCore, {
+    const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
       kind: "subflow",
       flow,
       definition,
@@ -584,7 +545,7 @@ class FlowContext implements Flow.Context {
         })));
       };
 
-      const executor = this.wrapWithExtensions(executeCore, {
+      const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
         kind: "parallel",
         mode: "parallel",
         promiseCount: promises.length,
@@ -629,7 +590,7 @@ class FlowContext implements Flow.Context {
         }));
       };
 
-      const executor = this.wrapWithExtensions(executeCore, {
+      const executor = wrapWithExtensions(this.extensions, executeCore, this.scope, {
         kind: "parallel",
         mode: "parallelSettled",
         promiseCount: promises.length,
@@ -656,7 +617,7 @@ class FlowContext implements Flow.Context {
       throw new Error("Flow definition not found in executor metadata");
     }
 
-    const executor = context.wrapWithExtensions(executeCore, {
+    const executor = wrapWithExtensions(context['extensions'], executeCore, context.scope, {
       kind: "execute",
       flow,
       definition,

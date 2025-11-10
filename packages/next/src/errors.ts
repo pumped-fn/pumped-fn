@@ -130,6 +130,25 @@ export function formatMessage(
   return message;
 }
 
+function buildMessageContext(
+  executorName: string,
+  dependencyChain: string[],
+  originalError: unknown,
+  additionalContext: Record<string, unknown>,
+  missingDependency?: string
+): Record<string, unknown> {
+  const errorMessage = originalError instanceof Error ? originalError.message : String(originalError);
+
+  return {
+    executorName,
+    dependencyName: missingDependency,
+    dependencyChain: dependencyChain.join(" -> "),
+    originalMessage: errorMessage,
+    cause: errorMessage,
+    ...additionalContext,
+  };
+}
+
 export function createFactoryError(
   code: Code,
   executorName: string,
@@ -144,20 +163,10 @@ export function createFactoryError(
     additionalInfo: additionalContext,
   };
 
-  const messageContext = {
-    executorName,
-    originalMessage:
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError),
-    cause:
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError),
-    ...additionalContext,
-  };
-
-  const message = formatMessage(code, messageContext);
+  const message = formatMessage(
+    code,
+    buildMessageContext(executorName, dependencyChain, originalError, additionalContext)
+  );
 
   return new FactoryExecutionError(message, context, code, {
     cause: originalError,
@@ -179,28 +188,14 @@ export function createDependencyError(
     additionalInfo: additionalContext,
   };
 
-  const messageContext = {
-    executorName,
-    dependencyName: missingDependency,
-    dependencyChain: dependencyChain.join(" -> "),
-    cause:
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError),
-    ...additionalContext,
-  };
-
-  const message = formatMessage(code, messageContext);
-
-  return new DependencyResolutionError(
-    message,
-    context,
+  const message = formatMessage(
     code,
-    missingDependency,
-    {
-      cause: originalError,
-    }
+    buildMessageContext(executorName, dependencyChain, originalError, additionalContext, missingDependency)
   );
+
+  return new DependencyResolutionError(message, context, code, missingDependency, {
+    cause: originalError,
+  });
 }
 
 export function createSystemError(
@@ -218,16 +213,10 @@ export function createSystemError(
     additionalInfo: additionalContext,
   };
 
-  const messageContext = {
-    executorName,
-    cause:
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError),
-    ...additionalContext,
-  };
-
-  const message = formatMessage(code, messageContext);
+  const message = formatMessage(
+    code,
+    buildMessageContext(executorName, dependencyChain, originalError, additionalContext)
+  );
 
   return new ExecutorResolutionError(message, context, code, "SYSTEM_ERROR", {
     cause: originalError,
