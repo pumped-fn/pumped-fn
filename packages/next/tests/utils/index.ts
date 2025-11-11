@@ -92,3 +92,63 @@ export function expectRejected(result: PromiseSettledResult<unknown>): {
     },
   };
 }
+
+export type OperationRecord = {
+  kind: string;
+  flowName?: string;
+  journalKey?: string;
+  input?: unknown;
+  output?: unknown;
+  error?: unknown;
+  params?: readonly unknown[];
+  parallelMode?: string;
+  promiseCount?: number;
+};
+
+export function createTrackingExtension(
+  filter?: (kind: string) => boolean
+): {
+  ext: Extension.Extension;
+  records: OperationRecord[];
+} {
+  const records: OperationRecord[] = [];
+
+  const ext: Extension.Extension = {
+    name: "tracker",
+    wrap: (_scope, next, operation) => {
+      if (filter && !filter(operation.kind)) {
+        return next();
+      }
+
+      const record: OperationRecord = { kind: operation.kind };
+
+      if (operation.kind === "execute") {
+        record.flowName = operation.definition.name;
+        record.input = operation.input;
+      } else if (operation.kind === "journal") {
+        record.journalKey = operation.key;
+        record.params = operation.params;
+      } else if (operation.kind === "subflow") {
+        record.flowName = operation.definition.name;
+        record.input = operation.input;
+      } else if (operation.kind === "parallel") {
+        record.parallelMode = operation.mode;
+        record.promiseCount = operation.promiseCount;
+      }
+
+      return next()
+        .then((result) => {
+          record.output = result;
+          records.push(record);
+          return result;
+        })
+        .catch((error) => {
+          record.error = error;
+          records.push(record);
+          throw error;
+        });
+    },
+  };
+
+  return { ext, records };
+}
