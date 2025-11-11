@@ -107,14 +107,14 @@ Extensions can filter by operation type:
 ```ts twoslash
 import { extension } from '@pumped-fn/core-next'
 
-const executeOnly = extension({
-  name: 'execute-only',
+const executionOnly = extension({
+  name: 'execution-only',
   wrap: async (scope, next, operation) => {
-    if (operation.kind !== 'execute') {
+    if (operation.kind !== 'execution') {
       return next()
     }
 
-    console.log('Execute-specific logic')
+    console.log('Execution-specific logic')
     return next()
   }
 })
