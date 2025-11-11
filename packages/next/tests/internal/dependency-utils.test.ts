@@ -99,4 +99,46 @@ describe("resolveShape", () => {
 
     expect(result).toBeUndefined();
   });
+
+  it("resolves array executors in parallel", async () => {
+    const scope = createScope();
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const e1 = provide(async () => {
+      await delay(100);
+      return 1;
+    });
+    const e2 = provide(async () => {
+      await delay(100);
+      return 2;
+    });
+
+    const start = Date.now();
+    const result = await resolveShape(scope, [e1, e2]);
+    const duration = Date.now() - start;
+
+    expect(result).toEqual([1, 2]);
+    expect(duration).toBeLessThan(150);
+  });
+
+  it("resolves record executors in parallel", async () => {
+    const scope = createScope();
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const e1 = provide(async () => {
+      await delay(100);
+      return "a";
+    });
+    const e2 = provide(async () => {
+      await delay(100);
+      return "b";
+    });
+
+    const start = Date.now();
+    const result = await resolveShape(scope, { x: e1, y: e2 });
+    const duration = Date.now() - start;
+
+    expect(result).toEqual({ x: "a", y: "b" });
+    expect(duration).toBeLessThan(150);
+  });
 });

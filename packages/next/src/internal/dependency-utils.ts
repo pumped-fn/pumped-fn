@@ -31,12 +31,11 @@ export async function resolveShape<T extends Core.UExecutor | ReadonlyArray<Core
       };
 
   if (Array.isArray(shape)) {
-    const results = [];
+    const promises = [];
     for (const item of shape) {
-      const result = await resolveItem(item);
-      results.push(result);
+      promises.push(resolveItem(item));
     }
-    return results;
+    return await Promise.all(promises);
   }
 
   if (typeof shape === "object") {
@@ -49,10 +48,13 @@ export async function resolveShape<T extends Core.UExecutor | ReadonlyArray<Core
       return await resolveItem(unwrapped);
     }
 
+    const entries = Object.entries(shape);
+    const promises = entries.map(([_, item]) => resolveItem(item));
+    const resolvedValues = await Promise.all(promises);
+
     const results: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(shape)) {
-      const result = await resolveItem(item);
-      results[key] = result;
+    for (let i = 0; i < entries.length; i++) {
+      results[entries[i][0]] = resolvedValues[i];
     }
     return results;
   }
