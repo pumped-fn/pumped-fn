@@ -178,7 +178,7 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const executeOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "flow");
+    const executeOp = operations.find((op) => op.kind === "execution" && op.target.type === "flow");
     expect(executeOp).toBeDefined();
     expect(executeOp).toMatchObject({
       kind: "execution",
@@ -202,7 +202,7 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(parent, 5, { scope });
 
-    const subflowOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "flow");
+    const subflowOp = operations.find((op) => op.kind === "execution" && op.target.type === "flow");
     expect(subflowOp).toBeDefined();
     expect(subflowOp).toMatchObject({
       kind: "execution",
@@ -225,7 +225,7 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const journalOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "fn" && op.key);
+    const journalOp = operations.find((op) => op.kind === "execution" && op.target.type === "fn" && op.key);
     expect(journalOp).toBeDefined();
     expect(journalOp).toMatchObject({
       kind: "execution",
@@ -250,13 +250,12 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const parallelOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "parallel");
+    const parallelOp = operations.find((op) => op.kind === "execution" && op.target.type === "parallel");
     expect(parallelOp).toBeDefined();
     if (parallelOp && parallelOp.kind === "execution" && parallelOp.target.type === "parallel") {
       expect(parallelOp.target.mode).toBe("parallel");
       expect(parallelOp.target.count).toBe(2);
       expect(parallelOp.context).toBeDefined();
     }
-    expect(parallelOp).toHaveProperty("context");
   });
 });
