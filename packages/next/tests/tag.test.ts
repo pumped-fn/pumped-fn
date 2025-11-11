@@ -42,40 +42,27 @@ describe("Tag System", () => {
 });
 
 describe("Tag Creation and Retrieval", () => {
-  test("tag without default requires value for extractFrom", () => {
-    const emailTag = tag(custom<string>());
+  test.each([
+    { desc: "string without default", hasDefault: false },
+    { desc: "number with default", hasDefault: true },
+  ])("$desc inject/read cycle", ({ hasDefault }) => {
     const store = new Map<symbol, unknown>();
 
-    expect(() => emailTag.extractFrom(store)).toThrow();
-  });
-
-  test("tag without default returns undefined for readFrom", () => {
-    const emailTag = tag(custom<string>());
-    const store = new Map<symbol, unknown>();
-
-    expect(emailTag.readFrom(store)).toBeUndefined();
-  });
-
-  test("tag with default never throws on extractFrom", () => {
-    const portTag = tag(custom<number>(), { default: 3000 });
-    const store = new Map<symbol, unknown>();
-
-    expect(portTag.extractFrom(store)).toBe(3000);
-  });
-
-  test("tag with default returns default for readFrom", () => {
-    const portTag = tag(custom<number>(), { default: 3000 });
-    const store = new Map<symbol, unknown>();
-
-    expect(portTag.readFrom(store)).toBe(3000);
-  });
-
-  test("tag retrieves stored value", () => {
-    const emailTag = tag(custom<string>());
-    const store = new Map<symbol, unknown>();
-
-    store.set(emailTag.key, "test@example.com");
-    expect(emailTag.extractFrom(store)).toBe("test@example.com");
+    if (!hasDefault) {
+      const t = tag(custom<string>());
+      expect(t.readFrom(store)).toBeUndefined();
+      expect(() => t.extractFrom(store)).toThrow();
+      t.injectTo(store, "hello");
+      expect(t.readFrom(store)).toBe("hello");
+      expect(t.extractFrom(store)).toBe("hello");
+    } else {
+      const t = tag(custom<number>(), { default: 10 });
+      expect(t.readFrom(store)).toBe(10);
+      expect(t.extractFrom(store)).toBe(10);
+      t.injectTo(store, 42);
+      expect(t.readFrom(store)).toBe(42);
+      expect(t.extractFrom(store)).toBe(42);
+    }
   });
 });
 
