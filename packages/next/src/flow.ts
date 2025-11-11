@@ -301,20 +301,20 @@ class FlowContext implements Flow.Context {
     const { controller, timeoutId } = createAbortWithTimeout(config.timeout, this.signal);
 
     const executeWithCleanup = async <T>(executor: () => Promise<T>): Promise<T> => {
-      try {
-        if (config.timeout) {
-          const abortPromise = new Promise<never>((_, reject) => {
-            controller.signal.addEventListener('abort', () => {
-              reject(controller.signal.reason || new Error('Operation aborted'));
-            }, { once: true });
-          });
+      if (config.timeout) {
+        const abortPromise = new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(controller.signal.reason || new Error('Operation aborted'));
+          }, { once: true });
+        });
 
+        try {
           return await Promise.race([executor(), abortPromise]);
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
         }
-        return await executor();
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
       }
+      return await executor();
     };
 
     if (config.type === "fn") {
