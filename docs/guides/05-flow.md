@@ -33,6 +33,38 @@ await scope.dispose()
 
 Scope `db` persists across executions. Flow context isolated per request.
 
+## Scope Disposal
+
+When a scope is disposed, all flow executions automatically complete. Flow contexts are ephemeral and automatically cleaned up after execution completes.
+
+```ts twoslash
+import { flow, provide, createScope } from '@pumped-fn/core-next'
+
+const logger = provide(() => ({
+  log: (msg: string) => console.log(msg),
+  close: async () => console.log('Logger closed')
+}))
+
+const handler = flow({ logger }, async (deps, ctx, msg: string) => {
+  deps.logger.log(msg)
+  return { logged: true }
+})
+
+const scope = createScope()
+
+await flow.execute(handler, 'message1', { scope })
+await flow.execute(handler, 'message2', { scope })
+
+await scope.dispose()
+```
+
+**Key Points:**
+- Flow contexts are discarded after each execution
+- Scope disposal cleans up long-running resources
+- Journal entries are scoped to individual flow executions
+- Always dispose scopes to prevent resource leaks
+- See [Scope Lifecycle](./03-scope-lifecycle.md) for cleanup patterns
+
 ## Flow Creation Patterns
 
 ### Inference-based (simple cases)
@@ -153,6 +185,65 @@ const handler = flow((ctx, input: string) => {
   return { requestId: id }
 })
 ```
+
+### ctx.resetJournal - Clear Journal Entries
+
+Clear journal entries to allow re-execution of previously journaled operations. Useful for retry logic or repeated operations within a flow.
+
+```ts twoslash
+import { flow } from '@pumped-fn/core-next'
+
+const retryOperation = flow(async (ctx, input: string) => {
+  const attempt1 = await ctx.exec({
+    key: 'operation',
+    fn: () => ({ result: 'first' })
+  })
+
+  ctx.resetJournal()
+
+  const attempt2 = await ctx.exec({
+    key: 'operation',
+    fn: () => ({ result: 'second' })
+  })
+
+  return { attempt1, attempt2 }
+})
+```
+
+Clear specific entries by pattern:
+
+```ts twoslash
+import { flow } from '@pumped-fn/core-next'
+
+const batchProcess = flow(async (ctx, items: string[]) => {
+  for (const item of items) {
+    await ctx.exec({
+      key: `process:${item}`,
+      fn: () => processItem(item)
+    })
+  }
+
+  ctx.resetJournal('process')
+
+  for (const item of items) {
+    await ctx.exec({
+      key: `process:${item}`,
+      fn: () => processItem(item)
+    })
+  }
+
+  return { processed: items.length }
+})
+
+declare function processItem(item: string): string
+```
+
+**Key Points:**
+- `ctx.resetJournal()` - Clears all journal entries
+- `ctx.resetJournal(pattern)` - Clears entries where user key contains pattern
+- Pattern matching only applies to user-provided key portion
+- Flow name and depth portions are not matched
+- Allows re-execution of previously journaled operations
 
 ## Production Error Handling
 

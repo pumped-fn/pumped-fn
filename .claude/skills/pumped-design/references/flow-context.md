@@ -15,6 +15,7 @@ Use context operations (`ctx`) when:
 - **ctx.parallelSettled()** - Running operations that may partially fail
 - **ctx.set()/ctx.get()** - Storing metadata across flow execution
 - **ctx.exec()** - Calling sub-flows (see flow-subflows.md)
+- **ctx.resetJournal()** - Clearing journal for re-execution or retry logic
 
 **Don't use for:**
 - Simple calculations that don't need journaling (just use direct code)
@@ -384,6 +385,76 @@ const result = await flow.execute(gatherResults, {})
 - Bulk operations where partial success is acceptable
 - Fetching multiple resources (continue if some fail)
 - Batch processing with error collection
+
+---
+
+## ctx.resetJournal() - Clear Journal Entries
+
+### Purpose
+
+Clear journal entries to allow re-execution of previously journaled operations. Useful for retry logic or repeated operations within a flow.
+
+### Pattern
+
+```typescript
+import { flow } from '@pumped-fn/core-next'
+
+const retryOperation = flow(async (ctx, input: string) => {
+  // First attempt
+  const attempt1 = await ctx.exec({
+    key: 'operation',
+    fn: () => ({ result: 'first' })
+  })
+
+  // Clear journal to allow re-execution
+  ctx.resetJournal()
+
+  // Second attempt - same key, will execute again
+  const attempt2 = await ctx.exec({
+    key: 'operation',
+    fn: () => ({ result: 'second' })
+  })
+
+  return { attempt1, attempt2 }
+})
+```
+
+### Pattern Matching
+
+```typescript
+import { flow } from '@pumped-fn/core-next'
+
+const batchProcess = flow(async (ctx, items: string[]) => {
+  // First batch
+  for (const item of items) {
+    await ctx.exec({
+      key: `process:${item}`,
+      fn: () => processItem(item)
+    })
+  }
+
+  // Clear only entries matching 'process'
+  ctx.resetJournal('process')
+
+  // Re-run batch - will execute again
+  for (const item of items) {
+    await ctx.exec({
+      key: `process:${item}`,
+      fn: () => processItem(item)
+    })
+  }
+
+  return { processed: items.length }
+})
+```
+
+**Key Points:**
+- `ctx.resetJournal()` - Clears all journal entries
+- `ctx.resetJournal(pattern)` - Clears entries where user key contains pattern
+- Pattern matching only applies to user-provided key portion
+- Flow name and depth portions are not matched
+- Allows re-execution of previously journaled operations
+- Use for retry logic, repeated operations, or clearing stale cache
 
 ---
 
