@@ -191,7 +191,7 @@ class FlowContext implements Flow.Context {
     baseExecutor: () => Promised<T>,
     operation: Extension.Operation
   ): () => Promised<T> {
-    let executor = baseExecutor;
+    let executor = baseExecutor as () => Promised<unknown>;
     for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const current = executor;
@@ -201,7 +201,7 @@ class FlowContext implements Flow.Context {
         };
       }
     }
-    return executor;
+    return executor as () => Promised<T>;
   }
 
   initializeExecutionContext(

@@ -10,7 +10,7 @@ export function wrapWithExtensions<T>(
   if (!extensions || extensions.length === 0) {
     return baseExecutor;
   }
-  let executor = baseExecutor;
+  let executor = baseExecutor as () => Promised<unknown>;
   for (let i = extensions.length - 1; i >= 0; i--) {
     const extension = extensions[i];
     if (extension.wrap) {
@@ -21,5 +21,5 @@ export function wrapWithExtensions<T>(
       };
     }
   }
-  return executor;
+  return executor as () => Promised<T>;
 }

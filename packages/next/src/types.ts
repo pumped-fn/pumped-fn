@@ -710,11 +710,11 @@ export namespace Extension {
 
     init?(scope: Core.Scope): MaybePromised<void>;
 
-    wrap?<T>(
+    wrap?(
       scope: Core.Scope,
-      next: () => Promised<T>,
+      next: () => Promised<unknown>,
       operation: Operation
-    ): Promise<T> | Promised<T>;
+    ): Promise<unknown> | Promised<unknown>;
 
     onError?(error: ExecutorError, scope: Core.Scope): void;
 

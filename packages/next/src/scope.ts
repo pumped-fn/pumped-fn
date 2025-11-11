@@ -20,7 +20,6 @@ import { type Tag } from "./tag-types";
 import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
-import { wrapWithExtensions } from "./internal/extension-utils";
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
@@ -705,17 +704,17 @@ class BaseScope implements Core.Scope {
     baseExecutor: () => Promised<T>,
     operation: Extension.Operation
   ): () => Promised<T> {
-    let executor = baseExecutor;
+    let executor = baseExecutor as () => Promised<unknown>;
     for (const extension of this.reversedExtensions) {
       if (extension.wrap) {
         const current = executor;
         executor = () => {
-          const result = extension.wrap!<T>(this, current, operation);
+          const result = extension.wrap!(this, current, operation);
           return result instanceof Promised ? result : Promised.create(result);
         };
       }
     }
-    return executor;
+    return executor as () => Promised<T>;
   }
 
   protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
@@ -1200,10 +1199,8 @@ class BaseScope implements Core.Scope {
           throw new Error("Flow definition not found in executor metadata");
         }
 
-        const executor = wrapWithExtensions(
-          this.extensions,
+        const executor = this.wrapWithExtensions(
           executeCore,
-          this,
           {
             kind: "execution",
             target: {

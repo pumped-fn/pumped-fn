@@ -44,7 +44,7 @@ describe("Devtools Extension", () => {
     await flow.execute(testFlow, undefined, { extensions: [ext] })
 
     expect(messages.length).toBeGreaterThan(0)
-    expect(messages.some(m => m.operation.kind === "execute" || m.operation.kind === "journal")).toBe(true)
+    expect(messages.some(m => m.operation.kind === "execution")).toBe(true)
   })
 
   it("should dispose devtools scope", async () => {
