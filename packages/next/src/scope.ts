@@ -1205,14 +1205,15 @@ class BaseScope implements Core.Scope {
           executeCore,
           this,
           {
-            kind: "execute",
-            flow,
-            definition,
+            kind: "execution",
+            target: {
+              type: "flow",
+              flow,
+              definition,
+            },
             input,
-            flowName: definition.name || context.find(flowMeta.flowName),
-            depth: context.get(flowMeta.depth),
-            isParallel: context.get(flowMeta.isParallel),
-            parentFlowName: context.find(flowMeta.parentFlowName),
+            key: undefined,
+            context,
           }
         );
 
