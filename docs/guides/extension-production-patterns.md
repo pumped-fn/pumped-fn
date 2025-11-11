@@ -21,13 +21,14 @@ operation.scope.registeredExecutors()  // All executors in scope
 operation.scope.entries()        // All cached values
 ```
 
-**Flow operations:**
+**Execution operations:**
 ```ts
-operation.kind === "execute" | "subflow" | "journal" | "parallel"
-operation.definition.name        // Flow name
-operation.depth                  // Call depth
-operation.parentFlowName         // Parent flow
+operation.kind === "execution"
+operation.target.type            // "flow" | "fn" | "parallel"
+operation.target.definition?.name // Flow name (if flow)
+operation.key                    // Named operation key (if journaled)
 operation.context                // Tag store for correlation
+// Access depth via: operation.context.get(flowMeta.depth.key)
 ```
 
 ### Timing Operations
@@ -58,18 +59,13 @@ const traceId = tag(custom<string>(), { label: 'trace.id' })
 const tracer = extension({
   name: 'tracer',
   wrap: async (scope, next, operation) => {
-    const ctx = 'context' in operation ? operation.context : undefined
-    const tid = ctx ? traceId.readFrom(ctx) : generateTraceId()
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
+      const ctx = operation.context
+      const tid = traceId.readFrom(ctx) || generateTraceId()
+      const depth = (ctx.get(flowMeta.depth.key) as number) || 0
 
-    if (operation.kind === 'execute') {
-      // Root span
-      const span = createSpan(tid, operation.definition.name, 0)
-      return recordSpan(span, next)
-    }
-
-    if (operation.kind === 'subflow') {
-      // Child span
-      const span = createSpan(tid, operation.definition.name, operation.depth)
+      // Create span for flow execution
+      const span = createSpan(tid, operation.target.definition.name, depth)
       return recordSpan(span, next)
     }
 
@@ -135,16 +131,21 @@ const cacheMonitor = extension({
 const tracer = extension({
   name: 'tracer',
   wrap: async (scope, next, operation) => {
-    const ctx = 'context' in operation ? operation.context : undefined
-    const traceId = ctx ? requestId.readFrom(ctx) : generateId()
+    const traceId = operation.kind === 'execution'
+      ? requestId.readFrom(operation.context) || generateId()
+      : generateId()
     const spanId = generateSpanId()
 
     const span = {
       traceId,
       spanId,
       operation: operation.kind,
-      name: operation.kind === 'execute' ? operation.definition.name : undefined,
-      depth: 'depth' in operation ? operation.depth : undefined,
+      name: operation.kind === 'execution' && operation.target.type === 'flow'
+        ? operation.target.definition.name
+        : undefined,
+      depth: operation.kind === 'execution'
+        ? (operation.context.get(flowMeta.depth.key) as number) || 0
+        : undefined,
       startTime: Date.now()
     }
 
@@ -179,7 +180,10 @@ const metrics = extension({
 
       metrics.histogram('operation.duration', duration, {
         kind: operation.kind,
-        name: 'definition' in operation ? operation.definition.name : undefined
+        targetType: operation.kind === 'execution' ? operation.target.type : undefined,
+        name: operation.kind === 'execution' && operation.target.type === 'flow'
+          ? operation.target.definition.name
+          : undefined
       })
 
       metrics.counter('operation.success', 1, { kind: operation.kind })

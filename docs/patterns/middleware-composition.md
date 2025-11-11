@@ -98,7 +98,7 @@ import { extension } from '@pumped-fn/core-next'
 const flowOnlyMiddleware = extension({
   name: 'flow-only',
   wrap: async (ctx, next, operation) => {
-    if (operation.kind !== 'execute') {
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') {
       return next()
     }
 

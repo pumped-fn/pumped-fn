@@ -173,7 +173,7 @@ const tracingExtension = extension({
       }
 
       // Access nesting depth via flowMeta tags
-      const depth = operation.context.get(flowMeta.depth.key) as number
+      const depth = (operation.context.get(flowMeta.depth.key) as number) || 0
       console.log(`Execution at depth ${depth}`)
     }
     return next()

@@ -86,7 +86,7 @@ Target types discriminate execution purpose:
 - `{ type: "parallel", mode, count }` - Parallel coordination (ctx.parallel/parallelSettled)
 
 Named operations have `key` defined (for journaling/replay).
-Nesting context available via `operation.context.get(flowMeta.depth)`.
+Nesting context available via `operation.context.get(flowMeta.depth.key)`.
 
 ---
 
