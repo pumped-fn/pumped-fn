@@ -2,11 +2,14 @@ import { describe, test, expect } from "vitest";
 import { flow, Promised } from "../src";
 
 describe("Promised - Settled Result Utilities", () => {
+  const createSuccessFlow = (multiplier: number = 1) => flow((_ctx, x: number) => x * multiplier);
+  const createFailureFlow = (message: string = "fail") => flow(() => { throw new Error(message); });
+
   describe("fulfilled()", () => {
     test("extracts fulfilled values from parallel execution", async () => {
-      const multiplyByTwo = flow((_ctx, x: number) => x * 2);
-      const multiplyByThree = flow((_ctx, x: number) => x * 3);
-      const multiplyByFour = flow((_ctx, x: number) => x * 4);
+      const multiplyByTwo = createSuccessFlow(2);
+      const multiplyByThree = createSuccessFlow(3);
+      const multiplyByFour = createSuccessFlow(4);
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -24,10 +27,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("filters out rejected results and keeps only fulfilled", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -48,12 +49,8 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("rejected()", () => {
     test("extracts rejection reasons from parallel execution", async () => {
-      const firstFailure = flow(() => {
-        throw new Error("error1");
-      });
-      const secondFailure = flow(() => {
-        throw new Error("error2");
-      });
+      const firstFailure = createFailureFlow("error1");
+      const secondFailure = createFailureFlow("error2");
 
       const main = flow(async (ctx) => {
         return ctx
@@ -69,10 +66,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("filters out fulfilled results and keeps only rejected", async () => {
-      const successFlow = flow((_ctx, x: number) => x * 2);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow(2);
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (ctx, input: number) => {
         return ctx

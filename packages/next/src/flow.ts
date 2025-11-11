@@ -659,13 +659,20 @@ class FlowContext implements Flow.Context {
   }
 
   createSnapshot(): Flow.ExecutionData {
-    const contextDataSnapshot = new Map(this.contextData);
-    if (this.journal) {
-      contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
-    }
+    let contextDataSnapshot: Map<unknown, unknown> | null = null;
+
+    const getSnapshot = () => {
+      if (!contextDataSnapshot) {
+        contextDataSnapshot = new Map(this.contextData);
+        if (this.journal) {
+          contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
+        }
+      }
+      return contextDataSnapshot;
+    };
 
     const dataStore = {
-      get: (key: unknown) => contextDataSnapshot.get(key),
+      get: (key: unknown) => getSnapshot().get(key),
       set: (_key: unknown, _value: unknown) => {
         throw new Error("Cannot set values on execution snapshot");
       },
