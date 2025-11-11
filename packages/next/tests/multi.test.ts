@@ -40,4 +40,22 @@ describe("Multi Executor", () => {
       endpoint: "https://api.example.com/orders",
     });
   });
+
+  test("multi.release completes in <5ms for 100 pooled executors", async () => {
+    const dbConnection = multi.provide(
+      { keySchema: custom<number>() },
+      (id) => ({ connection: `db-${id}` })
+    );
+
+    const scope = createScope();
+    for (let i = 0; i < 100; i++) {
+      await scope.resolve(dbConnection(i));
+    }
+
+    const start = performance.now();
+    await dbConnection.release(scope);
+    const duration = performance.now() - start;
+
+    expect(duration, `release() took ${duration.toFixed(2)}ms, expected <5ms`).toBeLessThan(5);
+  });
 });
