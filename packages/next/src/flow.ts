@@ -604,7 +604,7 @@ class FlowContext implements Flow.Context {
         return Promised.create(Promise.allSettled(promises).then((results) => {
           const succeeded = results.filter((r) => r.status === "fulfilled").length;
           const failed = results.filter((r) => r.status === "rejected").length;
-        
+
           return {
             results: results as PromiseSettledResult<any>[],
             stats: {
@@ -629,6 +629,28 @@ class FlowContext implements Flow.Context {
     })();
 
     return Promised.create(promise);
+  }
+
+  resetJournal(keyPattern?: string): void {
+    if (!this.journal) {
+      return;
+    }
+
+    if (keyPattern === undefined) {
+      this.journal.clear();
+      return;
+    }
+
+    const keysToDelete: string[] = [];
+    for (const key of this.journal.keys()) {
+      if (key.includes(keyPattern)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    for (const key of keysToDelete) {
+      this.journal.delete(key);
+    }
   }
 
   private executeWithExtensions<T>(

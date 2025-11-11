@@ -626,6 +626,8 @@ export namespace Flow {
         [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
       }>
     >;
+
+    resetJournal(keyPattern?: string): void;
   };
 
   export type Context = C;
