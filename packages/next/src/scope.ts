@@ -21,6 +21,7 @@ import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
 import { wrapWithExtensions } from "./internal/extension-utils";
+import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
 
@@ -683,34 +684,15 @@ class BaseScope implements Core.Scope {
     ie:
       | undefined
       | Core.UExecutor
-      | Core.UExecutor[]
+      | ReadonlyArray<Core.UExecutor>
       | Record<string, Core.UExecutor>,
     ref: UE
-  ): Promise<undefined | unknown | unknown[] | Record<string, unknown>> {
-    if (ie === undefined) {
-      return undefined;
-    }
-
-    if (isExecutor(ie)) {
-      return this["~resolveExecutor"](ie, ref);
-    }
-
-    if (Array.isArray(ie)) {
-      return await Promise.all(
-        ie.map((item) => this["~resolveDependencies"](item, ref))
-      );
-    }
-
-    const keys = Object.keys(ie);
-    const promises = keys.map((k) => this["~resolveDependencies"](ie[k], ref));
-    const values = await Promise.all(promises);
-
-    const r: Record<string, unknown> = Object.create(null);
-    keys.forEach((k, i) => {
-      r[k] = values[i];
-    });
-
-    return r;
+  ): Promise<unknown> {
+    return resolveShape(
+      this as unknown as Core.Scope,
+      ie,
+      (item) => this["~resolveExecutor"](item as Core.UExecutor, ref)
+    );
   }
 
   protected "~ensureNotDisposed"(): void {
