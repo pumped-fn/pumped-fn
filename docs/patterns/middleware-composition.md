@@ -128,7 +128,7 @@ const headersMiddleware = extension({
     const result = await next()
 
     return {
-      ...result,
+      ...(result as object),
       headers
     }
   }
