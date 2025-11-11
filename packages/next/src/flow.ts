@@ -8,29 +8,7 @@ import { custom } from "./ssch";
 import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay, isErrorEntry } from "./internal/journal-utils";
-
-function wrapWithExtensions<T>(
-  extensions: Extension.Extension[] | undefined,
-  baseExecutor: () => Promised<T>,
-  scope: Core.Scope,
-  operation: Extension.Operation
-): () => Promised<T> {
-  if (!extensions || extensions.length === 0) {
-    return baseExecutor;
-  }
-  let executor = baseExecutor;
-  for (let i = extensions.length - 1; i >= 0; i--) {
-    const extension = extensions[i];
-    if (extension.wrap) {
-      const current = executor;
-      executor = () => {
-        const result = extension.wrap!(scope, current, operation);
-        return result instanceof Promised ? result : Promised.create(result);
-      };
-    }
-  }
-  return executor;
-}
+import { wrapWithExtensions } from "./internal/extension-utils";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(custom<Flow.Definition<any, any>>(), {
   label: "flow.definition",
@@ -1012,4 +990,4 @@ export const flow: typeof flowImpl & {
   execute: execute,
 });
 
-export { FlowContext, flowDefinitionMeta, wrapWithExtensions };
+export { FlowContext, flowDefinitionMeta };

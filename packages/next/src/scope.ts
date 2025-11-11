@@ -19,7 +19,8 @@ import {
 import { type Tag } from "./tag-types";
 import { Promised } from "./promises";
 import * as errors from "./errors";
-import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta, wrapWithExtensions } from "./flow";
+import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
+import { wrapWithExtensions } from "./internal/extension-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
 
