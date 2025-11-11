@@ -643,8 +643,12 @@ class FlowContext implements Flow.Context {
 
     const keysToDelete: string[] = [];
     for (const key of this.journal.keys()) {
-      if (key.includes(keyPattern)) {
-        keysToDelete.push(key);
+      const parts = key.split(':');
+      if (parts.length >= 3) {
+        const userKey = parts.slice(2).join(':');
+        if (userKey.includes(keyPattern)) {
+          keysToDelete.push(key);
+        }
       }
     }
 

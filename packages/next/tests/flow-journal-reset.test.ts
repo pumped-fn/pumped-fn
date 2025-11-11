@@ -86,4 +86,75 @@ describe("Flow.Context resetJournal", () => {
 
     await scope.dispose();
   });
+
+  test("resetJournal('0') should not match depth-0 flows", async () => {
+    let executionCount = 0;
+
+    const testFlow = flow(async (ctx, _input: void) => {
+      await ctx.exec({ key: "step0", fn: () => { executionCount++; return "value0"; }});
+      await ctx.exec({ key: "step1", fn: () => { executionCount++; return "value1"; }});
+
+      ctx.resetJournal("0");
+
+      await ctx.exec({ key: "step0", fn: () => { executionCount++; return "value0-again"; }});
+      await ctx.exec({ key: "step1", fn: () => { executionCount++; return "value1-again"; }});
+
+      return executionCount;
+    });
+
+    const scope = createScope();
+    const result = await flow.execute(testFlow, undefined, { scope });
+
+    expect(result).toBe(3);
+    expect(executionCount).toBe(3);
+
+    await scope.dispose();
+  });
+
+  test("resetJournal(':') should match user keys containing colon", async () => {
+    let step1Count = 0;
+    let step2Count = 0;
+
+    const testFlow = flow(async (ctx, _input: void) => {
+      await ctx.exec({ key: "user:fetch", fn: () => { step1Count++; return "user"; }});
+      await ctx.exec({ key: "simple", fn: () => { step2Count++; return "simple"; }});
+
+      ctx.resetJournal(":");
+
+      await ctx.exec({ key: "user:fetch", fn: () => { step1Count++; return "user2"; }});
+      await ctx.exec({ key: "simple", fn: () => { step2Count++; return "simple2"; }});
+
+      return { step1Count, step2Count };
+    });
+
+    const scope = createScope();
+    const result = await flow.execute(testFlow, undefined, { scope });
+
+    expect(result.step1Count).toBe(2);
+    expect(result.step2Count).toBe(1);
+
+    await scope.dispose();
+  });
+
+  test("resetJournal should not match flow name or depth portions", async () => {
+    let executionCount = 0;
+
+    const testFlow = flow(async (ctx, _input: void) => {
+      await ctx.exec({ key: "operation", fn: () => { executionCount++; return "value"; }});
+
+      ctx.resetJournal("Flow");
+
+      await ctx.exec({ key: "operation", fn: () => { executionCount++; return "value2"; }});
+
+      return executionCount;
+    });
+
+    const scope = createScope();
+    const result = await flow.execute(testFlow, undefined, { scope });
+
+    expect(result).toBe(1);
+    expect(executionCount).toBe(1);
+
+    await scope.dispose();
+  });
 });
