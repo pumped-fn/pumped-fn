@@ -15,77 +15,18 @@ import { Promised } from "../src/promises";
 
 describe("Coverage Gaps", () => {
   describe("helpers.ts - resolves function", () => {
-    test("resolves array of executors", async () => {
+    test.each([
+      { desc: "array of executors", input: () => [provide(() => 1), provide(() => 2), provide(() => 3)], expected: [1, 2, 3] },
+      { desc: "object of executors", input: () => ({ a: provide(() => 1), b: provide(() => "hello") }), expected: { a: 1, b: "hello" } },
+      { desc: "array with escapable", input: () => [provide(() => 1), { escape: () => provide(() => 2) }], expected: [1, 2] },
+      { desc: "object with escapable", input: () => ({ value: { escape: () => provide(() => 42) } }), expected: { value: 42 } },
+      { desc: "lazy executor", input: () => [provide(() => 10).lazy], expected: [10] },
+      { desc: "reactive executor", input: () => [provide(() => 20).reactive], expected: [20] },
+      { desc: "static executor", input: () => [provide(() => 30).static], expected: [30] },
+    ])("resolves $desc", async ({ input, expected }) => {
       const scope = createScope();
-      const exec1 = provide(() => 1);
-      const exec2 = provide(() => 2);
-      const exec3 = provide(() => 3);
-
-      const result = await resolves(scope, [exec1, exec2, exec3]);
-
-      expect(result).toEqual([1, 2, 3]);
-      await scope.dispose();
-    });
-
-    test("resolves object of executors", async () => {
-      const scope = createScope();
-      const exec1 = provide(() => 1);
-      const exec2 = provide(() => "hello");
-
-      const result = await resolves(scope, { a: exec1, b: exec2 });
-
-      expect(result).toEqual({ a: 1, b: "hello" });
-      await scope.dispose();
-    });
-
-    test("resolves array with escapable values", async () => {
-      const scope = createScope();
-      const exec1 = provide(() => 1);
-      const escapable = { escape: () => provide(() => 2) };
-
-      const result = await resolves(scope, [exec1, escapable]);
-
-      expect(result).toEqual([1, 2]);
-      await scope.dispose();
-    });
-
-    test("resolves object with escapable values", async () => {
-      const scope = createScope();
-      const escapable = { escape: () => provide(() => 42) };
-
-      const result = await resolves(scope, { value: escapable });
-
-      expect(result).toEqual({ value: 42 });
-      await scope.dispose();
-    });
-
-    test("resolves lazy executor", async () => {
-      const scope = createScope();
-      const lazyExec = provide(() => 10).lazy;
-
-      const result = await resolves(scope, [lazyExec] as any);
-
-      expect(result).toEqual([10]);
-      await scope.dispose();
-    });
-
-    test("resolves reactive executor", async () => {
-      const scope = createScope();
-      const reactiveExec = provide(() => 20).reactive;
-
-      const result = await resolves(scope, [reactiveExec] as any);
-
-      expect(result).toEqual([20]);
-      await scope.dispose();
-    });
-
-    test("resolves static executor", async () => {
-      const scope = createScope();
-      const staticExec = provide(() => 30).static;
-
-      const result = await resolves(scope, [staticExec] as any);
-
-      expect(result).toEqual([30]);
+      const result = await resolves(scope, input() as any);
+      expect(result).toEqual(expected);
       await scope.dispose();
     });
   });
