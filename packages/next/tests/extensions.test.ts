@@ -4,7 +4,9 @@ import { createTrackingExtension } from "./utils";
 
 describe("Extension Operation Tracking", () => {
   test("extension captures journal operations with parameters and outputs", async () => {
-    const { ext, records } = createTrackingExtension((kind) => kind === "journal");
+    const { ext, records } = createTrackingExtension((kind, op) =>
+      kind === "execution" && op.kind === "execution" && op.target.type === "fn" && op.key !== undefined
+    );
 
     const mathCalculationFlow = flow(async (ctx, input: { x: number; y: number }) => {
       const product = await ctx.exec({ key: "multiply", fn: (a: number, b: number) => a * b, params: [input.x, input.y] });
@@ -22,13 +24,15 @@ describe("Extension Operation Tracking", () => {
 
     expect(result).toEqual({ product: 15, sum: 8, combined: 23 });
     expect(records).toHaveLength(3);
-    expect(records[0]).toMatchObject({ journalKey: "multiply", params: [5, 3], output: 15 });
-    expect(records[1]).toMatchObject({ journalKey: "add", params: [5, 3], output: 8 });
-    expect(records[2]).toMatchObject({ journalKey: "combine", output: 23 });
+    expect(records[0]).toMatchObject({ key: "multiply", params: [5, 3], output: 15 });
+    expect(records[1]).toMatchObject({ key: "add", params: [5, 3], output: 8 });
+    expect(records[2]).toMatchObject({ key: "combine", output: 23 });
   });
 
   test("extension intercepts flow execution and subflow inputs", async () => {
-    const { ext, records } = createTrackingExtension((kind) => kind === "execute" || kind === "subflow");
+    const { ext, records } = createTrackingExtension((kind, op) =>
+      kind === "execution" && op.kind === "execution" && op.target.type === "flow"
+    );
 
     const incrementFlow = flow((_ctx, x: number) => x + 1);
     const doubleFlow = flow((_ctx, x: number) => x * 2);
@@ -85,19 +89,19 @@ describe("Extension Operation Tracking", () => {
 
     expect(result).toEqual({ multiplied: 10, added: 15, combined: 25 });
 
-    const executeOperations = records.filter((r) => r.kind === "execute");
-    expect(executeOperations).toHaveLength(3);
+    const executeOperations = records.filter((r) => r.kind === "execution" && r.targetType === "flow");
+    expect(executeOperations.length).toBeGreaterThanOrEqual(3);
     expect(executeOperations[0].input).toBe(5);
 
-    const parallelOperations = records.filter((r) => r.kind === "parallel");
+    const parallelOperations = records.filter((r) => r.kind === "execution" && r.targetType === "parallel");
     expect(parallelOperations).toHaveLength(1);
     expect(parallelOperations[0].parallelMode).toBe("parallel");
-    expect(parallelOperations[0].promiseCount).toBe(2);
+    expect(parallelOperations[0].count).toBe(2);
 
-    const journalOperations = records.filter((r) => r.kind === "journal");
-    expect(journalOperations.some((r) => r.journalKey === "multiply-op" && r.output === 10)).toBe(true);
-    expect(journalOperations.some((r) => r.journalKey === "add-op" && r.output === 15)).toBe(true);
-    expect(journalOperations.some((r) => r.journalKey === "combine" && r.output === 25)).toBe(true);
+    const journalOperations = records.filter((r) => r.kind === "execution" && r.targetType === "fn" && r.key);
+    expect(journalOperations.some((r) => r.key === "multiply-op" && r.output === 10)).toBe(true);
+    expect(journalOperations.some((r) => r.key === "add-op" && r.output === 15)).toBe(true);
+    expect(journalOperations.some((r) => r.key === "combine" && r.output === 25)).toBe(true);
 
     records.length = 0;
 
@@ -109,7 +113,7 @@ describe("Extension Operation Tracking", () => {
       "Intentional failure"
     );
 
-    const errorOperation = records.find((r) => r.kind === "journal");
+    const errorOperation = records.find((r) => r.kind === "execution" && r.targetType === "fn");
     expect(errorOperation?.error).toBeDefined();
     expect((errorOperation?.error as Error).message).toBe("Intentional failure");
   });

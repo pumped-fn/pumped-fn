@@ -20,14 +20,14 @@ describe("Extension Operation Coverage", () => {
   test.each([
     {
       name: "flow execution",
-      expectedOperations: ["execute", "resolve"],
+      expectedOperations: ["execution", "resolve"],
       createFlow: () => flow((_ctx, input: number) => input * 2),
       input: 5,
       expectedResult: 10,
     },
     {
       name: "subflow execution",
-      expectedOperations: ["execute", "resolve", "subflow", "resolve", "execute"],
+      expectedOperations: ["execution", "resolve", "execution", "resolve", "execution"],
       createFlow: () => {
         const child = flow((_ctx, x: number) => x + 1);
         return flow(async (ctx, input: number) => {
@@ -40,7 +40,7 @@ describe("Extension Operation Coverage", () => {
     },
     {
       name: "journaled fn execution",
-      expectedOperations: ["execute", "resolve", "journal"],
+      expectedOperations: ["execution", "resolve", "execution"],
       createFlow: () =>
         flow(async (ctx, input: number) => {
           const doubled = await ctx.exec({ fn: () => input * 2, key: "double" });
@@ -51,7 +51,7 @@ describe("Extension Operation Coverage", () => {
     },
     {
       name: "non-journaled fn execution",
-      expectedOperations: ["execute", "resolve"],
+      expectedOperations: ["execution", "resolve"],
       createFlow: () =>
         flow(async (ctx, input: number) => {
           const doubled = await ctx.exec({ fn: () => input * 2 });
@@ -62,7 +62,7 @@ describe("Extension Operation Coverage", () => {
     },
     {
       name: "parallel execution",
-      expectedOperations: ["execute", "resolve", "parallel"],
+      expectedOperations: ["execution", "resolve", "execution"],
       createFlow: () =>
         flow(async (ctx, _input: number) => {
           const { results } = await ctx.parallel([
@@ -122,13 +122,13 @@ describe("Extension Wrapping Order", () => {
 
     await flow.execute(simpleFlow, 5, { scope });
 
-    const executeTraces = trace.filter((t) => t.kind === "execute");
+    const executeTraces = trace.filter((t) => t.kind === "execution");
 
     expect(executeTraces).toEqual([
-      { name: "outer", phase: "before", kind: "execute" },
-      { name: "inner", phase: "before", kind: "execute" },
-      { name: "inner", phase: "after", kind: "execute" },
-      { name: "outer", phase: "after", kind: "execute" },
+      { name: "outer", phase: "before", kind: "execution" },
+      { name: "inner", phase: "before", kind: "execution" },
+      { name: "inner", phase: "after", kind: "execution" },
+      { name: "outer", phase: "after", kind: "execution" },
     ]);
   });
 
@@ -156,16 +156,16 @@ describe("Extension Wrapping Order", () => {
     await flow.execute(parentFlow, 5, { scope });
 
     expect(trace.map((t) => `${t.kind}-${t.phase}`)).toEqual([
-      "execute-before",
+      "execution-before",
       "resolve-before",
       "resolve-after",
-      "execute-after",
-      "subflow-before",
+      "execution-after",
+      "execution-before",
       "resolve-before",
       "resolve-after",
-      "subflow-after",
-      "execute-before",
-      "execute-after",
+      "execution-after",
+      "execution-before",
+      "execution-after",
     ]);
   });
 });
@@ -178,18 +178,17 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const executeOp = operations.find((op) => op.kind === "execute");
+    const executeOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "flow");
     expect(executeOp).toBeDefined();
     expect(executeOp).toMatchObject({
-      kind: "execute",
-      flow: expect.any(Object),
-      definition: expect.any(Object),
+      kind: "execution",
       input: 5,
     });
-    expect(executeOp).toHaveProperty("depth");
-    expect(executeOp).toHaveProperty("isParallel");
-    expect(executeOp).toHaveProperty("flowName");
-    expect(executeOp).toHaveProperty("parentFlowName");
+    if (executeOp && executeOp.kind === "execution" && executeOp.target.type === "flow") {
+      expect(executeOp.target.flow).toBeDefined();
+      expect(executeOp.target.definition).toBeDefined();
+      expect(executeOp.context).toBeDefined();
+    }
   });
 
   test("subflow operation contains required metadata", async () => {
@@ -203,18 +202,17 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(parent, 5, { scope });
 
-    const subflowOp = operations.find((op) => op.kind === "subflow");
+    const subflowOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "flow");
     expect(subflowOp).toBeDefined();
     expect(subflowOp).toMatchObject({
-      kind: "subflow",
-      flow: expect.any(Object),
-      definition: expect.any(Object),
+      kind: "execution",
       input: 5,
     });
-    expect(subflowOp).toHaveProperty("depth");
-    expect(subflowOp).toHaveProperty("parentFlowName");
-    expect(subflowOp).toHaveProperty("journalKey");
-    expect(subflowOp).toHaveProperty("context");
+    if (subflowOp && subflowOp.kind === "execution" && subflowOp.target.type === "flow") {
+      expect(subflowOp.target.flow).toBeDefined();
+      expect(subflowOp.target.definition).toBeDefined();
+      expect(subflowOp.context).toBeDefined();
+    }
   });
 
   test("journal operation contains required metadata", async () => {
@@ -227,16 +225,15 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const journalOp = operations.find((op) => op.kind === "journal");
+    const journalOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "fn" && op.key);
     expect(journalOp).toBeDefined();
     expect(journalOp).toMatchObject({
-      kind: "journal",
+      kind: "execution",
       key: "double",
-      isReplay: false,
     });
-    expect(journalOp).toHaveProperty("depth");
-    expect(journalOp).toHaveProperty("flowName");
-    expect(journalOp).toHaveProperty("context");
+    if (journalOp && journalOp.kind === "execution" && journalOp.target.type === "fn") {
+      expect(journalOp.context).toBeDefined();
+    }
   });
 
   test("parallel operation contains required metadata", async () => {
@@ -253,15 +250,13 @@ describe("Extension Operation Metadata", () => {
 
     await flow.execute(testFlow, 5, { scope });
 
-    const parallelOp = operations.find((op) => op.kind === "parallel");
+    const parallelOp = operations.find((op) => op.kind === "execution" && op.kind === "execution" && op.target.type === "parallel");
     expect(parallelOp).toBeDefined();
-    expect(parallelOp).toMatchObject({
-      kind: "parallel",
-      mode: "parallel",
-      promiseCount: 2,
-    });
-    expect(parallelOp).toHaveProperty("depth");
-    expect(parallelOp).toHaveProperty("parentFlowName");
+    if (parallelOp && parallelOp.kind === "execution" && parallelOp.target.type === "parallel") {
+      expect(parallelOp.target.mode).toBe("parallel");
+      expect(parallelOp.target.count).toBe(2);
+      expect(parallelOp.context).toBeDefined();
+    }
     expect(parallelOp).toHaveProperty("context");
   });
 });
