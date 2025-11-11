@@ -60,34 +60,33 @@ class FlowDefinition<S, I> {
       input: I
     ) => Promise<S> | S
   ): Flow.Flow<I, S> {
-    if (typeof dependenciesOrHandler === "function") {
-      const noDepsHandler = dependenciesOrHandler;
-      const executor = createExecutor(
-        () => {
+    const hasDependencies = typeof dependenciesOrHandler !== "function";
+
+    const factory = hasDependencies
+      ? ((deps: unknown, _controller: Core.Controller) => {
+          const flowHandler = async (ctx: Flow.Context, input: I) => {
+            return handlerFn!(deps as Core.InferOutput<D>, ctx, input);
+          };
+          return flowHandler as Flow.Handler<S, I>;
+        }) as Core.DependentFn<Flow.Handler<S, I>, unknown>
+      : (() => {
+          const noDepsHandler = dependenciesOrHandler as (ctx: Flow.Context, input: I) => Promise<S> | S;
           const flowHandler = async (ctx: Flow.Context, input: I) => {
             return noDepsHandler(ctx, input);
           };
           return flowHandler as Flow.Handler<S, I>;
-        },
-        undefined,
-        [...this.tags, flowDefinitionMeta(this)]
-      ) as Flow.Flow<I, S>;
-      executor.definition = this;
-      return executor;
-    }
-    const dependencies = dependenciesOrHandler;
-    const dependentHandler = handlerFn!;
-    const executor = createExecutor(
-      (deps: unknown) => {
-        const flowHandler = async (ctx: Flow.Context, input: I) => {
-          return dependentHandler(deps as Core.InferOutput<D>, ctx, input);
-        };
+        }) as Core.NoDependencyFn<Flow.Handler<S, I>>;
 
-        return flowHandler as Flow.Handler<S, I>;
-      },
+    const dependencies = hasDependencies
+      ? (dependenciesOrHandler as Core.UExecutor | ReadonlyArray<Core.UExecutor> | Record<string, Core.UExecutor>)
+      : undefined;
+
+    const executor = createExecutor(
+      factory,
       dependencies,
       [...this.tags, flowDefinitionMeta(this)]
     ) as Flow.Flow<I, S>;
+
     executor.definition = this;
     return executor;
   }
