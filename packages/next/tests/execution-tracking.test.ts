@@ -1,22 +1,14 @@
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect } from "vitest";
 import { custom } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { flow, flowMeta } from "../src/flow";
 import { tag } from "../src/tag";
+import { createScopeWithCleanup } from "./utils";
 
 describe("Flow Execution Tracking", () => {
-  let scope: ReturnType<typeof createScope>;
-
-  beforeEach(() => {
-    scope = createScope();
-  });
-
-  afterEach(async () => {
-    await scope.dispose();
-  });
-
   describe("Execution ID and Status", () => {
     test("each flow execution has unique ID", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const executionIds = new Set<string>();
       const trackingTag = tag(custom<{ executionId: string }>(), {
         label: "execution.tracking",
@@ -45,9 +37,11 @@ describe("Flow Execution Tracking", () => {
       });
 
       expect(executionIds.size).toBe(3);
+      await cleanup();
     });
 
     test("execution status changes through lifecycle pending -> running -> completed", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const statusChanges: string[] = [];
       const statusTag = tag(custom<{ status: string }>(), {
         label: "execution.status",
@@ -75,11 +69,13 @@ describe("Flow Execution Tracking", () => {
       });
 
       expect(statusChanges).toContain("pending");
+      await cleanup();
     });
   });
 
   describe("Abort and Timeout Handling", () => {
     test("abort cancels execution gracefully", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const abortController = new AbortController();
       const abortTag = tag(custom<AbortSignal>(), { label: "execution.abort" });
       let executionAborted = false;
@@ -112,9 +108,11 @@ describe("Flow Execution Tracking", () => {
 
       await expect(executionPromise).rejects.toThrow("Execution aborted");
       expect(executionAborted).toBe(true);
+      await cleanup();
     });
 
     test("timeout aborts execution after specified duration", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const timeoutTag = tag(custom<number>(), { label: "execution.timeout" });
       let timedOut = false;
 
@@ -155,9 +153,11 @@ describe("Flow Execution Tracking", () => {
       });
 
       expect(timedOut).toBe(true);
+      await cleanup();
     });
 
     test("timeout cleanup verification - timeout cleared on early completion", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       let timeoutCallbackInvoked = false;
 
       const fastFlow = flow(
@@ -178,11 +178,13 @@ describe("Flow Execution Tracking", () => {
 
       expect(result).toBe("completed-early");
       expect(timeoutCallbackInvoked).toBe(false);
+      await cleanup();
     });
   });
 
   describe("ctx.exec API", () => {
     test("ctx.exec with config executes nested flow", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const childFlow = flow(
         {
           name: "child-flow",
@@ -209,9 +211,11 @@ describe("Flow Execution Tracking", () => {
       const result = await scope.exec({ flow: parentFlow, input: 5 });
 
       expect(result).toBe(20);
+      await cleanup();
     });
 
     test("ctx.exec with function and params executes logic", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const executionLog: string[] = [];
 
       const testFlow = flow(
@@ -239,9 +243,11 @@ describe("Flow Execution Tracking", () => {
 
       expect(result).toBe(20);
       expect(executionLog).toEqual(["step1", "step2"]);
+      await cleanup();
     });
 
     test("ctx.exec handles nested flow errors correctly", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const errorFlow = flow(
         {
           name: "error-flow",
@@ -272,11 +278,13 @@ describe("Flow Execution Tracking", () => {
       const result = await scope.exec({ flow: parentFlow, input: undefined });
 
       expect(result).toBe("caught: Child flow error");
+      await cleanup();
     });
   });
 
   describe("throwIfAborted Behavior", () => {
     test("throwIfAborted throws when execution is aborted", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const abortController = new AbortController();
       const abortTag = tag(custom<AbortSignal>(), { label: "execution.abort" });
 
@@ -305,9 +313,11 @@ describe("Flow Execution Tracking", () => {
         scope.exec({ flow: checkAbortedFlow, input: undefined, tags: [abortTag(abortController.signal)],
          })
       ).rejects.toThrow("Operation aborted");
+      await cleanup();
     });
 
     test("throwIfAborted does not throw when execution is not aborted", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const abortController = new AbortController();
       const abortTag = tag(custom<AbortSignal>(), { label: "execution.abort" });
 
@@ -332,11 +342,13 @@ describe("Flow Execution Tracking", () => {
        });
 
       expect(result).toBe("completed");
+      await cleanup();
     });
   });
 
   describe("onStatusChange Callback", () => {
     test("onStatusChange callback receives execution details on status change", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const statusChanges: Array<{ status: string; timestamp: number }> = [];
       const callbackTag = tag(
         custom<(status: string) => void>(),
@@ -375,9 +387,11 @@ describe("Flow Execution Tracking", () => {
         "processing",
         "completed",
       ]);
+      await cleanup();
     });
 
     test("onStatusChange receives execution context with metadata", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const capturedContext: Array<{ flowName?: string; depth: number }> = [];
       const contextTag = tag(
         custom<(context: { flowName?: string; depth: number }) => void>(),
@@ -413,11 +427,13 @@ describe("Flow Execution Tracking", () => {
       expect(capturedContext.length).toBeGreaterThan(0);
       expect(capturedContext[0]).toHaveProperty("flowName");
       expect(capturedContext[0]).toHaveProperty("depth");
+      await cleanup();
     });
   });
 
   describe("Execution Registry Cleanup", () => {
     test("execution registry automatically cleans up completed executions", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const registryTag = tag(custom<Set<string>>(), {
         label: "execution.registry",
       });
@@ -450,6 +466,7 @@ describe("Flow Execution Tracking", () => {
 
       expect(sizeAfterFirst).toBe(1);
       expect(sizeAfterSecond).toBe(2);
+      await cleanup();
     });
 
     test("execution registry removes entries after scope disposal", async () => {
@@ -482,6 +499,7 @@ describe("Flow Execution Tracking", () => {
     });
 
     test("multiple concurrent executions maintain separate entries in registry", async () => {
+      const { scope, cleanup } = createScopeWithCleanup();
       const executionIds: string[] = [];
       const idTag = tag(custom<string>(), { label: "execution.id" });
 
@@ -509,6 +527,7 @@ describe("Flow Execution Tracking", () => {
 
       expect(executions).toEqual([2, 4, 6]);
       expect(new Set(executionIds).size).toBe(3);
+      await cleanup();
     });
   });
 });
