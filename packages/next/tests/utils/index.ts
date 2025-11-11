@@ -49,3 +49,46 @@ export function createScopeWithCleanup(): {
     },
   };
 }
+
+export function expectResolved<T>(result: PromiseSettledResult<T>): {
+  toBe: (expected: T) => void;
+  toEqual: (expected: T) => void;
+} {
+  if (result.status !== "fulfilled") {
+    throw new Error(`Expected fulfilled promise, got ${result.status}`);
+  }
+
+  return {
+    toBe: (expected: T) => {
+      if (result.value !== expected) {
+        throw new Error(`Expected ${expected}, got ${result.value}`);
+      }
+    },
+    toEqual: (expected: T) => {
+      const actual = JSON.stringify(result.value);
+      const exp = JSON.stringify(expected);
+      if (actual !== exp) {
+        throw new Error(`Expected ${exp}, got ${actual}`);
+      }
+    },
+  };
+}
+
+export function expectRejected(result: PromiseSettledResult<unknown>): {
+  withMessage: (message: string) => void;
+} {
+  if (result.status !== "rejected") {
+    throw new Error(`Expected rejected promise, got ${result.status}`);
+  }
+
+  return {
+    withMessage: (message: string) => {
+      const errorMessage = result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason);
+      if (!errorMessage.includes(message)) {
+        throw new Error(`Expected error message to include "${message}", got "${errorMessage}"`);
+      }
+    },
+  };
+}
