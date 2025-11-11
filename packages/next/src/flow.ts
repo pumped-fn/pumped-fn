@@ -331,7 +331,7 @@ class FlowContext implements Flow.Context {
           executeWithCleanup(async () => await this.executeJournaledFn(config.fn, config.params, journalKey, flowName, depth))
         );
       } else {
-        return Promised.try(() => executeWithCleanup(() => config.fn(...config.params)));
+        return Promised.create(executeWithCleanup(() => Promise.resolve(config.fn(...config.params))));
       }
     }
 
