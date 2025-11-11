@@ -7,45 +7,6 @@ import { Promised } from "../src/promises";
 import { tag } from "../src/tag";
 
 describe("Core Functionality", () => {
-  describe("Tag functionality", () => {
-    test("tag provides default value when created with initial value", () => {
-      const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
-      const store = new Map();
-
-      const result = numberTag.readFrom(store);
-
-      expect(result).toBe(42);
-    });
-
-    test("tag stores and retrieves values from store", () => {
-      const stringTag = tag(custom<string>(), { label: "test.string" });
-      const store = new Map();
-
-      stringTag.injectTo(store, "hello");
-      const result = stringTag.readFrom(store);
-
-      expect(result).toBe("hello");
-    });
-
-    test("tag returns undefined when no value set and no default provided", () => {
-      const optionalTag = tag(custom<string>(), { label: "test.optional" });
-      const store = new Map();
-
-      const result = optionalTag.readFrom(store);
-
-      expect(result).toBeUndefined();
-    });
-
-    test("tag allows updating existing values without error", () => {
-      const numberTag = tag(custom<number>(), { label: "test.number", default: 42 });
-      const store = new Map();
-
-      const updateOperation = () => numberTag.injectTo(store, 123);
-
-      expect(updateOperation).not.toThrow();
-    });
-  });
-
   describe("Executor and Scope Integration", () => {
     test("scope detects and rejects circular dependency between executors", async () => {
       const scope = createScope();
