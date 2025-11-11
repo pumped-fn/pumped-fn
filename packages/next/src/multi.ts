@@ -58,7 +58,7 @@ class MultiExecutorImpl<T, K, PoolIdType = unknown> {
 
   release(scope: Core.Scope): Promised<void> {
     return Promised.create((async () => {
-      const scopeExecutors = new Set(scope.registeredExecutors());
+      const scopeExecutors = new Set(scope.entries().map(([executor]) => executor));
       for (const executor of this.keyPool.values()) {
         if (scopeExecutors.has(executor)) {
           await scope.release(executor);

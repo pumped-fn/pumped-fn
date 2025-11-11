@@ -57,5 +57,15 @@ describe("Multi Executor", () => {
     const duration = performance.now() - start;
 
     expect(duration, `release() took ${duration.toFixed(2)}ms, expected <5ms`).toBeLessThan(5);
+    expect(scope.entries().length, "executors should be released").toBe(0);
+  });
+
+  test("multi.release actually releases resolved executors", async () => {
+    const db = multi.provide({ keySchema: custom<number>() }, (id) => ({ id }));
+    const scope = createScope();
+    await scope.resolve(db(1));
+    expect(scope.entries().length).toBe(1);
+    await db.release(scope);
+    expect(scope.entries().length).toBe(0);
   });
 });
