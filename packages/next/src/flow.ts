@@ -819,7 +819,12 @@ function execute<S, I>(
 
   if (shouldDisposeScope) {
     return Promised.create(
-      execution.result.then((r) => scope.dispose().then(() => r)),
+      execution.result
+        .then((r) => scope.dispose().then(() => r))
+        .catch(async (error) => {
+          await scope.dispose();
+          throw error;
+        }),
       execution.result.ctx()
     ) as Promised<S>;
   }
