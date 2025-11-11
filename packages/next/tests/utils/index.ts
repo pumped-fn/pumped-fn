@@ -1,23 +1,32 @@
-import { type Flow } from "../../src/types";
+import { type Flow, type Extension, type Tag } from "../../src/types";
 import { flow } from "../../src/flow";
 import { createScope } from "../../src/scope";
 
 export type FlowScenarioOptions<I, O> = {
   input: I;
-  expected: O;
   flowDef?: Flow.Definition<O, I>;
-  handler?: (ctx: any, input: I) => O | Promise<O>;
-  extensions?: any[];
-  scopeTags?: any[];
-  executionTags?: any[];
+  handler?: (ctx: Flow.Context, input: I) => O | Promise<O>;
+  extensions?: Extension.Extension[];
+  scopeTags?: Tag.Tagged[];
+  executionTags?: Tag.Tagged[];
 };
 
 export async function buildFlowScenario<I, O>(
   options: FlowScenarioOptions<I, O>
-): Promise<{ result: O; scope?: ReturnType<typeof createScope> }> {
+): Promise<O> {
   const { input, handler, flowDef, extensions, scopeTags, executionTags } = options;
 
-  const flowInstance = flowDef ? flow(flowDef, handler!) : flow(handler!);
+  if (!handler && !flowDef) {
+    throw new Error("Either handler or flowDef must be provided");
+  }
+
+  const flowInstance = flowDef && handler
+    ? flow(flowDef, handler)
+    : flowDef
+      ? flow(flowDef, ((ctx: Flow.Context, input: I) => input as unknown as O))
+      : handler
+        ? flow(handler)
+        : (null as never);
 
   const result = await flow.execute(flowInstance, input, {
     extensions,
@@ -25,7 +34,7 @@ export async function buildFlowScenario<I, O>(
     executionTags,
   });
 
-  return { result };
+  return result;
 }
 
 export function createScopeWithCleanup(): {
