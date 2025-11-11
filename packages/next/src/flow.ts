@@ -302,6 +302,15 @@ class FlowContext implements Flow.Context {
 
     const executeWithCleanup = async <T>(executor: () => Promise<T>): Promise<T> => {
       try {
+        if (config.timeout) {
+          const abortPromise = new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () => {
+              reject(controller.signal.reason || new Error('Operation aborted'));
+            }, { once: true });
+          });
+
+          return await Promise.race([executor(), abortPromise]);
+        }
         return await executor();
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
@@ -387,7 +396,7 @@ class FlowContext implements Flow.Context {
     }
 
     return Promised.create(
-      executeWithCleanup(async () => await this.executeSubflow(config.flow, config.input, config.tags))
+      executeWithCleanup(async () => await this.executeSubflow(config.flow, config.input, config.tags, controller))
     );
   }
 
@@ -490,7 +499,8 @@ class FlowContext implements Flow.Context {
   private executeSubflow<F extends Flow.UFlow>(
     flow: F,
     input: Flow.InferInput<F>,
-    tags?: Tag.Tagged[]
+    tags?: Tag.Tagged[],
+    abortController?: AbortController
   ): Promised<Flow.InferOutput<F>> {
     const parentFlowName = this.find(flowMeta.flowName);
     const depth = this.get(flowMeta.depth);
@@ -502,7 +512,7 @@ class FlowContext implements Flow.Context {
           throw new Error("Flow definition not found in executor metadata");
         }
 
-        const childContext = new FlowContext(this.scope, this.extensions, tags, this);
+        const childContext = new FlowContext(this.scope, this.extensions, tags, this, abortController);
         childContext.initializeExecutionContext(definition.name, false);
 
         return (await this.executeWithExtensions<Flow.InferOutput<F>>(
