@@ -88,10 +88,8 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("partition()", () => {
     test("separates mixed results into fulfilled and rejected arrays", async () => {
-      const successFlow = flow((_ctx, x: number) => x * 2);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow(2);
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -114,7 +112,7 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("firstFulfilled()", () => {
     test("returns first fulfilled value from parallel execution", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
+      const successFlow = createSuccessFlow();
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -132,10 +130,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("skips rejected results and returns first fulfilled", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -174,10 +170,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("skips fulfilled results and returns first rejection", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("error");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow("error");
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -197,7 +191,7 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("findFulfilled()", () => {
     test("finds first fulfilled value matching predicate", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
+      const successFlow = createSuccessFlow();
 
       const main = flow<void, number | undefined>(async (ctx) => {
         return ctx
@@ -215,10 +209,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("skips rejected results when searching with predicate", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow<void, number | undefined>(async (ctx) => {
         return ctx
@@ -237,10 +229,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("provides correct index for fulfilled values in predicate", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const capturedIndices: number[] = [];
       const main = flow(async (ctx) => {
@@ -265,7 +255,7 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("mapFulfilled()", () => {
     test("transforms fulfilled values with mapper function", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
+      const successFlow = createSuccessFlow();
 
       const main = flow<void, number[]>(async (ctx) => {
         return ctx
@@ -283,10 +273,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("skips rejected results and maps only fulfilled values", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow<void, number[]>(async (ctx) => {
         return ctx
@@ -305,10 +293,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("provides correct index for fulfilled values in mapper", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (ctx) => {
         return ctx
@@ -331,7 +317,7 @@ describe("Promised - Settled Result Utilities", () => {
 
   describe("assertAllFulfilled()", () => {
     test("returns fulfilled values when all operations succeed", async () => {
-      const successFlow = flow((_ctx, x: number) => x * 2);
+      const successFlow = createSuccessFlow(2);
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -345,7 +331,7 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("throws with default error message when any operation fails", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
+      const successFlow = createSuccessFlow();
       const failureFlow = flow(() => {
         throw new Error("operation failed");
       });
@@ -360,10 +346,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("throws with custom error message from error mapper", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("op failed");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow("op failed");
 
       const main = flow(async (ctx, input: number) => {
         return ctx
@@ -387,9 +371,7 @@ describe("Promised - Settled Result Utilities", () => {
     test("works with static promise array using Promised.allSettled", async () => {
       const multiplyByTwo = flow((_ctx, x: number) => x * 2);
       const multiplyByThree = flow((_ctx, x: number) => x * 3);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const failureFlow = createFailureFlow();
 
       const main = flow(async (_ctx, input: number) => {
         const promise1 = flow.execute(multiplyByTwo, input);
@@ -418,10 +400,8 @@ describe("Promised - Settled Result Utilities", () => {
     });
 
     test("chains multiple transformations on settled results", async () => {
-      const successFlow = flow((_ctx, x: number) => x);
-      const failureFlow = flow(() => {
-        throw new Error("fail");
-      });
+      const successFlow = createSuccessFlow();
+      const failureFlow = createFailureFlow();
 
       const main = flow<void, number>(async (ctx) => {
         return ctx
