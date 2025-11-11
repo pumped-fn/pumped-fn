@@ -95,18 +95,19 @@ export function expectRejected(result: PromiseSettledResult<unknown>): {
 
 export type OperationRecord = {
   kind: string;
+  targetType?: "flow" | "fn" | "parallel";
   flowName?: string;
-  journalKey?: string;
+  key?: string;
   input?: unknown;
   output?: unknown;
   error?: unknown;
   params?: readonly unknown[];
   parallelMode?: string;
-  promiseCount?: number;
+  count?: number;
 };
 
 export function createTrackingExtension(
-  filter?: (kind: string) => boolean
+  filter?: (kind: string, operation: Extension.Operation) => boolean
 ): {
   ext: Extension.Extension;
   records: OperationRecord[];
@@ -116,24 +117,25 @@ export function createTrackingExtension(
   const ext: Extension.Extension = {
     name: "tracker",
     wrap: (_scope, next, operation) => {
-      if (filter && !filter(operation.kind)) {
+      if (filter && !filter(operation.kind, operation)) {
         return next();
       }
 
       const record: OperationRecord = { kind: operation.kind };
 
-      if (operation.kind === "execute") {
-        record.flowName = operation.definition.name;
+      if (operation.kind === "execution") {
+        record.targetType = operation.target.type;
         record.input = operation.input;
-      } else if (operation.kind === "journal") {
-        record.journalKey = operation.key;
-        record.params = operation.params;
-      } else if (operation.kind === "subflow") {
-        record.flowName = operation.definition.name;
-        record.input = operation.input;
-      } else if (operation.kind === "parallel") {
-        record.parallelMode = operation.mode;
-        record.promiseCount = operation.promiseCount;
+        record.key = operation.key;
+
+        if (operation.target.type === "flow") {
+          record.flowName = operation.target.definition.name;
+        } else if (operation.target.type === "fn") {
+          record.params = operation.target.params;
+        } else if (operation.target.type === "parallel") {
+          record.parallelMode = operation.target.mode;
+          record.count = operation.target.count;
+        }
       }
 
       return next()
