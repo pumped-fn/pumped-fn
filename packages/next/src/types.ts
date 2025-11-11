@@ -671,50 +671,39 @@ export namespace Flow {
 }
 
 export namespace Extension {
-  export type Operation =
-    | {
-        kind: "resolve";
-        executor: Core.Executor<unknown>;
-        scope: Core.Scope;
-        operation: "resolve" | "update";
-      }
-    | {
-        kind: "execute";
-        flow: Flow.UFlow;
-        definition: Flow.Definition<any, any>;
-        input: unknown;
-        flowName: string | undefined;
-        depth: number;
-        isParallel: boolean;
-        parentFlowName: string | undefined;
-      }
-    | {
-        kind: "journal";
-        key: string;
-        flowName: string;
-        depth: number;
-        isReplay: boolean;
-        context: import("./tag-types").Tag.Store;
-        params?: readonly unknown[];
-      }
-    | {
-        kind: "subflow";
-        flow: Flow.UFlow;
-        definition: Flow.Definition<any, any>;
-        input: unknown;
-        journalKey: string | undefined;
-        parentFlowName: string | undefined;
-        depth: number;
-        context: import("./tag-types").Tag.Store;
-      }
-    | {
-        kind: "parallel";
-        mode: "parallel" | "parallelSettled";
-        promiseCount: number;
-        depth: number;
-        parentFlowName: string | undefined;
-        context: import("./tag-types").Tag.Store;
-      };
+  export type ResolveOperation = {
+    kind: "resolve";
+    executor: Core.Executor<unknown>;
+    scope: Core.Scope;
+    operation: "resolve" | "update";
+  };
+
+  export type FlowTarget = {
+    type: "flow";
+    flow: Flow.UFlow;
+    definition: Flow.Definition<any, any>;
+  };
+
+  export type FnTarget = {
+    type: "fn";
+    params?: readonly unknown[];
+  };
+
+  export type ParallelTarget = {
+    type: "parallel";
+    mode: "parallel" | "parallelSettled";
+    count: number;
+  };
+
+  export type ExecutionOperation = {
+    kind: "execution";
+    target: FlowTarget | FnTarget | ParallelTarget;
+    input: unknown;
+    key?: string;
+    context: Tag.Store;
+  };
+
+  export type Operation = ResolveOperation | ExecutionOperation;
 
   export interface Extension {
     name: string;
