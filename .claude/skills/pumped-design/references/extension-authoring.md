@@ -46,7 +46,7 @@ interface Extension {
 
 **Lifecycle flow:**
 1. **init** - Called once when scope created or extension registered
-2. **wrap** - Called for every operation (execute, journal, subflow, parallel, resolve)
+2. **wrap** - Called for every operation (execution, resolve)
 3. **onError** - Called when executor resolution fails
 4. **dispose** - Called when scope disposed
 
@@ -91,21 +91,33 @@ interface Core.Scope {
 
 ### Operation Types
 
-Extensions intercept 5 operation kinds via `wrap()`:
+Extensions intercept 2 operation kinds via `wrap()`:
 
 ```typescript
 type Operation =
-  | { kind: "execute"; definition: Definition; input: unknown; ... }
-  | { kind: "journal"; key: string; params?: readonly unknown[]; context: Tag.Store; ... }
-  | { kind: "subflow"; definition: Definition; input: unknown; context: Tag.Store; ... }
-  | { kind: "parallel"; mode: "parallel" | "parallelSettled"; promiseCount: number; context: Tag.Store; ... }
   | { kind: "resolve"; executor: Executor<unknown>; operation: "resolve" | "update"; scope: Scope }
+  | {
+      kind: "execution";
+      target: FlowTarget | FnTarget | ParallelTarget;
+      input: unknown;
+      key?: string;
+      context: Tag.Store;
+    }
+
+type FlowTarget = { type: "flow"; flow: Flow.UFlow; definition: Flow.Definition }
+type FnTarget = { type: "fn"; params?: readonly unknown[] }
+type ParallelTarget = { type: "parallel"; mode: "parallel" | "parallelSettled"; count: number }
 ```
 
 **Resolve operation** - Extension can intercept executor resolution:
 - Wrap resource access with caching
 - Track dependency resolution performance
 - Implement lazy loading strategies
+
+**Execution operation** - Extension can intercept flow/function/parallel execution:
+- Target discrimination via `target.type` ("flow" | "fn" | "parallel")
+- Named operations indicated by `key` field (for journaling/replay)
+- Context access via `context` field (Tag.Store with flowMeta tags)
 
 ### Context vs Scope
 
@@ -115,7 +127,7 @@ type Operation =
 - Tag API: `ctx.get(tag)`, `ctx.set(tag, value)` - uses Tag object
 
 **Extension operation.context (Tag.Store):**
-- Available on `journal`, `subflow`, `parallel` operations only
+- Available on all `execution` operations (kind: "execution")
 - Methods: `get(key)`, `set(key, value)`
 - Tag API: `context.get(tag.key)`, `context.set(tag.key, value)` - uses symbol key
 
@@ -129,44 +141,40 @@ const requestIdTag = tag(custom<string>(), { label: 'request-id' })
 const example = extension({
   name: 'dual-api-example',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'journal') {
+    if (operation.kind === 'execution') {
       const requestIdFromContext = operation.context.get(requestIdTag.key)
 
       console.log('Extension context API:', requestIdFromContext)
     }
 
-    return next().then((result) => {
-      if (operation.kind === 'journal' && operation.ctx) {
-        const requestIdFromCtx = operation.ctx.get(requestIdTag)
-
-        console.log('Flow ctx API:', requestIdFromCtx)
-      }
-      return result
-    })
+    return next()
   }
 })
 ```
 
 ### Tag System for Context Propagation
 
-Tags propagate data through execution hierarchy. Only `journal`, `subflow`, and `parallel` have `context: Tag.Store`:
+Tags propagate data through execution hierarchy. All `execution` operations have `context: Tag.Store`:
 
 ```typescript
-import { tag, custom } from '@pumped-fn/core-next'
+import { tag, custom, flowMeta } from '@pumped-fn/core-next'
 
 const requestIdTag = tag(custom<string>(), { label: 'request-id' })
 
 const tracingExtension = extension({
   name: 'tracing',
   wrap: (scope, next, operation) => {
-    // Only journal, subflow, parallel have context
-    if (operation.kind === 'journal' || operation.kind === 'subflow' || operation.kind === 'parallel') {
+    if (operation.kind === 'execution') {
       const requestId = operation.context.get(requestIdTag.key) as string | undefined
 
       if (!requestId) {
         const newId = `req-${Date.now()}`
         operation.context.set(requestIdTag.key, newId)
       }
+
+      // Access nesting depth via flowMeta tags
+      const depth = operation.context.get(flowMeta.depth.key) as number
+      console.log(`Execution at depth ${depth}`)
     }
     return next()
   }
@@ -174,6 +182,7 @@ const tracingExtension = extension({
 ```
 
 **Pattern:** Use `context.get(tag.key)` and `context.set(tag.key, value)` with Tag.Store.
+**Nesting context:** Use `flowMeta.depth`, `flowMeta.flowName`, `flowMeta.parentFlowName` tags.
 
 ---
 
@@ -218,13 +227,13 @@ export const correlationExtension = extension({
     }
 
     // Type-safe operation handling
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
       // Track request start
       store.activeRequests.set(correlationId, {
         startTime: Date.now(),
-        flowName: operation.definition.name
+        flowName: operation.target.definition.name
       })
 
       return next()
@@ -313,15 +322,16 @@ dispose: (scope) => {
 ```typescript
 // ✅ Correct: Discriminated union with narrowing
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
-    // TypeScript knows: operation.definition, operation.input exist
-    const flowName = operation.definition.name
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
+    // TypeScript knows: operation.target.definition, operation.input exist
+    const flowName = operation.target.definition.name
     const input = operation.input
   }
 
-  if (operation.kind === 'journal') {
-    // TypeScript knows: operation.key, operation.params, operation.context exist
+  if (operation.kind === 'execution' && operation.target.type === 'fn' && operation.key) {
+    // TypeScript knows: operation.key, operation.target.params, operation.context exist
     const key = operation.key
+    const params = operation.target.params
     const context = operation.context  // Tag.Store
   }
 
@@ -330,7 +340,7 @@ wrap: (scope, next, operation) => {
 
 // ❌ Wrong: Accessing properties without narrowing
 wrap: (scope, next, operation) => {
-  const flowName = operation.definition.name  // Type error!
+  const flowName = operation.target.definition.name  // Type error!
   return next()
 }
 ```
@@ -427,12 +437,12 @@ export const rateLimiterExtension = (config: RateLimitConfig) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind !== 'execute') return next()
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') return next()
 
     const store = stateMap.get(scope)
     if (!store) return next()
 
-    const flowKey = operation.definition.name
+    const flowKey = operation.target.definition.name
     const now = Date.now()
     const requests = store.requests.get(flowKey) || []
 
@@ -484,16 +494,16 @@ export const apmExtension = (client: APMClient) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind !== 'execute') return next()
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') return next()
 
     const store = stateMap.get(scope)
     if (!store) return next()
 
-    const transactionId = `${operation.definition.name}-${Date.now()}`
+    const transactionId = `${operation.target.definition.name}-${Date.now()}`
 
     let transaction: APMTransaction | undefined
     try {
-      transaction = store.client.startTransaction(operation.definition.name)
+      transaction = store.client.startTransaction(operation.target.definition.name)
       store.activeTransactions.set(transactionId, transaction)
     } catch (error) {
       // APM client failure should not break flows
@@ -547,8 +557,7 @@ export const tenantIsolationExtension = extension({
   name: 'tenant-isolation',
 
   wrap: (scope, next, operation) => {
-    // Only journal, subflow, parallel have context
-    if (operation.kind === 'journal' || operation.kind === 'subflow') {
+    if (operation.kind === 'execution') {
       const tenantId = operation.context.get(tenantIdTag.key) as string | undefined
 
       if (!tenantId) {
@@ -561,8 +570,12 @@ export const tenantIsolationExtension = extension({
       }
 
       // Log access for audit
-      const flowName = operation.kind === 'subflow' ? operation.definition.name : 'journal'
-      console.log(`[tenant] ${tenantId} executing ${flowName}`)
+      const opName = operation.target.type === 'flow'
+        ? operation.target.definition.name
+        : operation.target.type === 'fn' && operation.key
+        ? operation.key
+        : operation.target.type
+      console.log(`[tenant] ${tenantId} executing ${opName}`)
     }
 
     return next()
@@ -590,19 +603,17 @@ export const authExtension = (policy: AuthPolicy) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind !== 'execute') return next()
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') return next()
 
     const store = stateMap.get(scope)
     if (!store) return next()
 
-    // Try to get userId from execute operation (would need to be passed via tags on flow definition)
-    // For subflow/journal, would use operation.context.get(userIdTag.key)
-    // This is simplified - real implementation would propagate userId through context
-    const userId = 'default-user'  // Placeholder - should come from context or flow tags
+    // Get userId from context (propagated via tags)
+    const userId = (operation.context.get(userIdTag.key) as string) || 'default-user'
 
-    const allowed = store.policy(operation.definition.name, operation.input, userId)
+    const allowed = store.policy(operation.target.definition.name, operation.input, userId)
     if (!allowed) {
-      return Promise.reject(new Error(`User ${userId} not authorized for ${operation.definition.name}`))
+      return Promise.reject(new Error(`User ${userId} not authorized for ${operation.target.definition.name}`))
     }
 
     return next()
@@ -651,11 +662,13 @@ export const devtoolsExtension = extension({
       kind: operation.kind
     }
 
-    if (operation.kind === 'execute' || operation.kind === 'subflow') {
-      event.flowName = operation.definition.name
-    }
-    if (operation.kind === 'journal') {
-      event.key = operation.key
+    if (operation.kind === 'execution') {
+      if (operation.target.type === 'flow') {
+        event.flowName = operation.target.definition.name
+      }
+      if (operation.key) {
+        event.key = operation.key
+      }
     }
 
     return next()
@@ -729,11 +742,11 @@ export const httpServerExtension = (app: Hono) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const store = stateMap.get(scope)
       if (store) {
         // Auto-register flows as HTTP endpoints
-        store.routes.set(operation.definition.name, operation.flow)
+        store.routes.set(operation.target.definition.name, operation.target.flow)
       }
     }
     return next()

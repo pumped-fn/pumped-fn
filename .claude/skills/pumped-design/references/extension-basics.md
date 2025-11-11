@@ -37,27 +37,27 @@ import { extension } from '@pumped-fn/core-next'
 export const loggingExtension = extension({
   name: 'logging',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
-      console.log(`[FLOW START] ${operation.definition.name}`, {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
+      console.log(`[FLOW START] ${operation.target.definition.name}`, {
         input: operation.input
       })
 
       return next()
         .then((result) => {
-          console.log(`[FLOW END] ${operation.definition.name}`, {
+          console.log(`[FLOW END] ${operation.target.definition.name}`, {
             result
           })
           return result
         })
         .catch((error) => {
-          console.error(`[FLOW ERROR] ${operation.definition.name}`, {
+          console.error(`[FLOW ERROR] ${operation.target.definition.name}`, {
             error
           })
           throw error
         })
     }
 
-    if (operation.kind === 'journal') {
+    if (operation.kind === 'execution' && operation.target.type === 'fn' && operation.key) {
       console.log(`  [STEP] ${operation.key}`)
     }
 
@@ -68,9 +68,31 @@ export const loggingExtension = extension({
 
 ---
 
+## Operation Types
+
+Extensions intercept two kinds of operations:
+
+### 1. Resolve Operations
+- `kind: "resolve"` - Executor resolution at scope level
+- Fields: `executor`, `scope`, `operation: "resolve" | "update"`
+
+### 2. Execution Operations
+- `kind: "execution"` - Flow/function/parallel execution
+- Fields: `target`, `input`, `key?`, `context`
+
+Target types discriminate execution purpose:
+- `{ type: "flow", flow, definition }` - Flow execution (ctx.exec or top-level)
+- `{ type: "fn", params? }` - Function execution (ctx.run)
+- `{ type: "parallel", mode, count }` - Parallel coordination (ctx.parallel/parallelSettled)
+
+Named operations have `key` defined (for journaling/replay).
+Nesting context available via `operation.context.get(flowMeta.depth)`.
+
+---
+
 ## Extension Hooks
 
-### Execute Hook
+### Flow Execution Hook
 
 Intercepts flow execution (both top-level and sub-flows):
 
@@ -78,9 +100,9 @@ Intercepts flow execution (both top-level and sub-flows):
 const metricsExtension = extension({
   name: 'metrics',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const startTime = Date.now()
-      const flowName = operation.definition.name
+      const flowName = operation.target.definition.name
 
       return next()
         .then((result) => {
@@ -101,7 +123,7 @@ const metricsExtension = extension({
 })
 ```
 
-### Journal Hook
+### Function (Journal) Hook
 
 Intercepts ctx.run() operations:
 
@@ -112,42 +134,20 @@ See: `journalCaptureExtension` in skill-examples/extensions.ts
 const journalCaptureExtension = extension({
   name: 'journal-capture',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'journal') {
+    if (operation.kind === 'execution' && operation.target.type === 'fn' && operation.key) {
       const record = {
         key: operation.key,
-        params: operation.params
+        params: operation.target.params
       }
 
       return next()
         .then((result) => {
           console.log(`Journal: ${operation.key}`, {
-            params: operation.params,
+            params: operation.target.params,
             output: result
           })
           return result
         })
-    }
-
-    return next()
-  }
-})
-```
-
-### Subflow Hook
-
-Intercepts ctx.exec() operations:
-
-
-See: `parallelTrackerExtension` in skill-examples/extensions.ts
-
-```typescript
-const subflowTrackerExtension = extension({
-  name: 'subflow-tracker',
-  wrap: (scope, next, operation) => {
-    if (operation.kind === 'subflow') {
-      console.log(`[SUBFLOW] ${operation.definition.name}`, {
-        input: operation.input
-      })
     }
 
     return next()
@@ -166,12 +166,12 @@ See: `parallelTrackerExtension` in skill-examples/extensions.ts
 const parallelTrackerExtension = extension({
   name: 'parallel-tracker',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'parallel') {
-      console.log(`[PARALLEL] mode=${operation.mode} count=${operation.promiseCount}`)
+    if (operation.kind === 'execution' && operation.target.type === 'parallel') {
+      console.log(`[PARALLEL] mode=${operation.target.mode} count=${operation.target.count}`)
 
       return next()
         .then((result) => {
-          console.log(`[PARALLEL COMPLETE] ${operation.promiseCount} promises resolved`)
+          console.log(`[PARALLEL COMPLETE] ${operation.target.count} promises resolved`)
           return result
         })
     }
@@ -199,10 +199,10 @@ const capturedJournalRecords: JournalRecord[] = []
 const journalCaptureExtension = extension({
   name: "journal-capture",
   wrap: (_scope, next, operation) => {
-    if (operation.kind === "journal") {
+    if (operation.kind === "execution" && operation.target.type === "fn" && operation.key) {
       const record: JournalRecord = {
         key: operation.key,
-        params: operation.params,
+        params: operation.target.params,
       }
 
       return next()
@@ -250,9 +250,10 @@ const capturedFlowInputs: Array<{ operation: string; input: unknown }> = []
 const inputCaptureExtension = extension({
   name: "input-capture",
   wrap: (_scope, next, operation) => {
-    if (operation.kind === "execute" || operation.kind === "subflow") {
+    if (operation.kind === "execution" && operation.target.type === "flow") {
+      const opType = operation.key === undefined ? "execute" : "subflow"
       capturedFlowInputs.push({
-        operation: `${operation.kind}:${operation.definition.name}`,
+        operation: `${opType}:${operation.target.definition.name}`,
         input: operation.input,
       })
     }
@@ -291,13 +292,14 @@ const result = await flow.execute(
 ```typescript
 type OperationRecord = {
   kind: string
+  targetType?: "flow" | "fn" | "parallel"
   flowName?: string
-  journalKey?: string
+  key?: string
   input?: unknown
   output?: unknown
   error?: unknown
   parallelMode?: string
-  promiseCount?: number
+  count?: number
 }
 
 const capturedOperations: OperationRecord[] = []
@@ -307,17 +309,17 @@ const comprehensiveTracker = extension({
   wrap: (_scope, next, operation) => {
     const record: OperationRecord = { kind: operation.kind }
 
-    if (operation.kind === "execute") {
-      record.flowName = operation.definition.name
+    if (operation.kind === "execution") {
+      record.targetType = operation.target.type
       record.input = operation.input
-    } else if (operation.kind === "journal") {
-      record.journalKey = operation.key
-    } else if (operation.kind === "subflow") {
-      record.flowName = operation.definition.name
-      record.input = operation.input
-    } else if (operation.kind === "parallel") {
-      record.parallelMode = operation.mode
-      record.promiseCount = operation.promiseCount
+      record.key = operation.key
+
+      if (operation.target.type === "flow") {
+        record.flowName = operation.target.definition.name
+      } else if (operation.target.type === "parallel") {
+        record.parallelMode = operation.target.mode
+        record.count = operation.target.count
+      }
     }
 
     return next()
@@ -345,24 +347,24 @@ const comprehensiveTracker = extension({
 export const loggingExtension = extension({
   name: 'logging',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const startTime = Date.now()
-      console.log(`[FLOW START] ${operation.definition.name}`, { input: operation.input })
+      console.log(`[FLOW START] ${operation.target.definition.name}`, { input: operation.input })
 
       return next()
         .then((result) => {
           const duration = Date.now() - startTime
-          console.log(`[FLOW END] ${operation.definition.name}`, { duration, result })
+          console.log(`[FLOW END] ${operation.target.definition.name}`, { duration, result })
           return result
         })
         .catch((error) => {
           const duration = Date.now() - startTime
-          console.error(`[FLOW ERROR] ${operation.definition.name}`, { duration, error })
+          console.error(`[FLOW ERROR] ${operation.target.definition.name}`, { duration, error })
           throw error
         })
     }
 
-    if (operation.kind === 'journal') {
+    if (operation.kind === 'execution' && operation.target.type === 'fn' && operation.key) {
       console.log(`  [STEP] ${operation.key}`)
     }
 
@@ -377,9 +379,9 @@ export const loggingExtension = extension({
 export const metricsExtension = extension({
   name: 'metrics',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const startTime = Date.now()
-      const metricName = `flow.${operation.definition.name}.duration`
+      const metricName = `flow.${operation.target.definition.name}.duration`
 
       return next()
         .then((result) => {
@@ -390,7 +392,7 @@ export const metricsExtension = extension({
         .catch((error) => {
           const duration = Date.now() - startTime
           console.log(`METRIC: ${metricName} = ${duration}ms (error)`)
-          console.log(`METRIC: flow.${operation.definition.name}.errors = 1`)
+          console.log(`METRIC: flow.${operation.target.definition.name}.errors = 1`)
           throw error
         })
     }
@@ -406,24 +408,24 @@ export const metricsExtension = extension({
 export const tracingExtension = extension({
   name: 'tracing',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const traceId = Math.random().toString(36).slice(2)
       const spanId = Math.random().toString(36).slice(2)
 
-      console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=start`)
+      console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.target.definition.name} phase=start`)
 
       return next()
         .then((result) => {
-          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=end`)
+          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.target.definition.name} phase=end`)
           return result
         })
         .catch((error) => {
-          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=error error=${error}`)
+          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.target.definition.name} phase=error error=${error}`)
           throw error
         })
     }
 
-    if (operation.kind === 'journal') {
+    if (operation.kind === 'execution' && operation.target.type === 'fn' && operation.key) {
       console.log(`[TRACE] operation=${operation.key}`)
     }
 
@@ -438,10 +440,10 @@ export const tracingExtension = extension({
 export const errorTrackingExtension = extension({
   name: 'error-tracking',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       return next()
         .catch((error) => {
-          console.error(`[ERROR TRACKING] Flow: ${operation.definition.name}`, {
+          console.error(`[ERROR TRACKING] Flow: ${operation.target.definition.name}`, {
             error: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
             timestamp: new Date().toISOString()
@@ -532,7 +534,7 @@ const result = await flow.execute(
 ```typescript
 // ❌ Wrong - next() not called in all paths
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     console.log('Execute')
     return next()
   }
@@ -541,7 +543,7 @@ wrap: (scope, next, operation) => {
 
 // ✅ Correct - next() called for all operations
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     console.log('Execute')
   }
   return next()
@@ -561,7 +563,7 @@ wrap: (scope, next, operation) => {
 // ✅ Safe extension
 wrap: (scope, next, operation) => {
   try {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       // Extension logic might fail
       logToExternalService(operation)
     }
@@ -634,7 +636,7 @@ const scope = createScope({
 // ❌ Wrong - business logic in extension
 const validationExtension = extension({
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute' && operation.input.email) {
+    if (operation.kind === 'execution' && operation.target.type === 'flow' && operation.input.email) {
       if (!operation.input.email.includes('@')) {
         throw new Error('Invalid email')  // Business logic!
       }
@@ -657,7 +659,7 @@ const createUserFlow = flow(async (ctx, input) => {
 ```typescript
 // ❌ Wrong - mutating input
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     operation.input.timestamp = Date.now()  // Mutation!
   }
   return next()
@@ -665,7 +667,7 @@ wrap: (scope, next, operation) => {
 
 // ✅ Correct - observe only
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     console.log('Input received at', Date.now())
   }
   return next()
@@ -677,7 +679,7 @@ wrap: (scope, next, operation) => {
 ```typescript
 // ❌ Wrong - next() not called
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     console.log('Execute')
   }
   // Missing return next()!
@@ -685,7 +687,7 @@ wrap: (scope, next, operation) => {
 
 // ✅ Correct - always call next()
 wrap: (scope, next, operation) => {
-  if (operation.kind === 'execute') {
+  if (operation.kind === 'execution' && operation.target.type === 'flow') {
     console.log('Execute')
   }
   return next()
