@@ -680,7 +680,7 @@ class BaseScope implements Core.Scope {
     return a.get();
   }
 
-  private async resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown> {
+  protected async resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown> {
     const hasDefault = tag.default !== undefined;
 
     if (hasDefault) {
@@ -690,7 +690,7 @@ class BaseScope implements Core.Scope {
     }
   }
 
-  private async resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown> {
+  protected async resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown> {
     switch (tagExec.extractionMode) {
       case "extract":
         return await tagExec.tag.extractFrom(this);
