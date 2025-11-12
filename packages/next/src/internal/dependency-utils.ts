@@ -4,9 +4,9 @@ import type { Escapable } from "../helpers";
 import { isTag, isTagExecutor } from "../tag-executors";
 import { type Tag } from "../tag-types";
 
-type ResolveFn = (item: Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>) => Promise<unknown>;
+type ResolveFn = (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>) => Promise<unknown>;
 
-export async function resolveShape<T extends Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | ReadonlyArray<Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>> | Record<string, Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>> | undefined>(
+export async function resolveShape<T extends Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | ReadonlyArray<Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>> | Record<string, Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>> | undefined>(
   scope: Core.Scope,
   shape: T,
   resolveFn?: ResolveFn
@@ -15,7 +15,7 @@ export async function resolveShape<T extends Core.UExecutor | Tag.Tag<any, boole
     return undefined;
   }
 
-  const unwrapTarget = (item: Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>): Core.Executor<unknown> | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> => {
+  const unwrapTarget = (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
     if (isTagExecutor(item)) {
       return item;
     }
@@ -40,7 +40,7 @@ export async function resolveShape<T extends Core.UExecutor | Tag.Tag<any, boole
 
   const resolveItem = resolveFn
     ? resolveFn
-    : async (item: Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>) => {
+    : async (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>) => {
         if (isTagExecutor(item)) {
           return scopeWithProtectedMethods.resolveTagExecutor(item);
         }
