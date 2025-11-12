@@ -195,6 +195,10 @@ export declare namespace Core {
     readonly lazy: Lazy<T>;
     readonly reactive: Reactive<T>;
     readonly static: Static<T>;
+    select<K extends keyof T>(
+      key: K,
+      options?: { equals?: (a: T[K], b: T[K]) => boolean }
+    ): Executor<T[K]>;
   }
 
   export interface Reactive<T> extends BaseExecutor<T> {
