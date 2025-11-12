@@ -1,12 +1,12 @@
 import { isExecutor, isLazyExecutor, isReactiveExecutor, isStaticExecutor } from "../executor";
-import type { Core } from "../types";
+import type { Core, ResolvableItem } from "../types";
 import type { Escapable } from "../helpers";
 import { isTag, isTagExecutor } from "../tag-executors";
 import { type Tag } from "../tag-types";
 
-type ResolveFn = (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>) => Promise<unknown>;
+type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
 
-export async function resolveShape<T extends Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | ReadonlyArray<Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>> | Record<string, Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>> | undefined>(
+export async function resolveShape<T extends ResolvableItem | ReadonlyArray<ResolvableItem> | Record<string, ResolvableItem> | undefined>(
   scope: Core.Scope,
   shape: T,
   resolveFn?: ResolveFn
@@ -15,7 +15,7 @@ export async function resolveShape<T extends Core.UExecutor | Tag.Tag<unknown, b
     return undefined;
   }
 
-  const unwrapTarget = (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
+  const unwrapTarget = (item: ResolvableItem): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
     if (isTagExecutor(item)) {
       return item;
     }
@@ -40,7 +40,7 @@ export async function resolveShape<T extends Core.UExecutor | Tag.Tag<unknown, b
 
   const resolveItem = resolveFn
     ? resolveFn
-    : async (item: Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>) => {
+    : async (item: ResolvableItem) => {
         if (isTagExecutor(item)) {
           return scopeWithProtectedMethods.resolveTagExecutor(item);
         }
