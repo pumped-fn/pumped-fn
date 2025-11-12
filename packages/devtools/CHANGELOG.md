@@ -1,5 +1,23 @@
 # @pumped-fn/devtools
 
+## 0.2.6
+
+### Patch Changes
+
+- 252db92: Simplify Extension.Operation types and remove generic from wrap method
+
+  - Consolidated 5 operation kinds (execute, journal, subflow, parallel, resolve) into 2 kinds (execution, resolve)
+  - Removed generic type parameter from Extension.wrap method for simpler type signatures
+  - Updated all wrapWithExtensions implementations to use type assertions
+  - Migrated all tests to new operation type structure
+  - Updated documentation for simplified 2-kind operation model
+  - Benefits: Simpler mental model, easier AI explanation, more flexible tag-based nesting context
+
+- Updated dependencies [252db92]
+- Updated dependencies [5f190c0]
+- Updated dependencies [13f84a4]
+  - @pumped-fn/core-next@0.5.84
+
 ## 0.2.5
 
 ### Patch Changes
