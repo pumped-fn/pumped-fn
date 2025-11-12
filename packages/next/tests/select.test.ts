@@ -69,4 +69,44 @@ describe("select - basic functionality", () => {
 
     expect(updateCount).toBe(0, "user should not update when custom equals returns true");
   });
+
+  test("cleans up updater executor on release", async () => {
+    const config = provide(() => ({ port: 3000, host: "localhost" }));
+    const port = config.select("port");
+
+    const scope = createScope();
+    await scope.resolve(port);
+
+    const entriesBeforeRelease = scope.entries().length;
+    expect(entriesBeforeRelease).toBeGreaterThan(1, "should have multiple executors (parent + selected + updater)");
+
+    await scope.release(port);
+
+    const entriesAfterRelease = scope.entries().length;
+    expect(entriesAfterRelease).toBeLessThan(entriesBeforeRelease, "should release updater executor");
+  });
+
+  test("maintains scope isolation for multi-scope usage", async () => {
+    const config = provide(() => ({ count: 0 }));
+    const count = config.select("count");
+
+    const scope1 = createScope();
+    const scope2 = createScope();
+
+    await scope1.resolve(count);
+    await scope2.resolve(count);
+
+    expect(scope1.accessor(count).get()).toBe(0);
+    expect(scope2.accessor(count).get()).toBe(0);
+
+    await scope1.update(config, { count: 10 });
+
+    expect(scope1.accessor(count).get()).toBe(10, "scope1 should have updated value");
+    expect(scope2.accessor(count).get()).toBe(0, "scope2 should remain unchanged");
+
+    await scope2.update(config, { count: 20 });
+
+    expect(scope1.accessor(count).get()).toBe(10, "scope1 should be unaffected");
+    expect(scope2.accessor(count).get()).toBe(20, "scope2 should have its own value");
+  });
 });

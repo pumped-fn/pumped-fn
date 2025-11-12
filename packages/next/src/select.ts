@@ -31,11 +31,14 @@ class SelectPool<T extends object> {
         const nextValue = reactiveValue[key];
 
         if (!equals(currentValue, nextValue)) {
+          // Type assertion needed: nextValue is Awaited<T>[K], but scope.update expects T[K]
+          // Safe because executor resolution automatically handles Promise unwrapping
           ctl.scope.update(state, nextValue as any);
         }
       });
 
       ctl.scope.resolve(updater);
+      ctl.cleanup(() => ctl.scope.release(updater));
 
       return initialValue;
     });
