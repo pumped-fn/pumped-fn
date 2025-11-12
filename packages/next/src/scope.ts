@@ -408,7 +408,7 @@ function getExecutor(e: Core.UExecutor): Core.AnyExecutor {
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, ExecutorState> = new Map();
-  protected executions: Map<string, { execution: Flow.FlowExecution<unknown>; startTime: number }> = new Map();
+  protected executions: Map<string, { execution: Flow.Execution<unknown>; startTime: number }> = new Map();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -1103,14 +1103,14 @@ class BaseScope implements Core.Scope {
     input?: I;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.FlowExecution<S>;
+  }): Flow.Execution<S>;
 
   exec<S, D extends Core.DependencyLike>(config: {
     dependencies: D;
     fn: (deps: Core.InferOutput<D>) => S | Promise<S>;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.FlowExecution<S>;
+  }): Flow.Execution<S>;
 
   exec<S, I, D extends Core.DependencyLike>(config: {
     dependencies: D;
@@ -1118,13 +1118,13 @@ class BaseScope implements Core.Scope {
     input: I;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.FlowExecution<S>;
+  }): Flow.Execution<S>;
 
   exec<S, I = undefined>(
     config:
       | { flow: Core.Executor<Flow.Handler<S, I>>; input?: I; timeout?: number; tags?: Tag.Tagged[] }
       | { dependencies: Core.DependencyLike; fn: (...args: any[]) => S | Promise<S>; input?: any; timeout?: number; tags?: Tag.Tagged[] }
-  ): Flow.FlowExecution<S> {
+  ): Flow.Execution<S> {
     this["~ensureNotDisposed"]();
     const executionId = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
