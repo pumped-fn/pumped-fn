@@ -1,5 +1,6 @@
 import { type Promised } from "./promises";
 import { type Tag } from "./tag-types";
+import { type Escapable } from "./helpers";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -268,13 +269,18 @@ export declare namespace Core {
       }
     : never;
 
-  export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
-    ? Awaited<U>
-    : T extends Lazy<infer U> | Static<infer U>
-    ? Accessor<Awaited<U>>
-    : T extends ReadonlyArray<UExecutor> | Record<string, UExecutor>
-    ? { [K in keyof T]: InferOutput<T[K]> }
-    : never;
+  export type InferOutput<T> =
+    T extends Tag.TagExecutor<infer U, any>
+      ? U
+      : T extends Tag.Tag<infer U, any>
+        ? U
+        : T extends Executor<infer U> | Reactive<infer U>
+          ? Awaited<U>
+          : T extends Lazy<infer U> | Static<infer U>
+            ? Accessor<Awaited<U>>
+            : T extends ReadonlyArray<any> | Record<string, any>
+              ? { [K in keyof T]: InferOutput<T[K]> }
+              : never;
 
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;
@@ -311,11 +317,14 @@ export declare namespace Core {
     scope: Scope;
   };
 
-  export type SingleDependencyLike = UExecutor;
+  export type SingleDependencyLike =
+    | UExecutor
+    | Tag.Tag<any, boolean>
+    | Tag.TagExecutor<any, any>;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<UExecutor>
-    | Record<string, UExecutor>;
+    | ReadonlyArray<UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>
+    | Record<string, UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =
@@ -389,6 +398,12 @@ export declare namespace Core {
     }): Flow.Execution<S>;
   }
 }
+
+export type ResolvableItem =
+  | Core.UExecutor
+  | Tag.Tag<unknown, boolean>
+  | Tag.TagExecutor<unknown>
+  | Escapable<unknown>;
 
 export class FlowError extends Error {
   public readonly code: string;

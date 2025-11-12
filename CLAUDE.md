@@ -101,3 +101,16 @@ When changing public API (types, function signatures, etc):
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`
+
+
+---
+
+## Agor Session Context
+
+You are currently running within **Agor** (https://agor.live), a multiplayer canvas for orchestrating AI coding agents.
+
+**Your current Agor session ID is: `cfffab89-64ab-47c0-b334-dee0a05c2591`** (short: `cfffab89`)
+
+When you see this ID referenced in prompts or tool calls, it refers to THIS session you're currently in.
+
+For more information about Agor, visit https://agor.live

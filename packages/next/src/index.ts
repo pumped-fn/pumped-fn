@@ -37,6 +37,7 @@ export { createScope, type ScopeOption } from "./scope";
 
 export { tag } from "./tag";
 export type { Tag } from "./tag-types";
+export { tags } from "./tag-executors";
 
 export { flow, flowMeta } from "./flow";
 export { Promised } from "./promises";

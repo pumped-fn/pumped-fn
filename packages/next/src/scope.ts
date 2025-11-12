@@ -16,15 +16,11 @@ import {
   executorSymbol,
   type Flow,
 } from "./types";
-import { type Tag } from "./tag-types";
+import { type Tag, tagSymbol } from "./tag-types";
+import { isTag, isTagExecutor } from "./tag-executors";
 import { Promised } from "./promises";
 import * as errors from "./errors";
-import {
-  flow as flowApi,
-  FlowContext,
-  flowMeta,
-  flowDefinitionMeta,
-} from "./flow";
+import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
@@ -64,7 +60,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private currentPromised: Promised<unknown> | null = null;
   public resolve: (force?: boolean) => Promised<unknown>;
 
-  constructor(scope: BaseScope, requestor: UE, tags: Tag.Tagged[] | undefined) {
+  constructor(
+    scope: BaseScope,
+    requestor: UE,
+    tags: Tag.Tagged[] | undefined
+  ) {
     this.scope = scope;
     this.requestor = requestor;
     this.tags = tags;
@@ -408,10 +408,7 @@ function getExecutor(e: Core.UExecutor): Core.AnyExecutor {
 class BaseScope implements Core.Scope {
   protected disposed: boolean = false;
   protected cache: Map<UE, ExecutorState> = new Map();
-  protected executions: Map<
-    string,
-    { execution: Flow.Execution<unknown>; startTime: number }
-  > = new Map();
+  protected executions: Map<string, { execution: Flow.FlowExecution<unknown>; startTime: number }> = new Map();
   protected onEvents: {
     readonly change: Set<Core.ChangeCallback>;
     readonly release: Set<Core.ReleaseCallback>;
@@ -683,6 +680,27 @@ class BaseScope implements Core.Scope {
     return a.get();
   }
 
+  protected async resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown> {
+    const hasDefault = tag.default !== undefined;
+
+    if (hasDefault) {
+      return await tag.readFrom(this);
+    } else {
+      return await tag.extractFrom(this);
+    }
+  }
+
+  protected async resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown> {
+    switch (tagExec.extractionMode) {
+      case "extract":
+        return await tagExec.tag.extractFrom(this);
+      case "read":
+        return await tagExec.tag.readFrom(this);
+      case "collect":
+        return await tagExec.tag.collectFrom(this);
+    }
+  }
+
   protected async "~resolveDependencies"(
     ie:
       | undefined
@@ -691,8 +709,20 @@ class BaseScope implements Core.Scope {
       | Record<string, Core.UExecutor>,
     ref: UE
   ): Promise<unknown> {
-    return resolveShape(this as unknown as Core.Scope, ie, (item) =>
-      this["~resolveExecutor"](item as Core.UExecutor, ref)
+    return resolveShape(
+      this as unknown as Core.Scope,
+      ie,
+      async (item) => {
+        if (isTagExecutor(item)) {
+          return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>);
+        }
+
+        if (isTag(item)) {
+          return this.resolveTag(item as Tag.Tag<unknown, boolean>);
+        }
+
+        return this["~resolveExecutor"](item as Core.UExecutor, ref);
+      }
     );
   }
 
@@ -1073,14 +1103,14 @@ class BaseScope implements Core.Scope {
     input?: I;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.Execution<S>;
+  }): Flow.FlowExecution<S>;
 
   exec<S, D extends Core.DependencyLike>(config: {
     dependencies: D;
     fn: (deps: Core.InferOutput<D>) => S | Promise<S>;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.Execution<S>;
+  }): Flow.FlowExecution<S>;
 
   exec<S, I, D extends Core.DependencyLike>(config: {
     dependencies: D;
@@ -1088,38 +1118,24 @@ class BaseScope implements Core.Scope {
     input: I;
     timeout?: number;
     tags?: Tag.Tagged[];
-  }): Flow.Execution<S>;
+  }): Flow.FlowExecution<S>;
 
   exec<S, I = undefined>(
     config:
-      | {
-          flow: Core.Executor<Flow.Handler<S, I>>;
-          input?: I;
-          timeout?: number;
-          tags?: Tag.Tagged[];
-        }
-      | {
-          dependencies: Core.DependencyLike;
-          fn: (...args: any[]) => S | Promise<S>;
-          input?: any;
-          timeout?: number;
-          tags?: Tag.Tagged[];
-        }
-  ): Flow.Execution<S> {
+      | { flow: Core.Executor<Flow.Handler<S, I>>; input?: I; timeout?: number; tags?: Tag.Tagged[] }
+      | { dependencies: Core.DependencyLike; fn: (...args: any[]) => S | Promise<S>; input?: any; timeout?: number; tags?: Tag.Tagged[] }
+  ): Flow.FlowExecution<S> {
     this["~ensureNotDisposed"]();
-    const executionId =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `exec-${Date.now()}-${Math.random()}`;
+    const executionId = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `exec-${Date.now()}-${Math.random()}`;
     const abortController = new AbortController();
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     if (config.timeout) {
       timeoutId = setTimeout(() => {
         if (!abortController.signal.aborted) {
-          abortController.abort(
-            new Error(`Flow execution timeout after ${config.timeout}ms`)
-          );
+          abortController.abort(new Error(`Flow execution timeout after ${config.timeout}ms`));
         }
       }, config.timeout);
     }
@@ -1128,23 +1144,14 @@ class BaseScope implements Core.Scope {
     let flowName: string | undefined;
 
     if ("flow" in config) {
-      flowPromise = this["~executeFlow"](
-        config.flow,
-        config.input as I,
-        config.tags,
-        abortController
-      );
+      flowPromise = this["~executeFlow"](config.flow, config.input as I, config.tags, abortController);
       const definition = flowDefinitionMeta.readFrom(config.flow);
       flowName = definition?.name;
     } else {
       flowPromise = Promised.create(
         (async () => {
           const deps = await this["~resolveDependencies"](
-            config.dependencies as
-              | Core.UExecutor
-              | Core.UExecutor[]
-              | Record<string, Core.UExecutor>
-              | undefined,
+            config.dependencies as Core.UExecutor | Core.UExecutor[] | Record<string, Core.UExecutor> | undefined,
             { [executorSymbol]: "main" as const } as any
           );
 
@@ -1198,25 +1205,18 @@ class BaseScope implements Core.Scope {
     );
 
     const promise = (async () => {
-      const context = new FlowContext(
-        this,
-        this.extensions,
-        executionTags,
-        undefined,
-        abortController
-      );
+      const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
 
       try {
-        const definition = flowDefinitionMeta.readFrom(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
-
-        context.initializeExecutionContext(definition.name, false);
-
         const executeCore = (): Promised<S> => {
           return this.resolve(flow).map(async (handler) => {
+            const definition = flowDefinitionMeta.readFrom(flow);
+            if (!definition) {
+              throw new Error("Flow definition not found in executor metadata");
+            }
             const validated = validate(definition.input, input);
+
+            context.initializeExecutionContext(definition.name, false);
 
             const result = await handler(context, validated);
 
@@ -1226,17 +1226,25 @@ class BaseScope implements Core.Scope {
           });
         };
 
-        const executor = this.wrapWithExtensions(executeCore, {
-          kind: "execution",
-          target: {
-            type: "flow",
-            flow,
-            definition,
-          },
-          input,
-          key: undefined,
-          context,
-        });
+        const definition = flowDefinitionMeta.readFrom(flow);
+        if (!definition) {
+          throw new Error("Flow definition not found in executor metadata");
+        }
+
+        const executor = this.wrapWithExtensions(
+          executeCore,
+          {
+            kind: "execution",
+            target: {
+              type: "flow",
+              flow,
+              definition,
+            },
+            input,
+            key: undefined,
+            context,
+          }
+        );
 
         const result = await executor();
         resolveSnapshot(context.createSnapshot());

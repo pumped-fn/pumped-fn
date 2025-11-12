@@ -1,10 +1,12 @@
 import { isExecutor, isLazyExecutor, isReactiveExecutor, isStaticExecutor } from "../executor";
-import type { Core } from "../types";
+import type { Core, ResolvableItem } from "../types";
 import type { Escapable } from "../helpers";
+import { isTag, isTagExecutor } from "../tag-executors";
+import { type Tag } from "../tag-types";
 
-type ResolveFn = (item: Core.UExecutor | Escapable<unknown>) => Promise<unknown>;
+type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
 
-export async function resolveShape<T extends Core.UExecutor | ReadonlyArray<Core.UExecutor | Escapable<unknown>> | Record<string, Core.UExecutor | Escapable<unknown>> | undefined>(
+export async function resolveShape<T extends ResolvableItem | ReadonlyArray<ResolvableItem> | Record<string, ResolvableItem> | undefined>(
   scope: Core.Scope,
   shape: T,
   resolveFn?: ResolveFn
@@ -13,7 +15,15 @@ export async function resolveShape<T extends Core.UExecutor | ReadonlyArray<Core
     return undefined;
   }
 
-  const unwrapTarget = (item: Core.UExecutor | Escapable<unknown>): Core.Executor<unknown> => {
+  const unwrapTarget = (item: ResolvableItem): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
+    if (isTagExecutor(item)) {
+      return item;
+    }
+
+    if (isTag(item)) {
+      return item;
+    }
+
     const executor = !isExecutor(item) ? (item as Escapable<unknown>).escape() : item;
 
     if (isLazyExecutor(executor) || isReactiveExecutor(executor) || isStaticExecutor(executor)) {
@@ -23,11 +33,24 @@ export async function resolveShape<T extends Core.UExecutor | ReadonlyArray<Core
     return executor as Core.Executor<unknown>;
   };
 
+  const scopeWithProtectedMethods = scope as Core.Scope & {
+    resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown>;
+    resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown>;
+  };
+
   const resolveItem = resolveFn
     ? resolveFn
-    : async (item: Core.UExecutor | Escapable<unknown>) => {
+    : async (item: ResolvableItem) => {
+        if (isTagExecutor(item)) {
+          return scopeWithProtectedMethods.resolveTagExecutor(item);
+        }
+
+        if (isTag(item)) {
+          return scopeWithProtectedMethods.resolveTag(item);
+        }
+
         const target = unwrapTarget(item);
-        return await scope.resolve(target);
+        return await scope.resolve(target as Core.Executor<unknown>);
       };
 
   if (Array.isArray(shape)) {
