@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/devtools",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Development tools for pumped-fn applications",
   "type": "module",
   "main": "./dist/index.js",

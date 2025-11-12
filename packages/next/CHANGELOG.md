@@ -1,5 +1,13 @@
 # @pumped-fn/core-next
 
+## 0.5.85
+
+### Patch Changes
+
+- 6deb01a: Fix Flow.Execution type references in scope implementation
+
+  Replace incorrect Flow.FlowExecution type with Flow.Execution in all scope.ts method signatures and internal tracking. Resolves type errors in exec method overloads.
+
 ## 0.5.84
 
 ### Patch Changes
