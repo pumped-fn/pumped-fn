@@ -33,15 +33,20 @@ export async function resolveShape<T extends Core.UExecutor | Tag.Tag<any, boole
     return executor as Core.Executor<unknown>;
   };
 
+  const scopeWithProtectedMethods = scope as Core.Scope & {
+    resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown>;
+    resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown>;
+  };
+
   const resolveItem = resolveFn
     ? resolveFn
     : async (item: Core.UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any> | Escapable<unknown>) => {
         if (isTagExecutor(item)) {
-          return (scope as any).resolveTagExecutor(item);
+          return scopeWithProtectedMethods.resolveTagExecutor(item);
         }
 
         if (isTag(item)) {
-          return (scope as any).resolveTag(item);
+          return scopeWithProtectedMethods.resolveTag(item);
         }
 
         const target = unwrapTarget(item);
