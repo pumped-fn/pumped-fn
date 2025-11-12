@@ -268,15 +268,18 @@ export declare namespace Core {
       }
     : never;
 
-  export type InferOutput<T> = T extends Executor<infer U> | Reactive<infer U>
-    ? Awaited<U>
-    : T extends Lazy<infer U> | Static<infer U>
-    ? Accessor<Awaited<U>>
-    : T extends
-        | ReadonlyArray<UExecutor>
-        | Record<string, UExecutor>
-    ? { [K in keyof T]: InferOutput<T[K]> }
-    : never;
+  export type InferOutput<T> =
+    T extends Tag.TagExecutor<infer U, any>
+      ? U
+      : T extends Tag.Tag<infer U, any>
+        ? U
+        : T extends Executor<infer U> | Reactive<infer U>
+          ? Awaited<U>
+          : T extends Lazy<infer U> | Static<infer U>
+            ? Accessor<Awaited<U>>
+            : T extends ReadonlyArray<any> | Record<string, any>
+              ? { [K in keyof T]: InferOutput<T[K]> }
+              : never;
 
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;
@@ -313,11 +316,14 @@ export declare namespace Core {
     scope: Scope;
   };
 
-  export type SingleDependencyLike = UExecutor;
+  export type SingleDependencyLike =
+    | UExecutor
+    | Tag.Tag<unknown, boolean>
+    | Tag.TagExecutor<unknown, unknown>;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<UExecutor>
-    | Record<string, UExecutor>;
+    | ReadonlyArray<UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown, unknown>>
+    | Record<string, UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown, unknown>>;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =
