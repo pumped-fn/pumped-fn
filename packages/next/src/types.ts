@@ -1,5 +1,6 @@
 import { type Promised } from "./promises";
 import { type Tag } from "./tag-types";
+import { type Escapable } from "./helpers";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
@@ -397,6 +398,12 @@ export declare namespace Core {
     }): Flow.Execution<S>;
   }
 }
+
+export type ResolvableItem =
+  | Core.UExecutor
+  | Tag.Tag<unknown, boolean>
+  | Tag.TagExecutor<unknown>
+  | Escapable<unknown>;
 
 export class FlowError extends Error {
   public readonly code: string;
