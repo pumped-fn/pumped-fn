@@ -318,12 +318,12 @@ export declare namespace Core {
 
   export type SingleDependencyLike =
     | UExecutor
-    | Tag.Tag<unknown, boolean>
-    | Tag.TagExecutor<unknown, unknown>;
+    | Tag.Tag<any, boolean>
+    | Tag.TagExecutor<any, any>;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown, unknown>>
-    | Record<string, UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown, unknown>>;
+    | ReadonlyArray<UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>
+    | Record<string, UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =

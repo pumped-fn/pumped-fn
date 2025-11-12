@@ -16,7 +16,8 @@ import {
   executorSymbol,
   type Flow,
 } from "./types";
-import { type Tag } from "./tag-types";
+import { type Tag, tagSymbol } from "./tag-types";
+import { isTag, isTagExecutor } from "./tag-executors";
 import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
@@ -711,7 +712,17 @@ class BaseScope implements Core.Scope {
     return resolveShape(
       this as unknown as Core.Scope,
       ie,
-      (item) => this["~resolveExecutor"](item as Core.UExecutor, ref)
+      async (item) => {
+        if (isTagExecutor(item)) {
+          return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>);
+        }
+
+        if (isTag(item)) {
+          return this.resolveTag(item as Tag.Tag<unknown, boolean>);
+        }
+
+        return this["~resolveExecutor"](item as Core.UExecutor, ref);
+      }
     );
   }
 
