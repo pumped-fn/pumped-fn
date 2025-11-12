@@ -679,6 +679,27 @@ class BaseScope implements Core.Scope {
     return a.get();
   }
 
+  private resolveTag(tag: Tag.Tag<unknown, boolean>): unknown {
+    const hasDefault = tag.default !== undefined;
+
+    if (hasDefault) {
+      return tag.readFrom(this);
+    } else {
+      return tag.extractFrom(this);
+    }
+  }
+
+  private resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): unknown {
+    switch (tagExec.extractionMode) {
+      case "extract":
+        return tagExec.tag.extractFrom(this);
+      case "read":
+        return tagExec.tag.readFrom(this);
+      case "collect":
+        return tagExec.tag.collectFrom(this);
+    }
+  }
+
   protected async "~resolveDependencies"(
     ie:
       | undefined
