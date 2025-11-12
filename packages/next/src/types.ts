@@ -379,14 +379,14 @@ export declare namespace Core {
       input?: I;
       timeout?: number;
       tags?: Tag.Tagged[];
-    }): Flow.FlowExecution<S>;
+    }): Flow.Execution<S>;
 
     exec<S, D extends DependencyLike>(config: {
       dependencies: D;
       fn: (deps: InferOutput<D>) => S | Promise<S>;
       timeout?: number;
       tags?: Tag.Tagged[];
-    }): Flow.FlowExecution<S>;
+    }): Flow.Execution<S>;
 
     exec<S, I, D extends DependencyLike>(config: {
       dependencies: D;
@@ -394,7 +394,7 @@ export declare namespace Core {
       input: I;
       timeout?: number;
       tags?: Tag.Tagged[];
-    }): Flow.FlowExecution<S>;
+    }): Flow.Execution<S>;
   }
 }
 
@@ -468,60 +468,6 @@ export namespace Flow {
       : S
     : never;
 
-  export type FlowRouterNode = { [key: string]: UFlow | FlowRouterNode };
-
-  export type PathsToFlows<T> = T extends UFlow
-    ? ""
-    : T extends object
-    ? {
-        [K in keyof T]: K extends string
-          ? PathsToFlows<T[K]> extends infer P
-            ? P extends ""
-              ? K
-              : P extends string
-              ? `${K}.${P}`
-              : never
-            : never
-          : never;
-      }[keyof T]
-    : never;
-
-  export type GetFlowFromPath<
-    T,
-    P extends string
-  > = P extends `${infer First}.${infer Rest}`
-    ? First extends keyof T
-      ? GetFlowFromPath<T[First], Rest>
-      : never
-    : P extends keyof T
-    ? T[P]
-    : never;
-
-  export type InferInputFromPath<Router, Path extends string> = GetFlowFromPath<
-    Router,
-    Path
-  > extends infer F
-    ? F extends UFlow
-      ? InferInput<F>
-      : never
-    : never;
-
-  export type InferOutputFromPath<
-    Router,
-    Path extends string
-  > = GetFlowFromPath<Router, Path> extends infer F
-    ? F extends UFlow
-      ? InferOutput<F>
-      : never
-    : never;
-
-  export type FlowRouterExecutor<Router extends FlowRouterNode> = <
-    P extends PathsToFlows<Router>
-  >(
-    path: P,
-    input: InferInputFromPath<Router, P>
-  ) => Promised<InferOutputFromPath<Router, P>>;
-
   export type FnExecutor<I, O> = (input: I) => O | Promised<O>;
 
   export type MultiFnExecutor<Args extends readonly unknown[], O> = (
@@ -565,19 +511,10 @@ export namespace Flow {
 
     throwIfAborted(): void;
 
-    get<T>(
-      accessor:
-        | import("./tag-types").Tag.Tag<T, false>
-        | import("./tag-types").Tag.Tag<T, true>
-    ): T;
-    find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
-    find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
-    set<T>(
-      accessor:
-        | import("./tag-types").Tag.Tag<T, false>
-        | import("./tag-types").Tag.Tag<T, true>,
-      value: T
-    ): void;
+    get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
+    find<T>(accessor: Tag.Tag<T, false>): T | undefined;
+    find<T>(accessor: Tag.Tag<T, true>): T;
+    set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
 
     exec<F extends UFlow>(
       flow: F,
@@ -640,13 +577,9 @@ export namespace Flow {
 
   export type ExecutionData = {
     readonly context: {
-      get<T>(
-        accessor:
-          | import("./tag-types").Tag.Tag<T, false>
-          | import("./tag-types").Tag.Tag<T, true>
-      ): T;
-      find<T>(accessor: import("./tag-types").Tag.Tag<T, false>): T | undefined;
-      find<T>(accessor: import("./tag-types").Tag.Tag<T, true>): T;
+      get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
+      find<T>(accessor: Tag.Tag<T, false>): T | undefined;
+      find<T>(accessor: Tag.Tag<T, true>): T;
     };
   };
 
@@ -654,9 +587,14 @@ export namespace Flow {
     | { success: true; result: T; ctx: ExecutionData }
     | { success: false; error: unknown; ctx: ExecutionData };
 
-  export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  export type ExecutionStatus =
+    | "pending"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled";
 
-  export interface FlowExecution<T> {
+  export interface Execution<T> {
     readonly result: Promised<T>;
     readonly id: string;
     readonly flowName: string | undefined;
@@ -666,12 +604,21 @@ export namespace Flow {
     readonly statusCallbackErrors: readonly Error[];
 
     onStatusChange(
-      callback: (status: ExecutionStatus, execution: FlowExecution<T>) => void | Promise<void>
+      callback: (
+        status: ExecutionStatus,
+        execution: Execution<T>
+      ) => void | Promise<void>
     ): Core.Cleanup;
 
     then<TResult1 = T, TResult2 = never>(
-      onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
-      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
+      onfulfilled?:
+        | ((value: T) => TResult1 | PromiseLike<TResult1>)
+        | null
+        | undefined,
+      onrejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | null
+        | undefined
     ): PromiseLike<TResult1 | TResult2>;
   }
 }

@@ -88,6 +88,10 @@ const withDeps = flow(db, (deps, ctx, id: string) => {
 
 Use when you need runtime validation or type sharing across network:
 
+::: tip Validation Guarantee
+All flows with schemas validate both input and output on every execution, whether journaled or non-journaled. This ensures type safety at runtime.
+:::
+
 ```ts twoslash
 import { flow, custom, provide } from '@pumped-fn/core-next'
 
@@ -116,6 +120,30 @@ const handler = flow(
   db,
   (deps, ctx, id) => deps.query(`SELECT * FROM users WHERE id = ${id}`)
 )
+```
+
+### Custom Validators
+
+`custom()` accepts an optional validator function for runtime validation:
+
+```ts twoslash
+import { flow, custom } from '@pumped-fn/core-next'
+
+const validateAge = flow({
+  input: custom<number>((value) => {
+    if (typeof value !== 'number') {
+      return { success: false, issues: [{ message: 'Must be a number' }] }
+    }
+    if (value < 0 || value > 120) {
+      return { success: false, issues: [{ message: 'Age must be 0-120' }] }
+    }
+    return value
+  }),
+  output: custom<boolean>()
+}, (ctx, age) => age >= 18)
+
+await flow.execute(validateAge, 25)
+await flow.execute(validateAge, 150)
 ```
 
 ## Context Operations

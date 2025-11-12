@@ -21,7 +21,7 @@ const transaction = tag(custom<{
 const transactionExtension = extension({
   name: 'transaction',
   wrap: async (scope, next, operation) => {
-    if (operation.kind !== 'subflow' && operation.kind !== 'journal') {
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') {
       return next()
     }
 
@@ -30,9 +30,7 @@ const transactionExtension = extension({
       rollback: async () => console.log('Transaction rolled back')
     }
 
-    if ('context' in operation) {
-      operation.context.set(transaction, txn)
-    }
+    operation.context.set(transaction, txn)
 
     try {
       const result = await next()

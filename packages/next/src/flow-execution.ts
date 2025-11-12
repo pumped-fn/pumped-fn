@@ -3,7 +3,7 @@ import { type Flow, type Core } from "./types";
 
 type StatusCallback<T> = (
   status: Flow.ExecutionStatus,
-  execution: Flow.FlowExecution<T>
+  execution: Flow.Execution<T>
 ) => void | Promise<void>;
 
 type StatusTracking<T> = {
@@ -12,13 +12,13 @@ type StatusTracking<T> = {
   abortController: AbortController;
 };
 
-export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
+export class FlowExecutionImpl<T> implements Flow.Execution<T> {
   readonly result: Promised<T>;
   readonly id: string;
   readonly flowName: string | undefined;
   readonly abort: AbortController;
 
-  private _status: Flow.ExecutionStatus = 'pending';
+  private _status: Flow.ExecutionStatus = "pending";
   private statusCallbacks = new Set<StatusCallback<T>>();
   private callbackErrors: Error[] = [];
   private _ctx: Flow.ExecutionData | null;
@@ -63,7 +63,7 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
       Promise.resolve(callback(newStatus, this)).catch((err) => {
         const error = err instanceof Error ? err : new Error(String(err));
         this.callbackErrors.push(error);
-        console.error('Error in status change callback:', err);
+        console.error("Error in status change callback:", err);
       });
     }
   }
@@ -107,8 +107,14 @@ export class FlowExecutionImpl<T> implements Flow.FlowExecution<T> {
   }
 
   then<TResult1 = T, TResult2 = never>(
-    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
+    onfulfilled?:
+      | ((value: T) => TResult1 | PromiseLike<TResult1>)
+      | null
+      | undefined,
+    onrejected?:
+      | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+      | null
+      | undefined
   ): PromiseLike<TResult1 | TResult2> {
     return this.result.then(onfulfilled, onrejected);
   }
