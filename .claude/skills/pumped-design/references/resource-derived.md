@@ -414,6 +414,76 @@ const repo = derive({ db: dbPool }, ({ db }) => ({
 
 ---
 
+## Property-Level Reactivity with select()
+
+### When to Use
+
+Use `.select()` when you need to derive individual properties from object executors with fine-grained change detection:
+
+- Creating property-specific derived resources from configuration objects
+- Optimizing reactivity by only propagating updates when specific values change
+- Splitting object resources into individual property streams
+- Reducing unnecessary downstream updates in reactive chains
+
+### Code Template
+
+See: `selectBasicUsage` in skill-examples/resources-derived.ts
+
+```typescript
+import { provide } from '@pumped-fn/core-next'
+
+const config = provide(() => ({
+  port: 3000,
+  host: 'localhost',
+  timeout: 5000
+}))
+
+// Select individual properties with change detection
+const port = config.select('port')
+const host = config.select('host')
+
+// Custom equality function
+const user = config.select('user', {
+  equals: (a, b) => a.id === b.id
+})
+```
+
+### Behavior
+
+- **Identity Guarantee:** Same key returns same executor instance
+- **Change Detection:** Only propagates when value actually changes (using `Object.is` by default)
+- **Custom Equality:** Supports custom comparator functions via options
+- **Automatic Cleanup:** Uses WeakRef-based caching with GC integration
+- **Type Safe:** Preserves property types via `keyof T` constraint
+
+### Example: Configuration Properties
+
+```typescript
+const appConfig = provide(() => ({
+  database: { host: 'localhost', port: 5432 },
+  api: { port: 3000, timeout: 5000 },
+  features: { enableAuth: true, enableCache: false }
+}))
+
+// Select specific configuration sections
+const dbConfig = appConfig.select('database')
+const apiPort = appConfig.select('api').select('port')
+
+// Only updates when feature flags change
+const authEnabled = appConfig.select('features')
+  .select('enableAuth')
+```
+
+### Memory Management
+
+The select() implementation uses WeakRef and FinalizationRegistry for automatic cleanup:
+
+- Requires Node.js 14.6+ or modern browsers (ES2021)
+- Executors are garbage collected when no longer referenced
+- No manual cleanup required
+
+---
+
 ## Related Sub-skills
 
 - **resource-basic.md** - Basic resources with provide()

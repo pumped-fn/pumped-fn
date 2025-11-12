@@ -1,6 +1,7 @@
 import { Core, executorSymbol } from "./types";
 import type { Tag } from "./tag-types";
 import type { Escapable } from "./helpers";
+import { select } from "./select";
 
 export function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
@@ -65,6 +66,15 @@ export function createExecutor<T>(
     },
     static: {
       value: staticExecutor,
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    },
+    select: {
+      value: <K extends keyof T>(
+        key: K,
+        options?: { equals?: (a: T[K], b: T[K]) => boolean }
+      ) => select(executor as Core.Executor<T>, key, options),
       writable: false,
       configurable: false,
       enumerable: false,

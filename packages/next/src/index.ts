@@ -33,6 +33,8 @@ export {
   isStaticExecutor,
 } from "./executor";
 
+export { select } from "./select";
+
 export { createScope, type ScopeOption } from "./scope";
 
 export { tag } from "./tag";
