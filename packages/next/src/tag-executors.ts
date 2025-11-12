@@ -1,6 +1,6 @@
 import { tagSymbol, type Tag } from "./tag-types";
 
-export function required<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T> {
+export function required<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
   return {
     [tagSymbol]: "required",
     tag,
@@ -8,7 +8,7 @@ export function required<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T> {
   };
 }
 
-export function optional<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T> {
+export function optional<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
   return {
     [tagSymbol]: "optional",
     tag,
@@ -16,7 +16,7 @@ export function optional<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T> {
   };
 }
 
-export function all<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T[]> {
+export function all<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T[], T> {
   return {
     [tagSymbol]: "all",
     tag,
@@ -43,7 +43,7 @@ export function isTag<T>(input: unknown): input is Tag.Tag<T, boolean> {
   );
 }
 
-export function isTagExecutor<T>(input: unknown): input is Tag.TagExecutor<T> {
+export function isTagExecutor<TOutput, TTag = TOutput>(input: unknown): input is Tag.TagExecutor<TOutput, TTag> {
   return (
     typeof input === "object" &&
     input !== null &&
