@@ -42,7 +42,7 @@ Use ast-grep where possible to search and replace code
 
 # Plans directory
 
-- use `plans/` (project root) for implementation plans
+- use `@plans/` (project root) for implementation plans
 - plans are committed to git for reference
 - **CRITICAL: plans MUST NOT include private/machine-specific information:**
   - NO usernames in paths (e.g., `/home/username/`)

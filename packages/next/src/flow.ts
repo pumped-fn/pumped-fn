@@ -148,6 +148,239 @@ namespace ExecConfig {
   export type Normalized<T = any> = Flow<any> | Fn<T>;
 }
 
+type UnwrappedExecutor<T> = {
+  executor: () => Promised<T>;
+  operation: Extension.Operation;
+};
+
+type ContextConfig = {
+  parent: FlowContext;
+  tags?: Tag.Tagged[];
+  abortController?: AbortController;
+  flowName: string;
+  isParallel: boolean;
+};
+
+const createChildContext = (config: ContextConfig): FlowContext => {
+  const childCtx = new FlowContext(
+    config.parent.scope,
+    config.parent['extensions'],
+    config.tags,
+    config.parent,
+    config.abortController || config.parent['abortController']
+  );
+  childCtx.initializeExecutionContext(config.flowName, config.isParallel);
+  return childCtx;
+};
+
+const executeFlowHandler = async <S, I>(
+  handler: Flow.Handler<S, I>,
+  definition: Flow.Definition<S, I>,
+  input: I,
+  context: FlowContext
+): Promise<S> => {
+  const validated = validate(definition.input, input);
+  const result = await handler(context, validated);
+  validate(definition.output, result);
+  return result;
+};
+
+const executeJournaledFlow = <S, I, F extends Flow.UFlow>(
+  config: ExecConfig.Flow<F>,
+  parentCtx: FlowContext,
+  controller: AbortController
+): UnwrappedExecutor<Flow.InferOutput<F>> => {
+  const definition = flowDefinitionMeta.readFrom(config.flow);
+  if (!definition) {
+    throw new Error("Flow definition not found");
+  }
+
+  const parentFlowName = parentCtx.find(flowMeta.flowName);
+  const depth = parentCtx.get(flowMeta.depth);
+  const journalKey = createJournalKey(
+    parentFlowName || "unknown",
+    depth,
+    config.key!
+  );
+
+  const childCtx = createChildContext({
+    parent: parentCtx,
+    tags: config.tags,
+    abortController: controller,
+    flowName: definition.name,
+    isParallel: false
+  });
+
+  return {
+    executor: () => parentCtx.scope.resolve(config.flow).map(async (handler) => {
+      const journal = parentCtx['journal'] as Map<
+        string,
+        Flow.InferOutput<F> | { __error: true; error: unknown }
+      >;
+      const { isReplay, value } = checkJournalReplay<Flow.InferOutput<F>>(
+        journal,
+        journalKey
+      );
+
+      if (isReplay) {
+        return value!;
+      }
+
+      parentCtx.throwIfAborted();
+
+      try {
+        const result = await executeFlowHandler(
+          handler as Flow.Handler<Flow.InferOutput<F>, Flow.InferInput<F>>,
+          definition,
+          config.input,
+          childCtx
+        );
+        journal.set(journalKey, result);
+        return result;
+      } catch (error) {
+        journal.set(journalKey, { __error: true, error });
+        throw error;
+      }
+    }),
+    operation: {
+      kind: 'execution',
+      target: { type: 'flow', flow: config.flow, definition },
+      input: config.input,
+      key: journalKey.split(':')[2],
+      context: childCtx
+    }
+  };
+};
+
+const executeNonJournaledFlow = <S, I, F extends Flow.UFlow>(
+  config: ExecConfig.Flow<F>,
+  parentCtx: FlowContext,
+  controller: AbortController
+): UnwrappedExecutor<Flow.InferOutput<F>> => {
+  const definition = flowDefinitionMeta.readFrom(config.flow);
+  if (!definition) {
+    throw new Error("Flow definition not found in executor metadata");
+  }
+
+  const childCtx = createChildContext({
+    parent: parentCtx,
+    tags: config.tags,
+    abortController: controller,
+    flowName: definition.name,
+    isParallel: false
+  });
+
+  return {
+    executor: () => parentCtx.scope.resolve(config.flow).map(async (handler) => {
+      return executeFlowHandler(
+        handler as Flow.Handler<Flow.InferOutput<F>, Flow.InferInput<F>>,
+        definition,
+        config.input,
+        childCtx
+      );
+    }),
+    operation: {
+      kind: 'execution',
+      target: { type: 'flow', flow: config.flow, definition },
+      input: config.input,
+      key: undefined,
+      context: childCtx
+    }
+  };
+};
+
+const executeJournaledFn = <T>(
+  config: ExecConfig.Fn<T>,
+  parentCtx: FlowContext
+): UnwrappedExecutor<T> => {
+  const flowName = parentCtx.find(flowMeta.flowName) || "unknown";
+  const depth = parentCtx.get(flowMeta.depth);
+  const journalKey = createJournalKey(flowName, depth, config.key!);
+
+  return {
+    executor: () => {
+      const journal = parentCtx['journal']! as Map<string, unknown>;
+      const { isReplay, value } = checkJournalReplay<T>(
+        journal as Map<string, T | { __error: true; error: unknown }>,
+        journalKey
+      );
+
+      if (isReplay) {
+        return Promised.create(Promise.resolve(value!));
+      }
+
+      return Promised.try(async () => {
+        const result = await config.fn(...config.params);
+        journal.set(journalKey, result);
+        return result;
+      }).catch((error) => {
+        journal.set(journalKey, { __error: true, error });
+        throw error;
+      });
+    },
+    operation: {
+      kind: 'execution',
+      target: {
+        type: 'fn',
+        params: config.params.length > 0 ? config.params : undefined
+      },
+      input: undefined,
+      key: journalKey.split(':')[2],
+      context: parentCtx
+    }
+  };
+};
+
+const executeNonJournaledFn = <T>(
+  config: ExecConfig.Fn<T>,
+  parentCtx: FlowContext
+): UnwrappedExecutor<T> => {
+  return {
+    executor: () => Promised.create(Promise.resolve(config.fn(...config.params))),
+    operation: {
+      kind: 'execution',
+      target: {
+        type: 'fn',
+        params: config.params.length > 0 ? config.params : undefined
+      },
+      input: undefined,
+      key: undefined,
+      context: parentCtx
+    }
+  };
+};
+
+const executeAndWrap = <T>(
+  unwrapped: UnwrappedExecutor<T>,
+  ctx: FlowContext
+): Promised<T> => {
+  const wrapped = ctx['wrapWithExtensions'](unwrapped.executor, unwrapped.operation);
+  return Promised.create(wrapped());
+};
+
+const executeWithTimeout = async <T>(
+  executor: () => Promised<T>,
+  timeout: number | undefined,
+  timeoutId: NodeJS.Timeout | null,
+  controller: AbortController
+): Promise<T> => {
+  if (!timeout) {
+    return await executor();
+  }
+
+  const abortPromise = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener('abort', () => {
+      reject(controller.signal.reason || new Error('Operation aborted'));
+    }, { once: true });
+  });
+
+  try {
+    return await Promise.race([executor(), abortPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 class FlowContext implements Flow.Context {
   private contextData = new Map<unknown, unknown>();
   private journal: Map<string, unknown> | null = null;
@@ -208,7 +441,8 @@ class FlowContext implements Flow.Context {
     flowName: string,
     isParallel: boolean = false
   ): void {
-    const currentDepth = this.parent ? this.parent.get(flowMeta.depth) + 1 : 0;
+    const parentDepth = this.parent ? this.parent.get(flowMeta.depth) : undefined;
+    const currentDepth = parentDepth !== undefined ? parentDepth + 1 : 0;
     const parentFlowName = this.parent
       ? this.parent.find(flowMeta.flowName)
       : undefined;
@@ -222,7 +456,7 @@ class FlowContext implements Flow.Context {
   get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
   get<T>(accessorOrKey: unknown): T | unknown {
     if (
-      typeof accessorOrKey === "object" &&
+      (typeof accessorOrKey === "object" || typeof accessorOrKey === "function") &&
       accessorOrKey !== null &&
       "extractFrom" in accessorOrKey
     ) {
@@ -235,6 +469,12 @@ class FlowContext implements Flow.Context {
     }
     if (this.tags && typeof key === "symbol") {
       const tagged = this.tags.find((m: Tag.Tagged) => m.key === key);
+      if (tagged) {
+        return tagged.value;
+      }
+    }
+    if (this.scope.tags && typeof key === "symbol") {
+      const tagged = this.scope.tags.find((m: Tag.Tagged) => m.key === key);
       if (tagged) {
         return tagged.value;
       }
@@ -336,155 +576,22 @@ class FlowContext implements Flow.Context {
       this.signal
     );
 
-    const executeWithCleanup = async <T>(
-      executor: () => Promise<T>
-    ): Promise<T> => {
-      if (config.timeout) {
-        const abortPromise = new Promise<never>((_, reject) => {
-          controller.signal.addEventListener(
-            "abort",
-            () => {
-              reject(
-                controller.signal.reason || new Error("Operation aborted")
-              );
-            },
-            { once: true }
-          );
-        });
-
-        try {
-          return await Promise.race([executor(), abortPromise]);
-        } finally {
-          if (timeoutId) clearTimeout(timeoutId);
-        }
-      }
-      return await executor();
-    };
-
-    if (config.type === "fn") {
-      if (config.key) {
-        if (!this.journal) {
-          this.journal = new Map();
-        }
-
-        const flowName = this.find(flowMeta.flowName) || "unknown";
-        const depth = this.get(flowMeta.depth);
-        const journalKey = createJournalKey(flowName, depth, config.key);
-
-        return Promised.create(
-          executeWithCleanup(
-            async () =>
-              await this.executeJournaledFn(
-                config.fn,
-                config.params,
-                journalKey,
-                flowName,
-                depth
-              )
-          )
-        );
-      } else {
-        return Promised.create(
-          executeWithCleanup(() => Promise.resolve(config.fn(...config.params)))
-        );
-      }
+    if (config.key && !this.journal) {
+      this.journal = new Map();
     }
 
-    if (config.key) {
-      if (!this.journal) {
-        this.journal = new Map();
-      }
+    const unwrapped = config.type === 'fn'
+      ? (config.key
+          ? executeJournaledFn(config, this)
+          : executeNonJournaledFn(config, this))
+      : (config.key
+          ? executeJournaledFlow(config, this, controller)
+          : executeNonJournaledFlow(config, this, controller));
 
-      const parentFlowName = this.find(flowMeta.flowName);
-      const depth = this.get(flowMeta.depth);
-      const journalKey = createJournalKey(
-        parentFlowName || "unknown",
-        depth,
-        config.key
-      );
-      const journal = this.journal as Map<
-        string,
-        Flow.InferOutput<F> | { __error: true; error: unknown }
-      >;
-
-      const definition = flowDefinitionMeta.readFrom(config.flow);
-      if (!definition) {
-        throw new Error("Flow definition not found");
-      }
-
-      const executeCore = (): Promised<Flow.InferOutput<F>> => {
-        return this.scope.resolve(config.flow).map(async (handler) => {
-          const { isReplay, value } = checkJournalReplay<Flow.InferOutput<F>>(
-            journal,
-            journalKey
-          );
-
-          if (isReplay) {
-            return value!;
-          }
-
-          this.throwIfAborted();
-
-          const validated = validate(definition.input, config.input);
-          const childContext = new FlowContext(
-            this.scope,
-            this.extensions,
-            config.tags,
-            this,
-            controller
-          );
-          childContext.initializeExecutionContext(definition.name, false);
-
-          try {
-            const result = (await this.executeWithExtensions<
-              Flow.InferOutput<F>
-            >(
-              async (ctx) =>
-                (
-                  handler as Flow.Handler<
-                    Flow.InferOutput<F>,
-                    Flow.InferInput<F>
-                  >
-                )(ctx, validated) as Promise<Flow.InferOutput<F>>,
-              childContext,
-              config.flow,
-              config.input
-            )) as Flow.InferOutput<F>;
-            validate(definition.output, result);
-            journal.set(journalKey, result);
-            return result;
-          } catch (error) {
-            journal.set(journalKey, { __error: true, error });
-            throw error;
-          }
-        });
-      };
-
-      const executor = this.wrapWithExtensions(executeCore, {
-        kind: "execution",
-        target: {
-          type: "flow",
-          flow: config.flow,
-          definition,
-        },
-        input: config.input,
-        key: journalKey.split(":")[2],
-        context: this,
-      });
-
-      return Promised.create(executeWithCleanup(async () => await executor()));
-    }
+    const wrapped = () => executeAndWrap(unwrapped, this);
 
     return Promised.create(
-      executeWithCleanup(
-        async () =>
-          await this.executeSubflow(
-            config.flow,
-            config.input,
-            config.tags,
-            controller
-          )
-      )
+      executeWithTimeout(wrapped, config.timeout, timeoutId, controller)
     );
   }
 
@@ -562,101 +669,6 @@ class FlowContext implements Flow.Context {
     };
   }
 
-  private executeJournaledFn<T>(
-    fn: (...args: any[]) => T | Promise<T>,
-    params: any[],
-    journalKey: string,
-    flowName: string,
-    depth: number
-  ): Promised<T> {
-    const journal = this.journal! as Map<string, unknown>;
-    const { isReplay, value } = checkJournalReplay<T>(
-      journal as Map<string, T | { __error: true; error: unknown }>,
-      journalKey
-    );
-
-    if (isReplay) {
-      return Promised.create(Promise.resolve(value!));
-    }
-
-    const executeCore = (): Promised<T> => {
-      return Promised.try(async () => {
-        const result = await fn(...params);
-        journal.set(journalKey, result);
-        return result;
-      }).catch((error) => {
-        journal.set(journalKey, { __error: true, error });
-        throw error;
-      });
-    };
-
-    const executor = this.wrapWithExtensions(executeCore, {
-      kind: "execution",
-      target: {
-        type: "fn",
-        params: params.length > 0 ? params : undefined,
-      },
-      input: undefined,
-      key: journalKey.split(":")[2],
-      context: this,
-    });
-
-    return Promised.create(executor());
-  }
-
-  private executeSubflow<F extends Flow.UFlow>(
-    flow: F,
-    input: Flow.InferInput<F>,
-    tags?: Tag.Tagged[],
-    abortController?: AbortController
-  ): Promised<Flow.InferOutput<F>> {
-    const parentFlowName = this.find(flowMeta.flowName);
-    const depth = this.get(flowMeta.depth);
-
-    const executeCore = (): Promised<Flow.InferOutput<F>> => {
-      return this.scope.resolve(flow).map(async (handler) => {
-        const definition = flowDefinitionMeta.readFrom(flow);
-        if (!definition) {
-          throw new Error("Flow definition not found in executor metadata");
-        }
-
-        const childContext = new FlowContext(
-          this.scope,
-          this.extensions,
-          tags,
-          this,
-          abortController
-        );
-        childContext.initializeExecutionContext(definition.name, false);
-
-        return (await this.executeWithExtensions<Flow.InferOutput<F>>(
-          async (ctx) => handler(ctx, input) as Promise<Flow.InferOutput<F>>,
-          childContext,
-          flow,
-          input
-        )) as Flow.InferOutput<F>;
-      });
-    };
-
-    const definition = flowDefinitionMeta.readFrom(flow);
-    if (!definition) {
-      throw new Error("Flow definition not found in executor metadata");
-    }
-
-    const executor = this.wrapWithExtensions(executeCore, {
-      kind: "execution",
-      target: {
-        type: "flow",
-        flow,
-        definition,
-      },
-      input,
-      key: undefined,
-      context: this,
-    });
-
-    return Promised.create(executor());
-  }
 
   parallel<T extends readonly Promised<any>[]>(
     promises: [...T]
@@ -787,32 +799,6 @@ class FlowContext implements Flow.Context {
     }
   }
 
-  private executeWithExtensions<T>(
-    handler: (ctx: FlowContext) => Promise<T>,
-    context: FlowContext,
-    flow: Flow.UFlow,
-    input: unknown
-  ): Promised<T> {
-    const executeCore = (): Promised<T> => Promised.create(handler(context));
-    const definition = flowDefinitionMeta.readFrom(flow);
-    if (!definition) {
-      throw new Error("Flow definition not found in executor metadata");
-    }
-
-    const executor = context.wrapWithExtensions(executeCore, {
-      kind: "execution",
-      target: {
-        type: "flow",
-        flow,
-        definition,
-      },
-      input,
-      key: undefined,
-      context,
-    });
-
-    return executor();
-  }
 
   createSnapshot(): Flow.ExecutionData {
     let contextDataSnapshot: Map<unknown, unknown> | null = null;
