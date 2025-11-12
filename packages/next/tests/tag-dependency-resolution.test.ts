@@ -75,4 +75,32 @@ describe("Tag Dependency Resolution", () => {
     const result = await scope.resolve(executor);
     expect(result).toBe("123:admin");
   });
+
+  test("throws when tag has no default and value is missing", async () => {
+    const requiredTag = tag(custom<string>(), { label: "required" });
+    const scope = createScope({ tags: [] });
+
+    const executor = derive([requiredTag], ([val]) => val);
+
+    await expect(scope.resolve(executor)).rejects.toThrow();
+  });
+
+  test("throws when tags.required() used and value is missing", async () => {
+    const requiredTag = tag(custom<string>(), { label: "required" });
+    const scope = createScope({ tags: [] });
+
+    const executor = derive([tags.required(requiredTag)], ([val]) => val);
+
+    await expect(scope.resolve(executor)).rejects.toThrow();
+  });
+
+  test("returns empty array when tags.all() has no matches", async () => {
+    const myTag = tag(custom<string>(), { label: "myTag" });
+    const scope = createScope({ tags: [] });
+
+    const executor = derive([tags.all(myTag)], ([values]) => values);
+
+    const result = await scope.resolve(executor);
+    expect(result).toEqual([]);
+  });
 });
