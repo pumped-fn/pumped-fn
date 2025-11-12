@@ -54,6 +54,6 @@ describe("Tag Scope Resolution", () => {
     const userIdTag = tag(custom<string>(), { label: "userId" });
     const scope = createScope({ tags: [] });
 
-    expect(() => (scope as any).resolveTag(userIdTag)).toThrow();
+    await expect((scope as any).resolveTag(userIdTag)).rejects.toThrow();
   });
 });
