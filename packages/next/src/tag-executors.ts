@@ -37,9 +37,12 @@ export const tags: {
 export function isTag<T>(input: unknown): input is Tag.Tag<T, boolean> {
   return (
     typeof input === "function" &&
-    typeof (input as any).extractFrom === "function" &&
-    typeof (input as any).readFrom === "function" &&
-    typeof (input as any).collectFrom === "function"
+    "extractFrom" in input &&
+    typeof input.extractFrom === "function" &&
+    "readFrom" in input &&
+    typeof input.readFrom === "function" &&
+    "collectFrom" in input &&
+    typeof input.collectFrom === "function"
   );
 }
 
@@ -48,7 +51,7 @@ export function isTagExecutor<TOutput, TTag = TOutput>(input: unknown): input is
     typeof input === "object" &&
     input !== null &&
     tagSymbol in input &&
-    typeof (input as any)[tagSymbol] === "string" &&
-    ["required", "optional", "all"].includes((input as any)[tagSymbol])
+    typeof input[tagSymbol] === "string" &&
+    ["required", "optional", "all"].includes(input[tagSymbol])
   );
 }
