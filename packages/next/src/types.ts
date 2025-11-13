@@ -396,6 +396,8 @@ export declare namespace Core {
       timeout?: number;
       tags?: Tag.Tagged[];
     }): Flow.Execution<S>;
+
+    createExecution(details?: Partial<ExecutionContext.Details>): ExecutionContext.Context;
   }
 }
 

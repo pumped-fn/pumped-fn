@@ -15,6 +15,7 @@ import {
   ErrorContext,
   executorSymbol,
   type Flow,
+  type ExecutionContext,
 } from "./types";
 import { type Tag, tagSymbol } from "./tag-types";
 import { isTag, isTagExecutor } from "./tag-executors";
@@ -451,6 +452,15 @@ class BaseScope implements Core.Scope {
         this.useExtension(extension);
       }
     }
+  }
+
+  createExecution(details?: Partial<ExecutionContext.Details>): ExecutionContext.Context {
+    this["~ensureNotDisposed"]();
+    const { ExecutionContextImpl } = require("./execution-context");
+    return new ExecutionContextImpl({
+      scope: this,
+      details: details || {}
+    });
   }
 
   protected getOrCreateState(executor: UE): ExecutorState {
