@@ -3,6 +3,7 @@ import { flow } from "../src/flow";
 import { createScope } from "../src/scope";
 import { custom } from "../src/ssch";
 import { provide } from "../src/executor";
+import { tag } from "../src/tag";
 
 describe("Flow API - Creation variants", () => {
   test.each([
@@ -276,5 +277,54 @@ describe("Timeout & abort", () => {
   ])("%s aborts after timeout", async (_, execFn) => {
     const parentFlow = flow(execFn);
     await expect(flow.execute(parentFlow, undefined)).rejects.toThrow();
+  });
+});
+
+describe("Flow spread tag syntax", () => {
+  test("flow() accepts spread tags and makes them extractable", () => {
+    const t1 = tag(custom<string>(), { label: "tag1" });
+    const t2 = tag(custom<number>(), { label: "tag2" });
+    const tagged1 = t1("test");
+    const tagged2 = t2(42);
+
+    const testFlow = flow((ctx, n: number) => n * 2, tagged1, tagged2);
+
+    expect(t1.readFrom(testFlow)).toBe("test");
+    expect(t2.readFrom(testFlow)).toBe(42);
+    expect(testFlow.tags).toContain(tagged1);
+    expect(testFlow.tags).toContain(tagged2);
+  });
+
+  test("flow() with dependencies accepts spread tags", () => {
+    const t1 = tag(custom<string>(), { label: "depTag" });
+    const tagged1 = t1("dep-test");
+    const dep = provide(() => 10);
+
+    const testFlow = flow([dep], ([d], ctx, n: number) => d + n, tagged1);
+
+    expect(t1.readFrom(testFlow)).toBe("dep-test");
+    expect(testFlow.tags).toContain(tagged1);
+  });
+
+  test("flow() without tags works as before (backward compatibility)", async () => {
+    const noTagFlow = flow((ctx, n: number) => n * 3);
+    const result = await flow.execute(noTagFlow, 7);
+    expect(result).toBe(21);
+
+    const dep = provide(() => 5);
+    const depNoTagFlow = flow([dep], ([d], ctx, n: number) => d + n);
+    const result2 = await flow.execute(depNoTagFlow, 10);
+    expect(result2).toBe(15);
+  });
+
+  test("flow() throws on invalid tag in spread params", () => {
+    expect(() => {
+      flow((ctx, n: number) => n * 2, "not-a-tag" as any);
+    }).toThrow("Invalid tag: all spread parameters must be Tag.Tagged values");
+
+    const dep = provide(() => 5);
+    expect(() => {
+      flow([dep], ([d], ctx, n: number) => d + n, { invalid: "object" } as any);
+    }).toThrow("Invalid tag: all spread parameters must be Tag.Tagged values");
   });
 });
