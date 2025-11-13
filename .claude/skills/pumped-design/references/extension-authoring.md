@@ -102,6 +102,7 @@ type Operation =
       input: unknown;
       key?: string;
       context: Tag.Store;
+      executionContext?: ExecutionContext.Context;
     }
 
 type FlowTarget = { type: "flow"; flow: Flow.UFlow; definition: Flow.Definition }
@@ -118,6 +119,7 @@ type ParallelTarget = { type: "parallel"; mode: "parallel" | "parallelSettled"; 
 - Target discrimination via `target.type` ("flow" | "fn" | "parallel")
 - Named operations indicated by `key` field (for journaling/replay)
 - Context access via `context` field (Tag.Store with flowMeta tags)
+- **NEW: ExecutionContext access** via `executionContext` field (ExecutionContext.Context for nested execution)
 
 ### ExecutionContext: Standalone Primitive
 
@@ -191,21 +193,27 @@ ctx.end()
 - Tag API: `context.get(tag.key)`, `context.set(tag.key, value)` - uses symbol key
 - Direct access to tag storage without wrapper methods
 
+**Extension operation.executionContext (ExecutionContext.Context)**:
+- Available on `execution` operations for nested executions
+- Full ExecutionContext.Context interface
+- Use for creating child contexts, accessing execution hierarchy
+- Tag API: `executionContext.get(tag)`, `executionContext.set(tag, value)` - uses Tag object
+
 **API Comparison:**
 
 | API | Where | Get Tag | Set Tag | Notes |
 |-----|-------|---------|---------|-------|
-| ExecutionContext.Context | `scope.createExecution()` | `ctx.get(tag)` | `ctx.set(tag, value)` | Primitive, uses Tag objects |
+| ExecutionContext.Context | `scope.createExecution()`, `operation.executionContext` | `ctx.get(tag)` | `ctx.set(tag, value)` | Primitive, uses Tag objects |
 | Flow.Context | Flow body `ctx` parameter | `ctx.get(tag)` | `ctx.set(tag, value)` | Extends ExecutionContext, uses Tag objects |
 | Tag.Store | `operation.context` | `store.get(tag.key)` | `store.set(tag.key, value)` | Low-level, uses symbol keys |
 
-**Visual Example - Tag.Store API in Extension:**
+**Visual Example - All Three APIs:**
 
 ```typescript
 const requestIdTag = tag(custom<string>(), { label: 'request-id' })
 
 const example = extension({
-  name: 'tag-store-example',
+  name: 'multi-api-example',
   wrap: (scope, next, operation) => {
     if (operation.kind === 'execution') {
       const requestIdFromStore = operation.context.get(requestIdTag.key)
@@ -213,6 +221,16 @@ const example = extension({
 
       if (!requestIdFromStore) {
         operation.context.set(requestIdTag.key, `req-${Date.now()}`)
+      }
+
+      if (operation.executionContext) {
+        const requestIdFromExecCtx = operation.executionContext.find(requestIdTag)
+        console.log('ExecutionContext API (Tag object):', requestIdFromExecCtx)
+
+        operation.executionContext.exec('nested', (childCtx) => {
+          console.log('Child context parent:', childCtx.parent === operation.executionContext)
+          return 'result'
+        })
       }
     }
 

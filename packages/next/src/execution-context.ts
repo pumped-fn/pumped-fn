@@ -66,7 +66,8 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       target: { type: "fn" },
       input: undefined,
       key: undefined,
-      context: childCtx.tagStore
+      context: childCtx.tagStore,
+      executionContext: childCtx
     }
 
     const executeCore = (): Promised<T> => {

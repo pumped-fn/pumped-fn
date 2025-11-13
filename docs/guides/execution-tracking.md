@@ -120,6 +120,7 @@ interface FlowExecution<T> {
   abort: AbortController;                   // Cancellation control
   result: Promised<T>;                     // Execution result
   ctx: Core.Context;                       // Flow execution context
+  executionContext: ExecutionContext.Context | undefined;  // Execution context primitive
   onStatusChange(callback: StatusCallback): void;
   throwIfAborted(): void;
 }
@@ -129,6 +130,7 @@ Access execution context from FlowExecution:
 ```typescript
 const execution = scope.exec({ flow, input });
 const ctx = execution.ctx;  // Access Flow.Context (which extends ExecutionContext)
+const execCtx = execution.executionContext;  // Access ExecutionContext directly
 ```
 
 **Backward compatibility:**
@@ -172,9 +174,9 @@ const myFlow = flow(async (ctx, input) => {
 - `running` → `failed`: Flow throws error
 - `running` → `cancelled`: abort() called or timeout exceeded
 
-## Tag.Store in Extensions
+## ExecutionContext in Extensions
 
-Extensions receive Tag.Store via operation.context:
+Extensions receive ExecutionContext via ExecutionOperation, and can also access Tag.Store:
 
 ```typescript
 const logging = extension({
@@ -184,13 +186,18 @@ const logging = extension({
       const store = operation.context
       const flowName = store.get(flowMeta.flowName.key) as string | undefined
 
-      if (flowName) {
+      if (operation.executionContext) {
+        const ctx = operation.executionContext
+        console.log(`Starting ${ctx.details.name} (${ctx.id})`)
+      } else if (flowName) {
         console.log(`Starting ${flowName}`)
       }
 
       const result = await next()
 
-      if (flowName) {
+      if (operation.executionContext) {
+        console.log(`Completed ${operation.executionContext.details.name}`)
+      } else if (flowName) {
         console.log(`Completed ${flowName}`)
       }
       return result
@@ -200,7 +207,7 @@ const logging = extension({
 })
 ```
 
-This enables extensions to access execution metadata and tags via the Tag.Store interface.
+This enables extensions to access execution metadata via ExecutionContext when available, or via Tag.Store for all execution operations.
 
 ## Migration Guide
 
@@ -222,26 +229,35 @@ New capability: Access execution context from FlowExecution:
 ```typescript
 const execution = scope.exec({ flow, input })
 const ctx = execution.ctx  // Flow.Context (extends ExecutionContext)
+const execCtx = execution.executionContext  // ExecutionContext directly
 console.log(ctx.details.name, ctx.id)
 ```
 
 ### For Extension Developers
 
-Extensions receive Tag.Store via operation.context:
+ExecutionContext now available in ExecutionOperation:
 
 ```typescript
+// Both APIs available
 extension({
   wrap(scope, next, operation) {
     if (operation.kind === 'execution') {
       const store = operation.context  // Tag.Store with tag access
       const requestId = store.get(requestIdTag.key)
       console.log('Request ID:', requestId)
+
+      // Access ExecutionContext when available (nested executions)
+      if (operation.executionContext) {
+        const ctx = operation.executionContext
+        console.log(ctx.details.name, ctx.id, ctx.signal)
+      }
     }
   }
 })
 ```
 
-For execution tracking in extensions, use operation.context (Tag.Store) to access flow metadata via flowMeta tags.
+For execution tracking in extensions, use operation.context (Tag.Store) to access flow metadata via flowMeta tags, or operation.executionContext when available for nested execution tracking.
+
 
 ### For Library Developers
 

@@ -55,3 +55,15 @@ export function isTagExecutor<TOutput, TTag = TOutput>(input: unknown): input is
     ["required", "optional", "all"].includes(input[tagSymbol])
   );
 }
+
+export function isTagged(input: unknown): input is Tag.Tagged {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    tagSymbol in input &&
+    input[tagSymbol] === true &&
+    "key" in input &&
+    typeof input.key === "symbol" &&
+    "value" in input
+  );
+}

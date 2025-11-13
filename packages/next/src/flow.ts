@@ -9,6 +9,7 @@ import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay } from "./internal/journal-utils";
 import { ExecutionContextImpl } from "./execution-context";
+import { isTagged } from "./tag-executors";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -1031,6 +1032,26 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
   ) => Promise<S> | S
 ): Flow.Flow<I, S>;
 
+function flowImpl<I, S>(
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
+function flowImpl<I extends void, S>(
+  handler: (ctx?: Flow.Context) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
+function flowImpl<D extends Core.DependencyLike, I, S>(
+  dependencies: D,
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
 function flowImpl<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I>;
 
 function flowImpl<S, I>(
@@ -1061,18 +1082,43 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
         deps: Core.InferOutput<D>,
         ctx: Flow.Context,
         input: I
-      ) => Promise<S> | S),
-  third?: (
-    deps: Core.InferOutput<D>,
-    ctx: Flow.Context,
-    input: I
-  ) => Promise<S> | S
+      ) => Promise<S> | S)
+    | Tag.Tagged,
+  third?:
+    | ((
+        deps: Core.InferOutput<D>,
+        ctx: Flow.Context,
+        input: I
+      ) => Promise<S> | S)
+    | Tag.Tagged,
+  ...rest: Tag.Tagged[]
 ): Flow.Flow<I, S> | FlowDefinition<S, I> {
+  const allTags: Tag.Tagged[] = [];
+
+  const isHandlerOnly = typeof first === "function";
+  const isSingleDep = isExecutor(first);
+  const isMultiDep = typeof first === "object" && first !== null && !("input" in first && "output" in first);
+  const hasDeps = isSingleDep || isMultiDep;
+
+  if (isHandlerOnly || (hasDeps && typeof second === "function")) {
+    const tagParams = hasDeps
+      ? [third, ...rest].filter(t => t !== undefined)
+      : [second, third, ...rest].filter(t => t !== undefined);
+
+    for (const item of tagParams) {
+      if (!isTagged(item)) {
+        throw new Error("Invalid tag: expected Tag.Tagged from tag()");
+      }
+      allTags.push(item);
+    }
+  }
+
   if (typeof first === "function") {
     const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S;
     const def = define({
       input: custom<I>(),
       output: custom<S>(),
+      tags: allTags.length > 0 ? allTags : undefined,
     });
     return def.handler(handler);
   }
@@ -1092,6 +1138,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     const def = define({
       input: custom<I>(),
       output: custom<S>(),
+      tags: allTags.length > 0 ? allTags : undefined,
     });
     return def.handler(dependencies, handler);
   }
@@ -1121,7 +1168,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       }
 
       if (isExecutor(second)) {
-        if (!third) {
+        if (!third || typeof third !== "function") {
           throw new Error(
             "flow(config, deps, handler) requires handler as third argument"
           );
@@ -1160,6 +1207,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       const def = define({
         input: custom<I>(),
         output: custom<S>(),
+        tags: allTags.length > 0 ? allTags : undefined,
       });
       return def.handler(dependencies, handler);
     }
