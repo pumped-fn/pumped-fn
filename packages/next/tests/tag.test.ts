@@ -627,6 +627,85 @@ describe("Tag System", () => {
     });
   });
 
+  describe("Tag.Container Support", () => {
+    test("extractFrom works with plain container object", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const container = { tags: [testTag("value")] };
+
+      const result = testTag.extractFrom(container);
+
+      expect(result, "should extract from container").toBe("value");
+    });
+
+    test("readFrom returns undefined for empty container", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const container = { tags: [] };
+
+      const result = testTag.readFrom(container);
+
+      expect(result, "should return undefined for empty container").toBeUndefined();
+    });
+
+    test("readFrom returns default from container without tags", () => {
+      const testTag = tag(custom<string>(), { label: "test", default: "default" });
+      const container = { tags: undefined };
+
+      const result = testTag.readFrom(container);
+
+      expect(result, "should return default when tags undefined").toBe("default");
+    });
+
+    test("collectFrom returns all values from container", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const container = {
+        tags: [testTag("first"), testTag("second"), testTag("third")],
+      };
+
+      const result = testTag.collectFrom(container);
+
+      expect(result, "should collect all values").toEqual(["first", "second", "third"]);
+    });
+
+    test("collectFrom returns empty array for container with undefined tags", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const container = { tags: undefined };
+
+      const result = testTag.collectFrom(container);
+
+      expect(result, "should return empty array").toEqual([]);
+    });
+
+    test("extractFrom throws for missing value in container", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const container = { tags: [] };
+
+      expect(() => testTag.extractFrom(container), "should throw for missing value").toThrow(
+        "Value not found for key:"
+      );
+    });
+
+    test("container with mixed tags returns correct value", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const otherTag = tag(custom<number>(), { label: "other" });
+      const container = {
+        tags: [otherTag(42), testTag("found"), otherTag(99)],
+      };
+
+      const result = testTag.extractFrom(container);
+
+      expect(result, "should find correct tag in mixed container").toBe("found");
+    });
+
+    test("Scope is a valid Tag.Container", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const scope = createScope({ tags: [testTag("scope-value")] });
+
+      const result = testTag.extractFrom(scope);
+
+      expect(result, "Scope should work as Container").toBe("scope-value");
+    });
+  });
+
   describe("Edge Cases", () => {
     test("schema validation throws on invalid value", () => {
       const numberTag = tag({
