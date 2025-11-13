@@ -462,8 +462,122 @@ describe("Tag System", () => {
   });
 
   describe("Tag Executors", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    describe("tags.required", () => {
+      test("creates TagExecutor with extract mode", () => {
+        const userIdTag = tag(custom<string>(), { label: "userId" });
+        const tagExec = tags.required(userIdTag);
+
+        expect(tagExec[tagSymbol], "should have required marker").toBe("required");
+        expect(tagExec.tag, "should reference original tag").toBe(userIdTag);
+        expect(tagExec.extractionMode, "should use extract mode").toBe("extract");
+      });
+    });
+
+    describe("tags.optional", () => {
+      test("creates TagExecutor with read mode", () => {
+        const roleTag = tag(custom<string>(), { label: "role" });
+        const tagExec = tags.optional(roleTag);
+
+        expect(tagExec[tagSymbol], "should have optional marker").toBe("optional");
+        expect(tagExec.tag, "should reference original tag").toBe(roleTag);
+        expect(tagExec.extractionMode, "should use read mode").toBe("read");
+      });
+    });
+
+    describe("tags.all", () => {
+      test("creates TagExecutor with collect mode", () => {
+        const permTag = tag(custom<string>(), { label: "permission" });
+        const tagExec = tags.all(permTag);
+
+        expect(tagExec[tagSymbol], "should have all marker").toBe("all");
+        expect(tagExec.tag, "should reference original tag").toBe(permTag);
+        expect(tagExec.extractionMode, "should use collect mode").toBe("collect");
+      });
+    });
+
+    describe("Type Guards", () => {
+      test("isTag detects raw tags", () => {
+        const userIdTag = tag(custom<string>());
+
+        expect(isTag(userIdTag), "should detect tag").toBe(true);
+        expect(isTag({}), "should reject plain object").toBe(false);
+        expect(isTag(null), "should reject null").toBe(false);
+      });
+
+      test("isTagExecutor detects tag executors", () => {
+        const userIdTag = tag(custom<string>());
+        const tagExec = tags.required(userIdTag);
+
+        expect(isTagExecutor(tagExec), "should detect tag executor").toBe(true);
+        expect(isTagExecutor(userIdTag), "should reject raw tag").toBe(false);
+        expect(isTagExecutor({}), "should reject plain object").toBe(false);
+      });
+    });
+
+    describe("Scope Resolution", () => {
+      test("scope resolves raw tag with default using readFrom", async () => {
+        const roleTag = tag(custom<string>(), { label: "role", default: "user" });
+        const scope = createScope({ tags: [roleTag("admin")] });
+
+        const result = await (scope as any).resolveTag(roleTag);
+
+        expect(result, "should resolve to actual value").toBe("admin");
+      });
+
+      test("scope resolves raw tag without default using extractFrom", async () => {
+        const userIdTag = tag(custom<string>(), { label: "userId" });
+        const scope = createScope({ tags: [userIdTag("123")] });
+
+        const result = await (scope as any).resolveTag(userIdTag);
+
+        expect(result, "should extract value").toBe("123");
+      });
+
+      test("scope resolves tag executor with required mode", async () => {
+        const userIdTag = tag(custom<string>(), { label: "userId" });
+        const scope = createScope({ tags: [userIdTag("123")] });
+        const tagExec = tags.required(userIdTag);
+
+        const result = await (scope as any).resolveTagExecutor(tagExec);
+
+        expect(result, "should extract required value").toBe("123");
+      });
+
+      test("scope resolves tag executor with optional mode", async () => {
+        const roleTag = tag(custom<string>(), { label: "role", default: "user" });
+        const scope = createScope({ tags: [] });
+        const tagExec = tags.optional(roleTag);
+
+        const result = await (scope as any).resolveTagExecutor(tagExec);
+
+        expect(result, "should return default for optional").toBe("user");
+      });
+
+      test("scope resolves tag executor with all mode", async () => {
+        const permTag = tag(custom<string>(), { label: "permission" });
+        const scope = createScope({
+          tags: [permTag("read"), permTag("write"), permTag("delete")],
+        });
+        const tagExec = tags.all(permTag);
+
+        const result = await (scope as any).resolveTagExecutor(tagExec);
+
+        expect(result, "should collect all matching values").toEqual([
+          "read",
+          "write",
+          "delete",
+        ]);
+      });
+
+      test("tag without default throws when missing", async () => {
+        const userIdTag = tag(custom<string>(), { label: "userId" });
+        const scope = createScope({ tags: [] });
+
+        await expect(
+          (scope as any).resolveTag(userIdTag),
+          "should throw for missing required tag"
+        ).rejects.toThrow();
+      });
     });
   });
 
