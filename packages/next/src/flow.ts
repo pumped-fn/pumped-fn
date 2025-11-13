@@ -9,6 +9,7 @@ import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay } from "./internal/journal-utils";
 import { ExecutionContextImpl } from "./execution-context";
+import { isTagged } from "./tag-executors";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -1092,11 +1093,37 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     | Tag.Tagged,
   ...rest: Tag.Tagged[]
 ): Flow.Flow<I, S> | FlowDefinition<S, I> {
+  const allTags: Tag.Tagged[] = [];
+
+  if (typeof first === "function" && second !== undefined && typeof second !== "function" && !isExecutor(second)) {
+    if (!isTagged(second)) {
+      throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
+    }
+    allTags.push(second);
+  }
+
+  if (third !== undefined && !isExecutor(first) && typeof third !== "function") {
+    if (!isTagged(third)) {
+      throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
+    }
+    allTags.push(third);
+  }
+
+  if (rest.length > 0) {
+    for (const item of rest) {
+      if (!isTagged(item)) {
+        throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
+      }
+    }
+    allTags.push(...rest);
+  }
+
   if (typeof first === "function") {
     const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S;
     const def = define({
       input: custom<I>(),
       output: custom<S>(),
+      tags: allTags.length > 0 ? allTags : undefined,
     });
     return def.handler(handler);
   }
@@ -1116,6 +1143,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     const def = define({
       input: custom<I>(),
       output: custom<S>(),
+      tags: allTags.length > 0 ? allTags : undefined,
     });
     return def.handler(dependencies, handler);
   }
@@ -1184,6 +1212,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       const def = define({
         input: custom<I>(),
         output: custom<S>(),
+        tags: allTags.length > 0 ? allTags : undefined,
       });
       return def.handler(dependencies, handler);
     }
