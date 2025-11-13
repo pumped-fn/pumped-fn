@@ -582,8 +582,114 @@ describe("Tag System", () => {
   });
 
   describe("Derive Integration", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    test("derive resolves raw tag in array dependencies", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [userIdTag("user123")] });
+
+      const executor = derive([userIdTag], ([userId]) => {
+        return `Hello ${userId}`;
+      });
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve raw tag in array deps").toBe("Hello user123");
+    });
+
+    test("derive resolves tag executor in array dependencies", async () => {
+      const permTag = tag(custom<string>(), { label: "permission" });
+      const scope = createScope({
+        tags: [permTag("read"), permTag("write")],
+      });
+
+      const executor = derive([tags.all(permTag)], ([permissions]) => {
+        return permissions.join(",");
+      });
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve tag executor (tags.all)").toBe("read,write");
+    });
+
+    test("derive resolves multiple tags in array", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const roleTag = tag(custom<string>(), { label: "role", default: "user" });
+      const scope = createScope({ tags: [userIdTag("123")] });
+
+      const executor = derive([userIdTag, roleTag], ([userId, role]) => {
+        return { userId, role };
+      });
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve multiple tags").toEqual({ userId: "123", role: "user" });
+    });
+
+    test("derive resolves object dependencies", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const roleTag = tag(custom<string>(), { label: "role" });
+      const scope = createScope({
+        tags: [userIdTag("123"), roleTag("admin")],
+      });
+
+      const executor = derive(
+        { user: userIdTag, role: roleTag },
+        ({ user, role }) => {
+          return `${user}:${role}`;
+        }
+      );
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve object deps with named keys").toBe("123:admin");
+    });
+
+    test("derive resolves mixed executor and tag dependencies", async () => {
+      const dbExecutor = provide(() => ({ query: () => "data" }));
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [userIdTag("user123")] });
+
+      const executor = derive([dbExecutor, userIdTag], ([db, userId]) => {
+        return `${db.query()} for ${userId}`;
+      });
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve mix of executors and tags").toBe("data for user123");
+    });
+
+    test("throws when tag without default is missing", async () => {
+      const requiredTag = tag(custom<string>(), { label: "required" });
+      const scope = createScope({ tags: [] });
+
+      const executor = derive([requiredTag], ([val]) => val);
+
+      await expect(
+        scope.resolve(executor),
+        "should throw for missing required tag"
+      ).rejects.toThrow();
+    });
+
+    test("throws when tags.required() value is missing", async () => {
+      const requiredTag = tag(custom<string>(), { label: "required" });
+      const scope = createScope({ tags: [] });
+
+      const executor = derive([tags.required(requiredTag)], ([val]) => val);
+
+      await expect(
+        scope.resolve(executor),
+        "should throw for missing tags.required()"
+      ).rejects.toThrow();
+    });
+
+    test("returns empty array when tags.all() has no matches", async () => {
+      const myTag = tag(custom<string>(), { label: "myTag" });
+      const scope = createScope({ tags: [] });
+
+      const executor = derive([tags.all(myTag)], ([values]) => values);
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should return empty array for no matches").toEqual([]);
     });
   });
 
