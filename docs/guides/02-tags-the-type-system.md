@@ -76,9 +76,38 @@ const handler = flow((ctx) => {
 })
 ```
 
+## ExecutionContext
+
+Tags work with ExecutionContext primitive via `scope.createExecution()`:
+
+```ts twoslash
+import { createScope, tag, custom } from '@pumped-fn/core-next'
+
+const userId = tag(custom<string>(), { label: 'user.id' })
+const requestId = tag(custom<string>(), { label: 'request.id' })
+
+const scope = createScope()
+
+const ctx = scope.createExecution({ name: 'handle-request' })
+ctx.set(requestId, 'req-123')
+
+ctx.exec('authenticate', (childCtx) => {
+  const reqId = childCtx.get(requestId)  // Inherited from parent
+  const uid = extractUserId('token')
+  childCtx.set(userId, uid)
+  return uid
+})
+
+function extractUserId(token: string): string {
+  return 'user-123'
+}
+```
+
+Child contexts inherit parent tags. Changes in child don't affect parent.
+
 ## Flow Context
 
-Primary use case: request-scoped data.
+Flow.Context extends ExecutionContext. Primary use case: request-scoped data with flow orchestration.
 
 ```ts twoslash
 import { flow, tag, custom } from '@pumped-fn/core-next'

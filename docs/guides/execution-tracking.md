@@ -2,6 +2,36 @@
 
 Track and control flow executions with IDs, status, cancellation, and timeout.
 
+## ExecutionContext Primitive
+
+ExecutionContext is the standalone primitive for execution tracking. Create contexts directly via `scope.createExecution()`:
+
+```typescript
+const ctx = scope.createExecution({
+  name: 'my-operation',
+  metadata: { userId: '123' }
+})
+
+ctx.exec('subtask', (childCtx) => {
+  childCtx.set(userIdTag, '123')
+  return performWork()
+})
+
+ctx.end()
+```
+
+ExecutionContext provides:
+- **id**: Unique execution identifier
+- **details**: name, startedAt, completedAt, error, metadata
+- **signal**: AbortSignal for cancellation
+- **tagStore**: Type-safe tag storage with parent inheritance
+- **exec()**: Create child contexts
+- **get/set/find()**: Tag operations
+- **end()**: Mark completion
+- **throwIfAborted()**: Cancellation check
+
+Flow.Context extends ExecutionContext with Flow-specific operations (exec with flows, parallel, parallelSettled).
+
 ## FlowExecution
 
 `scope.exec()` returns FlowExecution with metadata:
@@ -84,15 +114,22 @@ Status values: 'pending', 'running', 'completed', 'failed', 'cancelled'
 **New return type:**
 ```typescript
 interface FlowExecution<T> {
-  id: string;                     // Unique UUID
-  status: ExecutionStatus;        // Current status
-  flowName: string;               // Flow identifier
-  abort: AbortController;         // Cancellation control
-  result: Promised<T>;           // Execution result
-  ctx: Core.Context;             // Execution context
+  id: string;                               // Unique UUID
+  status: ExecutionStatus;                  // Current status
+  flowName: string;                         // Flow identifier
+  abort: AbortController;                   // Cancellation control
+  result: Promised<T>;                     // Execution result
+  ctx: Core.Context;                       // Legacy execution data
+  executionContext: ExecutionContext.Context | undefined;  // Execution context primitive
   onStatusChange(callback: StatusCallback): void;
   throwIfAborted(): void;
 }
+```
+
+Access ExecutionContext from FlowExecution:
+```typescript
+const execution = scope.exec({ flow, input });
+const ctx = execution.executionContext;  // Access ExecutionContext directly
 ```
 
 **Backward compatibility:**
@@ -135,3 +172,97 @@ const myFlow = flow(async (ctx, input) => {
 - `running` → `completed`: Flow returns successfully
 - `running` → `failed`: Flow throws error
 - `running` → `cancelled`: abort() called or timeout exceeded
+
+## ExecutionContext in Extensions
+
+Extensions receive ExecutionContext via ExecutionOperation:
+
+```typescript
+const logging = extension({
+  name: 'logging',
+  wrap(scope, next, operation) {
+    if (operation.kind === 'execution' && operation.executionContext) {
+      const ctx = operation.executionContext
+      console.log(`Starting ${ctx.details.name} (${ctx.id})`)
+
+      const result = await next()
+
+      console.log(`Completed ${ctx.details.name}`)
+      return result
+    }
+    return next()
+  }
+})
+```
+
+This enables extensions to access execution metadata, tags, and signals without depending on Flow-specific APIs.
+
+## Migration Guide
+
+### For Application Developers
+
+No changes required. Flow.Context continues to work exactly as before:
+
+```typescript
+// Existing code works unchanged
+flow((ctx, input) => {
+  ctx.set(userId, '123')
+  const id = ctx.get(userId)
+  return ctx.exec(subFlow, data)
+})
+```
+
+New capability: Access ExecutionContext from FlowExecution:
+
+```typescript
+const execution = scope.exec({ flow, input })
+const ctx = execution.executionContext
+console.log(ctx.details.name, ctx.id)
+```
+
+### For Extension Developers
+
+ExecutionContext now available in ExecutionOperation:
+
+```typescript
+// Before: Only Tag.Store available
+extension({
+  wrap(scope, next, operation) {
+    if (operation.kind === 'execution') {
+      const store = operation.context  // Tag.Store only
+    }
+  }
+})
+
+// After: Full ExecutionContext access
+extension({
+  wrap(scope, next, operation) {
+    if (operation.kind === 'execution') {
+      const ctx = operation.executionContext  // ExecutionContext.Context
+      console.log(ctx.details.name, ctx.id, ctx.signal)
+    }
+  }
+})
+```
+
+### For Library Developers
+
+Use ExecutionContext directly without Flow dependency:
+
+```typescript
+// Before: Required Flow
+import { flow } from '@pumped-fn/core-next'
+flow((ctx, input) => { /* ... */ })
+
+// After: Standalone execution context
+import { createScope } from '@pumped-fn/core-next'
+const scope = createScope()
+const ctx = scope.createExecution({ name: 'task' })
+ctx.exec('step', (c) => doWork())
+```
+
+Benefits:
+- No Flow overhead for simple execution tracking
+- Direct access to execution metadata (id, details, signal)
+- Tag inheritance without Flow-specific APIs
+- Lighter dependency for libraries
