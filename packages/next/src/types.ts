@@ -630,6 +630,33 @@ export namespace Flow {
   }
 }
 
+export namespace ExecutionContext {
+  export interface Details {
+    name: string
+    startedAt: number
+    completedAt?: number
+    error?: unknown
+    metadata?: Record<string, unknown>
+  }
+
+  export interface Context<TScope extends Core.Scope = Core.Scope> {
+    readonly scope: TScope
+    readonly parent: Context<TScope> | undefined
+    readonly id: string
+    readonly tagStore: Tag.Store
+    readonly signal: AbortSignal
+    readonly details: Details
+
+    exec<T>(name: string, fn: (ctx: Context<TScope>) => T): Promised<T>
+    get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T
+    find<T>(tag: Tag.Tag<T, false>): T | undefined
+    find<T>(tag: Tag.Tag<T, true>): T
+    set<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void
+    end(): void
+    throwIfAborted(): void
+  }
+}
+
 export namespace Extension {
   export type ResolveOperation = {
     kind: "resolve";
