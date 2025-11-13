@@ -690,7 +690,6 @@ export namespace Extension {
     input: unknown;
     key?: string;
     context: Tag.Store;
-    executionContext?: ExecutionContext.Context;
   };
 
   export type Operation = ResolveOperation | ExecutionOperation;
