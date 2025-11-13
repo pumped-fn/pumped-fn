@@ -23,94 +23,48 @@ import { Promised } from '@pumped-fn/core-next'
 export const loggingExtension = extension({
   name: 'logging',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const startTime = Date.now()
-      console.log(`[FLOW START] ${operation.definition.name}`, { input: operation.input })
+      const flowName = operation.target.definition.name
+      console.log(`[FLOW START] ${flowName}`, { input: operation.input })
 
       return next()
         .then((result) => {
           const duration = Date.now() - startTime
-          console.log(`[FLOW END] ${operation.definition.name}`, { duration, result })
+          console.log(`[FLOW END] ${flowName}`, { duration, result })
           return result
         })
         .catch((error) => {
           const duration = Date.now() - startTime
-          console.error(`[FLOW ERROR] ${operation.definition.name}`, { duration, error })
+          console.error(`[FLOW ERROR] ${flowName}`, { duration, error })
           throw error
         })
-    }
-
-    if (operation.kind === 'journal') {
-      console.log(`  [STEP] ${operation.key}`)
     }
 
     return next()
   }
 })
 
-/**
- * Journal Capture Extension
- *
- * Demonstrates intercepting ctx.run() operations with parameters.
- *
- * Referenced in: extension-basics.md
- * Section: Journal Hook, Example 1
- */
-export const journalCaptureExtension = () => {
-  type JournalRecord = {
-    key: string
-    params?: readonly unknown[]
-    output?: unknown
-  }
-
-  const capturedJournalRecords: JournalRecord[] = []
-
-  return {
-    extension: extension({
-      name: "journal-capture",
-      wrap: (_scope, next, operation) => {
-        if (operation.kind === "journal") {
-          const record: JournalRecord = {
-            key: operation.key,
-            params: operation.params,
-          }
-
-          return next()
-            .then((result) => {
-              record.output = result
-              capturedJournalRecords.push(record)
-              return result
-            })
-            .catch((error) => {
-              capturedJournalRecords.push(record)
-              throw error
-            })
-        }
-        return next()
-      },
-    }),
-    capturedJournalRecords
-  }
-}
 
 /**
  * Parallel Tracker Extension
  *
  * Demonstrates intercepting ctx.parallel() and ctx.parallelSettled().
- * Note: Subflow tracking shown in comprehensiveTrackerExtension.
  *
  * Referenced in: extension-basics.md
- * Section: Parallel Hook, Subflow Hook
+ * Section: Parallel Hook
  */
 export const parallelTrackerExtension = extension({
   name: 'parallel-tracker',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'parallel') {
-      console.log(`[PARALLEL] mode=${operation.mode} count=${operation.promiseCount}`)
+    if (operation.kind === 'execution' && operation.target.type === 'parallel') {
+      const mode = operation.target.mode
+      const count = operation.target.count
+      console.log(`[PARALLEL] mode=${mode} count=${count}`)
 
       return next()
         .then((result) => {
-          console.log(`[PARALLEL COMPLETE] ${operation.promiseCount} promises resolved`)
+          console.log(`[PARALLEL COMPLETE] ${count} promises resolved`)
           return result
         })
     }
@@ -132,7 +86,6 @@ export const comprehensiveTrackerExtension = () => {
   type OperationRecord = {
     kind: string
     flowName?: string
-    journalKey?: string
     input?: unknown
     output?: unknown
     error?: unknown
@@ -148,17 +101,14 @@ export const comprehensiveTrackerExtension = () => {
       wrap: (_scope, next, operation) => {
         const record: OperationRecord = { kind: operation.kind }
 
-        if (operation.kind === "execute") {
-          record.flowName = operation.definition.name
-          record.input = operation.input
-        } else if (operation.kind === "journal") {
-          record.journalKey = operation.key
-        } else if (operation.kind === "subflow") {
-          record.flowName = operation.definition.name
-          record.input = operation.input
-        } else if (operation.kind === "parallel") {
-          record.parallelMode = operation.mode
-          record.promiseCount = operation.promiseCount
+        if (operation.kind === "execution") {
+          if (operation.target.type === "flow") {
+            record.flowName = operation.target.definition.name
+            record.input = operation.input
+          } else if (operation.target.type === "parallel") {
+            record.parallelMode = operation.target.mode
+            record.promiseCount = operation.target.count
+          }
         }
 
         return next()
@@ -189,25 +139,22 @@ export const comprehensiveTrackerExtension = () => {
 export const tracingExtension = extension({
   name: 'tracing',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const traceId = Math.random().toString(36).slice(2)
       const spanId = Math.random().toString(36).slice(2)
+      const flowName = operation.target.definition.name
 
-      console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=start`)
+      console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${flowName} phase=start`)
 
       return next()
         .then((result) => {
-          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=end`)
+          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${flowName} phase=end`)
           return result
         })
         .catch((error) => {
-          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${operation.definition.name} phase=error error=${error}`)
+          console.log(`[TRACE] trace_id=${traceId} span_id=${spanId} flow=${flowName} phase=error error=${error}`)
           throw error
         })
-    }
-
-    if (operation.kind === 'journal') {
-      console.log(`[TRACE] operation=${operation.key}`)
     }
 
     return next()
@@ -225,10 +172,11 @@ export const tracingExtension = extension({
 export const errorTrackingExtension = extension({
   name: 'error-tracking',
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
+      const flowName = operation.target.definition.name
       return next()
         .catch((error) => {
-          console.error(`[ERROR TRACKING] Flow: ${operation.definition.name}`, {
+          console.error(`[ERROR TRACKING] Flow: ${flowName}`, {
             error: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
             timestamp: new Date().toISOString()
@@ -281,12 +229,12 @@ export const correlationExtension = extension({
       return next()
     }
 
-    if (operation.kind === 'execute') {
+    if (operation.kind === 'execution' && operation.target.type === 'flow') {
       const correlationId = `corr-${crypto.randomUUID()}`
 
       store.activeRequests.set(correlationId, {
         startTime: Date.now(),
-        flowName: operation.definition.name
+        flowName: operation.target.definition.name
       })
 
       return next()
@@ -351,12 +299,12 @@ export const rateLimiterExtension = (config: RateLimitConfig) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind !== 'execute') return next()
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') return next()
 
     const store = rateLimitStateMap.get(scope)
     if (!store) return next()
 
-    const flowKey = operation.definition.name
+    const flowKey = operation.target.definition.name
     const now = Date.now()
     const requests = store.requests.get(flowKey) || []
 
@@ -408,16 +356,16 @@ export const apmExtension = (client: APMClient) => extension({
   },
 
   wrap: (scope, next, operation) => {
-    if (operation.kind !== 'execute') return next()
+    if (operation.kind !== 'execution' || operation.target.type !== 'flow') return next()
 
     const store = apmStateMap.get(scope)
     if (!store) return next()
 
-    const transactionId = `${operation.definition.name}-${Date.now()}`
+    const transactionId = `${operation.target.definition.name}-${Date.now()}`
 
     let transaction: APMTransaction | undefined
     try {
-      transaction = store.client.startTransaction(operation.definition.name)
+      transaction = store.client.startTransaction(operation.target.definition.name)
       store.activeTransactions.set(transactionId, transaction)
     } catch (error) {
       console.error('[apm] Failed to start transaction:', error)
@@ -470,7 +418,7 @@ export const tenantIsolationExtension = extension({
   name: 'tenant-isolation',
 
   wrap: (scope, next, operation) => {
-    if (operation.kind === 'journal' || operation.kind === 'subflow') {
+    if (operation.kind === 'execution') {
       const tenantId = operation.context.get(tenantIdTag.key) as string | undefined
 
       if (!tenantId) {
@@ -481,7 +429,7 @@ export const tenantIsolationExtension = extension({
         return Promise.reject(new Error(`Invalid tenant ID format: ${tenantId}`))
       }
 
-      const flowName = operation.kind === 'subflow' ? operation.definition.name : 'journal'
+      const flowName = operation.target.type === 'flow' ? operation.target.definition.name : 'execution'
       console.log(`[tenant] ${tenantId} executing ${flowName}`)
     }
 
