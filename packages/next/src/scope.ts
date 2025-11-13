@@ -1228,7 +1228,7 @@ class BaseScope implements Core.Scope {
 
       if (executionTags) {
         executionTags.forEach(tagged => {
-          executionContext.set(tagged as any, tagged.value);
+          executionContext.tagStore.set(tagged.key, tagged.value);
         });
       }
 
