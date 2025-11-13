@@ -415,8 +415,49 @@ describe("Tag System", () => {
   });
 
   describe("injectTo", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    test("mutates Map (Tag.Store)", () => {
+      const emailTag = tag(custom<string>(), { label: "email" });
+      const store = new Map<symbol, unknown>();
+
+      emailTag.injectTo(store, "test@example.com");
+
+      expect(store.has(emailTag.key), "should set value in store").toBe(true);
+      expect(emailTag.extractFrom(store), "should be retrievable").toBe("test@example.com");
+    });
+
+    test("validates value via schema", () => {
+      const numberTag = tag(
+        {
+          "~standard": {
+            vendor: "test",
+            version: 1,
+            validate(value) {
+              if (typeof value !== "number") {
+                return { success: false, issues: [{ message: "Expected number" }] };
+              }
+              return { success: true, value };
+            },
+          },
+        },
+        { label: "validated-number" }
+      );
+      const store = new Map<symbol, unknown>();
+
+      expect(
+        () => numberTag.injectTo(store, "invalid" as unknown as number),
+        "should throw on schema validation failure"
+      ).toThrow();
+    });
+
+    test("overwrites existing value", () => {
+      const portTag = tag(custom<number>(), { label: "port" });
+      const store = new Map<symbol, unknown>();
+
+      portTag.injectTo(store, 3000);
+      expect(portTag.extractFrom(store)).toBe(3000);
+
+      portTag.injectTo(store, 8080);
+      expect(portTag.extractFrom(store), "should overwrite previous value").toBe(8080);
     });
   });
 
