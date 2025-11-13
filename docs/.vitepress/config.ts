@@ -9,6 +9,7 @@ export default withMermaid(defineConfig({
     base: "/pumped-fn/",
     srcExclude: ["**/plans/**"],
     ignoreDeadLinks: false,
+    metaChunk: true,
 
     head: [
       ["link", { rel: "icon", href: "/pumped-fn/favicon.ico" }],
@@ -128,5 +129,9 @@ export default withMermaid(defineConfig({
       ],
     },
 
-    vite: {},
+    vite: {
+      build: {
+        chunkSizeWarningLimit: 1500,
+      }
+    },
   }));
