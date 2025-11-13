@@ -65,6 +65,7 @@ export default withMermaid(defineConfig({
             { text: "Reactive Patterns", link: "/guides/08-reactive-patterns" },
             { text: "Extensions", link: "/guides/09-extensions" },
             { text: "Error Handling", link: "/guides/10-error-handling" },
+            { text: "Troubleshooting", link: "/guides/troubleshooting" },
           ],
         },
         {
@@ -74,6 +75,15 @@ export default withMermaid(defineConfig({
             { text: "Database Transactions", link: "/patterns/database-transactions" },
             { text: "Testing Strategies", link: "/patterns/testing-strategies" },
             { text: "Middleware Composition", link: "/patterns/middleware-composition" },
+          ],
+        },
+        {
+          text: "Diagrams",
+          items: [
+            { text: "Flow Lifecycle", link: "/diagrams/scenarios/01-flow-lifecycle-happy-path" },
+            { text: "Error Propagation", link: "/diagrams/scenarios/02-error-propagation" },
+            { text: "Parallel Execution", link: "/diagrams/scenarios/03-parallel-execution-order" },
+            { text: "Error Tracing", link: "/diagrams/scenarios/04-error-tracing-root-cause" },
           ],
         },
         {
