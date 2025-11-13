@@ -25,6 +25,7 @@ import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./fl
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
+import { ExecutionContextImpl } from "./execution-context";
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;
@@ -456,7 +457,6 @@ class BaseScope implements Core.Scope {
 
   createExecution(details?: Partial<ExecutionContext.Details>): ExecutionContext.Context {
     this["~ensureNotDisposed"]();
-    const { ExecutionContextImpl } = require("./execution-context");
     return new ExecutionContextImpl({
       scope: this,
       details: details || {}
