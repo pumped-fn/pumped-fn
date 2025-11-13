@@ -1031,6 +1031,26 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
   ) => Promise<S> | S
 ): Flow.Flow<I, S>;
 
+function flowImpl<I, S>(
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
+function flowImpl<I extends void, S>(
+  handler: (ctx?: Flow.Context) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
+function flowImpl<D extends Core.DependencyLike, I, S>(
+  dependencies: D,
+  handler: (
+    deps: Core.InferOutput<D>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S,
+  ...tags: Tag.Tagged[]
+): Flow.Flow<I, S>;
+
 function flowImpl<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I>;
 
 function flowImpl<S, I>(
@@ -1061,12 +1081,16 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
         deps: Core.InferOutput<D>,
         ctx: Flow.Context,
         input: I
-      ) => Promise<S> | S),
-  third?: (
-    deps: Core.InferOutput<D>,
-    ctx: Flow.Context,
-    input: I
-  ) => Promise<S> | S
+      ) => Promise<S> | S)
+    | Tag.Tagged,
+  third?:
+    | ((
+        deps: Core.InferOutput<D>,
+        ctx: Flow.Context,
+        input: I
+      ) => Promise<S> | S)
+    | Tag.Tagged,
+  ...rest: Tag.Tagged[]
 ): Flow.Flow<I, S> | FlowDefinition<S, I> {
   if (typeof first === "function") {
     const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S;
@@ -1121,7 +1145,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       }
 
       if (isExecutor(second)) {
-        if (!third) {
+        if (!third || typeof third !== "function") {
           throw new Error(
             "flow(config, deps, handler) requires handler as third argument"
           );
