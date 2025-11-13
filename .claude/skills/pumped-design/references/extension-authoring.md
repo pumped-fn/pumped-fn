@@ -102,6 +102,7 @@ type Operation =
       input: unknown;
       key?: string;
       context: Tag.Store;
+      executionContext?: ExecutionContext.Context;
     }
 
 type FlowTarget = { type: "flow"; flow: Flow.UFlow; definition: Flow.Definition }
@@ -118,33 +119,115 @@ type ParallelTarget = { type: "parallel"; mode: "parallel" | "parallelSettled"; 
 - Target discrimination via `target.type` ("flow" | "fn" | "parallel")
 - Named operations indicated by `key` field (for journaling/replay)
 - Context access via `context` field (Tag.Store with flowMeta tags)
+- **NEW: ExecutionContext access** via `executionContext` field (ExecutionContext.Context for nested execution)
 
-### Context vs Scope
+### ExecutionContext: Standalone Primitive
 
-**Flow Context (`ctx` in flow body):**
-- Available only inside flow execution
-- Methods: `run()`, `exec()`, `parallel()`, `get()`, `set()`
+**ExecutionContext** is the core execution primitive in pumped-fn:
+- Can be created directly via `scope.createExecution()`
+- Used independently without flows
+- Powers Flow.Context internally
+- Provides execution hierarchy, tag inheritance, abort signals
+
+```typescript
+namespace ExecutionContext {
+  interface Details {
+    name: string
+    startedAt: number
+    completedAt?: number
+    error?: unknown
+    metadata?: Record<string, unknown>
+  }
+
+  interface Context {
+    readonly scope: Scope
+    readonly parent: Context | undefined
+    readonly id: string
+    readonly tagStore: Tag.Store
+    readonly signal: AbortSignal
+    readonly details: Details
+
+    exec<T>(name: string, fn: (ctx: Context) => T): Promised<T>
+    get<T>(tag: Tag.Tag<T>): T
+    find<T>(tag: Tag.Tag<T>): T | undefined
+    set<T>(tag: Tag.Tag<T>, value: T): void
+    end(): void
+    throwIfAborted(): void
+  }
+}
+```
+
+**Creating ExecutionContext:**
+```typescript
+const scope = createScope()
+const ctx = scope.createExecution({ name: 'my-operation' })
+
+ctx.exec('step1', async (childCtx) => {
+  childCtx.set(someTag, 'value')
+  return await doWork()
+})
+
+ctx.end()
+```
+
+### Context Hierarchy: ExecutionContext → Flow.Context
+
+**ExecutionContext.Context** (primitive):
+- Core execution context interface
+- Created via `scope.createExecution()`
+- Methods: `exec()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`
 - Tag API: `ctx.get(tag)`, `ctx.set(tag, value)` - uses Tag object
+- Used for any execution, not just flows
 
-**Extension operation.context (Tag.Store):**
+**Flow.Context** (extension of ExecutionContext):
+- Extends ExecutionContext.Context with flow-specific operations
+- Created automatically by flow execution
+- Additional methods: `run()`, `parallel()`, `parallelSettled()`, `resetJournal()`
+- Overloaded `exec()` for flow/fn execution with retry/timeout options
+- Tag API: same as ExecutionContext, `ctx.get(tag)`, `ctx.set(tag, value)`
+
+**Extension operation.context (Tag.Store)**:
+- Low-level tag storage interface
 - Available on all `execution` operations (kind: "execution")
 - Methods: `get(key)`, `set(key, value)`
 - Tag API: `context.get(tag.key)`, `context.set(tag.key, value)` - uses symbol key
+- Direct access to tag storage without wrapper methods
 
-**Rule:** Flow ctx uses Tag objects, extension context uses symbol keys.
+**Extension operation.executionContext (ExecutionContext.Context)**:
+- Available on `execution` operations for nested executions
+- Full ExecutionContext.Context interface
+- Use for creating child contexts, accessing execution hierarchy
+- Tag API: `executionContext.get(tag)`, `executionContext.set(tag, value)` - uses Tag object
 
-**Visual Example - Both APIs in Same Extension:**
+**API Comparison:**
+
+| API | Where | Get Tag | Set Tag | Notes |
+|-----|-------|---------|---------|-------|
+| ExecutionContext.Context | `scope.createExecution()`, `operation.executionContext` | `ctx.get(tag)` | `ctx.set(tag, value)` | Primitive, uses Tag objects |
+| Flow.Context | Flow body `ctx` parameter | `ctx.get(tag)` | `ctx.set(tag, value)` | Extends ExecutionContext, uses Tag objects |
+| Tag.Store | `operation.context` | `store.get(tag.key)` | `store.set(tag.key, value)` | Low-level, uses symbol keys |
+
+**Visual Example - All Three APIs in Same Extension:**
 
 ```typescript
 const requestIdTag = tag(custom<string>(), { label: 'request-id' })
 
 const example = extension({
-  name: 'dual-api-example',
+  name: 'multi-api-example',
   wrap: (scope, next, operation) => {
     if (operation.kind === 'execution') {
-      const requestIdFromContext = operation.context.get(requestIdTag.key)
+      const requestIdFromStore = operation.context.get(requestIdTag.key)
+      console.log('Tag.Store API (symbol key):', requestIdFromStore)
 
-      console.log('Extension context API:', requestIdFromContext)
+      if (operation.executionContext) {
+        const requestIdFromExecCtx = operation.executionContext.find(requestIdTag)
+        console.log('ExecutionContext API (Tag object):', requestIdFromExecCtx)
+
+        operation.executionContext.exec('nested', (childCtx) => {
+          console.log('Child context parent:', childCtx.parent === operation.executionContext)
+          return 'result'
+        })
+      }
     }
 
     return next()
