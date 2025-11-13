@@ -6,8 +6,6 @@ export const createStateAggregator = () => {
   const snapshot: State.Snapshot = {
     executors: new Map(),
     flows: new Map(),
-    journals: new Map(),
-    subflows: new Map(),
     parallelBatches: new Map(),
     updates: []
   }
@@ -29,54 +27,30 @@ export const createStateAggregator = () => {
       notify()
     }
 
-    if (msg.operation.kind === "execute") {
-      const flowId = msg.operation.flowName || `flow-${msg.timestamp}`
-      snapshot.flows.set(flowId, {
-        id: flowId,
-        name: msg.operation.definition.name,
-        startedAt: msg.timestamp,
-        depth: msg.operation.depth,
-        children: []
-      })
-      notify()
-    }
+    if (msg.operation.kind === "execution") {
+      if (msg.operation.target.type === "flow") {
+        const flowId = msg.operation.key || `flow-${msg.timestamp}`
+        snapshot.flows.set(flowId, {
+          id: flowId,
+          name: msg.operation.target.definition.name,
+          startedAt: msg.timestamp,
+          depth: 0,
+          children: []
+        })
+        notify()
+      }
 
-    if (msg.operation.kind === "journal") {
-      const journalId = `${msg.operation.flowName}:${msg.operation.key}`
-      snapshot.journals.set(journalId, {
-        key: msg.operation.key,
-        flowName: msg.operation.flowName,
-        depth: msg.operation.depth,
-        isReplay: msg.operation.isReplay,
-        timestamp: msg.timestamp
-      })
-      notify()
-    }
-
-    if (msg.operation.kind === "subflow") {
-      const subflowId = `subflow-${msg.timestamp}`
-      snapshot.subflows.set(subflowId, {
-        id: subflowId,
-        name: msg.operation.definition.name,
-        parentFlowName: msg.operation.parentFlowName,
-        depth: msg.operation.depth,
-        journalKey: msg.operation.journalKey,
-        startedAt: msg.timestamp
-      })
-      notify()
-    }
-
-    if (msg.operation.kind === "parallel") {
-      const parallelId = `parallel-${msg.timestamp}`
-      snapshot.parallelBatches.set(parallelId, {
-        id: parallelId,
-        mode: msg.operation.mode,
-        promiseCount: msg.operation.promiseCount,
-        depth: msg.operation.depth,
-        parentFlowName: msg.operation.parentFlowName,
-        startedAt: msg.timestamp
-      })
-      notify()
+      if (msg.operation.target.type === "parallel") {
+        const parallelId = `parallel-${msg.timestamp}`
+        snapshot.parallelBatches.set(parallelId, {
+          id: parallelId,
+          mode: msg.operation.target.mode,
+          promiseCount: msg.operation.target.count,
+          depth: 0,
+          startedAt: msg.timestamp
+        })
+        notify()
+      }
     }
   }
 

@@ -119,16 +119,14 @@ executor.tags = [tag1, tag2, flowDefinitionMeta]
 
 ## Testing
 
-Single test confirms tags attached and extractable:
+Single test confirms tags attached:
 ```typescript
 test('flow() accepts spread tags', () => {
   const t1 = tag(custom<string>(), { label: 't1' })
   const t2 = tag(custom<number>(), { label: 't2' })
-
   const f = flow(() => 'x', t1('a'), t2(1))
-
-  expect(t1.readFrom(f)).toBe('a')
-  expect(t2.readFrom(f)).toBe(1)
+  expect(f.tags).toContain(t1('a'))
+  expect(f.tags).toContain(t2(1))
 })
 ```
 
@@ -156,5 +154,5 @@ Existing flow tests verify backward compatibility.
 1. TypeScript compiles without errors
 2. All existing tests pass
 3. New test confirms tags attached via spread syntax
-4. Tags extractable via `myTag.readFrom(executor)`
+4. Tags extractable via `ctx.get(tag)` in flow execution
 5. `provide()/derive()/flow()` have consistent tag API

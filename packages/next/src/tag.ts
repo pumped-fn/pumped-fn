@@ -53,7 +53,7 @@ function extract<T>(
 
   let cache = tagCacheMap.get(source);
   if (!cache) {
-    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
+    const tags = Array.isArray(source) ? source : isContainer(source) ? (source.tags ?? []) : [];
     cache = buildTagCache(tags);
     tagCacheMap.set(source, cache);
   }
@@ -74,7 +74,7 @@ function collect<T>(
 
   let cache = tagCacheMap.get(source);
   if (!cache) {
-    const tags = Array.isArray(source) ? source : ((source as any).tags ?? []);
+    const tags = Array.isArray(source) ? source : isContainer(source) ? (source.tags ?? []) : [];
     cache = buildTagCache(tags);
     tagCacheMap.set(source, cache);
   }
