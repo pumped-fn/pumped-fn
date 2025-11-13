@@ -1095,27 +1095,22 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
 ): Flow.Flow<I, S> | FlowDefinition<S, I> {
   const allTags: Tag.Tagged[] = [];
 
-  if (typeof first === "function" && second !== undefined && typeof second !== "function" && !isExecutor(second)) {
-    if (!isTagged(second)) {
-      throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
-    }
-    allTags.push(second);
-  }
+  const isHandlerOnly = typeof first === "function";
+  const isSingleDep = isExecutor(first);
+  const isMultiDep = typeof first === "object" && first !== null && !("input" in first && "output" in first);
+  const hasDeps = isSingleDep || isMultiDep;
 
-  if (third !== undefined && !isExecutor(first) && typeof third !== "function") {
-    if (!isTagged(third)) {
-      throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
-    }
-    allTags.push(third);
-  }
+  if (isHandlerOnly || (hasDeps && typeof second === "function")) {
+    const tagParams = hasDeps
+      ? [third, ...rest].filter(t => t !== undefined)
+      : [second, third, ...rest].filter(t => t !== undefined);
 
-  if (rest.length > 0) {
-    for (const item of rest) {
+    for (const item of tagParams) {
       if (!isTagged(item)) {
-        throw new Error("Invalid tag: all spread parameters must be Tag.Tagged values created via tag()");
+        throw new Error("Invalid tag: expected Tag.Tagged from tag()");
       }
+      allTags.push(item);
     }
-    allTags.push(...rest);
   }
 
   if (typeof first === "function") {

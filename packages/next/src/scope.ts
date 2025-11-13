@@ -1187,7 +1187,6 @@ class BaseScope implements Core.Scope {
       abort: abortController,
       result: flowPromise,
       ctx: null,
-      executionContext: undefined,
       statusTracking,
     });
 
@@ -1221,17 +1220,6 @@ class BaseScope implements Core.Scope {
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      const executionContext = this.createExecution({
-        name: definition.name,
-        startedAt: Date.now()
-      });
-
-      if (executionTags) {
-        executionTags.forEach(tagged => {
-          executionContext.tagStore.set(tagged.key, tagged.value);
-        });
-      }
-
       const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
       context.initializeExecutionContext(definition.name, false);
 
@@ -1260,18 +1248,14 @@ class BaseScope implements Core.Scope {
             input,
             key: undefined,
             context,
-            executionContext,
           }
         );
 
         const result = await executor();
-        executionContext.end();
         context.end();
         resolveSnapshot(context.createSnapshot());
         return result;
       } catch (error) {
-        executionContext.details.error = error;
-        executionContext.end();
         context.details.error = error;
         context.end();
         resolveSnapshot(context.createSnapshot());

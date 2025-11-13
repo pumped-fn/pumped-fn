@@ -320,11 +320,36 @@ describe("Flow spread tag syntax", () => {
   test("flow() throws on invalid tag in spread params", () => {
     expect(() => {
       flow((ctx, n: number) => n * 2, "not-a-tag" as any);
-    }).toThrow("Invalid tag: all spread parameters must be Tag.Tagged values");
+    }).toThrow("Invalid tag: expected Tag.Tagged from tag()");
 
     const dep = provide(() => 5);
     expect(() => {
       flow([dep], ([d], ctx, n: number) => d + n, { invalid: "object" } as any);
-    }).toThrow("Invalid tag: all spread parameters must be Tag.Tagged values");
+    }).toThrow("Invalid tag: expected Tag.Tagged from tag()");
+  });
+
+  test("flow() handles multiple tags with same key (first value wins)", () => {
+    const t1 = tag(custom<string>(), { label: "duplicateKey" });
+    const tagged1 = t1("first-value");
+    const tagged2 = t1("second-value");
+
+    const testFlow = flow((ctx, n: number) => n * 2, tagged1, tagged2);
+
+    expect(t1.readFrom(testFlow)).toBe("first-value");
+    expect(testFlow.tags?.filter(t => t.key === t1.key).length).toBe(2);
+  });
+
+  test("flow() config form uses tags array, not spread syntax", () => {
+    const t1 = tag(custom<string>(), { label: "configTag" });
+    const tagged1 = t1("config-value");
+
+    const testFlow = flow({
+      input: custom<number>(),
+      output: custom<number>(),
+      tags: [tagged1],
+    }, (ctx, n: number) => n * 2);
+
+    expect(t1.readFrom(testFlow)).toBe("config-value");
+    expect(testFlow.tags).toContain(tagged1);
   });
 });
