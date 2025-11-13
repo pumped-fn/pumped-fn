@@ -1,5 +1,5 @@
 import { Promised } from "./promises";
-import { type Flow, type Core } from "./types";
+import { type Flow, type Core, type ExecutionContext } from "./types";
 
 type StatusCallback<T> = (
   status: Flow.ExecutionStatus,

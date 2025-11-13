@@ -269,18 +269,17 @@ export declare namespace Core {
       }
     : never;
 
-  export type InferOutput<T> =
-    T extends Tag.TagExecutor<infer U, any>
-      ? U
-      : T extends Tag.Tag<infer U, any>
-        ? U
-        : T extends Executor<infer U> | Reactive<infer U>
-          ? Awaited<U>
-          : T extends Lazy<infer U> | Static<infer U>
-            ? Accessor<Awaited<U>>
-            : T extends ReadonlyArray<any> | Record<string, any>
-              ? { [K in keyof T]: InferOutput<T[K]> }
-              : never;
+  export type InferOutput<T> = T extends Tag.TagExecutor<infer U, any>
+    ? U
+    : T extends Tag.Tag<infer U, any>
+    ? U
+    : T extends Executor<infer U> | Reactive<infer U>
+    ? Awaited<U>
+    : T extends Lazy<infer U> | Static<infer U>
+    ? Accessor<Awaited<U>>
+    : T extends ReadonlyArray<any> | Record<string, any>
+    ? { [K in keyof T]: InferOutput<T[K]> }
+    : never;
 
   export type Event = "resolve" | "update" | "release";
   export type Replacer = Preset<unknown>;
@@ -323,8 +322,13 @@ export declare namespace Core {
     | Tag.TagExecutor<any, any>;
 
   export type MultiDependencyLike =
-    | ReadonlyArray<UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>
-    | Record<string, UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>>;
+    | ReadonlyArray<
+        UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>
+      >
+    | Record<
+        string,
+        UExecutor | Tag.Tag<any, boolean> | Tag.TagExecutor<any, any>
+      >;
 
   export type DependencyLike = SingleDependencyLike | MultiDependencyLike;
   export type Destructed<T extends DependencyLike> =
@@ -396,6 +400,10 @@ export declare namespace Core {
       timeout?: number;
       tags?: Tag.Tagged[];
     }): Flow.Execution<S>;
+
+    createExecution(
+      details?: Partial<ExecutionContext.Details>
+    ): ExecutionContext.Context;
   }
 }
 
@@ -511,17 +519,12 @@ export namespace Flow {
     onItemComplete?: (result: any, index: number) => void;
   };
 
-  export type C = {
+  export type Context = C;
+
+  export type C = ExecutionContext.Context & {
     readonly scope: Core.Scope;
     readonly tags: Tag.Tagged[] | undefined;
     readonly signal: AbortSignal;
-
-    throwIfAborted(): void;
-
-    get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
-    find<T>(accessor: Tag.Tag<T, false>): T | undefined;
-    find<T>(accessor: Tag.Tag<T, true>): T;
-    set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
 
     exec<F extends UFlow>(
       flow: F,
@@ -580,8 +583,6 @@ export namespace Flow {
     resetJournal(keyPattern?: string): void;
   };
 
-  export type Context = C;
-
   export type ExecutionData = {
     readonly context: {
       get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
@@ -627,6 +628,33 @@ export namespace Flow {
         | null
         | undefined
     ): PromiseLike<TResult1 | TResult2>;
+  }
+}
+
+export namespace ExecutionContext {
+  export interface Details {
+    name: string;
+    startedAt: number;
+    completedAt?: number;
+    error?: unknown;
+    metadata?: Record<string, unknown>;
+  }
+
+  export interface Context {
+    readonly scope: Core.Scope;
+    readonly parent: Context | undefined;
+    readonly id: string;
+    readonly tagStore: Tag.Store;
+    readonly signal: AbortSignal;
+    readonly details: Details;
+
+    exec<T>(name: string, fn: (ctx: Context) => T): Promised<T>;
+    get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
+    find<T>(tag: Tag.Tag<T, false>): T | undefined;
+    find<T>(tag: Tag.Tag<T, true>): T;
+    set<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
+    end(): void;
+    throwIfAborted(): void;
   }
 }
 

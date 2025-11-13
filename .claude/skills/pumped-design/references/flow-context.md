@@ -6,6 +6,14 @@ description: Flow execution context operations - ctx.run() for journaled operati
 
 # Flow: Context Operations
 
+## Architecture Note
+
+**Flow.Context** extends **ExecutionContext.Context**, the standalone execution primitive:
+- ExecutionContext provides: `exec()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`, tag inheritance, abort signals
+- Flow.Context adds: `run()` (journaling), `parallel()`, `parallelSettled()`, `resetJournal()`, overloaded `exec()` with retry/timeout
+- For direct ExecutionContext usage (without flows), use `scope.createExecution()`
+- See extension-authoring.md for ExecutionContext API details
+
 ## When to Use
 
 Use context operations (`ctx`) when:

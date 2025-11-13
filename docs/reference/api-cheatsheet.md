@@ -8,19 +8,20 @@ keywords: [api, reference, cheatsheet]
 
 ## Quick Start: Which API Do I Need?
 
-| I need to...                    | Use this API      | Signature                    |
-|---------------------------------|-------------------|------------------------------|
-| Create value (no dependencies)  | `provide()`       | `() => T`                    |
-| Create value (with dependencies)| `derive()`        | `(deps) => T`                |
-| Manage resource lifecycle       | `createScope()`   | `{ tags, presets, ext }`     |
-| Handle request/task/job         | `flow()`          | `(ctx, args) => result`      |
-| Pass type-safe runtime data     | `tag()`           | `get()/set()/find()`         |
-| Mock dependencies in tests      | `preset()`        | `(executor, mockValue)`      |
-| Dynamic resource pools          | `multi.provide()` | `(key) => executor`          |
-| Add logging/tracing             | `extension()`     | `wrap(scope, next, op)`      |
-| Lazy composition/error handling | `Promised`        | `.map()/.switch()/.catch()`  |
+| I need to...                    | Use this API            | Signature                    |
+|---------------------------------|-------------------------|------------------------------|
+| Create value (no dependencies)  | `provide()`             | `() => T`                    |
+| Create value (with dependencies)| `derive()`              | `(deps) => T`                |
+| Manage resource lifecycle       | `createScope()`         | `{ tags, presets, ext }`     |
+| Track execution context         | `scope.createExecution()` | `{ name, metadata }`       |
+| Handle request/task/job         | `flow()`                | `(ctx, args) => result`      |
+| Pass type-safe runtime data     | `tag()`                 | `get()/set()/find()`         |
+| Mock dependencies in tests      | `preset()`              | `(executor, mockValue)`      |
+| Dynamic resource pools          | `multi.provide()`       | `(key) => executor`          |
+| Add logging/tracing             | `extension()`           | `wrap(scope, next, op)`      |
+| Lazy composition/error handling | `Promised`              | `.map()/.switch()/.catch()`  |
 
-**Jump to:** [provide](#provide) · [derive](#derive) · [createScope](#createscope) · [flow](#flow) · [tag](#tag) · [preset](#preset) · [Promised](#promised) · [extension](#extension) · [multi](#multi-executors) · [Patterns](#common-patterns)
+**Jump to:** [provide](#provide) · [derive](#derive) · [createScope](#createscope) · [ExecutionContext](#executioncontext) · [flow](#flow) · [tag](#tag) · [preset](#preset) · [Promised](#promised) · [extension](#extension) · [multi](#multi-executors) · [Patterns](#common-patterns)
 
 ---
 
@@ -119,6 +120,87 @@ const service = await promised
 ```typescript
 // Cleanup all resources
 await scope.dispose()
+```
+
+### scope.createExecution()
+```typescript
+// Create standalone execution context
+const ctx = scope.createExecution({
+  name: 'my-operation',
+  metadata: { userId: '123' }
+})
+
+// Create child context
+ctx.exec('subtask', (childCtx) => {
+  childCtx.set(userIdTag, '123')
+  return performWork()
+})
+
+// Mark completion
+ctx.end()
+```
+
+## ExecutionContext
+
+Standalone primitive for execution tracking independent of Flow.
+
+### ExecutionContext.Context
+```typescript
+interface ExecutionContext.Context {
+  readonly scope: Core.Scope
+  readonly parent: ExecutionContext.Context | undefined
+  readonly id: string
+  readonly tagStore: Tag.Store
+  readonly signal: AbortSignal
+  readonly details: Details
+
+  exec<T>(name: string, fn: (ctx: Context) => T): Promised<T>
+  get<T>(tag: Tag.Tag<T>): T
+  find<T>(tag: Tag.Tag<T>): T | undefined
+  set<T>(tag: Tag.Tag<T>, value: T): void
+  end(): void
+  throwIfAborted(): void
+}
+```
+
+### Usage
+```typescript
+// Create execution context
+const ctx = scope.createExecution({ name: 'task' })
+
+// Set/get tags
+ctx.set(userIdTag, 'user-123')
+const userId = ctx.get(userIdTag)
+
+// Create child contexts
+ctx.exec('subtask', (childCtx) => {
+  const inheritedUserId = childCtx.get(userIdTag)
+  return processUser(inheritedUserId)
+})
+
+// Check cancellation
+ctx.throwIfAborted()
+
+// Mark completion
+ctx.end()
+```
+
+### Flow.Context extends ExecutionContext.Context
+Flow.Context adds Flow-specific operations:
+- exec() with Flow overloads
+- parallel() / parallelSettled()
+- resetJournal()
+
+```typescript
+// ExecutionContext - standalone usage
+const ctx = scope.createExecution({ name: 'task' })
+ctx.exec('step', (c) => doWork())
+
+// Flow.Context - flow orchestration
+flow((ctx, input) => {
+  ctx.exec(subFlow, data)         // Execute flows
+  ctx.parallel([p1, p2])          // Parallel flows
+})
 ```
 
 ## Tags

@@ -8,6 +8,7 @@ import { custom } from "./ssch";
 import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay } from "./internal/journal-utils";
+import { ExecutionContextImpl } from "./execution-context";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -167,7 +168,7 @@ const createChildContext = (config: ContextConfig): FlowContext => {
     config.parent['extensions'],
     config.tags,
     config.parent,
-    config.abortController || config.parent['abortController']
+    config.abortController
   );
   childCtx.initializeExecutionContext(config.flowName, config.isParallel);
   return childCtx;
@@ -381,43 +382,33 @@ const executeWithTimeout = async <T>(
   }
 };
 
-class FlowContext implements Flow.Context {
-  private contextData = new Map<unknown, unknown>();
+class FlowContext extends ExecutionContextImpl implements Flow.Context {
   private journal: Map<string, unknown> | null = null;
-  public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
+  private contextData: Map<unknown, unknown>;
   public readonly tags: Tag.Tagged[] | undefined;
-  private abortController: AbortController;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext | undefined,
+    parent?: FlowContext | undefined,
     abortController?: AbortController
   ) {
-    this.scope = scope;
+    super({
+      scope,
+      parent,
+      details: { name: "flow-context" },
+      abortController
+    });
     this.reversedExtensions = [...extensions].reverse();
+    this.contextData = new Map<unknown, unknown>();
     this.tags = tags;
-    this.abortController = abortController || new AbortController();
-  }
-
-  get signal(): AbortSignal {
-    return this.abortController.signal;
-  }
-
-  throwIfAborted(): void {
-    if (this.signal.aborted) {
-      throw new Error("Flow execution cancelled");
+    if (tags) {
+      tags.forEach(tagged => {
+        this.tagStore.set(tagged.key, tagged.value);
+      });
     }
-  }
-
-  resolve<T>(executor: Core.Executor<T>): Promised<T> {
-    return this.scope.resolve(executor);
-  }
-
-  accessor<T>(executor: Core.Executor<T>): Core.Accessor<T> {
-    return this.scope.accessor(executor);
   }
 
   private wrapWithExtensions<T>(
@@ -461,7 +452,21 @@ class FlowContext implements Flow.Context {
       "extractFrom" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
-      return accessor.extractFrom(this);
+      const key = (accessor as any).key as symbol;
+      let value = this.tagStore.get(key);
+      if (value !== undefined) {
+        return value;
+      }
+      if (this.scope.tags) {
+        const tagged = this.scope.tags.find((m: Tag.Tagged) => m.key === key);
+        if (tagged) {
+          return tagged.value;
+        }
+      }
+      if ((accessor as any).default !== undefined) {
+        return (accessor as any).default;
+      }
+      throw new Error(`Value not found for key: ${key.toString()}`);
     }
     const key = accessorOrKey;
     if (this.contextData.has(key)) {
@@ -485,12 +490,6 @@ class FlowContext implements Flow.Context {
     return undefined;
   }
 
-  find<T>(accessor: Tag.Tag<T, false>): T | undefined;
-  find<T>(accessor: Tag.Tag<T, true>): T;
-  find<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T | undefined {
-    return accessor.readFrom(this);
-  }
-
   set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
   set<T>(accessorOrKey: unknown, value: unknown): void | unknown {
     if (
@@ -501,7 +500,7 @@ class FlowContext implements Flow.Context {
       "injectTo" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>;
-      accessor.injectTo(this, value as T);
+      super.set(accessor, value as T);
       return;
     }
     const key = accessorOrKey;
@@ -801,20 +800,27 @@ class FlowContext implements Flow.Context {
 
 
   createSnapshot(): Flow.ExecutionData {
-    let contextDataSnapshot: Map<unknown, unknown> | null = null;
+    let snapshotData: Map<unknown, unknown> | null = null;
 
     const getSnapshot = () => {
-      if (!contextDataSnapshot) {
-        contextDataSnapshot = new Map(this.contextData);
+      if (!snapshotData) {
+        snapshotData = new Map(this.contextData);
         if (this.journal) {
-          contextDataSnapshot.set(flowMeta.journal.key, new Map(this.journal));
+          snapshotData.set(flowMeta.journal.key, new Map(this.journal));
         }
       }
-      return contextDataSnapshot;
+      return snapshotData;
     };
 
+    const snapshotContext = this;
     const dataStore = {
-      get: (key: unknown) => getSnapshot().get(key),
+      get: (key: unknown) => {
+        const snapshot = getSnapshot();
+        if (snapshot.has(key)) {
+          return snapshot.get(key);
+        }
+        return snapshotContext.tagStore.get(key);
+      },
       set: (_key: unknown, _value: unknown) => {
         throw new Error("Cannot set values on execution snapshot");
       },
