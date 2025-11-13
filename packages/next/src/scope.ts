@@ -732,7 +732,7 @@ class BaseScope implements Core.Scope {
     }
   }
 
-  private wrapWithExtensions<T>(
+  protected wrapWithExtensions<T>(
     baseExecutor: () => Promised<T>,
     operation: Extension.Operation
   ): () => Promised<T> {

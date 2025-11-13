@@ -93,7 +93,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       }
     }
 
-    return (this.scope as any)["wrapWithExtensions"](executeCore, operation)
+    return (this.scope as any).wrapWithExtensions(executeCore, operation)
   }
 
   get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T {
