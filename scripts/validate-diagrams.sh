@@ -23,7 +23,7 @@ extract_mermaid_blocks() {
       current_block=""
     elif [[ "$line" =~ ^\`\`\`$ ]] && [ "$in_mermaid" = true ]; then
       in_mermaid=false
-      echo "$current_block" > "${output_prefix}_${block_num}.mmd"
+      printf '%s\n' "$current_block" > "${output_prefix}_${block_num}.mmd"
     elif [ "$in_mermaid" = true ]; then
       current_block="${current_block}${line}\n"
     fi
@@ -37,9 +37,10 @@ validate_diagram() {
   local source_file="$2"
   local block_num="$3"
 
-  if mmdc -i "$mmd_file" -o "${mmd_file}.svg" 2>&1 | grep -q "Error"; then
+  local output
+  if ! output=$(mmdc -i "$mmd_file" -o "${mmd_file}.svg" 2>&1); then
     echo "❌ FAIL: $source_file (block $block_num)"
-    mmdc -i "$mmd_file" -o "${mmd_file}.svg" 2>&1 || true
+    echo "$output"
     return 1
   else
     echo "✅ PASS: $source_file (block $block_num)"
@@ -48,6 +49,12 @@ validate_diagram() {
 }
 
 main() {
+  if ! command -v mmdc >/dev/null 2>&1; then
+    echo "❌ ERROR: mmdc command not found"
+    echo "Install with: pnpm add -g @mermaid-js/mermaid-cli"
+    exit 1
+  fi
+
   local total=0
   local failed=0
 
