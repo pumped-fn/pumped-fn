@@ -332,8 +332,85 @@ describe("Tag System", () => {
   });
 
   describe("collectFrom", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    test.each([
+      {
+        source: "Map",
+        createEmpty: () => new Map<symbol, unknown>(),
+      },
+      {
+        source: "Array",
+        createEmpty: () => [] as Tag.Tagged<string>[],
+      },
+      {
+        source: "Scope",
+        createEmpty: () => createScope({ tags: [] }),
+      },
+    ])("$source - returns empty array when no match", ({ createEmpty }) => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const source = createEmpty();
+
+      const result = testTag.collectFrom(source);
+
+      expect(result, "should return empty array").toEqual([]);
+    });
+
+    test("Map - returns single value in array", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const store = new Map<symbol, unknown>();
+      store.set(testTag.key, "value");
+
+      const result = testTag.collectFrom(store);
+
+      expect(result, "Map should return single value").toEqual(["value"]);
+    });
+
+    test("Array - returns all matching values", () => {
+      const testTag = tag(custom<string>(), { label: "test" });
+      const tags: Tag.Tagged<string>[] = [
+        testTag("value1"),
+        testTag("value2"),
+        testTag("value3"),
+      ];
+
+      const result = testTag.collectFrom(tags);
+
+      expect(result, "should collect all matching values").toEqual([
+        "value1",
+        "value2",
+        "value3",
+      ]);
+    });
+
+    test("Array - filters by key in mixed array", () => {
+      const emailTag = tag(custom<string>(), { label: "email" });
+      const nameTag = tag(custom<string>(), { label: "name" });
+      const tags: Tag.Tagged[] = [
+        emailTag("test@example.com"),
+        nameTag("John"),
+        emailTag("another@example.com"),
+      ];
+
+      const result = emailTag.collectFrom(tags);
+
+      expect(result, "should filter by tag key").toEqual([
+        "test@example.com",
+        "another@example.com",
+      ]);
+    });
+
+    test("Scope - returns all matching values", () => {
+      const permTag = tag(custom<string>(), { label: "permission" });
+      const scope = createScope({
+        tags: [permTag("read"), permTag("write"), permTag("delete")],
+      });
+
+      const result = permTag.collectFrom(scope);
+
+      expect(result, "should collect all from scope").toEqual([
+        "read",
+        "write",
+        "delete",
+      ]);
     });
   });
 
