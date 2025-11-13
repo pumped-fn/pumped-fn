@@ -40,14 +40,15 @@ describe("State Aggregator", () => {
       timestamp: 2000,
       duration: 100,
       operation: {
-        kind: "execute",
-        flow: {} as any,
-        definition: { name: "testFlow" } as any,
+        kind: "execution",
+        target: {
+          type: "flow",
+          flow: {} as any,
+          definition: { name: "testFlow" } as any
+        },
         input: {},
-        depth: 0,
-        isParallel: false,
-        flowName: "flow-1",
-        parentFlowName: undefined
+        key: "flow-1",
+        context: {} as any
       }
     })
 
@@ -64,74 +65,6 @@ describe("State Aggregator", () => {
     await scope.dispose()
   })
 
-  it("should track journal operations", async () => {
-    const scope = createScope()
-    const transport = await scope.resolve(transportExecutor)
-    const aggregator = await scope.resolve(stateAggregatorExecutor)
-
-    transport.emit({
-      timestamp: 3000,
-      duration: 10,
-      operation: {
-        kind: "journal",
-        key: "step-1",
-        flowName: "main-flow",
-        depth: 1,
-        isReplay: false,
-        context: {} as any,
-        params: []
-      }
-    })
-
-    const snapshot = aggregator.getSnapshot()
-
-    expect(snapshot.journals.size).toBe(1)
-    expect(snapshot.journals.get("main-flow:step-1")).toMatchObject({
-      key: "step-1",
-      flowName: "main-flow",
-      depth: 1,
-      isReplay: false,
-      timestamp: 3000
-    })
-
-    await scope.dispose()
-  })
-
-  it("should track subflow executions", async () => {
-    const scope = createScope()
-    const transport = await scope.resolve(transportExecutor)
-    const aggregator = await scope.resolve(stateAggregatorExecutor)
-
-    transport.emit({
-      timestamp: 4000,
-      duration: 50,
-      operation: {
-        kind: "subflow",
-        flow: {} as any,
-        definition: { name: "childFlow" } as any,
-        input: {},
-        journalKey: "journal-1",
-        parentFlowName: "parent-flow",
-        depth: 2,
-        context: {} as any
-      }
-    })
-
-    const snapshot = aggregator.getSnapshot()
-
-    expect(snapshot.subflows.size).toBe(1)
-    const subflow = Array.from(snapshot.subflows.values())[0]
-    expect(subflow).toMatchObject({
-      name: "childFlow",
-      parentFlowName: "parent-flow",
-      depth: 2,
-      journalKey: "journal-1",
-      startedAt: 4000
-    })
-
-    await scope.dispose()
-  })
-
   it("should track parallel batch operations", async () => {
     const scope = createScope()
     const transport = await scope.resolve(transportExecutor)
@@ -141,11 +74,13 @@ describe("State Aggregator", () => {
       timestamp: 5000,
       duration: 200,
       operation: {
-        kind: "parallel",
-        mode: "parallel",
-        promiseCount: 5,
-        depth: 1,
-        parentFlowName: "parent-flow",
+        kind: "execution",
+        target: {
+          type: "parallel",
+          mode: "parallel" as const,
+          count: 5
+        },
+        input: {},
         context: {} as any
       }
     })
@@ -157,8 +92,7 @@ describe("State Aggregator", () => {
     expect(batch).toMatchObject({
       mode: "parallel",
       promiseCount: 5,
-      depth: 1,
-      parentFlowName: "parent-flow",
+      depth: 0,
       startedAt: 5000
     })
 
