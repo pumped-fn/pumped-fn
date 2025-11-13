@@ -220,8 +220,114 @@ describe("Tag System", () => {
   });
 
   describe("readFrom", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    describe("without default", () => {
+      test.each([
+        {
+          source: "Map",
+          createEmpty: () => new Map<symbol, unknown>(),
+          createWithValue: (tag: Tag.Tag<string>, value: string) => {
+            const map = new Map<symbol, unknown>();
+            map.set(tag.key, value);
+            return map;
+          },
+        },
+        {
+          source: "Array",
+          createEmpty: () => [] as Tag.Tagged<string>[],
+          createWithValue: (tag: Tag.Tag<string>, value: string) => [tag(value)],
+        },
+        {
+          source: "Scope",
+          createEmpty: () => createScope({ tags: [] }),
+          createWithValue: (tag: Tag.Tag<string>, value: string) =>
+            createScope({ tags: [tag(value)] }),
+        },
+      ])("$source - returns undefined when missing", ({ createEmpty }) => {
+        const testTag = tag(custom<string>(), { label: "test" });
+        const source = createEmpty();
+
+        const result = testTag.readFrom(source);
+
+        expect(result, "should return undefined for missing value").toBeUndefined();
+      });
+
+      test.each([
+        {
+          source: "Map",
+          createWithValue: (tag: Tag.Tag<string>, value: string) => {
+            const map = new Map<symbol, unknown>();
+            map.set(tag.key, value);
+            return map;
+          },
+        },
+        {
+          source: "Array",
+          createWithValue: (tag: Tag.Tag<string>, value: string) => [tag(value)],
+        },
+        {
+          source: "Scope",
+          createWithValue: (tag: Tag.Tag<string>, value: string) =>
+            createScope({ tags: [tag(value)] }),
+        },
+      ])("$source - returns value when present", ({ createWithValue }) => {
+        const testTag = tag(custom<string>(), { label: "test" });
+        const source = createWithValue(testTag, "test-value");
+
+        const result = testTag.readFrom(source);
+
+        expect(result, "should return actual value").toBe("test-value");
+      });
+    });
+
+    describe("with default", () => {
+      test.each([
+        {
+          source: "Map",
+          createEmpty: () => new Map<symbol, unknown>(),
+        },
+        {
+          source: "Array",
+          createEmpty: () => [] as Tag.Tagged<number>[],
+        },
+        {
+          source: "Scope",
+          createEmpty: () => createScope({ tags: [] }),
+        },
+      ])("$source - returns default when missing", ({ createEmpty }) => {
+        const testTag = tag(custom<number>(), { label: "test", default: 42 });
+        const source = createEmpty();
+
+        const result = testTag.readFrom(source);
+
+        expect(result, "should return default value").toBe(42);
+      });
+
+      test.each([
+        {
+          source: "Map",
+          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => {
+            const map = new Map<symbol, unknown>();
+            map.set(tag.key, value);
+            return map;
+          },
+        },
+        {
+          source: "Array",
+          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => [tag(value)],
+        },
+        {
+          source: "Scope",
+          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) =>
+            createScope({ tags: [tag(value)] }),
+        },
+      ])("$source - returns actual value over default", ({ createWithValue }) => {
+        const testTag = tag(custom<number>(), { label: "test", default: 42 });
+        const source = createWithValue(testTag, 100);
+
+        const result = testTag.readFrom(source);
+
+        expect(result, "should return actual value, not default").toBe(100);
+      });
     });
   });
 
