@@ -70,15 +70,20 @@ describe("ExecutionContext", () => {
     const scope = createScope()
     const ctx = scope.createExecution({ name: "parent" })
 
+    let childCtx: any
     try {
-      await ctx.exec("failing", () => {
+      await ctx.exec("failing", (c) => {
+        childCtx = c
         throw new Error("test error")
       })
     } catch (error) {
       // Expected
     }
 
-    // Child context should have error recorded
+    expect(childCtx.details.error).toBeDefined()
+    expect(childCtx.details.error).toBeInstanceOf(Error)
+    expect((childCtx.details.error as Error).message).toBe("test error")
+    expect(childCtx.details.completedAt).toBeDefined()
   })
 
   it("supports abort signal", () => {
