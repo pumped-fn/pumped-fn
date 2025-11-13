@@ -513,17 +513,12 @@ export namespace Flow {
     onItemComplete?: (result: any, index: number) => void;
   };
 
-  export type C = {
+  export type Context = C;
+
+  export type C = ExecutionContext.Context & {
     readonly scope: Core.Scope;
     readonly tags: Tag.Tagged[] | undefined;
     readonly signal: AbortSignal;
-
-    throwIfAborted(): void;
-
-    get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
-    find<T>(accessor: Tag.Tag<T, false>): T | undefined;
-    find<T>(accessor: Tag.Tag<T, true>): T;
-    set<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
 
     exec<F extends UFlow>(
       flow: F,
@@ -581,8 +576,6 @@ export namespace Flow {
 
     resetJournal(keyPattern?: string): void;
   };
-
-  export type Context = ExecutionContext.Context;
 
   export type ExecutionData = {
     readonly context: {
