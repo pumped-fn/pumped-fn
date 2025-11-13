@@ -582,7 +582,7 @@ export namespace Flow {
     resetJournal(keyPattern?: string): void;
   };
 
-  export type Context = C;
+  export type Context = ExecutionContext.Context;
 
   export type ExecutionData = {
     readonly context: {

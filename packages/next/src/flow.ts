@@ -8,6 +8,7 @@ import { custom } from "./ssch";
 import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay } from "./internal/journal-utils";
+import { ExecutionContextImpl } from "./execution-context";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -381,25 +382,31 @@ const executeWithTimeout = async <T>(
   }
 };
 
-class FlowContext implements Flow.Context {
-  private contextData = new Map<unknown, unknown>();
+class FlowContext extends ExecutionContextImpl implements Flow.Context {
   private journal: Map<string, unknown> | null = null;
-  public readonly scope: Core.Scope;
   private reversedExtensions: Extension.Extension[];
   public readonly tags: Tag.Tagged[] | undefined;
-  private abortController: AbortController;
 
   constructor(
     scope: Core.Scope,
     private extensions: Extension.Extension[],
     tags?: Tag.Tagged[],
-    private parent?: FlowContext | undefined,
+    parent?: FlowContext | undefined,
     abortController?: AbortController
   ) {
-    this.scope = scope;
+    super({
+      scope,
+      parent,
+      details: { name: "flow-context" },
+      abortController
+    });
     this.reversedExtensions = [...extensions].reverse();
     this.tags = tags;
-    this.abortController = abortController || new AbortController();
+    if (tags) {
+      tags.forEach(tagged => {
+        this.tagStore.set(tagged.key, tagged.value);
+      });
+    }
   }
 
   get signal(): AbortSignal {
