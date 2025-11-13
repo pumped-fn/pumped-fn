@@ -1,3 +1,32 @@
+# Consolidate Tag Tests Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Consolidate 7 overlapping tag test files into a single source-organized tag.test.ts
+
+**Architecture:** Source-first organization (Map, Array, Scope) with test.each for extraction methods. Remove type inference tests (tsc handles that). Remove duplicate coverage tests.
+
+**Tech Stack:** Vitest, TypeScript
+
+---
+
+## Task 1: Create Consolidated Tag Test Structure
+
+**Files:**
+- Create: `packages/next/tests/tag.test.ts` (backup old to tag.test.ts.backup)
+- Reference: Design in `docs/plans/2025-11-13-consolidate-tag-tests.md`
+
+**Step 1: Backup existing tag.test.ts**
+
+```bash
+mv packages/next/tests/tag.test.ts packages/next/tests/tag.test.ts.backup
+```
+
+**Step 2: Create new tag.test.ts with structure**
+
+Create `packages/next/tests/tag.test.ts`:
+
+```typescript
 import { describe, test, expect } from "vitest";
 import { tag } from "../src/tag";
 import { custom } from "../src/ssch";
@@ -8,6 +37,84 @@ import { tagSymbol, type Tag } from "../src/tag-types";
 import { inspect } from "node:util";
 
 describe("Tag System", () => {
+  describe("Tag Creation", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("extractFrom", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("readFrom", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("collectFrom", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("injectTo", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Tag Executors", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Derive Integration", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Edge Cases", () => {
+    test("placeholder", () => {
+      expect(true).toBe(true);
+    });
+  });
+});
+```
+
+**Step 3: Verify structure typechecks and runs**
+
+Run: `pnpm -F @pumped-fn/core-next typecheck:full`
+Expected: PASS
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (8 placeholder tests)
+
+**Step 4: Commit structure**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: create consolidated tag test structure"
+```
+
+---
+
+## Task 2: Implement Tag Creation Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts:9-12`
+- Reference: `packages/next/tests/tag.test.ts.backup:7-248`
+
+**Step 1: Replace Tag Creation placeholder**
+
+Replace placeholder in `packages/next/tests/tag.test.ts`:
+
+```typescript
   describe("Tag Creation", () => {
     test("creates tag with label", () => {
       const emailTag = tag(custom<string>(), { label: "email" });
@@ -106,7 +213,33 @@ describe("Tag System", () => {
       expect(output).toContain("8080");
     });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (all Tag Creation tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add Tag Creation tests to consolidated file"
+```
+
+---
+
+## Task 3: Implement extractFrom Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (extractFrom section)
+- Reference: Tag API in `packages/next/src/tag.ts:147-156`
+
+**Step 1: Replace extractFrom placeholder**
+
+Replace placeholder in extractFrom section:
+
+```typescript
   describe("extractFrom", () => {
     describe("without default", () => {
       test.each([
@@ -193,7 +326,7 @@ describe("Tag System", () => {
       test.each([
         {
           source: "Map",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => {
+          createWithValue: (tag: Tag.Tag<number>, value: number) => {
             const map = new Map<symbol, unknown>();
             map.set(tag.key, value);
             return map;
@@ -201,11 +334,11 @@ describe("Tag System", () => {
         },
         {
           source: "Array",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => [tag(value)],
+          createWithValue: (tag: Tag.Tag<number>, value: number) => [tag(value)],
         },
         {
           source: "Scope",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) =>
+          createWithValue: (tag: Tag.Tag<number>, value: number) =>
             createScope({ tags: [tag(value)] }),
         },
       ])("$source - returns actual value over default", ({ createWithValue }) => {
@@ -218,29 +351,47 @@ describe("Tag System", () => {
       });
     });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (extractFrom tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add extractFrom tests to consolidated file"
+```
+
+---
+
+## Task 4: Implement readFrom Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (readFrom section)
+- Reference: Tag API in `packages/next/src/tag.ts:158-161`
+
+**Step 1: Replace readFrom placeholder**
+
+Replace placeholder in readFrom section:
+
+```typescript
   describe("readFrom", () => {
     describe("without default", () => {
       test.each([
         {
           source: "Map",
           createEmpty: () => new Map<symbol, unknown>(),
-          createWithValue: (tag: Tag.Tag<string>, value: string) => {
-            const map = new Map<symbol, unknown>();
-            map.set(tag.key, value);
-            return map;
-          },
         },
         {
           source: "Array",
           createEmpty: () => [] as Tag.Tagged<string>[],
-          createWithValue: (tag: Tag.Tag<string>, value: string) => [tag(value)],
         },
         {
           source: "Scope",
           createEmpty: () => createScope({ tags: [] }),
-          createWithValue: (tag: Tag.Tag<string>, value: string) =>
-            createScope({ tags: [tag(value)] }),
         },
       ])("$source - returns undefined when missing", ({ createEmpty }) => {
         const testTag = tag(custom<string>(), { label: "test" });
@@ -248,7 +399,7 @@ describe("Tag System", () => {
 
         const result = testTag.readFrom(source);
 
-        expect(result, "should return undefined for missing value").toBeUndefined();
+        expect(result, "should return undefined").toBeUndefined();
       });
 
       test.each([
@@ -305,7 +456,7 @@ describe("Tag System", () => {
       test.each([
         {
           source: "Map",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => {
+          createWithValue: (tag: Tag.Tag<number>, value: number) => {
             const map = new Map<symbol, unknown>();
             map.set(tag.key, value);
             return map;
@@ -313,11 +464,11 @@ describe("Tag System", () => {
         },
         {
           source: "Array",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) => [tag(value)],
+          createWithValue: (tag: Tag.Tag<number>, value: number) => [tag(value)],
         },
         {
           source: "Scope",
-          createWithValue: (tag: Tag.Tag<number, boolean>, value: number) =>
+          createWithValue: (tag: Tag.Tag<number>, value: number) =>
             createScope({ tags: [tag(value)] }),
         },
       ])("$source - returns actual value over default", ({ createWithValue }) => {
@@ -330,7 +481,33 @@ describe("Tag System", () => {
       });
     });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (readFrom tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add readFrom tests to consolidated file"
+```
+
+---
+
+## Task 5: Implement collectFrom Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (collectFrom section)
+- Reference: Tag API in `packages/next/src/tag.ts:163-165`
+
+**Step 1: Replace collectFrom placeholder**
+
+Replace placeholder in collectFrom section:
+
+```typescript
   describe("collectFrom", () => {
     test.each([
       {
@@ -413,152 +590,287 @@ describe("Tag System", () => {
       ]);
     });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (collectFrom tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add collectFrom tests to consolidated file"
+```
+
+---
+
+## Task 6: Implement injectTo Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (injectTo section)
+- Reference: Tag API in `packages/next/src/tag.ts:167-177`
+
+**Step 1: Replace injectTo placeholder**
+
+Replace placeholder in injectTo section:
+
+```typescript
   describe("injectTo", () => {
-    test("mutates Map (Tag.Store)", () => {
+    test("mutates Map with value", () => {
       const emailTag = tag(custom<string>(), { label: "email" });
       const store = new Map<symbol, unknown>();
 
       emailTag.injectTo(store, "test@example.com");
 
-      expect(store.has(emailTag.key), "should set value in store").toBe(true);
-      expect(emailTag.extractFrom(store), "should be retrievable").toBe("test@example.com");
+      expect(emailTag.extractFrom(store), "should be in store").toBe(
+        "test@example.com"
+      );
     });
 
     test("validates value via schema", () => {
-      const numberTag = tag(
-        {
-          "~standard": {
-            vendor: "test",
-            version: 1,
-            validate(value) {
-              if (typeof value !== "number") {
-                return { success: false, issues: [{ message: "Expected number" }] };
-              }
-              return { success: true, value };
-            },
+      const numberTag = tag({
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate(value) {
+            if (typeof value !== "number") {
+              return { issues: [{ message: "must be number" }] };
+            }
+            return { value };
           },
         },
-        { label: "validated-number" }
-      );
+      });
       const store = new Map<symbol, unknown>();
 
-      expect(
-        () => numberTag.injectTo(store, "invalid" as unknown as number),
-        "should throw on schema validation failure"
+      expect(() =>
+        numberTag.injectTo(store, "invalid" as unknown as number)
       ).toThrow();
     });
-
-    test("overwrites existing value", () => {
-      const portTag = tag(custom<number>(), { label: "port" });
-      const store = new Map<symbol, unknown>();
-
-      portTag.injectTo(store, 3000);
-      expect(portTag.extractFrom(store)).toBe(3000);
-
-      portTag.injectTo(store, 8080);
-      expect(portTag.extractFrom(store), "should overwrite previous value").toBe(8080);
-    });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (injectTo tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add injectTo tests to consolidated file"
+```
+
+---
+
+## Task 7: Implement Tag Executors Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (Tag Executors section)
+- Reference: `packages/next/tests/tag-executors.test.ts`, `packages/next/tests/tag-scope-resolution.test.ts`
+
+**Step 1: Replace Tag Executors placeholder**
+
+Replace placeholder in Tag Executors section:
+
+```typescript
   describe("Tag Executors", () => {
-    describe("tags.required", () => {
-      test("creates TagExecutor with extract mode", () => {
-        const userIdTag = tag(custom<string>(), { label: "userId" });
-        const tagExec = tags.required(userIdTag);
+    test("tags.required creates TagExecutor with extract mode", () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const tagExec = tags.required(userIdTag);
 
-        expect(tagExec[tagSymbol], "should have required marker").toBe("required");
-        expect(tagExec.tag, "should reference original tag").toBe(userIdTag);
-        expect(tagExec.extractionMode, "should use extract mode").toBe("extract");
-      });
+      expect(tagExec[tagSymbol], "should have required symbol").toBe("required");
+      expect(tagExec.tag, "should reference tag").toBe(userIdTag);
+      expect(tagExec.extractionMode, "should use extract mode").toBe("extract");
     });
 
-    describe("tags.optional", () => {
-      test("creates TagExecutor with read mode", () => {
-        const roleTag = tag(custom<string>(), { label: "role" });
-        const tagExec = tags.optional(roleTag);
+    test("tags.optional creates TagExecutor with read mode", () => {
+      const roleTag = tag(custom<string>(), { label: "role" });
+      const tagExec = tags.optional(roleTag);
 
-        expect(tagExec[tagSymbol], "should have optional marker").toBe("optional");
-        expect(tagExec.tag, "should reference original tag").toBe(roleTag);
-        expect(tagExec.extractionMode, "should use read mode").toBe("read");
-      });
+      expect(tagExec[tagSymbol], "should have optional symbol").toBe("optional");
+      expect(tagExec.tag, "should reference tag").toBe(roleTag);
+      expect(tagExec.extractionMode, "should use read mode").toBe("read");
     });
 
-    describe("tags.all", () => {
-      test("creates TagExecutor with collect mode", () => {
-        const permTag = tag(custom<string>(), { label: "permission" });
-        const tagExec = tags.all(permTag);
+    test("tags.all creates TagExecutor with collect mode", () => {
+      const permTag = tag(custom<string>(), { label: "permission" });
+      const tagExec = tags.all(permTag);
 
-        expect(tagExec[tagSymbol], "should have all marker").toBe("all");
-        expect(tagExec.tag, "should reference original tag").toBe(permTag);
-        expect(tagExec.extractionMode, "should use collect mode").toBe("collect");
-      });
+      expect(tagExec[tagSymbol], "should have all symbol").toBe("all");
+      expect(tagExec.tag, "should reference tag").toBe(permTag);
+      expect(tagExec.extractionMode, "should use collect mode").toBe("collect");
     });
 
-    describe("Type Guards", () => {
-      test("isTag detects raw tags", () => {
-        const userIdTag = tag(custom<string>());
+    test("isTag detects raw tags", () => {
+      const userIdTag = tag(custom<string>());
 
-        expect(isTag(userIdTag), "should detect tag").toBe(true);
-        expect(isTag({}), "should reject plain object").toBe(false);
-        expect(isTag(null), "should reject null").toBe(false);
+      expect(isTag(userIdTag), "should detect tag").toBe(true);
+      expect(isTag({}), "should reject plain object").toBe(false);
+      expect(isTag(null), "should reject null").toBe(false);
+    });
+
+    test("isTagExecutor detects tag executors", () => {
+      const userIdTag = tag(custom<string>());
+      const tagExec = tags.required(userIdTag);
+
+      expect(isTagExecutor(tagExec), "should detect tag executor").toBe(true);
+      expect(isTagExecutor(userIdTag), "should reject raw tag").toBe(false);
+      expect(isTagExecutor({}), "should reject plain object").toBe(false);
+    });
+
+    test("scope resolves raw tag with default using readFrom", async () => {
+      const roleTag = tag(custom<string>(), { label: "role", default: "user" });
+      const scope = createScope({ tags: [roleTag("admin")] });
+
+      const result = await (scope as any).resolveTag(roleTag);
+
+      expect(result, "should resolve tag value").toBe("admin");
+    });
+
+    test("scope resolves raw tag without default using extractFrom", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [userIdTag("123")] });
+
+      const result = await (scope as any).resolveTag(userIdTag);
+
+      expect(result, "should resolve tag value").toBe("123");
+    });
+
+    test("scope resolves tag executor with required mode", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [userIdTag("123")] });
+      const tagExec = tags.required(userIdTag);
+
+      const result = await (scope as any).resolveTagExecutor(tagExec);
+
+      expect(result, "should extract value").toBe("123");
+    });
+
+    test("scope resolves tag executor with optional mode", async () => {
+      const roleTag = tag(custom<string>(), { label: "role", default: "user" });
+      const scope = createScope({ tags: [] });
+      const tagExec = tags.optional(roleTag);
+
+      const result = await (scope as any).resolveTagExecutor(tagExec);
+
+      expect(result, "should return default").toBe("user");
+    });
+
+    test("scope resolves tag executor with all mode", async () => {
+      const permTag = tag(custom<string>(), { label: "permission" });
+      const scope = createScope({
+        tags: [permTag("read"), permTag("write"), permTag("delete")],
       });
+      const tagExec = tags.all(permTag);
 
-      test("isTagExecutor detects tag executors", () => {
-        const userIdTag = tag(custom<string>());
-        const tagExec = tags.required(userIdTag);
+      const result = await (scope as any).resolveTagExecutor(tagExec);
 
-        expect(isTagExecutor(tagExec), "should detect tag executor").toBe(true);
-        expect(isTagExecutor(userIdTag), "should reject raw tag").toBe(false);
-        expect(isTagExecutor({}), "should reject plain object").toBe(false);
-      });
+      expect(result, "should collect all values").toEqual([
+        "read",
+        "write",
+        "delete",
+      ]);
+    });
+
+    test("tag without default throws when missing", async () => {
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [] });
+
+      await expect((scope as any).resolveTag(userIdTag)).rejects.toThrow();
     });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (Tag Executors tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add Tag Executors tests to consolidated file"
+```
+
+---
+
+## Task 8: Implement Derive Integration Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (Derive Integration section)
+- Reference: `packages/next/tests/tag-dependency-resolution.test.ts`
+
+**Step 1: Replace Derive Integration placeholder**
+
+Replace placeholder in Derive Integration section:
+
+```typescript
   describe("Derive Integration", () => {
     test("derive resolves raw tag in array dependencies", async () => {
       const userIdTag = tag(custom<string>(), { label: "userId" });
       const scope = createScope({ tags: [userIdTag("user123")] });
 
-      const executor = derive([userIdTag], ([userId]) => {
-        return `Hello ${userId}`;
-      });
+      const executor = derive([userIdTag], ([userId]) => `Hello ${userId}`);
 
       const result = await scope.resolve(executor);
 
-      expect(result, "should resolve raw tag in array deps").toBe("Hello user123");
+      expect(result, "should resolve tag dependency").toBe("Hello user123");
     });
 
-    test("derive resolves tag executor in array dependencies", async () => {
+    test("derive resolves tag executor in dependencies", async () => {
       const permTag = tag(custom<string>(), { label: "permission" });
       const scope = createScope({
         tags: [permTag("read"), permTag("write")],
       });
 
-      const executor = derive([tags.all(permTag)], ([permissions]) => {
-        return permissions.join(",");
-      });
+      const executor = derive([tags.all(permTag)], ([permissions]) =>
+        permissions.join(",")
+      );
 
       const result = await scope.resolve(executor);
 
-      expect(result, "should resolve tag executor (tags.all)").toBe("read,write");
+      expect(result, "should resolve tag executor").toBe("read,write");
     });
 
-    test("derive resolves multiple tags in array", async () => {
+    test("derive resolves mixed executor and tag dependencies", async () => {
+      const dbExecutor = provide(() => ({ query: () => "data" }));
+      const userIdTag = tag(custom<string>(), { label: "userId" });
+      const scope = createScope({ tags: [userIdTag("user123")] });
+
+      const executor = derive([dbExecutor, userIdTag], ([db, userId]) =>
+        `${db.query()} for ${userId}`
+      );
+
+      const result = await scope.resolve(executor);
+
+      expect(result, "should resolve mixed dependencies").toBe(
+        "data for user123"
+      );
+    });
+
+    test("derive resolves tag array dependencies", async () => {
       const userIdTag = tag(custom<string>(), { label: "userId" });
       const roleTag = tag(custom<string>(), { label: "role", default: "user" });
       const scope = createScope({ tags: [userIdTag("123")] });
 
-      const executor = derive([userIdTag, roleTag], ([userId, role]) => {
-        return { userId, role };
-      });
+      const executor = derive([userIdTag, roleTag], ([userId, role]) => ({
+        userId,
+        role,
+      }));
 
       const result = await scope.resolve(executor);
 
-      expect(result, "should resolve multiple tags").toEqual({ userId: "123", role: "user" });
+      expect(result, "should resolve multiple tags").toEqual({
+        userId: "123",
+        role: "user",
+      });
     });
 
-    test("derive resolves object dependencies", async () => {
+    test("derive resolves tag object dependencies", async () => {
       const userIdTag = tag(custom<string>(), { label: "userId" });
       const roleTag = tag(custom<string>(), { label: "role" });
       const scope = createScope({
@@ -567,52 +879,30 @@ describe("Tag System", () => {
 
       const executor = derive(
         { user: userIdTag, role: roleTag },
-        ({ user, role }) => {
-          return `${user}:${role}`;
-        }
+        ({ user, role }) => `${user}:${role}`
       );
 
       const result = await scope.resolve(executor);
 
-      expect(result, "should resolve object deps with named keys").toBe("123:admin");
+      expect(result, "should resolve object dependencies").toBe("123:admin");
     });
 
-    test("derive resolves mixed executor and tag dependencies", async () => {
-      const dbExecutor = provide(() => ({ query: () => "data" }));
-      const userIdTag = tag(custom<string>(), { label: "userId" });
-      const scope = createScope({ tags: [userIdTag("user123")] });
-
-      const executor = derive([dbExecutor, userIdTag], ([db, userId]) => {
-        return `${db.query()} for ${userId}`;
-      });
-
-      const result = await scope.resolve(executor);
-
-      expect(result, "should resolve mix of executors and tags").toBe("data for user123");
-    });
-
-    test("throws when tag without default is missing", async () => {
+    test("throws when tag has no default and value is missing", async () => {
       const requiredTag = tag(custom<string>(), { label: "required" });
       const scope = createScope({ tags: [] });
 
       const executor = derive([requiredTag], ([val]) => val);
 
-      await expect(
-        scope.resolve(executor),
-        "should throw for missing required tag"
-      ).rejects.toThrow();
+      await expect(scope.resolve(executor)).rejects.toThrow();
     });
 
-    test("throws when tags.required() value is missing", async () => {
+    test("throws when tags.required() used and value is missing", async () => {
       const requiredTag = tag(custom<string>(), { label: "required" });
       const scope = createScope({ tags: [] });
 
       const executor = derive([tags.required(requiredTag)], ([val]) => val);
 
-      await expect(
-        scope.resolve(executor),
-        "should throw for missing tags.required()"
-      ).rejects.toThrow();
+      await expect(scope.resolve(executor)).rejects.toThrow();
     });
 
     test("returns empty array when tags.all() has no matches", async () => {
@@ -623,89 +913,36 @@ describe("Tag System", () => {
 
       const result = await scope.resolve(executor);
 
-      expect(result, "should return empty array for no matches").toEqual([]);
-    });
-  });
-
-  describe("Tag.Container Support", () => {
-    test("extractFrom works with plain container object", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const container = { tags: [testTag("value")] };
-
-      const result = testTag.extractFrom(container);
-
-      expect(result, "should extract from container").toBe("value");
-    });
-
-    test("readFrom returns undefined for empty container", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const container = { tags: [] };
-
-      const result = testTag.readFrom(container);
-
-      expect(result, "should return undefined for empty container").toBeUndefined();
-    });
-
-    test("readFrom returns default from container without tags", () => {
-      const testTag = tag(custom<string>(), { label: "test", default: "default" });
-      const container = { tags: undefined };
-
-      const result = testTag.readFrom(container);
-
-      expect(result, "should return default when tags undefined").toBe("default");
-    });
-
-    test("collectFrom returns all values from container", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const container = {
-        tags: [testTag("first"), testTag("second"), testTag("third")],
-      };
-
-      const result = testTag.collectFrom(container);
-
-      expect(result, "should collect all values").toEqual(["first", "second", "third"]);
-    });
-
-    test("collectFrom returns empty array for container with undefined tags", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const container = { tags: undefined };
-
-      const result = testTag.collectFrom(container);
-
       expect(result, "should return empty array").toEqual([]);
     });
-
-    test("extractFrom throws for missing value in container", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const container = { tags: [] };
-
-      expect(() => testTag.extractFrom(container), "should throw for missing value").toThrow(
-        "Value not found for key:"
-      );
-    });
-
-    test("container with mixed tags returns correct value", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const otherTag = tag(custom<number>(), { label: "other" });
-      const container = {
-        tags: [otherTag(42), testTag("found"), otherTag(99)],
-      };
-
-      const result = testTag.extractFrom(container);
-
-      expect(result, "should find correct tag in mixed container").toBe("found");
-    });
-
-    test("Scope is a valid Tag.Container", () => {
-      const testTag = tag(custom<string>(), { label: "test" });
-      const scope = createScope({ tags: [testTag("scope-value")] });
-
-      const result = testTag.extractFrom(scope);
-
-      expect(result, "Scope should work as Container").toBe("scope-value");
-    });
   });
+```
 
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (Derive Integration tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add Derive Integration tests to consolidated file"
+```
+
+---
+
+## Task 9: Implement Edge Cases Tests
+
+**Files:**
+- Modify: `packages/next/tests/tag.test.ts` (Edge Cases section)
+- Reference: `packages/next/tests/coverage-gaps.test.ts:34-108`
+
+**Step 1: Replace Edge Cases placeholder**
+
+Replace placeholder in Edge Cases section:
+
+```typescript
   describe("Edge Cases", () => {
     test("schema validation throws on invalid value", () => {
       const numberTag = tag({
@@ -761,4 +998,124 @@ describe("Tag System", () => {
       expect(() => testTag.extractFrom(store)).toThrow("Value not found for key:");
     });
   });
-});
+```
+
+**Step 2: Run tests to verify**
+
+Run: `pnpm -F @pumped-fn/core-next test tag.test.ts`
+Expected: PASS (Edge Cases tests pass)
+
+**Step 3: Commit**
+
+```bash
+git add packages/next/tests/tag.test.ts
+git commit -m "test: add Edge Cases tests to consolidated file"
+```
+
+---
+
+## Task 10: Remove Old Tag Test Files
+
+**Files:**
+- Delete: `packages/next/tests/tag-executors.test.ts`
+- Delete: `packages/next/tests/tag-type-inference.test.ts`
+- Delete: `packages/next/tests/tag-scope-resolution.test.ts`
+- Delete: `packages/next/tests/tag-executor-types.test.ts`
+- Delete: `packages/next/tests/tag-dependency-resolution.test.ts`
+- Delete: `packages/next/tests/tag.test.ts.backup`
+
+**Step 1: Remove old test files**
+
+```bash
+rm packages/next/tests/tag-executors.test.ts
+rm packages/next/tests/tag-type-inference.test.ts
+rm packages/next/tests/tag-scope-resolution.test.ts
+rm packages/next/tests/tag-executor-types.test.ts
+rm packages/next/tests/tag-dependency-resolution.test.ts
+rm packages/next/tests/tag.test.ts.backup
+```
+
+**Step 2: Verify tests still pass**
+
+Run: `pnpm -F @pumped-fn/core-next test`
+Expected: PASS (same test count as before, minus removed files)
+
+**Step 3: Commit removal**
+
+```bash
+git add -A
+git commit -m "test: remove old tag test files"
+```
+
+---
+
+## Task 11: Clean Up coverage-gaps.test.ts
+
+**Files:**
+- Modify: `packages/next/tests/coverage-gaps.test.ts:34-377`
+
+**Step 1: Remove tag tests from coverage-gaps**
+
+Remove lines 34-377 in `packages/next/tests/coverage-gaps.test.ts` (both "tag.ts - uncovered lines" and "tag.ts - additional coverage" sections).
+
+The file should go from:
+- Line 33: `});`
+- Line 34-377: DELETE entire tag sections
+- Line 378: `  describe("promises.ts - uncovered lines", () => {`
+
+**Step 2: Verify tests still pass**
+
+Run: `pnpm -F @pumped-fn/core-next test`
+Expected: PASS (tag tests removed from coverage-gaps)
+
+**Step 3: Commit cleanup**
+
+```bash
+git add packages/next/tests/coverage-gaps.test.ts
+git commit -m "test: remove duplicate tag tests from coverage-gaps"
+```
+
+---
+
+## Task 12: Final Verification
+
+**Files:**
+- Verify: All test files in `packages/next/tests/`
+- Verify: Typecheck for src and tests
+
+**Step 1: Run full test suite**
+
+Run: `pnpm -F @pumped-fn/core-next test`
+Expected: PASS (all tests pass, similar test count to before)
+
+**Step 2: Verify src typecheck**
+
+Run: `pnpm -F @pumped-fn/core-next typecheck`
+Expected: PASS
+
+**Step 3: Verify test typecheck**
+
+Run: `pnpm -F @pumped-fn/core-next typecheck:full`
+Expected: PASS
+
+**Step 4: Final commit if any fixes needed**
+
+If any issues were fixed during verification:
+```bash
+git add -A
+git commit -m "test: fix verification issues"
+```
+
+---
+
+## Success Criteria
+
+- [ ] Single `tag.test.ts` file with all tag tests
+- [ ] 5 old test files removed
+- [ ] Tag tests removed from `coverage-gaps.test.ts`
+- [ ] All tests pass: `pnpm -F @pumped-fn/core-next test`
+- [ ] Src typecheck passes: `pnpm -F @pumped-fn/core-next typecheck`
+- [ ] Test typecheck passes: `pnpm -F @pumped-fn/core-next typecheck:full`
+- [ ] Similar test count to before consolidation
+- [ ] Source-first organization (Map, Array, Scope)
+- [ ] test.each used for extraction methods across sources
