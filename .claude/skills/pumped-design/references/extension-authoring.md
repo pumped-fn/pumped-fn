@@ -207,7 +207,7 @@ ctx.end()
 | Flow.Context | Flow body `ctx` parameter | `ctx.get(tag)` | `ctx.set(tag, value)` | Extends ExecutionContext, uses Tag objects |
 | Tag.Store | `operation.context` | `store.get(tag.key)` | `store.set(tag.key, value)` | Low-level, uses symbol keys |
 
-**Visual Example - All Three APIs in Same Extension:**
+**Visual Example - All Three APIs:**
 
 ```typescript
 const requestIdTag = tag(custom<string>(), { label: 'request-id' })
@@ -218,6 +218,10 @@ const example = extension({
     if (operation.kind === 'execution') {
       const requestIdFromStore = operation.context.get(requestIdTag.key)
       console.log('Tag.Store API (symbol key):', requestIdFromStore)
+
+      if (!requestIdFromStore) {
+        operation.context.set(requestIdTag.key, `req-${Date.now()}`)
+      }
 
       if (operation.executionContext) {
         const requestIdFromExecCtx = operation.executionContext.find(requestIdTag)

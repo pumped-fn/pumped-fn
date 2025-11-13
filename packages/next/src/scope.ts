@@ -1233,13 +1233,12 @@ class BaseScope implements Core.Scope {
       }
 
       const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
+      context.initializeExecutionContext(definition.name, false);
 
       try {
         const executeCore = (): Promised<S> => {
           return this.resolve(flow).map(async (handler) => {
             const validated = validate(definition.input, input);
-
-            context.initializeExecutionContext(definition.name, false);
 
             const result = await handler(context, validated);
 
@@ -1267,11 +1266,14 @@ class BaseScope implements Core.Scope {
 
         const result = await executor();
         executionContext.end();
+        context.end();
         resolveSnapshot(context.createSnapshot());
         return result;
       } catch (error) {
         executionContext.details.error = error;
         executionContext.end();
+        context.details.error = error;
+        context.end();
         resolveSnapshot(context.createSnapshot());
         throw error;
       }

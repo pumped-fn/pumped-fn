@@ -129,6 +129,8 @@ test('flow() accepts spread tags', () => {
 
   expect(t1.readFrom(f)).toBe('a')
   expect(t2.readFrom(f)).toBe(1)
+  expect(f.tags).toContain(t1('a'))
+  expect(f.tags).toContain(t2(1))
 })
 ```
 
@@ -156,5 +158,5 @@ Existing flow tests verify backward compatibility.
 1. TypeScript compiles without errors
 2. All existing tests pass
 3. New test confirms tags attached via spread syntax
-4. Tags extractable via `myTag.readFrom(executor)`
+4. Tags extractable via `myTag.readFrom(executor)` and `ctx.get(tag)` in flow execution
 5. `provide()/derive()/flow()` have consistent tag API
