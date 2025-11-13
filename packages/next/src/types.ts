@@ -602,6 +602,7 @@ export namespace Flow {
     readonly flowName: string | undefined;
     readonly status: ExecutionStatus;
     readonly ctx: ExecutionData | undefined;
+    readonly executionContext: ExecutionContext.Context | undefined;
     readonly abort: AbortController;
     readonly statusCallbackErrors: readonly Error[];
 
