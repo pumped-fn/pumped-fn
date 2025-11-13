@@ -23,9 +23,13 @@ extract_mermaid_blocks() {
       current_block=""
     elif [[ "$line" =~ ^\`\`\`$ ]] && [ "$in_mermaid" = true ]; then
       in_mermaid=false
-      printf '%s\n' "$current_block" > "${output_prefix}_${block_num}.mmd"
+      printf '%s' "$current_block" > "${output_prefix}_${block_num}.mmd"
     elif [ "$in_mermaid" = true ]; then
-      current_block="${current_block}${line}\n"
+      if [ -n "$current_block" ]; then
+        current_block="${current_block}"$'\n'"${line}"
+      else
+        current_block="${line}"
+      fi
     fi
   done < "$file"
 

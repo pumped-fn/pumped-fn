@@ -6,7 +6,7 @@
 
 ```mermaid
 flowchart TD
-    Resolve[scope.resolve executor] --> GetState[getOrCreateState executor]
+    Resolve["scope.resolve executor"] --> GetState["getOrCreateState executor"]
     GetState --> CheckCache{Cached value?}
 
     CheckCache -->|Yes| ReturnCached[Return cached Promised]
@@ -18,23 +18,23 @@ flowchart TD
     CheckImmediate -->|Yes| QueueMicro[queueMicrotask]
     CheckImmediate -->|No| CreateController[createController]
 
-    QueueMicro --> StoreState[Store in state.value]
+    QueueMicro --> StoreState["Store in state.value"]
     StoreState --> ReturnPromised[Return Promised]
 
     CreateController --> ResolveDeps[Resolve dependencies]
     ResolveDeps --> CreateExecCtx[new ExecutionContextImpl]
-    CreateExecCtx --> InheritTags[tagStore inherits from parent]
+    CreateExecCtx --> InheritTags["tagStore inherits from parent"]
     InheritTags --> ExecuteFactory[Execute factory function]
 
     ExecuteFactory --> WrapExtensions[wrapWithExtensions]
-    WrapExtensions --> RunFactory[factory deps, controller]
+    WrapExtensions --> RunFactory["factory deps, controller"]
 
     RunFactory --> CaptureResult[Capture return value]
-    CaptureResult --> EndContext[ctx.end - set completedAt]
-    EndContext --> CacheResult[state.value = resolved]
+    CaptureResult --> EndContext["ctx.end - set completedAt"]
+    EndContext --> CacheResult["state.value = resolved"]
     CacheResult --> ReturnPromised
 
-    RunFactory -->|Error| CaptureError[ctx.details.error = error]
+    RunFactory -->|Error| CaptureError["ctx.details.error = error"]
     CaptureError --> TriggerCleanup[triggerCleanup]
     TriggerCleanup --> ReverseCleanups[Array.reverse]
     ReverseCleanups --> ExecuteCleanups[await each cleanup]
@@ -51,8 +51,8 @@ stateDiagram-v2
     Creating --> Cached: existing state.value
     Creating --> Resolving: no cached value
 
-    Resolving --> Immediate: processReplacer()<br/>has immediateValue
-    Resolving --> FactoryExec: processReplacer()<br/>has factory
+    Resolving --> Immediate: "processReplacer()<br/>has immediateValue"
+    Resolving --> FactoryExec: "processReplacer()<br/>has factory"
 
     Immediate --> Queued: queueMicrotask
     Queued --> Resolved: microtask executes
@@ -67,11 +67,6 @@ stateDiagram-v2
 
     Cleaning --> Cleaned: all cleanups done
     Cleaned --> [*]
-
-    note right of Cleaning
-        Cleanups in reverse order
-        scope.ts:569
-    end note
 ```
 
 ## Key Implementation Details

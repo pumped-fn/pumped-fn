@@ -13,33 +13,33 @@ Understand execution timing and ordering of concurrent flows.
 ```mermaid
 gantt
     title Parallel Flow Execution Timeline
-    dateFormat SSS
+    dateFormat YYYY-MM-DD
     axisFormat %L ms
 
     section User Code
-    Submit Flow A           :milestone, 000, 0ms
-    Submit Flow B           :milestone, 001, 1ms
-    Submit Flow C           :milestone, 002, 2ms
+    Submit Flow A           :milestone, 2025-01-01, 0d
+    Submit Flow B           :milestone, 2025-01-01, 0d
+    Submit Flow C           :milestone, 2025-01-01, 0d
 
     section Flow A
-    A: Pending              :a1, 000, 5ms
+    A: Pending              :a1, 2025-01-01, 5ms
     A: Executing            :active, a2, after a1, 20ms
     A: Completed            :done, a3, after a2, 1ms
 
     section Flow B
-    B: Pending              :b1, 001, 3ms
+    B: Pending              :b1, 2025-01-01, 3ms
     B: Executing            :active, b2, after b1, 30ms
     B: Completed            :done, b3, after b2, 1ms
 
     section Flow C
-    C: Pending              :c1, 002, 8ms
+    C: Pending              :c1, 2025-01-01, 8ms
     C: Executing            :active, c2, after c1, 10ms
     C: Completed            :done, c3, after c2, 1ms
 
     section Completion Order
-    C completes first       :milestone, crit, 021, 0ms
-    A completes second      :milestone, crit, 026, 0ms
-    B completes last        :milestone, crit, 035, 0ms
+    C completes first       :milestone, crit, 2025-01-01, 0d
+    A completes second      :milestone, crit, 2025-01-01, 0d
+    B completes last        :milestone, crit, 2025-01-01, 0d
 ```
 
 ## Sequence View
