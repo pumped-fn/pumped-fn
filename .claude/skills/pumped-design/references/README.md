@@ -1,27 +1,23 @@
-# Pumped-Design Sub-skills
+# Pumped-fn References
 
-This directory contains sub-skills loaded on-demand by the main pumped-design skill.
+This directory contains reference documentation for AI models and library contributors.
 
-## Structure
+## Diagrams
 
-Each sub-skill has:
-- **YAML frontmatter** - name, tags, description (AI reads first)
-- **Content sections** - When to use, code templates, examples, troubleshooting
+Scenario-based diagrams explaining library internals:
 
-## Usage
+- [internal-flow-execution.md](./diagrams/internal-flow-execution.md) - Flow execution implementation details
+- [internal-cleanup-order.md](./diagrams/internal-cleanup-order.md) - Cleanup order (LIFO) implementation
 
-AI loads sub-skills based on user query:
-1. Scans main SKILL.md routing table
-2. Reads sub-skill frontmatter to assess relevance
-3. Loads full content if applicable
-4. Applies patterns to user's code
+## User-Facing Diagrams
 
-## Sub-skills
+User documentation diagrams are in `docs/diagrams/scenarios/`:
 
-- `coding-standards.md` - Mandatory before writing code
-- `resource-*.md` - Resource construction patterns
-- `flow-*.md` - Flow orchestration and context
-- `integration-*.md` - Framework integration
-- `testing-*.md` - Testing strategies
-- `extension-basics.md` - Cross-cutting concerns
-- `entrypoint-patterns.md` - Application entry points
+- `01-flow-lifecycle-happy-path.md` - Normal flow execution lifecycle
+- `02-error-propagation.md` - Error handling and propagation
+- `03-parallel-execution-order.md` - Parallel flow timing
+- `04-error-tracing-root-cause.md` - Debugging errors
+
+## Troubleshooting
+
+See `docs/guides/troubleshooting.md` for symptom-based index linking to diagrams.
