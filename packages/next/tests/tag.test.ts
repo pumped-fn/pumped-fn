@@ -694,8 +694,58 @@ describe("Tag System", () => {
   });
 
   describe("Edge Cases", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    test("schema validation throws on invalid value", () => {
+      const numberTag = tag({
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate(value) {
+            if (typeof value !== "number") {
+              return { issues: [{ message: "must be number" }] };
+            }
+            return { value };
+          },
+        },
+      });
+
+      expect(() => numberTag("invalid" as unknown as number)).toThrow();
+    });
+
+    test("anonymous tag (no label) works correctly", () => {
+      const anonTag = tag(custom<string>());
+      const store = new Map();
+
+      anonTag.injectTo(store, "value");
+      const result = anonTag.readFrom(store);
+
+      expect(result, "anonymous tag should work").toBe("value");
+    });
+
+    test("extractFrom with different key returns undefined from array", () => {
+      const testTag = tag(custom<string>(), { label: "test.meta" });
+      const otherTag = tag(custom<string>(), { label: "test.other" });
+      const tagArray = [otherTag("test-value")];
+
+      const result = testTag.readFrom(tagArray);
+
+      expect(result, "should not find different key").toBeUndefined();
+    });
+
+    test("readFrom executor with different tag returns undefined", () => {
+      const testTag = tag(custom<number>(), { label: "test.exec" });
+      const otherTag = tag(custom<number>(), { label: "test.other" });
+      const exec = provide(() => 1, otherTag(42));
+
+      const result = testTag.readFrom(exec);
+
+      expect(result, "should not find different key").toBeUndefined();
+    });
+
+    test("extractFrom throws with descriptive error", () => {
+      const testTag = tag(custom<number>(), { label: "test.key" });
+      const store = new Map();
+
+      expect(() => testTag.extractFrom(store)).toThrow("Value not found for key:");
     });
   });
 });
