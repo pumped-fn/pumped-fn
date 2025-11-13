@@ -2,14 +2,7 @@ import { describe, test, expect } from "vitest";
 import { custom, validate } from "../src/ssch";
 import { createScope } from "../src/scope";
 import { provide } from "../src/executor";
-import { flow } from "../src/flow";
 import { resolves } from "../src/helpers";
-import {
-  getExecutorName,
-  createFactoryError,
-  createDependencyError,
-  createSystemError,
-} from "../src/errors";
 import { Promised } from "../src/promises";
 
 describe("Coverage Gaps", () => {
