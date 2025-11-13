@@ -9,8 +9,101 @@ import { inspect } from "node:util";
 
 describe("Tag System", () => {
   describe("Tag Creation", () => {
-    test("placeholder", () => {
-      expect(true).toBe(true);
+    test("creates tag with label", () => {
+      const emailTag = tag(custom<string>(), { label: "email" });
+
+      expect(typeof emailTag.key).toBe("symbol");
+      expect(emailTag.label).toBe("email");
+      expect(emailTag.schema).toBeDefined();
+      expect(emailTag.toString()).toBe("Tag(email)");
+    });
+
+    test("creates tag without label (anonymous)", () => {
+      const anonTag = tag(custom<string>());
+
+      expect(typeof anonTag.key).toBe("symbol");
+      expect(anonTag.label).toBeUndefined();
+      expect(anonTag.toString()).toContain("Tag(");
+    });
+
+    test("creates tag with default value", () => {
+      const portTag = tag(custom<number>(), { label: "port", default: 3000 });
+
+      expect(portTag.default).toBe(3000);
+    });
+
+    test("callable creates Tagged value", () => {
+      const emailTag = tag(custom<string>(), { label: "email" });
+      const tagged = emailTag("test@example.com");
+
+      expect(tagged.key).toBe(emailTag.key);
+      expect(tagged.value).toBe("test@example.com");
+      expect(tagged[tagSymbol]).toBe(true);
+      expect(tagged.toString()).toBe("email=\"test@example.com\"");
+    });
+
+    test("callable with default can omit value", () => {
+      const portTag = tag(custom<number>(), { default: 3000 });
+      const tagged = portTag();
+
+      expect(tagged.value).toBe(3000);
+    });
+
+    test("callable with default can override default", () => {
+      const portTag = tag(custom<number>(), { default: 3000 });
+      const tagged = portTag(8080);
+
+      expect(tagged.value).toBe(8080);
+    });
+
+    test("callable without default throws when called without value", () => {
+      const emailTag = tag(custom<string>()) as unknown as Tag.Tag<string, true>;
+
+      expect(() => emailTag()).toThrow("Value required");
+    });
+
+    test("entry creates symbol-value tuple", () => {
+      const emailTag = tag(custom<string>(), { label: "email" });
+      const [key, value] = emailTag.entry("test@example.com");
+
+      expect(key).toBe(emailTag.key);
+      expect(value).toBe("test@example.com");
+    });
+
+    test("entry with default can omit value", () => {
+      const portTag = tag(custom<number>(), { default: 3000 });
+      const [key, value] = portTag.entry();
+
+      expect(key).toBe(portTag.key);
+      expect(value).toBe(3000);
+    });
+
+    test("entry without default throws when called without value", () => {
+      const emailTag = tag(custom<string>()) as unknown as Tag.Tag<string, true>;
+
+      expect(() => emailTag.entry()).toThrow();
+    });
+
+    test("entry can initialize Map", () => {
+      const portTag = tag(custom<number>(), { default: 3000 });
+      const store = new Map([portTag.entry()]);
+
+      expect(portTag.extractFrom(store)).toBe(3000);
+    });
+
+    test("Symbol.toStringTag shows label", () => {
+      const portTag = tag(custom<number>(), { label: "port" });
+
+      expect(portTag[Symbol.toStringTag]).toBe("Tag<port>");
+    });
+
+    test("Tagged value inspect shows formatted output", () => {
+      const portTag = tag(custom<number>(), { label: "port" });
+      const tagged = portTag(8080);
+      const output = inspect(tagged);
+
+      expect(output).toContain("port");
+      expect(output).toContain("8080");
     });
   });
 
