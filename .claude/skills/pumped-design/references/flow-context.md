@@ -14,6 +14,12 @@ description: Flow execution context operations - ctx.run() for journaled operati
 - For direct ExecutionContext usage (without flows), use `scope.createExecution()`
 - See extension-authoring.md for ExecutionContext API details
 
+### Tag Inheritance
+
+- FlowDefinition tags and `flow.execute` `executionTags` are merged via `mergeFlowTags` before FlowContext initializes.
+- Extensions receive the merged list through `operation.context.tags`; order is definition tags first, then execution tags.
+- Undefined entries never reach the context (helper filters them), so `ctx.get()` and `ctx.find()` stay stable even when users spread conditional tags.
+
 ## When to Use
 
 Use context operations (`ctx`) when:

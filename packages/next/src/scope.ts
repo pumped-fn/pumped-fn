@@ -22,6 +22,7 @@ import { isTag, isTagExecutor } from "./tag-executors";
 import { Promised } from "./promises";
 import * as errors from "./errors";
 import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
+import { mergeFlowTags } from "./tags/merge";
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
@@ -1220,7 +1221,13 @@ class BaseScope implements Core.Scope {
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
+      const context = new FlowContext(
+        this,
+        this.extensions,
+        mergeFlowTags(definition.tags, executionTags),
+        undefined,
+        abortController
+      );
       context.initializeExecutionContext(definition.name, false);
 
       try {

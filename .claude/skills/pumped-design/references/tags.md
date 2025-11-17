@@ -7,7 +7,7 @@ Tags can be used in executor dependencies for automatic scope extraction.
 ### API
 
 ```typescript
-import { tag, tags, derive } from "@pumped-fn/core-next";
+import { tag, tags, derive, flow, provide } from "@pumped-fn/core-next";
 
 // Define tags
 const userIdTag = tag(custom<string>());
@@ -24,7 +24,44 @@ derive([
   tags.optional(roleTag),     // readFrom
   tags.all(permissionTag)     // collectFrom
 ], ([userId, role, permissions]) => {});
+
+// Spread syntax in flow() - tags as rest parameters
+const processUser = flow(
+  async (ctx, userId: string) => {
+    return { userId, processed: true }
+  },
+  userIdTag('user-123'),
+  roleTag('admin')
+);
+
+// Spread syntax with dependencies
+const dbClient = provide(() => ({ query: async () => {} }));
+const fetchUser = flow(
+  dbClient,
+  async (db, ctx, userId: string) => {
+    return await db.query()
+  },
+  userIdTag('user-123')
+);
+
+// Spread syntax in provide() and derive()
+const userService = provide(
+  () => ({ getUser: async () => ({}) }),
+  userIdTag('service-user')
+);
+
+const userInfo = derive(
+  [userIdTag, roleTag],
+  ([userId, role]) => ({ userId, role }),
+  userIdTag('derived-user')
+);
 ```
+
+### Definition vs Execution Tags
+
+- `mergeFlowTags` (`packages/next/src/tags/merge.ts`) merges definition-time tags with execution-time overrides whenever a flow runs.
+- Order is `[definition tags..., execution tags...]`; undefined entries are dropped.
+- Execution tags travel through `flow.execute(..., { executionTags })` and become visible via `ctx.get(tag)`.
 
 ### Type Inference
 
