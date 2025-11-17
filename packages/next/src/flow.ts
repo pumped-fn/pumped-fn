@@ -15,6 +15,7 @@ import {
 import { ExecutionContextImpl } from "./execution-context";
 import { isTag, isTagged } from "./tag-executors";
 import { mergeFlowTags } from "./tags/merge";
+import { applyExtensions } from "./internal/extension-utils";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -496,7 +497,6 @@ const executeWithTimeout = async <T>(
 
 class FlowContext extends ExecutionContextImpl implements Flow.Context {
   private journal: Map<string, unknown> | null = null;
-  private reversedExtensions: Extension.Extension[];
   private contextData: Map<unknown, unknown>;
   public readonly tags: Tag.Tagged[] | undefined;
 
@@ -513,7 +513,7 @@ class FlowContext extends ExecutionContextImpl implements Flow.Context {
       details: { name: "flow-context" },
       abortController
     });
-    this.reversedExtensions = [...extensions].reverse();
+    this.extensions = [...extensions];
     this.contextData = new Map<unknown, unknown>();
     this.tags = tags;
     if (tags) {
@@ -527,17 +527,7 @@ class FlowContext extends ExecutionContextImpl implements Flow.Context {
     baseExecutor: () => Promised<T>,
     operation: Extension.Operation
   ): () => Promised<T> {
-    let executor = baseExecutor as () => Promised<unknown>;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const current = executor;
-        executor = () => {
-          const result = extension.wrap!(this.scope, current, operation);
-          return result instanceof Promised ? result : Promised.create(result);
-        };
-      }
-    }
-    return executor as () => Promised<T>;
+    return applyExtensions(this.extensions, baseExecutor, this.scope, operation);
   }
 
   initializeExecutionContext(

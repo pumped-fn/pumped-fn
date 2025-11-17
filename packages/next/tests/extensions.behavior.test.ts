@@ -19,7 +19,7 @@ import {
   checkJournalReplay,
   isErrorEntry,
 } from "../src/internal/journal-utils"
-import { wrapWithExtensions } from "../src/internal/extension-utils"
+import { applyExtensions } from "../src/internal/extension-utils"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"
 import type { Extension } from "../src/types"
@@ -491,7 +491,7 @@ describe("extensions behavior", () => {
     expect(scope.entries().length).toBeLessThan(entriesBeforeRelease)
   })
 
-  scenario("wrapWithExtensions integration", async () => {
+  scenario("applyExtensions integration", async () => {
     const scope = createScope()
     const base = () => Promised.create(Promise.resolve(10))
     const operation = {
@@ -500,7 +500,7 @@ describe("extensions behavior", () => {
       scope,
       operation: "resolve" as const,
     }
-    const wrappedWithoutExt = wrapWithExtensions(undefined, base, scope, operation)
+    const wrappedWithoutExt = applyExtensions(undefined, base, scope, operation)
     expect(wrappedWithoutExt).toBe(base)
 
     const ext = {
@@ -508,18 +508,18 @@ describe("extensions behavior", () => {
       wrap: (_scope: any, next: () => Promised<number>) =>
         Promised.create(next().then((value) => (value + 5) as any)),
     }
-    const wrapped = wrapWithExtensions([ext], base, scope, operation)
+    const wrapped = applyExtensions([ext], base, scope, operation)
     expect(await wrapped()).toBe(15)
 
     const identityExt = { name: "no-wrap" }
-    const identityWrapped = wrapWithExtensions([identityExt], base, scope, operation)
+    const identityWrapped = applyExtensions([identityExt], base, scope, operation)
     expect(identityWrapped).toBe(base)
 
     const promiseExt = {
       name: "promise",
       wrap: (_scope: any, next: () => Promised<number>) => next().then((value) => Promise.resolve(value * 2)),
     }
-    const promiseWrapped = wrapWithExtensions([promiseExt], base, scope, operation)
+    const promiseWrapped = applyExtensions([promiseExt], base, scope, operation)
     const promisedResult = promiseWrapped()
     expect(promisedResult).toBeInstanceOf(Promised)
     expect(await promisedResult).toBe(20)
