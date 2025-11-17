@@ -3,6 +3,8 @@ import { flow } from "../src/flow";
 import { createScope } from "../src/scope";
 import { custom } from "../src/ssch";
 import { provide } from "../src/executor";
+import { tag } from "../src/tag";
+import { type Tag } from "../src/tag-types";
 
 describe("Flow API - Creation variants", () => {
   test.each([
@@ -276,5 +278,169 @@ describe("Timeout & abort", () => {
   ])("%s aborts after timeout", async (_, execFn) => {
     const parentFlow = flow(execFn);
     await expect(flow.execute(parentFlow, undefined)).rejects.toThrow();
+  });
+});
+
+describe("Flow spread tag syntax", () => {
+  test("flow() accepts spread tags and makes them extractable", () => {
+    const t1 = tag(custom<string>(), { label: "tag1" });
+    const t2 = tag(custom<number>(), { label: "tag2" });
+    const tagged1 = t1("test");
+    const tagged2 = t2(42);
+
+    const testFlow = flow((ctx, n: number) => n * 2, tagged1, tagged2);
+
+    expect(t1.readFrom(testFlow)).toBe("test");
+    expect(t2.readFrom(testFlow)).toBe(42);
+    expect(testFlow.tags).toContain(tagged1);
+    expect(testFlow.tags).toContain(tagged2);
+  });
+
+  test("flow() with dependencies accepts spread tags", () => {
+    const t1 = tag(custom<string>(), { label: "depTag" });
+    const tagged1 = t1("dep-test");
+    const dep = provide(() => 10);
+
+    const testFlow = flow([dep], ([d], ctx, n: number) => d + n, tagged1);
+
+    expect(t1.readFrom(testFlow)).toBe("dep-test");
+    expect(testFlow.tags).toContain(tagged1);
+  });
+
+  test("flow() without tags works as before (backward compatibility)", async () => {
+    const noTagFlow = flow((ctx, n: number) => n * 3);
+    const result = await flow.execute(noTagFlow, 7);
+    expect(result).toBe(21);
+
+    const dep = provide(() => 5);
+    const depNoTagFlow = flow([dep], ([d], ctx, n: number) => d + n);
+    const result2 = await flow.execute(depNoTagFlow, 10);
+    expect(result2).toBe(15);
+  });
+
+  test("flow() throws on invalid tag in spread params", () => {
+    expect(() => {
+      flow((ctx, n: number) => n * 2, "not-a-tag" as any);
+    }).toThrow("Invalid tag: expected Tag.Tagged from tag()");
+
+    const dep = provide(() => 5);
+    expect(() => {
+      flow([dep], ([d], ctx, n: number) => d + n, { invalid: "object" } as any);
+    }).toThrow("Invalid tag: expected Tag.Tagged from tag()");
+  });
+
+  test("flow() handles multiple tags with same key (first value wins)", () => {
+    const t1 = tag(custom<string>(), { label: "duplicateKey" });
+    const tagged1 = t1("first-value");
+    const tagged2 = t1("second-value");
+
+    const testFlow = flow((ctx, n: number) => n * 2, tagged1, tagged2);
+
+    expect(t1.readFrom(testFlow)).toBe("first-value");
+    expect(testFlow.tags?.filter(t => t.key === t1.key).length).toBe(2);
+  });
+
+  test("flow() config form uses tags array, not spread syntax", () => {
+    const t1 = tag(custom<string>(), { label: "configTag" });
+    const tagged1 = t1("config-value");
+
+    const testFlow = flow({
+      input: custom<number>(),
+      output: custom<number>(),
+      tags: [tagged1],
+    }, (ctx, n: number) => n * 2);
+
+    expect(t1.readFrom(testFlow)).toBe("config-value");
+    expect(testFlow.tags).toContain(tagged1);
+  });
+
+  test("flow() rejects plain object as first argument", () => {
+    expect(() => {
+      flow({ invalid: "object" } as any, () => "x");
+    }).toThrow("Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions");
+  });
+
+  test("flow() spread tags accessible via ctx.get() during execution", async () => {
+    const myTag = tag(custom<string>(), { label: "runtime" });
+    const f = flow((ctx) => ctx.get(myTag), myTag("hello"));
+    const result = await flow.execute(f, undefined);
+    expect(result).toBe("hello");
+  });
+
+  test("flow() ignores undefined spread entries but preserves tag order", () => {
+    const first = tag(custom<string>(), { label: "first" });
+    const second = tag(custom<string>(), { label: "second" });
+
+    const testFlow = flow((ctx) => {
+      return `${ctx.get(first)}-${ctx.get(second)}`;
+    }, first("a"), undefined as unknown as Tag.Tagged, second("b"));
+
+    const orderedValues =
+      testFlow.tags
+        ?.filter((tagged) =>
+          tagged.key === first.key || tagged.key === second.key
+        )
+        .map((tagged) => tagged.value) ?? [];
+
+    expect(orderedValues).toEqual(["a", "b"]);
+  });
+});
+
+describe("Flow dependency detection", () => {
+  test("flow() accepts dependency arrays", async () => {
+    const dep = provide(() => 4);
+    const testFlow = flow([dep], ([resolved], ctx, n: number) => {
+      return resolved + n;
+    });
+    const result = await flow.execute(testFlow, 3);
+    expect(result).toBe(7);
+  });
+
+  test("flow() accepts object dependency maps", async () => {
+    const deps = {
+      first: provide(() => 2),
+      second: provide(() => 3),
+    };
+    const testFlow = flow(deps, ({ first, second }, ctx, n: number) => {
+      return first + second + n;
+    });
+    const result = await flow.execute(testFlow, 5);
+    expect(result).toBe(10);
+  });
+
+  test("flow() accepts empty dependency objects and keeps spread tags", async () => {
+    const emptyDeps: Record<string, ReturnType<typeof provide>> = {};
+    const emptyTag = tag(custom<string>(), { label: "empty-deps" });
+    const testFlow = flow(
+      emptyDeps,
+      () => "ok",
+      emptyTag("works")
+    );
+    expect(emptyTag.readFrom(testFlow)).toBe("works");
+    const result = await flow.execute(testFlow, undefined);
+    expect(result).toBe("ok");
+  });
+
+  test("flow() rejects dependency objects with invalid values", () => {
+    expect(() => {
+      flow({ valid: provide(() => 1), nope: 42 } as any, () => 1);
+    }).toThrow(
+      "Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions"
+    );
+  });
+
+  test("flow.execute merges definition tags with execution tags", async () => {
+    const defTag = tag(custom<string>(), { label: "definition" });
+    const execTag = tag(custom<string>(), { label: "execution" });
+
+    const childFlow = flow((ctx) => {
+      return `${ctx.get(defTag)}-${ctx.get(execTag)}`;
+    }, defTag("def"));
+
+    const result = await flow.execute(childFlow, undefined, {
+      executionTags: [execTag("exec")],
+    });
+
+    expect(result).toBe("def-exec");
   });
 });

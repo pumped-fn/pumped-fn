@@ -8,6 +8,8 @@
 
 **Tech Stack:** Vitest, TypeScript
 
+**Related:** Tag merge behavior lives in `docs/plans/2025-11-17-flow-tag-helpers.md`
+
 ---
 
 ## Task 1: Create Consolidated Tag Test Structure

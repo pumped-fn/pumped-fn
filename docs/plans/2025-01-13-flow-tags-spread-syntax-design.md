@@ -117,14 +117,32 @@ FlowDefinition.handler() → createExecutor(factory, deps, [...this.tags, flowDe
 executor.tags = [tag1, tag2, flowDefinitionMeta]
 ```
 
+## Edge Cases & Tag Merging
+
+- Empty dependency objects (`flow({}, handler, tag)`) are valid: they skip dependency resolution but still attach spread tags.
+- Undefined entries inside spread lists are ignored while preserving the relative order of defined tags.
+- Runtime tags provided to `flow.execute` merge with definition tags via `packages/next/src/tags/merge.ts#mergeFlowTags`, ensuring extensions see `[definition..., execution...]` with no `undefined`.
+
+```mermaid
+graph TD
+    DefTags[FlowDefinition.tags] --> Merge(mergeFlowTags)
+    ExecTags[flow.execute executionTags] --> Merge
+    Merge --> FlowCtx[FlowContext.tags]
+    FlowCtx --> Extensions[Extensions wrap/inspect]
+```
+
 ## Testing
 
-Single test confirms tags attached:
+Single test confirms tags attached and extractable:
 ```typescript
 test('flow() accepts spread tags', () => {
   const t1 = tag(custom<string>(), { label: 't1' })
   const t2 = tag(custom<number>(), { label: 't2' })
+
   const f = flow(() => 'x', t1('a'), t2(1))
+
+  expect(t1.readFrom(f)).toBe('a')
+  expect(t2.readFrom(f)).toBe(1)
   expect(f.tags).toContain(t1('a'))
   expect(f.tags).toContain(t2(1))
 })
@@ -154,5 +172,5 @@ Existing flow tests verify backward compatibility.
 1. TypeScript compiles without errors
 2. All existing tests pass
 3. New test confirms tags attached via spread syntax
-4. Tags extractable via `ctx.get(tag)` in flow execution
+4. Tags extractable via `myTag.readFrom(executor)` and `ctx.get(tag)` in flow execution
 5. `provide()/derive()/flow()` have consistent tag API
