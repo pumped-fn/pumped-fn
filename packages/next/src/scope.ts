@@ -1220,7 +1220,12 @@ class BaseScope implements Core.Scope {
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      const context = new FlowContext(this, this.extensions, executionTags, undefined, abortController);
+      const mergedTags = [
+        ...(definition.tags || []),
+        ...(executionTags || [])
+      ];
+
+      const context = new FlowContext(this, this.extensions, mergedTags.length > 0 ? mergedTags : undefined, undefined, abortController);
       context.initializeExecutionContext(definition.name, false);
 
       try {

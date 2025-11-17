@@ -352,4 +352,17 @@ describe("Flow spread tag syntax", () => {
     expect(t1.readFrom(testFlow)).toBe("config-value");
     expect(testFlow.tags).toContain(tagged1);
   });
+
+  test("flow() rejects plain object as first argument", () => {
+    expect(() => {
+      flow({ invalid: "object" } as any, () => "x");
+    }).toThrow("Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions");
+  });
+
+  test("flow() spread tags accessible via ctx.get() during execution", async () => {
+    const myTag = tag(custom<string>(), { label: "runtime" });
+    const f = flow((ctx) => ctx.get(myTag), myTag("hello"));
+    const result = await flow.execute(f, undefined);
+    expect(result).toBe("hello");
+  });
 });

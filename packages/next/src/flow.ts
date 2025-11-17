@@ -205,9 +205,14 @@ const executeJournaledFlow = <S, I, F extends Flow.UFlow>(
     config.key!
   );
 
+  const mergedTags = [
+    ...(definition.tags || []),
+    ...(config.tags || [])
+  ];
+
   const childCtx = createChildContext({
     parent: parentCtx,
-    tags: config.tags,
+    tags: mergedTags.length > 0 ? mergedTags : undefined,
     abortController: controller,
     flowName: definition.name,
     isParallel: false
@@ -264,9 +269,14 @@ const executeNonJournaledFlow = <S, I, F extends Flow.UFlow>(
     throw new Error("Flow definition not found in executor metadata");
   }
 
+  const mergedTags = [
+    ...(definition.tags || []),
+    ...(config.tags || [])
+  ];
+
   const childCtx = createChildContext({
     parent: parentCtx,
-    tags: config.tags,
+    tags: mergedTags.length > 0 ? mergedTags : undefined,
     abortController: controller,
     flowName: definition.name,
     isParallel: false
@@ -1097,7 +1107,12 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
 
   const isHandlerOnly = typeof first === "function";
   const isSingleDep = isExecutor(first);
-  const isMultiDep = typeof first === "object" && first !== null && !("input" in first && "output" in first);
+  const isMultiDep =
+    (Array.isArray(first) ||
+    (typeof first === "object" &&
+     first !== null &&
+     !("input" in first && "output" in first) &&
+     Object.values(first).every(value => typeof value === "function" || isExecutor(value))));
   const hasDeps = isSingleDep || isMultiDep;
 
   if (isHandlerOnly || (hasDeps && typeof second === "function")) {
