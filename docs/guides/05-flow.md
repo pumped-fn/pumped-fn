@@ -120,6 +120,38 @@ const handler = flow(
   db,
   (deps, ctx, id) => deps.query(`SELECT * FROM users WHERE id = ${id}`)
 )
+
+### Spread Tags + Execution Tags
+
+Any `flow()` overload (handler-only, deps + handler, or config) accepts spread tags after the handler arguments:
+
+```ts twoslash
+import { flow, tag, provide } from '@pumped-fn/core-next'
+import { custom } from '@pumped-fn/core-next'
+
+const auditTag = tag(custom<string>(), { label: 'audit' })
+const tenantTag = tag(custom<string>(), { label: 'tenant' })
+const db = provide(() => ({ query: async () => ({ id: '1' }) }))
+
+const getUser = flow(
+  db,
+  async (deps, ctx, id: string) => {
+    return deps.query()
+  },
+  auditTag('getUser'),
+  // undefined entries are ignored but ordering is preserved
+  (process.env.MULTI_TENANT ? tenantTag('acme') : undefined) as any
+)
+
+const result = await flow.execute(getUser, '1', {
+  executionTags: [tenantTag('runtime-tenant')]
+})
+```
+
+**Important:**
+- Spread tags can follow `flow(handler, ...)`, `flow(deps, handler, ...)`, or `flow(config, deps?, handler)` forms.
+- Undefined spread entries are dropped automatically via `mergeFlowTags`, so conditional spreads are safe.
+- `flow.execute(..., { executionTags })` merges runtime tags after definition tags; extensions observe `[definition tags..., execution tags...]`.
 ```
 
 ### Custom Validators

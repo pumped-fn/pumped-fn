@@ -117,6 +117,20 @@ FlowDefinition.handler() → createExecutor(factory, deps, [...this.tags, flowDe
 executor.tags = [tag1, tag2, flowDefinitionMeta]
 ```
 
+## Edge Cases & Tag Merging
+
+- Empty dependency objects (`flow({}, handler, tag)`) are valid: they skip dependency resolution but still attach spread tags.
+- Undefined entries inside spread lists are ignored while preserving the relative order of defined tags.
+- Runtime tags provided to `flow.execute` merge with definition tags via `packages/next/src/tags/merge.ts#mergeFlowTags`, ensuring extensions see `[definition..., execution...]` with no `undefined`.
+
+```mermaid
+graph TD
+    DefTags[FlowDefinition.tags] --> Merge(mergeFlowTags)
+    ExecTags[flow.execute executionTags] --> Merge
+    Merge --> FlowCtx[FlowContext.tags]
+    FlowCtx --> Extensions[Extensions wrap/inspect]
+```
+
 ## Testing
 
 Single test confirms tags attached and extractable:

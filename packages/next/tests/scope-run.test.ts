@@ -1,7 +1,11 @@
 import { describe, test, expect } from "vitest";
+import { flow, FlowContext } from "../src/flow";
 import { createScope } from "../src/scope";
 import { provide, derive } from "../src/executor";
-import { type Core } from "../src/types";
+import { custom } from "../src/ssch";
+import { tag } from "../src/tag";
+import { mergeFlowTags } from "../src/tags/merge";
+import { type Core, type Extension } from "../src/types";
 
 describe("scope.run()", () => {
   test("basic resolution without params", async () => {
@@ -239,5 +243,62 @@ describe("scope.run()", () => {
 
     expect(result).toBe(52);
     await scope.dispose();
+  });
+});
+
+describe("scope tag merging", () => {
+  test("scope.exec merges definition and execution tags preserving order", async () => {
+    const defTagA = tag(custom<string>(), { label: "defA" });
+    const defTagB = tag(custom<string>(), { label: "defB" });
+    const execTag = tag(custom<string>(), { label: "exec" });
+
+    const capture: string[][] = [];
+    const captureExtension: Extension.Extension = {
+      name: "capture-tags",
+      wrap(scope, next, operation) {
+        if (operation.kind === "execution" && operation.context instanceof FlowContext) {
+          const tags = operation.context.tags?.map((tagged) => tagged.value as string) ?? [];
+          capture.push(tags);
+        }
+        return next();
+      },
+    };
+
+    const scope = createScope({ extensions: [captureExtension] });
+
+    const testFlow = flow((ctx) => {
+      return `${ctx.get(defTagA)}-${ctx.get(defTagB)}-${ctx.get(execTag)}`;
+    }, defTagA("defA"), defTagB("defB"));
+
+    const result = await scope.exec({
+      flow: testFlow,
+      input: undefined,
+      tags: [execTag("execValue")],
+    });
+
+    expect(result).toBe("defA-defB-execValue");
+    expect(capture).toEqual([["defA", "defB", "execValue"]]);
+
+    await scope.dispose();
+  });
+
+  test("mergeFlowTags filters undefined entries while keeping order", () => {
+    const defTag = tag(custom<string>(), { label: "def" });
+    const execTag = tag(custom<string>(), { label: "exec" });
+
+    const result = mergeFlowTags(
+      [defTag("definition"), undefined],
+      [undefined, execTag("execution")]
+    );
+
+    expect(result?.map((tagged) => tagged.value)).toEqual([
+      "definition",
+      "execution",
+    ]);
+  });
+
+  test("mergeFlowTags returns undefined when no tags provided", () => {
+    expect(mergeFlowTags(undefined, undefined)).toBeUndefined();
+    expect(mergeFlowTags([], [])).toBeUndefined();
   });
 });

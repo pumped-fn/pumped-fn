@@ -9,7 +9,8 @@ import { Promised } from "./promises";
 import { createAbortWithTimeout } from "./internal/abort-utils";
 import { createJournalKey, checkJournalReplay } from "./internal/journal-utils";
 import { ExecutionContextImpl } from "./execution-context";
-import { isTagged } from "./tag-executors";
+import { isTag, isTagged } from "./tag-executors";
+import { mergeFlowTags } from "./tags/merge";
 
 const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -126,6 +127,18 @@ function define<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> {
   );
 }
 
+const attachDependencies = <S, I, D2 extends Core.DependencyLike>(
+  def: FlowDefinition<S, I>,
+  dependencies: D2,
+  handler: (
+    deps: Core.InferOutput<D2>,
+    ctx: Flow.Context,
+    input: I
+  ) => Promise<S> | S
+): Flow.Flow<I, S> => {
+  return def.handler(dependencies, handler);
+};
+
 namespace ExecConfig {
   export type Flow<F extends Flow.UFlow> = {
     type: "flow";
@@ -161,6 +174,49 @@ type ContextConfig = {
   abortController?: AbortController;
   flowName: string;
   isParallel: boolean;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const hasInputOutput = (
+  value: Record<string, unknown>
+): value is DefineConfig<unknown, unknown> => {
+  return "input" in value && "output" in value;
+};
+
+const isDefineConfig = (value: unknown): value is DefineConfig<any, any> => {
+  return isPlainObject(value) && hasInputOutput(value);
+};
+
+const isDependencyCandidate = (value: unknown): boolean => {
+  return typeof value === "function" || isExecutor(value);
+};
+
+const isDependencyCollection = (
+  value: unknown
+): value is Core.DependencyLike => {
+  if (!value) {
+    return false;
+  }
+  if (isExecutor(value)) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0 || value.every(isDependencyCandidate);
+  }
+  if (!isPlainObject(value)) {
+    return false;
+  }
+  if (hasInputOutput(value)) {
+    return false;
+  }
+  const entries = Object.values(value);
+  if (entries.length === 0) {
+    return true;
+  }
+  return entries.every(isDependencyCandidate);
 };
 
 const createChildContext = (config: ContextConfig): FlowContext => {
@@ -205,14 +261,9 @@ const executeJournaledFlow = <S, I, F extends Flow.UFlow>(
     config.key!
   );
 
-  const mergedTags = [
-    ...(definition.tags || []),
-    ...(config.tags || [])
-  ];
-
   const childCtx = createChildContext({
     parent: parentCtx,
-    tags: mergedTags.length > 0 ? mergedTags : undefined,
+    tags: mergeFlowTags(definition.tags, config.tags),
     abortController: controller,
     flowName: definition.name,
     isParallel: false
@@ -269,14 +320,9 @@ const executeNonJournaledFlow = <S, I, F extends Flow.UFlow>(
     throw new Error("Flow definition not found in executor metadata");
   }
 
-  const mergedTags = [
-    ...(definition.tags || []),
-    ...(config.tags || [])
-  ];
-
   const childCtx = createChildContext({
     parent: parentCtx,
-    tags: mergedTags.length > 0 ? mergedTags : undefined,
+    tags: mergeFlowTags(definition.tags, config.tags),
     abortController: controller,
     flowName: definition.name,
     isParallel: false
@@ -1029,10 +1075,6 @@ function flowImpl<I, S>(
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
 ): Flow.Flow<I, S>;
 
-function flowImpl<I extends void, S>(
-  handler: (ctx?: Flow.Context) => Promise<S> | S
-): Flow.Flow<I, S>;
-
 function flowImpl<D extends Core.DependencyLike, I, S>(
   dependencies: D,
   handler: (
@@ -1044,11 +1086,6 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
 
 function flowImpl<I, S>(
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S,
-  ...tags: Tag.Tagged[]
-): Flow.Flow<I, S>;
-
-function flowImpl<I extends void, S>(
-  handler: (ctx?: Flow.Context) => Promise<S> | S,
   ...tags: Tag.Tagged[]
 ): Flow.Flow<I, S>;
 
@@ -1083,8 +1120,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
   first:
     | DefineConfig<S, I>
     | D
-    | ((ctx: Flow.Context, input: I) => Promise<S> | S)
-    | ((ctx?: Flow.Context) => Promise<S> | S),
+    | ((ctx: Flow.Context, input: I) => Promise<S> | S),
   second?:
     | D
     | ((ctx: Flow.Context, input: I) => Promise<S> | S)
@@ -1106,14 +1142,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
   const allTags: Tag.Tagged[] = [];
 
   const isHandlerOnly = typeof first === "function";
-  const isSingleDep = isExecutor(first);
-  const isMultiDep =
-    Array.isArray(first) ||
-    (typeof first === "object" &&
-     first !== null &&
-     !("input" in first && "output" in first) &&
-     Object.values(first).every(value => typeof value === "function" || isExecutor(value)));
-  const hasDeps = isSingleDep || isMultiDep;
+  const hasDeps = isDependencyCollection(first);
 
   if (isHandlerOnly || (hasDeps && typeof second === "function")) {
     const tagParams = hasDeps
@@ -1129,6 +1158,9 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
   }
 
   if (typeof first === "function") {
+    if (isTag(first)) {
+      throw new Error("flow(handler) requires handler function");
+    }
     const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S;
     const def = define({
       input: custom<I>(),
@@ -1138,13 +1170,12 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
     return def.handler(handler);
   }
 
-  if (isExecutor(first)) {
-    if (typeof second !== "function") {
+  if (isDependencyCollection(first)) {
+    if (typeof second !== "function" || isTag(second)) {
       throw new Error(
         "flow(deps, handler) requires handler as second argument"
       );
     }
-    const dependencies = first as D;
     const handler = second as (
       deps: Core.InferOutput<D>,
       ctx: Flow.Context,
@@ -1155,80 +1186,56 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       output: custom<S>(),
       tags: allTags.length > 0 ? allTags : undefined,
     });
-    return def.handler(dependencies, handler);
+    return attachDependencies(def, first, handler);
   }
 
-  if (typeof first === "object" && first !== null) {
-    const hasInputOutput = "input" in first && "output" in first;
+  if (isDefineConfig(first)) {
+    const config = first as DefineConfig<S, I>;
 
-    if (hasInputOutput) {
-      const config = first as DefineConfig<S, I>;
-
-      if ("handler" in config || "dependencies" in config) {
-        throw new Error(
-          "Config object cannot contain 'handler' or 'dependencies' properties. Use flow(config, handler) or flow(config, deps, handler) instead."
-        );
-      }
-
-      const def = define(config);
-
-      if (!second) {
-        return def;
-      }
-
-      if (typeof second === "function") {
-        return def.handler(
-          second as (ctx: Flow.Context, input: I) => Promise<S> | S
-        );
-      }
-
-      if (isExecutor(second)) {
-        if (!third || typeof third !== "function") {
-          throw new Error(
-            "flow(config, deps, handler) requires handler as third argument"
-          );
-        }
-        return def.handler(second as D, third);
-      }
-
+    if ("handler" in config || "dependencies" in config) {
       throw new Error(
-        "Invalid flow() call: second argument must be handler function or dependencies"
+        "Config object cannot contain 'handler' or 'dependencies' properties. Use flow(config, handler) or flow(config, deps, handler) instead."
       );
     }
 
-    const isValidDependencyObject = (obj: object): boolean => {
-      const values = Object.values(obj);
-      if (values.length === 0) {
-        return true;
-      }
-      return values.every(
-        (value) => typeof value === "function" || isExecutor(value)
-      );
-    };
+    const def = define(config);
 
-    if (!isValidDependencyObject(first)) {
-      throw new Error(
-        "Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions"
-      );
+    if (!second) {
+      return def;
     }
 
     if (typeof second === "function") {
-      const dependencies = first as D;
-      const handler = second as (
-        deps: Core.InferOutput<D>,
-        ctx: Flow.Context,
-        input: I
-      ) => Promise<S> | S;
-      const def = define({
-        input: custom<I>(),
-        output: custom<S>(),
-        tags: allTags.length > 0 ? allTags : undefined,
-      });
-      return def.handler(dependencies, handler);
+      if (isTag(second)) {
+        throw new Error(
+          "flow(config, handler) requires handler function"
+        );
+      }
+      return def.handler(
+        second as (ctx: Flow.Context, input: I) => Promise<S> | S
+      );
+    }
+
+    if (isExecutor(second)) {
+      if (
+        !third ||
+        typeof third !== "function" ||
+        isTag(third)
+      ) {
+        throw new Error(
+          "flow(config, deps, handler) requires handler as third argument"
+        );
+      }
+      return attachDependencies(def, second, third);
     }
 
     throw new Error(
-      "Invalid flow() call: object dependencies require handler function as second argument"
+      "Invalid flow() call: second argument must be handler function or dependencies"
+    );
+  }
+
+  if (isPlainObject(first)) {
+    throw new Error(
+      "Invalid flow() call: first argument must be either a config object with 'input' and 'output' properties, or a valid dependency object containing executors/functions"
     );
   }
 

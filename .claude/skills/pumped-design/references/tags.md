@@ -57,6 +57,12 @@ const userInfo = derive(
 );
 ```
 
+### Definition vs Execution Tags
+
+- `mergeFlowTags` (`packages/next/src/tags/merge.ts`) merges definition-time tags with execution-time overrides whenever a flow runs.
+- Order is `[definition tags..., execution tags...]`; undefined entries are dropped.
+- Execution tags travel through `flow.execute(..., { executionTags })` and become visible via `ctx.get(tag)`.
+
 ### Type Inference
 
 - `Tag<T, false>` → `T` (uses extractFrom)
