@@ -777,46 +777,22 @@ class FlowContext extends ExecutionContextImpl implements Flow.Context {
       [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
     }>
   > {
-    const parentFlowName = this.find(flowMeta.flowName);
-    const depth = this.get(flowMeta.depth);
+    type Results = Flow.ParallelResult<{
+      [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+    }>["results"];
 
-    const promise = (async () => {
-      const executeCore = (): Promised<{
-        results: Flow.ParallelResult<{
-          [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
-        }>["results"];
-        stats: { total: number; succeeded: number; failed: number };
-      }> => {
-        return Promised.create(
-          Promise.all(promises).then((results) => ({
-            results: results as Flow.ParallelResult<{
-              [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
-            }>["results"],
-            stats: {
-              total: results.length,
-              succeeded: results.length,
-              failed: 0,
-            },
-          }))
-        );
-      };
+    const aggregate = () =>
+      Promise.all(promises).then(
+        (results) => results as Results
+      );
 
-      const executor = this.wrapWithExtensions(executeCore, {
-        kind: "execution",
-        target: {
-          type: "parallel",
-          mode: "parallel",
-          count: promises.length,
-        },
-        input: promises,
-        key: undefined,
-        context: this,
-      });
+    const stats = (results: Results) => ({
+      total: results.length,
+      succeeded: results.length,
+      failed: 0,
+    });
 
-      return executor();
-    })();
-
-    return Promised.create(promise);
+    return this.runParallelExecutor(promises, "parallel", aggregate, stats);
   }
 
   parallelSettled<T extends readonly Promised<any>[]>(
@@ -826,51 +802,73 @@ class FlowContext extends ExecutionContextImpl implements Flow.Context {
       [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
     }>
   > {
-    const parentFlowName = this.find(flowMeta.flowName);
-    const depth = this.get(flowMeta.depth);
+    type Settled = Flow.ParallelSettledResult<{
+      [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+    }>["results"];
 
-    const promise = (async () => {
-      const executeCore = (): Promised<{
-        results: PromiseSettledResult<any>[];
-        stats: { total: number; succeeded: number; failed: number };
-      }> => {
-        return Promised.create(
-          Promise.allSettled(promises).then((results) => {
-            const succeeded = results.filter(
-              (r) => r.status === "fulfilled"
-            ).length;
-            const failed = results.filter(
-              (r) => r.status === "rejected"
-            ).length;
+    const aggregate = () =>
+      Promise.allSettled(promises).then(
+        (results) => results as Settled
+      );
 
-            return {
-              results: results as PromiseSettledResult<any>[],
-              stats: {
-                total: results.length,
-                succeeded,
-                failed,
-              },
-            };
-          })
-        );
+    const stats = (results: Settled) => {
+      const succeeded = results.filter(
+        (r) => r.status === "fulfilled"
+      ).length;
+      const failed = results.length - succeeded;
+      return {
+        total: results.length,
+        succeeded,
+        failed,
       };
+    };
 
-      const executor = this.wrapWithExtensions(executeCore, {
-        kind: "execution",
-        target: {
-          type: "parallel",
-          mode: "parallelSettled",
-          count: promises.length,
-        },
-        input: promises,
-        key: undefined,
-        context: this,
-      });
+    return this.runParallelExecutor(
+      promises,
+      "parallelSettled",
+      aggregate,
+      stats
+    );
+  }
 
-      return executor();
-    })();
+  private runParallelExecutor<T>(
+    promises: readonly Promised<any>[],
+    mode: "parallel" | "parallelSettled",
+    aggregate: () => Promise<T>,
+    statsBuilder: (results: T) => {
+      total: number;
+      succeeded: number;
+      failed: number;
+    }
+  ): Promised<{
+    results: T;
+    stats: { total: number; succeeded: number; failed: number };
+  }> {
+    const executeCore = (): Promised<{
+      results: T;
+      stats: { total: number; succeeded: number; failed: number };
+    }> => {
+      return Promised.create(
+        aggregate().then((results) => ({
+          results,
+          stats: statsBuilder(results),
+        }))
+      );
+    };
 
-    return Promised.create(promise);
+    const executor = this.wrapWithExtensions(executeCore, {
+      kind: "execution",
+      target: {
+        type: "parallel",
+        mode,
+        count: promises.length,
+      },
+      input: promises,
+      key: undefined,
+      context: this,
+    });
+
+    return Promised.create(executor());
   }
 
   resetJournal(keyPattern?: string): void {
