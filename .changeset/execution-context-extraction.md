@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/core-next": minor
+"@pumped-fn/core-next": patch
 ---
 
 Extract ExecutionContext as standalone primitive
