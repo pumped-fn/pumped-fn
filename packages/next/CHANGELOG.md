@@ -1,5 +1,41 @@
 # @pumped-fn/core-next
 
+## 1.0.0
+
+### Minor Changes
+
+- bd22240: Extract ExecutionContext as standalone primitive
+
+  - Add `ExecutionContext.Context` interface with lifecycle tracking
+  - Add `ExecutionContext.Details` for execution metadata
+  - Add `Scope.createExecution()` for creating execution contexts
+  - Consolidate Flow.Context and Flow.Execution around ExecutionContext
+  - Add tag inheritance through parent context chain
+  - Add `ExecutionOperation.executionContext` field for extensions
+  - Enable new patterns beyond Flow (streaming, long-running tasks)
+  - Maintain backward compatibility with Flow API
+
+### Patch Changes
+
+- 2e8c85e: Consolidate tag system tests and fix Tag.Container type safety
+
+  - Consolidate 7 overlapping tag test files into single organized tag.test.ts (291 tests)
+  - Use source-first organization with test.each patterns (Map, Array, Scope)
+  - Add comprehensive Tag.Container support tests (8 new tests)
+  - Fix Tag.Container support by using isContainer type guard instead of type assertions
+  - Remove tests accessing internal scope methods (resolveTag, resolveTagExecutor)
+  - Properly handle optional Tag.Container.tags property
+
+- fc40aea: Add spread tags syntax to flow() matching provide()/derive() pattern
+- c6d3cef: Improve flow spread tag handling, add tag merge helper, and document/test the new behavior.
+- bd22240: Fix duplicate ExecutionContext creation in Scope.~executeFlow
+
+  - Remove redundant executionContext creation in Scope.~executeFlow
+  - Use FlowContext as single ExecutionContext instance per Flow execution
+  - Remove executionContext field from Extension.ExecutionOperation type
+  - Remove executionContext field from Flow.Execution interface
+  - Update documentation to reflect Tag.Store-based extension API
+
 ## 0.5.85
 
 ### Patch Changes
