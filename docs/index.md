@@ -1,177 +1,203 @@
-# Pumped Functions - Graph-Based Architecture
+# pumped-fn // ExecutionContext-first activation
 
-Type-safe dependency injection with automatic graph resolution. Resolve your entire application with a single function call—no wiring, no initialization order, no manual dependency management.
+## Activation
+- load layered map → memorize ExecutionContext outer, Flow medium, Scope core, Extensions detached
+- follow API grid rows top → bottom when coding
+- never skip tests listed per row
+- twoslash snippet shows canonical usage; copy + adapt
 
-**Quick Start:** [Install](#start-in-a-minute-or-maybe-a-little-bit-more) · [API Cheatsheet](./reference/api-cheatsheet.md) · [Guides](#getting-started) · [Patterns](#patterns)
+## Layered map
+```mermaid
+graph LR
+  subgraph EC[ExecutionContext Ring]
+    A["scope.createExecution / ctx.exec / ctx.set-find-get / ctx.end / throwIfAborted"]
+    B["Promised normalization + TagStore + AbortSignal"]
+  end
 
----
+  subgraph Flow[Flow Medium]
+    C["flow() definitions + schema validation + flowMeta tags"]
+    D["Flow.Context parallel + resetJournal + exec overloads"]
+    E["Extension.Operation dispatch"]
+  end
 
-## Why Graph Resolution?
+  subgraph Resolution["Resolution & Scope Core"]
+    F["createExecutor + dependency graph + controller cleanup"]
+    G["scope.run + scope.resolve + journal/abort utilities"]
+  end
 
-**Traditional Code**: Wire dependencies manually, manage initialization order, debug complex setups
+  subgraph Ext["Extension Ring (SPI)"]
+    X["extension() modules"]
+  end
 
-```typescript
-const config = {
-  logLevel: "info",
-  database: "db://prod",
-  redis: "redis://prod",
-};
-const logger = {
-  log: (msg: string) => console.log(`[${config.logLevel}] ${msg}`),
-};
-const db = { query: () => [], url: config.database };
-const cache = { get: () => null, set: () => true };
-const api = { start: () => logger.log("API started") };
+  subgraph Tests["Testing Mirror"]
+    T1["execution-context.test.ts"]
+    T2["flow-execution.test.ts"]
+    T3["scope-run.test.ts"]
+    T4["extensions.test.ts"]
+    TH["shared harness: tests/test-utils.ts"]
+  end
+
+  EC --> Flow
+  Flow --> Resolution
+  Ext -- "wrap/onError" --> EC
+  Ext -- "dispose/reload" --> Resolution
+  EC -.-> T1
+  Flow -.-> T2
+  Resolution -.-> T3
+  Ext -.-> T4
+  T1 --> TH
+  T2 --> TH
+  T3 --> TH
+  T4 --> TH
 ```
 
-**Graph Resolution**: Define relationships, resolve automatically
+## Atom graph
+```mermaid
+classDiagram
+  class ExecutionContext {
+    <<API>>
+    +scope: Core.Scope
+    +parent?: ExecutionContext
+    +id: string
+    +details: Details
+    +tagStore: Tag.Store
+    +signal: AbortSignal
+    +exec(name, fn)
+    +set(tag, value)
+    +get(tag)
+    +find(tag)
+    +end()
+    +throwIfAborted()
+  }
 
-```typescript
-const app = derive([db, cache, logger], ([db, cache, log]) => ({
-  start: () => log.log("API started with all dependencies"),
-}));
-await scope.resolve(app);
+  class FlowDefinition {
+    <<API>>
+    +define(inputSchema, outputSchema)
+    +handler(dependencies?, fn)
+    +meta(flowMeta tags)
+  }
+
+  class FlowContext {
+    <<Core>>
+    +exec(flowOrFn, input)
+    +parallel(flows)
+    +parallelSettled(flows)
+    +resetJournal()
+    +createSnapshot()
+  }
+
+  class Scope {
+    <<Core>>
+    +createExecution(details)
+    +executeFlow(flow, input)
+    +run(deps, fn)
+    +resolve(executor)
+    +dispose()
+  }
+
+  class ExecutorFactory {
+    <<Core>>
+    +provide()
+    +derive()
+    +preset()
+    +isExecutor()
+    +multi()
+  }
+
+  class Promised {
+    <<Utility>>
+    +wrap(valueOrPromise)
+    +settled(entries)
+  }
+
+  class InternalUtils {
+    <<Utility>>
+    +createAbortWithTimeout()
+    +createJournalKey()
+    +checkJournalReplay()
+  }
+
+  class ExtensionModule {
+    <<SPI>>
+    +name
+    +init(scope)
+    +wrap(operation)
+    +onError(error, scope)
+    +dispose(scope)
+  }
+
+  ExecutionContext <|-- FlowContext
+  FlowDefinition --* FlowContext
+  FlowDefinition --> ExecutorFactory
+  ExecutorFactory --> Scope
+  ExecutionContext --> Scope : controller access
+  FlowContext --> Promised
+  FlowContext --> InternalUtils : journal/abort helpers
+  Promised --> Scope
+  ExtensionModule --> ExecutionContext : wrap/onError hooks
+  ExtensionModule --> Scope : dispose lifecycle
+  InternalUtils --> Scope
 ```
 
-**Benefits**:
+## API grid
+| Layer | API | Usage pulse | Tests |
+| --- | --- | --- | --- |
+| ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/execution-context.test.ts`, `flow-execution.test.ts`
+| Flow | `flow()`, `flowMeta`, `flow.execute`, `Flow.Context` overloads | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
+| Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/scope-run.test.ts`, `core.test.ts`
+| Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`, `multi.test.ts`
+| Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/tag.test.ts`, `meta.test.ts`
+| Extensions | `extension()`, `extension.wrap/onError/dispose` | cross-cutting instrumentation via ExecutionContext + Scope only | `packages/next/tests/extensions.test.ts`, `flow-extensions.test.ts`
+| Promised & Utilities | `Promised`, `MaybePromised`, `standardSchema`, `errors.*` | unify sync+async, validate inputs/outputs, bubble typed errors | `packages/next/tests/promised-settled.test.ts`, `errors` suite
 
-- **Single Point Resolution**: Resolve the tip, get the entire graph
-- **Automatic Ordering**: Dependencies resolve in correct sequence
-- **Zero Configuration**: No frameworks, no decorators, no magic
-- **Test Friendly**: Change one node, test entire systems
-
-## start in a minute (or maybe a little bit more)
-
-### install that really quickly
-
-::: code-group
-
-```sh [npm]
-$ npm add @pumped-fn/core-next
-```
-
-```sh [pnpm]
-$ pnpm add @pumped-fn/core-next
-```
-
-```sh [yarn]
-$ yarn add @pumped-fn/core-next
-```
-
-```sh [bun]
-$ bun add @pumped-fn/core-next
-```
-
-:::
-
-### Graph Resolution in Action
-
+## Canonical twoslash
 ```ts twoslash
-import { provide, derive, createScope } from '@pumped-fn/core-next'
+import {
+  createScope,
+  flow,
+  provide,
+  derive,
+  extension,
+  tag,
+  custom,
+} from "@pumped-fn/core-next";
 
-const config = provide(() => ({
-  port: 3000,
-  dbHost: 'localhost'
-}))
+const requestId = tag(custom<string>(), { label: "req.id" });
 
-const db = derive(config, (cfg) => ({
-  query: async (sql: string) => {
-    console.log(`Querying ${cfg.dbHost}: ${sql}`)
-    return []
-  }
-}))
+const clock = provide(() => () => new Date().toISOString());
+const logger = derive(clock, (now) => ({
+  info: (msg: string) => `[${now()}] ${msg}`,
+}));
 
-const userService = derive({ db, config }, ({ db, config }) => ({
-  getUser: async (id: string) => {
-    const results = await db.query(`SELECT * FROM users WHERE id = '${id}'`)
-    return results[0]
-  }
-}))
+const trace = extension({
+  name: "trace",
+  wrap: (_scope, next, operation) => {
+    if (operation.kind === "execution") {
+      console.log(`op:${operation.target.type}`);
+    }
+    return next();
+  },
+});
 
-const scope = createScope()
-const service = await scope.resolve(userService)
-const user = await service.getUser('123')
-await scope.dispose()
+const toUpper = flow(async (_ctx, name: string) => name.toUpperCase());
+
+const greet = flow({ logger }, async ({ logger }, ctx, name: string) => {
+  const upper = await ctx.exec({ flow: toUpper, input: name, key: "upper" });
+  ctx.set(requestId, upper);
+  await ctx.parallel([
+    ctx.exec({ fn: () => logger.info(upper) }),
+  ]);
+  return { upper, tagged: ctx.get(requestId) };
+});
+
+const scope = createScope({ extensions: [trace] });
+const execution = flow.execute(greet, "Ada", { scope });
+
+type ExecutionResult = Awaited<typeof execution>;
+const expectUpper: ExecutionResult["upper"] = "ADA";
 ```
 
-## How Graph Resolution Works
-
-1. **Define Nodes**: Each `provide()` or `derive()` creates a graph node
-2. **Declare Dependencies**: Dependencies are explicit in the function signature
-3. **Resolve Graph**: `scope.resolve()` traverses and resolves in dependency order
-4. **Singleton Caching**: Each node resolves once per scope, cached automatically
-
-**Key Insight**: You define the shape of your dependency graph, the library handles the rest.
-
-## Testing Revolution
-
-Traditional testing requires mocking every dependency. Graph resolution lets you test entire systems by changing single nodes:
-
-```typescript
-// Change environment = different entire system
-const testScope = createScope(preset(config, testConfig));
-const prodScope = createScope(preset(config, prodConfig));
-
-// Same code, different behavior based on graph node
-const result = await scope.resolve(application);
-```
-
-## Core Concepts
-
-| Concept | Purpose | When to Use |
-|---------|---------|-------------|
-| **Executors** (`provide`, `derive`) | Declare dependencies and factories | Define your application structure |
-| **Scope** (`createScope`) | Manage resource lifecycle | Long-lived resources (DB, services) |
-| **Flow** (`flow`) | Handle ephemeral operations | Requests, jobs, CLI commands |
-| **Tags** (`tag`) | Type-safe runtime data | Request context, user IDs, config |
-| **Extensions** (`extension`) | Cross-cutting concerns | Logging, tracing, transactions |
-
-## Code Organization Benefits
-
-- **Natural Separation**: Each component declares only what it needs
-- **No Manual Wiring**: Graph resolution handles initialization order
-- **Easy Refactoring**: Change dependencies without touching consumers
-- **Composable Design**: Mix and match components across projects
-- **Type Safety**: Full TypeScript support with inference
-
----
-
-## Documentation
-
-### Getting Started
-
-- [**Executors and Dependencies**](./guides/01-executors-and-dependencies.md) - Build your dependency graph
-- [**Tags: The Type System**](./guides/02-tags-the-type-system.md) - Type-safe runtime data access
-- [**Scope Lifecycle**](./guides/03-scope-lifecycle.md) - Manage long-running resources
-- [**Type Inference Patterns**](./guides/04-type-inference-patterns.md) - Zero-annotation TypeScript
-
-### Core Guides
-
-- [**Flow**](./guides/05-flow.md) - Execution context for short-lived operations
-- [**Extensions**](./guides/09-extensions.md) - Cross-cutting concerns
-- [**Error Handling**](./guides/10-error-handling.md) - Error boundaries and recovery
-
-### Patterns
-
-- [**Testing Strategies**](./patterns/testing-strategies.md) - Graph-based testing with presets
-- [**HTTP Server Setup**](./patterns/http-server-setup.md) - Complete server lifecycle
-- [**Database Transactions**](./patterns/database-transactions.md) - Transaction-per-flow pattern
-- [**Middleware Composition**](./patterns/middleware-composition.md) - Extension pipelines
-
-### Reference
-
-- [**API Cheatsheet**](./reference/api-cheatsheet.md) - Quick API reference
-- [**Common Mistakes**](./reference/common-mistakes.md) - Anti-patterns and fixes
-- [**Error Solutions**](./reference/error-solutions.md) - TypeScript error mappings
-
-### Quick Navigation
-
-| I want to...                  | Go to                                                           |
-| ----------------------------- | --------------------------------------------------------------- |
-| **Start building apps**       | [Executors and Dependencies](./guides/01-executors-and-dependencies.md) |
-| **Add business logic**        | [Flow](./guides/05-flow.md)                                    |
-| **Manage context data**       | [Tags: The Type System](./guides/02-tags-the-type-system.md)  |
-| **Build reusable components** | [Extensions](./guides/09-extensions.md)                        |
-| **Add monitoring/logging**    | [Extensions](./guides/09-extensions.md)                        |
-| **Test my application**       | [Testing Strategies](./patterns/testing-strategies.md)        |
-| **Understand the concepts**   | [Scope Lifecycle](./guides/03-scope-lifecycle.md)              |
+## Verification
+- `pnpm -F @pumped-fn/core-next typecheck`
+- `pnpm -F @pumped-fn/core-next test`
+- `pnpm docs:build`

@@ -126,6 +126,7 @@ type ParallelTarget = { type: "parallel"; mode: "parallel" | "parallelSettled"; 
 - Used independently without flows
 - Powers Flow.Context internally
 - Provides execution hierarchy, tag inheritance, abort signals
+- Layer boundaries + touchpoints visualized in `docs/index.md`; review that diagram before designing or reviewing extensions
 
 ```typescript
 namespace ExecutionContext {
