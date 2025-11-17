@@ -27,6 +27,7 @@ import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
 import { FlowExecutionImpl } from "./flow-execution";
 import { ExecutionContextImpl } from "./execution-context";
+import { applyExtensions } from "./internal/extension-utils";
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;
@@ -426,7 +427,6 @@ class BaseScope implements Core.Scope {
   private readonly CIRCULAR_CHECK_THRESHOLD = 15;
 
   protected extensions: Extension.Extension[] = [];
-  private reversedExtensions: Extension.Extension[] = [];
   protected registry: Core.Executor<unknown>[] = [];
   protected initialValues: Core.Preset<unknown>[] = [];
   public tags: Tag.Tagged[] | undefined;
@@ -747,17 +747,7 @@ class BaseScope implements Core.Scope {
     baseExecutor: () => Promised<T>,
     operation: Extension.Operation
   ): () => Promised<T> {
-    let executor = baseExecutor as () => Promised<unknown>;
-    for (const extension of this.reversedExtensions) {
-      if (extension.wrap) {
-        const current = executor;
-        executor = () => {
-          const result = extension.wrap!(this, current, operation);
-          return result instanceof Promised ? result : Promised.create(result);
-        };
-      }
-    }
-    return executor as () => Promised<T>;
+    return applyExtensions(this.extensions, baseExecutor, this, operation);
   }
 
   protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
@@ -1089,7 +1079,6 @@ class BaseScope implements Core.Scope {
     }
 
     this.extensions.push(extension);
-    this.reversedExtensions.unshift(extension);
     extension.init?.(this);
 
     return () => {
@@ -1097,10 +1086,6 @@ class BaseScope implements Core.Scope {
       const idx = this.extensions.indexOf(extension);
       if (idx !== -1) {
         this.extensions.splice(idx, 1);
-        this.reversedExtensions.splice(
-          this.reversedExtensions.length - 1 - idx,
-          1
-        );
       }
     };
   }

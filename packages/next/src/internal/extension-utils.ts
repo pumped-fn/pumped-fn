@@ -1,7 +1,7 @@
 import { Promised } from "../promises";
 import type { Extension, Core } from "../types";
 
-export function wrapWithExtensions<T>(
+export function applyExtensions<T>(
   extensions: Extension.Extension[] | undefined,
   baseExecutor: () => Promised<T>,
   scope: Core.Scope,

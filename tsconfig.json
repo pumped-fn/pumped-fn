@@ -12,7 +12,11 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@pumped-fn/core-next": ["packages/next/src/index.ts"],
+      "@pumped-fn/core-next/*": ["packages/next/src/*"]
+    }
   },
   "exclude": ["node_modules", "dist"]
 }
