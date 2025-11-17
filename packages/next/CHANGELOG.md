@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.87
+
+### Patch Changes
+
+- e899e22: Refactor flow execution internals - unify execution descriptors and share parallel helpers
+
 ## 0.5.86
 
 ### Patch Changes
