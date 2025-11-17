@@ -6,5 +6,5 @@
     "isolatedDeclarations": true
   },
   "include": ["src"],
-  "exclude": ["./*.ts"]
+  "exclude": ["tests/**/*.ts"]
 }

@@ -22,13 +22,18 @@ import {
 import { wrapWithExtensions } from "../src/internal/extension-utils"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"
+import type { Extension } from "../src/types"
+
+const isExecutionOperation = (
+  operation: Extension.Operation,
+): operation is Extension.ExecutionOperation => operation.kind === "execution"
 
 describe("extensions behavior", () => {
   const harness = createFlowHarness()
 
   scenario("extension tracking and real flows", async () => {
     const { ext, records } = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && op.target.type === "fn",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "fn",
     )
     const mathFlow = flow(async (ctx, input: { x: number; y: number }) => {
       const product = await ctx.exec({
@@ -52,7 +57,7 @@ describe("extensions behavior", () => {
     expect(records[2]).toMatchObject({ key: "combine", output: 23 })
 
     const composeTracker = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && op.target.type === "flow",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "flow",
     )
     const incrementFlow = flow((_ctx, x: number) => x + 1)
     const doubleFlow = flow((_ctx, x: number) => x * 2)
@@ -66,10 +71,14 @@ describe("extensions behavior", () => {
     })
     expect(composedResult).toEqual({ original: 5, result: 12 })
     expect(
-      composeTracker.records.some((record) => record.kind === "execution" && record.input === 5),
+      composeTracker.records.some(
+        (record) => record.kind === "execution" && record.input === 5,
+      ),
     ).toBe(true)
     expect(
-      composeTracker.records.some((record) => record.kind === "execution" && record.input === 6),
+      composeTracker.records.some(
+        (record) => record.kind === "execution" && record.input === 6,
+      ),
     ).toBe(true)
 
     const allTracker = harness.createTrackingExtension()
@@ -247,18 +256,18 @@ describe("extensions behavior", () => {
     }
 
     const order: string[] = []
-    const ext1 = {
+    const ext1: Extension.Extension = {
       name: "ext1",
-      wrap: async (_scope: any, next: () => Promise<unknown>, operation: any) => {
+      async wrap(_scope, next, operation) {
         if (operation.kind === "execution") order.push("ext1-before")
         const result = await next()
         if (operation.kind === "execution") order.push("ext1-after")
         return result
       },
     }
-    const ext2 = {
+    const ext2: Extension.Extension = {
       name: "ext2",
-      wrap: async (_scope: any, next: () => Promise<unknown>, operation: any) => {
+      async wrap(_scope, next, operation) {
         if (operation.kind === "execution") order.push("ext2-before")
         const result = await next()
         if (operation.kind === "execution") order.push("ext2-after")
@@ -280,9 +289,9 @@ describe("extensions behavior", () => {
     ])
 
     const depthRecords: number[] = []
-    const depthExt = {
+    const depthExt: Extension.Extension = {
       name: "depth",
-      wrap(_scope: any, next: () => Promise<unknown>, operation: any) {
+      wrap(_scope, next, operation) {
         if (operation.kind === "execution" && operation.target.type === "flow") {
           depthRecords.push(operation.context.get(flowMeta.depth) as number)
         }

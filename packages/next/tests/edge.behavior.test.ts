@@ -18,6 +18,7 @@ import { createFlowHarness } from "./harness"
 
 describe("edge behavior", () => {
   const harness = createFlowHarness()
+  const freshScope = () => harness.setup.scopeWithExtensions([])
 
   scenario("error handling and callbacks", async () => {
     await harness.error.expectExecutorError(
@@ -43,7 +44,7 @@ describe("edge behavior", () => {
     )
     await scope.dispose()
 
-    const multiCallbackScope = createScope()
+    const multiCallbackScope = freshScope()
     const firstCallback = vi.fn()
     const secondCallback = vi.fn()
     multiCallbackScope.onError(firstCallback)
@@ -53,8 +54,9 @@ describe("edge behavior", () => {
     ).rejects.toThrow()
     expect(firstCallback).toHaveBeenCalledTimes(1)
     expect(secondCallback).toHaveBeenCalledTimes(1)
+    await multiCallbackScope.dispose()
 
-    const perExecutorScope = createScope()
+    const perExecutorScope = freshScope()
     const perCallback = vi.fn()
     const otherCallback = vi.fn()
     const target = harness.executors.failing("target")
@@ -64,6 +66,7 @@ describe("edge behavior", () => {
     await expect(perExecutorScope.resolve(target)).rejects.toThrow()
     expect(perCallback).toHaveBeenCalledTimes(1)
     expect(otherCallback).not.toHaveBeenCalled()
+    await perExecutorScope.dispose()
 
     const extensionHandler = vi.fn()
     const extension = harness.extensions.errorHandler(extensionHandler, "ext")
@@ -79,12 +82,14 @@ describe("edge behavior", () => {
     const throwingScope = harness.setup.scopeWithExtensions([
       harness.extensions.errorHandler(throwingExtension, "thrower"),
     ])
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
     await expect(
       throwingScope.resolve(harness.executors.failing("original")),
     ).rejects.toThrow("original")
+    consoleError.mockRestore()
     expect(throwingExtension).toHaveBeenCalledTimes(1)
 
-    const cleanupScope = createScope()
+    const cleanupScope = freshScope()
     const cleanupCallback = vi.fn()
     const cleanup = cleanupScope.onError(cleanupCallback)
     cleanup()
@@ -92,8 +97,9 @@ describe("edge behavior", () => {
       cleanupScope.resolve(harness.executors.failing("after cleanup")),
     ).rejects.toThrow()
     expect(cleanupCallback).not.toHaveBeenCalled()
+    await cleanupScope.dispose()
 
-    const executorCleanupScope = createScope()
+    const executorCleanupScope = freshScope()
     const execCallback = vi.fn()
     const execCleanup = executorCleanupScope.onError(
       harness.executors.failing("per"),
@@ -104,25 +110,27 @@ describe("edge behavior", () => {
       executorCleanupScope.resolve(harness.executors.failing("per")),
     ).rejects.toThrow()
     expect(execCallback).not.toHaveBeenCalled()
+    await executorCleanupScope.dispose()
 
-    const disposedScope = createScope()
+    const disposedScope = freshScope()
     await disposedScope.dispose()
     expect(() => disposedScope.onError(() => {})).toThrow("Scope is disposed")
     expect(() =>
       disposedScope.onError(harness.executors.failing("x"), () => {}),
     ).toThrow("Scope is disposed")
 
-    const asyncScope = createScope()
+    const asyncScope = freshScope()
     const asyncCallback = vi.fn().mockResolvedValue(undefined)
     asyncScope.onError(asyncCallback)
     await expect(
       asyncScope.resolve(harness.executors.failing("async")),
     ).rejects.toThrow()
     expect(asyncCallback).toHaveBeenCalledTimes(1)
+    await asyncScope.dispose()
   })
 
   scenario("scope.run variants", async () => {
-    const scope = createScope()
+    const { scope, cleanup } = harness.createScopeWithCleanup()
     const userService = provide(() => ({ list: () => ["u1", "u2"] }))
     const postDb = provide(() => ({ get: (page: number) => [`post-${page}`] }))
     const value = provide(() => 42)
@@ -212,14 +220,14 @@ describe("edge behavior", () => {
     const empty = await scope.run({}, () => "no deps")
     expect(empty).toBe("no deps")
 
-    await scope.dispose()
-    const disposed = createScope()
+    await cleanup()
+    const disposed = freshScope()
     await disposed.dispose()
     expect(() =>
       disposed.run({ value }, ({ value }) => value),
     ).toThrow("Scope is disposed")
 
-    const closureScope = createScope()
+    const closureScope = freshScope()
     const other = provide(() => 10)
     const closureResult = await closureScope.run(
       { value },
@@ -243,10 +251,10 @@ describe("edge behavior", () => {
       { input: () => [provide(() => 30).static], expected: [30] },
     ]
     for (const entry of cases) {
-      const scope = createScope()
+      const { scope, cleanup } = harness.createScopeWithCleanup()
       const result = await resolves(scope, entry.input() as any)
       expect(result).toEqual(entry.expected)
-      await scope.dispose()
+      await cleanup()
     }
 
     const p1 = Promised.create(Promise.resolve(1))
@@ -354,7 +362,7 @@ describe("edge behavior", () => {
       (count) => count + 1,
       name("double"),
     )
-    const scope = createScope()
+    const { scope, cleanup } = harness.createScopeWithCleanup()
     const loggerFn = await scope.resolve(logger)
     expect(typeof loggerFn).toBe("function")
     expect(configFactory).toHaveBeenCalledTimes(1)
@@ -407,7 +415,7 @@ describe("edge behavior", () => {
     await scope.resolve(timer)
     await controller.changeIncrement(2)
 
-    const releaseScope = createScope()
+    const releaseScope = freshScope()
     const releaseCounter = provide(() => 0)
     const releaseDerived = derive(releaseCounter.reactive, (count) => count + 1)
     const releaseAccessor = await releaseScope.resolveAccessor(releaseCounter)
@@ -418,11 +426,12 @@ describe("edge behavior", () => {
     expect(releaseDerivedAccessor.get()).toBe(1)
     await releaseAccessor.update(2)
     expect(releaseDerivedAccessor.get()).toBe(3)
+    await releaseScope.dispose()
 
     const presetCounter = provide(() => 0)
     const fakeValue = provide(() => 1)
     const presetDerived = derive(presetCounter, (value) => value + 1)
-    let presetScope = createScope()
+    let presetScope = freshScope()
     expect(await presetScope.resolve(presetDerived)).toBe(1)
     await presetScope.dispose()
     presetScope = createScope(preset(presetCounter, 2))
@@ -432,7 +441,7 @@ describe("edge behavior", () => {
     expect(await presetScope.resolve(presetDerived)).toBe(2)
     await presetScope.dispose()
 
-    const accessorScope = createScope()
+    const accessorScope = freshScope()
     const accessorCounter = provide(() => 0)
     const accessor = accessorScope.accessor(accessorCounter)
     const p1 = accessor.resolve()
@@ -441,6 +450,7 @@ describe("edge behavior", () => {
     expect(p1).toBe(p2)
     expect(another).toBe(accessor)
     expect(another.resolve()).toBe(accessor.resolve())
+    await accessorScope.dispose()
 
     const eagerTag = tag(custom<boolean>(), { label: "eager" })
     const eagerExtension: Extension.Extension = {
@@ -469,15 +479,21 @@ describe("edge behavior", () => {
 
     const valueExecutor = provide(() => 0)
     const reloadingFn = vi.fn()
+    let reloadScheduled = false
     const reloading = derive(valueExecutor, (value, ctl) => {
       reloadingFn()
-      const timeout = setTimeout(() => ctl.reload(), 10)
-      ctl.cleanup(() => clearTimeout(timeout))
+      if (!reloadScheduled) {
+        reloadScheduled = true
+        const timeout = setTimeout(() => ctl.reload(), 10)
+        ctl.cleanup(() => clearTimeout(timeout))
+      }
       return value + 1
     })
-    const reloadScope = createScope()
+    const reloadScope = freshScope()
     await reloadScope.resolve(reloading)
     await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(reloadingFn.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(reloadingFn).toHaveBeenCalledTimes(2)
+    await reloadScope.dispose()
+    await cleanup()
   })
 })

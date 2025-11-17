@@ -1,6 +1,6 @@
-import { it } from "vitest"
+import { it, type TestFunction } from "vitest"
 
-type ScenarioCallback = NonNullable<Parameters<typeof it>[1]>
+type ScenarioCallback = TestFunction
 
 type ScenarioOptions = {
   only?: boolean
@@ -14,5 +14,10 @@ export function scenario(
   options: ScenarioOptions = {},
 ) {
   const testFn = options.only ? it.only : options.skip ? it.skip : it
-  testFn(`[scenario] ${name}`, runner, options.timeout)
+  const { timeout } = options
+  if (timeout !== undefined) {
+    testFn(`[scenario] ${name}`, { timeout }, runner)
+  } else {
+    testFn(`[scenario] ${name}`, runner)
+  }
 }

@@ -433,7 +433,7 @@ export function createTrackingExtension(
 
 export function buildExecutionContext(details?: {
   name?: string
-  tags?: Tag.Tagged[]
+  tags?: Array<{ tag: Tag.Tag<any, boolean>; value: unknown }>
 }) {
   const scope = createScope()
   const context = scope.createExecution({ name: details?.name || "test" })
