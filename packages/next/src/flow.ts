@@ -1108,11 +1108,11 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
   const isHandlerOnly = typeof first === "function";
   const isSingleDep = isExecutor(first);
   const isMultiDep =
-    (Array.isArray(first) ||
+    Array.isArray(first) ||
     (typeof first === "object" &&
      first !== null &&
      !("input" in first && "output" in first) &&
-     Object.values(first).every(value => typeof value === "function" || isExecutor(value))));
+     Object.values(first).every(value => typeof value === "function" || isExecutor(value)));
   const hasDeps = isSingleDep || isMultiDep;
 
   if (isHandlerOnly || (hasDeps && typeof second === "function")) {
