@@ -1,7 +1,7 @@
 ---
 name: flow-subflows
 tags: flow, add, reuse, orchestration, ctx.exec, composition, sub-flow, error-mapping
-description: Flow orchestration using ctx.exec() to call sub-flows. Sub-flows are called via ctx.exec({ flow, input, key, timeout }) config object - NOT wrapped in ctx.run(). Covers error mapping, discriminated union outputs, and reusable vs non-reusable flow patterns.
+description: Flow orchestration using ctx.exec() to call sub-flows. Sub-flows are called via ctx.exec({ flow, input, key, timeout }) config object with no legacy ctx.run() wrapper. Covers error mapping, discriminated union outputs, and reusable vs non-reusable flow patterns.
 ---
 
 # Flow: Sub-flows and Orchestration
@@ -16,13 +16,13 @@ Use `ctx.exec()` for sub-flows when:
 - Creating testable flow hierarchies (test sub-flows independently)
 
 **Critical Pattern:**
-- Sub-flows are called via `ctx.exec({ flow, input, key })` config object - **NOT** wrapped in `ctx.run()`
-- Use `ctx.run()` for direct operations (calculations, validations)
-- Use `ctx.exec()` for flow composition with config (timeout, retry, tags)
+- Sub-flows are called via `ctx.exec({ flow, input, key, timeout, retry, tags })` config object (no other wrapper)
+- Use `ctx.exec({ fn, params, key })` for direct operations needing journaling
+- `ctx.exec` is the single execution primitive (flows + functions)
 
 **Don't use for:**
-- Simple operations that don't need journaling (just use direct calls)
-- Operations that should share the same journal entry (use `ctx.run()`)
+- Simple operations that don't need journaling (inline pure call)
+- Operations that should share the same journal entry (reuse same `key`)
 
 ---
 
@@ -69,7 +69,7 @@ export namespace ProcessOrder {
 
 export const processOrder = flow(
   async (ctx, input: ProcessOrder.Input): Promise<ProcessOrder.Result> => {
-    // ✅ CORRECT: ctx.exec() with config object, NOT in ctx.run()
+    // ✅ CORRECT: ctx.exec() with config object, no extra wrapper
     const validated = await ctx.exec({
       flow: validateOrder,
       input: {
@@ -86,7 +86,10 @@ export const processOrder = flow(
     }
 
     // Continue with validated.total available
-    const orderId = await ctx.run('generate-id', () => `order-${Date.now()}`)
+    const orderId = await ctx.exec({
+      fn: () => `order-${Date.now()}`,
+      key: 'generate-id'
+    })
 
     return { success: true, orderId, total: validated.total }
   }
@@ -131,18 +134,20 @@ const result = await flow.execute(processValue, { value: 10 })
 
 ```typescript
 const fetchUserById = flow(apiService, async (api, ctx, userId: number) => {
-  const response = await ctx.run("fetch-user", () =>
-    api.fetch(`/users/${userId}`)
-  )
+  const response = await ctx.exec({
+    fn: () => api.fetch(`/users/${userId}`),
+    key: 'fetch-user-http'
+  })
   return { userId, username: `user${userId}`, raw: response.data }
 })
 
 const fetchPostsByUserId = flow(
   { api: apiService },
   async ({ api }, ctx, userId: number) => {
-    const response = await ctx.run("fetch-posts", () =>
-      api.fetch(`/posts?userId=${userId}`)
-    )
+    const response = await ctx.exec({
+      fn: () => api.fetch(`/posts?userId=${userId}`),
+      key: 'fetch-posts-http'
+    })
     return { posts: [{ id: 1, title: "Post 1" }], raw: response.data }
   }
 )
@@ -169,10 +174,13 @@ const getUserWithPosts = flow(
       key: 'fetch-posts'
     })
 
-    const enriched = await ctx.run("enrich", () => ({
-      ...user,
-      postCount: posts.posts.length
-    }))
+    const enriched = await ctx.exec({
+      fn: () => ({
+        ...user,
+        postCount: posts.posts.length
+      }),
+      key: 'enrich-user'
+    })
 
     return enriched
   }
@@ -180,9 +188,9 @@ const getUserWithPosts = flow(
 ```
 
 **Pattern:**
-- Sub-flows (`fetchUserById`, `fetchPostsByUserId`) use `ctx.run()` internally
-- Parent flow (`getUserWithPosts`) uses `ctx.exec()` to orchestrate
-- `ctx.run()` used for direct operations (enrichment logic)
+- Sub-flows (`fetchUserById`, `fetchPostsByUserId`) rely on `ctx.exec({ fn })` for HTTP calls
+- Parent flow (`getUserWithPosts`) composes everything with `ctx.exec`
+- Keys stay consistent (`fetch-user`, `fetch-posts`, `enrich-user`) for tracing
 
 ### Example 3: Void Input Sub-flow (flow-expected.test.ts)
 
@@ -220,27 +228,32 @@ export namespace CreateUser {
 export const createUser = flow(
   { userRepo: userRepository },
   async ({ userRepo }, ctx, input: CreateUser.Input): Promise<CreateUser.Result> => {
-    const validation = await ctx.run('validate-input', () => {
-      if (!input.email.includes('@')) {
-        return { ok: false as const, reason: 'INVALID_EMAIL' as const }
-      }
-      return { ok: true as const }
+    const validation = await ctx.exec({
+      fn: () => {
+        if (!input.email.includes('@')) {
+          return { ok: false as const, reason: 'INVALID_EMAIL' as const }
+        }
+        return { ok: true as const }
+      },
+      key: 'validate-input'
     })
 
     if (!validation.ok) {
       return { success: false, reason: validation.reason }
     }
 
-    const existing = await ctx.run('check-existing', async () => {
-      return userRepo.findByEmail(input.email)
+    const existing = await ctx.exec({
+      fn: () => userRepo.findByEmail(input.email),
+      key: 'check-existing'
     })
 
     if (existing !== null) {
       return { success: false, reason: 'EMAIL_EXISTS' }
     }
 
-    const user = await ctx.run('create-user', async () => {
-      return userRepo.create(input)
+    const user = await ctx.exec({
+      fn: () => userRepo.create(input),
+      key: 'create-user-record'
     })
 
     return { success: true, user }
@@ -277,8 +290,9 @@ export const registerUser = flow(
     // userResult.user is available after narrowing
     let emailSent = false
     if (input.sendWelcomeEmail) {
-      const emailResult = await ctx.run('send-welcome-email', async () => {
-        return { success: true as const }
+      const emailResult = await ctx.exec({
+        fn: () => ({ success: true as const }),
+        key: 'send-welcome-email'
       })
 
       if (!emailResult.success) {
@@ -495,7 +509,7 @@ const processOrder = flow(async (ctx, items: OrderItem[]) => {
 ```
 
 **Guidance:**
-- If a flow is only called from one parent, consider inlining with `ctx.run()`
+- If a flow is only called from one parent, consider inlining with direct helpers or `ctx.exec({ fn })`
 - Extract to sub-flow when logic is complex enough to obscure parent flow readability
 - Always export and test flows that are called from multiple parents
 
@@ -537,37 +551,37 @@ const processOrder = flow(async (ctx, input) => {
 
 ## Anti-patterns
 
-### ❌ Wrapping ctx.exec() in ctx.run()
+### ❌ Wrapping ctx.exec() inside another ctx.exec fn
 
 ```typescript
-// ❌ WRONG: Don't wrap ctx.exec() in ctx.run()
-const result = await ctx.run('validate', async () => {
-  return await ctx.exec({
-    flow: validateOrder,
-    input,
-    key: 'validate-order'
-  })
+// ❌ WRONG: Double wrap
+const result = await ctx.exec({
+  fn: () =>
+    ctx.exec({
+      flow: validateOrder,
+      input,
+      key: 'validate-order'
+    }),
+  key: 'validate-wrapper'
 })
 
-// ✅ CORRECT: ctx.exec() is already journaled
+// ✅ CORRECT: Call flow directly
 const result = await ctx.exec({
   flow: validateOrder,
   input,
-  key: 'validate'
+  key: 'validate-order'
 })
 ```
 
-**Why wrong?** `ctx.exec()` already creates a journal entry. Wrapping in `ctx.run()` creates unnecessary nesting and confuses the journal hierarchy.
+**Why wrong?** `ctx.exec()` already creates a journal entry. Wrapping it inside another `ctx.exec({ fn })` hides metadata and complicates retries.
 
-### ❌ Using ctx.run() for Flow Composition
+### ❌ Executing flows manually
 
 ```typescript
-// ❌ WRONG: Don't manually call flow inside ctx.run()
-const result = await ctx.run('validate', async () => {
-  return await flow.execute(validateOrder, input)
-})
+// ❌ WRONG: Direct flow.execute bypasses context
+const result = await flow.execute(validateOrder, input)
 
-// ✅ CORRECT: Use ctx.exec()
+// ✅ CORRECT: Always use ctx.exec for composition
 const result = await ctx.exec({
   flow: validateOrder,
   input,
@@ -697,7 +711,7 @@ const config = await ctx.exec({
 
 ## Related Sub-skills
 
-- **flow-context.md** - Using `ctx.run()`, `ctx.parallel()`, reading/writing context
+- **flow-context.md** - Using `ctx.exec()` config, `ctx.parallel()`, reading/writing context
 - **resource-derived.md** - Composing resources with dependencies
 - **testing-flows.md** - Testing flows with `preset()` for mocking sub-flows
 - **coding-standards.md** - Type safety rules for discriminated unions

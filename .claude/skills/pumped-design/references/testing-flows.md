@@ -12,7 +12,7 @@ description: Integration testing flows with preset() for mocking dependencies. T
 - Testing flow orchestration with mocked dependencies
 - Testing ALL discriminated union branches (Success + each Error)
 - Testing sub-flow composition
-- Testing ctx.run() operations
+- Testing ctx.exec({ fn }) journaled operations
 - Mocking resources/repositories via `preset()`
 
 **Use integration tests for:**
@@ -201,23 +201,27 @@ export const createUser = flow(
   { userRepo: userRepository },
   ({ userRepo }) =>
     async (ctx, input: CreateUser.Input): Promise<CreateUser.Result> => {
-      const validation = await ctx.run('validate', () => {
-        if (input.name.length < 2) {
-          return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
-        }
-        if (!input.email.includes('@')) {
-          return { ok: false as const, reason: 'INVALID_EMAIL' as const }
-        }
-        return { ok: true as const }
+      const validation = await ctx.exec({
+        fn: () => {
+          if (input.name.length < 2) {
+            return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
+          }
+          if (!input.email.includes('@')) {
+            return { ok: false as const, reason: 'INVALID_EMAIL' as const }
+          }
+          return { ok: true as const }
+        },
+        key: 'validate'
       })
 
       if (!validation.ok) {
         return { success: false, reason: validation.reason }
       }
 
-      const created = await ctx.run('create', () =>
-        userRepo.create({ name: input.name, email: input.email })
-      )
+      const created = await ctx.exec({
+        fn: () => userRepo.create({ name: input.name, email: input.email }),
+        key: 'create-user'
+      })
 
       return { success: true, userId: created.id }
     }
@@ -446,18 +450,20 @@ describe("Nameless flows", () => {
     const apiService = provide(() => ({ fetch: fetchMock }));
 
     const fetchUserById = flow(apiService, async (api, ctx, userId: number) => {
-      const response = await ctx.run("fetch-user", () =>
-        api.fetch(`/users/${userId}`)
-      );
+      const response = await ctx.exec({
+        fn: () => api.fetch(`/users/${userId}`),
+        key: 'fetch-user'
+      });
       return { userId, username: `user${userId}`, raw: response.data };
     });
 
     const fetchPostsByUserId = flow(
       { api: apiService },
       async ({ api }, ctx, userId: number) => {
-        const response = await ctx.run("fetch-posts", () =>
-          api.fetch(`/posts?userId=${userId}`)
-        );
+        const response = await ctx.exec({
+          fn: () => api.fetch(`/posts?userId=${userId}`),
+          key: 'fetch-posts'
+        });
         return { posts: [{ id: 1, title: "Post 1" }], raw: response.data };
       }
     );
@@ -467,10 +473,13 @@ describe("Nameless flows", () => {
       async ({ api: _api }, ctx, userId: number) => {
         const user = await ctx.exec(fetchUserById, userId);
         const posts = await ctx.exec(fetchPostsByUserId, userId);
-        const enriched = await ctx.run("enrich", () => ({
-          ...user,
-          postCount: posts.posts.length,
-        }));
+        const enriched = await ctx.exec({
+          fn: () => ({
+            ...user,
+            postCount: posts.posts.length,
+          }),
+          key: 'enrich'
+        });
         return enriched;
       }
     );
@@ -488,7 +497,7 @@ describe("Nameless flows", () => {
 **What makes this good:**
 - Tests complete flow orchestration
 - Mocks external dependency (apiService)
-- Tests ctx.run() and ctx.exec() together
+- Tests ctx.exec() across both flow + fn modes
 - Verifies sub-flow composition
 - Checks mock invocation count
 

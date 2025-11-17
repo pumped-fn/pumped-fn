@@ -1,7 +1,7 @@
 ---
 name: flow-context
-tags: flow, modify, ctx.run, ctx.parallel, ctx.parallelSettled, ctx.set, ctx.get, context, journaling
-description: Flow execution context operations - ctx.run() for journaled operations, ctx.parallel() for concurrent execution, ctx.parallelSettled() for partial failures, and reading/writing context state with tags. Direct operations use ctx.run(), NOT ctx.exec().
+tags: flow, modify, ctx.exec, ctx.parallel, ctx.parallelSettled, ctx.set, ctx.get, context, journaling
+description: Flow execution context operations - ctx.exec() handles both sub-flows and journaled functions, ctx.parallel()/ctx.parallelSettled() run concurrent work, ctx.set()/ctx.get() manage tagged metadata. Direct operations use ctx.exec({ fn, params, key }).
 ---
 
 # Flow: Context Operations
@@ -10,7 +10,7 @@ description: Flow execution context operations - ctx.run() for journaled operati
 
 **Flow.Context** extends **ExecutionContext.Context**, the standalone execution primitive:
 - ExecutionContext provides: `exec()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`, tag inheritance, abort signals
-- Flow.Context adds: `run()` (journaling), `parallel()`, `parallelSettled()`, `resetJournal()`, overloaded `exec()` with retry/timeout
+- Flow.Context adds: Overloaded `exec()` signatures (flow shortcut + config with fn/params/key/timeout/retry/tags), `parallel()`, `parallelSettled()`, `resetJournal()`
 - For direct ExecutionContext usage (without flows), use `scope.createExecution()`
 - See extension-authoring.md for ExecutionContext API details
 
@@ -18,24 +18,24 @@ description: Flow execution context operations - ctx.run() for journaled operati
 
 Use context operations (`ctx`) when:
 
-- **ctx.run()** - Journaling direct operations (validation, calculation, I/O)
+- **ctx.exec({ fn, params, key, timeout, retry, tags })** - Journaling direct operations (validation, calculation, I/O)
+- **ctx.exec(flow, input)** or config variant - Calling sub-flows (see flow-subflows.md)
 - **ctx.parallel()** - Running multiple flows/operations concurrently
 - **ctx.parallelSettled()** - Running operations that may partially fail
 - **ctx.set()/ctx.get()** - Storing metadata across flow execution
-- **ctx.exec()** - Calling sub-flows (see flow-subflows.md)
 - **ctx.resetJournal()** - Clearing journal for re-execution or retry logic
 
 **Don't use for:**
 - Simple calculations that don't need journaling (just use direct code)
-- Sub-flow calls (use `ctx.exec()`, not `ctx.run()`)
+- Manual `flow.execute` calls inside flows (always go through ctx.exec)
 
 ---
 
-## ctx.run() - Journaled Operations
+## ctx.exec({ fn }) - Journaled Operations
 
 ### Purpose
 
-`ctx.run()` journals and executes direct operations:
+`ctx.exec({ fn })` journals and executes direct operations:
 - Validations
 - Calculations
 - Resource calls (database queries, HTTP requests)
@@ -51,11 +51,14 @@ import { flow } from '@pumped-fn/core-next'
 
 const processData = flow(async (ctx, input: string) => {
   // ✅ Journal validation
-  const validation = await ctx.run('validate', () => {
-    if (!input || input.trim() === '') {
-      return { ok: false as const, reason: 'EMPTY' as const }
-    }
-    return { ok: true as const }
+  const validation = await ctx.exec({
+    fn: () => {
+      if (!input || input.trim() === '') {
+        return { ok: false as const, reason: 'EMPTY' as const }
+      }
+      return { ok: true as const }
+    },
+    key: 'validate'
   })
 
   if (!validation.ok) {
@@ -63,13 +66,15 @@ const processData = flow(async (ctx, input: string) => {
   }
 
   // ✅ Journal transformation
-  const transformed = await ctx.run('transform', () => {
-    return input.toUpperCase()
+  const transformed = await ctx.exec({
+    fn: () => input.toUpperCase(),
+    key: 'transform'
   })
 
   // ✅ Journal external call
-  const saved = await ctx.run('save', async () => {
-    return await saveToDatabase(transformed)
+  const saved = await ctx.exec({
+    fn: () => saveToDatabase(transformed),
+    key: 'save-record'
   })
 
   return { success: true, result: saved }
@@ -77,8 +82,8 @@ const processData = flow(async (ctx, input: string) => {
 ```
 
 **Key Points:**
-- First argument is journal key (string)
-- Second argument is operation (sync or async function)
+- `key` is journal identifier (string)
+- `fn` is operation (sync or async)
 - Returns the operation's result
 - Journal key must be unique within the flow
 - Same key = deduplication (cached result returned)
@@ -94,7 +99,10 @@ const fetchData = vi.fn(() => Promise.resolve("data"))
 
 const loadData = flow<{ url: string }, { data: string }>(
   async (ctx, _input) => {
-    const data = await ctx.run("fetch", () => fetchData())
+    const data = await ctx.exec({
+      fn: () => fetchData(),
+      key: 'fetch'
+    })
     return { data }
   }
 )
@@ -112,8 +120,14 @@ const incrementCounter = vi.fn(() => ++executionCount)
 
 const deduplicatedOps = flow<Record<string, never>, { value: number }>(
   async (ctx, _input) => {
-    const firstCall = await ctx.run("op", () => incrementCounter())
-    const secondCall = await ctx.run("op", () => incrementCounter())
+    const firstCall = await ctx.exec({
+      fn: () => incrementCounter(),
+      key: 'op'
+    })
+    const secondCall = await ctx.exec({
+      fn: () => incrementCounter(),
+      key: 'op'
+    })
     return { value: firstCall }
   }
 )
@@ -134,20 +148,22 @@ const result = await flow.execute(deduplicatedOps, {})
 const apiService = provide(() => ({ fetch: fetchMock }))
 
 const fetchUserById = flow(apiService, async (api, ctx, userId: number) => {
-  // ✅ ctx.run() journals resource call
-  const response = await ctx.run("fetch-user", () =>
-    api.fetch(`/users/${userId}`)
-  )
+  // ✅ ctx.exec({ fn }) journals resource call
+  const response = await ctx.exec({
+    fn: () => api.fetch(`/users/${userId}`),
+    key: 'fetch-user-http'
+  })
   return { userId, username: `user${userId}`, raw: response.data }
 })
 
 const fetchPostsByUserId = flow(
   { api: apiService },
   async ({ api }, ctx, userId: number) => {
-    // ✅ ctx.run() journals resource call
-    const response = await ctx.run("fetch-posts", () =>
-      api.fetch(`/posts?userId=${userId}`)
-    )
+    // ✅ ctx.exec({ fn }) journals resource call
+    const response = await ctx.exec({
+      fn: () => api.fetch(`/posts?userId=${userId}`),
+      key: 'fetch-posts-http'
+    })
     return { posts: [{ id: 1, title: "Post 1" }], raw: response.data }
   }
 )
@@ -158,11 +174,14 @@ const getUserWithPosts = flow(
     const user = await ctx.exec(fetchUserById, userId)
     const posts = await ctx.exec(fetchPostsByUserId, userId)
 
-    // ✅ ctx.run() journals enrichment logic
-    const enriched = await ctx.run("enrich", () => ({
-      ...user,
-      postCount: posts.posts.length
-    }))
+    // ✅ ctx.exec({ fn }) journals enrichment logic
+    const enriched = await ctx.exec({
+      fn: () => ({
+        ...user,
+        postCount: posts.posts.length
+      }),
+      key: 'enrich-user'
+    })
 
     return enriched
   }
@@ -170,9 +189,9 @@ const getUserWithPosts = flow(
 ```
 
 **Pattern:**
-- Sub-flows use `ctx.run()` internally for operations
+- Sub-flows use `ctx.exec({ fn })` internally for operations
 - Parent uses `ctx.exec()` to orchestrate sub-flows
-- `ctx.run()` used for direct logic (enrichment)
+- All journaled steps expose descriptive keys
 
 ### Example 4: Validation with Discriminated Unions (templates.md)
 
@@ -180,36 +199,42 @@ const getUserWithPosts = flow(
 const createUser = flow(
   { userRepo: userRepository },
   async ({ userRepo }, ctx, input: { email: string; name: string }) => {
-    // ✅ ctx.run() for validation logic
-    const validation = await ctx.run('validate-input', () => {
-      if (!input.email.includes('@')) {
-        return { ok: false as const, reason: 'INVALID_EMAIL' as const }
-      }
-      if (input.name.length < 2) {
-        return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
-      }
-      return { ok: true as const }
+    // ✅ ctx.exec({ fn }) for validation logic
+    const validation = await ctx.exec({
+      fn: () => {
+        if (!input.email.includes('@')) {
+          return { ok: false as const, reason: 'INVALID_EMAIL' as const }
+        }
+        if (input.name.length < 2) {
+          return { ok: false as const, reason: 'NAME_TOO_SHORT' as const }
+        }
+        return { ok: true as const }
+      },
+      key: 'validate-input'
     })
 
     if (!validation.ok) {
       return { success: false, reason: validation.reason }
     }
 
-    // ✅ ctx.run() for database query
-    const existing = await ctx.run('check-existing', async () => {
-      return userRepo.findByEmail(input.email)
+    // ✅ ctx.exec({ fn }) for database query
+    const existing = await ctx.exec({
+      fn: () => userRepo.findByEmail(input.email),
+      key: 'check-existing'
     })
 
     if (existing !== null) {
       return { success: false, reason: 'EMAIL_EXISTS' }
     }
 
-    // ✅ ctx.run() for database write
-    const user = await ctx.run('create-user', async () => {
-      return userRepo.create({
-        email: input.email,
-        name: input.name
-      })
+    // ✅ ctx.exec({ fn }) for database write
+    const user = await ctx.exec({
+      fn: () =>
+        userRepo.create({
+          email: input.email,
+          name: input.name
+        }),
+      key: 'create-user'
     })
 
     return { success: true, user }
@@ -521,7 +546,10 @@ const customValue = metadata?.context.find(processingKey)
 import { flowMeta } from '@pumped-fn/core-next'
 
 const inspectFlow = flow(async (ctx, input: number) => {
-  const result = await ctx.run('operation', () => input * 2)
+  const result = await ctx.exec({
+    fn: () => input * 2,
+    key: 'operation'
+  })
   return result
 })
 
@@ -541,7 +569,7 @@ const depth = metadata?.context.get(flowMeta.depth)
 const isParallel = metadata?.context.get(flowMeta.isParallel)
 // false
 
-// ✅ Journal (all ctx.run() operations)
+// ✅ Journal (all ctx.exec({ fn }) operations)
 const journal = metadata?.context.find(flowMeta.journal)
 // Map with journal entries
 ```
@@ -550,9 +578,12 @@ const journal = metadata?.context.find(flowMeta.journal)
 
 ```typescript
 const multiStepCalculation = flow(async (ctx, input: number) => {
-  const doubled = await ctx.run("double", () => input * 2)
-  const tripled = await ctx.run("triple", () => input * 3)
-  const combined = await ctx.run("sum", () => doubled + tripled)
+  const doubled = await ctx.exec({ fn: () => input * 2, key: 'double' })
+  const tripled = await ctx.exec({ fn: () => input * 3, key: 'triple' })
+  const combined = await ctx.exec({
+    fn: () => doubled + tripled,
+    key: 'sum'
+  })
   return combined
 })
 
@@ -585,8 +616,11 @@ See: `processData` in skill-examples/flows-context.ts
 import { flow } from '@pumped-fn/core-next'
 
 const calculateBoth = flow(async (ctx, input: { x: number; y: number }) => {
-  const sum = await ctx.run('sum', () => input.x + input.y)
-  const product = await ctx.run('product', () => input.x * input.y)
+  const sum = await ctx.exec({ fn: () => input.x + input.y, key: 'sum' })
+  const product = await ctx.exec({
+    fn: () => input.x * input.y,
+    key: 'product'
+  })
   return { sum, product }
 })
 
@@ -608,8 +642,11 @@ const journal = details.ctx.context.find(flowMeta.journal)
 
 ```typescript
 const calculateBoth = flow(async (ctx, input: { x: number; y: number }) => {
-  const sum = await ctx.run("sum", () => input.x + input.y)
-  const product = await ctx.run("product", () => input.x * input.y)
+  const sum = await ctx.exec({ fn: () => input.x + input.y, key: 'sum' })
+  const product = await ctx.exec({
+    fn: () => input.x * input.y,
+    key: 'product'
+  })
   return { sum, product }
 })
 
@@ -632,7 +669,7 @@ expect(journal?.size).toBeGreaterThan(0)
 
 ```typescript
 const operationWithError = flow(async (ctx, input: number) => {
-  await ctx.run("before-error", () => input * 2)
+  await ctx.exec({ fn: () => input * 2, key: 'before-error' })
   throw new Error("test error")
 })
 
@@ -658,7 +695,7 @@ expect(journal?.size).toBeGreaterThan(0)  // "before-error" was journaled
 
 ```typescript
 const doubleValue = flow(async (ctx, input: number) => {
-  await ctx.run("increment", () => input + 1)
+  await ctx.exec({ fn: () => input + 1, key: 'increment' })
   return input * 2
 })
 
@@ -716,15 +753,16 @@ if (details.success) {
 
 ## Anti-patterns
 
-### ❌ Using ctx.run() for Sub-flows
+### ❌ Using function-mode ctx.exec for Sub-flows
 
 ```typescript
-// ❌ WRONG: Don't use ctx.run() for sub-flows
-const result = await ctx.run('validate', async () => {
-  return await flow.execute(validateOrder, input)
+// ❌ WRONG: Don't call flow via fn-mode exec
+const result = await ctx.exec({
+  fn: () => flow.execute(validateOrder, input),
+  key: 'validate-wrapper'
 })
 
-// ✅ CORRECT: Use ctx.exec()
+// ✅ CORRECT: Use flow shortcut
 const result = await ctx.exec(validateOrder, input)
 ```
 
@@ -732,26 +770,29 @@ const result = await ctx.exec(validateOrder, input)
 
 ```typescript
 // ❌ WRONG: Duplicate keys cause deduplication
-const first = await ctx.run('step', () => calculateA())
-const second = await ctx.run('step', () => calculateB())
+const first = await ctx.exec({ fn: () => calculateA(), key: 'step' })
+const second = await ctx.exec({ fn: () => calculateB(), key: 'step' })
 // second === first (deduplication!)
 
 // ✅ CORRECT: Unique keys
-const first = await ctx.run('calculate-a', () => calculateA())
-const second = await ctx.run('calculate-b', () => calculateB())
+const first = await ctx.exec({ fn: () => calculateA(), key: 'calculate-a' })
+const second = await ctx.exec({ fn: () => calculateB(), key: 'calculate-b' })
 ```
 
 ### ❌ Over-journaling
 
 ```typescript
 // ❌ WRONG: Journaling trivial operations
-const result = await ctx.run('add', () => x + y)
-const doubled = await ctx.run('double', () => result * 2)
+const result = await ctx.exec({ fn: () => x + y, key: 'add' })
+const doubled = await ctx.exec({ fn: () => result * 2, key: 'double' })
 
 // ✅ CORRECT: Journal meaningful operations only
-const result = await ctx.run('calculate-total', () => {
-  const sum = x + y
-  return sum * 2
+const result = await ctx.exec({
+  fn: () => {
+    const sum = x + y
+    return sum * 2
+  },
+  key: 'calculate-total'
 })
 ```
 
@@ -765,13 +806,13 @@ const result = await ctx.run('calculate-total', () => {
 
 ## Troubleshooting
 
-### Issue: ctx.run() not deduplicating
+### Issue: ctx.exec({ fn }) not deduplicating
 
 **Symptom:** Same operation runs multiple times with same key
 
 ```typescript
-const first = await ctx.run('fetch', () => fetch('/api/data'))
-const second = await ctx.run('fetch', () => fetch('/api/data'))
+const first = await ctx.exec({ fn: () => fetch('/api/data'), key: 'fetch' })
+const second = await ctx.exec({ fn: () => fetch('/api/data'), key: 'fetch' })
 // Both fetch calls execute
 ```
 
@@ -782,8 +823,8 @@ const second = await ctx.run('fetch', () => fetch('/api/data'))
 ```typescript
 // ✅ Static keys deduplicate
 const key = 'fetch-data'
-const first = await ctx.run(key, () => fetch('/api/data'))
-const second = await ctx.run(key, () => fetch('/api/data'))
+const first = await ctx.exec({ fn: () => fetch('/api/data'), key })
+const second = await ctx.exec({ fn: () => fetch('/api/data'), key })
 // Only first fetch executes
 ```
 
@@ -845,16 +886,16 @@ const journal = metadata?.context.find(flowMeta.journal)
 // journal empty or undefined
 ```
 
-**Cause:** Operations not journaled with `ctx.run()`
+**Cause:** Operations not journaled with `ctx.exec({ fn })`
 
-**Solution:** Wrap operations in `ctx.run()`
+**Solution:** Wrap operations in `ctx.exec({ fn, key })`
 
 ```typescript
 // ❌ Not journaled
 const result = await someOperation()
 
 // ✅ Journaled
-const result = await ctx.run('operation', () => someOperation())
+const result = await ctx.exec({ fn: () => someOperation(), key: 'operation' })
 ```
 
 ---
@@ -863,5 +904,5 @@ const result = await ctx.run('operation', () => someOperation())
 
 - **flow-subflows.md** - Using `ctx.exec()` for sub-flow composition
 - **testing-flows.md** - Testing flows and verifying journal entries
-- **coding-standards.md** - Code economy rules for when to use ctx.run()
-- **resource-basic.md** - Resource operations journaled via ctx.run()
+- **coding-standards.md** - Code economy rules for when to use ctx.exec({ fn })
+- **resource-basic.md** - Resource operations journaled via ctx.exec()

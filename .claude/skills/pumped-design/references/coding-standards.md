@@ -323,10 +323,13 @@ export const processOrder = flow(
         return charged
       }
 
-      return ctx.run('finalize', () => ({
-        success: true,
-        orderId: charged.id
-      }))
+      return ctx.exec({
+        fn: () => ({
+          success: true,
+          orderId: charged.id
+        }),
+        key: 'finalize'
+      })
     }
 )
 ```

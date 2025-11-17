@@ -450,7 +450,7 @@ test('correlation extension tracks request lifecycle', async () => {
   const scope = createScope({ extensions: [correlationExtension] })
 
   const testFlow = flow(async (ctx, input: number) => {
-    return await ctx.run('double', () => input * 2)
+    return await ctx.exec({ fn: () => input * 2, key: 'double' })
   })
 
   const result = await scope.exec(testFlow, 5)
@@ -851,6 +851,6 @@ export const httpServerExtension = (app: Hono) => extension({
 ## Related Sub-skills
 
 - **extension-basics** - Using existing extensions, basic wrap() patterns
-- **flow-context** - Understanding ctx.run() and ctx.exec() that extensions intercept
+- **flow-context** - Understanding ctx.exec() operations that extensions intercept
 - **testing-flows** - Testing flows with extensions enabled
 - **entrypoint-patterns** - Attaching extensions at app initialization

@@ -81,8 +81,8 @@ Extensions intercept two kinds of operations:
 - Fields: `target`, `input`, `key?`, `context`
 
 Target types discriminate execution purpose:
-- `{ type: "flow", flow, definition }` - Flow execution (ctx.exec or top-level)
-- `{ type: "fn", params? }` - Function execution (ctx.run)
+- `{ type: "flow", flow, definition }` - Flow execution (ctx.exec flow mode or top-level)
+- `{ type: "fn", params? }` - Function execution (ctx.exec({ fn, params }))
 - `{ type: "parallel", mode, count }` - Parallel coordination (ctx.parallel/parallelSettled)
 
 Named operations have `key` defined (for journaling/replay).
@@ -125,7 +125,7 @@ const metricsExtension = extension({
 
 ### Function (Journal) Hook
 
-Intercepts ctx.run() operations:
+Intercepts ctx.exec({ fn }) operations:
 
 
 See: `journalCaptureExtension` in skill-examples/extensions.ts
@@ -221,9 +221,18 @@ const journalCaptureExtension = extension({
 })
 
 const mathCalculationFlow = flow(async (ctx, input: { x: number; y: number }) => {
-  const product = await ctx.run("multiply", (a: number, b: number) => a * b, input.x, input.y)
-  const sum = await ctx.run("add", (a: number, b: number) => a + b, input.x, input.y)
-  const combined = await ctx.run("combine", () => product + sum)
+  const product = await ctx.exec({
+    fn: () => input.x * input.y,
+    key: 'multiply'
+  })
+  const sum = await ctx.exec({
+    fn: () => input.x + input.y,
+    key: 'add'
+  })
+  const combined = await ctx.exec({
+    fn: () => product + sum,
+    key: 'combine'
+  })
 
   return { product, sum, combined }
 })
@@ -700,4 +709,4 @@ wrap: (scope, next, operation) => {
 
 - **entrypoint-patterns** - Attaching extensions to scope at app initialization
 - **testing-flows** - Testing flows with extensions enabled
-- **flow-context** - Understanding ctx.run() and ctx.exec() that extensions intercept
+- **flow-context** - Understanding ctx.exec() operations that extensions intercept

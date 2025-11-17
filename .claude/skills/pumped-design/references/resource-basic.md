@@ -217,6 +217,33 @@ export const dbPool = provide(() => {
 
 ---
 
+## Flow Consumption + Testing
+
+- Flows declare resources as dependencies (`flow(resource, handler)` or object map). Scope resolves resource exactly once per scope.
+- Use `ctx.exec({ fn, key })` when invoking resource operations that hit external systems so the journal captures the I/O.
+- Override resources during tests with `preset(resource, fakeImplementation)` or `preset(apiTag, value)` to avoid live calls.
+
+```typescript
+export const userRepo = provide((controller) => {
+  const pool = controller.scope.exec(dbPool)
+  return {
+    findById: async (id: string) => pool.query('select * from users where id = $1', [id])
+  }
+})
+
+export const getUser = flow(userRepo, async (repo, ctx, input: { id: string }) => {
+  const record = await ctx.exec({
+    fn: () => repo.findById(input.id),
+    key: 'fetch-user'
+  })
+  return record
+})
+```
+
+**Testing:** `const scope = createScope({ presets: [preset(userRepo, fakeRepo)] })` then `await flow.execute(getUser, { id: '123' })`.
+
+---
+
 ## Troubleshooting
 
 ### Problem: "Resource is resolved multiple times"

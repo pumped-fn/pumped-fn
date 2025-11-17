@@ -17,6 +17,8 @@ activate_when:
 
 Structured approach for building maintainable pumped-fn backend applications with strict organization, regression discoverability, and clear testing strategy.
 
+**Phases:** 1) Architecture sweep (entrypoint/resource/state/flow layout + ctx.exec orchestration) → 2) Testing playbooks (utilities vs flows vs integrations) → 3) Routing matrix (compose sub-skills per component/operation).
+
 **Announce at start:** "I'm using the pumped-design skill to [design/navigate/troubleshoot/test] your pumped-fn application."
 
 ## When to Use
@@ -59,7 +61,7 @@ Structured approach for building maintainable pumped-fn backend applications wit
 | **State: Basic** | state, add, reactive, lifecycle | Adding state | references/state-basic.md |
 | **State: Derived** | state, add, dependencies, composition | State with dependencies | references/state-derived.md |
 | **Flow: Sub-flows** | flow, add, reuse, orchestration | Flow calling flows | references/flow-subflows.md |
-| **Flow: Context** | flow, modify, ctx.run, ctx.exec | Context operations | references/flow-context.md |
+| **Flow: Context** | flow, modify, ctx.exec, journal | Context operations + journaling | references/flow-context.md |
 | **Integration: Hono** | integration, add, hono, http | Hono server setup | references/integration-hono.md |
 | **Integration: Next.js** | integration, add, nextjs, ssr | Next.js integration | references/integration-nextjs.md |
 | **Integration: TanStack** | integration, add, tanstack, router | TanStack Start | references/integration-tanstack.md |
@@ -79,10 +81,21 @@ Structured approach for building maintainable pumped-fn backend applications wit
 
 ## Quick Reference
 
+```mermaid
+graph TD
+  Entrypoint -->|createScope| FlowRoot
+  FlowRoot -->|ctx.exec| SubFlow
+  FlowRoot -->|deps| Resource
+  FlowRoot -->|deps| State
+  State -->|.reactive| FlowRoot
+  SubFlow -->|ctx.exec| Resource
+  SubFlow -->|ctx.exec| State
+```
+
 **File Naming:**
 - `entrypoint.*.ts` - Scope creation, env initialization
 - `resource.*.ts` - DB, logger, cache (provide/derive)
-- `state.*.ts` - Session data, reactive app state (provide/derive)
+- `state.*.ts` - Session data, in-memory reactive app state (provide/derive)
 - `flow.*.ts` - Business workflows (flow())
 - `util.*.ts` - Pure functions or executor wrappers
 
@@ -94,10 +107,23 @@ Structured approach for building maintainable pumped-fn backend applications wit
 - `entrypoint.*` → Smoke only
 
 **Key Patterns:**
-- Sub-flows: `await ctx.exec(subFlow, input)` - NO ctx.run() wrapper
-- Operations: `await ctx.run('step-id', () => ...)`
+- Sub-flows: `await ctx.exec(subFlow, input)` - direct flow dependency
+- Operations: `await ctx.exec({ fn: persistUser, params: [payload], key: 'persist-user' })`
+- State access: `.reactive` dependency to re-run flow, `.static` controller for mutations
 - Errors: Discriminated unions, type narrowing, explicit mapping
 - Types: Never `any`, prefer `unknown`, inference for internals
+
+**Architecture Sweep Checklist:**
+- Entrypoint owns `createScope`, presets, extensions, exported flows
+- Resources/states registered via `provide/derive/preset`, deterministic factories only
+- Flows declare dependencies + tags, orchestrate resources/states/sub-flows via `ctx.exec`
+- Catalog consulted before changes (docs/catalog diagrams)
+
+## Testing Playbooks
+
+- **Utilities (`util.*`):** Unit test with deterministic presets. Cover every branch. Use `pnpm -F @pumped-fn/core-next test` filtered suites when possible.
+- **Flows (`flow.*`):** Integration tests via `flow.execute` + `createScope`. Use `preset` to isolate dependencies. One test per discriminated outcome (success + each error). Assert structured results and inspect `await execution.ctx()` when debugging.
+- **Integrations (Hono/Next/TanStack):** Contract tests verifying adapter wiring + correct flow invocation. Keep flows as observable boundary. Run `pnpm -F @pumped-fn/core-next typecheck`, `pnpm -F @pumped-fn/core-next typecheck:full`, then `pnpm -F @pumped-fn/core-next test`.
 
 ## Design Process
 
@@ -137,13 +163,24 @@ if (!validated.success) return validated
 const charged = await ctx.exec(chargePayment, { amount: validated.total })
 if (!charged.success) return charged
 
-return ctx.run('finalize', () => ({ success: true, orderId: charged.id }))
+return ctx.exec({
+  fn: finalizeOrder,
+  params: [charged.order],
+  key: 'finalize-order',
+})
 ```
 
 **Testing coverage:**
 - Flow with N outputs needs N tests minimum
 - Test Success + each Error variant
 - Use preset() for all dependencies
+
+## Routing Matrix
+
+- Determine **component** (entrypoint/resource/state/flow/util/integration), **operation** (add/modify/test/debug), **dependency depth** (basic/derived/lazy), **integration context** (Next/Hono/TanStack/none), **execution concern** (extensions, journal, parallel).
+- Load only the needed references but announce each: “Opening flow-subflows for ctx.exec patterns.”
+- Stack sub-skills when task crosses boundaries (flow touching derived state + Next.js adapter → load `flow-subflows`, `state-derived`, `integration-nextjs`).
+- Always consult catalog diagrams first, then route.
 
 ## Summary
 

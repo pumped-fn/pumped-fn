@@ -123,6 +123,32 @@ const display = flow(
 )
 ```
 
+### Mix with Resources
+
+States often pair with resources inside a single flow dependency map:
+
+```typescript
+export const cartState = provide(() => new Map<string, number>())
+
+export const checkout = flow(
+  {
+    repo: orderRepository,
+    cart: cartState.reactive
+  },
+  async ({ repo, cart }, ctx) => {
+    const payload = Array.from(cart.entries())
+    const created = await ctx.exec({
+      fn: () => repo.create(payload),
+      key: 'create-order'
+    })
+    return created
+  }
+)
+```
+
+- `cart.reactive` triggers flow re-run when items update.
+- Resource operation is journaled via `ctx.exec`.
+
 ## Static Controller
 
 Use `.static` property to create controllers for imperative mutations.
