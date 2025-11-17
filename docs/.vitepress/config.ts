@@ -48,41 +48,9 @@ export default withMermaid(defineConfig({
 
       sidebar: [
         {
-          text: "Getting Started",
+          text: "ExecutionContext-first",
           items: [
-            { text: "Introduction", link: "/" },
-          ],
-        },
-        {
-          text: "Guides",
-          items: [
-            { text: "Executors and Dependencies", link: "/guides/01-executors-and-dependencies" },
-            { text: "Tags: The Type System", link: "/guides/02-tags-the-type-system" },
-            { text: "Scope Lifecycle", link: "/guides/03-scope-lifecycle" },
-            { text: "Type Inference Patterns", link: "/guides/04-type-inference-patterns" },
-            { text: "Flow", link: "/guides/05-flow" },
-            { text: "Promised API", link: "/guides/07-promised-api" },
-            { text: "Reactive Patterns", link: "/guides/08-reactive-patterns" },
-            { text: "Extensions", link: "/guides/09-extensions" },
-            { text: "Error Handling", link: "/guides/10-error-handling" },
-          ],
-        },
-        {
-          text: "Patterns",
-          items: [
-            { text: "HTTP Server Setup", link: "/patterns/http-server-setup" },
-            { text: "Database Transactions", link: "/patterns/database-transactions" },
-            { text: "Testing Strategies", link: "/patterns/testing-strategies" },
-            { text: "Middleware Composition", link: "/patterns/middleware-composition" },
-          ],
-        },
-        {
-          text: "Reference",
-          items: [
-            { text: "API Cheatsheet", link: "/reference/api-cheatsheet" },
-            { text: "Type Verification", link: "/reference/type-verification" },
-            { text: "Common Mistakes", link: "/reference/common-mistakes" },
-            { text: "Error Solutions", link: "/reference/error-solutions" },
+            { text: "Activation Map", link: "/" },
           ],
         },
       ],
