@@ -1,5 +1,12 @@
 # @pumped-fn/devtools
 
+## 0.2.10
+
+### Patch Changes
+
+- Updated dependencies [f4009fb]
+  - @pumped-fn/core-next@0.5.88
+
 ## 0.2.9
 
 ### Patch Changes

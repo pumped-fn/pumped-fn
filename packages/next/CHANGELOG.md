@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.88
+
+### Patch Changes
+
+- f4009fb: Add tag scope integration test
+
 ## 0.5.87
 
 ### Patch Changes
