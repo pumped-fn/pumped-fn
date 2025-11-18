@@ -10,6 +10,7 @@ import {
   Promised,
   tag,
 } from "../src"
+import type { Flow } from "../src"
 import { createExecutor } from "../src/executor"
 import { createAbortWithTimeout } from "../src/internal/abort-utils"
 import { scenario } from "./scenario"
@@ -474,31 +475,46 @@ describe("core behavior", () => {
     expect(ctx.parent).toBeUndefined()
 
     const parentCtx = scope.createExecution({ name: "parent" })
-    let childCtx: any
-    const result = await parentCtx.exec("child", (c) => {
-      childCtx = c
-      expect(c.parent).toBe(parentCtx)
-      expect(c.details.name).toBe("child")
-      return "result"
+    let childCtx: Flow.Context | undefined
+    const captureFlow = flow({
+      name: "captureFlow",
+      input: custom<string>(),
+      output: custom<string>(),
+    }).handler(async (ctx, value) => {
+      childCtx = ctx
+      expect(ctx.parent).toBe(parentCtx)
+      expect(ctx.details.name).toBe("captureFlow")
+      return value
     })
-    expect(childCtx.parent).toBe(parentCtx)
+    const result = await parentCtx.exec({ flow: captureFlow, input: "result" })
+    expect(childCtx?.parent).toBe(parentCtx)
     expect(result).toBe("result")
 
     const requestIdTag = tag(custom<string>(), { label: "requestId" })
     const tagCtx = scope.createExecution({ name: "parent" })
     tagCtx.set(requestIdTag, "req-123")
-    await tagCtx.exec("child", (child) => {
-      expect(child.get(requestIdTag)).toBe("req-123")
-    })
+    const readTagFlow = flow({
+      name: "readTag",
+      input: custom<void>(),
+      output: custom<string>(),
+    }).handler(async (ctx) => ctx.get(requestIdTag))
+    const tagValue = await tagCtx.exec({ flow: readTagFlow, input: undefined })
+    expect(tagValue).toBe("req-123")
 
     const nameTag = tag(custom<string>(), { label: "name" })
     const inheritCtx = scope.createExecution({ name: "parent" })
     inheritCtx.set(nameTag, "parent-name")
-    await inheritCtx.exec("child", (child) => {
-      child.set(nameTag, "child-name")
-      expect(child.get(nameTag)).toBe("child-name")
-      expect(inheritCtx.get(nameTag)).toBe("parent-name")
+    const inheritFlow = flow({
+      name: "inheritTag",
+      input: custom<void>(),
+      output: custom<string>(),
+    }).handler(async (ctx) => {
+      ctx.set(nameTag, "child-name")
+      return ctx.get(nameTag)
     })
+    const inherited = await inheritCtx.exec({ flow: inheritFlow, input: undefined })
+    expect(inherited).toBe("child-name")
+    expect(inheritCtx.get(nameTag)).toBe("parent-name")
 
     const ended = scope.createExecution({ name: "test" })
     expect(ended.details.completedAt).toBeUndefined()
@@ -506,16 +522,19 @@ describe("core behavior", () => {
     expect(ended.details.completedAt).toBeDefined()
 
     const errorCtx = scope.createExecution({ name: "parent" })
-    let failingChild: any
-    try {
-      await errorCtx.exec("failing", (c) => {
-        failingChild = c
-        throw new Error("test error")
-      })
-    } catch {}
-    expect(failingChild.details.error).toBeInstanceOf(Error)
-    expect((failingChild.details.error as Error).message).toBe("test error")
-    expect(failingChild.details.completedAt).toBeDefined()
+    let failingChild: Flow.Context | undefined
+    const failingFlow = flow({
+      name: "failingFlow",
+      input: custom<void>(),
+      output: custom<void>(),
+    }).handler(async (ctx) => {
+      failingChild = ctx
+      throw new Error("test error")
+    })
+    await expect(errorCtx.exec({ flow: failingFlow, input: undefined })).rejects.toThrow(
+      "test error",
+    )
+    expect(failingChild?.details.completedAt).toBeDefined()
 
     const abortCtx = scope.createExecution({ name: "test" })
     expect(abortCtx.signal.aborted).toBe(false)

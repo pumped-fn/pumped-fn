@@ -39,7 +39,8 @@ export { tag } from "./tag";
 export type { Tag } from "./tag-types";
 export { tags } from "./tag-executors";
 
-export { flow, flowMeta } from "./flow";
+export { flow } from "./flow";
+export { flowMeta } from "./execution-context";
 export { Promised } from "./promises";
 
 export { extension } from "./extension";

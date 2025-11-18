@@ -16,7 +16,7 @@ graph LR
 
   subgraph Flow[Flow Medium]
     C["flow() definitions + schema validation + flowMeta tags"]
-    D["Flow.Context parallel + resetJournal + exec overloads"]
+    D["ExecutionContext.Context (Flow ctx) parallel + resetJournal + exec overloads"]
     E["Extension.Operation dispatch"]
   end
 
@@ -127,12 +127,12 @@ classDiagram
   }
 
   ExecutionContext <|-- FlowContext
-  FlowDefinition --* FlowContext
+  FlowDefinition --* ExecutionContextImpl
   FlowDefinition --> ExecutorFactory
   ExecutorFactory --> Scope
   ExecutionContext --> Scope : controller access
-  FlowContext --> Promised
-  FlowContext --> InternalUtils : journal/abort helpers
+  ExecutionContext --> Promised
+  ExecutionContext --> InternalUtils : journal/abort helpers
   Promised --> Scope
   ExtensionModule --> ExecutionContext : wrap/onError hooks
   ExtensionModule --> Scope : dispose lifecycle
@@ -143,12 +143,18 @@ classDiagram
 | Layer | API | Usage pulse | Tests |
 | --- | --- | --- | --- |
 | ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/execution-context.test.ts`, `flow-execution.test.ts`
-| Flow | `flow()`, `flowMeta`, `flow.execute`, `Flow.Context` overloads | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
+| Flow | `flow()`, `flowMeta`, `flow.execute`, `ExecutionContext.Context` (aka Flow.Context) | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
 | Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/scope-run.test.ts`, `core.test.ts`
 | Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`, `multi.test.ts`
 | Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/tag.test.ts`, `meta.test.ts`
 | Extensions | `extension()`, `extension.wrap/onError/dispose` | cross-cutting instrumentation via ExecutionContext + Scope only | `packages/next/tests/extensions.test.ts`, `flow-extensions.test.ts`
 | Promised & Utilities | `Promised`, `MaybePromised`, `standardSchema`, `errors.*` | unify sync+async, validate inputs/outputs, bubble typed errors | `packages/next/tests/promised-settled.test.ts`, `errors` suite
+
+## Migration Notes
+
+- `Flow.Context` is now an alias of `ExecutionContext.Context`. Replace any imports of FlowContext implementations with the ExecutionContext exports or call `scope.createExecution()` directly when a context is needed outside flow handlers.
+- Custom FlowContext subclasses should be deleted; reuse `ExecutionContextImpl` or helper utilities exposed from `execution-context.ts`.
+- Extension authors should rely on `operation.context` (Tag.Store) for tags and request a new child ExecutionContext via `scope.createExecution()` instead of storing their own context copies.
 
 ## Canonical twoslash
 ```ts twoslash

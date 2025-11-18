@@ -16,7 +16,7 @@ graph LR
 
   subgraph Flow[Flow Medium]
     C["flow() definitions + schema validation + flowMeta tags"]
-    D["Flow.Context parallel + resetJournal + exec overloads"]
+    D["ExecutionContext.Context (Flow ctx) parallel + resetJournal + exec overloads"]
     E["Extension.Operation dispatch"]
   end
 
@@ -126,13 +126,13 @@ classDiagram
     +dispose(scope)
   }
 
-  ExecutionContext <|-- FlowContext
-  FlowDefinition --* FlowContext
+  ExecutionContext <|-- ExecutionContextImpl
+  FlowDefinition --* ExecutionContextImpl
   FlowDefinition --> ExecutorFactory
   ExecutorFactory --> Scope
   ExecutionContext --> Scope : controller access
-  FlowContext --> Promised
-  FlowContext --> InternalUtils : journal/abort helpers
+  ExecutionContext --> Promised
+  ExecutionContext --> InternalUtils : journal/abort helpers
   Promised --> Scope
   ExtensionModule --> ExecutionContext : wrap/onError hooks
   ExtensionModule --> Scope : dispose lifecycle
@@ -143,7 +143,7 @@ classDiagram
 | Layer | API | Usage pulse | Tests |
 | --- | --- | --- | --- |
 | ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/execution-context.test.ts`, `flow-execution.test.ts`
-| Flow | `flow()`, `flowMeta`, `flow.execute`, `Flow.Context` overloads | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
+| Flow | `flow()`, `flowMeta`, `flow.execute`, `ExecutionContext.Context` (aka Flow.Context) | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
 | Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/scope-run.test.ts`, `core.test.ts`
 | Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`, `multi.test.ts`
 | Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/tag.test.ts`, `meta.test.ts`

@@ -7,114 +7,172 @@ import {
 import { type Tag } from "./tag-types";
 import { name } from "./index";
 
-export const codes = {
-  FACTORY_EXECUTION_FAILED: "F001",
-  FACTORY_THREW_ERROR: "F002",
-  FACTORY_RETURNED_INVALID_TYPE: "F003",
-  FACTORY_ASYNC_ERROR: "F004",
-
-  DEPENDENCY_NOT_FOUND: "D001",
-  CIRCULAR_DEPENDENCY: "D002",
-  DEPENDENCY_RESOLUTION_FAILED: "D003",
-  INVALID_DEPENDENCY_TYPE: "D004",
-  DEPENDENCY_CHAIN_TOO_DEEP: "D005",
-
-  SCOPE_DISPOSED: "S001",
-  EXECUTOR_NOT_RESOLVED: "S002",
-  INVALID_SCOPE_STATE: "S003",
-  SCOPE_CLEANUP_FAILED: "S004",
-  UPDATE_CALLBACK_ON_DISPOSING_SCOPE: "S006",
-
-  SCHEMA_VALIDATION_FAILED: "V001",
-  META_VALIDATION_FAILED: "V002",
-  INPUT_TYPE_MISMATCH: "V003",
-  OUTPUT_TYPE_MISMATCH: "V004",
-  ASYNC_VALIDATION_NOT_SUPPORTED: "V005",
-
-  INTERNAL_RESOLUTION_ERROR: "SYS001",
-  CACHE_CORRUPTION: "SYS002",
-  MEMORY_LEAK_DETECTED: "SYS003",
-  PLUGIN_SYSTEM_ERROR: "SYS004",
-
-  INVALID_EXECUTOR_CONFIG: "C001",
-  MALFORMED_DEPENDENCIES: "C002",
-  INVALID_FACTORY_SIGNATURE: "C003",
-  PRESET_APPLICATION_FAILED: "C004",
-
-  FLOW_EXECUTION_FAILED: "FL001",
-  FLOW_CONTEXT_MISSING: "FL002",
-  FLOW_PLUGIN_ERROR: "FL003",
-  FLOW_INPUT_VALIDATION_FAILED: "FL004",
-  FLOW_OUTPUT_VALIDATION_FAILED: "FL005",
+const errorCatalog = {
+  FACTORY_EXECUTION_FAILED: {
+    code: "F001",
+    message:
+      "Factory function execution failed for executor '{executorName}'. {cause}",
+  },
+  FACTORY_THREW_ERROR: {
+    code: "F002",
+    message:
+      "Factory function threw an error in executor '{executorName}': {originalMessage}",
+  },
+  FACTORY_RETURNED_INVALID_TYPE: {
+    code: "F003",
+    message:
+      "Factory function returned invalid type. Expected {expectedType}, got {actualType}",
+  },
+  FACTORY_ASYNC_ERROR: {
+    code: "F004",
+    message: "Async factory function failed with error: {originalMessage}",
+  },
+  DEPENDENCY_NOT_FOUND: {
+    code: "D001",
+    message:
+      "Dependency '{dependencyName}' could not be resolved in the current scope",
+  },
+  CIRCULAR_DEPENDENCY: {
+    code: "D002",
+    message: "Circular dependency detected in chain: {dependencyChain}",
+  },
+  DEPENDENCY_RESOLUTION_FAILED: {
+    code: "D003",
+    message:
+      "Failed to resolve dependencies for executor '{executorName}': {cause}",
+  },
+  INVALID_DEPENDENCY_TYPE: {
+    code: "D004",
+    message:
+      "Invalid dependency type provided. Expected Executor, got {actualType}",
+  },
+  DEPENDENCY_CHAIN_TOO_DEEP: {
+    code: "D005",
+    message:
+      "Dependency resolution chain exceeded maximum depth of {maxDepth}",
+  },
+  SCOPE_DISPOSED: {
+    code: "S001",
+    message: "Cannot perform operation on disposed scope",
+  },
+  EXECUTOR_NOT_RESOLVED: {
+    code: "S002",
+    message:
+      "Executor '{executorName}' is not resolved. Call resolve() first or check if resolution failed",
+  },
+  INVALID_SCOPE_STATE: {
+    code: "S003",
+    message: "Scope is in invalid state for this operation: {currentState}",
+  },
+  SCOPE_CLEANUP_FAILED: {
+    code: "S004",
+    message: "Scope cleanup failed: {cause}",
+  },
+  UPDATE_CALLBACK_ON_DISPOSING_SCOPE: {
+    code: "S006",
+    message: "Cannot register update callback on a disposing scope",
+  },
+  SCHEMA_VALIDATION_FAILED: {
+    code: "V001",
+    message: "Schema validation failed: {validationMessage}",
+  },
+  META_VALIDATION_FAILED: {
+    code: "V002",
+    message:
+      "Meta validation failed for key '{metaKey}': {validationMessage}",
+  },
+  INPUT_TYPE_MISMATCH: {
+    code: "V003",
+    message: "Input type validation failed: {validationMessage}",
+  },
+  OUTPUT_TYPE_MISMATCH: {
+    code: "V004",
+    message: "Output type validation failed: {validationMessage}",
+  },
+  ASYNC_VALIDATION_NOT_SUPPORTED: {
+    code: "V005",
+    message: "Async validation is not currently supported",
+  },
+  INTERNAL_RESOLUTION_ERROR: {
+    code: "SYS001",
+    message:
+      "Internal error during executor resolution. This is likely a bug in Pumped Functions",
+  },
+  CACHE_CORRUPTION: {
+    code: "SYS002",
+    message: "Executor cache corruption detected. Scope integrity compromised",
+  },
+  MEMORY_LEAK_DETECTED: {
+    code: "SYS003",
+    message: "Potential memory leak detected in scope {scopeId}",
+  },
+  PLUGIN_SYSTEM_ERROR: {
+    code: "SYS004",
+    message: "Plugin system error: {pluginName} - {cause}",
+  },
+  INVALID_EXECUTOR_CONFIG: {
+    code: "C001",
+    message: "Invalid executor configuration: {configError}",
+  },
+  MALFORMED_DEPENDENCIES: {
+    code: "C002",
+    message: "Malformed dependency structure: {dependencyError}",
+  },
+  INVALID_FACTORY_SIGNATURE: {
+    code: "C003",
+    message:
+      "Factory function has invalid signature. Expected (dependencies, controller) => value",
+  },
+  PRESET_APPLICATION_FAILED: {
+    code: "C004",
+    message: "Failed to apply preset: {presetError}",
+  },
+  FLOW_EXECUTION_FAILED: {
+    code: "FL001",
+    message: "Flow execution failed: {flowName}",
+  },
+  FLOW_CONTEXT_MISSING: {
+    code: "FL002",
+    message: "Flow execution context is missing or invalid",
+  },
+  FLOW_PLUGIN_ERROR: {
+    code: "FL003",
+    message: "Flow plugin '{pluginName}' failed: {cause}",
+  },
+  FLOW_INPUT_VALIDATION_FAILED: {
+    code: "FL004",
+    message: "Flow input validation failed: {validationMessage}",
+  },
+  FLOW_OUTPUT_VALIDATION_FAILED: {
+    code: "FL005",
+    message: "Flow output validation failed: {validationMessage}",
+  },
 } as const;
 
-export type Code = (typeof codes)[keyof typeof codes];
+type ErrorCatalog = typeof errorCatalog;
 
-const messages: Record<Code, string> = {
-  [codes.FACTORY_EXECUTION_FAILED]:
-    "Factory function execution failed for executor '{executorName}'. {cause}",
-  [codes.FACTORY_THREW_ERROR]:
-    "Factory function threw an error in executor '{executorName}': {originalMessage}",
-  [codes.FACTORY_RETURNED_INVALID_TYPE]:
-    "Factory function returned invalid type. Expected {expectedType}, got {actualType}",
-  [codes.FACTORY_ASYNC_ERROR]:
-    "Async factory function failed with error: {originalMessage}",
+export type Code = ErrorCatalog[keyof ErrorCatalog]["code"];
 
-  [codes.DEPENDENCY_NOT_FOUND]:
-    "Dependency '{dependencyName}' could not be resolved in the current scope",
-  [codes.CIRCULAR_DEPENDENCY]:
-    "Circular dependency detected in chain: {dependencyChain}",
-  [codes.DEPENDENCY_RESOLUTION_FAILED]:
-    "Failed to resolve dependencies for executor '{executorName}': {cause}",
-  [codes.INVALID_DEPENDENCY_TYPE]:
-    "Invalid dependency type provided. Expected Executor, got {actualType}",
-  [codes.DEPENDENCY_CHAIN_TOO_DEEP]:
-    "Dependency resolution chain exceeded maximum depth of {maxDepth}",
+const buildCodes = (): { [K in keyof ErrorCatalog]: ErrorCatalog[K]["code"] } => {
+  const entries = Object.keys(errorCatalog).map((key) => {
+    const catalogKey = key as keyof ErrorCatalog
+    return [catalogKey, errorCatalog[catalogKey].code] as const
+  })
+  return Object.fromEntries(entries) as {
+    [K in keyof ErrorCatalog]: ErrorCatalog[K]["code"]
+  }
+}
 
-  [codes.SCOPE_DISPOSED]: "Cannot perform operation on disposed scope",
-  [codes.EXECUTOR_NOT_RESOLVED]:
-    "Executor '{executorName}' is not resolved. Call resolve() first or check if resolution failed",
-  [codes.INVALID_SCOPE_STATE]:
-    "Scope is in invalid state for this operation: {currentState}",
-  [codes.SCOPE_CLEANUP_FAILED]: "Scope cleanup failed: {cause}",
-  [codes.UPDATE_CALLBACK_ON_DISPOSING_SCOPE]:
-    "Cannot register update callback on a disposing scope",
+const buildMessages = (): Record<Code, string> => {
+  const entries = Object.keys(errorCatalog).map((key) => {
+    const entry = errorCatalog[key as keyof ErrorCatalog]
+    return [entry.code, entry.message] as const
+  })
+  return Object.fromEntries(entries) as Record<Code, string>
+}
 
-  [codes.SCHEMA_VALIDATION_FAILED]:
-    "Schema validation failed: {validationMessage}",
-  [codes.META_VALIDATION_FAILED]:
-    "Meta validation failed for key '{metaKey}': {validationMessage}",
-  [codes.INPUT_TYPE_MISMATCH]:
-    "Input type validation failed: {validationMessage}",
-  [codes.OUTPUT_TYPE_MISMATCH]:
-    "Output type validation failed: {validationMessage}",
-  [codes.ASYNC_VALIDATION_NOT_SUPPORTED]:
-    "Async validation is not currently supported",
-
-  [codes.INTERNAL_RESOLUTION_ERROR]:
-    "Internal error during executor resolution. This is likely a bug in Pumped Functions",
-  [codes.CACHE_CORRUPTION]:
-    "Executor cache corruption detected. Scope integrity compromised",
-  [codes.MEMORY_LEAK_DETECTED]:
-    "Potential memory leak detected in scope {scopeId}",
-  [codes.PLUGIN_SYSTEM_ERROR]: "Plugin system error: {pluginName} - {cause}",
-
-  [codes.INVALID_EXECUTOR_CONFIG]:
-    "Invalid executor configuration: {configError}",
-  [codes.MALFORMED_DEPENDENCIES]:
-    "Malformed dependency structure: {dependencyError}",
-  [codes.INVALID_FACTORY_SIGNATURE]:
-    "Factory function has invalid signature. Expected (dependencies, controller) => value",
-  [codes.PRESET_APPLICATION_FAILED]: "Failed to apply preset: {presetError}",
-
-  [codes.FLOW_EXECUTION_FAILED]: "Flow execution failed: {flowName}",
-  [codes.FLOW_CONTEXT_MISSING]: "Flow execution context is missing or invalid",
-  [codes.FLOW_PLUGIN_ERROR]: "Flow plugin '{pluginName}' failed: {cause}",
-  [codes.FLOW_INPUT_VALIDATION_FAILED]:
-    "Flow input validation failed: {validationMessage}",
-  [codes.FLOW_OUTPUT_VALIDATION_FAILED]:
-    "Flow output validation failed: {validationMessage}",
-};
+export const codes: { [K in keyof ErrorCatalog]: ErrorCatalog[K]["code"] } = buildCodes()
+const messages: Record<Code, string> = buildMessages()
 
 export function formatMessage(
   code: Code,
