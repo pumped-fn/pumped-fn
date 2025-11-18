@@ -43,6 +43,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
+    ],
+    "patchedDependencies": {
+      "read-yaml-file@1.1.0": "patches/read-yaml-file@1.1.0.patch"
+    }
   }
 }
