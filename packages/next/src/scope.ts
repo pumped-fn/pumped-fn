@@ -21,7 +21,8 @@ import { type Tag, tagSymbol } from "./tag-types";
 import { isTag, isTagExecutor } from "./tag-executors";
 import { Promised } from "./promises";
 import * as errors from "./errors";
-import { flow as flowApi, FlowContext, flowMeta, flowDefinitionMeta } from "./flow";
+import { flow as flowApi } from "./flow";
+import { flowDefinitionMeta } from "./execution-context";
 import { mergeFlowTags } from "./tags/merge";
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./ssch";
@@ -460,6 +461,7 @@ class BaseScope implements Core.Scope {
     this["~ensureNotDisposed"]();
     return new ExecutionContextImpl({
       scope: this,
+      extensions: this.extensions,
       details: details || {}
     });
   }
@@ -1206,13 +1208,13 @@ class BaseScope implements Core.Scope {
         throw new Error("Flow definition not found in executor metadata");
       }
 
-      const context = new FlowContext(
-        this,
-        this.extensions,
-        mergeFlowTags(definition.tags, executionTags),
-        undefined,
-        abortController
-      );
+      const context = new ExecutionContextImpl({
+        scope: this,
+        extensions: this.extensions,
+        tags: mergeFlowTags(definition.tags, executionTags),
+        abortController,
+        details: { name: definition.name }
+      });
       context.initializeExecutionContext(definition.name, false);
 
       try {

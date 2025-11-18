@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest"
 import { flow } from "../../src/flow"
 import { custom } from "../../src/ssch"
 
-describe("FlowContext.exec journaling", () => {
+describe("ExecutionContext.exec journaling", () => {
   it("replays journaled flow executions", async () => {
     const innerCalls = vi.fn()
     const inner = flow({

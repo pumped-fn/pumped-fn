@@ -3,7 +3,7 @@ import { flow } from "../../src/flow"
 import { custom } from "../../src/ssch"
 import { Promised } from "../../src/promises"
 
-describe("FlowContext parallel helpers", () => {
+describe("ExecutionContext parallel helpers", () => {
   it("reports stats for parallel success", async () => {
     const runner = flow({
       name: "parallel",

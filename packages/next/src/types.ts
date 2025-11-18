@@ -519,69 +519,9 @@ export namespace Flow {
     onItemComplete?: (result: any, index: number) => void;
   };
 
-  export type Context = C;
+  export type Context = ExecutionContext.Context;
 
-  export type C = ExecutionContext.Context & {
-    readonly scope: Core.Scope;
-    readonly tags: Tag.Tagged[] | undefined;
-    readonly signal: AbortSignal;
-
-    exec<F extends UFlow>(
-      flow: F,
-      input: InferInput<F>
-    ): Promised<InferOutput<F>>;
-
-    exec<F extends UFlow>(
-      key: string,
-      flow: F,
-      input: InferInput<F>
-    ): Promised<InferOutput<F>>;
-
-    exec<F extends UFlow>(config: {
-      flow: F;
-      input: InferInput<F>;
-      key?: string;
-      timeout?: number;
-      retry?: number;
-      tags?: Tag.Tagged[];
-    }): Promised<InferOutput<F>>;
-
-    exec<T>(config: {
-      fn: () => T | Promise<T>;
-      params?: never;
-      key?: string;
-      timeout?: number;
-      retry?: number;
-      tags?: Tag.Tagged[];
-    }): Promised<T>;
-
-    exec<Fn extends (...args: any[]) => any>(config: {
-      fn: Fn;
-      params: Parameters<Fn>;
-      key?: string;
-      timeout?: number;
-      retry?: number;
-      tags?: Tag.Tagged[];
-    }): Promised<ReturnType<Fn>>;
-
-    parallel<T extends readonly Promised<any>[]>(
-      promises: [...T]
-    ): Promised<
-      ParallelResult<{
-        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
-      }>
-    >;
-
-    parallelSettled<T extends readonly Promised<any>[]>(
-      promises: [...T]
-    ): Promised<
-      ParallelSettledResult<{
-        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
-      }>
-    >;
-
-    resetJournal(keyPattern?: string): void;
-  };
+  export type C = ExecutionContext.Context;
 
   export type ExecutionData = {
     readonly context: {
@@ -608,7 +548,6 @@ export namespace Flow {
     readonly flowName: string | undefined;
     readonly status: ExecutionStatus;
     readonly ctx: ExecutionData | undefined;
-    readonly executionContext: ExecutionContext.Context | undefined;
     readonly abort: AbortController;
     readonly statusCallbackErrors: readonly Error[];
 
@@ -648,12 +587,70 @@ export namespace ExecutionContext {
     readonly tagStore: Tag.Store;
     readonly signal: AbortSignal;
     readonly details: Details;
+    readonly tags: Tag.Tagged[] | undefined;
 
-    exec<T>(name: string, fn: (ctx: Context) => T): Promised<T>;
     get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
     find<T>(tag: Tag.Tag<T, false>): T | undefined;
     find<T>(tag: Tag.Tag<T, true>): T;
     set<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>, value: T): void;
+    initializeExecutionContext(flowName: string, isParallel?: boolean): void;
+
+    exec<F extends Flow.UFlow>(
+      flow: F,
+      input: Flow.InferInput<F>
+    ): Promised<Flow.InferOutput<F>>;
+
+    exec<F extends Flow.UFlow>(
+      key: string,
+      flow: F,
+      input: Flow.InferInput<F>
+    ): Promised<Flow.InferOutput<F>>;
+
+    exec<F extends Flow.UFlow>(config: {
+      flow: F;
+      input: Flow.InferInput<F>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<Flow.InferOutput<F>>;
+
+    exec<T>(config: {
+      fn: () => T | Promise<T>;
+      params?: never;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<T>;
+
+    exec<Fn extends (...args: any[]) => any>(config: {
+      fn: Fn;
+      params: Parameters<Fn>;
+      key?: string;
+      timeout?: number;
+      retry?: number;
+      tags?: Tag.Tagged[];
+    }): Promised<ReturnType<Fn>>;
+
+    parallel<T extends readonly Promised<any>[]>(
+      promises: [...T]
+    ): Promised<
+      Flow.ParallelResult<{
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+      }>
+    >;
+
+    parallelSettled<T extends readonly Promised<any>[]>(
+      promises: [...T]
+    ): Promised<
+      Flow.ParallelSettledResult<{
+        [K in keyof T]: T[K] extends Promised<infer R> ? R : never;
+      }>
+    >;
+
+    resetJournal(keyPattern?: string): void;
+    createSnapshot(): Flow.ExecutionData;
     end(): void;
     throwIfAborted(): void;
   }
@@ -690,7 +687,6 @@ export namespace Extension {
     input: unknown;
     key?: string;
     context: Tag.Store;
-    executionContext?: ExecutionContext.Context;
   };
 
   export type Operation = ResolveOperation | ExecutionOperation;

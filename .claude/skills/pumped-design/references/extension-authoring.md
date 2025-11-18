@@ -124,68 +124,49 @@ type ParallelTarget = { type: "parallel"; mode: "parallel" | "parallelSettled"; 
 ### ExecutionContext: Standalone Primitive
 
 **ExecutionContext** is the core execution primitive in pumped-fn:
-- Can be created directly via `scope.createExecution()`
-- Used independently without flows
-- Powers Flow.Context internally
-- Provides execution hierarchy, tag inheritance, abort signals
+- Create directly via `scope.createExecution()` or receive it as Flow `ctx`
+- Used independently without flows; Flow.Context is now just an alias
+- Provides execution hierarchy, tag inheritance, abort signals, journaling, parallel helpers
 - Layer boundaries + touchpoints visualized in `docs/index.md`; review that diagram before designing or reviewing extensions
 
-```typescript
-namespace ExecutionContext {
-  interface Details {
-    name: string
-    startedAt: number
-    completedAt?: number
-    error?: unknown
-    metadata?: Record<string, unknown>
-  }
+**ExecutionContext API highlights:**
+- `ctx.exec({ flow, input, key?, timeout?, retry?, tags? })` - run flows with journaling + retries
+- `ctx.exec({ fn, params?, key?, timeout?, retry?, tags? })` - run arbitrary async/sync functions with journaling
+- `ctx.parallel()` / `ctx.parallelSettled()` - parallel Promised helpers with stats
+- `ctx.resetJournal(pattern?)` - clear cached journal entries
+- `ctx.createSnapshot()` - capture readonly tag + journal state for reporting
+- Tag helpers: `ctx.get(tag)`, `ctx.find(tag)`, `ctx.set(tag, value)`
+- Lifecycle: `ctx.initializeExecutionContext(flowName, isParallel?)`, `ctx.end()`, `ctx.throwIfAborted()`
 
-  interface Context {
-    readonly scope: Scope
-    readonly parent: Context | undefined
-    readonly id: string
-    readonly tagStore: Tag.Store
-    readonly signal: AbortSignal
-    readonly details: Details
-
-    exec<T>(name: string, fn: (ctx: Context) => T): Promised<T>
-    get<T>(tag: Tag.Tag<T>): T
-    find<T>(tag: Tag.Tag<T>): T | undefined
-    set<T>(tag: Tag.Tag<T>, value: T): void
-    end(): void
-    throwIfAborted(): void
-  }
-}
-```
-
-**Creating ExecutionContext:**
+**Creating ExecutionContext + running flow:**
 ```typescript
 const scope = createScope()
 const ctx = scope.createExecution({ name: 'my-operation' })
 
-ctx.exec('step1', async (childCtx) => {
-  childCtx.set(someTag, 'value')
-  return await doWork()
-})
+const childFlow = flow({ name: 'child', input: custom<number>(), output: custom<number>() })
+  .handler(async (childCtx, value) => {
+    childCtx.set(someTag, 'value')
+    return value * 2
+  })
+
+const doubled = await ctx.exec({ key: 'step1', flow: childFlow, input: 21 })
 
 ctx.end()
 ```
 
-### Context Hierarchy: ExecutionContext → Flow.Context
+### Context Hierarchy: ExecutionContext everywhere
 
 **ExecutionContext.Context** (primitive):
 - Core execution context interface
 - Created via `scope.createExecution()`
-- Methods: `exec()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`
+- Methods: `exec()` for flows/fns, `parallel()`, `parallelSettled()`, `resetJournal()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`, `createSnapshot()`
 - Tag API: `ctx.get(tag)`, `ctx.set(tag, value)` - uses Tag object
 - Used for any execution, not just flows
 
-**Flow.Context** (extension of ExecutionContext):
-- Extends ExecutionContext.Context with flow-specific operations
+**Flow.Context**:
+- Alias of ExecutionContext.Context
 - Created automatically by flow execution
-- Additional methods: `run()`, `parallel()`, `parallelSettled()`, `resetJournal()`
-- Overloaded `exec()` for flow/fn execution with retry/timeout options
-- Tag API: same as ExecutionContext, `ctx.get(tag)`, `ctx.set(tag, value)`
+- Same surface as ExecutionContext, so docs + extensions can treat them identically
 
 **Extension operation.context (Tag.Store)**:
 - Low-level tag storage interface
@@ -204,8 +185,7 @@ ctx.end()
 
 | API | Where | Get Tag | Set Tag | Notes |
 |-----|-------|---------|---------|-------|
-| ExecutionContext.Context | `scope.createExecution()`, `operation.executionContext` | `ctx.get(tag)` | `ctx.set(tag, value)` | Primitive, uses Tag objects |
-| Flow.Context | Flow body `ctx` parameter | `ctx.get(tag)` | `ctx.set(tag, value)` | Extends ExecutionContext, uses Tag objects |
+| ExecutionContext.Context (Flow.Context) | `scope.createExecution()`, Flow body `ctx`, `operation.executionContext` | `ctx.get(tag)` | `ctx.set(tag, value)` | Single surface for Flow + standalone |
 | Tag.Store | `operation.context` | `store.get(tag.key)` | `store.set(tag.key, value)` | Low-level, uses symbol keys |
 
 **Visual Example - All Three APIs:**
@@ -228,9 +208,13 @@ const example = extension({
         const requestIdFromExecCtx = operation.executionContext.find(requestIdTag)
         console.log('ExecutionContext API (Tag object):', requestIdFromExecCtx)
 
-        operation.executionContext.exec('nested', (childCtx) => {
-          console.log('Child context parent:', childCtx.parent === operation.executionContext)
-          return 'result'
+        operation.executionContext.exec({
+          flow: flow({ name: 'nested', input: custom<void>(), output: custom<string>() })
+            .handler((childCtx) => {
+              console.log('Child context parent:', childCtx.parent === operation.executionContext)
+              return 'result'
+            }),
+          input: undefined
         })
       }
     }

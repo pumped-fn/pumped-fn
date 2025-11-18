@@ -8,10 +8,9 @@ description: Flow execution context operations - ctx.run() for journaled operati
 
 ## Architecture Note
 
-**Flow.Context** extends **ExecutionContext.Context**, the standalone execution primitive:
-- ExecutionContext provides: `exec()`, `get()`, `find()`, `set()`, `end()`, `throwIfAborted()`, tag inheritance, abort signals
-- Flow.Context adds: `run()` (journaling), `parallel()`, `parallelSettled()`, `resetJournal()`, overloaded `exec()` with retry/timeout
-- For direct ExecutionContext usage (without flows), use `scope.createExecution()`
+**ExecutionContext.Context** is the standalone execution primitive; `Flow.Context` is just a type alias:
+- ExecutionContext now exposes every Flow API: `exec()` (flows + fns), `parallel()`, `parallelSettled()`, `resetJournal()`, `get()/set()/find()`, tag inheritance, abort signals
+- Use `scope.createExecution()` to build contexts outside Flow and reuse the exact same API
 - Reference the layered map + atom graph in `docs/index.md` for enforced boundaries between ExecutionContext, Flow medium, Scope core, and detached extensions
 - See extension-authoring.md for ExecutionContext API details
 

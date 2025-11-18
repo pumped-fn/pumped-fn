@@ -5,6 +5,16 @@
 ### Patch Changes
 
 - e899e22: Refactor flow execution internals - unify execution descriptors and share parallel helpers
+- 2f02c5b: Align ExecutionContext with Flow.Context API
+  - Flow.Context is now a type alias for ExecutionContext.Context
+  - ExecutionContextImpl implements journaling, `exec()` overloads, parallel helpers, and snapshots directly
+  - `scope.createExecution()` and Flow handlers share the same context surface, so standalone executions can call flows/functions identically
+  - Updated docs + pumped-design skill references to describe ExecutionContext as the primary primitive
+  - Migration: replace custom FlowContext subclasses with ExecutionContext exports and update imports to reference `execution-context.ts`
+- 2f02c5b: Collapse Flow runtime helpers into ExecutionContext
+  - FlowDefinition + flow factory now live alongside ExecutionContextImpl, so `flow.ts` only contains execution wrapper logic
+  - Reduced duplicated Tag/import plumbing and removed the extra flow-meta module
+  - Removed redundant `executionContext` fields from Flow.Execution + Extension.Operation now that ExecutionContext.Context is the sole surface
 
 ## 0.5.86
 

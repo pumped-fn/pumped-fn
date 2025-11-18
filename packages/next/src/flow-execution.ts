@@ -1,5 +1,5 @@
 import { Promised } from "./promises";
-import { type Flow, type Core, type ExecutionContext } from "./types";
+import { type Flow, type Core } from "./types";
 
 type StatusCallback<T> = (
   status: Flow.ExecutionStatus,
@@ -17,7 +17,6 @@ export class FlowExecutionImpl<T> implements Flow.Execution<T> {
   readonly id: string;
   readonly flowName: string | undefined;
   readonly abort: AbortController;
-  readonly executionContext: ExecutionContext.Context | undefined;
 
   private _status: Flow.ExecutionStatus = "pending";
   private statusCallbacks = new Set<StatusCallback<T>>();
@@ -32,14 +31,12 @@ export class FlowExecutionImpl<T> implements Flow.Execution<T> {
     abort: AbortController;
     result: Promised<T>;
     ctx: Flow.ExecutionData | null;
-    executionContext?: ExecutionContext.Context;
     statusTracking?: StatusTracking<T>;
   }) {
     this.id = config.id;
     this.flowName = config.flowName;
     this.abort = config.abort;
     this._ctx = config.ctx;
-    this.executionContext = config.executionContext;
     this.result = config.result;
     this.statusTracking = config.statusTracking ?? null;
   }
