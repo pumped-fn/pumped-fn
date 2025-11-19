@@ -164,16 +164,42 @@ class TagImpl<T, HasDefault extends boolean = false> {
     return collect(source, this.key, this.schema);
   }
 
-  set(target: Tag.Store, value: T): void;
-  set(target: Tag.Container | Tag.Tagged[], value: T): Tag.Tagged<T>;
-  set(target: Tag.Source, value: T): void | Tag.Tagged<T> {
-    if (isStore(target)) {
-      write(target, this.key, this.schema, value);
-      return;
+  writeToStore(target: Tag.Store, value: T): void {
+    write(target, this.key, this.schema, value);
+  }
+
+  writeToContainer(target: Tag.Container, value: T): Tag.Tagged<T> {
+    if (!target || typeof target !== "object" || Array.isArray(target)) {
+      throw new TypeError("writeToContainer requires Container object");
+    }
+    if (target.tags !== undefined && !Array.isArray(target.tags)) {
+      throw new TypeError("Container.tags must be array if present");
     }
 
     const validated = validate(this.schema, value);
-    return createTagged(this.key, this.schema, validated, this.label);
+    const tagged = createTagged(this.key, this.schema, validated, this.label);
+
+    if (!target.tags) {
+      target.tags = [];
+    }
+    target.tags.push(tagged);
+
+    tagCacheMap.delete(target);
+    return tagged;
+  }
+
+  writeToTags(target: Tag.Tagged[], value: T): Tag.Tagged<T> {
+    if (!Array.isArray(target)) {
+      throw new TypeError("writeToTags requires Tagged[] array");
+    }
+
+    const validated = validate(this.schema, value);
+    const tagged = createTagged(this.key, this.schema, validated, this.label);
+
+    target.push(tagged);
+
+    tagCacheMap.delete(target);
+    return tagged;
   }
 
   entry(value?: T): [symbol, T] {
@@ -252,7 +278,10 @@ export function tag<T>(
   fn.extractFrom = impl.get.bind(impl);
   fn.readFrom = impl.find.bind(impl);
   fn.collectFrom = impl.some.bind(impl);
-  fn.injectTo = impl.set.bind(impl);
+  fn.injectTo = impl.writeToStore.bind(impl);
+  fn.writeToStore = impl.writeToStore.bind(impl);
+  fn.writeToContainer = impl.writeToContainer.bind(impl);
+  fn.writeToTags = impl.writeToTags.bind(impl);
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
   (fn as any).partial = <D extends Partial<T>>(d: D): D => {

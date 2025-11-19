@@ -44,8 +44,12 @@ export declare namespace Tag {
     /** Collects all values with this key from source */
     collectFrom(source: Source): T[];
 
-    /** Writes value to store */
+    /** Writes value to store (backwards compatible alias for writeToStore) */
     injectTo(target: Store, value: T): void;
+
+    writeToStore(target: Store, value: T): void;
+    writeToContainer(target: Container, value: T): Tagged<T>;
+    writeToTags(target: Tagged[], value: T): Tagged<T>;
 
     entry(value?: HasDefault extends true ? T : never): [symbol, T];
     entry(value: T): [symbol, T];
