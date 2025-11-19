@@ -26,12 +26,12 @@
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest run --coverage --coverage.reporter=html && open coverage/index.html",
-    "typecheck": "tsc --noEmit && node ./scripts/verify-public-docs.mjs",
+    "typecheck": "tsc --noEmit",
     "typecheck:test": "vitest typecheck",
     "typecheck:full": "tsc --noEmit --project tsconfig.test.json",
     "verify:public-docs": "node ./scripts/verify-public-docs.mjs",
     "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/next@",
-    "release": "pnpm build && pnpm pump && npm publish --access public"
+    "release": "pnpm build && pnpm verify:public-docs && pnpm pump && npm publish --access public"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
