@@ -47,6 +47,9 @@ export declare namespace Tag {
     /** Writes value to store */
     injectTo(target: Store, value: T): void;
 
+    writeTo(target: Store, value: T): void;
+    writeTo(target: Container, value: T): Tagged<T>;
+
     entry(value?: HasDefault extends true ? T : never): [symbol, T];
     entry(value: T): [symbol, T];
 

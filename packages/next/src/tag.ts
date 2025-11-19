@@ -173,7 +173,18 @@ class TagImpl<T, HasDefault extends boolean = false> {
     }
 
     const validated = validate(this.schema, value);
-    return createTagged(this.key, this.schema, validated, this.label);
+    const tagged = createTagged(this.key, this.schema, validated, this.label);
+
+    if (Array.isArray(target)) {
+      target.push(tagged);
+    } else if (isContainer(target)) {
+      if (!target.tags) {
+        target.tags = [];
+      }
+      target.tags.push(tagged);
+    }
+
+    return tagged;
   }
 
   entry(value?: T): [symbol, T] {
@@ -253,6 +264,7 @@ export function tag<T>(
   fn.readFrom = impl.find.bind(impl);
   fn.collectFrom = impl.some.bind(impl);
   fn.injectTo = impl.set.bind(impl);
+  fn.writeTo = impl.set.bind(impl) as typeof fn.writeTo;
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
   (fn as any).partial = <D extends Partial<T>>(d: D): D => {

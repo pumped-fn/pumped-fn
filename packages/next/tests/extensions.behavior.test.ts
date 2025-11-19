@@ -376,11 +376,22 @@ describe("extensions behavior", () => {
     const validatedStore = new Map<symbol, unknown>()
     expect(() => validatedNumberTag.injectTo(validatedStore, "invalid" as any)).toThrow()
 
+    const writeToStore = new Map<symbol, unknown>()
+    const numberTag = tag(custom<number>(), { label: "number" })
+    numberTag.writeTo(writeToStore, 42)
+    expect(numberTag.extractFrom(writeToStore)).toBe(42)
+
+    const writeToContainer = { tags: [] as ReturnType<typeof numberTag>[] }
+    const tagged = numberTag.writeTo(writeToContainer, 5)
+    expect(tagged.value).toBe(5)
+    expect(writeToContainer.tags).toHaveLength(1)
+    expect(writeToContainer.tags[0].value).toBe(5)
+
     const mapSource = new Map<symbol, unknown>()
-    const numberTag = tag(custom<number>(), { default: 42 })
-    expect(numberTag.extractFrom(mapSource)).toBe(42)
-    mapSource.set(numberTag.key, 100)
-    expect(numberTag.extractFrom(mapSource)).toBe(100)
+    const defaultNumberTag = tag(custom<number>(), { default: 42 })
+    expect(defaultNumberTag.extractFrom(mapSource)).toBe(42)
+    mapSource.set(defaultNumberTag.key, 100)
+    expect(defaultNumberTag.extractFrom(mapSource)).toBe(100)
 
     const scopeSource = createScope({ tags: [emailTag("scope@example.com")] })
     expect(emailTag.extractFrom(scopeSource)).toBe("scope@example.com")
