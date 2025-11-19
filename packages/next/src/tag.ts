@@ -169,6 +169,9 @@ class TagImpl<T, HasDefault extends boolean = false> {
   }
 
   writeToContainer(target: Tag.Container, value: T): Tag.Tagged<T> {
+    if (!target || typeof target !== "object" || Array.isArray(target)) {
+      throw new TypeError("writeToContainer requires Container object");
+    }
     const validated = validate(this.schema, value);
     const tagged = createTagged(this.key, this.schema, validated, this.label);
     if (!target.tags) {
@@ -180,6 +183,9 @@ class TagImpl<T, HasDefault extends boolean = false> {
   }
 
   writeToTags(target: Tag.Tagged[], value: T): Tag.Tagged<T> {
+    if (!Array.isArray(target)) {
+      throw new TypeError("writeToTags requires Tagged[] array");
+    }
     const validated = validate(this.schema, value);
     const tagged = createTagged(this.key, this.schema, validated, this.label);
     target.push(tagged);
