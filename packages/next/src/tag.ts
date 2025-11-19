@@ -184,6 +184,30 @@ class TagImpl<T, HasDefault extends boolean = false> {
       target.tags.push(tagged);
     }
 
+    tagCacheMap.delete(target);
+    return tagged;
+  }
+
+  writeToStore(target: Tag.Store, value: T): void {
+    write(target, this.key, this.schema, value);
+  }
+
+  writeToContainer(target: Tag.Container, value: T): Tag.Tagged<T> {
+    const validated = validate(this.schema, value);
+    const tagged = createTagged(this.key, this.schema, validated, this.label);
+    if (!target.tags) {
+      target.tags = [];
+    }
+    target.tags.push(tagged);
+    tagCacheMap.delete(target);
+    return tagged;
+  }
+
+  writeToTags(target: Tag.Tagged[], value: T): Tag.Tagged<T> {
+    const validated = validate(this.schema, value);
+    const tagged = createTagged(this.key, this.schema, validated, this.label);
+    target.push(tagged);
+    tagCacheMap.delete(target);
     return tagged;
   }
 
@@ -263,8 +287,10 @@ export function tag<T>(
   fn.extractFrom = impl.get.bind(impl);
   fn.readFrom = impl.find.bind(impl);
   fn.collectFrom = impl.some.bind(impl);
-  fn.injectTo = impl.set.bind(impl);
-  fn.writeTo = impl.set.bind(impl) as typeof fn.writeTo;
+  fn.injectTo = impl.writeToStore.bind(impl);
+  fn.writeToStore = impl.writeToStore.bind(impl);
+  fn.writeToContainer = impl.writeToContainer.bind(impl);
+  fn.writeToTags = impl.writeToTags.bind(impl);
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
   (fn as any).partial = <D extends Partial<T>>(d: D): D => {

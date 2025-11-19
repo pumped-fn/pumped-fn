@@ -378,14 +378,34 @@ describe("extensions behavior", () => {
 
     const writeToStore = new Map<symbol, unknown>()
     const numberTag = tag(custom<number>(), { label: "number" })
-    numberTag.writeTo(writeToStore, 42)
+    numberTag.writeToStore(writeToStore, 42)
     expect(numberTag.extractFrom(writeToStore)).toBe(42)
 
     const writeToContainer = { tags: [] as ReturnType<typeof numberTag>[] }
-    const tagged = numberTag.writeTo(writeToContainer, 5)
+    const tagged = numberTag.writeToContainer(writeToContainer, 5)
     expect(tagged.value).toBe(5)
     expect(writeToContainer.tags).toHaveLength(1)
     expect(writeToContainer.tags[0].value).toBe(5)
+
+    const writeToTagsArray: ReturnType<typeof numberTag>[] = []
+    const taggedFromArray = numberTag.writeToTags(writeToTagsArray, 99)
+    expect(taggedFromArray.value).toBe(99)
+    expect(writeToTagsArray).toHaveLength(1)
+    expect(writeToTagsArray[0].value).toBe(99)
+
+    const cachedContainer = { tags: [numberTag(10), numberTag(20)] }
+    const firstRead = numberTag.collectFrom(cachedContainer)
+    expect(firstRead).toEqual([10, 20])
+    numberTag.writeToContainer(cachedContainer, 30)
+    const secondRead = numberTag.collectFrom(cachedContainer)
+    expect(secondRead).toEqual([10, 20, 30])
+
+    const cachedTagArray: ReturnType<typeof numberTag>[] = [numberTag(1)]
+    const firstArrayRead = numberTag.collectFrom(cachedTagArray)
+    expect(firstArrayRead).toEqual([1])
+    numberTag.writeToTags(cachedTagArray, 2)
+    const secondArrayRead = numberTag.collectFrom(cachedTagArray)
+    expect(secondArrayRead).toEqual([1, 2])
 
     const mapSource = new Map<symbol, unknown>()
     const defaultNumberTag = tag(custom<number>(), { default: 42 })
