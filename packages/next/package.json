@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:test": "vitest typecheck",
     "typecheck:full": "tsc --noEmit --project tsconfig.test.json",
+    "verify:public-docs": "node ./scripts/verify-public-docs.mjs",
     "pump": "pnpm dlx commit-and-tag-version --path . -r patch -t @pumped-fn/next@",
     "release": "pnpm build && pnpm pump && npm publish --access public"
   },
