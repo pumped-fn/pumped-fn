@@ -1,5 +1,31 @@
 # Tags Reference
 
+## Tag Types
+
+The `Tag` namespace provides types for working with tagged metadata:
+
+```typescript
+import { type Tag } from "@pumped-fn/core-next";
+
+// Tag definition type
+Tag.Tag<T, HasDefault>
+
+// Storage interface for tag key-value pairs
+Tag.Store
+
+// Tagged value instance
+Tag.Tagged<T>
+
+// Tag container interface
+Tag.Container
+
+// Sources from which tag values can be extracted
+Tag.Source
+
+// Tag-based executor wrapper
+Tag.TagExecutor<TOutput, TTag>
+```
+
 ## Tag Executors
 
 Tags can be used in executor dependencies for automatic scope extraction.

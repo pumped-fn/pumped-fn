@@ -35,6 +35,7 @@ import { resolves as resolvesHelper } from "./helpers";
 import { tag as tagImpl } from "./tag";
 import { tags as tagsImpl } from "./tag-executors";
 import { type Tag as TagType } from "./tag-types";
+import type * as TagTypes from "./tag-types";
 import * as standardSchemaModule from "./ssch";
 import { custom as customSchema } from "./ssch";
 import { type ScopeOption as InternalScopeOption, createScope as createScopeImpl } from "./scope";
@@ -166,6 +167,41 @@ export type ScopeOption = InternalScopeOption;
 export type Tag<T, HasDefault extends boolean = false> = TagType.Tag<T, HasDefault>;
 
 /**
+ * Tag-related helper types.
+ */
+export namespace Tag {
+  /**
+   * Storage interface for tag key-value pairs.
+   */
+  export type Store = TagTypes.Tag.Store;
+
+  /**
+   * Tagged value instance attached to executors/flows/scopes.
+   */
+  export type Tagged<T = unknown> = TagTypes.Tag.Tagged<T>;
+
+  /**
+   * Tag container interface.
+   */
+  export type Container = TagTypes.Tag.Container;
+
+  /**
+   * Sources from which tag values can be extracted.
+   */
+  export type Source = TagTypes.Tag.Source;
+
+  /**
+   * Tag definition with schema and extraction methods.
+   */
+  export type Tag<T, HasDefault extends boolean = false> = TagTypes.Tag.Tag<T, HasDefault>;
+
+  /**
+   * Tag-based executor wrapper for dependency resolution.
+   */
+  export type TagExecutor<TOutput, TTag = TOutput> = TagTypes.Tag.TagExecutor<TOutput, TTag>;
+}
+
+/**
  * Promise-like helper that may resolve immediately or later.
  */
 export type MaybePromised<T> = InternalMaybePromised<T>;
@@ -237,11 +273,6 @@ export namespace Core {
   export type Output<T> = InternalCore.Output<T>;
 
   /**
-   * Allowed return values for generator-style executors.
-   */
-  export type GeneratorOutput<Y, T> = InternalCore.GeneratorOutput<Y, T>;
-
-  /**
    * Factory signature used by {@link provide}.
    */
   export type NoDependencyFn<T> = InternalCore.NoDependencyFn<T>;
@@ -250,21 +281,6 @@ export namespace Core {
    * Factory signature receiving resolved dependencies before producing values.
    */
   export type DependentFn<T, D> = InternalCore.DependentFn<T, D>;
-
-  /**
-   * Factory for generators without dependencies.
-   */
-  export type NoDependencyGeneratorFn<Y, T> = InternalCore.NoDependencyGeneratorFn<Y, T>;
-
-  /**
-   * Generator factory receiving resolved dependencies.
-   */
-  export type DependentGeneratorFn<Y, T, D> = InternalCore.DependentGeneratorFn<Y, T, D>;
-
-  /**
-   * Executor record-like dependency structure.
-   */
-  export type RecordLike = InternalCore.RecordLike;
 
   /**
    * Untyped executor placeholder used internally.
@@ -285,11 +301,6 @@ export namespace Core {
    * Controller offered inside executor factories for lifecycle operations.
    */
   export type Controller = InternalCore.Controller;
-
-  /**
-   * Kind metadata applied to executor variants.
-   */
-  export type Kind = InternalCore.Kind;
 
   /**
    * Base executor contract shared by all executor flavors.
@@ -315,26 +326,6 @@ export namespace Core {
    * Static executor exposing `.static`.
    */
   export type Static<T> = InternalCore.Static<T>;
-
-  /**
-   * Pending accessor state with a still-resolving promise.
-   */
-  export type PendingState<T> = InternalCore.PendingState<T>;
-
-  /**
-   * Resolved accessor state including cached value.
-   */
-  export type ResolvedState<T> = InternalCore.ResolvedState<T>;
-
-  /**
-   * Rejected accessor state with captured context.
-   */
-  export type RejectedState = InternalCore.RejectedState;
-
-  /**
-   * Union describing every accessor lookup state.
-   */
-  export type ResolveState<T> = InternalCore.ResolveState<T>;
 
   /**
    * Accessor bound to an executor inside a scope.
