@@ -685,6 +685,11 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       }
     }
 
+    if (this.scope.tags) {
+      for (const tagged of this.scope.tags) {
+        this.tagStore.set(tagged.key, tagged.value)
+      }
+    }
     if (this.tags) {
       for (const tagged of this.tags) {
         this.tagStore.set(tagged.key, tagged.value)
@@ -750,20 +755,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       "extractFrom" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>
-      const key = (accessor as { key: symbol }).key
-      const taggedValue = this.tagStore.get(key)
-      if (taggedValue !== undefined) {
-        return taggedValue
-      }
-      const fallback = this.readSymbolValue(key)
-      if (fallback !== undefined) {
-        return fallback
-      }
-      const defaultValue = (accessor as { default?: T }).default
-      if (defaultValue !== undefined) {
-        return defaultValue
-      }
-      throw new Error(`Value not found for key: ${key.toString()}`)
+      return accessor.extractFrom(this.tagStore)
     }
     return this.readStoredValue(accessorOrKey)
   }
@@ -783,7 +775,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       "injectTo" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>
-      accessor.injectTo(this.tagStore, value as T)
+      accessor.writeTo(this.tagStore, value as T)
       return
     }
     const key = accessorOrKey

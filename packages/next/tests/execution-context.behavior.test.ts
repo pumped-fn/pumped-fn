@@ -3,6 +3,7 @@ import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
 import { custom } from "../src/ssch"
 import { Promised } from "../src/promises"
+import { tag } from "../src/tag"
 
 describe("ExecutionContext.exec parity", () => {
   it("supports flow + fn journaling and parallel helpers", async () => {
@@ -78,5 +79,30 @@ describe("ExecutionContext.exec parity", () => {
       throw boom
     })
     await expect(ctx.exec({ flow: faulty, input: undefined })).rejects.toThrow("explode")
+  })
+})
+
+describe("ExecutionContext tag store alignment", () => {
+  it("reads tag defaults solely through extractFrom", async () => {
+    const flagTag = tag(custom<boolean>(), { default: true })
+    const scope = createScope({ tags: [flagTag(true)] })
+    const ctx = scope.createExecution()
+    expect(flagTag.extractFrom(ctx.tagStore)).toBe(true)
+    expect(ctx.get(flagTag)).toBe(true)
+  })
+
+  it("seeds execution tags into store for readFrom/get", async () => {
+    const configTag = tag(custom<string>(), { label: "config" })
+    const scope = createScope()
+    const ctx = scope.createExecution({ tags: [configTag("a")] })
+    expect(ctx.tagStore.get(configTag.key)).toBe("a")
+    expect(configTag.readFrom(ctx.tagStore)).toBe("a")
+  })
+
+  it("throws when tag missing even if scope tags absent", async () => {
+    const missingTag = tag(custom<string>(), { label: "missing" })
+    const scope = createScope()
+    const ctx = scope.createExecution()
+    expect(() => ctx.get(missingTag)).toThrow()
   })
 })
