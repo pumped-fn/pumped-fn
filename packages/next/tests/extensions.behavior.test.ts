@@ -407,6 +407,12 @@ describe("extensions behavior", () => {
     const secondArrayRead = numberTag.collectFrom(cachedTagArray)
     expect(secondArrayRead).toEqual([1, 2])
 
+    expect(() => numberTag.writeToContainer(null as any, 5)).toThrow("writeToContainer requires Container object")
+    expect(() => numberTag.writeToContainer([] as any, 5)).toThrow("writeToContainer requires Container object")
+    expect(() => numberTag.writeToContainer({ tags: "invalid" as any }, 5)).toThrow("Container.tags must be array if present")
+    expect(() => numberTag.writeToTags(null as any, 5)).toThrow("writeToTags requires Tagged[] array")
+    expect(() => numberTag.writeToTags({} as any, 5)).toThrow("writeToTags requires Tagged[] array")
+
     const mapSource = new Map<symbol, unknown>()
     const defaultNumberTag = tag(custom<number>(), { default: 42 })
     expect(defaultNumberTag.extractFrom(mapSource)).toBe(42)

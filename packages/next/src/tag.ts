@@ -172,6 +172,9 @@ class TagImpl<T, HasDefault extends boolean = false> {
     if (!target || typeof target !== "object" || Array.isArray(target)) {
       throw new TypeError("writeToContainer requires Container object");
     }
+    if (target.tags !== undefined && !Array.isArray(target.tags)) {
+      throw new TypeError("Container.tags must be array if present");
+    }
     const validated = validate(this.schema, value);
     const tagged = createTagged(this.key, this.schema, validated, this.label);
     if (!target.tags) {

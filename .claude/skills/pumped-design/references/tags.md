@@ -4,7 +4,7 @@
 
 Tags provide explicit helpers for each target type:
 
-- `tag.injectTo(store, value)` - Legacy method, writes to Tag.Store only (backwards compatible)
+- `tag.injectTo(store, value)` - Backwards compatible alias for writeToStore
 - `tag.writeToStore(store, value)` - Explicit store write, validates and sets value
 - `tag.writeToContainer(container, value)` - Appends to container.tags array, returns Tagged, invalidates cache
 - `tag.writeToTags(tagArray, value)` - Appends to Tagged[] array, returns Tagged, invalidates cache
