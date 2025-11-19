@@ -599,7 +599,7 @@ const executeAndWrap = <T>(
 const executeWithTimeout = async <T>(
   executor: () => Promised<T>,
   timeout: number | undefined,
-  timeoutId: NodeJS.Timeout | null,
+  timeoutId: ReturnType<typeof setTimeout> | null,
   controller: AbortController
 ): Promise<T> => {
   if (!timeout) {
@@ -685,6 +685,12 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       }
     }
 
+    if (!this.parent && this.scope.tags) {
+      for (const tagged of this.scope.tags) {
+        this.tagStore.set(tagged.key, tagged.value)
+      }
+    }
+
     if (this.tags) {
       for (const tagged of this.tags) {
         this.tagStore.set(tagged.key, tagged.value)
@@ -699,31 +705,12 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     return applyExtensions(this.extensions, baseExecutor, this.scope, operation)
   }
 
-  private readSymbolValue(key: symbol): unknown {
-    if (this.tags) {
-      const tagged = this.tags.find((entry) => entry.key === key)
-      if (tagged) {
-        return tagged.value
-      }
-    }
-    if (this.scope.tags) {
-      const tagged = this.scope.tags.find((entry) => entry.key === key)
-      if (tagged) {
-        return tagged.value
-      }
-    }
-    if (this.parent) {
-      return (this.parent.get as (key: unknown) => unknown)(key)
-    }
-    return undefined
-  }
-
   private readStoredValue(key: unknown): unknown {
     if (this.contextData.has(key)) {
       return this.contextData.get(key)
     }
     if (typeof key === "symbol") {
-      return this.readSymbolValue(key)
+      return this.tagStore.get(key)
     }
     if (this.parent) {
       return (this.parent.get as (key: unknown) => unknown)(key)
@@ -744,26 +731,8 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   get<T>(accessor: Tag.Tag<T, false> | Tag.Tag<T, true>): T
   get<T>(accessorOrKey: unknown): T | unknown {
-    if (
-      (typeof accessorOrKey === "object" || typeof accessorOrKey === "function") &&
-      accessorOrKey !== null &&
-      "extractFrom" in accessorOrKey
-    ) {
-      const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>
-      const key = (accessor as { key: symbol }).key
-      const taggedValue = this.tagStore.get(key)
-      if (taggedValue !== undefined) {
-        return taggedValue
-      }
-      const fallback = this.readSymbolValue(key)
-      if (fallback !== undefined) {
-        return fallback
-      }
-      const defaultValue = (accessor as { default?: T }).default
-      if (defaultValue !== undefined) {
-        return defaultValue
-      }
-      throw new Error(`Value not found for key: ${key.toString()}`)
+    if (isTag(accessorOrKey)) {
+      return accessorOrKey.extractFrom(this.tagStore)
     }
     return this.readStoredValue(accessorOrKey)
   }
