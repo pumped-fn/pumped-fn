@@ -1,4 +1,4 @@
-import { derive, name } from "@pumped-fn/core-next"
+import { derive, name, type Core } from "@pumped-fn/core-next"
 import { transportExecutor } from "./transport"
 import { type State, type Transport } from "./types"
 
@@ -69,7 +69,7 @@ export const createStateAggregator = () => {
   }
 }
 
-export const stateAggregatorExecutor = derive([transportExecutor], ([transport]) => {
+export const stateAggregatorExecutor: Core.Executor<State.Aggregator> = derive([transportExecutor], ([transport]) => {
   const aggregator = createStateAggregator()
   transport.subscribe(aggregator.process)
   return aggregator
