@@ -13,7 +13,7 @@ import {
 } from "../src"
 import { preset } from "../src/executor"
 import { isTag, isTagExecutor } from "../src/tag-executors"
-import { tagSymbol } from "../src/tag-types"
+import { type Tag, tagSymbol } from "../src/tag-types"
 import {
   createJournalKey,
   checkJournalReplay,
@@ -374,13 +374,88 @@ describe("extensions behavior", () => {
       { label: "validated-number" },
     )
     const validatedStore = new Map<symbol, unknown>()
-    expect(() => validatedNumberTag.injectTo(validatedStore, "invalid" as any)).toThrow()
+    // @ts-expect-error - testing validation with invalid type
+    expect(() => validatedNumberTag.injectTo(validatedStore, "invalid")).toThrow()
+
+    const writeToStore = new Map<symbol, unknown>()
+    const numberTag = tag(custom<number>(), { label: "number" })
+    numberTag.writeToStore(writeToStore, 42)
+    expect(numberTag.extractFrom(writeToStore)).toBe(42)
+
+    const writeToContainer = { tags: [] as ReturnType<typeof numberTag>[] }
+    const tagged = numberTag.writeToContainer(writeToContainer, 5)
+    expect(tagged.value).toBe(5)
+    expect(writeToContainer.tags).toHaveLength(1)
+    expect(writeToContainer.tags[0].value).toBe(5)
+
+    const emptyContainer: Tag.Container = {}
+    const taggedToEmpty = numberTag.writeToContainer(emptyContainer, 7)
+    expect(taggedToEmpty.value).toBe(7)
+    expect(emptyContainer.tags).toBeDefined()
+    expect(emptyContainer.tags).toHaveLength(1)
+    expect(emptyContainer.tags![0].value).toBe(7)
+
+    const writeToTagsArray: ReturnType<typeof numberTag>[] = []
+    const taggedFromArray = numberTag.writeToTags(writeToTagsArray, 99)
+    expect(taggedFromArray.value).toBe(99)
+    expect(writeToTagsArray).toHaveLength(1)
+    expect(writeToTagsArray[0].value).toBe(99)
+
+    const cachedContainer = { tags: [numberTag(10), numberTag(20)] }
+    const firstRead = numberTag.collectFrom(cachedContainer)
+    expect(firstRead).toEqual([10, 20])
+    numberTag.writeToContainer(cachedContainer, 30)
+    const secondRead = numberTag.collectFrom(cachedContainer)
+    expect(secondRead).toEqual([10, 20, 30])
+
+    const cachedTagArray: ReturnType<typeof numberTag>[] = [numberTag(1)]
+    const firstArrayRead = numberTag.collectFrom(cachedTagArray)
+    expect(firstArrayRead).toEqual([1])
+    numberTag.writeToTags(cachedTagArray, 2)
+    const secondArrayRead = numberTag.collectFrom(cachedTagArray)
+    expect(secondArrayRead).toEqual([1, 2])
+
+    // @ts-expect-error - testing runtime type guard with null
+    expect(() => numberTag.writeToContainer(null, 5)).toThrow("writeToContainer requires Container object")
+    // @ts-expect-error - testing runtime type guard with array
+    expect(() => numberTag.writeToContainer([], 5)).toThrow("writeToContainer requires Container object")
+    // @ts-expect-error - testing runtime type guard with invalid tags property
+    expect(() => numberTag.writeToContainer({ tags: "invalid" }, 5)).toThrow("Container.tags must be array if present")
+    // @ts-expect-error - testing runtime type guard with null
+    expect(() => numberTag.writeToTags(null, 5)).toThrow("writeToTags requires Tagged[] array")
+    // @ts-expect-error - testing runtime type guard with object
+    expect(() => numberTag.writeToTags({}, 5)).toThrow("writeToTags requires Tagged[] array")
+
+    const invalidValueTag = tag(
+      {
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate(value: unknown) {
+            if (typeof value !== "string") {
+              return { success: false, issues: [{ message: "Expected string" }] }
+            }
+            return { success: true, value }
+          },
+        },
+      },
+      { label: "string-only" },
+    )
+    const storeForValidation = new Map<symbol, unknown>()
+    // @ts-expect-error - testing schema validation with invalid type
+    expect(() => invalidValueTag.writeToStore(storeForValidation, 42)).toThrow()
+    const containerForValidation = { tags: [] }
+    // @ts-expect-error - testing schema validation with invalid type
+    expect(() => invalidValueTag.writeToContainer(containerForValidation, 42)).toThrow()
+    const arrayForValidation: ReturnType<typeof invalidValueTag>[] = []
+    // @ts-expect-error - testing schema validation with invalid type
+    expect(() => invalidValueTag.writeToTags(arrayForValidation, 42)).toThrow()
 
     const mapSource = new Map<symbol, unknown>()
-    const numberTag = tag(custom<number>(), { default: 42 })
-    expect(numberTag.extractFrom(mapSource)).toBe(42)
-    mapSource.set(numberTag.key, 100)
-    expect(numberTag.extractFrom(mapSource)).toBe(100)
+    const defaultNumberTag = tag(custom<number>(), { default: 42 })
+    expect(defaultNumberTag.extractFrom(mapSource)).toBe(42)
+    mapSource.set(defaultNumberTag.key, 100)
+    expect(defaultNumberTag.extractFrom(mapSource)).toBe(100)
 
     const scopeSource = createScope({ tags: [emailTag("scope@example.com")] })
     expect(emailTag.extractFrom(scopeSource)).toBe("scope@example.com")
@@ -412,8 +487,8 @@ describe("extensions behavior", () => {
 
     const container = { tags: [emailTag("container@example.com")] }
     expect(emailTag.extractFrom(container)).toBe("container@example.com")
-    const emptyContainer = { tags: undefined as ReturnType<typeof emailTag>[] | undefined }
-    expect(emailTag.collectFrom(emptyContainer)).toEqual([])
+    const containerWithUndefinedTags = { tags: undefined as ReturnType<typeof emailTag>[] | undefined }
+    expect(emailTag.collectFrom(containerWithUndefinedTags)).toEqual([])
     const otherTag = tag(custom<string>(), { label: "other" })
     const mixedContainer = { tags: [otherTag("x"), emailTag("y")] }
     expect(emailTag.extractFrom(mixedContainer)).toBe("y")

@@ -457,12 +457,13 @@ class BaseScope implements Core.Scope {
     }
   }
 
-  createExecution(details?: Partial<ExecutionContext.Details>): ExecutionContext.Context {
+  createExecution(details?: Partial<ExecutionContext.Details> & { tags?: Tag.Tagged[] }): ExecutionContext.Context {
     this["~ensureNotDisposed"]();
     return new ExecutionContextImpl({
       scope: this,
       extensions: this.extensions,
-      details: details || {}
+      details: details || {},
+      tags: details?.tags
     });
   }
 

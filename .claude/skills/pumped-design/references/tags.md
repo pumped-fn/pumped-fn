@@ -26,6 +26,41 @@ Tag.Source
 Tag.TagExecutor<TOutput, TTag>
 ```
 
+## Tag Write Operations
+
+Tags provide explicit helpers for each target type:
+
+- `tag.injectTo(store, value)` - Backwards compatible alias for writeToStore
+- `tag.writeToStore(store, value)` - Explicit store write, validates and sets value
+- `tag.writeToContainer(container, value)` - Appends to container.tags array, returns Tagged, invalidates cache
+- `tag.writeToTags(tagArray, value)` - Appends to Tagged[] array, returns Tagged, invalidates cache
+
+All tag writes validate via schema before mutation. Container and array writes invalidate the tagCacheMap to ensure subsequent reads reflect new values.
+
+### When to Use Each Helper
+
+**`writeToStore(store, value)`**
+- ExecutionContext/Scope tag state management
+- Isolated tag storage without container dependencies
+- Testing tag extraction logic
+- Example: `ctx.set(myTag, value)` internally uses writeToStore
+
+**`writeToContainer(container, value)`**
+- Adding metadata to flows, executors, or scopes
+- Building container objects with tagged metadata
+- Returns Tagged value for immediate use
+- Side effect: initializes empty tags array if missing
+- Example: Building flow with runtime tags
+
+**`writeToTags(tagArray, value)`**
+- Programmatic tag collection building
+- Batch tag operations before container assignment
+- Testing tag collection logic
+- Returns Tagged value for immediate use
+- Example: Building tags array to pass to scope constructor
+
+ExecutionContext automatically seeds both scope tags and execution-provided tags into its tagStore during construction, ensuring all tag access methods (extractFrom, readFrom, get, find) work consistently.
+
 ## Tag Executors
 
 Tags can be used in executor dependencies for automatic scope extraction.

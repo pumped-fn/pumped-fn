@@ -402,7 +402,7 @@ export declare namespace Core {
     }): Flow.Execution<S>;
 
     createExecution(
-      details?: Partial<ExecutionContext.Details>
+      details?: Partial<ExecutionContext.Details> & { tags?: Tag.Tagged[] }
     ): ExecutionContext.Context;
   }
 }
