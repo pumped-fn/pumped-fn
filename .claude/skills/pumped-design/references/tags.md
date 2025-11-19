@@ -1,14 +1,15 @@
 # Tags Reference
 
-## Tag Store Operations
+## Tag Write Operations
 
-Tags provide two methods for writing to stores:
+Tags provide explicit helpers for each target type:
 
-- `tag.injectTo(store, value)` - Legacy method, writes to Tag.Store only
-- `tag.writeTo(store, value)` - Preferred alias, writes to Tag.Store
-- `tag.writeTo(container, value)` - Also works with Tag.Container, returns Tagged
+- `tag.injectTo(store, value)` - Legacy method, writes to Tag.Store only (backwards compatible)
+- `tag.writeToStore(store, value)` - Explicit store write, validates and sets value
+- `tag.writeToContainer(container, value)` - Appends to container.tags array, returns Tagged, invalidates cache
+- `tag.writeToTags(tagArray, value)` - Appends to Tagged[] array, returns Tagged, invalidates cache
 
-All tag writes and reads in ExecutionContext go through the Tag.Store abstraction to ensure schema validation and consistent defaults.
+All tag writes validate via schema before mutation. Container and array writes invalidate the tagCacheMap to ensure subsequent reads reflect new values.
 
 ExecutionContext automatically seeds both scope tags and execution-provided tags into its tagStore during construction, ensuring all tag access methods (extractFrom, readFrom, get, find) work consistently.
 
