@@ -333,6 +333,26 @@ export namespace Core {
   export type Accessor<T> = InternalCore.Accessor<T>;
 
   /**
+   * Pending accessor state with a still-resolving promise.
+   */
+  export type PendingState<T> = InternalCore.PendingState<T>;
+
+  /**
+   * Resolved accessor state including cached value.
+   */
+  export type ResolvedState<T> = InternalCore.ResolvedState<T>;
+
+  /**
+   * Rejected accessor state with captured context.
+   */
+  export type RejectedState = InternalCore.RejectedState;
+
+  /**
+   * Union describing every accessor lookup state returned by {@link Accessor.lookup}.
+   */
+  export type ResolveState<T> = InternalCore.ResolveState<T>;
+
+  /**
    * Preset value applied to override executor outputs.
    */
   export type Preset<T> = InternalCore.Preset<T>;
