@@ -40,10 +40,6 @@ import * as standardSchemaModule from "./ssch";
 import { custom as customSchema } from "./ssch";
 import { type ScopeOption as InternalScopeOption, createScope as createScopeImpl } from "./scope";
 
-const standardSchema: typeof standardSchemaModule = standardSchemaModule;
-const multi: typeof multiModule = multiModule;
-const errors: typeof errorsModule = errorsModule;
-
 /**
  * Promise-aware helper returned by several APIs to carry execution metadata.
  */
@@ -52,17 +48,17 @@ export { PromisedClass as Promised };
 /**
  * Toolkit for defining schema primitives compatible with Pumped-fn tags.
  */
-export { standardSchema };
+export { standardSchemaModule as standardSchema };
 
 /**
  * Multi-executor helpers for key-scoped executor pools.
  */
-export { multi };
+export { multiModule as multi };
 
 /**
  * Canonical error catalog helpers for executor failures.
  */
-export { errors };
+export { errorsModule as errors };
 
 /**
  * Build tag-aware schema instances or adapters.
