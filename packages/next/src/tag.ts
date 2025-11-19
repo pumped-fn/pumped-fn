@@ -164,30 +164,6 @@ class TagImpl<T, HasDefault extends boolean = false> {
     return collect(source, this.key, this.schema);
   }
 
-  set(target: Tag.Store, value: T): void;
-  set(target: Tag.Container | Tag.Tagged[], value: T): Tag.Tagged<T>;
-  set(target: Tag.Source, value: T): void | Tag.Tagged<T> {
-    if (isStore(target)) {
-      write(target, this.key, this.schema, value);
-      return;
-    }
-
-    const validated = validate(this.schema, value);
-    const tagged = createTagged(this.key, this.schema, validated, this.label);
-
-    if (Array.isArray(target)) {
-      target.push(tagged);
-    } else if (isContainer(target)) {
-      if (!target.tags) {
-        target.tags = [];
-      }
-      target.tags.push(tagged);
-    }
-
-    tagCacheMap.delete(target);
-    return tagged;
-  }
-
   writeToStore(target: Tag.Store, value: T): void {
     write(target, this.key, this.schema, value);
   }
