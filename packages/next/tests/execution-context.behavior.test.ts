@@ -105,4 +105,21 @@ describe("ExecutionContext tag store alignment", () => {
     const ctx = scope.createExecution()
     expect(() => ctx.get(missingTag)).toThrow()
   })
+
+  it("execution tags override scope tags with same key", async () => {
+    const envTag = tag(custom<string>(), { label: "env" })
+    const scope = createScope({ tags: [envTag("production")] })
+    const ctx = scope.createExecution({ tags: [envTag("development")] })
+    expect(ctx.get(envTag)).toBe("development")
+    expect(envTag.extractFrom(ctx.tagStore)).toBe("development")
+  })
+
+  it("seeds both scope and execution tags without conflict when keys differ", async () => {
+    const scopeTag = tag(custom<string>(), { label: "scope" })
+    const execTag = tag(custom<string>(), { label: "exec" })
+    const scope = createScope({ tags: [scopeTag("from-scope")] })
+    const ctx = scope.createExecution({ tags: [execTag("from-exec")] })
+    expect(ctx.get(scopeTag)).toBe("from-scope")
+    expect(ctx.get(execTag)).toBe("from-exec")
+  })
 })
