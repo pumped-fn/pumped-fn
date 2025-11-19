@@ -772,10 +772,10 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       accessorOrKey !== null &&
       accessorOrKey !== undefined &&
       (typeof accessorOrKey === "object" || typeof accessorOrKey === "function") &&
-      "injectTo" in accessorOrKey
+      "writeToStore" in accessorOrKey
     ) {
       const accessor = accessorOrKey as Tag.Tag<T, false> | Tag.Tag<T, true>
-      accessor.writeTo(this.tagStore, value as T)
+      accessor.writeToStore(this.tagStore, value as T)
       return
     }
     const key = accessorOrKey
