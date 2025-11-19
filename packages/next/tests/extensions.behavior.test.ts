@@ -413,6 +413,28 @@ describe("extensions behavior", () => {
     expect(() => numberTag.writeToTags(null as any, 5)).toThrow("writeToTags requires Tagged[] array")
     expect(() => numberTag.writeToTags({} as any, 5)).toThrow("writeToTags requires Tagged[] array")
 
+    const invalidValueTag = tag(
+      {
+        "~standard": {
+          vendor: "test",
+          version: 1,
+          validate(value: unknown) {
+            if (typeof value !== "string") {
+              return { success: false, issues: [{ message: "Expected string" }] }
+            }
+            return { success: true, value }
+          },
+        },
+      },
+      { label: "string-only" },
+    )
+    const storeForValidation = new Map<symbol, unknown>()
+    expect(() => invalidValueTag.writeToStore(storeForValidation, 42 as any)).toThrow()
+    const containerForValidation = { tags: [] }
+    expect(() => invalidValueTag.writeToContainer(containerForValidation, 42 as any)).toThrow()
+    const arrayForValidation: ReturnType<typeof invalidValueTag>[] = []
+    expect(() => invalidValueTag.writeToTags(arrayForValidation, 42 as any)).toThrow()
+
     const mapSource = new Map<symbol, unknown>()
     const defaultNumberTag = tag(custom<number>(), { default: 42 })
     expect(defaultNumberTag.extractFrom(mapSource)).toBe(42)

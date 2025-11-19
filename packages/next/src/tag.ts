@@ -175,12 +175,15 @@ class TagImpl<T, HasDefault extends boolean = false> {
     if (target.tags !== undefined && !Array.isArray(target.tags)) {
       throw new TypeError("Container.tags must be array if present");
     }
+
     const validated = validate(this.schema, value);
     const tagged = createTagged(this.key, this.schema, validated, this.label);
+
     if (!target.tags) {
       target.tags = [];
     }
     target.tags.push(tagged);
+
     tagCacheMap.delete(target);
     return tagged;
   }
@@ -189,9 +192,12 @@ class TagImpl<T, HasDefault extends boolean = false> {
     if (!Array.isArray(target)) {
       throw new TypeError("writeToTags requires Tagged[] array");
     }
+
     const validated = validate(this.schema, value);
     const tagged = createTagged(this.key, this.schema, validated, this.label);
+
     target.push(tagged);
+
     tagCacheMap.delete(target);
     return tagged;
   }
