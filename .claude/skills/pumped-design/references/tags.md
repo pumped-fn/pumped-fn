@@ -1,5 +1,17 @@
 # Tags Reference
 
+## Tag Store Operations
+
+Tags provide two methods for writing to stores:
+
+- `tag.injectTo(store, value)` - Legacy method, writes to Tag.Store only
+- `tag.writeTo(store, value)` - Preferred alias, writes to Tag.Store
+- `tag.writeTo(container, value)` - Also works with Tag.Container, returns Tagged
+
+All tag writes and reads in ExecutionContext go through the Tag.Store abstraction to ensure schema validation and consistent defaults.
+
+ExecutionContext automatically seeds both scope tags and execution-provided tags into its tagStore during construction, ensuring all tag access methods (extractFrom, readFrom, get, find) work consistently.
+
 ## Tag Executors
 
 Tags can be used in executor dependencies for automatic scope extraction.
