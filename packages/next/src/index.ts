@@ -1,17 +1,3 @@
-import {
-  derive as deriveExecutor,
-  isExecutor as isExecutorFn,
-  isLazyExecutor as isLazyExecutorFn,
-  isMainExecutor as isMainExecutorFn,
-  isPreset as isPresetFn,
-  isReactiveExecutor as isReactiveExecutorFn,
-  isStaticExecutor as isStaticExecutorFn,
-  preset as presetExecutor,
-  provide as provideExecutor,
-} from "./executor";
-import { flow as flowImpl, flowMeta as flowMetaImpl } from "./flow";
-import { extension as extensionFactory } from "./extension";
-import * as errorsModule from "./errors";
 import type {
   ExecutorError as InternalExecutorError,
   Extension as InternalExtension,
@@ -20,448 +6,462 @@ import type {
   Multi as InternalMulti,
   StandardSchemaV1 as InternalStandardSchemaV1,
   Core as InternalCore,
-} from "./types";
-import {
-  DependencyResolutionError as DependencyResolutionErrorCtor,
-  ExecutorResolutionError as ExecutorResolutionErrorCtor,
-  FactoryExecutionError as FactoryExecutionErrorCtor,
-  FlowError as FlowErrorCtor,
-  FlowValidationError as FlowValidationErrorCtor,
-  SchemaError as SchemaErrorCtor,
-} from "./types";
-import * as multiModule from "./multi";
-import { Promised as PromisedClass } from "./promises";
-import { resolves as resolvesHelper } from "./helpers";
-import { tag as tagImpl } from "./tag";
-import { tags as tagsImpl } from "./tag-executors";
-import { type Tag as TagType } from "./tag-types";
-import type * as TagTypes from "./tag-types";
-import * as standardSchemaModule from "./ssch";
-import { custom as customSchema } from "./ssch";
-import { type ScopeOption as InternalScopeOption, createScope as createScopeImpl } from "./scope";
+} from "./types"
+import type { Tag as TagType } from "./tag-types"
+import type * as TagTypes from "./tag-types"
+import { tag as tagImpl } from "./tag"
+import { custom as customSchema } from "./ssch"
 
 /**
  * Promise-aware helper returned by several APIs to carry execution metadata.
  */
-export { PromisedClass as Promised };
+export { Promised } from "./promises"
 
 /**
  * Toolkit for defining schema primitives compatible with Pumped-fn tags.
  */
-export { standardSchemaModule as standardSchema };
+export * as standardSchema from "./ssch"
 
 /**
  * Multi-executor helpers for key-scoped executor pools.
  */
-export { multiModule as multi };
+export * as multi from "./multi"
 
 /**
  * Canonical error catalog helpers for executor failures.
  */
-export { errorsModule as errors };
+export * as errors from "./errors"
 
 /**
  * Build tag-aware schema instances or adapters.
  */
-export const custom: typeof customSchema = customSchema;
+export { custom } from "./ssch"
 
 /**
  * Creates a typed tag accessor bound to a schema.
  */
-export const tag: typeof tagImpl = tagImpl;
+export { tag } from "./tag"
 
 /**
  * Curated helpers for extracting metadata from tags.
  */
-export const tags: typeof tagsImpl = tagsImpl;
+export { tags } from "./tag-executors"
 
 /**
  * Create a new execution scope with optional presets, registry, and extensions.
  */
-export const createScope: typeof createScopeImpl = createScopeImpl;
-
-/**
- * Register a dependency-free executor that resolves directly from the controller.
- */
-export const provide: typeof provideExecutor = provideExecutor;
-
-/**
- * Register an executor that depends on other executors before producing a value.
- */
-export const derive: typeof deriveExecutor = deriveExecutor;
-
-/**
- * Override executor output within a scope using static values or other executors.
- */
-export const preset: typeof presetExecutor = presetExecutor;
-
-/**
- * Runtime check verifying any object implements the executor contract.
- */
-export const isExecutor: typeof isExecutorFn = isExecutorFn;
-
-/**
- * Runtime check verifying an executor was produced through the lazy channel.
- */
-export const isLazyExecutor: typeof isLazyExecutorFn = isLazyExecutorFn;
-
-/**
- * Runtime check verifying an executor exposes the reactive channel.
- */
-export const isReactiveExecutor: typeof isReactiveExecutorFn = isReactiveExecutorFn;
-
-/**
- * Runtime check verifying an executor exposes a static channel accessor.
- */
-export const isStaticExecutor: typeof isStaticExecutorFn = isStaticExecutorFn;
-
-/**
- * Runtime check verifying the executor instance represents the main factory.
- */
-export const isMainExecutor: typeof isMainExecutorFn = isMainExecutorFn;
-
-/**
- * Runtime check verifying a value represents a preset override entry.
- */
-export const isPreset: typeof isPresetFn = isPresetFn;
-
-/**
- * Orchestrates flow factories and exposes helpers for standalone executions.
- */
-export const flow: typeof flowImpl = flowImpl;
-
-/**
- * Accessor for metadata injected during flow definition.
- */
-export const flowMeta: typeof flowMetaImpl = flowMetaImpl;
-
-/**
- * Create typed extensions with init/wrap/onError/dispose hooks.
- */
-export const extension: typeof extensionFactory = extensionFactory;
+export { createScope, type ScopeOption } from "./scope"
 
 /**
  * Resolve a tree of executors inside a scope and return typed values.
  */
-export const resolves: typeof resolvesHelper = resolvesHelper;
+export { resolves } from "./helpers"
+
+/**
+ * Create typed extensions with init/wrap/onError/dispose hooks.
+ */
+export { extension } from "./extension"
+
+/**
+ * Register a dependency-free executor that resolves directly from the controller.
+ */
+export { provide } from "./executor"
+
+/**
+ * Register an executor that depends on other executors before producing a value.
+ */
+export { derive } from "./executor"
+
+/**
+ * Override executor output within a scope using static values or other executors.
+ */
+export { preset } from "./executor"
+
+/**
+ * Runtime check verifying any object implements the executor contract.
+ */
+export { isExecutor } from "./executor"
+
+/**
+ * Runtime check verifying an executor was produced through the lazy channel.
+ */
+export { isLazyExecutor } from "./executor"
+
+/**
+ * Runtime check verifying an executor exposes the reactive channel.
+ */
+export { isReactiveExecutor } from "./executor"
+
+/**
+ * Runtime check verifying an executor exposes a static channel accessor.
+ */
+export { isStaticExecutor } from "./executor"
+
+/**
+ * Runtime check verifying the executor instance represents the main factory.
+ */
+export { isMainExecutor } from "./executor"
+
+/**
+ * Runtime check verifying a value represents a preset override entry.
+ */
+export { isPreset } from "./executor"
+
+/**
+ * Orchestrates flow factories and exposes helpers for standalone executions.
+ */
+export { flow } from "./flow"
+
+/**
+ * Accessor for metadata injected during flow definition.
+ */
+export { flowMeta } from "./flow"
+
+/**
+ * Error thrown when schema validation fails.
+ */
+export { SchemaError } from "./types"
+
+/**
+ * Base executor resolution error capturing scope context.
+ */
+export { ExecutorResolutionError } from "./types"
+
+/**
+ * Error thrown when executor factory throws or rejects.
+ */
+export { FactoryExecutionError } from "./types"
+
+/**
+ * Error thrown when dependencies cannot be resolved.
+ */
+export { DependencyResolutionError } from "./types"
+
+/**
+ * Flow-level error used for descriptive failures inside handlers.
+ */
+export { FlowError } from "./types"
+
+/**
+ * Error thrown when flow input or output validation fails.
+ */
+export { FlowValidationError } from "./types"
 
 /**
  * Standard tag representing the friendly executor name.
  */
 export const name: TagType.Tag<string, false> = tagImpl(customSchema<string>(), {
   label: "pumped-fn/name",
-});
+})
 
 /**
- * Options accepted by {@link createScope}.
+ * Tag instance with consumer-facing metadata.
  */
-export type ScopeOption = InternalScopeOption;
+export type Tag<T, HasDefault extends boolean = false> = TagType.Tag<T, HasDefault>
 
 /**
- * Tagged metadata accessor used throughout Pumped-fn.
+ * Value that may be wrapped in a Promise.
  */
-export type Tag<T, HasDefault extends boolean = false> = TagType.Tag<T, HasDefault>;
+export type MaybePromised<T> = InternalMaybePromised<T>
 
 /**
- * Tag-related helper types.
+ * Base error type for all executor-related failures.
  */
-export namespace Tag {
-  /**
-   * Storage interface for tag key-value pairs.
-   */
-  export type Store = TagTypes.Tag.Store;
-
-  /**
-   * Tagged value instance attached to executors/flows/scopes.
-   */
-  export type Tagged<T = unknown> = TagTypes.Tag.Tagged<T>;
-
-  /**
-   * Tag container interface.
-   */
-  export type Container = TagTypes.Tag.Container;
-
-  /**
-   * Sources from which tag values can be extracted.
-   */
-  export type Source = TagTypes.Tag.Source;
-
-  /**
-   * Tag definition with schema and extraction methods.
-   */
-  export type Tag<T, HasDefault extends boolean = false> = TagTypes.Tag.Tag<T, HasDefault>;
-
-  /**
-   * Tag-based executor wrapper for dependency resolution.
-   */
-  export type TagExecutor<TOutput, TTag = TOutput> = TagTypes.Tag.TagExecutor<TOutput, TTag>;
-}
+export type ExecutorError = InternalExecutorError
 
 /**
- * Promise-like helper that may resolve immediately or later.
- */
-export type MaybePromised<T> = InternalMaybePromised<T>;
-
-/**
- * Union describing every executor error variant raised during resolution.
- */
-export type ExecutorError = InternalExecutorError;
-
-/**
- * Strongly typed Standard Schema interface compatible with tags and executors.
+ * Standard schema contract compatible with validation libraries.
  */
 export interface StandardSchemaV1<Input = unknown, Output = Input> extends InternalStandardSchemaV1<Input, Output> {}
 
-export namespace StandardSchemaV1 {
+/**
+ * Tag helper types representing tag instances and metadata containers.
+ */
+export namespace Tag {
   /**
-   * Shared properties describing schema metadata and validation contract.
+   * Container mapping tag labels to tag instances.
    */
-  export type Props<Input = unknown, Output = Input> = InternalStandardSchemaV1.Props<Input, Output>;
+  export type Store = TagTypes.Tag.Store
 
   /**
-   * Result returned by schema validation hooks.
+   * Object carrying tag metadata in its symbol properties.
    */
-  export type Result<Output> = InternalStandardSchemaV1.Result<Output>;
+  export type Tagged<T = unknown> = TagTypes.Tag.Tagged<T>
 
   /**
-   * Successful validation outcome.
+   * Tag storage container attached to executors.
    */
-  export type SuccessResult<Output> = InternalStandardSchemaV1.SuccessResult<Output>;
+  export type Container = TagTypes.Tag.Container
 
   /**
-   * Failed validation outcome with issue breakdown.
+   * Source object providing tags for executor creation.
    */
-  export type FailureResult = InternalStandardSchemaV1.FailureResult;
+  export type Source = TagTypes.Tag.Source
 
   /**
-   * Structured validation issue detail.
+   * Tag instance with consumer-facing metadata.
    */
-  export type Issue = InternalStandardSchemaV1.Issue;
+  export type Tag<T, HasDefault extends boolean = false> = TagTypes.Tag.Tag<T, HasDefault>
 
   /**
-   * Additional path metadata for nested validation failures.
+   * Executor producing tag values from tagged sources.
    */
-  export type PathSegment = InternalStandardSchemaV1.PathSegment;
-
-  /**
-   * Optional input/output typing metadata.
-   */
-  export type Types<Input = unknown, Output = Input> = InternalStandardSchemaV1.Types<Input, Output>;
-
-  /**
-   * Extract Input type from schema metadata.
-   */
-  export type InferInput<Schema extends StandardSchemaV1> = InternalStandardSchemaV1.InferInput<Schema>;
-
-  /**
-   * Extract Output type from schema metadata.
-   */
-  export type InferOutput<Schema extends StandardSchemaV1> = InternalStandardSchemaV1.InferOutput<Schema>;
+  export type TagExecutor<TOutput, TTag = TOutput> = TagTypes.Tag.TagExecutor<TOutput, TTag>
 }
 
 /**
- * Executor-level helper types for registering and operating scopes.
+ * Standard schema helper types for validation contracts.
+ */
+export namespace StandardSchemaV1 {
+  /**
+   * Schema metadata properties.
+   */
+  export type Props<Input = unknown, Output = Input> = InternalStandardSchemaV1.Props<Input, Output>
+
+  /**
+   * Validation result union (success or failure).
+   */
+  export type Result<Output> = InternalStandardSchemaV1.Result<Output>
+
+  /**
+   * Successful validation result.
+   */
+  export type SuccessResult<Output> = InternalStandardSchemaV1.SuccessResult<Output>
+
+  /**
+   * Failed validation result.
+   */
+  export type FailureResult = InternalStandardSchemaV1.FailureResult
+
+  /**
+   * Single validation issue.
+   */
+  export type Issue = InternalStandardSchemaV1.Issue
+
+  /**
+   * Path segment identifying issue location.
+   */
+  export type PathSegment = InternalStandardSchemaV1.PathSegment
+
+  /**
+   * Type information for schema inputs and outputs.
+   */
+  export type Types<Input = unknown, Output = Input> = InternalStandardSchemaV1.Types<Input, Output>
+
+  /**
+   * Extract schema input type.
+   */
+  export type InferInput<Schema extends StandardSchemaV1> = InternalStandardSchemaV1.InferInput<Schema>
+
+  /**
+   * Extract schema output type.
+   */
+  export type InferOutput<Schema extends StandardSchemaV1> = InternalStandardSchemaV1.InferOutput<Schema>
+}
+
+/**
+ * Core executor types representing factory contracts and execution states.
  */
 export namespace Core {
   /**
    * Async-safe output returned by executors and scopes.
    */
-  export type Output<T> = InternalCore.Output<T>;
+  export type Output<T> = InternalCore.Output<T>
 
   /**
    * Factory signature used by {@link provide}.
    */
-  export type NoDependencyFn<T> = InternalCore.NoDependencyFn<T>;
+  export type NoDependencyFn<T> = InternalCore.NoDependencyFn<T>
 
   /**
-   * Factory signature receiving resolved dependencies before producing values.
+   * Factory signature used by {@link derive}.
    */
-  export type DependentFn<T, D> = InternalCore.DependentFn<T, D>;
+  export type DependentFn<T, D> = InternalCore.DependentFn<T, D>
 
   /**
-   * Untyped executor placeholder used internally.
+   * Executor with unknown output type.
    */
-  export type UExecutor = InternalCore.UExecutor;
+  export type UExecutor = InternalCore.UExecutor
 
   /**
-   * Any executor variant produced by Pumped-fn.
+   * Union of all executor variants.
    */
-  export type AnyExecutor = InternalCore.AnyExecutor;
+  export type AnyExecutor = InternalCore.AnyExecutor
 
   /**
-   * Cleanup callback invoked on scope disposal.
+   * Cleanup function invoked when executor is released.
    */
-  export type Cleanup = InternalCore.Cleanup;
+  export type Cleanup = InternalCore.Cleanup
 
   /**
-   * Controller offered inside executor factories for lifecycle operations.
+   * Controller passed to executor factories for lifecycle management.
    */
-  export type Controller = InternalCore.Controller;
+  export type Controller = InternalCore.Controller
 
   /**
-   * Base executor contract shared by all executor flavors.
+   * Base executor interface with core channels.
    */
-  export type BaseExecutor<T> = InternalCore.BaseExecutor<T>;
+  export type BaseExecutor<T> = InternalCore.BaseExecutor<T>
 
   /**
-   * Main executor flavor returned by {@link provide} and {@link derive}.
+   * Executor instance produced by {@link provide} or {@link derive}.
    */
-  export type Executor<T> = InternalCore.Executor<T>;
+  export type Executor<T> = InternalCore.Executor<T>
 
   /**
-   * Reactive executor exposing `.reactive`.
+   * Reactive channel exposing subscription capabilities.
    */
-  export type Reactive<T> = InternalCore.Reactive<T>;
+  export type Reactive<T> = InternalCore.Reactive<T>
 
   /**
-   * Lazy executor exposing `.lazy`.
+   * Lazy channel for deferred execution.
    */
-  export type Lazy<T> = InternalCore.Lazy<T>;
+  export type Lazy<T> = InternalCore.Lazy<T>
 
   /**
-   * Static executor exposing `.static`.
+   * Static channel providing synchronous access.
    */
-  export type Static<T> = InternalCore.Static<T>;
+  export type Static<T> = InternalCore.Static<T>
 
   /**
-   * Accessor bound to an executor inside a scope.
+   * Accessor exposing lookup and subscription capabilities.
    */
-  export type Accessor<T> = InternalCore.Accessor<T>;
+  export type Accessor<T> = InternalCore.Accessor<T>
 
   /**
-   * Pending accessor state with a still-resolving promise.
+   * State representing an unresolved accessor.
    */
-  export type PendingState<T> = InternalCore.PendingState<T>;
+  export type PendingState<T> = InternalCore.PendingState<T>
 
   /**
-   * Resolved accessor state including cached value.
+   * State representing a successfully resolved accessor.
    */
-  export type ResolvedState<T> = InternalCore.ResolvedState<T>;
+  export type ResolvedState<T> = InternalCore.ResolvedState<T>
 
   /**
-   * Rejected accessor state with captured context.
+   * State representing a rejected accessor.
    */
-  export type RejectedState = InternalCore.RejectedState;
+  export type RejectedState = InternalCore.RejectedState
 
   /**
-   * Union describing every accessor lookup state returned by {@link Accessor.lookup}.
+   * Union of all possible accessor states.
    */
-  export type ResolveState<T> = InternalCore.ResolveState<T>;
+  export type ResolveState<T> = InternalCore.ResolveState<T>
 
   /**
-   * Preset value applied to override executor outputs.
+   * Preset configuration for overriding executor output.
    */
-  export type Preset<T> = InternalCore.Preset<T>;
+  export type Preset<T> = InternalCore.Preset<T>
 
   /**
-   * Inferred output helper for dependencies passed to {@link derive}.
+   * Extract output type from executor.
    */
-  export type InferOutput<T> = InternalCore.InferOutput<T>;
+  export type InferOutput<T> = InternalCore.InferOutput<T>
 
   /**
-   * Shapes that can be passed as dependencies when deriving executors.
+   * Value accepted as executor dependency.
    */
-  export type DependencyLike = InternalCore.DependencyLike;
+  export type DependencyLike = InternalCore.DependencyLike
 
   /**
-   * Scoped callback for change notifications.
+   * Callback invoked when executor output changes.
    */
-  export type ChangeCallback = InternalCore.ChangeCallback;
+  export type ChangeCallback = InternalCore.ChangeCallback
 
   /**
-   * Scoped callback for release notifications.
+   * Callback invoked when executor is released.
    */
-  export type ReleaseCallback = InternalCore.ReleaseCallback;
+  export type ReleaseCallback = InternalCore.ReleaseCallback
 
   /**
-   * Executor-specific error callback signature.
+   * Callback invoked when executor encounters an error.
    */
-  export type ErrorCallback<T = unknown> = InternalCore.ErrorCallback<T>;
+  export type ErrorCallback = InternalCore.ErrorCallback
 
   /**
-   * Global error callback signature.
+   * Global error callback for unhandled executor errors.
    */
-  export type GlobalErrorCallback = InternalCore.GlobalErrorCallback;
+  export type GlobalErrorCallback = InternalCore.GlobalErrorCallback
 
   /**
-   * Scope interface representing executor registry and lifecycle.
+   * Scope managing executor lifecycle and resolution.
    */
-  export interface Scope extends InternalCore.Scope {}
+  export type Scope = InternalCore.Scope
 }
 
 /**
- * Flow helper types representing handlers and execution metadata.
+ * Flow helper types representing execution contexts and results.
  */
 export namespace Flow {
   /**
-   * Static definition describing flow input/output schemas.
+   * Flow definition combining handler and metadata.
    */
-  export type Definition<S, I> = InternalFlow.Definition<S, I>;
+  export type Definition<I, O> = InternalFlow.Definition<I, O>
 
   /**
-   * Flow handler signature invoked during execution.
+   * Handler function processing flow inputs.
    */
-  export type Handler<S, I> = InternalFlow.Handler<S, I>;
+  export type Handler<I, O> = InternalFlow.Handler<I, O>
 
   /**
-   * Flow executor wrapper embedding the definition metadata.
+   * Flow instance produced by {@link flow}.
    */
-  export type Flow<I, O> = InternalFlow.Flow<I, O>;
+  export type Flow<I, O> = InternalFlow.Flow<I, O>
 
   /**
    * Extract type of flow input from handler or executor.
    */
-  export type InferInput<F> = InternalFlow.InferInput<F>;
+  export type InferInput<F> = InternalFlow.InferInput<F>
 
   /**
    * Extract type of flow output from handler or executor.
    */
-  export type InferOutput<F> = InternalFlow.InferOutput<F>;
+  export type InferOutput<F> = InternalFlow.InferOutput<F>
 
   /**
    * Single-argument executor signature returning results.
    */
-  export type FnExecutor<I, O> = InternalFlow.FnExecutor<I, O>;
+  export type FnExecutor<I, O> = InternalFlow.FnExecutor<I, O>
 
   /**
    * Multi-argument executor signature returning results.
    */
-  export type MultiFnExecutor<Args extends readonly unknown[], O> = InternalFlow.MultiFnExecutor<Args, O>;
+  export type MultiFnExecutor<Args extends readonly unknown[], O> = InternalFlow.MultiFnExecutor<Args, O>
 
   /**
    * Result summary returned by {@link Core.Scope.parallel}.
    */
-  export type ParallelResult<T> = InternalFlow.ParallelResult<T>;
+  export type ParallelResult<T> = InternalFlow.ParallelResult<T>
 
   /**
    * Settled result summary returned by {@link Core.Scope.parallelSettled}.
    */
-  export type ParallelSettledResult<T> = InternalFlow.ParallelSettledResult<T>;
+  export type ParallelSettledResult<T> = InternalFlow.ParallelSettledResult<T>
 
   /**
    * Configuration applied to parallel executions.
    */
-  export type ParallelExecutionOptions = InternalFlow.ParallelExecutionOptions;
+  export type ParallelExecutionOptions = InternalFlow.ParallelExecutionOptions
 
   /**
    * Flow execution context exposed to handlers.
    */
-  export type Context = InternalFlow.Context;
+  export type Context = InternalFlow.Context
 
   /**
    * Execution data shared across flow status updates.
    */
-  export type ExecutionData = InternalFlow.ExecutionData;
+  export type ExecutionData = InternalFlow.ExecutionData
 
   /**
    * Result details describing success/failure plus context.
    */
-  export type ExecutionDetails<T> = InternalFlow.ExecutionDetails<T>;
+  export type ExecutionDetails<T> = InternalFlow.ExecutionDetails<T>
 
   /**
    * Current execution status for flows run through {@link Core.Scope}.
    */
-  export type ExecutionStatus = InternalFlow.ExecutionStatus;
+  export type ExecutionStatus = InternalFlow.ExecutionStatus
 
   /**
    * Execution handle containing result promise, metadata, and abort controller.
@@ -476,32 +476,32 @@ export namespace Extension {
   /**
    * Operation emitted when executors are resolved or updated.
    */
-  export type ResolveOperation = InternalExtension.ResolveOperation;
+  export type ResolveOperation = InternalExtension.ResolveOperation
 
   /**
    * Target metadata for flow executions.
    */
-  export type FlowTarget = InternalExtension.FlowTarget;
+  export type FlowTarget = InternalExtension.FlowTarget
 
   /**
    * Target metadata for stand-alone functions executed through ctx.exec.
    */
-  export type FnTarget = InternalExtension.FnTarget;
+  export type FnTarget = InternalExtension.FnTarget
 
   /**
    * Target metadata for ctx.parallel or ctx.parallelSettled operations.
    */
-  export type ParallelTarget = InternalExtension.ParallelTarget;
+  export type ParallelTarget = InternalExtension.ParallelTarget
 
   /**
    * Operation metadata provided to extension hooks.
    */
-  export type ExecutionOperation = InternalExtension.ExecutionOperation;
+  export type ExecutionOperation = InternalExtension.ExecutionOperation
 
   /**
    * Union describing every supported extension operation.
    */
-  export type Operation = InternalExtension.Operation;
+  export type Operation = InternalExtension.Operation
 
   /**
    * Extension contract implemented by custom cross-cutting hooks.
@@ -516,55 +516,25 @@ export namespace Multi {
   /**
    * Key type accepted by multi executors.
    */
-  export type Key = InternalMulti.Key;
+  export type Key = InternalMulti.Key
 
   /**
    * Executor that can be called with keys to fetch accessor executors.
    */
-  export type MultiExecutor<T, K> = InternalMulti.MultiExecutor<T, K>;
+  export type MultiExecutor<T, K> = InternalMulti.MultiExecutor<T, K>
 
   /**
    * Dependent factory signature for keyed executors.
    */
-  export type DependentFn<T, K, D> = InternalMulti.DependentFn<T, K, D>;
+  export type DependentFn<T, K, D> = InternalMulti.DependentFn<T, K, D>
 
   /**
    * Multi executor configuration describing key schema and transforms.
    */
-  export type Option<K> = InternalMulti.Option<K>;
+  export type Option<K> = InternalMulti.Option<K>
 
   /**
    * Derived multi configuration attaching dependencies.
    */
-  export type DeriveOption<K, D> = InternalMulti.DeriveOption<K, D>;
+  export type DeriveOption<K, D> = InternalMulti.DeriveOption<K, D>
 }
-
-/**
- * Error thrown when schema validation fails.
- */
-export { SchemaErrorCtor as SchemaError };
-
-/**
- * Base executor resolution error capturing scope context.
- */
-export { ExecutorResolutionErrorCtor as ExecutorResolutionError };
-
-/**
- * Error thrown when executor factory throws or rejects.
- */
-export { FactoryExecutionErrorCtor as FactoryExecutionError };
-
-/**
- * Error thrown when dependencies cannot be resolved.
- */
-export { DependencyResolutionErrorCtor as DependencyResolutionError };
-
-/**
- * Flow-level error used for descriptive failures inside handlers.
- */
-export { FlowErrorCtor as FlowError };
-
-/**
- * Error thrown when flow input or output validation fails.
- */
-export { FlowValidationErrorCtor as FlowValidationError };
