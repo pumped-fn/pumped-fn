@@ -1,5 +1,11 @@
 # @pumped-fn/core-next
 
+## 0.5.89
+
+### Patch Changes
+
+- de02524: Add explicit tag write helpers (writeToStore, writeToContainer, writeToTags) with cache invalidation for container and array mutations
+
 ## 0.5.88
 
 ### Patch Changes
