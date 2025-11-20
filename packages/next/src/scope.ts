@@ -148,6 +148,10 @@ class AccessorImpl implements Core.Accessor<unknown> {
     try {
       return await this.resolveCore();
     } catch (error) {
+      if (this.executionContext) {
+        this.contextResolvedValue = NOT_SET;
+      }
+
       const { enhancedError, errorContext, originalError } =
         this.enhanceResolutionError(error);
 

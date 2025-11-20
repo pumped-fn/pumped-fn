@@ -122,4 +122,21 @@ describe("ExecutionContext tag store alignment", () => {
     expect(ctx.get(scopeTag)).toBe("from-scope")
     expect(ctx.get(execTag)).toBe("from-exec")
   })
+
+  it("should clean up contextResolvedValue on resolution error", async () => {
+    const errorTag = tag(custom<string>())
+    const scope = createScope()
+
+    const failingFlow = flow([errorTag], () => {
+      throw new Error("Resolution failed")
+    })
+
+    const ctx = scope.createExecution({ tags: [errorTag("value")] })
+
+    await expect(ctx.exec(failingFlow, undefined)).rejects.toThrow("Resolution failed")
+
+    const workingFlow = flow([errorTag], ([value]) => value)
+    const result = await ctx.exec(workingFlow, undefined)
+    expect(result).toBe("value")
+  })
 })
