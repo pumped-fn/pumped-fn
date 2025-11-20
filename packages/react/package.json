@@ -16,6 +16,9 @@
     "directory": "packages/react"
   },
   "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
