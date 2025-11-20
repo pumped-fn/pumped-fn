@@ -139,4 +139,19 @@ describe("ExecutionContext tag store alignment", () => {
     const result = await ctx.exec(workingFlow, undefined)
     expect(result).toBe("value")
   })
+
+  it("should not re-apply scope tags to child contexts", async () => {
+    const value = tag(custom<string>())
+    const scope = createScope({ tags: [value("scope")] })
+
+    const parentCtx = scope.createExecution({ tags: [value("parent")] })
+
+    const innerFlow = flow([value], ([v], ctx) => v)
+    const nestedFlow = flow([], async (_deps, ctx) => {
+      return await ctx.exec({ flow: innerFlow, input: undefined, tags: [value("child")] })
+    })
+
+    const result = await parentCtx.exec(nestedFlow, undefined)
+    expect(result).toBe("child")
+  })
 })
