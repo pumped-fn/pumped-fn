@@ -58,7 +58,8 @@ Use ast-grep where possible to search and replace code
 - strict coding style, concrete reasonable naming
 - **ALWAYS** guarantee no any, unknonw or casting to direct type required
 - **ALWAYS** make sure typecheck pass/ or use tsc --noEmit to verify, especially tests
-- **NEVER** add comments, most of the time those are codesmells (that's why it'll require comments)
+- **NEVER** add inline `//` comments - code should be well named so content explains itself
+- **ALWAYS** add TSDoc/JSDoc for all public API (anything exported via packages/*/src/index.ts)
 - group types using namespace, less cluttered
 - combine tests where possible, test running quite quickly, add test error message so it'll be easy to track from the stdout
 - cleanup redundant codes, dead codes
@@ -72,7 +73,8 @@ The library is meant to be GENERIC, it has its core, and extensions (plugins, mi
 # Coding workflow
 
 - **ALWAYS** make sure typechecking passed, for both src code and tests code, to the directory you are working on
-- **NEVER** use comment on code, code should be well named so the content explains for themseleves
+- **NEVER** use inline `//` comments - code should be well named so content explains itself
+- **ALWAYS** add TSDoc/JSDoc for public API exports (see Coding style section)
 - ALWAYS use pnpm, read to understand the project setting before hand
 - use linebreak smartly to separate area of code with different meanings
 
@@ -101,6 +103,30 @@ When changing public API (types, function signatures, etc):
 6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`
+
+## Public API export rules (packages/*/src/index.ts)
+
+**Export pattern:**
+- Use direct re-exports: `export { X } from "./module"`
+- Use namespace re-exports for modules: `export * as name from "./module"`
+- Zero inline `//` comments
+- Mandatory TSDoc/JSDoc for ALL exports
+
+**Type export rules (function adjacency principle):**
+- Export ONLY types used in public API function signatures
+- Types used in parameters/returns of exported functions → export
+- Internal-only implementation types → DO NOT export
+- Trace from exported functions to their type dependencies
+
+**Namespace organization:**
+- Group related types under namespaces (Core, Flow, Extension, Multi, etc.)
+- Use type aliases within namespaces: `export type X = Internal.X`
+- Keep top-level exports minimal and well-organized
+
+**Verification:**
+- Run `pnpm -F @pumped-fn/core-next verify:public-docs` before release
+- All exports must have TSDoc (enforced by verification script)
+- Verification runs in release workflow, not in typecheck
 
 
 ---

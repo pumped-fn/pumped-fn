@@ -1,4 +1,4 @@
-import { derive, name } from "@pumped-fn/core-next"
+import { derive, name, type Core } from "@pumped-fn/core-next"
 import { render } from "ink"
 import React, { useState, useEffect } from "react"
 import { Box, Text } from "ink"
@@ -34,7 +34,7 @@ const DevtoolsApp: React.FC<{ aggregator: State.Aggregator }> = ({ aggregator })
   )
 }
 
-export const tuiExecutor = derive([stateAggregatorExecutor], ([aggregator], ctl) => {
+export const tuiExecutor: Core.Executor<{ start: () => void; stop: () => void }> = derive([stateAggregatorExecutor], ([aggregator], ctl) => {
   let instance: ReturnType<typeof render> | null = null
 
   const start = () => {
