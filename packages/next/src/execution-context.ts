@@ -507,7 +507,7 @@ const createFlowExecutionDescriptor = <F extends Flow.UFlow>(
 
   return {
     executor: () =>
-      parentCtx.scope.resolve(config.flow).map(async (handler) => {
+      parentCtx.scope.resolve(config.flow, false, childCtx).map(async (handler) => {
         const runHandler = () =>
           executeFlowHandler(
             handler as Flow.Handler<Flow.InferOutput<F>, Flow.InferInput<F>>,
@@ -685,7 +685,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       }
     }
 
-    if (this.scope.tags) {
+    if (!this.parent && this.scope.tags) {
       for (const tagged of this.scope.tags) {
         this.tagStore.set(tagged.key, tagged.value)
       }

@@ -343,7 +343,7 @@ export declare namespace Core {
     entries(): [AnyExecutor, Accessor<unknown>][];
     registeredExecutors(): AnyExecutor[];
 
-    resolve<T>(executor: Core.Executor<T>, force?: boolean): Promised<T>;
+    resolve<T>(executor: Core.Executor<T>, force?: boolean, executionContext?: ExecutionContext.Context): Promised<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
 
     run<T, D extends Core.DependencyLike>(

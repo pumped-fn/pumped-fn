@@ -18,14 +18,22 @@ function buildTagCache(tags: Tag.Tagged[]): Map<symbol, unknown[]> {
 }
 
 function isStore(source: Tag.Source): source is Tag.Store {
-  return (
-    typeof source === "object" &&
-    source !== null &&
-    "get" in source &&
-    "set" in source &&
-    typeof source.get === "function" &&
-    typeof source.set === "function"
-  );
+  if (
+    typeof source !== "object" ||
+    source === null ||
+    !("get" in source) ||
+    !("set" in source) ||
+    typeof source.get !== "function" ||
+    typeof source.set !== "function"
+  ) {
+    return false;
+  }
+
+  if ("tagStore" in source && typeof (source as any).tagStore === "object") {
+    return false;
+  }
+
+  return true;
 }
 
 function isContainer(source: Tag.Source): source is Tag.Container {
@@ -51,6 +59,17 @@ function extract<T>(
     return value === undefined ? undefined : validate(schema, value);
   }
 
+  if (
+    typeof source === "object" &&
+    source !== null &&
+    !Array.isArray(source) &&
+    "tagStore" in source &&
+    isStore((source as any).tagStore)
+  ) {
+    const value = (source as any).tagStore.get(key);
+    return value === undefined ? undefined : validate(schema, value);
+  }
+
   let cache = tagCacheMap.get(source);
   if (!cache) {
     const tags = Array.isArray(source) ? source : isContainer(source) ? (source.tags ?? []) : [];
@@ -69,6 +88,17 @@ function collect<T>(
 ): T[] {
   if (isStore(source)) {
     const value = source.get(key);
+    return value === undefined ? [] : [validate(schema, value)];
+  }
+
+  if (
+    typeof source === "object" &&
+    source !== null &&
+    !Array.isArray(source) &&
+    "tagStore" in source &&
+    isStore((source as any).tagStore)
+  ) {
+    const value = (source as any).tagStore.get(key);
     return value === undefined ? [] : [validate(schema, value)];
   }
 
