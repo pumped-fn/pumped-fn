@@ -343,6 +343,16 @@ export declare namespace Core {
     entries(): [AnyExecutor, Accessor<unknown>][];
     registeredExecutors(): AnyExecutor[];
 
+    /**
+     * Resolves an executor and returns its value.
+     *
+     * @param executor - The executor to resolve
+     * @param force - If true, forces re-resolution even if cached
+     * @param executionContext - Optional execution context for context-specific resolution.
+     *   When provided, bypasses scope cache and resolves tags from the execution context
+     *   instead of the scope, ensuring proper isolation between execution contexts.
+     * @returns Promised value of the resolved executor
+     */
     resolve<T>(executor: Core.Executor<T>, force?: boolean, executionContext?: ExecutionContext.Context): Promised<T>;
     resolveAccessor<T>(executor: Core.Executor<T>): Promised<Accessor<T>>;
 

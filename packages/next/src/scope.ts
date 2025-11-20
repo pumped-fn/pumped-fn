@@ -827,6 +827,16 @@ class BaseScope implements Core.Scope {
     return [...this.registry];
   }
 
+  /**
+   * Resolves an executor and returns its value.
+   *
+   * When executionContext is provided:
+   * - Tag resolution uses execution context instead of scope
+   * - Scope cache is bypassed to ensure context isolation
+   * - Resolved values are stored separately per context
+   *
+   * @internal
+   */
   resolve<T>(
     executor: Core.Executor<T>,
     force: boolean = false,
