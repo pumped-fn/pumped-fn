@@ -104,6 +104,30 @@ When changing public API (types, function signatures, etc):
 7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
 8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`
 
+## Public API export rules (packages/*/src/index.ts)
+
+**Export pattern:**
+- Use direct re-exports: `export { X } from "./module"`
+- Use namespace re-exports for modules: `export * as name from "./module"`
+- Zero inline `//` comments
+- Mandatory TSDoc/JSDoc for ALL exports
+
+**Type export rules (function adjacency principle):**
+- Export ONLY types used in public API function signatures
+- Types used in parameters/returns of exported functions → export
+- Internal-only implementation types → DO NOT export
+- Trace from exported functions to their type dependencies
+
+**Namespace organization:**
+- Group related types under namespaces (Core, Flow, Extension, Multi, etc.)
+- Use type aliases within namespaces: `export type X = Internal.X`
+- Keep top-level exports minimal and well-organized
+
+**Verification:**
+- Run `pnpm -F @pumped-fn/core-next verify:public-docs` before release
+- All exports must have TSDoc (enforced by verification script)
+- Verification runs in release workflow, not in typecheck
+
 
 ---
 
