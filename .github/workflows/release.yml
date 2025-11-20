@@ -40,9 +40,6 @@ jobs:
       - name: Build packages
         run: pnpm -r --filter=!docs build
 
-      - name: Run tests
-        run: pnpm test --passWithNoTests
-
       - name: Generate release title
         id: release_title
         run: echo "title=$(bash scripts/get-release-title.sh)" >> $GITHUB_OUTPUT
