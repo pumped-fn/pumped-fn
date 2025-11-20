@@ -108,7 +108,14 @@ When changing public API (types, function signatures, etc):
 
 **Export pattern:**
 - Use direct re-exports: `export { X } from "./module"`
-- Use namespace re-exports for modules: `export * as name from "./module"`
+- For namespace module exports, use const declarations:
+  ```typescript
+  import * as moduleExports from "./module"
+  const name: typeof moduleExports = moduleExports
+  export { name }
+  ```
+  - Rationale: `export * as` pattern increases type declaration size
+  - Const pattern provides better type compatibility and smaller bundles
 - Zero inline `//` comments
 - Mandatory TSDoc/JSDoc for ALL exports
 

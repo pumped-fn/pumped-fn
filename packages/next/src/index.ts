@@ -9,8 +9,15 @@ import type {
 } from "./types"
 import type { Tag as TagType } from "./tag-types"
 import type * as TagTypes from "./tag-types"
+import * as errorsModule from "./errors"
+import * as multiModule from "./multi"
+import * as standardSchemaModule from "./ssch"
 import { tag as tagImpl } from "./tag"
 import { custom as customSchema } from "./ssch"
+
+const standardSchema: typeof standardSchemaModule = standardSchemaModule
+const multi: typeof multiModule = multiModule
+const errors: typeof errorsModule = errorsModule
 
 /**
  * Promise-aware helper returned by several APIs to carry execution metadata.
@@ -20,17 +27,17 @@ export { Promised } from "./promises"
 /**
  * Toolkit for defining schema primitives compatible with Pumped-fn tags.
  */
-export * as standardSchema from "./ssch"
+export { standardSchema }
 
 /**
  * Multi-executor helpers for key-scoped executor pools.
  */
-export * as multi from "./multi"
+export { multi }
 
 /**
  * Canonical error catalog helpers for executor failures.
  */
-export * as errors from "./errors"
+export { errors }
 
 /**
  * Build tag-aware schema instances or adapters.
