@@ -38,7 +38,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm build
+        run: pnpm -r --filter=!docs build
 
       - name: Run tests
         run: pnpm test --passWithNoTests
