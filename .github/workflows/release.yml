@@ -43,6 +43,10 @@ jobs:
       - name: Run tests
         run: pnpm test --passWithNoTests
 
+      - name: Generate release title
+        id: release_title
+        run: echo "title=$(bash scripts/get-release-title.sh)" >> $GITHUB_OUTPUT
+
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
@@ -50,7 +54,7 @@ jobs:
           publish: pnpm changeset publish
           version: pnpm changeset version
           commit: 'chore: version packages'
-          title: 'chore: version packages'
+          title: '${{ steps.release_title.outputs.title }}'
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
