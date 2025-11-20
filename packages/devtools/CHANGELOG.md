@@ -1,5 +1,19 @@
 # @pumped-fn/devtools
 
+## 0.2.12
+
+### Patch Changes
+
+- bcf91ca: Fix type mappings for tsdown beta.50 and revert namespace aliases
+
+  - Update package.json exports to use .d.mts/.d.cts extensions instead of .d.ts
+  - Revert from `export * as` pattern to const declarations for smaller bundle size
+  - Add main/module/types fields to React package for consistency
+  - Update skill references to use correct import paths
+
+- Updated dependencies [bcf91ca]
+  - @pumped-fn/core-next@0.5.90
+
 ## 0.2.11
 
 ### Patch Changes
