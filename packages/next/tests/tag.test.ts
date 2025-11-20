@@ -28,4 +28,12 @@ describe("tag", () => {
     result = await anotherContext.exec(myFlow, "me");
     expect(result).toBe("me");
   });
+
+  it("should correctly identify ExecutionContext with tagStore", () => {
+    const value = tag(custom<string>());
+    const scope = createScope();
+    const ctx = scope.createExecution({ tags: [value("test")] });
+
+    expect(value.extractFrom(ctx)).toBe("test");
+  });
 });
