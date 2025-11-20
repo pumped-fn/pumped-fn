@@ -268,7 +268,7 @@ See: `correlationExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
-import type { Extension, Core } from '@pumped-fn/core-next/types'
+import type { Extension, Core } from '@pumped-fn/core-next'
 
 type CorrelationStore = {
   activeRequests: Map<string, { startTime: number; flowName: string }>
@@ -491,7 +491,7 @@ See: `rateLimiterExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
-import type { Extension, Core } from '@pumped-fn/core-next/types'
+import type { Extension, Core } from '@pumped-fn/core-next'
 
 type RateLimitConfig = { maxRequests: number; windowMs: number }
 type RateLimitStore = { requests: Map<string, number[]>; config: RateLimitConfig }
@@ -547,7 +547,7 @@ See: `apmExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
-import type { Extension, Core } from '@pumped-fn/core-next/types'
+import type { Extension, Core } from '@pumped-fn/core-next'
 
 type APMClient = { startTransaction: (name: string) => APMTransaction }
 type APMTransaction = { end: () => void; setError: (error: unknown) => void }
@@ -621,7 +621,7 @@ See: `tenantIsolationExtension` in skill-examples/extensions.ts
 
 ```typescript
 import { tag, custom, extension } from '@pumped-fn/core-next'
-import type { Extension } from '@pumped-fn/core-next/types'
+import type { Extension } from '@pumped-fn/core-next'
 
 const tenantIdTag = tag(custom<string>(), { label: 'tenant-id' })
 
@@ -659,7 +659,7 @@ export const tenantIsolationExtension = extension({
 
 ```typescript
 import { tag, custom, extension } from '@pumped-fn/core-next'
-import type { Extension, Core } from '@pumped-fn/core-next/types'
+import type { Extension, Core } from '@pumped-fn/core-next'
 
 type AuthPolicy = (flowName: string, input: unknown, userId: string) => boolean
 type AuthStore = { policy: AuthPolicy }
@@ -701,7 +701,7 @@ export const authExtension = (policy: AuthPolicy) => extension({
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
-import type { Extension, Core } from '@pumped-fn/core-next/types'
+import type { Extension, Core } from '@pumped-fn/core-next'
 
 type ExecutionEvent = {
   timestamp: number
@@ -772,7 +772,7 @@ export const devtoolsExtension = extension({
 
 ```typescript
 import { extension } from '@pumped-fn/core-next'
-import type { Extension, Core, Flow } from '@pumped-fn/core-next/types'
+import type { Extension, Core, Flow } from '@pumped-fn/core-next'
 import type { Hono } from 'hono'
 
 type ServerStore = { app: Hono; routes: Map<string, Flow.UFlow> }
