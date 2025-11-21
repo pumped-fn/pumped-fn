@@ -82,9 +82,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     this.resolve = this.createResolveFunction();
 
-    const state = this.scope["getOrCreateState"](requestor);
-    if (!state.accessor) {
-      state.accessor = this;
+    if (!executionContext) {
+      const state = this.scope["getOrCreateState"](requestor);
+      if (!state.accessor) {
+        state.accessor = this;
+      }
     }
   }
 
