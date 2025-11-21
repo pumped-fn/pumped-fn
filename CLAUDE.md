@@ -135,6 +135,7 @@ When changing public API (types, function signatures, etc):
 - Run `pnpm -F @pumped-fn/core-next verify:public-docs` before release
 - All exports must have TSDoc (enforced by verification script)
 - Verification runs in release workflow, not in typecheck
+- **IGNORE `verify-public-docs.mjs` in PR reviews** - this check is release-only, not blocking for PRs
 
 
 ---
