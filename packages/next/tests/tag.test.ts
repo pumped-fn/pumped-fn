@@ -73,4 +73,26 @@ describe("tag", () => {
     expect(r2).toBe("ctx2");
     expect(r3).toBe("ctx3");
   });
+
+  it("should handle concurrent resolutions of same executor in same context", async () => {
+    const value = tag(custom<string>());
+    const scope = createScope({ tags: [value("scope")] });
+
+    const slowFlow = flow([value], async ([v]) => {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return v;
+    });
+
+    const ctx = scope.createExecution({ tags: [value("context")] });
+
+    const [r1, r2, r3] = await Promise.all([
+      ctx.exec(slowFlow, undefined),
+      ctx.exec(slowFlow, undefined),
+      ctx.exec(slowFlow, undefined),
+    ]);
+
+    expect(r1).toBe("context");
+    expect(r2).toBe("context");
+    expect(r3).toBe("context");
+  });
 });
