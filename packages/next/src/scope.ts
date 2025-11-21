@@ -57,28 +57,36 @@ interface ReplacerResult {
   immediateValue?: unknown;
 }
 
+const NOT_SET = Symbol("accessor-value-not-set");
+
 class AccessorImpl implements Core.Accessor<unknown> {
   public tags: Tag.Tagged[] | undefined;
   private scope: BaseScope;
   private requestor: UE;
+  private executionContext: ExecutionContext.Context | undefined;
   private currentPromise: Promise<unknown> | null = null;
   private currentPromised: Promised<unknown> | null = null;
+  private contextResolvedValue: unknown = NOT_SET;
   public resolve: (force?: boolean) => Promised<unknown>;
 
   constructor(
     scope: BaseScope,
     requestor: UE,
-    tags: Tag.Tagged[] | undefined
+    tags: Tag.Tagged[] | undefined,
+    executionContext?: ExecutionContext.Context
   ) {
     this.scope = scope;
     this.requestor = requestor;
     this.tags = tags;
+    this.executionContext = executionContext;
 
     this.resolve = this.createResolveFunction();
 
-    const state = this.scope["getOrCreateState"](requestor);
-    if (!state.accessor) {
-      state.accessor = this;
+    if (!executionContext) {
+      const state = this.scope["getOrCreateState"](requestor);
+      if (!state.accessor) {
+        state.accessor = this;
+      }
     }
   }
 
@@ -88,13 +96,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
 
-      const state = this.scope["getOrCreateState"](this.requestor);
-      state.accessor = this;
-      state.value = {
-        kind: "resolved",
-        value: immediateValue,
-        promised: Promised.create(Promise.resolve(immediateValue)),
-      };
+      if (!this.executionContext) {
+        const state = this.scope["getOrCreateState"](this.requestor);
+        state.accessor = this;
+        state.value = {
+          kind: "resolved",
+          value: immediateValue,
+          promised: Promised.create(Promise.resolve(immediateValue)),
+        };
+      } else {
+        this.contextResolvedValue = immediateValue;
+      }
 
       return immediateValue;
     }
@@ -103,7 +115,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const resolvedDependencies = await this.scope["~resolveDependencies"](
       dependencies,
-      this.requestor
+      this.requestor,
+      this.executionContext
     );
 
     const result = await this.executeFactory(
@@ -114,13 +127,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const processedResult = await this.processChangeEvents(result);
 
-    const state = this.scope["getOrCreateState"](this.requestor);
-    state.accessor = this;
-    state.value = {
-      kind: "resolved",
-      value: processedResult,
-      promised: Promised.create(Promise.resolve(processedResult)),
-    };
+    if (!this.executionContext) {
+      const state = this.scope["getOrCreateState"](this.requestor);
+      state.accessor = this;
+      state.value = {
+        kind: "resolved",
+        value: processedResult,
+        promised: Promised.create(Promise.resolve(processedResult)),
+      };
+    } else {
+      this.contextResolvedValue = processedResult;
+    }
 
     this.scope["~removeFromResolutionChain"](this.requestor);
     this.currentPromise = null;
@@ -133,6 +150,10 @@ class AccessorImpl implements Core.Accessor<unknown> {
     try {
       return await this.resolveCore();
     } catch (error) {
+      if (this.executionContext) {
+        this.contextResolvedValue = NOT_SET;
+      }
+
       const { enhancedError, errorContext, originalError } =
         this.enhanceResolutionError(error);
 
@@ -158,11 +179,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     return (force: boolean = false): Promised<unknown> => {
       this.scope["~ensureNotDisposed"]();
 
-      const entry = this.scope["cache"].get(this.requestor);
-      const cached = entry?.value;
+      if (!this.executionContext) {
+        const entry = this.scope["cache"].get(this.requestor);
+        const cached = entry?.value;
 
-      if (cached && !force) {
-        return this.handleCachedState(cached);
+        if (cached && !force) {
+          return this.handleCachedState(cached);
+        }
       }
 
       if (this.currentPromise && !force) {
@@ -176,9 +199,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
       this.currentPromise = this.resolveWithErrorHandling();
 
-      const state = this.scope["getOrCreateState"](this.requestor);
-      state.accessor = this;
-      state.value = { kind: "pending", promise: this.currentPromise };
+      if (!this.executionContext) {
+        const state = this.scope["getOrCreateState"](this.requestor);
+        state.accessor = this;
+        state.value = { kind: "pending", promise: this.currentPromise };
+      }
 
       this.currentPromised = Promised.create(this.currentPromise);
       return this.currentPromised;
@@ -357,6 +382,11 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   get(): unknown {
     this.scope["~ensureNotDisposed"]();
+
+    if (this.executionContext && this.contextResolvedValue !== NOT_SET) {
+      return this.contextResolvedValue;
+    }
+
     const cacheEntry = this.scope["cache"].get(this.requestor)?.value;
 
     if (!cacheEntry || cacheEntry.kind === "pending") {
@@ -694,24 +724,33 @@ class BaseScope implements Core.Scope {
     return a.get();
   }
 
-  protected async resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown> {
+  protected async resolveTag(
+    tag: Tag.Tag<unknown, boolean>,
+    executionContext?: ExecutionContext.Context
+  ): Promise<unknown> {
+    const source = executionContext || this;
     const hasDefault = tag.default !== undefined;
 
     if (hasDefault) {
-      return await tag.readFrom(this);
+      return await tag.readFrom(source);
     } else {
-      return await tag.extractFrom(this);
+      return await tag.extractFrom(source);
     }
   }
 
-  protected async resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown> {
+  protected async resolveTagExecutor(
+    tagExec: Tag.TagExecutor<unknown>,
+    executionContext?: ExecutionContext.Context
+  ): Promise<unknown> {
+    const source = executionContext || this;
+
     switch (tagExec.extractionMode) {
       case "extract":
-        return await tagExec.tag.extractFrom(this);
+        return await tagExec.tag.extractFrom(source);
       case "read":
-        return await tagExec.tag.readFrom(this);
+        return await tagExec.tag.readFrom(source);
       case "collect":
-        return await tagExec.tag.collectFrom(this);
+        return await tagExec.tag.collectFrom(source);
     }
   }
 
@@ -721,18 +760,19 @@ class BaseScope implements Core.Scope {
       | Core.UExecutor
       | ReadonlyArray<Core.UExecutor>
       | Record<string, Core.UExecutor>,
-    ref: UE
+    ref: UE,
+    executionContext?: ExecutionContext.Context
   ): Promise<unknown> {
     return resolveShape(
       this as unknown as Core.Scope,
       ie,
       async (item) => {
         if (isTagExecutor(item)) {
-          return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>);
+          return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>, executionContext);
         }
 
         if (isTag(item)) {
-          return this.resolveTag(item as Tag.Tag<unknown, boolean>);
+          return this.resolveTag(item as Tag.Tag<unknown, boolean>, executionContext);
         }
 
         return this["~resolveExecutor"](item as Core.UExecutor, ref);
@@ -753,18 +793,23 @@ class BaseScope implements Core.Scope {
     return applyExtensions(this.extensions, baseExecutor, this, operation);
   }
 
-  protected "~makeAccessor"(e: Core.UExecutor): Core.Accessor<unknown> {
+  protected "~makeAccessor"(
+    e: Core.UExecutor,
+    executionContext?: ExecutionContext.Context
+  ): Core.Accessor<unknown> {
     let requestor =
       isLazyExecutor(e) || isReactiveExecutor(e) || isStaticExecutor(e)
         ? e.executor
         : (e as UE);
 
-    const cachedAccessor = this.cache.get(requestor);
-    if (cachedAccessor && cachedAccessor.accessor) {
-      return cachedAccessor.accessor;
+    if (!executionContext) {
+      const cachedAccessor = this.cache.get(requestor);
+      if (cachedAccessor && cachedAccessor.accessor) {
+        return cachedAccessor.accessor;
+      }
     }
 
-    const accessor = new AccessorImpl(this, requestor, e.tags);
+    const accessor = new AccessorImpl(this, requestor, e.tags, executionContext);
     return accessor;
   }
 
@@ -784,11 +829,26 @@ class BaseScope implements Core.Scope {
     return [...this.registry];
   }
 
-  resolve<T>(executor: Core.Executor<T>, force: boolean = false): Promised<T> {
+  /**
+   * Resolves an executor and returns its value.
+   *
+   * When executionContext is provided:
+   * - Tag resolution uses execution context instead of scope
+   * - Scope cache is bypassed to ensure context isolation
+   * - Resolved values are stored separately per context
+   *
+   * @internal
+   */
+  resolve<T>(
+    executor: Core.Executor<T>,
+    force: boolean = false,
+    executionContext?: ExecutionContext.Context
+  ): Promised<T> {
     this["~ensureNotDisposed"]();
 
+    const accessor = this["~makeAccessor"](executor, executionContext);
+
     const coreResolve = (): Promised<T> => {
-      const accessor = this["~makeAccessor"](executor);
       return accessor.resolve(force).map(() => accessor.get() as T);
     };
 
@@ -1220,7 +1280,7 @@ class BaseScope implements Core.Scope {
 
       try {
         const executeCore = (): Promised<S> => {
-          return this.resolve(flow).map(async (handler) => {
+          return this.resolve(flow, false, context).map(async (handler) => {
             const validated = validate(definition.input, input);
 
             const result = await handler(context, validated);

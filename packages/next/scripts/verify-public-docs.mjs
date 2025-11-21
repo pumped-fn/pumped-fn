@@ -6,7 +6,7 @@ import ts from "typescript";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkgRoot = path.resolve(__dirname, "..");
-const dtsPath = path.resolve(pkgRoot, "dist/index.d.ts");
+const dtsPath = path.resolve(pkgRoot, "dist/index.d.mts");
 
 if (!fs.existsSync(dtsPath)) {
   console.error(`Missing ${dtsPath}. Build the package first.`);
@@ -82,4 +82,4 @@ if (failures.length > 0) {
   process.exit();
 }
 
-console.log("All exported declarations in dist/index.d.ts include TSDoc.");
+console.log("All exported declarations in dist/index.d.mts include TSDoc.");

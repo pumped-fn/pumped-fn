@@ -72,6 +72,7 @@ The library is meant to be GENERIC, it has its core, and extensions (plugins, mi
 
 # Coding workflow
 
+- **CRITICAL: ALWAYS use brainstorming skill before making code changes** - Use `/superpowers:brainstorm` or the brainstorming skill to properly analyze and plan changes before implementation
 - **ALWAYS** make sure typechecking passed, for both src code and tests code, to the directory you are working on
 - **NEVER** use inline `//` comments - code should be well named so content explains itself
 - **ALWAYS** add TSDoc/JSDoc for public API exports (see Coding style section)
@@ -134,6 +135,7 @@ When changing public API (types, function signatures, etc):
 - Run `pnpm -F @pumped-fn/core-next verify:public-docs` before release
 - All exports must have TSDoc (enforced by verification script)
 - Verification runs in release workflow, not in typecheck
+- **IGNORE `verify-public-docs.mjs` in PR reviews** - this check is release-only, not blocking for PRs
 
 
 ---

@@ -122,4 +122,36 @@ describe("ExecutionContext tag store alignment", () => {
     expect(ctx.get(scopeTag)).toBe("from-scope")
     expect(ctx.get(execTag)).toBe("from-exec")
   })
+
+  it("should clean up contextResolvedValue on resolution error", async () => {
+    const errorTag = tag(custom<string>())
+    const scope = createScope()
+
+    const failingFlow = flow([errorTag], () => {
+      throw new Error("Resolution failed")
+    })
+
+    const ctx = scope.createExecution({ tags: [errorTag("value")] })
+
+    await expect(ctx.exec(failingFlow, undefined)).rejects.toThrow("Resolution failed")
+
+    const workingFlow = flow([errorTag], ([value]) => value)
+    const result = await ctx.exec(workingFlow, undefined)
+    expect(result).toBe("value")
+  })
+
+  it("should not re-apply scope tags to child contexts", async () => {
+    const value = tag(custom<string>())
+    const scope = createScope({ tags: [value("scope")] })
+
+    const parentCtx = scope.createExecution({ tags: [value("parent")] })
+
+    const innerFlow = flow([value], ([v], ctx) => v)
+    const nestedFlow = flow([], async (_deps, ctx) => {
+      return await ctx.exec({ flow: innerFlow, input: undefined, tags: [value("child")] })
+    })
+
+    const result = await parentCtx.exec(nestedFlow, undefined)
+    expect(result).toBe("child")
+  })
 })
