@@ -61,6 +61,38 @@ All tag writes validate via schema before mutation. Container and array writes i
 
 ExecutionContext automatically seeds both scope tags and execution-provided tags into its tagStore during construction, ensuring all tag access methods (extractFrom, readFrom, get, find) work consistently.
 
+## Execution Context Tag Resolution
+
+When flows resolve tags from their dependencies, tags are resolved from the **execution context**, not the scope:
+
+```typescript
+const value = tag(custom<string>());
+const scope = createScope({ tags: [value("scope-value")] });
+
+const myFlow = flow([value], ([v]) => v);
+
+const ctx = scope.createExecution({ tags: [value("context-value")] });
+const result = await ctx.exec(myFlow, undefined);
+// result === "context-value" (from execution context, NOT scope)
+```
+
+### Tag Resolution Hierarchy
+
+1. **Execution context tags** - Highest priority (provided via `createExecution({ tags: [...] })`)
+2. **Flow definition tags** - Medium priority (defined in `flow([...], ...)`)
+3. **Scope tags** - Lowest priority (defined in `createScope({ tags: [...] })`)
+
+Execution context tags **override** scope tags for any tag key that appears in both.
+
+### Implementation Details
+
+Internally, `scope.resolve()` accepts an optional `executionContext` parameter that:
+- Bypasses scope cache to ensure context isolation
+- Resolves tags from execution context's `tagStore` instead of scope
+- Stores resolved values separately per context
+
+This ensures each execution context is properly isolated with independent tag values.
+
 ## Tag Executors
 
 Tags can be used in executor dependencies for automatic scope extraction.
