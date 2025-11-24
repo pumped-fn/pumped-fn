@@ -165,4 +165,134 @@ describe("ExecutionContext lifecycle", () => {
     expect(ctx.state).toBe("active")
     expect(ctx.closed).toBe(false)
   })
+
+  it("notifies subscribers on state change", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    const transitions: Array<{ state: string; prev: string }> = []
+    const cleanup = ctx.onStateChange((state, prev) => {
+      transitions.push({ state, prev })
+    })
+
+    ;(ctx as any).setState('closing')
+    ;(ctx as any).setState('closed')
+
+    expect(transitions).toEqual([
+      { state: 'closing', prev: 'active' },
+      { state: 'closed', prev: 'closing' }
+    ])
+
+    cleanup()
+    ;(ctx as any).setState('active')
+    expect(transitions.length).toBe(2)
+  })
+
+  it("close() waits for in-flight executions in graceful mode", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    let resolved = false
+    const slowFlow = flow({
+      name: "slow",
+      input: custom<void>(),
+      output: custom<string>()
+    }).handler(async () => {
+      await new Promise(r => setTimeout(r, 50))
+      resolved = true
+      return "done"
+    })
+
+    const execution = ctx.exec(slowFlow, undefined)
+
+    expect(ctx.state).toBe("active")
+
+    const closePromise = ctx.close()
+
+    expect(ctx.state).toBe("closing")
+    expect(resolved).toBe(false)
+
+    await closePromise
+
+    expect(ctx.state).toBe("closed")
+    expect(resolved).toBe(true)
+    expect(ctx.closed).toBe(true)
+  })
+
+  it("close() aborts in-flight executions in abort mode", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    let handlerStarted = false
+    let abortReceived = false
+    const neverFlow = flow({
+      name: "never",
+      input: custom<void>(),
+      output: custom<void>()
+    }).handler(async (flowCtx) => {
+      handlerStarted = true
+      await new Promise<void>((resolve, reject) => {
+        if (flowCtx.signal.aborted) {
+          reject(new Error('Aborted'))
+          return
+        }
+        flowCtx.signal.addEventListener('abort', () => {
+          abortReceived = true
+          reject(new Error('Aborted'))
+        })
+      })
+    })
+
+    const execution = ctx.exec(neverFlow, undefined)
+
+    await new Promise(r => setTimeout(r, 10))
+
+    await ctx.close({ mode: 'abort' })
+
+    expect(ctx.state).toBe("closed")
+    expect(handlerStarted).toBe(true)
+    expect(abortReceived).toBe(true)
+    await expect(execution).rejects.toThrow()
+  })
+
+  it("exec() throws ExecutionContextClosedError after close", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    await ctx.close()
+
+    const simpleFlow = flow({
+      name: "simple",
+      input: custom<void>(),
+      output: custom<string>()
+    }).handler(async () => "result")
+
+    expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
+  })
+
+  it("exec() throws ExecutionContextClosedError while closing", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    const slowFlow = flow({
+      name: "slow",
+      input: custom<void>(),
+      output: custom<void>()
+    }).handler(async () => {
+      await new Promise(r => setTimeout(r, 100))
+    })
+
+    ctx.exec(slowFlow, undefined)
+    const closePromise = ctx.close()
+
+    const simpleFlow = flow({
+      name: "simple",
+      input: custom<void>(),
+      output: custom<string>()
+    }).handler(async () => "result")
+
+    expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
+
+    await closePromise
+  })
 })

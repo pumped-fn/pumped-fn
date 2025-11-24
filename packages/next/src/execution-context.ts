@@ -9,7 +9,7 @@ import { createAbortWithTimeout } from "./internal/abort-utils"
 import { createJournalKey, checkJournalReplay, type JournalEntry } from "./internal/journal-utils"
 import { createExecutor, isExecutor } from "./executor"
 import { isTag, isTagged } from "./tag-executors"
-import { createSystemError, codes } from "./errors"
+import { createSystemError, codes, ExecutionContextClosedError } from "./errors"
 
 export const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -840,6 +840,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     inputOrUndefined?: Flow.InferInput<F>
   ): Promised<any> {
     this.throwIfAborted()
+    this.throwIfClosed()
 
     const config = this.parseExecOverloads(
       keyOrFlowOrConfig,
@@ -854,9 +855,10 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     const descriptor = createExecutionDescriptor(config, this, controller)
     const wrapped = () => executeAndWrap(descriptor, this)
 
-    return Promised.create(
-      executeWithTimeout(wrapped, config.timeout, timeoutId, controller)
-    )
+    const execution = executeWithTimeout(wrapped, config.timeout, timeoutId, controller)
+    this.trackExecution(execution)
+
+    return Promised.create(execution)
   }
 
   private parseExecOverloads<F extends Flow.UFlow>(
@@ -1092,6 +1094,12 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
   throwIfAborted(): void {
     if (this.signal.aborted) {
       throw new Error("Execution aborted")
+    }
+  }
+
+  private throwIfClosed(): void {
+    if (this._state !== 'active') {
+      throw new ExecutionContextClosedError(this.id, this._state)
     }
   }
 
