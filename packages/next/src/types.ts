@@ -582,6 +582,8 @@ export namespace Flow {
 }
 
 export namespace ExecutionContext {
+  export type ContextState = 'active' | 'closing' | 'closed'
+
   export interface Details {
     name: string;
     startedAt: number;
@@ -699,7 +701,14 @@ export namespace Extension {
     context: Tag.Store;
   };
 
-  export type Operation = ResolveOperation | ExecutionOperation;
+  export type ContextLifecycleOperation = {
+    kind: "context-lifecycle"
+    phase: "create" | "closing" | "closed"
+    context: ExecutionContext.Context
+    mode?: 'graceful' | 'abort'
+  }
+
+  export type Operation = ResolveOperation | ExecutionOperation | ContextLifecycleOperation;
 
   export interface Extension {
     name: string;

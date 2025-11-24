@@ -1,11 +1,24 @@
 import {
   type ErrorContext,
+  type ExecutionContext,
   ExecutorResolutionError,
   FactoryExecutionError,
   DependencyResolutionError,
 } from "./types";
 import { type Tag } from "./tag-types";
 import { name } from "./index";
+
+export class ExecutionContextClosedError extends Error {
+  readonly contextId: string
+  readonly state: ExecutionContext.ContextState
+
+  constructor(contextId: string, state: ExecutionContext.ContextState) {
+    super(`ExecutionContext ${contextId} is ${state}`)
+    this.name = 'ExecutionContextClosedError'
+    this.contextId = contextId
+    this.state = state
+  }
+}
 
 const errorCatalog = {
   FACTORY_EXECUTION_FAILED: {
