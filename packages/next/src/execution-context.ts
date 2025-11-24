@@ -468,7 +468,7 @@ const createChildContext = (config: ContextConfig): ExecutionContextImpl => {
   })
   childCtx.initializeExecutionContext(config.flowName, config.isParallel)
 
-  config.parent.registerChild(childCtx)
+  config.parent["~registerChild"](childCtx)
 
   return childCtx
 }
@@ -867,7 +867,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     const wrapped = () => executeAndWrap(descriptor, this)
 
     const execution = executeWithTimeout(wrapped, config.timeout, timeoutId, controller)
-    this.trackExecution(execution)
+    this["~trackExecution"](execution)
 
     return Promised.create(execution)
   }
@@ -1031,7 +1031,11 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     }
 
     const executor = this.wrapWithExtensions(executeCore, operation)
-    return Promised.create(executor())
+    const result = Promised.create(executor())
+
+    this["~trackExecution"](result.toPromise())
+
+    return result
   }
 
   resetJournal(keyPattern?: string): void {
@@ -1158,28 +1162,38 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   private async performClose(mode: 'graceful' | 'abort'): Promise<void> {
     this.setState('closing')
-    await this.emitLifecycleOperation('closing', mode)
+    await this["~emitLifecycleOperation"]('closing', mode)
 
     if (mode === 'abort') {
       this.abortController.abort(new Error('Context closed'))
     }
 
-    const childClosePromises = Array.from(this.children).map(child =>
-      child.close({ mode }).catch(() => {})
+    const childResults = await Promise.allSettled(
+      Array.from(this.children).map(child => child.close({ mode }))
     )
-    await Promise.allSettled(childClosePromises)
 
-    await Promise.allSettled([...this.inFlight])
+    const inFlightResults = await Promise.allSettled([...this.inFlight])
 
     this.children.clear()
     this.inFlight.clear()
 
     this.end()
     this.setState('closed')
-    await this.emitLifecycleOperation('closed', mode)
+    await this["~emitLifecycleOperation"]('closed', mode)
+
+    const errors: unknown[] = []
+    for (const r of [...childResults, ...inFlightResults]) {
+      if (r.status === 'rejected') {
+        errors.push(r.reason)
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, 'Errors occurred during context close')
+    }
   }
 
-  async emitLifecycleOperation(phase: 'create' | 'closing' | 'closed', mode?: 'graceful' | 'abort'): Promise<void> {
+  "~emitLifecycleOperation"(phase: 'create' | 'closing' | 'closed', mode?: 'graceful' | 'abort'): Promise<void> {
     const operation: Extension.ContextLifecycleOperation = {
       kind: 'context-lifecycle',
       phase,
@@ -1189,18 +1203,19 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
     const noop = () => Promised.create(Promise.resolve(undefined))
     const wrapped = applyExtensions(this.extensions, noop, this.scope, operation)
-    await wrapped()
+    return wrapped().toPromise()
   }
 
-  registerChild(child: ExecutionContextImpl): void {
+  "~registerChild"(child: ExecutionContextImpl): void {
     this.children.add(child)
   }
 
-  trackExecution<T>(promise: Promise<T>): Promise<T> {
+  "~trackExecution"<T>(promise: Promise<T>): Promise<T> {
     this.inFlight.add(promise)
     const tracked = promise.finally(() => {
       this.inFlight.delete(promise)
     })
+    // Suppress unhandled rejection - the caller is responsible for error handling
     tracked.catch(() => {})
     return promise
   }

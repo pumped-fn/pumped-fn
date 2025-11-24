@@ -496,7 +496,8 @@ class BaseScope implements Core.Scope {
       tags: details?.tags
     });
 
-    context.emitLifecycleOperation('create').catch(() => {})
+    // Fire-and-forget: extension errors during create shouldn't prevent context usage
+    context["~emitLifecycleOperation"]('create').catch(() => {})
 
     return context;
   }
@@ -1318,6 +1319,7 @@ class BaseScope implements Core.Scope {
       } catch (error) {
         context.details.error = error;
         context.end();
+        // Best-effort cleanup: don't let close errors mask the original error
         await context.close().catch(() => {});
         resolveSnapshot(context.createSnapshot());
         throw error;

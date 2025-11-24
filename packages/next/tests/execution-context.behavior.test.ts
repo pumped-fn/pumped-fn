@@ -247,7 +247,7 @@ describe("ExecutionContext lifecycle", () => {
 
     await new Promise(r => setTimeout(r, 10))
 
-    await ctx.close({ mode: 'abort' })
+    await expect(ctx.close({ mode: 'abort' })).rejects.toThrow(AggregateError)
 
     expect(ctx.state).toBe("closed")
     expect(handlerStarted).toBe(true)
