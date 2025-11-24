@@ -1,13 +1,11 @@
 # Pumped-fn Project Instructions
 
 > Architecture documented in `.c3/` - Context/Container/Component documentation.
-> Pumped-design skill handles application patterns. This file: workflow requirements.
 
 # Skills
 
 - **CRITICAL:** Always use `superpowers:brainstorming` before code changes
-- Project skills in `.claude/skills/`
-- `pumped-design` - Application patterns for building with pumped-fn
+- Project skills: `c3` (architecture docs), `superpowers` (development workflows)
 - Architecture reference: `.c3/` (run `.c3/scripts/build-toc.sh` for index)
 
 # Coding Style
@@ -32,8 +30,7 @@ API changes in packages/next require updates to:
 2. Tests (packages/next/tests/)
 3. Examples (examples/)
 4. Docs (docs/guides/)
-5. **Skills** (.claude/skills/pumped-design/references/)
-6. **C3 docs** (.c3/c3-1-core/) - if architecture changes
+5. **C3 docs** (.c3/c3-1-core/) - if architecture changes
 
 ## Verification Commands
 

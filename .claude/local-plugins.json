@@ -17,6 +17,34 @@
         "c3-toc",
         "c3-migrate"
       ]
+    },
+    "superpowers": {
+      "source": "github.com/obra/superpowers",
+      "branch": "main",
+      "clonedAt": "2025-11-24T07:59:00.000Z",
+      "gitCommitSha": "94089bdce57c7df7c0c8bdbc94aa204e360f6e17",
+      "installedSkills": [
+        "using-git-worktrees",
+        "using-superpowers",
+        "test-driven-development",
+        "dispatching-parallel-agents",
+        "receiving-code-review",
+        "verification-before-completion",
+        "systematic-debugging",
+        "requesting-code-review",
+        "root-cause-tracing",
+        "brainstorming",
+        "finishing-a-development-branch",
+        "writing-skills",
+        "defense-in-depth",
+        "condition-based-waiting",
+        "subagent-driven-development",
+        "testing-anti-patterns",
+        "executing-plans",
+        "testing-skills-with-subagents",
+        "sharing-skills",
+        "writing-plans"
+      ]
     }
   }
 }
