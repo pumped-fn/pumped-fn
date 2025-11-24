@@ -1163,6 +1163,9 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
     await Promise.allSettled([...this.inFlight])
 
+    this.children.clear()
+    this.inFlight.clear()
+
     this.end()
     this.setState('closed')
     await this.emitLifecycleOperation('closed', mode)
@@ -1183,10 +1186,6 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   registerChild(child: ExecutionContextImpl): void {
     this.children.add(child)
-  }
-
-  unregisterChild(child: ExecutionContextImpl): void {
-    this.children.delete(child)
   }
 
   trackExecution<T>(promise: Promise<T>): Promise<T> {

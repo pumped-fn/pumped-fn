@@ -512,6 +512,11 @@ export namespace Extension {
   export type ExecutionOperation = InternalExtension.ExecutionOperation
 
   /**
+   * Operation emitted during ExecutionContext lifecycle (create/closing/closed).
+   */
+  export type ContextLifecycleOperation = InternalExtension.ContextLifecycleOperation
+
+  /**
    * Union describing every supported extension operation.
    */
   export type Operation = InternalExtension.Operation
