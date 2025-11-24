@@ -61,6 +61,18 @@ The `operation` passed to `wrap()` describes what's happening:
 }
 ```
 
+**ContextLifecycleOperation:**
+```typescript
+{
+  kind: "context-lifecycle",
+  phase: "create" | "closing" | "closed",
+  context: ExecutionContext.Context,
+  mode?: "graceful" | "abort"  // present for "closing" phase
+}
+```
+
+Emitted when ExecutionContext is created, closing, or closed. Use for tracing spans, request logging, cleanup.
+
 **Target types:**
 
 | Target | Properties | Description |

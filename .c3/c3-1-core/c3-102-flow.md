@@ -177,6 +177,23 @@ The journal provides replay capability:
 | Completion | `end()` called, snapshot created |
 | Cleanup | Scope may dispose if auto-created |
 
+## Context Lifecycle Management {#c3-102-lifecycle-management}
+
+ExecutionContext has explicit lifecycle control:
+
+| Property/Method | Purpose |
+|-----------------|---------|
+| `state` | Current state: `'active'` \| `'closing'` \| `'closed'` |
+| `closed` | Convenience: `true` when `state === 'closed'` |
+| `close(options?)` | Close context with `mode: 'graceful'` (default) or `'abort'` |
+| `onStateChange(cb)` | Subscribe to state transitions, returns cleanup function |
+
+**Graceful close:** Waits for all in-flight executions to complete.
+
+**Abort close:** Triggers AbortController, rejects pending executions.
+
+Both modes cascade to child contexts.
+
 **Execution details:**
 
 | Field | Set When |
