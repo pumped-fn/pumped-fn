@@ -1,12 +1,8 @@
 # Pumped-fn Project Instructions
 
-> Architecture documented in `.c3/` - Context/Container/Component documentation.
+# IMPORTANT
+Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
 
-# Skills
-
-- **CRITICAL:** Always use `superpowers:brainstorming` before code changes
-- Project skills: `c3` (architecture docs), `superpowers` (development workflows)
-- Architecture reference: `.c3/` (run `.c3/scripts/build-toc.sh` for index)
 
 # Coding Style
 
