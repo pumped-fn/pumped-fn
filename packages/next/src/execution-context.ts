@@ -609,7 +609,13 @@ const executeWithTimeout = async <T>(
     return await executor()
   }
 
+  let rejectAbort: ((reason: Error) => void) | null = null
   const abortPromise = new Promise<never>((_, reject) => {
+    rejectAbort = reject
+    if (controller.signal.aborted) {
+      reject(controller.signal.reason || new Error("Operation aborted"))
+      return
+    }
     controller.signal.addEventListener(
       "abort",
       () => {
@@ -618,6 +624,8 @@ const executeWithTimeout = async <T>(
       { once: true }
     )
   })
+
+  abortPromise.catch(() => {})
 
   try {
     return await Promise.race([executor(), abortPromise])
@@ -1190,9 +1198,10 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   trackExecution<T>(promise: Promise<T>): Promise<T> {
     this.inFlight.add(promise)
-    promise.finally(() => {
+    const tracked = promise.finally(() => {
       this.inFlight.delete(promise)
     })
+    tracked.catch(() => {})
     return promise
   }
 }
