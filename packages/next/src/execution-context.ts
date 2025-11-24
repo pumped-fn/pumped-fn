@@ -1146,13 +1146,14 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     }
   }
 
-  async close(options?: { mode?: 'graceful' | 'abort' }): Promise<void> {
+  close(options?: { mode?: 'graceful' | 'abort' }): Promise<void> {
     if (this.closePromise) {
       return this.closePromise
     }
 
     if (this._state === 'closed') {
-      return Promise.resolve()
+      this.closePromise = Promise.resolve()
+      return this.closePromise
     }
 
     const mode = options?.mode ?? 'graceful'
@@ -1184,13 +1185,18 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
     this.end()
     this.setState('closed')
-    await this["~emitLifecycleOperation"]('closed', mode)
 
     const errors: unknown[] = []
     for (const r of [...childResults, ...inFlightResults]) {
       if (r.status === 'rejected') {
         errors.push(r.reason)
       }
+    }
+
+    try {
+      await this["~emitLifecycleOperation"]('closed', mode)
+    } catch (extensionError) {
+      errors.push(extensionError)
     }
 
     if (errors.length > 0) {

@@ -497,7 +497,9 @@ class BaseScope implements Core.Scope {
     });
 
     // Fire-and-forget: extension errors during create shouldn't prevent context usage
-    context["~emitLifecycleOperation"]('create').catch(() => {})
+    context["~emitLifecycleOperation"]('create').catch((err) => {
+      console.error('Extension error during context creation:', err)
+    })
 
     return context;
   }

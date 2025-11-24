@@ -296,6 +296,21 @@ describe("ExecutionContext lifecycle", () => {
     await closePromise
   })
 
+  it("close() returns same promise on multiple calls (idempotent)", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    const p1 = ctx.close()
+    const p2 = ctx.close()
+    const p3 = ctx.close()
+
+    expect(p1).toBe(p2)
+    expect(p2).toBe(p3)
+
+    await p1
+    expect(ctx.state).toBe("closed")
+  })
+
   it("close() cascades to child contexts", async () => {
     const scope = createScope()
     const ctx = scope.createExecution({ name: "parent" })

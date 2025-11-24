@@ -603,7 +603,24 @@ export namespace ExecutionContext {
     readonly state: ContextState;
     readonly closed: boolean;
 
+    /**
+     * Close this execution context and all child contexts.
+     *
+     * In graceful mode (default), waits for in-flight executions to complete.
+     * In abort mode, signals abort to in-flight executions immediately.
+     *
+     * @param options.mode - 'graceful' (default) or 'abort'
+     * @returns Promise that resolves when close completes
+     * @throws {AggregateError} When child contexts, in-flight executions, or extension
+     *   hooks fail during close. Requires Node.js 15+ or modern browser.
+     */
     close(options?: { mode?: 'graceful' | 'abort' }): Promise<void>;
+
+    /**
+     * Subscribe to context state changes.
+     * @param callback - Called with new state and previous state
+     * @returns Cleanup function to unsubscribe
+     */
     onStateChange(callback: (state: ContextState, prev: ContextState) => void): () => void;
 
     get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
