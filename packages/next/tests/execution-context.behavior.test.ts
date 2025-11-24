@@ -4,6 +4,7 @@ import { flow } from "../src/flow"
 import { custom } from "../src/ssch"
 import { Promised } from "../src/promises"
 import { tag } from "../src/tag"
+import { ExecutionContextClosedError } from "../src/errors"
 
 describe("ExecutionContext.exec parity", () => {
   it("supports flow + fn journaling and parallel helpers", async () => {
@@ -153,5 +154,15 @@ describe("ExecutionContext tag store alignment", () => {
 
     const result = await parentCtx.exec(nestedFlow, undefined)
     expect(result).toBe("child")
+  })
+})
+
+describe("ExecutionContext lifecycle", () => {
+  it("starts in active state", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "test" })
+
+    expect(ctx.state).toBe("active")
+    expect(ctx.closed).toBe(false)
   })
 })

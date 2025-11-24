@@ -638,6 +638,12 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
   private abortController: AbortController
   private tagData: Map<symbol, unknown>
 
+  private _state: ExecutionContext.ContextState = 'active'
+  private stateChangeCallbacks: Set<(state: ExecutionContext.ContextState, prev: ExecutionContext.ContextState) => void> = new Set()
+  private inFlight: Set<Promise<unknown>> = new Set()
+  private children: Set<ExecutionContextImpl> = new Set()
+  private closePromise: Promise<void> | null = null
+
   constructor(config: {
     scope: Core.Scope
     extensions: Extension.Extension[]
@@ -1087,5 +1093,81 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     if (this.signal.aborted) {
       throw new Error("Execution aborted")
     }
+  }
+
+  get state(): ExecutionContext.ContextState {
+    return this._state
+  }
+
+  get closed(): boolean {
+    return this._state === 'closed'
+  }
+
+  private setState(newState: ExecutionContext.ContextState): void {
+    const prev = this._state
+    if (prev === newState) return
+    this._state = newState
+    for (const cb of this.stateChangeCallbacks) {
+      try {
+        cb(newState, prev)
+      } catch {
+      }
+    }
+  }
+
+  onStateChange(callback: (state: ExecutionContext.ContextState, prev: ExecutionContext.ContextState) => void): () => void {
+    this.stateChangeCallbacks.add(callback)
+    return () => {
+      this.stateChangeCallbacks.delete(callback)
+    }
+  }
+
+  async close(options?: { mode?: 'graceful' | 'abort' }): Promise<void> {
+    if (this.closePromise) {
+      return this.closePromise
+    }
+
+    if (this._state === 'closed') {
+      return Promise.resolve()
+    }
+
+    const mode = options?.mode ?? 'graceful'
+
+    this.closePromise = this.performClose(mode)
+    return this.closePromise
+  }
+
+  private async performClose(mode: 'graceful' | 'abort'): Promise<void> {
+    this.setState('closing')
+
+    if (mode === 'abort') {
+      this.abortController.abort(new Error('Context closed'))
+    }
+
+    const childClosePromises = Array.from(this.children).map(child =>
+      child.close({ mode }).catch(() => {})
+    )
+    await Promise.allSettled(childClosePromises)
+
+    await Promise.allSettled([...this.inFlight])
+
+    this.end()
+    this.setState('closed')
+  }
+
+  registerChild(child: ExecutionContextImpl): void {
+    this.children.add(child)
+  }
+
+  unregisterChild(child: ExecutionContextImpl): void {
+    this.children.delete(child)
+  }
+
+  trackExecution<T>(promise: Promise<T>): Promise<T> {
+    this.inFlight.add(promise)
+    promise.finally(() => {
+      this.inFlight.delete(promise)
+    })
+    return promise
   }
 }
