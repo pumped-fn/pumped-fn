@@ -1134,6 +1134,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
       try {
         cb(newState, prev)
       } catch {
+        // Callback errors must not prevent state transitions from completing
       }
     }
   }
@@ -1177,6 +1178,10 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     this.children.clear()
     this.inFlight.clear()
 
+    if (this.parent instanceof ExecutionContextImpl) {
+      this.parent["~unregisterChild"](this)
+    }
+
     this.end()
     this.setState('closed')
     await this["~emitLifecycleOperation"]('closed', mode)
@@ -1208,6 +1213,10 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   "~registerChild"(child: ExecutionContextImpl): void {
     this.children.add(child)
+  }
+
+  "~unregisterChild"(child: ExecutionContextImpl): void {
+    this.children.delete(child)
   }
 
   "~trackExecution"<T>(promise: Promise<T>): Promise<T> {
