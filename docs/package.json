@@ -12,21 +12,21 @@
   },
   "devDependencies": {
     "@pumped-fn/core-next": "workspace:*",
-    "@types/node": "^20.19.17",
+    "@types/node": "^20.19.25",
     "typedoc": "^0.28.13",
     "typedoc-github-theme": "^0.3.1",
     "typescript": "^5.9.2",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.21"
+    "vue": "^3.5.25"
   },
   "type": "module",
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.1",
-    "@shikijs/vitepress-twoslash": "^3.13.0",
+    "@shikijs/vitepress-twoslash": "^3.15.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
-    "dayjs": "^1.11.18",
-    "mermaid": "^11.12.0",
+    "dayjs": "^1.11.19",
+    "mermaid": "^11.12.1",
     "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
