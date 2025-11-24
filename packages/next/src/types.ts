@@ -600,6 +600,11 @@ export namespace ExecutionContext {
     readonly signal: AbortSignal;
     readonly details: Details;
     readonly tags: Tag.Tagged[] | undefined;
+    readonly state: ContextState;
+    readonly closed: boolean;
+
+    close(options?: { mode?: 'graceful' | 'abort' }): Promise<void>;
+    onStateChange(callback: (state: ContextState, prev: ContextState) => void): () => void;
 
     get<T>(tag: Tag.Tag<T, false> | Tag.Tag<T, true>): T;
     find<T>(tag: Tag.Tag<T, false>): T | undefined;
