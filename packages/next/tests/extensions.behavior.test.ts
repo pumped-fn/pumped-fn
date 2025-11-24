@@ -566,6 +566,55 @@ describe("extensions behavior", () => {
     expect(scope.entries().length).toBeLessThan(entriesBeforeRelease)
   })
 
+  scenario("context lifecycle operations", async () => {
+    const operations: Array<{ kind: string; phase?: string }> = []
+
+    const trackingExt = {
+      name: "tracking",
+      wrap(scope: any, next: any, operation: any) {
+        if (operation.kind === "context-lifecycle") {
+          operations.push({ kind: operation.kind, phase: operation.phase })
+        }
+        return next()
+      }
+    }
+
+    const scope = createScope({ extensions: [trackingExt] })
+    const ctx = scope.createExecution({ name: "test" })
+
+    await ctx.close()
+
+    expect(operations).toContainEqual({ kind: "context-lifecycle", phase: "create" })
+    expect(operations).toContainEqual({ kind: "context-lifecycle", phase: "closing" })
+    expect(operations).toContainEqual({ kind: "context-lifecycle", phase: "closed" })
+  })
+
+  scenario("scope.exec() auto-closes internal context", async () => {
+    const closedContexts: string[] = []
+
+    const trackingExt = {
+      name: "tracking",
+      wrap(scope: any, next: any, operation: any) {
+        if (operation.kind === "context-lifecycle" && operation.phase === "closed") {
+          closedContexts.push(operation.context.id)
+        }
+        return next()
+      }
+    }
+
+    const scope = createScope({ extensions: [trackingExt] })
+
+    const simpleFlow = flow({
+      name: "simple",
+      input: custom<void>(),
+      output: custom<string>()
+    }).handler(async () => "result")
+
+    await scope.exec({ flow: simpleFlow, input: undefined }).result
+
+    expect(closedContexts.length).toBe(1)
+  })
+
   scenario("applyExtensions integration", async () => {
     const scope = createScope()
     const base = () => Promised.create(Promise.resolve(10))

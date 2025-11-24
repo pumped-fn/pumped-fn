@@ -295,4 +295,31 @@ describe("ExecutionContext lifecycle", () => {
 
     await closePromise
   })
+
+  it("close() cascades to child contexts", async () => {
+    const scope = createScope()
+    const ctx = scope.createExecution({ name: "parent" })
+
+    const childStates: string[] = []
+
+    const nestedFlow = flow({
+      name: "nested",
+      input: custom<void>(),
+      output: custom<void>()
+    }).handler(async (flowCtx) => {
+      flowCtx.onStateChange((state) => {
+        childStates.push(state)
+      })
+      await new Promise(r => setTimeout(r, 100))
+    })
+
+    ctx.exec(nestedFlow, undefined)
+
+    await new Promise(r => setTimeout(r, 10))
+
+    await ctx.close()
+
+    expect(childStates).toContain('closing')
+    expect(childStates).toContain('closed')
+  })
 })

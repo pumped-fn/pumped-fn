@@ -1,4 +1,4 @@
-import type { Core, Extension, ExecutionContext, Flow, Tag as TagNS, StandardSchemaV1 } from "./types"
+import { type Core, type Extension, type ExecutionContext, type Flow, type Tag as TagNS, type StandardSchemaV1 } from "./types"
 import type { Tag } from "./tag-types"
 import { tag } from "./tag"
 import { validate, custom } from "./ssch"
@@ -467,6 +467,9 @@ const createChildContext = (config: ContextConfig): ExecutionContextImpl => {
     details: { name: config.flowName }
   })
   childCtx.initializeExecutionContext(config.flowName, config.isParallel)
+
+  config.parent.registerChild(childCtx)
+
   return childCtx
 }
 
@@ -1147,6 +1150,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
   private async performClose(mode: 'graceful' | 'abort'): Promise<void> {
     this.setState('closing')
+    await this.emitLifecycleOperation('closing', mode)
 
     if (mode === 'abort') {
       this.abortController.abort(new Error('Context closed'))
@@ -1161,6 +1165,20 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
     this.end()
     this.setState('closed')
+    await this.emitLifecycleOperation('closed', mode)
+  }
+
+  async emitLifecycleOperation(phase: 'create' | 'closing' | 'closed', mode?: 'graceful' | 'abort'): Promise<void> {
+    const operation: Extension.ContextLifecycleOperation = {
+      kind: 'context-lifecycle',
+      phase,
+      context: this,
+      mode
+    }
+
+    const noop = () => Promised.create(Promise.resolve(undefined))
+    const wrapped = applyExtensions(this.extensions, noop, this.scope, operation)
+    await wrapped()
   }
 
   registerChild(child: ExecutionContextImpl): void {

@@ -489,12 +489,16 @@ class BaseScope implements Core.Scope {
 
   createExecution(details?: Partial<ExecutionContext.Details> & { tags?: Tag.Tagged[] }): ExecutionContext.Context {
     this["~ensureNotDisposed"]();
-    return new ExecutionContextImpl({
+    const context = new ExecutionContextImpl({
       scope: this,
       extensions: this.extensions,
       details: details || {},
       tags: details?.tags
     });
+
+    context.emitLifecycleOperation('create').catch(() => {})
+
+    return context;
   }
 
   protected getOrCreateState(executor: UE): ExecutorState {
@@ -1308,11 +1312,13 @@ class BaseScope implements Core.Scope {
 
         const result = await executor();
         context.end();
+        await context.close();
         resolveSnapshot(context.createSnapshot());
         return result;
       } catch (error) {
         context.details.error = error;
         context.end();
+        await context.close().catch(() => {});
         resolveSnapshot(context.createSnapshot());
         throw error;
       }
