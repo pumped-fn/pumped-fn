@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "repos": {
+    "c3-skill": {
+      "source": "github.com/lagz0ne/c3-skill",
+      "branch": "main",
+      "clonedAt": "2025-11-24T07:56:00.000Z",
+      "gitCommitSha": "1755e092e9d62ad2b7ed14536548fababed19b75",
+      "installedSkills": [
+        "c3-design",
+        "c3-context-design",
+        "c3-container-design",
+        "c3-component-design",
+        "c3-adopt",
+        "c3-locate",
+        "c3-naming",
+        "c3-toc",
+        "c3-migrate"
+      ]
+    }
+  }
+}
