@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-24 14:38:05
+> Last generated: 2025-11-24 08:22:38
 
 ## Context Level
 
