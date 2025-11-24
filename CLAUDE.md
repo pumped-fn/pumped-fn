@@ -1,151 +1,70 @@
 # Pumped-fn Project Instructions
 
-> Pumped-design skill active: Pattern enforcement, architecture, testing strategies handled by skill.
-> This file: Project-specific overrides and workflow requirements.
+> Architecture documented in `.c3/` - Context/Container/Component documentation.
+> Pumped-design skill handles application patterns. This file: workflow requirements.
 
 # Skills
 
-- _IMPORTANT:_ Always use skill superpowers:brainstorming for all operations. If there's no skill like that, ask user to install obra/superpowers-marketplace prior to moving toward
-- Current project skills is in `.claude/skills/`
+- **CRITICAL:** Always use `superpowers:brainstorming` before code changes
+- Project skills in `.claude/skills/`
+- `pumped-design` - Application patterns for building with pumped-fn
+- Architecture reference: `.c3/` (run `.c3/scripts/build-toc.sh` for index)
 
-## Pumped-design Skill
+# Coding Style
 
-- **pumped-design** - Design, navigate, troubleshoot, and test pumped-fn backend applications
-  - Strict organizational patterns (entrypoints, resources, flows, utilities)
-  - Sub-skill architecture with on-demand pattern loading
-  - Layer-specific testing strategies
-  - Framework integration guides (Hono, Next.js, TanStack Start)
-  - AI-assisted catalog system with mermaid diagrams
-  - Type-safe error handling patterns
-  - Source of truth for marketplace plugin
+- Strict typing: no `any`, `unknown` over casting
+- **NEVER** inline `//` comments - code self-documents via naming
+- **ALWAYS** TSDoc for public API (exports via packages/*/src/index.ts)
+- Group types using namespaces
+- Use `import { type ... }` for type-only imports
+- Never inline `import()`
 
-## Skill Use Cases
+# Coding Workflow
 
-1. **Designing applications** - Phased design process with brainstorming integration
-2. **Implementing features** - Sub-skills guide correct pattern usage
-3. **Troubleshooting flows** - Catalog navigation with mermaid diagrams
-4. **Testing** - Layer-specific strategies (utilities, flows, integration)
-5. **Code reviews** - Enforce naming conventions and patterns
+- Always use pnpm
+- Typecheck before commit: `pnpm -F @pumped-fn/core-next typecheck`
+- Brainstorm before implementation
 
-## External Skills
+# Making Changes
 
-Use superpowers plugin from marketplace for general development workflows:
+API changes in packages/next require updates to:
+1. Implementation (packages/next/src/)
+2. Tests (packages/next/tests/)
+3. Examples (examples/)
+4. Docs (docs/guides/)
+5. **Skills** (.claude/skills/pumped-design/references/)
+6. **C3 docs** (.c3/c3-1-core/) - if architecture changes
 
-- test-driven-development, systematic-debugging, verification-before-completion
-- requesting-code-review, brainstorming, writing-plans, executing-plans
-- using-git-worktrees, defense-in-depth, condition-based-waiting
+## Verification Commands
 
-# Upmost important
+```bash
+pnpm -F @pumped-fn/core-next typecheck      # src types
+pnpm -F @pumped-fn/core-next typecheck:full # include tests
+pnpm -F @pumped-fn/core-next test           # run tests
+pnpm -F @pumped-fn/examples typecheck       # examples
+```
 
-Sacrifice English grammar for conciseness. Concrete and straightforward.
-Use ast-grep where possible to search and replace code
+## Public API Export Rules
 
-# Plans directory
-
-- use `@plans/` (project root) for implementation plans
-- plans are committed to git for reference
-- **CRITICAL: plans MUST NOT include private/machine-specific information:**
-  - NO usernames in paths (e.g., `/home/username/`)
-  - NO absolute paths with user directories
-  - USE relative paths for project files (`docs/guides/`, `examples/`)
-  - USE `/tmp` for temporary file operations
-  - USE `${SUPERPOWERS_SKILLS_ROOT}` for Claude skills/superpowers paths
-  - USE environment variables or placeholders instead of hardcoded values
-- before committing plans, verify no sensitive data (usernames, machine names, absolute paths)
-
-# Coding style
-
-- strict coding style, concrete reasonable naming
-- **ALWAYS** guarantee no any, unknonw or casting to direct type required
-- **ALWAYS** make sure typecheck pass/ or use tsc --noEmit to verify, especially tests
-- **NEVER** add inline `//` comments - code should be well named so content explains itself
-- **ALWAYS** add TSDoc/JSDoc for all public API (anything exported via packages/*/src/index.ts)
-- group types using namespace, less cluttered
-- combine tests where possible, test running quite quickly, add test error message so it'll be easy to track from the stdout
-- cleanup redundant codes, dead codes
-- use `import { type ...}` where it's needed
-- never use inline `import()`
-
-# Priority
-
-The library is meant to be GENERIC, it has its core, and extensions (plugins, middlewares). DO NOT bring case-specific concepts/api into the design of the library, the library is meant to be generic
-
-# Coding workflow
-
-- **CRITICAL: ALWAYS use brainstorming skill before making code changes** - Use `/superpowers:brainstorm` or the brainstorming skill to properly analyze and plan changes before implementation
-- **ALWAYS** make sure typechecking passed, for both src code and tests code, to the directory you are working on
-- **NEVER** use inline `//` comments - code should be well named so content explains itself
-- **ALWAYS** add TSDoc/JSDoc for public API exports (see Coding style section)
-- ALWAYS use pnpm, read to understand the project setting before hand
-- use linebreak smartly to separate area of code with different meanings
-
-# Making changes
-
-To make change to the library, there are some details that'll need to be addressed as a completed workflow
-
-Making API change in packages/next means:
-
-- Potential change to docs (docs/guides/)
-- Potential change to examples (examples/)
-- Potential change to test (packages/next/tests/)
-- **CRITICAL: Potential change to SKILL (.claude/skills/pumped-design/references/)**
-
-To keep things compact, economic, those should be planned as needed
-
-## Checklist for API changes
-
-When changing public API (types, function signatures, etc):
-
-1. Update implementation in packages/next/src/
-2. Update tests in packages/next/tests/
-3. Update examples in examples/
-4. Update documentation in docs/guides/
-5. **ALWAYS check and update .claude/skills/pumped-design/references/** - critical for skill accuracy
-6. Verify all typechecks pass: `pnpm -F @pumped-fn/core-next typecheck && pnpm -F @pumped-fn/core-next typecheck:full`
-7. Verify all tests pass: `pnpm -F @pumped-fn/core-next test`
-8. Verify examples typecheck: `pnpm -F @pumped-fn/examples typecheck`
-
-## Public API export rules (packages/*/src/index.ts)
-
-**Export pattern:**
-- Use direct re-exports: `export { X } from "./module"`
-- For namespace module exports, use const declarations:
+**Pattern:**
+- Direct re-exports: `export { X } from "./module"`
+- Namespace exports via const (not `export * as`):
   ```typescript
   import * as moduleExports from "./module"
   const name: typeof moduleExports = moduleExports
   export { name }
   ```
-  - Rationale: `export * as` pattern increases type declaration size
-  - Const pattern provides better type compatibility and smaller bundles
-- Zero inline `//` comments
-- Mandatory TSDoc/JSDoc for ALL exports
 
-**Type export rules (function adjacency principle):**
-- Export ONLY types used in public API function signatures
-- Types used in parameters/returns of exported functions → export
-- Internal-only implementation types → DO NOT export
-- Trace from exported functions to their type dependencies
+**Type exports:** Only types used in public function signatures.
 
-**Namespace organization:**
-- Group related types under namespaces (Core, Flow, Extension, Multi, etc.)
-- Use type aliases within namespaces: `export type X = Internal.X`
-- Keep top-level exports minimal and well-organized
+**Verification:** `pnpm -F @pumped-fn/core-next verify:public-docs` (release-only)
 
-**Verification:**
-- Run `pnpm -F @pumped-fn/core-next verify:public-docs` before release
-- All exports must have TSDoc (enforced by verification script)
-- Verification runs in release workflow, not in typecheck
-- **IGNORE `verify-public-docs.mjs` in PR reviews** - this check is release-only, not blocking for PRs
+# Plans Directory
 
+- Location: `plans/` (project root)
+- **NO** private paths (usernames, absolute paths)
+- Use relative paths, `/tmp`, `${SUPERPOWERS_SKILLS_ROOT}`
 
----
+# Priority
 
-## Agor Session Context
-
-You are currently running within **Agor** (https://agor.live), a multiplayer canvas for orchestrating AI coding agents.
-
-**Your current Agor session ID is: `cfffab89-64ab-47c0-b334-dee0a05c2591`** (short: `cfffab89`)
-
-When you see this ID referenced in prompts or tool calls, it refers to THIS session you're currently in.
-
-For more information about Agor, visit https://agor.live
+Library is GENERIC. No case-specific concepts in core API design.

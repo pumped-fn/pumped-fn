@@ -1,0 +1,214 @@
+---
+id: c3-1
+c3-version: 3
+title: Core Library (@pumped-fn/core-next)
+summary: >
+  Core effect system providing executors, scopes, flows, tags, and extensions
+  for TypeScript dependency injection and execution orchestration.
+---
+
+# Core Library (@pumped-fn/core-next)
+
+## Overview {#c3-1-overview}
+<!-- Primary responsibility: effect system foundation -->
+
+The core library provides the foundation for pumped-fn's effect system:
+- **Executor** - Unit of work with factory functions and dependencies
+- **Scope** - Execution container managing lifecycle and caching
+- **Flow** - Request/response pattern with schema validation
+- **Tag** - Metadata system for cross-cutting data
+- **Extension** - Hooks for observability and behavior modification
+
+## Technology Stack {#c3-1-stack}
+<!-- Runtime and build tooling -->
+
+| Category | Technology | Version |
+|----------|------------|---------|
+| Language | TypeScript | ^5.0 |
+| Build | tsdown | latest |
+| Testing | Vitest | latest |
+| Output | ESM + CJS | dual package |
+
+## Component Relationships {#c3-1-relationships}
+<!-- How internal modules connect -->
+
+```mermaid
+flowchart TB
+    subgraph "Public API"
+        provide[provide/derive]
+        createScope[createScope]
+        flow[flow]
+        tag[tag/tags]
+        extension[extension]
+    end
+
+    subgraph "Core Internals"
+        Executor[Executor]
+        Scope[Scope]
+        Accessor[Accessor]
+        ExecutionContext[ExecutionContext]
+        Tag[Tag System]
+        Extension[Extension Pipeline]
+    end
+
+    subgraph "Support"
+        Promised[Promised]
+        Multi[Multi-Executor]
+        Errors[Error Classes]
+        Schema[StandardSchema]
+    end
+
+    provide --> Executor
+    createScope --> Scope
+    Scope --> Accessor
+    Scope --> Extension
+    flow --> ExecutionContext
+    ExecutionContext --> Scope
+    tag --> Tag
+    extension --> Extension
+
+    Executor --> Tag
+    Flow --> Schema
+    Scope --> Promised
+    Scope --> Multi
+    Scope --> Errors
+```
+
+## Data Flow {#c3-1-data-flow}
+<!-- Execution sequence -->
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Scope as Scope
+    participant Ext as Extension
+    participant Exec as Executor
+    participant Ctx as ExecutionContext
+
+    App->>Scope: createScope(options)
+    App->>Scope: resolve(executor)
+    Scope->>Ext: wrap(operation)
+    Ext->>Exec: factory(controller)
+    Exec-->>Ext: value
+    Ext-->>Scope: wrapped value
+    Scope-->>App: Accessor<T>
+
+    App->>Scope: exec(flow, input)
+    Scope->>Ctx: create context
+    Ctx->>Ext: wrap(execution)
+    Ext->>Exec: handler(ctx, input)
+    Exec-->>Ext: output
+    Ext-->>Ctx: result
+    Ctx-->>App: Promised<Output>
+```
+
+## Public API {#c3-1-api}
+<!-- Exported functions and types -->
+
+### Core Functions
+
+| Function | Purpose | Source |
+|----------|---------|--------|
+| `provide(factory)` | Create executor without dependencies | executor.ts |
+| `derive(deps, factory)` | Create executor with dependencies | executor.ts |
+| `preset(executor, value)` | Override executor in scope | executor.ts |
+| `createScope(options)` | Create execution scope | scope.ts |
+| `resolves(...executors)` | Resolve multiple executors | helpers.ts |
+| `flow(definition, handler)` | Create flow with execute helper | flow.ts |
+| `flowMeta` | Access flow metadata tags | execution-context.ts |
+| `tag(schema, options)` | Create metadata tag | tag.ts |
+| `tags.required/optional/all` | Tag dependency helpers | tag-executors.ts |
+| `extension(ext)` | Type helper for extensions | extension.ts |
+| `custom(schema)` | Create custom schema validator | ssch.ts |
+
+### Type Namespaces
+
+| Namespace | Contains |
+|-----------|----------|
+| `Core` | Executor, Scope, Controller, Accessor, Cleanup, ResolveState, Preset |
+| `Flow` | Definition, Handler, Flow, Context, Execution, ParallelResult |
+| `Extension` | Extension, Operation, ResolveOperation, ExecutionOperation |
+| `Tag` | Tag, Tagged, Store, Container, Source, TagExecutor |
+| `Multi` | MultiExecutor, Key, Option, DeriveOption |
+| `StandardSchemaV1` | Props, Result, Issue, InferInput, InferOutput |
+
+## Cross-Cutting Implementations {#c3-1-cross-cutting}
+<!-- Where cross-cutting concerns are implemented -->
+
+### Extension System {#c3-1-extension}
+Cross-cutting behavior hooks into executor resolution and flow execution.
+
+Implemented in: [c3-104-extension](./c3-104-extension.md)
+
+### Tag System {#c3-1-tag}
+Metadata propagation across execution boundaries.
+
+Implemented in: [c3-103-tag](./c3-103-tag.md)
+
+### Error Handling {#c3-1-errors}
+Structured error hierarchy with context-rich classes.
+
+Implemented in: [c3-105-errors](./c3-105-errors.md)
+
+### Schema Validation {#c3-1-schema}
+StandardSchema-based validation for flows and tags.
+
+Implemented in: [c3-106-schema](./c3-106-schema.md)
+
+## Components {#c3-1-components}
+<!-- Component inventory -->
+
+| Component | Role | Responsibility | Documentation |
+|-----------|------|----------------|---------------|
+| Scope & Executor | Business Logic | Core DI - factory resolution, dependency injection, caching | [c3-101-scope](./c3-101-scope.md) |
+| Flow & ExecutionContext | Request Handler | Request/response pattern with schema validation | [c3-102-flow](./c3-102-flow.md) |
+| Tag System | State Container | Metadata attachment and extraction | [c3-103-tag](./c3-103-tag.md) |
+| Extension System | Transformer | Cross-cutting concern hooks | [c3-104-extension](./c3-104-extension.md) |
+| Error Classes | Business Logic | Structured error reporting | [c3-105-errors](./c3-105-errors.md) |
+| StandardSchema | Transformer | Validation contract | [c3-106-schema](./c3-106-schema.md) |
+| Multi-Executor | Business Logic | Keyed executor pools | [c3-107-multi](./c3-107-multi.md) |
+| Promised | Transformer | Enhanced Promise with context | [c3-108-promised](./c3-108-promised.md) |
+
+## Source Organization {#c3-1-source}
+<!-- File structure -->
+
+```
+packages/next/src/
+├── index.ts              # Public API exports
+├── types.ts              # Core type definitions
+├── scope.ts              # Scope implementation
+├── executor.ts           # Executor creation
+├── tag.ts                # Tag implementation
+├── tag-types.ts          # Tag type definitions
+├── tag-executors.ts      # Tag dependency helpers
+├── flow.ts               # Flow API
+├── flow-execution.ts     # Flow execution tracking
+├── execution-context.ts  # ExecutionContext implementation
+├── extension.ts          # Extension type helper
+├── promises.ts           # Promised class
+├── multi.ts              # Multi-executor support
+├── ssch.ts               # StandardSchema validation
+├── errors.ts             # Error catalog
+├── helpers.ts            # Utility functions
+└── internal/             # Internal utilities
+    ├── dependency-utils.ts
+    ├── extension-utils.ts
+    ├── abort-utils.ts
+    └── journal-utils.ts
+```
+
+## Testing {#c3-1-testing}
+<!-- Testing strategy -->
+
+Tests are organized by behavior area:
+
+| Test File | Focus |
+|-----------|-------|
+| core.behavior.test.ts | Executor graphs, scope execution |
+| extensions.behavior.test.ts | Extension lifecycle |
+| execution-context.behavior.test.ts | ExecutionContext, journaling |
+| tag.test.ts | Tag creation, resolution |
+| flow/*.test.ts | Flow execution patterns |
+
+Run tests: `pnpm -F @pumped-fn/core-next test`
+Typecheck: `pnpm -F @pumped-fn/core-next typecheck`
