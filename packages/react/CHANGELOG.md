@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [7c00672]
+  - @pumped-fn/core-next@1.0.0
+
 ## 0.5.90
 
 ### Patch Changes
