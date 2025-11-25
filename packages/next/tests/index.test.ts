@@ -159,10 +159,12 @@ describe("Scope & Executor", () => {
     it("detects circular dependencies", async () => {
       const a = provide(() => 1)
       const b = derive(a, () => 2)
-      ;(a as any).dependencies = { b }
-      ;(b as any).dependencies = { a }
-      ;(a as any).factory = (deps: { b: number }) => deps.b + 1
-      ;(b as any).factory = (deps: { a: number }) => deps.a + 1
+      const aInternal = a as unknown as { dependencies: Record<string, unknown>; factory: (deps: { b: number }) => number }
+      const bInternal = b as unknown as { dependencies: Record<string, unknown>; factory: (deps: { a: number }) => number }
+      aInternal.dependencies = { b }
+      bInternal.dependencies = { a }
+      aInternal.factory = (deps: { b: number }) => deps.b + 1
+      bInternal.factory = (deps: { a: number }) => deps.a + 1
       const scope = createScope()
       await expect(scope.resolve(a)).rejects.toThrow()
       await scope.dispose()
@@ -1043,20 +1045,20 @@ describe("Tag", () => {
         { label: "positive" }
       )
       const store = new Map<symbol, unknown>()
-      expect(() => positiveTag.writeToStore(store, -1 as any)).toThrow()
+      expect(() => positiveTag.writeToStore(store, -1 as unknown as number)).toThrow()
     })
 
     it("writeToContainer throws for invalid container", () => {
       const envTag = tag(custom<string>(), { label: "env" })
-      expect(() => envTag.writeToContainer(null as any, "x")).toThrow()
-      expect(() => envTag.writeToContainer([] as any, "x")).toThrow()
-      expect(() => envTag.writeToContainer({ tags: "invalid" } as any, "x")).toThrow()
+      expect(() => envTag.writeToContainer(null as unknown as Tag.Container, "x")).toThrow()
+      expect(() => envTag.writeToContainer([] as unknown as Tag.Container, "x")).toThrow()
+      expect(() => envTag.writeToContainer({ tags: "invalid" } as unknown as Tag.Container, "x")).toThrow()
     })
 
     it("writeToTags throws for non-array", () => {
       const envTag = tag(custom<string>(), { label: "env" })
-      expect(() => envTag.writeToTags(null as any, "x")).toThrow()
-      expect(() => envTag.writeToTags({} as any, "x")).toThrow()
+      expect(() => envTag.writeToTags(null as unknown as Tag.Tagged[], "x")).toThrow()
+      expect(() => envTag.writeToTags({} as unknown as Tag.Tagged[], "x")).toThrow()
     })
   })
 
@@ -1934,7 +1936,7 @@ describe("Realistic Scenario: Request Processing with Tags and Extensions", () =
     const auditExt = createAuditExtension(auditLogs)
 
     const getUserOrders = flow(database, (db, ctx, userId: string) => {
-      return db.list("order:").filter((o: any) => o.userId === userId)
+      return db.list("order:").filter((o) => (o as { userId?: string }).userId === userId)
     })
 
     const getUserWithOrders = flow(database, async (db, ctx, userId: string) => {
