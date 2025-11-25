@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/core-next": major
+"@pumped-fn/core-next": patch
 ---
 
 ## Breaking Changes
