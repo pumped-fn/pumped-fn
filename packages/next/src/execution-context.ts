@@ -497,10 +497,13 @@ const createFlowExecutionDescriptor = <F extends Flow.UFlow>(
       }),
     operation: {
       kind: "execution",
-      target: { type: "flow", flow: config.flow, definition },
+      name: definition.name,
+      mode: "sequential",
       input: config.input,
       key: getOperationKey(journalKey),
-      context: childCtx
+      context: childCtx,
+      flow: config.flow,
+      definition
     }
   }
 }
@@ -528,13 +531,12 @@ const createFnExecutionDescriptor = <T>(
     },
     operation: {
       kind: "execution",
-      target: {
-        type: "fn",
-        params: config.params.length > 0 ? config.params : undefined
-      },
+      name: "fn",
+      mode: "sequential",
       input: undefined,
       key: getOperationKey(journalKey),
-      context: parentCtx
+      context: parentCtx,
+      params: config.params.length > 0 ? config.params : undefined
     }
   }
 }
@@ -929,14 +931,12 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
 
     const operation: Extension.ExecutionOperation = {
       kind: "execution",
-      target: {
-        type: "parallel",
-        mode,
-        count: promises.length
-      },
+      name: "parallel",
+      mode: mode === "parallel" ? "parallel" : "parallel-settled",
       input: undefined,
       key: undefined,
-      context: this
+      context: this,
+      count: promises.length
     }
 
     const executor = this.wrapWithExtensions(executeCore, operation)

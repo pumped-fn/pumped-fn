@@ -692,29 +692,19 @@ export namespace Extension {
     operation: "resolve" | "update";
   };
 
-  export type FlowTarget = {
-    type: "flow";
-    flow: Flow.UFlow;
-    definition: Flow.Definition<any, any>;
-  };
-
-  export type FnTarget = {
-    type: "fn";
-    params?: readonly unknown[];
-  };
-
-  export type ParallelTarget = {
-    type: "parallel";
-    mode: "parallel" | "parallelSettled";
-    count: number;
-  };
+  export type ExecutionMode = "sequential" | "parallel" | "parallel-settled"
 
   export type ExecutionOperation = {
     kind: "execution";
-    target: FlowTarget | FnTarget | ParallelTarget;
-    input: unknown;
+    name: string;
+    mode: ExecutionMode;
+    input?: unknown;
     key?: string;
     context: Tag.Store;
+    flow?: Flow.UFlow;
+    definition?: Flow.Definition<any, any>;
+    params?: readonly unknown[];
+    count?: number;
   };
 
   export type ContextLifecycleOperation = {

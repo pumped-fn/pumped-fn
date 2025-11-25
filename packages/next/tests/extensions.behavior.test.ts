@@ -33,7 +33,7 @@ describe("extensions behavior", () => {
 
   scenario("extension tracking and real flows", async () => {
     const { ext, records } = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "fn",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.name === "fn",
     )
     const mathFlow = flow(async (ctx, input: { x: number; y: number }) => {
       const product = await ctx.exec({
@@ -57,7 +57,7 @@ describe("extensions behavior", () => {
     expect(records[2]).toMatchObject({ key: "combine", output: 23 })
 
     const composeTracker = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "flow",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.flow !== undefined,
     )
     const incrementFlow = flow((_ctx, x: number) => x + 1)
     const doubleFlow = flow((_ctx, x: number) => x * 2)
@@ -104,7 +104,7 @@ describe("extensions behavior", () => {
     expect(parallelResult).toEqual({ multiplied: 10, added: 15, combined: 25 })
     expect(
       allTracker.records.filter(
-        (record) => record.kind === "execution" && record.targetType === "parallel",
+        (record) => record.kind === "execution" && record.mode === "parallel",
       ).length,
     ).toBe(1)
     records.length = 0
@@ -292,7 +292,7 @@ describe("extensions behavior", () => {
     const depthExt: Extension.Extension = {
       name: "depth",
       wrap(_scope, next, operation) {
-        if (operation.kind === "execution" && operation.target.type === "flow") {
+        if (operation.kind === "execution" && operation.flow !== undefined) {
           depthRecords.push(operation.context.get(flowMeta.depth) as number)
         }
         return next()

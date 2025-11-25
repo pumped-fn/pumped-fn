@@ -1265,14 +1265,13 @@ class BaseScope implements Core.Scope {
           executeCore,
           {
             kind: "execution",
-            target: {
-              type: "flow",
-              flow,
-              definition,
-            },
+            name: definition.name,
+            mode: "sequential",
             input,
             key: undefined,
             context,
+            flow,
+            definition,
           }
         );
 

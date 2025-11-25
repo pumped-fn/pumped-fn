@@ -492,22 +492,19 @@ export namespace Extension {
   export type ResolveOperation = InternalExtension.ResolveOperation
 
   /**
-   * Target metadata for flow executions.
+   * Execution mode for OTel span hierarchy support.
+   * - "sequential": Single flow or function execution
+   * - "parallel": ctx.parallel() operations
+   * - "parallel-settled": ctx.parallelSettled() operations
    */
-  export type FlowTarget = InternalExtension.FlowTarget
-
-  /**
-   * Target metadata for stand-alone functions executed through ctx.exec.
-   */
-  export type FnTarget = InternalExtension.FnTarget
-
-  /**
-   * Target metadata for ctx.parallel or ctx.parallelSettled operations.
-   */
-  export type ParallelTarget = InternalExtension.ParallelTarget
+  export type ExecutionMode = InternalExtension.ExecutionMode
 
   /**
    * Operation metadata provided to extension hooks.
+   *
+   * Use `mode` to determine execution type:
+   * - "sequential": flow/fn execution (check `flow`/`definition` for flows, `params` for fns)
+   * - "parallel"/"parallel-settled": parallel execution (check `count` for item count)
    */
   export type ExecutionOperation = InternalExtension.ExecutionOperation
 

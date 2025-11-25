@@ -372,14 +372,14 @@ export function expectRejected(result: PromiseSettledResult<unknown>): {
 
 export type OperationRecord = {
   kind: string
-  targetType?: "flow" | "fn" | "parallel"
+  name?: string
+  mode?: Extension.ExecutionMode
   flowName?: string
   key?: string
   input?: unknown
   output?: unknown
   error?: unknown
   params?: readonly unknown[]
-  parallelMode?: string
   count?: number
 }
 
@@ -401,18 +401,13 @@ export function createTrackingExtension(
       const record: OperationRecord = { kind: operation.kind }
 
       if (operation.kind === "execution") {
-        record.targetType = operation.target.type
+        record.name = operation.name
+        record.mode = operation.mode
         record.input = operation.input
         record.key = operation.key
-
-        if (operation.target.type === "flow") {
-          record.flowName = operation.target.definition.name
-        } else if (operation.target.type === "fn") {
-          record.params = operation.target.params
-        } else if (operation.target.type === "parallel") {
-          record.parallelMode = operation.target.mode
-          record.count = operation.target.count
-        }
+        record.flowName = operation.definition?.name
+        record.params = operation.params
+        record.count = operation.count
       }
 
       return next()
