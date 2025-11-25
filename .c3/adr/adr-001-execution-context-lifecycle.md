@@ -320,42 +320,42 @@ No changes to c3-1 container doc.
 ## Verification {#adr-001-verification}
 
 ### Core Behavior
-- [ ] `close()` awaits all in-flight `exec()` calls in graceful mode
-- [ ] `close()` triggers abort and rejects pending in abort mode
-- [ ] Child contexts are cascaded (both modes)
-- [ ] `exec()` throws `ExecutionContextClosedError` after `close()` is called
-- [ ] Multiple `close()` calls are idempotent (returns same promise)
+- [x] `close()` awaits all in-flight `exec()` calls in graceful mode
+- [x] `close()` triggers abort and rejects pending in abort mode
+- [x] Child contexts are cascaded (both modes)
+- [x] `exec()` throws `ExecutionContextClosedError` after `close()` is called
+- [x] Multiple `close()` calls are idempotent (returns same promise)
 
 ### State Management
-- [ ] `state` property transitions: `active` → `closing` → `closed`
-- [ ] `closed` property returns `true` only when `state === 'closed'`
-- [ ] State is `closing` during drain/abort phase
-- [ ] `onStateChange()` callback fires on each transition
-- [ ] `onStateChange()` returns cleanup function that unsubscribes
+- [x] `state` property transitions: `active` → `closing` → `closed`
+- [x] `closed` property returns `true` only when `state === 'closed'`
+- [x] State is `closing` during drain/abort phase
+- [x] `onStateChange()` callback fires on each transition
+- [x] `onStateChange()` returns cleanup function that unsubscribes
 
 ### Execution Tracking
-- [ ] Flow executions (`ctx.exec(flow, input)`) are tracked and awaited
-- [ ] Function executions (`ctx.exec({ fn })`) are tracked and awaited
-- [ ] `parallel()` operations are tracked as single unit
-- [ ] `parallelSettled()` operations are tracked as single unit
+- [x] Flow executions (`ctx.exec(flow, input)`) are tracked and awaited
+- [x] Function executions (`ctx.exec({ fn })`) are tracked and awaited
+- [x] `parallel()` operations are tracked as single unit
+- [x] `parallelSettled()` operations are tracked as single unit
 
 ### Error Handling
-- [ ] Error during child close doesn't prevent other children from closing
-- [ ] Errors collected into `AggregateError` when multiple failures
-- [ ] Individual execution errors still available via `Promised` results
+- [x] Error during child close doesn't prevent other children from closing
+- [x] Errors collected into `AggregateError` when multiple failures
+- [x] Individual execution errors still available via `Promised` results
 
 ### Extension Integration
-- [ ] `wrap()` receives `context-lifecycle` operation with `phase: 'create'` on context creation
-- [ ] `wrap()` receives `context-lifecycle` operation with `phase: 'closing'` when close starts
-- [ ] `wrap()` receives `context-lifecycle` operation with `phase: 'closed'` after drain completes
-- [ ] `closing` phase includes correct `mode` parameter
-- [ ] Extension errors in `wrap()` don't prevent context close
+- [x] `wrap()` receives `context-lifecycle` operation with `phase: 'create'` on context creation
+- [x] `wrap()` receives `context-lifecycle` operation with `phase: 'closing'` when close starts
+- [x] `wrap()` receives `context-lifecycle` operation with `phase: 'closed'` after drain completes
+- [x] `closing` phase includes correct `mode` parameter
+- [x] Extension errors in `wrap()` don't prevent context close
 
 ### Integration
-- [ ] `Scope.exec()` auto-closes its internal context on completion
-- [ ] `scope.createExecution()` returns context requiring manual close
-- [ ] AbortSignal propagation still works as before
-- [ ] Existing tests continue to pass
+- [x] `Scope.exec()` auto-closes its internal context on completion
+- [x] `scope.createExecution()` returns context requiring manual close
+- [x] AbortSignal propagation still works as before
+- [x] Existing tests continue to pass
 
 ## Future Considerations {#adr-001-future}
 

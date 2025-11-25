@@ -600,7 +600,36 @@ export namespace ExecutionContext {
     readonly signal: AbortSignal;
     readonly details: Details;
     readonly tags: Tag.Tagged[] | undefined;
+
+    /**
+     * Current lifecycle state of the context.
+     *
+     * States:
+     * - `'active'`: Context is operational, can execute work
+     * - `'closing'`: Close has been called, draining or aborting
+     * - `'closed'`: Close complete, no new executions allowed
+     *
+     * @example
+     * ```typescript
+     * if (ctx.state === 'active') {
+     *   // Safe to start new work
+     *   ctx.exec(flow, input)
+     * }
+     * ```
+     */
     readonly state: ContextState;
+
+    /**
+     * Convenience property indicating if context is closed.
+     * Equivalent to `state === 'closed'`.
+     *
+     * @example
+     * ```typescript
+     * if (!ctx.closed) {
+     *   // Context is still active or closing
+     * }
+     * ```
+     */
     readonly closed: boolean;
 
     /**
@@ -608,6 +637,32 @@ export namespace ExecutionContext {
      *
      * In graceful mode (default), waits for in-flight executions to complete.
      * In abort mode, signals abort to in-flight executions immediately.
+     *
+     * The method is idempotent - multiple calls return the same promise.
+     *
+     * @example
+     * ```typescript
+     * // Graceful close - wait for work to complete
+     * const ctx = scope.createExecution()
+     * const work = ctx.exec(longRunningFlow, input)
+     * await ctx.close() // Waits for work to finish
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Abort mode - cancel in-flight work
+     * const ctx = scope.createExecution()
+     * ctx.exec(infiniteFlow, input) // Never completes
+     * await ctx.close({ mode: 'abort' }) // Forces termination
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Idempotent - safe to call multiple times
+     * const p1 = ctx.close()
+     * const p2 = ctx.close()
+     * assert(p1 === p2) // Same promise
+     * ```
      *
      * @param options.mode - 'graceful' (default) or 'abort'
      * @returns Promise that resolves when close completes
@@ -618,6 +673,37 @@ export namespace ExecutionContext {
 
     /**
      * Subscribe to context state changes.
+     *
+     * The callback fires on each state transition:
+     * - `active` → `closing`: When close() is called
+     * - `closing` → `closed`: When close completes
+     *
+     * @example
+     * ```typescript
+     * const ctx = scope.createExecution()
+     *
+     * const cleanup = ctx.onStateChange((state, prev) => {
+     *   console.log(`State changed: ${prev} → ${state}`)
+     *   if (state === 'closing') {
+     *     // Context is shutting down
+     *   }
+     * })
+     *
+     * // Later: unsubscribe
+     * cleanup()
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Track lifecycle in middleware
+     * const cleanup = ctx.onStateChange((state) => {
+     *   metrics.recordState(state)
+     *   if (state === 'closed') {
+     *     logger.info('Request context closed')
+     *   }
+     * })
+     * ```
+     *
      * @param callback - Called with new state and previous state
      * @returns Cleanup function to unsubscribe
      */
