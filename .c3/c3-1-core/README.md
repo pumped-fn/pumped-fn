@@ -192,15 +192,14 @@ packages/next/src/
 ## Testing {#c3-1-testing}
 <!-- Testing strategy -->
 
-Tests are organized by behavior area:
+Tests are organized in a unified test suite covering all layers:
 
 | Test File | Focus |
 |-----------|-------|
-| core.behavior.test.ts | Executor graphs, scope execution |
-| extensions.behavior.test.ts | Extension lifecycle |
-| execution-context.behavior.test.ts | ExecutionContext, journaling |
-| tag.test.ts | Tag creation, resolution |
-| flow/*.test.ts | Flow execution patterns |
+| index.test.ts | Unified test suite - 160 tests covering Scope, Flow, Tag, Extension, ExecutionContext, Multi, Promised, Errors |
+
+**Coverage**: 83% (82.9% statements, 85% functions, 68% branches)
 
 Run tests: `pnpm -F @pumped-fn/core-next test`
+Coverage: `pnpm -F @pumped-fn/core-next test:coverage`
 Typecheck: `pnpm -F @pumped-fn/core-next typecheck`
