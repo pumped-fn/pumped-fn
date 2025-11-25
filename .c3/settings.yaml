@@ -1,0 +1,19 @@
+# C3 Architecture Documentation Settings
+# Project: pumped-fn
+
+# Audit handoff preference
+audit:
+  handoff: plan  # Use /superpowers:write-plan for remediation planning
+
+# Diagram tools (optional)
+diagrams:
+  tool: mermaid
+
+# Layer guidance (optional)
+layers:
+  context:
+    focus: system boundaries, actors, cross-component interactions
+  container:
+    focus: technology choices, package organization
+  component:
+    focus: implementation details, source files, APIs

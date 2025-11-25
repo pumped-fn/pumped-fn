@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-24 17:17:52
+> Last generated: 2025-11-25 15:36:28
 
 ## Context Level
 
@@ -70,6 +70,7 @@ and nested flow support.
 - [Tag Store](#c3-102-tagstore)
 - [Journaling](#c3-102-journaling)
 - [Execution Lifecycle](#c3-102-lifecycle)
+- [Context Lifecycle Management](#c3-102-lifecycle-management)
 - [Flow.execute Helper](#c3-102-execute)
 - [Configuration](#c3-102-config)
 - [Source Files](#c3-102-source)
