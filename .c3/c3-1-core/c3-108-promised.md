@@ -14,9 +14,9 @@ summary: >
 Promised is an enhanced Promise that:
 
 - **Carries execution context** - Access to ExecutionData after completion
-- **Provides transformation methods** - `map()`, `switch()`, `mapError()`
+- **Provides transformation methods** - `map()`, `mapError()`
 - **Includes static helpers** - `all()`, `race()`, `allSettled()`, `try()`
-- **Supports settled result operations** - `fulfilled()`, `rejected()`, `partition()`
+- **Supports settled result partitioning** - `partition()`
 
 Promised implements `PromiseLike<T>` so it works anywhere a Promise is expected.
 
@@ -27,9 +27,7 @@ Promised implements `PromiseLike<T>` so it works anywhere a Promise is expected.
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `map(fn)` | `(T => U) => Promised<U>` | Transform success value |
-| `switch(fn)` | `(T => Promised<U>) => Promised<U>` | Flat-map to new Promised |
 | `mapError(fn)` | `(err => err) => Promised<T>` | Transform error (rethrow) |
-| `switchError(fn)` | `(err => Promised<T>) => Promised<T>` | Recover with new Promised |
 
 **Example:**
 ```typescript
@@ -87,25 +85,20 @@ For `Promised<PromiseSettledResult[]>` or parallel results:
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `fulfilled()` | `Promised<T[]>` | Extract fulfilled values |
-| `rejected()` | `Promised<unknown[]>` | Extract rejection reasons |
-| `partition()` | `Promised<{ fulfilled, rejected }>` | Split into both |
-| `firstFulfilled()` | `Promised<T \| undefined>` | First successful value |
-| `firstRejected()` | `Promised<unknown \| undefined>` | First rejection reason |
-| `findFulfilled(predicate)` | `Promised<T \| undefined>` | Find matching fulfilled |
-| `mapFulfilled(fn)` | `Promised<U[]>` | Transform fulfilled values |
-| `assertAllFulfilled(errorMapper?)` | `Promised<T[]>` | Throw if any rejected |
+| `partition()` | `Promised<{ fulfilled, rejected }>` | Split into fulfilled values and rejection reasons |
 
 **Example:**
 ```typescript
-const { fulfilled, rejected } = await Promised.allSettled([
+const results = await Promised.allSettled([
   fetchUser(1),
   fetchUser(2),
   fetchUser(3)
 ]).partition()
 
-console.log(`${fulfilled.length} succeeded, ${rejected.length} failed`)
+console.log(`${results.fulfilled.length} succeeded, ${results.rejected.length} failed`)
 ```
+
+**Note:** Previous methods like `fulfilled()`, `rejected()`, `firstFulfilled()`, `findFulfilled()`, `mapFulfilled()`, and `assertAllFulfilled()` were removed in favor of the simpler `partition()` approach.
 
 ## Usage Patterns {#c3-108-patterns}
 
@@ -155,18 +148,6 @@ if (errors.length > 0) {
 }
 ```
 
-### Assert All Succeeded
-
-```typescript
-const users = await Promised.allSettled([
-  getUser(1),
-  getUser(2),
-  getUser(3)
-]).assertAllFulfilled((errors, successCount, total) =>
-  new BatchError(`${errors.length}/${total} users failed to load`)
-)
-```
-
 ## Creation {#c3-108-creation}
 
 ```typescript
@@ -185,7 +166,8 @@ const p = Promised.try(async () => await asyncOp())
 
 | File | Contents |
 |------|----------|
-| `promises.ts` | Promised class implementation |
+| `primitives.ts` | Promised class implementation |
+| `types.ts` | MaybePromised type |
 
 ## Testing {#c3-108-testing}
 
