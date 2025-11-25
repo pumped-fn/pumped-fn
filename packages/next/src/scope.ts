@@ -299,7 +299,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   private async processChangeEvents(result: unknown): Promise<unknown> {
     let currentValue = result;
-    const events = this.scope["onEvents"].change;
+    const events = this.scope["onEvents"].resolve;
 
     for (const event of events) {
       const updated = await event(
@@ -423,11 +423,11 @@ class BaseScope implements Core.Scope {
   protected cache: Map<UE, ExecutorState> = new Map();
   protected executions: Map<string, { execution: Flow.Execution<unknown>; startTime: number }> = new Map();
   protected onEvents: {
-    readonly change: Set<Core.ChangeCallback>;
+    readonly resolve: Set<Core.ResolveCallback>;
     readonly release: Set<Core.ReleaseCallback>;
     readonly error: Set<Core.GlobalErrorCallback>;
   } = {
-    change: new Set<Core.ChangeCallback>(),
+    resolve: new Set<Core.ResolveCallback>(),
     release: new Set<Core.ReleaseCallback>(),
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
@@ -915,7 +915,7 @@ class BaseScope implements Core.Scope {
             value = u;
           }
 
-          const events = this.onEvents.change;
+          const events = this.onEvents.resolve;
           for (const event of events) {
             const updated = await event("update", e, value, this);
             if (updated !== undefined && e === updated.executor) {
@@ -1002,7 +1002,7 @@ class BaseScope implements Core.Scope {
 
         this.disposed = true;
         this.cache.clear();
-        this.onEvents.change.clear();
+        this.onEvents.resolve.clear();
         this.onEvents.release.clear();
         this.onEvents.error.clear();
         this.executions.clear();
@@ -1036,16 +1036,16 @@ class BaseScope implements Core.Scope {
     };
   }
 
-  onChange(callback: Core.ChangeCallback): Core.Cleanup {
+  onResolve(callback: Core.ResolveCallback): Core.Cleanup {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    this.onEvents["change"].add(callback);
+    this.onEvents["resolve"].add(callback);
     return () => {
       this["~ensureNotDisposed"]();
-      this.onEvents["change"].delete(callback);
+      this.onEvents["resolve"].delete(callback);
     };
   }
 

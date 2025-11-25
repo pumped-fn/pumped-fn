@@ -379,7 +379,7 @@ export namespace Core {
   /**
    * Callback invoked when executor output changes.
    */
-  export type ChangeCallback = InternalCore.ChangeCallback
+  export type ResolveCallback = InternalCore.ResolveCallback
 
   /**
    * Callback invoked when executor is released.

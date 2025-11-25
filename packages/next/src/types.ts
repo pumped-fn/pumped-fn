@@ -201,7 +201,7 @@ export declare namespace Core {
   export type Replacer = Preset<unknown>;
   type EventCallbackResult = void | Replacer;
 
-  export type ChangeCallback = (
+  export type ResolveCallback = (
     event: "resolve" | "update",
     executor: AnyExecutor,
     resolved: unknown,
@@ -298,7 +298,7 @@ export declare namespace Core {
       callback: (accessor: Accessor<T>) => void
     ): Cleanup;
 
-    onChange(cb: ChangeCallback): Cleanup;
+    onResolve(cb: ResolveCallback): Cleanup;
     onRelease(cb: ReleaseCallback): Cleanup;
     onError<T>(executor: Executor<T>, callback: ErrorCallback<T>): Cleanup;
     onError(callback: GlobalErrorCallback): Cleanup;
