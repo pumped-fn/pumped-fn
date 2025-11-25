@@ -36,7 +36,6 @@ A flow is an executor specialized for request handling. It adds:
 |---------|----------|
 | `flow(handler)` | Simple flow, no validation |
 | `flow(deps, handler)` | Flow with dependencies |
-| `flow(config)` | Returns FlowDefinition for `.handler()` chaining |
 | `flow(config, handler)` | Complete flow with validation |
 | `flow(config, deps, handler)` | Full flow with deps and validation |
 

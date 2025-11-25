@@ -4,7 +4,7 @@ import { type ExecutionContext } from "./types";
 
 export class SchemaError extends Error {
   static readonly CODE = "V001"
-  readonly code: string = SchemaError.CODE
+  readonly code: typeof SchemaError.CODE = SchemaError.CODE
   readonly issues: ReadonlyArray<StandardSchemaV1.Issue>
 
   constructor(issues: ReadonlyArray<StandardSchemaV1.Issue>) {
@@ -16,7 +16,7 @@ export class SchemaError extends Error {
 
 export class ExecutorResolutionError extends Error {
   static readonly CODE = "E001"
-  readonly code: string = ExecutorResolutionError.CODE
+  readonly code: typeof ExecutorResolutionError.CODE = ExecutorResolutionError.CODE
   readonly executorName: string
   readonly dependencyChain: string[]
 
@@ -30,7 +30,7 @@ export class ExecutorResolutionError extends Error {
 
 export class FactoryExecutionError extends Error {
   static readonly CODE = "F001"
-  readonly code: string = FactoryExecutionError.CODE
+  readonly code: typeof FactoryExecutionError.CODE = FactoryExecutionError.CODE
   readonly executorName: string
   readonly dependencyChain: string[]
 
@@ -44,7 +44,7 @@ export class FactoryExecutionError extends Error {
 
 export class DependencyResolutionError extends Error {
   static readonly CODE = "D001"
-  readonly code: string = DependencyResolutionError.CODE
+  readonly code: typeof DependencyResolutionError.CODE = DependencyResolutionError.CODE
   readonly executorName: string
   readonly dependencyChain: string[]
   readonly missingDependency?: string
@@ -60,7 +60,7 @@ export class DependencyResolutionError extends Error {
 
 export class ExecutionContextClosedError extends Error {
   static readonly CODE = "EC001"
-  readonly code: string = ExecutionContextClosedError.CODE
+  readonly code: typeof ExecutionContextClosedError.CODE = ExecutionContextClosedError.CODE
   readonly contextId: string
   readonly state: string
 

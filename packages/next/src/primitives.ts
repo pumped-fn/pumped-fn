@@ -138,11 +138,22 @@ export class Promised<T> implements PromiseLike<T> {
   }
 
   partition<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<{ fulfilled: any[]; rejected: unknown[] }> {
-    return this.map((value: any) => {
-      const results = Array.isArray(value) ? value : value.results;
-      const fulfilled: any[] = [];
+    this: Promised<readonly PromiseSettledResult<U>[]>
+  ): Promised<{ fulfilled: U[]; rejected: unknown[] }>
+  partition<T extends readonly unknown[]>(
+    this: Promised<Flow.ParallelSettledResult<T>>
+  ): Promised<{ fulfilled: T[number][]; rejected: unknown[] }>
+  partition<U>(
+    this: Promised<{ results: readonly PromiseSettledResult<U>[] }>
+  ): Promised<{ fulfilled: U[]; rejected: unknown[] }>
+  partition(
+    this: Promised<readonly PromiseSettledResult<unknown>[]> | Promised<{ results: readonly PromiseSettledResult<unknown>[] }>
+  ): Promised<{ fulfilled: unknown[]; rejected: unknown[] }> {
+    return this.map((value) => {
+      const results: readonly PromiseSettledResult<unknown>[] = Array.isArray(value)
+        ? value
+        : (value as { results: readonly PromiseSettledResult<unknown>[] }).results;
+      const fulfilled: unknown[] = [];
       const rejected: unknown[] = [];
 
       for (const result of results) {
