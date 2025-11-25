@@ -2,14 +2,19 @@
 
 # Prerequisites
 
-This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, clone and install them first:
+This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, install them first:
 
 ```bash
-git clone https://github.com/lagz0ne/c3-skill.git
-git clone https://github.com/obra/superpowers.git
+# Install c3-skill
+/plugin marketplace add Lagz0ne/c3-skill
+/plugin install c3-skill
+
+# Install superpowers
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
 ```
 
-Then get started with those required skills.
+Verify installation with `/help` - you should see `/c3:*` and `/superpowers:*` commands available.
 
 # IMPORTANT
 Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
