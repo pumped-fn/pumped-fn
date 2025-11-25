@@ -68,7 +68,7 @@ export { resolves } from "./helpers"
 /**
  * Create typed extensions with init/wrap/onError/dispose hooks.
  */
-export { extension } from "./extension"
+export { extension } from "./helpers"
 
 /**
  * Register a dependency-free executor that resolves directly from the controller.

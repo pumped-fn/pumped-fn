@@ -1,7 +1,16 @@
-import { Core, type Escapable } from "./types";
+import { Core, type Escapable, type Extension } from "./types";
 import { isExecutor, isLazyExecutor, isReactiveExecutor, isStaticExecutor } from "./executor";
 
 export type { Escapable } from "./types";
+
+/**
+ * Type helper for defining extensions (no-op at runtime).
+ * @param ext - Extension object with init/wrap/onError/dispose hooks
+ * @example extension({ name: "logger", wrap: (scope, next, op) => next() })
+ */
+export function extension<T extends Extension.Extension>(ext: T): T {
+  return ext;
+}
 
 function unwrapItem(item: unknown): Core.Executor<unknown> {
   if (item && typeof item === "object" && "escape" in item) {
