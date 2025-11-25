@@ -137,6 +137,14 @@ export class Promised<T> implements PromiseLike<T> {
     return Promised.create(promise);
   }
 
+  /**
+   * Splits settled results into fulfilled values and rejection reasons.
+   * Works with both `PromiseSettledResult[]` and `ctx.parallelSettled()` results.
+   *
+   * @example
+   * const { fulfilled, rejected } = await Promised.allSettled([p1, p2, p3]).partition()
+   * const { fulfilled } = await ctx.parallelSettled([...]).partition()
+   */
   partition<U>(
     this: Promised<readonly PromiseSettledResult<U>[]>
   ): Promised<{ fulfilled: U[]; rejected: unknown[] }>
