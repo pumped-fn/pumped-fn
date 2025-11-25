@@ -890,7 +890,7 @@ describe("core behavior", () => {
     await cleanup()
   })
 
-  scenario("Promised settled helpers", async () => {
+  scenario("Promised partition helper", async () => {
     const createSuccessFlow = (multiplier = 1) => flow((_ctx, x: number) => x * multiplier)
     const createFailureFlow = (message = "fail") =>
       flow(() => {
@@ -904,7 +904,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(3), input: input }),
           ctx.exec({ flow: createSuccessFlow(4), input: input }),
         ])
-        .fulfilled(),
+        .partition()
+        .map(p => p.fulfilled),
     )
     const fulfilled = await flow.execute(fulfilledMain, 5)
     expect(fulfilled).toEqual([10, 15, 20])
@@ -915,7 +916,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createFailureFlow("error1"), input: undefined }),
           ctx.exec({ flow: createFailureFlow("error2"), input: undefined }),
         ])
-        .rejected(),
+        .partition()
+        .map(p => p.rejected),
     )
     const rejected = await flow.execute(rejectedMain, undefined)
     expect(rejected).toHaveLength(2)
@@ -941,7 +943,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(), input: input }),
           ctx.exec({ flow: createSuccessFlow(), input: input * 2 }),
         ])
-        .firstFulfilled(),
+        .partition()
+        .map(p => p.fulfilled[0]),
     )
     const firstFulfilled = await flow.execute(firstFulfilledMain, 5)
     expect(firstFulfilled).toBe(5)
@@ -952,7 +955,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createFailureFlow("first"), input: undefined }),
           ctx.exec({ flow: createFailureFlow("second"), input: undefined }),
         ])
-        .firstRejected(),
+        .partition()
+        .map(p => p.rejected[0]),
     )
     const firstRejected = await flow.execute(firstRejectedMain, undefined)
     expect((firstRejected as Error).message).toBe("first")
@@ -964,7 +968,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(), input: 5 }),
           ctx.exec({ flow: createSuccessFlow(), input: 10 }),
         ])
-        .findFulfilled((value: number) => value > 3),
+        .partition()
+        .map(p => p.fulfilled.find((value: number) => value > 3)),
     )
     const found = await flow.execute(findFulfilledMain, undefined)
     expect(found).toBe(5)
@@ -976,7 +981,8 @@ describe("core behavior", () => {
           ctx.exec({ flow: createFailureFlow(), input: undefined }),
           ctx.exec({ flow: createSuccessFlow(), input: 3 }),
         ])
-        .mapFulfilled((value: number) => value * 10),
+        .partition()
+        .map(p => p.fulfilled.map((value: number) => value * 10)),
     )
     const mapped = await flow.execute(mapFulfilledMain, undefined)
     expect(mapped).toEqual([10, 30])
@@ -987,7 +993,13 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(2), input: input }),
           ctx.exec({ flow: createSuccessFlow(2), input: input * 2 }),
         ])
-        .assertAllFulfilled(),
+        .partition()
+        .map(p => {
+          if (p.rejected.length > 0) {
+            throw new Error(`${p.rejected.length} of ${p.fulfilled.length + p.rejected.length} operations failed`)
+          }
+          return p.fulfilled
+        }),
     )
     const asserted = await flow.execute(assertMain, 5)
     expect(asserted).toEqual([10, 20])
@@ -998,7 +1010,13 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(), input: input }),
           ctx.exec({ flow: createFailureFlow("operation failed"), input: undefined }),
         ])
-        .assertAllFulfilled(),
+        .partition()
+        .map(p => {
+          if (p.rejected.length > 0) {
+            throw new Error(`${p.rejected.length} of ${p.fulfilled.length + p.rejected.length} operations failed`)
+          }
+          return p.fulfilled
+        }),
     )
     await expect(flow.execute(assertFail, 5)).rejects.toThrow(
       "1 of 2 operations failed",
@@ -1011,11 +1029,15 @@ describe("core behavior", () => {
           ctx.exec({ flow: createFailureFlow("op failed"), input: undefined }),
           ctx.exec({ flow: createFailureFlow("op failed"), input: undefined }),
         ])
-        .assertAllFulfilled((reasons, fulfilledCount, totalCount) =>
-          new Error(
-            `Custom: ${reasons.length} failed, ${fulfilledCount} succeeded out of ${totalCount} total`,
-          ),
-        ),
+        .partition()
+        .map(p => {
+          if (p.rejected.length > 0) {
+            throw new Error(
+              `Custom: ${p.rejected.length} failed, ${p.fulfilled.length} succeeded out of ${p.fulfilled.length + p.rejected.length} total`,
+            )
+          }
+          return p.fulfilled
+        }),
     )
     await expect(flow.execute(customFail, 5)).rejects.toThrow(
       "Custom: 2 failed, 1 succeeded out of 3 total",
@@ -1038,14 +1060,15 @@ describe("core behavior", () => {
           ctx.exec({ flow: createSuccessFlow(), input: 5 }),
           ctx.exec({ flow: createSuccessFlow(), input: 10 }),
         ])
-        .fulfilled()
+        .partition()
+        .map(p => p.fulfilled)
         .map((values: number[]) => values.filter((value) => value > 3))
         .map((values: number[]) => values.reduce((sum, value) => sum + value, 0)),
     )
     const chainedResult = await flow.execute(chained, undefined)
     expect(chainedResult).toBe(15)
 
-    const empty = flow(async (ctx) => ctx.parallelSettled([]).fulfilled())
+    const empty = flow(async (ctx) => ctx.parallelSettled([]).partition().map(p => p.fulfilled))
     const emptyResult = await flow.execute(empty, undefined)
     expect(emptyResult).toEqual([])
   })
