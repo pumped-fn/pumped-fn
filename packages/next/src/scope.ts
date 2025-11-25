@@ -12,6 +12,7 @@ import {
   executorSymbol,
   type Flow,
   type ExecutionContext,
+  type Escapable,
 } from "./types";
 import {
   ExecutorResolutionError,
@@ -19,15 +20,117 @@ import {
   DependencyResolutionError,
 } from "./errors";
 import { type Tag, tagSymbol, isTag, isTagExecutor, mergeFlowTags } from "./tag";
-import { Promised } from "./primitives";
+import { Promised, validate } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 import { flowDefinitionMeta } from "./execution-context";
-import { resolveShape } from "./internal/dependency-utils";
-import { validate } from "./primitives";
 import { FlowExecutionImpl } from "./flow-execution";
 import { ExecutionContextImpl } from "./execution-context";
-import { applyExtensions } from "./internal/extension-utils";
+
+export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
+type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
+
+export async function resolveShape<T extends ResolvableItem | ReadonlyArray<ResolvableItem> | Record<string, ResolvableItem> | undefined>(
+  scope: Core.Scope,
+  shape: T,
+  resolveFn?: ResolveFn
+): Promise<any> {
+  if (shape === undefined) {
+    return undefined;
+  }
+
+  const unwrapTarget = (item: ResolvableItem): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
+    if (isTagExecutor(item)) {
+      return item;
+    }
+
+    if (isTag(item)) {
+      return item;
+    }
+
+    const executor = !isExecutor(item) ? (item as Escapable<unknown>).escape() : item;
+
+    if (isLazyExecutor(executor) || isReactiveExecutor(executor) || isStaticExecutor(executor)) {
+      return executor.executor;
+    }
+
+    return executor as Core.Executor<unknown>;
+  };
+
+  const scopeWithProtectedMethods = scope as Core.Scope & {
+    resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown>;
+    resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown>;
+  };
+
+  const resolveItem = resolveFn
+    ? resolveFn
+    : async (item: ResolvableItem) => {
+        if (isTagExecutor(item)) {
+          return scopeWithProtectedMethods.resolveTagExecutor(item);
+        }
+
+        if (isTag(item)) {
+          return scopeWithProtectedMethods.resolveTag(item);
+        }
+
+        const target = unwrapTarget(item);
+        return await scope.resolve(target as Core.Executor<unknown>);
+      };
+
+  if (Array.isArray(shape)) {
+    const promises = [];
+    for (const item of shape) {
+      promises.push(resolveItem(item));
+    }
+    return await Promise.all(promises);
+  }
+
+  if (typeof shape === "object") {
+    if ("factory" in shape) {
+      return await resolveItem(shape as Core.UExecutor);
+    }
+
+    if ("escape" in shape) {
+      const unwrapped = (shape as unknown as Escapable<unknown>).escape();
+      return await resolveItem(unwrapped);
+    }
+
+    const entries = Object.entries(shape);
+    const promises = entries.map(([_, item]) => resolveItem(item));
+    const resolvedValues = await Promise.all(promises);
+
+    const results: Record<string, unknown> = {};
+    for (let i = 0; i < entries.length; i++) {
+      results[entries[i][0]] = resolvedValues[i];
+    }
+    return results;
+  }
+
+  return undefined;
+}
+
+function applyExtensions<T>(
+  extensions: Extension.Extension[] | undefined,
+  baseExecutor: () => Promised<T>,
+  scope: Core.Scope,
+  operation: Extension.Operation
+): () => Promised<T> {
+  if (!extensions || extensions.length === 0) {
+    return baseExecutor;
+  }
+  let executor = baseExecutor as () => Promised<unknown>;
+  for (let i = extensions.length - 1; i >= 0; i--) {
+    const extension = extensions[i];
+    if (extension.wrap) {
+      const current = executor;
+      executor = () => {
+        const result = extension.wrap!(scope, current, operation);
+        return result instanceof Promised ? result : Promised.create(result);
+      };
+    }
+  }
+  return executor as () => Promised<T>;
+}
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;

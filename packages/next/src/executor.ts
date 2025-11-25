@@ -1,6 +1,5 @@
-import { Core, executorSymbol } from "./types";
+import { Core, executorSymbol, type Escapable } from "./types";
 import type { Tag } from "./tag";
-import type { Escapable } from "./helpers";
 
 export function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,

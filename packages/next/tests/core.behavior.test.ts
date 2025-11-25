@@ -12,7 +12,7 @@ import {
 } from "../src"
 import type { Flow } from "../src"
 import { createExecutor } from "../src/executor"
-import { createAbortWithTimeout } from "../src/internal/abort-utils"
+import { createAbortWithTimeout } from "../src/execution-context"
 import { scenario } from "./scenario"
 
 describe("core behavior", () => {

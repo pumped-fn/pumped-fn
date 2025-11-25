@@ -1,11 +1,94 @@
 import { type Core, type Extension, type ExecutionContext, type Flow, type Tag as TagNS, type StandardSchemaV1 } from "./types"
 import { type Tag, tag, mergeFlowTags, isTag, isTagged } from "./tag"
 import { validate, custom, Promised } from "./primitives"
-import { applyExtensions } from "./internal/extension-utils"
-import { createAbortWithTimeout } from "./internal/abort-utils"
-import { createJournalKey, checkJournalReplay, type JournalEntry } from "./internal/journal-utils"
 import { createExecutor, isExecutor } from "./executor"
 import { createSystemError, ExecutionContextClosedError } from "./errors"
+
+export type JournalEntry<T = unknown> = T | { __error: true; error: unknown }
+
+export function createJournalKey(flowName: string, depth: number, key: string): string {
+  return `${flowName}:${depth}:${key}`
+}
+
+export function isErrorEntry<T>(entry: JournalEntry<T>): entry is { __error: true; error: unknown } {
+  return typeof entry === "object" && entry !== null && "__error" in entry && entry.__error === true
+}
+
+export function checkJournalReplay<T>(
+  journal: Map<string, JournalEntry<T>>,
+  journalKey: string
+): { isReplay: boolean; value: T | undefined } {
+  if (!journal.has(journalKey)) {
+    return { isReplay: false, value: undefined }
+  }
+
+  const entry = journal.get(journalKey)
+
+  if (isErrorEntry(entry)) {
+    throw entry.error
+  }
+
+  return { isReplay: true, value: entry }
+}
+
+export type AbortWithTimeout = {
+  controller: AbortController
+  timeoutId: ReturnType<typeof setTimeout> | null
+}
+
+export function createAbortWithTimeout(
+  timeout?: number,
+  parentSignal?: AbortSignal
+): AbortWithTimeout {
+  const controller = new AbortController()
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  if (timeout) {
+    timeoutId = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        controller.abort(new Error(`Operation timeout after ${timeout}ms`))
+      }
+    }, timeout)
+  }
+
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      if (timeoutId) clearTimeout(timeoutId)
+      controller.abort(parentSignal.reason)
+    } else {
+      parentSignal.addEventListener("abort", () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        controller.abort(parentSignal.reason)
+      }, { once: true })
+    }
+  }
+
+  return { controller, timeoutId }
+}
+
+export function applyExtensions<T>(
+  extensions: Extension.Extension[] | undefined,
+  baseExecutor: () => Promised<T>,
+  scope: Core.Scope,
+  operation: Extension.Operation
+): () => Promised<T> {
+  if (!extensions || extensions.length === 0) {
+    return baseExecutor
+  }
+  let executor = baseExecutor as () => Promised<unknown>
+  for (let i = extensions.length - 1; i >= 0; i--) {
+    const extension = extensions[i]
+    if (extension.wrap) {
+      const current = executor
+      executor = () => {
+        const result = extension.wrap!(scope, current, operation)
+        return result instanceof Promised ? result : Promised.create(result)
+      }
+    }
+  }
+  return executor as () => Promised<T>
+}
 
 export const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),

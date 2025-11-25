@@ -1,10 +1,13 @@
 import { type Promised } from "./primitives";
 import { type Tag } from "./tag";
-import { type Escapable } from "./helpers";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
+
+export type Escapable<T> = {
+  escape: () => Core.Executor<T>;
+};
 
 export type MaybePromised<T> = T | Promise<T> | Promised<T>;
 

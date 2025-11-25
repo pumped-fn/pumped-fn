@@ -17,8 +17,8 @@ import {
   createJournalKey,
   checkJournalReplay,
   isErrorEntry,
-} from "../src/internal/journal-utils"
-import { applyExtensions } from "../src/internal/extension-utils"
+  applyExtensions,
+} from "../src/execution-context"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"
 import type { Extension } from "../src/types"
