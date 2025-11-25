@@ -1322,7 +1322,9 @@ class BaseScope implements Core.Scope {
         context.details.error = error;
         context.end();
         // Best-effort cleanup: don't let close errors mask the original error
-        await context.close().catch(() => {});
+        await context.close().catch((closeErr) => {
+          console.error('Error closing context after flow failure:', closeErr);
+        });
         resolveSnapshot(context.createSnapshot());
         throw error;
       }
