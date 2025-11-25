@@ -1,5 +1,21 @@
 # Pumped-fn Project Instructions
 
+# Prerequisites
+
+This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, install them first:
+
+```bash
+# Install c3-skill
+/plugin marketplace add Lagz0ne/c3-skill
+/plugin install c3-skill
+
+# Install superpowers
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
+```
+
+Verify installation with `/help` - you should see `/c3:*` and `/superpowers:*` commands available.
+
 # IMPORTANT
 Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
 
