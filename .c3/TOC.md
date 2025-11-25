@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-25 15:36:28
+> Last generated: 2025-11-25 15:58:13
 
 ## Context Level
 
@@ -171,6 +171,26 @@ and nested flow support.
 
 ## Architecture Decisions
 
+### [ADR-002-core-performance-optimization](./adr/adr-002-core-performance-optimization.md) - Core Package Performance Optimization
+> Comprehensive performance optimization for @pumped-fn/core-next targeting memory
+allocation, async patterns, type guard overhead, and module structure. Includes
+critical bug fixes for un-awaited cleanup promises.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-002-status)
+- [Problem/Requirement](#adr-002-problem)
+- [Exploration Journey](#adr-002-exploration)
+- [Solution](#adr-002-solution)
+- [Changes Across Layers](#adr-002-changes)
+- [Verification](#adr-002-verification)
+- [Expected Impact](#adr-002-impact)
+- [Alternatives Considered](#adr-002-alternatives)
+- [Related](#adr-002-related)
+
+---
+
 ### [ADR-001-execution-context-lifecycle](./adr/adr-001-execution-context-lifecycle.md) - ExecutionContext Explicit Lifecycle with close()
 > Add close() method to ExecutionContext for middleware integration patterns,
 enabling explicit lifecycle management with graceful/abort modes and cascading
@@ -193,5 +213,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 11
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 1
+**Total Documents**: 12
+**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 2
