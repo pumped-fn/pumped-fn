@@ -1,6 +1,6 @@
 import type { Core, Flow } from "./types"
 import { createScope, type ScopeOption } from "./scope"
-import type { Tag } from "./tag-types"
+import type { Tag } from "./tag"
 import { Promised } from "./primitives"
 import { flowImpl, flowMeta } from "./execution-context"
 

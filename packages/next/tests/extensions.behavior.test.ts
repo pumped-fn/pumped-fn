@@ -12,8 +12,7 @@ import {
   tags,
 } from "../src"
 import { preset } from "../src/executor"
-import { isTag, isTagExecutor } from "../src/tag-executors"
-import { type Tag, tagSymbol } from "../src/tag-types"
+import { isTag, isTagExecutor, type Tag, tagSymbol } from "../src/tag"
 import {
   createJournalKey,
   checkJournalReplay,

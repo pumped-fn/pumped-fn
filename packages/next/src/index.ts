@@ -8,8 +8,8 @@ import type {
   Core as InternalCore,
   ExecutionContext as InternalExecutionContext,
 } from "./types"
-import type { Tag as TagType } from "./tag-types"
-import type * as TagTypes from "./tag-types"
+import type { Tag as TagType } from "./tag"
+import type * as TagTypes from "./tag"
 import * as errorsModule from "./errors"
 import * as multiModule from "./multi"
 import * as primitivesModule from "./primitives"
@@ -53,7 +53,7 @@ export { tag } from "./tag"
 /**
  * Curated helpers for extracting metadata from tags.
  */
-export { tags } from "./tag-executors"
+export { tags } from "./tag"
 
 /**
  * Create a new execution scope with optional presets, registry, and extensions.

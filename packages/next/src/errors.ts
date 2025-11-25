@@ -1,5 +1,5 @@
 import { type StandardSchemaV1 } from "./types";
-import { type Tag } from "./tag-types";
+import { type Tag } from "./tag";
 import { type ExecutionContext } from "./types";
 
 export class SchemaError extends Error {

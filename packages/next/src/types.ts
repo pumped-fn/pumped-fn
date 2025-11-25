@@ -1,5 +1,5 @@
 import { type Promised } from "./primitives";
-import { type Tag } from "./tag-types";
+import { type Tag } from "./tag";
 import { type Escapable } from "./helpers";
 
 export const executorSymbol: unique symbol = Symbol.for(
@@ -757,4 +757,4 @@ export namespace Multi {
   };
 }
 
-export { tagSymbol, type Tag } from "./tag-types";
+export { tagSymbol, type Tag } from "./tag";

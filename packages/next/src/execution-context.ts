@@ -1,13 +1,10 @@
 import { type Core, type Extension, type ExecutionContext, type Flow, type Tag as TagNS, type StandardSchemaV1 } from "./types"
-import type { Tag } from "./tag-types"
-import { tag } from "./tag"
+import { type Tag, tag, mergeFlowTags, isTag, isTagged } from "./tag"
 import { validate, custom, Promised } from "./primitives"
-import { mergeFlowTags } from "./tags/merge"
 import { applyExtensions } from "./internal/extension-utils"
 import { createAbortWithTimeout } from "./internal/abort-utils"
 import { createJournalKey, checkJournalReplay, type JournalEntry } from "./internal/journal-utils"
 import { createExecutor, isExecutor } from "./executor"
-import { isTag, isTagged } from "./tag-executors"
 import { createSystemError, ExecutionContextClosedError } from "./errors"
 
 export const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(

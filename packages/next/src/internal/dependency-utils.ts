@@ -1,8 +1,7 @@
 import { isExecutor, isLazyExecutor, isReactiveExecutor, isStaticExecutor } from "../executor";
 import type { Core, ResolvableItem } from "../types";
 import type { Escapable } from "../helpers";
-import { isTag, isTagExecutor } from "../tag-executors";
-import { type Tag } from "../tag-types";
+import { isTag, isTagExecutor, type Tag } from "../tag";
 
 type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
 

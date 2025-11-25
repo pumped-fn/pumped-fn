@@ -1,6 +1,58 @@
 import { type StandardSchemaV1 } from "./types";
 import { validate } from "./primitives";
-import { tagSymbol, type Tag } from "./tag-types";
+
+export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/core/tag");
+
+export declare namespace Tag {
+  export interface Store {
+    get(key: unknown): unknown;
+    set(key: unknown, value: unknown): unknown | undefined;
+  }
+
+  export interface Tagged<T = unknown> {
+    readonly [tagSymbol]: true;
+    readonly key: symbol;
+    readonly schema: StandardSchemaV1<T>;
+    readonly value: T;
+    toString(): string;
+    readonly [Symbol.toStringTag]: string;
+  }
+
+  export interface Container {
+    tags?: Tagged[];
+  }
+
+  export type Source = Store | Container | Tagged[];
+
+  export interface Tag<T, HasDefault extends boolean = false> {
+    readonly key: symbol;
+    readonly schema: StandardSchemaV1<T>;
+    readonly label?: string;
+    readonly default: HasDefault extends true ? T : never;
+
+    (value?: HasDefault extends true ? T : never): Tagged<T>;
+    (value: T): Tagged<T>;
+
+    extractFrom(source: Source): T;
+    readFrom(source: Source): HasDefault extends true ? T : T | undefined;
+    collectFrom(source: Source): T[];
+
+    writeToStore(target: Store, value: T): void;
+    writeToContainer(target: Container, value: T): Tagged<T>;
+    writeToTags(target: Tagged[], value: T): Tagged<T>;
+
+    entry(value?: HasDefault extends true ? T : never): [symbol, T];
+    entry(value: T): [symbol, T];
+
+    toString(): string;
+    readonly [Symbol.toStringTag]: string;
+  }
+
+  export interface TagExecutor<TOutput, TTag = TOutput> extends Container {
+    readonly [tagSymbol]: "required" | "optional" | "all";
+    readonly tag: Tag<TTag, boolean>;
+  }
+}
 
 const tagCacheMap = new WeakMap<Tag.Source, Map<symbol, unknown[]>>();
 
@@ -264,12 +316,6 @@ class TagImpl<T, HasDefault extends boolean = false> {
   }
 }
 
-/**
- * Creates metadata tag for executors/flows/scopes.
- * @param schema - Validation schema (use custom<T>() for no validation)
- * @param options - Label and optional default value
- * @example tag(custom<number>(), { label: "retry", default: 3 })
- */
 export function tag<T>(schema: StandardSchemaV1<T>): Tag.Tag<T, false>;
 export function tag<T>(
   schema: StandardSchemaV1<T>,
@@ -333,3 +379,100 @@ export function tag<T>(
 
   return fn;
 }
+
+export function required<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
+  return {
+    [tagSymbol]: "required",
+    tag,
+  };
+}
+
+export function optional<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
+  return {
+    [tagSymbol]: "optional",
+    tag,
+  };
+}
+
+export function all<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T[], T> {
+  return {
+    [tagSymbol]: "all",
+    tag,
+  };
+}
+
+export const tags: {
+  required: typeof required;
+  optional: typeof optional;
+  all: typeof all;
+} = {
+  required,
+  optional,
+  all,
+};
+
+export function isTag<T>(input: unknown): input is Tag.Tag<T, boolean> {
+  return (
+    typeof input === "function" &&
+    "extractFrom" in input &&
+    typeof input.extractFrom === "function" &&
+    "readFrom" in input &&
+    typeof input.readFrom === "function" &&
+    "collectFrom" in input &&
+    typeof input.collectFrom === "function"
+  );
+}
+
+export function isTagExecutor<TOutput, TTag = TOutput>(input: unknown): input is Tag.TagExecutor<TOutput, TTag> {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    tagSymbol in input &&
+    typeof input[tagSymbol] === "string" &&
+    ["required", "optional", "all"].includes(input[tagSymbol])
+  );
+}
+
+export function isTagged(input: unknown): input is Tag.Tagged {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    tagSymbol in input &&
+    input[tagSymbol] === true &&
+    "key" in input &&
+    typeof input.key === "symbol" &&
+    "value" in input
+  );
+}
+
+export const mergeFlowTags = (
+  definitionTags?: ReadonlyArray<Tag.Tagged | undefined>,
+  executionTags?: ReadonlyArray<Tag.Tagged | undefined>
+): Tag.Tagged[] | undefined => {
+  const hasDefinition = !!definitionTags && definitionTags.length > 0;
+  const hasExecution = !!executionTags && executionTags.length > 0;
+
+  if (!hasDefinition && !hasExecution) {
+    return undefined;
+  }
+
+  const merged: Tag.Tagged[] = [];
+
+  if (definitionTags) {
+    for (const tag of definitionTags) {
+      if (tag) {
+        merged.push(tag);
+      }
+    }
+  }
+
+  if (executionTags) {
+    for (const tag of executionTags) {
+      if (tag) {
+        merged.push(tag);
+      }
+    }
+  }
+
+  return merged.length > 0 ? merged : undefined;
+};

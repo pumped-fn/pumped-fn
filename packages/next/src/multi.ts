@@ -6,7 +6,7 @@ import {
   type Multi,
   type StandardSchemaV1,
 } from "./types";
-import { type Tag } from "./tag-types";
+import { type Tag } from "./tag";
 
 class MultiExecutorImpl<T, K, PoolIdType = unknown> {
   private option: Multi.Option<K>;

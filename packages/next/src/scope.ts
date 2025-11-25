@@ -18,13 +18,11 @@ import {
   FactoryExecutionError,
   DependencyResolutionError,
 } from "./errors";
-import { type Tag, tagSymbol } from "./tag-types";
-import { isTag, isTagExecutor } from "./tag-executors";
+import { type Tag, tagSymbol, isTag, isTagExecutor, mergeFlowTags } from "./tag";
 import { Promised } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 import { flowDefinitionMeta } from "./execution-context";
-import { mergeFlowTags } from "./tags/merge";
 import { resolveShape } from "./internal/dependency-utils";
 import { validate } from "./primitives";
 import { FlowExecutionImpl } from "./flow-execution";

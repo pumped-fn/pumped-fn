@@ -1,5 +1,5 @@
 import { Core, executorSymbol } from "./types";
-import type { Tag } from "./tag-types";
+import type { Tag } from "./tag";
 import type { Escapable } from "./helpers";
 
 export function createExecutor<T>(
