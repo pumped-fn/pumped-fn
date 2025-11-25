@@ -37,6 +37,10 @@ pnpm -F @pumped-fn/core-next test           # run tests
 pnpm -F @pumped-fn/examples typecheck       # examples
 ```
 
+## Before Opening a PR
+
+Run `/c3-skill:c3-audit` to verify C3 documentation is in sync with codebase changes. This ensures architecture docs in `.c3/` reflect any structural modifications.
+
 ## Public API Export Rules
 
 **Pattern:**
