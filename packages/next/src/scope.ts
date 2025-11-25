@@ -714,12 +714,12 @@ class BaseScope implements Core.Scope {
   ): Promise<unknown> {
     const source = executionContext || this;
 
-    switch (tagExec.extractionMode) {
-      case "extract":
+    switch (tagExec[tagSymbol]) {
+      case "required":
         return await tagExec.tag.extractFrom(source);
-      case "read":
+      case "optional":
         return await tagExec.tag.readFrom(source);
-      case "collect":
+      case "all":
         return await tagExec.tag.collectFrom(source);
     }
   }

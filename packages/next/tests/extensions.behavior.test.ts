@@ -469,10 +469,8 @@ describe("extensions behavior", () => {
     const requiredExec = tags.required(emailTag)
     expect(requiredExec[tagSymbol]).toBe("required")
     expect(requiredExec.tag).toBe(emailTag)
-    expect(requiredExec.extractionMode).toBe("extract")
     const optionalExec = tags.optional(portTag)
     expect(optionalExec[tagSymbol]).toBe("optional")
-    expect(optionalExec.extractionMode).toBe("read")
     const allExec = tags.all(emailTag)
     expect(allExec[tagSymbol]).toBe("all")
 

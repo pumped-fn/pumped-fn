@@ -4,7 +4,6 @@ export function required<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
   return {
     [tagSymbol]: "required",
     tag,
-    extractionMode: "extract",
   };
 }
 
@@ -12,7 +11,6 @@ export function optional<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T, T> {
   return {
     [tagSymbol]: "optional",
     tag,
-    extractionMode: "read",
   };
 }
 
@@ -20,7 +18,6 @@ export function all<T>(tag: Tag.Tag<T, boolean>): Tag.TagExecutor<T[], T> {
   return {
     [tagSymbol]: "all",
     tag,
-    extractionMode: "collect",
   };
 }
 

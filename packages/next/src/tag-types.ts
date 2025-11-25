@@ -58,6 +58,5 @@ export declare namespace Tag {
   export interface TagExecutor<TOutput, TTag = TOutput> extends Container {
     readonly [tagSymbol]: "required" | "optional" | "all";
     readonly tag: Tag<TTag, boolean>;
-    readonly extractionMode: "extract" | "read" | "collect";
   }
 }
