@@ -171,6 +171,11 @@ const p = Promised.try(async () => await asyncOp())
 
 ## Testing {#c3-108-testing}
 
-Covered in:
-- `flow/parallel.test.ts` - Parallel execution and settled operations
-- `execution-context.behavior.test.ts` - Context propagation
+Primary tests: `index.test.ts` - "Promised" describe block
+
+Key test scenarios:
+- Instance methods (map, mapError, then, catch, finally)
+- Static methods (all, race, allSettled, try)
+- partition() for settled results
+- inDetails() for execution context
+- Context propagation via ctx()

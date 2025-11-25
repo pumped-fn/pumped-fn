@@ -330,12 +330,12 @@ It provides TypeScript type inference without runtime overhead.
 
 ## Testing {#c3-104-testing}
 
-Primary tests: `extensions.behavior.test.ts`
+Primary tests: `index.test.ts` - "Extension" describe block
 
 Key test scenarios:
 - Extension lifecycle (init, wrap, dispose)
-- Pipeline ordering
-- Error propagation
-- Dynamic registration
-- Operation inspection
+- Pipeline ordering and chaining
+- Error handling via onError hooks
+- onStatusChange callback
+- Operation inspection (resolve vs execution)
 - Async extensions

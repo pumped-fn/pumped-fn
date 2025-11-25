@@ -187,9 +187,11 @@ All executors in the pool carry this tag.
 
 ## Testing {#c3-107-testing}
 
-Multi-executor tests cover:
-- Key validation
-- Key transformation
-- Pool caching behavior
-- Release mechanics
-- Integration with scope lifecycle
+Primary tests: `index.test.ts` - "Multi-Executor" describe block
+
+Key test scenarios:
+- multi.provide() creates keyed pools
+- multi.derive() with dependencies
+- Key caching (same key = same instance)
+- Release mechanics via accessor.release()
+- Integration with scope lifecycle and cleanup

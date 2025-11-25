@@ -194,6 +194,10 @@ type User = StandardSchemaV1.InferOutput<typeof userSchema>
 
 ## Testing {#c3-106-testing}
 
-Schema validation tested via:
-- `tag.test.ts` - Tag value validation
-- `flow/*.test.ts` - Flow input/output validation
+Primary tests: `index.test.ts` - integrated throughout Tag and Flow tests
+
+Key test scenarios:
+- Tag value validation with custom schemas
+- Flow input/output validation
+- custom() schema factory
+- StandardSchemaV1 compliance
