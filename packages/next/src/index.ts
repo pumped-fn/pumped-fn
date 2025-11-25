@@ -116,6 +116,12 @@ export { isMainExecutor } from "./executor"
 export { isPreset } from "./executor"
 
 /**
+ * Gets pre-computed static analysis for an executor.
+ * Returns shape, dependency count, circular risk, and optimization hints.
+ */
+export { getAnalysis } from "./executor"
+
+/**
  * Orchestrates flow factories and exposes helpers for standalone executions.
  */
 export { flow } from "./flow"
@@ -375,6 +381,16 @@ export namespace Core {
    * Value accepted as executor dependency.
    */
   export type DependencyLike = InternalCore.DependencyLike
+
+  /**
+   * Shape of executor dependencies (none, single, array, record).
+   */
+  export type DependencyShape = InternalCore.DependencyShape
+
+  /**
+   * Pre-computed static analysis for an executor.
+   */
+  export type ExecutorAnalysis = InternalCore.ExecutorAnalysis
 
   /**
    * Callback invoked when executor output changes.

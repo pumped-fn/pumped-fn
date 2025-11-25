@@ -5,6 +5,7 @@ import {
   isMainExecutor,
   isExecutor,
   isPreset,
+  getAnalysis,
 } from "./executor";
 import {
   Core,
@@ -28,11 +29,39 @@ import { flowDefinitionMeta, ExecutionContextImpl } from "./execution-context";
 export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
 type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
 
+async function resolveOptimizedArray(
+  dependencies: ReadonlyArray<Core.UExecutor>,
+  resolveFn: ResolveFn
+): Promise<unknown[]> {
+  const promises = new Array(dependencies.length);
+  for (let i = 0; i < dependencies.length; i++) {
+    promises[i] = resolveFn(dependencies[i]);
+  }
+  return await Promise.all(promises);
+}
+
+async function resolveOptimizedRecord(
+  dependencies: Record<string, Core.UExecutor>,
+  keys: ReadonlyArray<string>,
+  resolveFn: ResolveFn
+): Promise<Record<string, unknown>> {
+  const promises = new Array(keys.length);
+  for (let i = 0; i < keys.length; i++) {
+    promises[i] = resolveFn(dependencies[keys[i]]);
+  }
+  const resolvedValues = await Promise.all(promises);
+  const results: Record<string, unknown> = {};
+  for (let i = 0; i < keys.length; i++) {
+    results[keys[i]] = resolvedValues[i];
+  }
+  return results;
+}
+
 export async function resolveShape<T extends ResolvableItem | ReadonlyArray<ResolvableItem> | Record<string, ResolvableItem> | undefined>(
   scope: Core.Scope,
   shape: T,
   resolveFn?: ResolveFn
-): Promise<any> {
+): Promise<unknown> {
   if (shape === undefined) {
     return undefined;
   }
@@ -832,21 +861,37 @@ class BaseScope implements Core.Scope {
     ref: UE,
     executionContext?: ExecutionContext.Context
   ): Promise<unknown> {
-    return resolveShape(
-      this as unknown as Core.Scope,
-      ie,
-      async (item) => {
-        if (isTagExecutor(item)) {
-          return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>, executionContext);
-        }
-
-        if (isTag(item)) {
-          return this.resolveTag(item as Tag.Tag<unknown, boolean>, executionContext);
-        }
-
-        return this["~resolveExecutor"](item as Core.UExecutor, ref);
+    const resolveFn = async (item: ResolvableItem) => {
+      if (isTagExecutor(item)) {
+        return this.resolveTagExecutor(item as Tag.TagExecutor<unknown>, executionContext);
       }
-    );
+
+      if (isTag(item)) {
+        return this.resolveTag(item as Tag.Tag<unknown, boolean>, executionContext);
+      }
+
+      return this["~resolveExecutor"](item as Core.UExecutor, ref);
+    };
+
+    if (ie === undefined) {
+      return undefined;
+    }
+
+    const analysis = getAnalysis(ref);
+
+    if (analysis && analysis.shape === "array" && analysis.optimizedKeys === undefined) {
+      return resolveOptimizedArray(ie as ReadonlyArray<Core.UExecutor>, resolveFn);
+    }
+
+    if (analysis && analysis.shape === "record" && analysis.optimizedKeys) {
+      return resolveOptimizedRecord(
+        ie as Record<string, Core.UExecutor>,
+        analysis.optimizedKeys,
+        resolveFn
+      );
+    }
+
+    return resolveShape(this as unknown as Core.Scope, ie, resolveFn);
   }
 
   protected "~ensureNotDisposed"(): void {

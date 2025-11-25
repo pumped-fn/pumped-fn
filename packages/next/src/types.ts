@@ -5,6 +5,10 @@ export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
 
+export const analysisSymbol: unique symbol = Symbol.for(
+  "@pumped-fn/core/analysis"
+);
+
 export type Escapable<T> = {
   escape: () => Core.Executor<T>;
 };
@@ -100,6 +104,18 @@ export declare namespace Core {
 
   export type Kind = "main" | "reactive" | "lazy" | "static";
 
+  export type DependencyShape = "none" | "single" | "array" | "record";
+
+  export interface ExecutorAnalysis {
+    readonly shape: DependencyShape;
+    readonly dependencyCount: number;
+    readonly directDependencies: ReadonlyArray<UExecutor>;
+    readonly hasNestedDependencies: boolean;
+    readonly maxDepth: number;
+    readonly circularRisk: boolean;
+    readonly optimizedKeys: ReadonlyArray<string> | undefined;
+  }
+
   export interface BaseExecutor<T> extends Tag.Container {
     [executorSymbol]: Kind;
     factory: NoDependencyFn<T> | DependentFn<T, unknown> | undefined;
@@ -108,6 +124,7 @@ export declare namespace Core {
       | UExecutor
       | Array<UExecutor>
       | Record<string, UExecutor>;
+    [analysisSymbol]?: ExecutorAnalysis;
   }
 
   export interface Executor<T> extends BaseExecutor<T> {

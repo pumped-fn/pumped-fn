@@ -1,5 +1,163 @@
-import { Core, executorSymbol, type Escapable } from "./types";
+import { Core, executorSymbol, analysisSymbol, type Escapable } from "./types";
 import type { Tag } from "./tag";
+
+function isExecutorLike(item: unknown): item is Core.UExecutor {
+  return typeof item === "object" && item !== null && executorSymbol in item;
+}
+
+function extractDirectDependencies(
+  dependencies:
+    | undefined
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>
+): Core.UExecutor[] {
+  if (dependencies === undefined) {
+    return [];
+  }
+
+  if (isExecutorLike(dependencies)) {
+    return [dependencies];
+  }
+
+  if (Array.isArray(dependencies)) {
+    return dependencies.filter(isExecutorLike);
+  }
+
+  if (typeof dependencies === "object") {
+    return Object.values(dependencies).filter(isExecutorLike);
+  }
+
+  return [];
+}
+
+function computeDependencyShape(
+  dependencies:
+    | undefined
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>
+): Core.DependencyShape {
+  if (dependencies === undefined) {
+    return "none";
+  }
+
+  if (isExecutorLike(dependencies)) {
+    return "single";
+  }
+
+  if (Array.isArray(dependencies)) {
+    return "array";
+  }
+
+  if (typeof dependencies === "object") {
+    return "record";
+  }
+
+  return "none";
+}
+
+function computeMaxDepth(
+  executor: Core.UExecutor,
+  visited: Set<Core.UExecutor> = new Set(),
+  currentDepth: number = 0
+): number {
+  if (visited.has(executor)) {
+    return currentDepth;
+  }
+
+  visited.add(executor);
+
+  const deps = executor.dependencies;
+  if (!deps) {
+    return currentDepth;
+  }
+
+  const directDeps = extractDirectDependencies(deps);
+  if (directDeps.length === 0) {
+    return currentDepth;
+  }
+
+  let maxChildDepth = currentDepth;
+  for (const dep of directDeps) {
+    const childDepth = computeMaxDepth(dep, visited, currentDepth + 1);
+    if (childDepth > maxChildDepth) {
+      maxChildDepth = childDepth;
+    }
+  }
+
+  return maxChildDepth;
+}
+
+function detectCircularRisk(
+  executor: Core.UExecutor,
+  visited: Set<Core.UExecutor> = new Set()
+): boolean {
+  if (visited.has(executor)) {
+    return true;
+  }
+
+  visited.add(executor);
+
+  const deps = executor.dependencies;
+  if (!deps) {
+    visited.delete(executor);
+    return false;
+  }
+
+  const directDeps = extractDirectDependencies(deps);
+  for (const dep of directDeps) {
+    if (detectCircularRisk(dep, visited)) {
+      return true;
+    }
+  }
+
+  visited.delete(executor);
+  return false;
+}
+
+function computeOptimizedKeys(
+  dependencies:
+    | undefined
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>
+): ReadonlyArray<string> | undefined {
+  if (
+    dependencies !== undefined &&
+    typeof dependencies === "object" &&
+    !Array.isArray(dependencies) &&
+    !isExecutorLike(dependencies)
+  ) {
+    return Object.keys(dependencies);
+  }
+  return undefined;
+}
+
+function analyzeExecutor(
+  executor: Core.UExecutor,
+  dependencies:
+    | undefined
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>
+): Core.ExecutorAnalysis {
+  const shape = computeDependencyShape(dependencies);
+  const directDeps = extractDirectDependencies(dependencies);
+  const maxDepth = computeMaxDepth(executor);
+  const circularRisk = directDeps.length > 0 && detectCircularRisk(executor);
+  const optimizedKeys = computeOptimizedKeys(dependencies);
+
+  return {
+    shape,
+    dependencyCount: directDeps.length,
+    directDependencies: directDeps,
+    hasNestedDependencies: maxDepth > 1,
+    maxDepth,
+    circularRisk,
+    optimizedKeys,
+  };
+}
 
 export function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
@@ -24,6 +182,9 @@ export function createExecutor<T>(
     dependencies,
     tags: tags,
   } as unknown as Core.Executor<T>;
+
+  const analysis = analyzeExecutor(executor, dependencies);
+  (executor as Core.UExecutor)[analysisSymbol] = analysis;
 
   const lazyExecutor = {
     [executorSymbol]: "lazy",
@@ -108,6 +269,14 @@ export function isPreset(input: unknown): input is Core.Preset<unknown> {
     executorSymbol in input &&
     (input as Core.Preset<unknown>)[executorSymbol] === "preset"
   );
+}
+
+/**
+ * Gets the pre-computed static analysis for an executor.
+ * Returns undefined if executor was not created via provide/derive.
+ */
+export function getAnalysis(executor: Core.UExecutor): Core.ExecutorAnalysis | undefined {
+  return executor[analysisSymbol];
 }
 
 /**
