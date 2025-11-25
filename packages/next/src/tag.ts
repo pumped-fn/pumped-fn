@@ -318,15 +318,11 @@ export function tag<T>(
   fn.extractFrom = impl.get.bind(impl);
   fn.readFrom = impl.find.bind(impl);
   fn.collectFrom = impl.some.bind(impl);
-  fn.injectTo = impl.writeToStore.bind(impl);
   fn.writeToStore = impl.writeToStore.bind(impl);
   fn.writeToContainer = impl.writeToContainer.bind(impl);
   fn.writeToTags = impl.writeToTags.bind(impl);
   fn.entry = impl.entry.bind(impl);
   fn.toString = impl.toString.bind(impl);
-  (fn as any).partial = <D extends Partial<T>>(d: D): D => {
-    return Object.assign({}, createTagged(impl.key, impl.schema, {} as T, impl.label), d);
-  };
   Object.defineProperty(fn, Symbol.toStringTag, {
     get: () => impl[Symbol.toStringTag],
   });

@@ -354,9 +354,9 @@ describe("extensions behavior", () => {
     expect(portValue).toBe(3000)
 
     const store = new Map<symbol, unknown>()
-    emailTag.injectTo(store, "test@example.com")
+    emailTag.writeToStore(store, "test@example.com")
     expect(emailTag.extractFrom(store)).toBe("test@example.com")
-    portTag.injectTo(store, 8080)
+    portTag.writeToStore(store, 8080)
     expect(portTag.extractFrom(store)).toBe(8080)
     const validatedNumberTag = tag(
       {
@@ -375,7 +375,7 @@ describe("extensions behavior", () => {
     )
     const validatedStore = new Map<symbol, unknown>()
     // @ts-expect-error - testing validation with invalid type
-    expect(() => validatedNumberTag.injectTo(validatedStore, "invalid")).toThrow()
+    expect(() => validatedNumberTag.writeToStore(validatedStore, "invalid")).toThrow()
 
     const writeToStore = new Map<symbol, unknown>()
     const numberTag = tag(custom<number>(), { label: "number" })
