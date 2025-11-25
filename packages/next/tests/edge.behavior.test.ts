@@ -11,7 +11,7 @@ import {
 } from "../src"
 import { type Extension } from "../src/types"
 import { resolves } from "../src/helpers"
-import { validate } from "../src/ssch"
+import { validate } from "../src/primitives"
 import { FactoryExecutionError, ExecutorResolutionError } from "../src/errors"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"

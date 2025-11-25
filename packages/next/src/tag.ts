@@ -1,5 +1,5 @@
 import { type StandardSchemaV1 } from "./types";
-import { validate } from "./ssch";
+import { validate } from "./primitives";
 import { tagSymbol, type Tag } from "./tag-types";
 
 const tagCacheMap = new WeakMap<Tag.Source, Map<symbol, unknown[]>>();

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { flow } from "../../src/flow"
-import { custom } from "../../src/ssch"
-import { Promised } from "../../src/promises"
+import { custom, Promised } from "../../src/primitives"
 
 describe("ExecutionContext parallel helpers", () => {
   it("reports stats for parallel success", async () => {

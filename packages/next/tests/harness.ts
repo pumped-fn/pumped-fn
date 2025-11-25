@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest"
 import { flow } from "../src/flow"
-import { custom } from "../src/ssch"
+import { custom } from "../src/primitives"
 import { createExecutor, provide, derive } from "../src/executor"
 import {
   createScope,

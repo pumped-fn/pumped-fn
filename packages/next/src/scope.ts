@@ -20,13 +20,13 @@ import {
 } from "./errors";
 import { type Tag, tagSymbol } from "./tag-types";
 import { isTag, isTagExecutor } from "./tag-executors";
-import { Promised } from "./promises";
+import { Promised } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi } from "./flow";
 import { flowDefinitionMeta } from "./execution-context";
 import { mergeFlowTags } from "./tags/merge";
 import { resolveShape } from "./internal/dependency-utils";
-import { validate } from "./ssch";
+import { validate } from "./primitives";
 import { FlowExecutionImpl } from "./flow-execution";
 import { ExecutionContextImpl } from "./execution-context";
 import { applyExtensions } from "./internal/extension-utils";

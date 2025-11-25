@@ -1,4 +1,4 @@
-import { Promised } from "./promises";
+import { Promised } from "./primitives";
 import { type Flow, type Core } from "./types";
 
 type StatusCallback<T> = (

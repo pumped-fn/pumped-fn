@@ -1,4 +1,4 @@
-import { Promised } from "../promises";
+import { Promised } from "../primitives";
 import type { Extension, Core } from "../types";
 
 export function applyExtensions<T>(

@@ -1,7 +1,7 @@
 import type { Core, Flow } from "./types"
 import { createScope, type ScopeOption } from "./scope"
 import type { Tag } from "./tag-types"
-import { Promised } from "./promises"
+import { Promised } from "./primitives"
 import { flowImpl, flowMeta } from "./execution-context"
 
 const normalizeExecuteOptions = (

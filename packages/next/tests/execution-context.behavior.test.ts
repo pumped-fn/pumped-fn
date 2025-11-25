@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
-import { custom } from "../src/ssch"
-import { Promised } from "../src/promises"
+import { custom, Promised } from "../src/primitives"
 import { tag } from "../src/tag"
 import { ExecutionContextClosedError } from "../src/errors"
 

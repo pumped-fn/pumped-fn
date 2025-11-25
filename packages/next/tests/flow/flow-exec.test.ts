@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { flow } from "../../src/flow"
-import { custom } from "../../src/ssch"
+import { custom } from "../../src/primitives"
 
 describe("ExecutionContext.exec journaling", () => {
   it("replays journaled flow executions", async () => {

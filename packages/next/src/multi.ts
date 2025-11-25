@@ -1,7 +1,6 @@
 import { createExecutor } from "./executor";
 import { tag } from "./tag";
-import { Promised } from "./promises";
-import { custom, validate } from "./ssch";
+import { Promised, custom, validate } from "./primitives";
 import {
   type Core,
   type Multi,

@@ -1,4 +1,4 @@
-import { type Promised } from "./promises";
+import { type Promised } from "./primitives";
 import { type Tag } from "./tag-types";
 import { type Escapable } from "./helpers";
 
