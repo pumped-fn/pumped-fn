@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { flow } from "../../src/flow"
-import { custom } from "../../src/ssch"
-import { Promised } from "../../src/promises"
+import { custom, Promised } from "../../src/primitives"
 
 describe("ExecutionContext parallel helpers", () => {
   it("reports stats for parallel success", async () => {
@@ -9,7 +8,7 @@ describe("ExecutionContext parallel helpers", () => {
       name: "parallel",
       input: custom<void>(),
       output: custom<{ total: number; succeeded: number; failed: number }>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       const { stats } = await ctx.parallel([
         Promised.create(Promise.resolve(1)),
         Promised.create(Promise.resolve(2)),
@@ -26,7 +25,7 @@ describe("ExecutionContext parallel helpers", () => {
       name: "parallel-settled",
       input: custom<void>(),
       output: custom<{ total: number; succeeded: number; failed: number }>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       const { stats } = await ctx.parallelSettled([
         Promised.create(Promise.resolve("a")),
         Promised.create(Promise.reject(new Error("x"))),

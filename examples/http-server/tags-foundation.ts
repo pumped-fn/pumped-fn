@@ -104,7 +104,7 @@ function tagsInDifferentContexts() {
 
   // Tags work with any container implementing Store interface
   const store = new Map()
-  requestId.injectTo(store, 'req-123')
+  requestId.writeToStore(store, 'req-123')
   const id = requestId.readFrom(store)
   console.log('From Map:', id)
 }

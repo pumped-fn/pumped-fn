@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
-import { custom } from "../src/ssch"
-import { Promised } from "../src/promises"
+import { custom, Promised } from "../src/primitives"
 import { tag } from "../src/tag"
 import { ExecutionContextClosedError } from "../src/errors"
 
@@ -14,7 +13,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "inner",
       input: custom<number>(),
       output: custom<number>()
-    }).handler(async (_ctx, value) => value + 1)
+    }, async (_ctx, value) => value + 1)
     const first = await ctx.exec({ key: "inner", flow: inner, input: 1 })
     const second = await ctx.exec({ key: "inner", flow: inner, input: 1 })
     expect(first).toBe(2)
@@ -38,7 +37,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "never",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(() => {})
     })
     const pending = ctx.exec({ flow: never, input: undefined, timeout: 5 })
@@ -55,7 +54,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "runner",
       input: custom<void>(),
       output: custom<number>()
-    }).handler(async () => {
+    }, async () => {
       calls()
       return calls.mock.calls.length
     })
@@ -76,7 +75,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "faulty",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       throw boom
     })
     await expect(ctx.exec({ flow: faulty, input: undefined })).rejects.toThrow("explode")
@@ -134,10 +133,10 @@ describe("ExecutionContext tag store alignment", () => {
 
     const ctx = scope.createExecution({ tags: [errorTag("value")] })
 
-    await expect(ctx.exec(failingFlow, undefined)).rejects.toThrow("Resolution failed")
+    await expect(ctx.exec({ flow: failingFlow, input: undefined })).rejects.toThrow("Resolution failed")
 
     const workingFlow = flow([errorTag], ([value]) => value)
-    const result = await ctx.exec(workingFlow, undefined)
+    const result = await ctx.exec({ flow: workingFlow, input: undefined })
     expect(result).toBe("value")
   })
 
@@ -152,7 +151,7 @@ describe("ExecutionContext tag store alignment", () => {
       return await ctx.exec({ flow: innerFlow, input: undefined, tags: [value("child")] })
     })
 
-    const result = await parentCtx.exec(nestedFlow, undefined)
+    const result = await parentCtx.exec({ flow: nestedFlow, input: undefined })
     expect(result).toBe("child")
   })
 })
@@ -197,13 +196,13 @@ describe("ExecutionContext lifecycle", () => {
       name: "slow",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(r => setTimeout(r, 50))
       resolved = true
       return "done"
     })
 
-    const execution = ctx.exec(slowFlow, undefined)
+    const execution = ctx.exec({ flow: slowFlow, input: undefined })
 
     expect(ctx.state).toBe("active")
 
@@ -229,7 +228,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "never",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async (flowCtx) => {
+    }, async (flowCtx) => {
       handlerStarted = true
       await new Promise<void>((resolve, reject) => {
         if (flowCtx.signal.aborted) {
@@ -243,7 +242,7 @@ describe("ExecutionContext lifecycle", () => {
       })
     })
 
-    const execution = ctx.exec(neverFlow, undefined)
+    const execution = ctx.exec({ flow: neverFlow, input: undefined })
 
     await new Promise(r => setTimeout(r, 10))
 
@@ -265,9 +264,9 @@ describe("ExecutionContext lifecycle", () => {
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
-    expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
+    expect(() => ctx.exec({ flow: simpleFlow, input: undefined })).toThrow(ExecutionContextClosedError)
   })
 
   it("exec() throws ExecutionContextClosedError while closing", async () => {
@@ -278,20 +277,20 @@ describe("ExecutionContext lifecycle", () => {
       name: "slow",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(r => setTimeout(r, 100))
     })
 
-    ctx.exec(slowFlow, undefined)
+    ctx.exec({ flow: slowFlow, input: undefined })
     const closePromise = ctx.close()
 
     const simpleFlow = flow({
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
-    expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
+    expect(() => ctx.exec({ flow: simpleFlow, input: undefined })).toThrow(ExecutionContextClosedError)
 
     await closePromise
   })
@@ -321,14 +320,14 @@ describe("ExecutionContext lifecycle", () => {
       name: "nested",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async (flowCtx) => {
+    }, async (flowCtx) => {
       flowCtx.onStateChange((state) => {
         childStates.push(state)
       })
       await new Promise(r => setTimeout(r, 100))
     })
 
-    ctx.exec(nestedFlow, undefined)
+    ctx.exec({ flow: nestedFlow, input: undefined })
 
     await new Promise(r => setTimeout(r, 10))
 

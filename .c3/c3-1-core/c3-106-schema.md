@@ -189,8 +189,8 @@ type User = StandardSchemaV1.InferOutput<typeof userSchema>
 
 | File | Contents |
 |------|----------|
-| `ssch.ts` | validate(), custom() functions |
-| `types.ts` | StandardSchemaV1 namespace types |
+| `primitives.ts` | validate(), custom() functions, Promised class |
+| `types.ts` | StandardSchemaV1 interface and namespace |
 
 ## Testing {#c3-106-testing}
 

@@ -14,7 +14,7 @@ describe("memory profiling", () => {
     // Create 1000 execution contexts and execute flows
     for (let i = 0; i < 1000; i++) {
       const ctx = scope.createExecution({ tags: [value(`ctx-${i}`)] });
-      await ctx.exec(myFlow, undefined);
+      await ctx.exec({ flow: myFlow, input: undefined });
 
       // Keep reference to prevent GC (simulating long-lived contexts)
       if (i % 100 === 0) {
@@ -43,7 +43,7 @@ describe("memory profiling", () => {
     // Create contexts without keeping references
     for (let i = 0; i < 1000; i++) {
       const ctx = scope.createExecution({ tags: [value(`ctx-${i}`)] });
-      await ctx.exec(myFlow, undefined);
+      await ctx.exec({ flow: myFlow, input: undefined });
       // ctx goes out of scope, should be GC-able
     }
 

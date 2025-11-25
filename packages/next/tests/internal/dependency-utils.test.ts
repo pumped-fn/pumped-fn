@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveShape } from "../../src/internal/dependency-utils";
-import { createScope } from "../../src/scope";
+import { resolveShape, createScope } from "../../src/scope";
 import { provide, derive } from "../../src/executor";
 
 describe("resolveShape", () => {

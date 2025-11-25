@@ -1,10 +1,13 @@
-import { type Promised } from "./promises";
-import { type Tag } from "./tag-types";
-import { type Escapable } from "./helpers";
+import { type Promised } from "./primitives";
+import { type Tag } from "./tag";
 
 export const executorSymbol: unique symbol = Symbol.for(
   "@pumped-fn/core/executor"
 );
+
+export type Escapable<T> = {
+  escape: () => Core.Executor<T>;
+};
 
 export type MaybePromised<T> = T | Promise<T> | Promised<T>;
 
@@ -56,93 +59,10 @@ export declare namespace StandardSchemaV1 {
   >["output"];
 }
 
-export class SchemaError extends Error {
-  public readonly issues: ReadonlyArray<StandardSchemaV1.Issue>;
-
-  constructor(issues: ReadonlyArray<StandardSchemaV1.Issue>) {
-    super(issues[0].message);
-    this.name = "SchemaError";
-    this.issues = issues;
-  }
-}
-
-export interface ErrorContext {
-  readonly executorName?: string;
-  readonly resolutionStage:
-    | "dependency-resolution"
-    | "factory-execution"
-    | "post-processing"
-    | "validation";
-  readonly dependencyChain: string[];
-  readonly scopeId?: string;
-  readonly timestamp: number;
-  readonly additionalInfo?: Record<string, unknown>;
-}
-
-export class ExecutorResolutionError extends Error {
-  public readonly context: ErrorContext;
-  public readonly code: string;
-  public readonly category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR";
-
-  constructor(
-    message: string,
-    context: ErrorContext,
-    code: string,
-    category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR" = "USER_ERROR",
-    options?: { cause?: unknown }
-  ) {
-    super(message, options);
-    this.name = "ExecutorResolutionError";
-    this.context = context;
-    this.code = code;
-    this.category = category;
-  }
-}
-
-export class FactoryExecutionError extends ExecutorResolutionError {
-  constructor(
-    message: string,
-    context: Omit<ErrorContext, "resolutionStage">,
-    code: string,
-    options?: { cause?: unknown }
-  ) {
-    super(
-      message,
-      { ...context, resolutionStage: "factory-execution" },
-      code,
-      "USER_ERROR",
-      options
-    );
-    this.name = "FactoryExecutionError";
-  }
-}
-
-export class DependencyResolutionError extends ExecutorResolutionError {
-  public readonly missingDependency?: string;
-
-  constructor(
-    message: string,
-    context: Omit<ErrorContext, "resolutionStage">,
-    code: string,
-    missingDependency?: string,
-    options?: { cause?: unknown }
-  ) {
-    super(
-      message,
-      { ...context, resolutionStage: "dependency-resolution" },
-      code,
-      "USER_ERROR",
-      options
-    );
-    this.name = "DependencyResolutionError";
-    this.missingDependency = missingDependency;
-  }
-}
-
 export type ExecutorError =
-  | ExecutorResolutionError
-  | FactoryExecutionError
-  | DependencyResolutionError;
+  | import("./errors").ExecutorResolutionError
+  | import("./errors").FactoryExecutionError
+  | import("./errors").DependencyResolutionError;
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
@@ -225,8 +145,7 @@ export declare namespace Core {
   export type RejectedState = {
     kind: "rejected";
     error: unknown;
-    context?: ErrorContext;
-    enhancedError?: ExecutorResolutionError;
+    enhancedError?: import("./errors").ExecutorResolutionError;
   };
 
   export type ResolveState<T> =
@@ -285,7 +204,7 @@ export declare namespace Core {
   export type Replacer = Preset<unknown>;
   type EventCallbackResult = void | Replacer;
 
-  export type ChangeCallback = (
+  export type ResolveCallback = (
     event: "resolve" | "update",
     executor: AnyExecutor,
     resolved: unknown,
@@ -382,7 +301,7 @@ export declare namespace Core {
       callback: (accessor: Accessor<T>) => void
     ): Cleanup;
 
-    onChange(cb: ChangeCallback): Cleanup;
+    onResolve(cb: ResolveCallback): Cleanup;
     onRelease(cb: ReleaseCallback): Cleanup;
     onError<T>(executor: Executor<T>, callback: ErrorCallback<T>): Cleanup;
     onError(callback: GlobalErrorCallback): Cleanup;
@@ -716,24 +635,16 @@ export namespace ExecutionContext {
     initializeExecutionContext(flowName: string, isParallel?: boolean): void;
 
     exec<F extends Flow.UFlow>(
-      flow: F,
-      input: Flow.InferInput<F>
+      config: {
+        flow: F;
+        key?: string;
+        timeout?: number;
+        retry?: number;
+        tags?: Tag.Tagged[];
+      } & (Flow.InferInput<F> extends void | undefined
+        ? { input?: never }
+        : { input: Flow.InferInput<F> })
     ): Promised<Flow.InferOutput<F>>;
-
-    exec<F extends Flow.UFlow>(
-      key: string,
-      flow: F,
-      input: Flow.InferInput<F>
-    ): Promised<Flow.InferOutput<F>>;
-
-    exec<F extends Flow.UFlow>(config: {
-      flow: F;
-      input: Flow.InferInput<F>;
-      key?: string;
-      timeout?: number;
-      retry?: number;
-      tags?: Tag.Tagged[];
-    }): Promised<Flow.InferOutput<F>>;
 
     exec<T>(config: {
       fn: () => T | Promise<T>;
@@ -784,29 +695,19 @@ export namespace Extension {
     operation: "resolve" | "update";
   };
 
-  export type FlowTarget = {
-    type: "flow";
-    flow: Flow.UFlow;
-    definition: Flow.Definition<any, any>;
-  };
-
-  export type FnTarget = {
-    type: "fn";
-    params?: readonly unknown[];
-  };
-
-  export type ParallelTarget = {
-    type: "parallel";
-    mode: "parallel" | "parallelSettled";
-    count: number;
-  };
+  export type ExecutionMode = "sequential" | "parallel" | "parallel-settled"
 
   export type ExecutionOperation = {
     kind: "execution";
-    target: FlowTarget | FnTarget | ParallelTarget;
-    input: unknown;
+    name: string;
+    mode: ExecutionMode;
+    input?: unknown;
     key?: string;
     context: Tag.Store;
+    flow?: Flow.UFlow;
+    definition?: Flow.Definition<any, any>;
+    params?: readonly unknown[];
+    count?: number;
   };
 
   export type ContextLifecycleOperation = {
@@ -859,4 +760,4 @@ export namespace Multi {
   };
 }
 
-export { tagSymbol, type Tag } from "./tag-types";
+export { tagSymbol, type Tag } from "./tag";

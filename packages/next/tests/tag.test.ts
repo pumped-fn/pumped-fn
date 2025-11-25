@@ -22,10 +22,10 @@ describe("tag", () => {
       tags: [value("me")],
     });
 
-    let result = await executionContext.exec(myFlow, "world");
+    let result = await executionContext.exec({ flow: myFlow, input: "world" });
     expect(result).toBe("world");
 
-    result = await anotherContext.exec(myFlow, "me");
+    result = await anotherContext.exec({ flow: myFlow, input: "me" });
     expect(result).toBe("me");
   });
 
@@ -46,8 +46,8 @@ describe("tag", () => {
 
     const ctx = scope.createExecution({ tags: [value("context")] });
 
-    const result1 = await ctx.exec(flow1, undefined);
-    const result2 = await ctx.exec(flow2, undefined);
+    const result1 = await ctx.exec({ flow: flow1, input: undefined });
+    const result2 = await ctx.exec({ flow: flow2, input: undefined });
 
     expect(result1).toBe("context");
     expect(result2).toBe("context-2");
@@ -64,9 +64,9 @@ describe("tag", () => {
     const ctx3 = scope.createExecution({ tags: [value("ctx3")] });
 
     const [r1, r2, r3] = await Promise.all([
-      ctx1.exec(myFlow, undefined),
-      ctx2.exec(myFlow, undefined),
-      ctx3.exec(myFlow, undefined),
+      ctx1.exec({ flow: myFlow, input: undefined }),
+      ctx2.exec({ flow: myFlow, input: undefined }),
+      ctx3.exec({ flow: myFlow, input: undefined }),
     ]);
 
     expect(r1).toBe("ctx1");
@@ -86,9 +86,9 @@ describe("tag", () => {
     const ctx = scope.createExecution({ tags: [value("context")] });
 
     const [r1, r2, r3] = await Promise.all([
-      ctx.exec(slowFlow, undefined),
-      ctx.exec(slowFlow, undefined),
-      ctx.exec(slowFlow, undefined),
+      ctx.exec({ flow: slowFlow, input: undefined }),
+      ctx.exec({ flow: slowFlow, input: undefined }),
+      ctx.exec({ flow: slowFlow, input: undefined }),
     ]);
 
     expect(r1).toBe("context");

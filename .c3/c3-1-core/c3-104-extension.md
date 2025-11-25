@@ -54,12 +54,27 @@ The `operation` passed to `wrap()` describes what's happening:
 ```typescript
 {
   kind: "execution",
-  target: FlowTarget | FnTarget | ParallelTarget,
-  input: unknown,
+  name: string,
+  mode: "sequential" | "parallel" | "parallel-settled",
+  input?: unknown,
   key?: string,
-  context: Tag.Store
+  context: Tag.Store,
+  flow?: Flow.UFlow,           // Present for flow executions
+  definition?: Flow.Definition, // Present for flow executions
+  params?: readonly unknown[], // Present for fn executions
+  count?: number               // Present for parallel executions
 }
 ```
+
+**Mode field:**
+- `"sequential"` - Single flow or function execution
+- `"parallel"` - ctx.parallel() operations
+- `"parallel-settled"` - ctx.parallelSettled() operations
+
+Use `mode` to determine execution type:
+- Sequential with `flow`/`definition` = flow execution
+- Sequential with `params` = fn execution
+- Parallel modes = check `count` for item count
 
 **ContextLifecycleOperation:**
 ```typescript
@@ -72,14 +87,6 @@ The `operation` passed to `wrap()` describes what's happening:
 ```
 
 Emitted when ExecutionContext is created, closing, or closed. Use for tracing spans, request logging, cleanup.
-
-**Target types:**
-
-| Target | Properties | Description |
-|--------|------------|-------------|
-| FlowTarget | `{ type: "flow", flow, definition }` | Flow execution |
-| FnTarget | `{ type: "fn", params? }` | Arbitrary function |
-| ParallelTarget | `{ type: "parallel", mode, count }` | Parallel execution |
 
 ### Pipeline Execution
 
@@ -156,7 +163,7 @@ const loggingExtension = extension({
 const tracingExtension = extension({
   name: "tracing",
   wrap: (scope, next, operation) => {
-    if (operation.kind === "execution" && operation.target.type === "flow") {
+    if (operation.kind === "execution" && operation.flow) {
       const traceId = operation.context.get(traceIdTag.key)
       const spanId = crypto.randomUUID()
 
@@ -316,9 +323,10 @@ It provides TypeScript type inference without runtime overhead.
 
 | File | Contents |
 |------|----------|
-| `extension.ts` | extension() type helper |
-| `types.ts` | Extension namespace (Operation, ResolveOperation, ExecutionOperation) |
-| `internal/extension-utils.ts` | createExtensionPipeline, applyExtensions |
+| `helpers.ts` | extension() type helper |
+| `types.ts` | Extension namespace (Operation, ResolveOperation, ExecutionOperation, ContextLifecycleOperation) |
+| `scope.ts` | Extension pipeline execution |
+| `execution-context.ts` | applyExtensions() utility |
 
 ## Testing {#c3-104-testing}
 

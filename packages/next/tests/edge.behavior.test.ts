@@ -11,8 +11,8 @@ import {
 } from "../src"
 import { type Extension } from "../src/types"
 import { resolves } from "../src/helpers"
-import { validate } from "../src/ssch"
-import { FactoryExecutionError, ExecutorResolutionError } from "../src/types"
+import { validate } from "../src/primitives"
+import { FactoryExecutionError, ExecutorResolutionError } from "../src/errors"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"
 
@@ -38,7 +38,7 @@ describe("edge behavior", () => {
     )
     expect(errorCallback).toHaveBeenNthCalledWith(
       2,
-      expect.any(ExecutorResolutionError),
+      expect.any(FactoryExecutionError),
       chain.chainedExecutor,
       scope,
     )

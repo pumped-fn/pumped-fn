@@ -41,11 +41,10 @@ describe("State Aggregator", () => {
       duration: 100,
       operation: {
         kind: "execution",
-        target: {
-          type: "flow",
-          flow: {} as any,
-          definition: { name: "testFlow" } as any
-        },
+        name: "testFlow",
+        mode: "sequential",
+        flow: {} as any,
+        definition: { name: "testFlow" } as any,
         input: {},
         key: "flow-1",
         context: {} as any
@@ -75,11 +74,9 @@ describe("State Aggregator", () => {
       duration: 200,
       operation: {
         kind: "execution",
-        target: {
-          type: "parallel",
-          mode: "parallel" as const,
-          count: 5
-        },
+        name: "parallel-batch",
+        mode: "parallel",
+        count: 5,
         input: {},
         context: {} as any
       }

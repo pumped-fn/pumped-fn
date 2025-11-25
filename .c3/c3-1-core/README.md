@@ -107,8 +107,8 @@ sequenceDiagram
 
 ### Core Functions
 
-| Function | Purpose | Source |
-|----------|---------|--------|
+| Function | Purpose | File |
+|----------|---------|------|
 | `provide(factory)` | Create executor without dependencies | executor.ts |
 | `derive(deps, factory)` | Create executor with dependencies | executor.ts |
 | `preset(executor, value)` | Override executor in scope | executor.ts |
@@ -117,9 +117,11 @@ sequenceDiagram
 | `flow(definition, handler)` | Create flow with execute helper | flow.ts |
 | `flowMeta` | Access flow metadata tags | execution-context.ts |
 | `tag(schema, options)` | Create metadata tag | tag.ts |
-| `tags.required/optional/all` | Tag dependency helpers | tag-executors.ts |
-| `extension(ext)` | Type helper for extensions | extension.ts |
-| `custom(schema)` | Create custom schema validator | ssch.ts |
+| `tags.required/optional/all` | Tag dependency helpers | tag.ts |
+| `extension(ext)` | Type helper for extensions | helpers.ts |
+| `custom(schema)` | Create custom schema validator | primitives.ts |
+| `validate(schema, data)` | Validate data against schema | primitives.ts |
+| `Promised` | Enhanced Promise with context | primitives.ts |
 
 ### Type Namespaces
 
@@ -177,24 +179,14 @@ packages/next/src/
 ├── index.ts              # Public API exports
 ├── types.ts              # Core type definitions
 ├── scope.ts              # Scope implementation
-├── executor.ts           # Executor creation
-├── tag.ts                # Tag implementation
-├── tag-types.ts          # Tag type definitions
-├── tag-executors.ts      # Tag dependency helpers
-├── flow.ts               # Flow API
-├── flow-execution.ts     # Flow execution tracking
-├── execution-context.ts  # ExecutionContext implementation
-├── extension.ts          # Extension type helper
-├── promises.ts           # Promised class
-├── multi.ts              # Multi-executor support
-├── ssch.ts               # StandardSchema validation
-├── errors.ts             # Error catalog
-├── helpers.ts            # Utility functions
-└── internal/             # Internal utilities
-    ├── dependency-utils.ts
-    ├── extension-utils.ts
-    ├── abort-utils.ts
-    └── journal-utils.ts
+├── executor.ts           # Executor factory functions
+├── flow.ts               # Flow definition + FlowExecutionImpl
+├── execution-context.ts  # ExecutionContext lifecycle
+├── tag.ts                # Tag system (types, executors, merge)
+├── primitives.ts         # Promised class + schema validation
+├── helpers.ts            # resolves() + extension()
+├── multi.ts              # Multi-executor pools
+└── errors.ts             # Error classes
 ```
 
 ## Testing {#c3-1-testing}

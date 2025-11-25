@@ -35,8 +35,8 @@ const handleRequest = flow(async (ctx, req: { userId: string }) => {
   const reqId = `req-${Date.now()}`
   ctx.set(requestId, reqId)
 
-  const id = await ctx.exec(validateUser, req.userId)
-  const userData = await ctx.exec(fetchUserData, id)
+  const id = await ctx.exec({ flow: validateUser, input: req.userId })
+  const userData = await ctx.exec({ flow: fetchUserData, input: id })
 
   return {
     requestId: reqId,

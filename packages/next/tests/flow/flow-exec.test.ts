@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { flow } from "../../src/flow"
-import { custom } from "../../src/ssch"
+import { custom } from "../../src/primitives"
 
 describe("ExecutionContext.exec journaling", () => {
   it("replays journaled flow executions", async () => {
@@ -9,7 +9,7 @@ describe("ExecutionContext.exec journaling", () => {
       name: "inner",
       input: custom<{ value: number }>(),
       output: custom<number>(),
-    }).handler(async (_ctx, input) => {
+    }, async (_ctx, input) => {
       innerCalls()
       return input.value + 1
     })
@@ -17,7 +17,7 @@ describe("ExecutionContext.exec journaling", () => {
       name: "outer",
       input: custom<number>(),
       output: custom<number>(),
-    }).handler(async (ctx, value) => {
+    }, async (ctx, value) => {
       const first = await ctx.exec({ key: "inner", flow: inner, input: { value } })
       const second = await ctx.exec({ key: "inner", flow: inner, input: { value } })
       return first + second
@@ -33,7 +33,7 @@ describe("ExecutionContext.exec journaling", () => {
       name: "fn",
       input: custom<void>(),
       output: custom<string>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       const first = await ctx.exec<string>({ key: "fn", fn })
       const second = await ctx.exec<string>({ key: "fn", fn })
       return `${first}-${second}`

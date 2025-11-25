@@ -36,7 +36,6 @@ A flow is an executor specialized for request handling. It adds:
 |---------|----------|
 | `flow(handler)` | Simple flow, no validation |
 | `flow(deps, handler)` | Flow with dependencies |
-| `flow(config)` | Returns FlowDefinition for `.handler()` chaining |
 | `flow(config, handler)` | Complete flow with validation |
 | `flow(config, deps, handler)` | Full flow with deps and validation |
 
@@ -85,7 +84,7 @@ scope.exec({ flow, input })
     ├── Call handler(context, validatedInput)
     │   │
     │   └── Handler can:
-    │       ├── ctx.exec(otherFlow, input) - nested flows
+    │       ├── ctx.exec({ flow: otherFlow, input }) - nested flows
     │       ├── ctx.exec({ fn, params }) - arbitrary functions
     │       ├── ctx.parallel([...]) - concurrent execution
     │       ├── ctx.get(tag) - read tag values
@@ -98,17 +97,30 @@ scope.exec({ flow, input })
 
 ### Nested Execution
 
-Context provides `exec()` for nested operations:
+Context provides `exec()` for nested operations with a single config object:
 
-| Overload | Purpose |
-|----------|---------|
-| `exec(flow, input)` | Call nested flow |
-| `exec(key, flow, input)` | Call with journal key |
-| `exec({ flow, input, key?, timeout?, tags? })` | Full config |
-| `exec({ fn, params?, key?, timeout? })` | Call arbitrary function |
+```typescript
+// Flow execution
+ctx.exec({ flow: myFlow, input: data })
+ctx.exec({ flow: myFlow, input: data, key: "cache-key" })
+ctx.exec({ flow: myFlow, input: data, timeout: 5000, tags: [...] })
 
-**Key parameter:**
-When a `key` is provided, the execution result is journaled. Subsequent calls with the same key return cached result (replay pattern).
+// Function execution
+ctx.exec({ fn: myFn, params: [arg1, arg2] })
+ctx.exec({ fn: myFn, params: [arg1], key: "cache-key" })
+```
+
+**Config options:**
+
+| Field | Purpose |
+|-------|---------|
+| `flow` | Flow to execute (mutually exclusive with `fn`) |
+| `fn` | Function to execute (mutually exclusive with `flow`) |
+| `input` | Input for flow execution |
+| `params` | Parameters for function execution |
+| `key` | Journal key for replay/caching |
+| `timeout` | Execution timeout in milliseconds |
+| `tags` | Additional tags for execution context |
 
 ### Parallel Execution
 
@@ -241,11 +253,9 @@ The `flow.execute()` convenience function:
 
 | File | Contents |
 |------|----------|
-| `flow.ts` | flow(), FlowDefinition, execute helper |
-| `execution-context.ts` | ExecutionContextImpl, flowMeta, flowImpl |
-| `flow-execution.ts` | FlowExecutionImpl status tracking |
-| `internal/journal-utils.ts` | Journal key creation, replay logic |
-| `internal/abort-utils.ts` | Timeout/abort controller utilities |
+| `flow.ts` | flow() factory, FlowExecutionImpl, flow.execute() |
+| `execution-context.ts` | ExecutionContextImpl, flowMeta, journaling utilities |
+| `types.ts` | Flow namespace (Definition, Handler, Context, Execution) |
 
 ## Testing {#c3-102-testing}
 

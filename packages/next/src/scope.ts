@@ -9,26 +9,126 @@ import {
 import {
   Core,
   Extension,
-  ExecutorResolutionError,
-  FactoryExecutionError,
-  DependencyResolutionError,
-  ErrorContext,
   executorSymbol,
   type Flow,
   type ExecutionContext,
+  type Escapable,
 } from "./types";
-import { type Tag, tagSymbol } from "./tag-types";
-import { isTag, isTagExecutor } from "./tag-executors";
-import { Promised } from "./promises";
+import {
+  ExecutorResolutionError,
+  FactoryExecutionError,
+  DependencyResolutionError,
+} from "./errors";
+import { type Tag, tagSymbol, isTag, isTagExecutor, mergeFlowTags } from "./tag";
+import { Promised, validate } from "./primitives";
 import * as errors from "./errors";
-import { flow as flowApi } from "./flow";
-import { flowDefinitionMeta } from "./execution-context";
-import { mergeFlowTags } from "./tags/merge";
-import { resolveShape } from "./internal/dependency-utils";
-import { validate } from "./ssch";
-import { FlowExecutionImpl } from "./flow-execution";
-import { ExecutionContextImpl } from "./execution-context";
-import { applyExtensions } from "./internal/extension-utils";
+import { flow as flowApi, FlowExecutionImpl } from "./flow";
+import { flowDefinitionMeta, ExecutionContextImpl } from "./execution-context";
+
+export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
+type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
+
+export async function resolveShape<T extends ResolvableItem | ReadonlyArray<ResolvableItem> | Record<string, ResolvableItem> | undefined>(
+  scope: Core.Scope,
+  shape: T,
+  resolveFn?: ResolveFn
+): Promise<any> {
+  if (shape === undefined) {
+    return undefined;
+  }
+
+  const unwrapTarget = (item: ResolvableItem): Core.Executor<unknown> | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> => {
+    if (isTagExecutor(item)) {
+      return item;
+    }
+
+    if (isTag(item)) {
+      return item;
+    }
+
+    const executor = !isExecutor(item) ? (item as Escapable<unknown>).escape() : item;
+
+    if (isLazyExecutor(executor) || isReactiveExecutor(executor) || isStaticExecutor(executor)) {
+      return executor.executor;
+    }
+
+    return executor as Core.Executor<unknown>;
+  };
+
+  const scopeWithProtectedMethods = scope as Core.Scope & {
+    resolveTag(tag: Tag.Tag<unknown, boolean>): Promise<unknown>;
+    resolveTagExecutor(tagExec: Tag.TagExecutor<unknown>): Promise<unknown>;
+  };
+
+  const resolveItem = resolveFn
+    ? resolveFn
+    : async (item: ResolvableItem) => {
+        if (isTagExecutor(item)) {
+          return scopeWithProtectedMethods.resolveTagExecutor(item);
+        }
+
+        if (isTag(item)) {
+          return scopeWithProtectedMethods.resolveTag(item);
+        }
+
+        const target = unwrapTarget(item);
+        return await scope.resolve(target as Core.Executor<unknown>);
+      };
+
+  if (Array.isArray(shape)) {
+    const promises = [];
+    for (const item of shape) {
+      promises.push(resolveItem(item));
+    }
+    return await Promise.all(promises);
+  }
+
+  if (typeof shape === "object") {
+    if ("factory" in shape) {
+      return await resolveItem(shape as Core.UExecutor);
+    }
+
+    if ("escape" in shape) {
+      const unwrapped = (shape as unknown as Escapable<unknown>).escape();
+      return await resolveItem(unwrapped);
+    }
+
+    const entries = Object.entries(shape);
+    const promises = entries.map(([_, item]) => resolveItem(item));
+    const resolvedValues = await Promise.all(promises);
+
+    const results: Record<string, unknown> = {};
+    for (let i = 0; i < entries.length; i++) {
+      results[entries[i][0]] = resolvedValues[i];
+    }
+    return results;
+  }
+
+  return undefined;
+}
+
+function applyExtensions<T>(
+  extensions: Extension.Extension[] | undefined,
+  baseExecutor: () => Promised<T>,
+  scope: Core.Scope,
+  operation: Extension.Operation
+): () => Promised<T> {
+  if (!extensions || extensions.length === 0) {
+    return baseExecutor;
+  }
+  let executor = baseExecutor as () => Promised<unknown>;
+  for (let i = extensions.length - 1; i >= 0; i--) {
+    const extension = extensions[i];
+    if (extension.wrap) {
+      const current = executor;
+      executor = () => {
+        const result = extension.wrap!(scope, current, operation);
+        return result instanceof Promised ? result : Promised.create(result);
+      };
+    }
+  }
+  return executor as () => Promised<T>;
+}
 
 type ExecutorState = {
   accessor: Core.Accessor<unknown>;
@@ -154,7 +254,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         this.contextResolvedValue = NOT_SET;
       }
 
-      const { enhancedError, errorContext, originalError } =
+      const { enhancedError, originalError } =
         this.enhanceResolutionError(error);
 
       const state = this.scope["getOrCreateState"](this.requestor);
@@ -162,7 +262,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
       state.value = {
         kind: "rejected",
         error: originalError,
-        context: errorContext,
         enhancedError: enhancedError,
       };
 
@@ -277,15 +376,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
           const dependencyChain = [executorName];
 
           throw errors.createFactoryError(
-            errors.codes.FACTORY_ASYNC_ERROR,
             executorName,
             dependencyChain,
-            asyncError,
-            {
-              dependenciesResolved: resolvedDependencies !== undefined,
-              factoryType: typeof factory,
-              isAsyncFactory: true,
-            }
+            asyncError
           );
         }
       }
@@ -296,22 +389,16 @@ class AccessorImpl implements Core.Accessor<unknown> {
       const dependencyChain = [executorName];
 
       throw errors.createFactoryError(
-        errors.codes.FACTORY_THREW_ERROR,
         executorName,
         dependencyChain,
-        syncError,
-        {
-          dependenciesResolved: resolvedDependencies !== undefined,
-          factoryType: typeof factory,
-          isAsyncFactory: false,
-        }
+        syncError
       );
     }
   }
 
   private async processChangeEvents(result: unknown): Promise<unknown> {
     let currentValue = result;
-    const events = this.scope["onEvents"].change;
+    const events = this.scope["onEvents"].resolve;
 
     for (const event of events) {
       const updated = await event(
@@ -331,20 +418,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   private enhanceResolutionError(error: unknown): {
     enhancedError: ExecutorResolutionError;
-    errorContext: ErrorContext;
     originalError: unknown;
   } {
     if (
       error &&
       typeof error === "object" &&
-      "context" in error &&
-      "code" in error &&
-      error.context &&
-      error.code
+      "executorName" in error &&
+      "dependencyChain" in error &&
+      "code" in error
     ) {
       return {
         enhancedError: error as ExecutorResolutionError,
-        errorContext: error.context as ErrorContext,
         originalError: error,
       };
     }
@@ -353,20 +437,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     const dependencyChain = [executorName];
 
     const enhancedError = errors.createSystemError(
-      errors.codes.INTERNAL_RESOLUTION_ERROR,
       executorName,
       dependencyChain,
-      error,
-      {
-        errorType: error?.constructor?.name || "UnknownError",
-        resolutionPhase: "post-factory",
-        hasOriginalContext: false,
-      }
+      error
     );
 
     return {
       enhancedError,
-      errorContext: enhancedError.context,
       originalError: error,
     };
   }
@@ -445,11 +522,11 @@ class BaseScope implements Core.Scope {
   protected cache: Map<UE, ExecutorState> = new Map();
   protected executions: Map<string, { execution: Flow.Execution<unknown>; startTime: number }> = new Map();
   protected onEvents: {
-    readonly change: Set<Core.ChangeCallback>;
+    readonly resolve: Set<Core.ResolveCallback>;
     readonly release: Set<Core.ReleaseCallback>;
     readonly error: Set<Core.GlobalErrorCallback>;
   } = {
-    change: new Set<Core.ChangeCallback>(),
+    resolve: new Set<Core.ResolveCallback>(),
     release: new Set<Core.ReleaseCallback>(),
     error: new Set<Core.GlobalErrorCallback>(),
   } as const;
@@ -561,18 +638,9 @@ class BaseScope implements Core.Scope {
       const dependencyChain = errors.buildDependencyChain(chainArray);
 
       throw errors.createDependencyError(
-        errors.codes.CIRCULAR_DEPENDENCY,
         errors.getExecutorName(executor),
         dependencyChain,
-        errors.getExecutorName(executor),
-        undefined,
-        {
-          circularPath:
-            dependencyChain.join(" -> ") +
-            " -> " +
-            errors.getExecutorName(executor),
-          detectedAt: errors.getExecutorName(resolvingExecutor),
-        }
+        errors.getExecutorName(executor)
       );
     }
   }
@@ -688,15 +756,9 @@ class BaseScope implements Core.Scope {
     if (e === ref) {
       const executorName = errors.getExecutorName(e);
       throw errors.createDependencyError(
-        errors.codes.CIRCULAR_DEPENDENCY,
         executorName,
         [executorName],
-        executorName,
-        undefined,
-        {
-          circularPath: `${executorName} -> ${executorName}`,
-          detectedAt: executorName,
-        }
+        executorName
       );
     }
 
@@ -751,12 +813,12 @@ class BaseScope implements Core.Scope {
   ): Promise<unknown> {
     const source = executionContext || this;
 
-    switch (tagExec.extractionMode) {
-      case "extract":
+    switch (tagExec[tagSymbol]) {
+      case "required":
         return await tagExec.tag.extractFrom(source);
-      case "read":
+      case "optional":
         return await tagExec.tag.readFrom(source);
-      case "collect":
+      case "all":
         return await tagExec.tag.collectFrom(source);
     }
   }
@@ -952,7 +1014,7 @@ class BaseScope implements Core.Scope {
             value = u;
           }
 
-          const events = this.onEvents.change;
+          const events = this.onEvents.resolve;
           for (const event of events) {
             const updated = await event("update", e, value, this);
             if (updated !== undefined && e === updated.executor) {
@@ -1039,7 +1101,7 @@ class BaseScope implements Core.Scope {
 
         this.disposed = true;
         this.cache.clear();
-        this.onEvents.change.clear();
+        this.onEvents.resolve.clear();
         this.onEvents.release.clear();
         this.onEvents.error.clear();
         this.executions.clear();
@@ -1073,16 +1135,16 @@ class BaseScope implements Core.Scope {
     };
   }
 
-  onChange(callback: Core.ChangeCallback): Core.Cleanup {
+  onResolve(callback: Core.ResolveCallback): Core.Cleanup {
     this["~ensureNotDisposed"]();
     if (this.isDisposing) {
       throw new Error("Cannot register update callback on a disposing scope");
     }
 
-    this.onEvents["change"].add(callback);
+    this.onEvents["resolve"].add(callback);
     return () => {
       this["~ensureNotDisposed"]();
-      this.onEvents["change"].delete(callback);
+      this.onEvents["resolve"].delete(callback);
     };
   }
 
@@ -1302,14 +1364,13 @@ class BaseScope implements Core.Scope {
           executeCore,
           {
             kind: "execution",
-            target: {
-              type: "flow",
-              flow,
-              definition,
-            },
+            name: definition.name,
+            mode: "sequential",
             input,
             key: undefined,
             context,
+            flow,
+            definition,
           }
         );
 

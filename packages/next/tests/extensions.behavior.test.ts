@@ -12,14 +12,13 @@ import {
   tags,
 } from "../src"
 import { preset } from "../src/executor"
-import { isTag, isTagExecutor } from "../src/tag-executors"
-import { type Tag, tagSymbol } from "../src/tag-types"
+import { isTag, isTagExecutor, type Tag, tagSymbol } from "../src/tag"
 import {
   createJournalKey,
   checkJournalReplay,
   isErrorEntry,
-} from "../src/internal/journal-utils"
-import { applyExtensions } from "../src/internal/extension-utils"
+  applyExtensions,
+} from "../src/execution-context"
 import { scenario } from "./scenario"
 import { createFlowHarness } from "./harness"
 import type { Extension } from "../src/types"
@@ -33,7 +32,7 @@ describe("extensions behavior", () => {
 
   scenario("extension tracking and real flows", async () => {
     const { ext, records } = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "fn",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.name === "fn",
     )
     const mathFlow = flow(async (ctx, input: { x: number; y: number }) => {
       const product = await ctx.exec({
@@ -57,13 +56,13 @@ describe("extensions behavior", () => {
     expect(records[2]).toMatchObject({ key: "combine", output: 23 })
 
     const composeTracker = harness.createTrackingExtension(
-      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.target.type === "flow",
+      (kind, op) => kind === "execution" && isExecutionOperation(op) && op.flow !== undefined,
     )
     const incrementFlow = flow((_ctx, x: number) => x + 1)
     const doubleFlow = flow((_ctx, x: number) => x * 2)
     const composed = flow(async (ctx, input: { value: number }) => {
-      const incremented = await ctx.exec(incrementFlow, input.value)
-      const doubled = await ctx.exec(doubleFlow, incremented)
+      const incremented = await ctx.exec({ flow: incrementFlow, input: input.value })
+      const doubled = await ctx.exec({ flow: doubleFlow, input: incremented })
       return { original: input.value, result: doubled }
     })
     const composedResult = await flow.execute(composed, { value: 5 }, {
@@ -96,7 +95,7 @@ describe("extensions behavior", () => {
       ctx.exec({ key: "add-op", fn: () => api.add(input) }),
     )
     const parallelFlow = flow({ api }, async (_deps, ctx, input: number) => {
-      const { results } = await ctx.parallel([ctx.exec(multiplyFlow, input), ctx.exec(addFlow, input)])
+      const { results } = await ctx.parallel([ctx.exec({ flow: multiplyFlow, input: input }), ctx.exec({ flow: addFlow, input: input })])
       const combined = await ctx.exec({ key: "combine", fn: () => results[0] + results[1] })
       return { multiplied: results[0], added: results[1], combined }
     })
@@ -104,7 +103,7 @@ describe("extensions behavior", () => {
     expect(parallelResult).toEqual({ multiplied: 10, added: 15, combined: 25 })
     expect(
       allTracker.records.filter(
-        (record) => record.kind === "execution" && record.targetType === "parallel",
+        (record) => record.kind === "execution" && record.mode === "parallel",
       ).length,
     ).toBe(1)
     records.length = 0
@@ -154,11 +153,11 @@ describe("extensions behavior", () => {
       ctx.exec({ key: "reserve", fn: () => deps.reserveInventory(items) }),
     )
     const processOrder = flow(services, async (deps, ctx, order: Order) => {
-      const validation = await ctx.exec(validateOrderFlow, order)
-      const inventory = await ctx.exec(checkInventoryFlow, order.items)
+      const validation = await ctx.exec({ flow: validateOrderFlow, input: order })
+      const inventory = await ctx.exec({ flow: checkInventoryFlow, input: order.items })
       const settled = await ctx.parallelSettled([
-        ctx.exec(chargePaymentFlow, { orderId: order.orderId, amount: order.total }),
-        ctx.exec(reserveInventoryFlow, order.items),
+        ctx.exec({ flow: chargePaymentFlow, input: { orderId: order.orderId, amount: order.total } }),
+        ctx.exec({ flow: reserveInventoryFlow, input: order.items }),
       ])
       const [paymentResult, inventoryResult] = settled.results
       if (paymentResult.status === "rejected") {
@@ -220,7 +219,7 @@ describe("extensions behavior", () => {
         name: "non-journaled subflow",
         run: async (scope) => {
           const child = flow((_ctx, n: number) => n * 2)
-          const parent = flow(async (ctx) => ctx.exec(child, 5))
+          const parent = flow(async (ctx) => ctx.exec({ flow: child, input: 5 }))
           return flow.execute(parent, undefined, { scope })
         },
       },
@@ -242,7 +241,7 @@ describe("extensions behavior", () => {
         name: "parallel",
         run: async (scope) => {
           const child = flow((_ctx, n: number) => n * 2)
-          const parent = flow(async (ctx) => ctx.parallel([ctx.exec(child, 1), ctx.exec(child, 2)]))
+          const parent = flow(async (ctx) => ctx.parallel([ctx.exec({ flow: child, input: 1 }), ctx.exec({ flow: child, input: 2 })]))
           return flow.execute(parent, undefined, { scope })
         },
       },
@@ -292,7 +291,7 @@ describe("extensions behavior", () => {
     const depthExt: Extension.Extension = {
       name: "depth",
       wrap(_scope, next, operation) {
-        if (operation.kind === "execution" && operation.target.type === "flow") {
+        if (operation.kind === "execution" && operation.flow !== undefined) {
           depthRecords.push(operation.context.get(flowMeta.depth) as number)
         }
         return next()
@@ -300,7 +299,7 @@ describe("extensions behavior", () => {
     }
     const depthScope = createScope({ extensions: [depthExt] })
     const child = flow((_ctx, n: number) => n * 2)
-    const parent = flow(async (ctx) => ctx.exec(child, 5))
+    const parent = flow(async (ctx) => ctx.exec({ flow: child, input: 5 }))
     await flow.execute(parent, undefined, { scope: depthScope })
     expect(depthRecords).toContain(0)
     expect(depthRecords).toContain(1)
@@ -315,7 +314,7 @@ describe("extensions behavior", () => {
     })
     expect(tagResult).toEqual({ scopeValue: "scopeValue", execValue: "execValue" })
     const inheritedTag = tag(custom<string>(), { label: "parentTag" })
-    const parentFlow = flow(async (ctx) => ctx.exec(flow((childCtx) => childCtx.get(inheritedTag)), undefined))
+    const parentFlow = flow(async (ctx) => ctx.exec({ flow: flow((childCtx) => childCtx.get(inheritedTag)), input: undefined }))
     const inherited = await flow.execute(parentFlow, undefined, {
       executionTags: [inheritedTag("parentValue")],
     })
@@ -354,9 +353,9 @@ describe("extensions behavior", () => {
     expect(portValue).toBe(3000)
 
     const store = new Map<symbol, unknown>()
-    emailTag.injectTo(store, "test@example.com")
+    emailTag.writeToStore(store, "test@example.com")
     expect(emailTag.extractFrom(store)).toBe("test@example.com")
-    portTag.injectTo(store, 8080)
+    portTag.writeToStore(store, 8080)
     expect(portTag.extractFrom(store)).toBe(8080)
     const validatedNumberTag = tag(
       {
@@ -375,7 +374,7 @@ describe("extensions behavior", () => {
     )
     const validatedStore = new Map<symbol, unknown>()
     // @ts-expect-error - testing validation with invalid type
-    expect(() => validatedNumberTag.injectTo(validatedStore, "invalid")).toThrow()
+    expect(() => validatedNumberTag.writeToStore(validatedStore, "invalid")).toThrow()
 
     const writeToStore = new Map<symbol, unknown>()
     const numberTag = tag(custom<number>(), { label: "number" })
@@ -469,10 +468,8 @@ describe("extensions behavior", () => {
     const requiredExec = tags.required(emailTag)
     expect(requiredExec[tagSymbol]).toBe("required")
     expect(requiredExec.tag).toBe(emailTag)
-    expect(requiredExec.extractionMode).toBe("extract")
     const optionalExec = tags.optional(portTag)
     expect(optionalExec[tagSymbol]).toBe("optional")
-    expect(optionalExec.extractionMode).toBe("read")
     const allExec = tags.all(emailTag)
     expect(allExec[tagSymbol]).toBe("all")
 
@@ -608,7 +605,7 @@ describe("extensions behavior", () => {
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
     await scope.exec({ flow: simpleFlow, input: undefined }).result
 

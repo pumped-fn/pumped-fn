@@ -54,7 +54,7 @@ export namespace State {
 
   export type ParallelBatch = {
     id: string
-    mode: "parallel" | "parallelSettled"
+    mode: "parallel" | "parallel-settled"
     promiseCount: number
     depth: number
     parentFlowName?: string

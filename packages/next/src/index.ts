@@ -8,22 +8,22 @@ import type {
   Core as InternalCore,
   ExecutionContext as InternalExecutionContext,
 } from "./types"
-import type { Tag as TagType } from "./tag-types"
-import type * as TagTypes from "./tag-types"
+import type { Tag as TagType } from "./tag"
+import type * as TagTypes from "./tag"
 import * as errorsModule from "./errors"
 import * as multiModule from "./multi"
-import * as standardSchemaModule from "./ssch"
+import * as primitivesModule from "./primitives"
 import { tag as tagImpl } from "./tag"
-import { custom as customSchema } from "./ssch"
+import { custom as customSchema } from "./primitives"
 
-const standardSchema: typeof standardSchemaModule = standardSchemaModule
+const standardSchema: typeof primitivesModule = primitivesModule
 const multi: typeof multiModule = multiModule
 const errors: typeof errorsModule = errorsModule
 
 /**
  * Promise-aware helper returned by several APIs to carry execution metadata.
  */
-export { Promised } from "./promises"
+export { Promised } from "./primitives"
 
 /**
  * Toolkit for defining schema primitives compatible with Pumped-fn tags.
@@ -43,7 +43,7 @@ export { errors }
 /**
  * Build tag-aware schema instances or adapters.
  */
-export { custom } from "./ssch"
+export { custom } from "./primitives"
 
 /**
  * Creates a typed tag accessor bound to a schema.
@@ -53,7 +53,7 @@ export { tag } from "./tag"
 /**
  * Curated helpers for extracting metadata from tags.
  */
-export { tags } from "./tag-executors"
+export { tags } from "./tag"
 
 /**
  * Create a new execution scope with optional presets, registry, and extensions.
@@ -68,7 +68,7 @@ export { resolves } from "./helpers"
 /**
  * Create typed extensions with init/wrap/onError/dispose hooks.
  */
-export { extension } from "./extension"
+export { extension } from "./helpers"
 
 /**
  * Register a dependency-free executor that resolves directly from the controller.
@@ -128,22 +128,22 @@ export { flowMeta } from "./flow"
 /**
  * Error thrown when schema validation fails.
  */
-export { SchemaError } from "./types"
+export { SchemaError } from "./errors"
 
 /**
  * Base executor resolution error capturing scope context.
  */
-export { ExecutorResolutionError } from "./types"
+export { ExecutorResolutionError } from "./errors"
 
 /**
  * Error thrown when executor factory throws or rejects.
  */
-export { FactoryExecutionError } from "./types"
+export { FactoryExecutionError } from "./errors"
 
 /**
  * Error thrown when dependencies cannot be resolved.
  */
-export { DependencyResolutionError } from "./types"
+export { DependencyResolutionError } from "./errors"
 
 /**
  * Flow-level error used for descriptive failures inside handlers.
@@ -379,7 +379,7 @@ export namespace Core {
   /**
    * Callback invoked when executor output changes.
    */
-  export type ChangeCallback = InternalCore.ChangeCallback
+  export type ResolveCallback = InternalCore.ResolveCallback
 
   /**
    * Callback invoked when executor is released.
@@ -492,22 +492,19 @@ export namespace Extension {
   export type ResolveOperation = InternalExtension.ResolveOperation
 
   /**
-   * Target metadata for flow executions.
+   * Execution mode for OTel span hierarchy support.
+   * - "sequential": Single flow or function execution
+   * - "parallel": ctx.parallel() operations
+   * - "parallel-settled": ctx.parallelSettled() operations
    */
-  export type FlowTarget = InternalExtension.FlowTarget
-
-  /**
-   * Target metadata for stand-alone functions executed through ctx.exec.
-   */
-  export type FnTarget = InternalExtension.FnTarget
-
-  /**
-   * Target metadata for ctx.parallel or ctx.parallelSettled operations.
-   */
-  export type ParallelTarget = InternalExtension.ParallelTarget
+  export type ExecutionMode = InternalExtension.ExecutionMode
 
   /**
    * Operation metadata provided to extension hooks.
+   *
+   * Use `mode` to determine execution type:
+   * - "sequential": flow/fn execution (check `flow`/`definition` for flows, `params` for fns)
+   * - "parallel"/"parallel-settled": parallel execution (check `count` for item count)
    */
   export type ExecutionOperation = InternalExtension.ExecutionOperation
 

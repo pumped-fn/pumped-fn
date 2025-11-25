@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest"
 import { flow } from "../src/flow"
-import { custom } from "../src/ssch"
+import { custom } from "../src/primitives"
 import { createExecutor, provide, derive } from "../src/executor"
 import {
   createScope,
@@ -36,44 +36,45 @@ export namespace TestTypes {
 }
 
 export const testFlows = {
-  basic: (name: string) =>
+  basic: (name: string, handler: (ctx: Flow.Context, input: TestTypes.BasicInput) => Promise<TestTypes.SuccessResult<string>> | TestTypes.SuccessResult<string>) =>
     flow({
       name,
       input: custom<TestTypes.BasicInput>(),
       output: custom<TestTypes.SuccessResult<string>>(),
-    }),
+    }, handler),
 
-  math: (name: string) =>
+  math: (name: string, handler: (ctx: Flow.Context, input: TestTypes.MathInput) => Promise<TestTypes.SuccessResult<number>> | TestTypes.SuccessResult<number>) =>
     flow({
       name,
       input: custom<TestTypes.MathInput>(),
       output: custom<TestTypes.SuccessResult<number>>(),
-    }),
+    }, handler),
 
-  user: (name: string) =>
+  user: (name: string, handler: (ctx: Flow.Context, input: { userId: string }) => Promise<{ user: TestTypes.User }> | { user: TestTypes.User }) =>
     flow({
       name,
       input: custom<{ userId: string }>(),
       output: custom<{ user: TestTypes.User }>(),
-    }),
+    }, handler),
 
-  validation: (name: string) =>
+  validation: (name: string, handler: (ctx: Flow.Context, input: { email: string }) => Promise<{ valid: boolean }> | { valid: boolean }) =>
     flow({
       name,
       input: custom<{ email: string }>(),
       output: custom<{ valid: boolean }>(),
-    }),
+    }, handler),
 
   generic: <TInput, TSuccess>(
     name: string,
-    input: StandardSchemaV1<TInput, unknown>,
-    output: StandardSchemaV1<TSuccess, unknown>,
+    input: StandardSchemaV1<TInput>,
+    output: StandardSchemaV1<TSuccess>,
+    handler: (ctx: Flow.Context, input: TInput) => Promise<TSuccess> | TSuccess
   ) =>
     flow({
       name,
       input,
       output,
-    }),
+    }, handler),
 }
 
 export const MockExecutors = {
@@ -371,14 +372,14 @@ export function expectRejected(result: PromiseSettledResult<unknown>): {
 
 export type OperationRecord = {
   kind: string
-  targetType?: "flow" | "fn" | "parallel"
+  name?: string
+  mode?: Extension.ExecutionMode
   flowName?: string
   key?: string
   input?: unknown
   output?: unknown
   error?: unknown
   params?: readonly unknown[]
-  parallelMode?: string
   count?: number
 }
 
@@ -400,18 +401,13 @@ export function createTrackingExtension(
       const record: OperationRecord = { kind: operation.kind }
 
       if (operation.kind === "execution") {
-        record.targetType = operation.target.type
+        record.name = operation.name
+        record.mode = operation.mode
         record.input = operation.input
         record.key = operation.key
-
-        if (operation.target.type === "flow") {
-          record.flowName = operation.target.definition.name
-        } else if (operation.target.type === "fn") {
-          record.params = operation.target.params
-        } else if (operation.target.type === "parallel") {
-          record.parallelMode = operation.target.mode
-          record.count = operation.target.count
-        }
+        record.flowName = operation.definition?.name
+        record.params = operation.params
+        record.count = operation.count
       }
 
       return next()

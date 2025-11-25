@@ -28,11 +28,11 @@ export const createStateAggregator = () => {
     }
 
     if (msg.operation.kind === "execution") {
-      if (msg.operation.target.type === "flow") {
+      if (msg.operation.flow && msg.operation.definition) {
         const flowId = msg.operation.key || `flow-${msg.timestamp}`
         snapshot.flows.set(flowId, {
           id: flowId,
-          name: msg.operation.target.definition.name,
+          name: msg.operation.definition.name,
           startedAt: msg.timestamp,
           depth: 0,
           children: []
@@ -40,12 +40,12 @@ export const createStateAggregator = () => {
         notify()
       }
 
-      if (msg.operation.target.type === "parallel") {
+      if (msg.operation.mode === "parallel" || msg.operation.mode === "parallel-settled") {
         const parallelId = `parallel-${msg.timestamp}`
         snapshot.parallelBatches.set(parallelId, {
           id: parallelId,
-          mode: msg.operation.target.mode,
-          promiseCount: msg.operation.target.count,
+          mode: msg.operation.mode,
+          promiseCount: msg.operation.count ?? 0,
           depth: 0,
           startedAt: msg.timestamp
         })

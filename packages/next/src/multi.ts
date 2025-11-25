@@ -1,13 +1,12 @@
 import { createExecutor } from "./executor";
 import { tag } from "./tag";
-import { Promised } from "./promises";
-import { custom, validate } from "./ssch";
+import { Promised, custom, validate } from "./primitives";
 import {
   type Core,
   type Multi,
   type StandardSchemaV1,
 } from "./types";
-import { type Tag } from "./tag-types";
+import { type Tag } from "./tag";
 
 class MultiExecutorImpl<T, K, PoolIdType = unknown> {
   private option: Multi.Option<K>;

@@ -1,4 +1,5 @@
-import type { Core, Flow } from "./types";
+import type { Flow, StandardSchemaV1 } from "./types";
+import { SchemaError } from "./errors";
 
 export class Promised<T> implements PromiseLike<T> {
   private executionDataPromise?: Promise<Flow.ExecutionData | undefined>;
@@ -25,20 +26,10 @@ export class Promised<T> implements PromiseLike<T> {
     this.executionDataPromise);
   }
 
-  switch<U>(fn: (value: T) => Promised<U>): Promised<U> {
-    return Promised.create(this.promise.then(fn),
-    this.executionDataPromise);
-  }
-
   mapError(fn: (error: unknown) => unknown): Promised<T> {
     return Promised.create(this.promise.catch((error) => {
       throw fn(error);
     }),
-    this.executionDataPromise);
-  }
-
-  switchError(fn: (error: unknown) => Promised<T>): Promised<T> {
-    return Promised.create(this.promise.catch(fn),
     this.executionDataPromise);
   }
 
@@ -146,49 +137,31 @@ export class Promised<T> implements PromiseLike<T> {
     return Promised.create(promise);
   }
 
-  private static extractResults<U>(
-    value: readonly PromiseSettledResult<U>[] | { results: readonly PromiseSettledResult<U>[] }
-  ): readonly PromiseSettledResult<U>[] {
-    if (Array.isArray(value)) {
-      return value;
-    }
-    return (value as { results: readonly PromiseSettledResult<U>[] }).results;
-  }
-
-  private mapResults<R>(
-    fn: (results: readonly PromiseSettledResult<any>[]) => R
-  ): Promised<R> {
-    return this.map((value: any) => {
-      const results = Promised.extractResults(value);
-      return fn(results);
-    });
-  }
-
-  fulfilled<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<any[]> {
-    return this.mapResults((results) =>
-      results
-        .filter((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-        .map((r: any) => r.value)
-    );
-  }
-
-  rejected<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<unknown[]> {
-    return this.mapResults((results) =>
-      results
-        .filter((r: any): r is PromiseRejectedResult => r.status === "rejected")
-        .map((r: any) => r.reason)
-    );
-  }
-
+  /**
+   * Splits settled results into fulfilled values and rejection reasons.
+   * Works with both `PromiseSettledResult[]` and `ctx.parallelSettled()` results.
+   *
+   * @example
+   * const { fulfilled, rejected } = await Promised.allSettled([p1, p2, p3]).partition()
+   * const { fulfilled } = await ctx.parallelSettled([...]).partition()
+   */
   partition<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<{ fulfilled: any[]; rejected: unknown[] }> {
-    return this.mapResults((results) => {
-      const fulfilled: any[] = [];
+    this: Promised<readonly PromiseSettledResult<U>[]>
+  ): Promised<{ fulfilled: U[]; rejected: unknown[] }>
+  partition<T extends readonly unknown[]>(
+    this: Promised<Flow.ParallelSettledResult<T>>
+  ): Promised<{ fulfilled: T[number][]; rejected: unknown[] }>
+  partition<U>(
+    this: Promised<{ results: readonly PromiseSettledResult<U>[] }>
+  ): Promised<{ fulfilled: U[]; rejected: unknown[] }>
+  partition(
+    this: Promised<readonly PromiseSettledResult<unknown>[]> | Promised<{ results: readonly PromiseSettledResult<unknown>[] }>
+  ): Promised<{ fulfilled: unknown[]; rejected: unknown[] }> {
+    return this.map((value) => {
+      const results: readonly PromiseSettledResult<unknown>[] = Array.isArray(value)
+        ? value
+        : (value as { results: readonly PromiseSettledResult<unknown>[] }).results;
+      const fulfilled: unknown[] = [];
       const rejected: unknown[] = [];
 
       for (const result of results) {
@@ -202,90 +175,46 @@ export class Promised<T> implements PromiseLike<T> {
       return { fulfilled, rejected };
     });
   }
+}
 
-  firstFulfilled<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<any> {
-    return this.mapResults((results) => {
-      const found = results.find((r: any): r is PromiseFulfilledResult<any> => r.status === "fulfilled");
-      return found?.value;
-    });
+export function validate<TSchema extends StandardSchemaV1>(
+  schema: TSchema,
+  data: unknown
+): Awaited<StandardSchemaV1.InferOutput<TSchema>> {
+  const result = schema["~standard"].validate(data);
+
+  if ("then" in result) {
+    throw new Error("validating async is not supported");
   }
 
-  firstRejected<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>
-  ): Promised<unknown | undefined> {
-    return this.mapResults((results) => {
-      const found = results.find((r: any): r is PromiseRejectedResult => r.status === "rejected");
-      return found?.reason;
-    });
+  if (result.issues) {
+    throw new SchemaError(result.issues);
   }
+  return result.value as Awaited<StandardSchemaV1.InferOutput<TSchema>>;
+}
 
-  findFulfilled<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
-    predicate: (value: any, index: number) => boolean
-  ): Promised<any> {
-    return this.mapResults((results) => {
-      let fulfilledIndex = 0;
+type ValidationError = { success: false; issues: StandardSchemaV1.Issue[] };
 
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          if (predicate(result.value, fulfilledIndex)) {
-            return result.value;
-          }
-          fulfilledIndex++;
+export function custom<T>(
+  validator?: (value: unknown) => T | ValidationError
+): StandardSchemaV1<T, T> {
+  return {
+    "~standard": {
+      vendor: "pumped-fn",
+      version: 1,
+      validate: (value): StandardSchemaV1.Result<T> => {
+        if (!validator) {
+          return { value: value as T };
         }
-      }
 
-      return undefined;
-    });
-  }
+        const result = validator(value);
 
-  mapFulfilled<U, R>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
-    fn: (value: any, index: number) => R
-  ): Promised<R[]> {
-    return this.mapResults((results) => {
-      const mapped: R[] = [];
-      let fulfilledIndex = 0;
-
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          mapped.push(fn(result.value, fulfilledIndex));
-          fulfilledIndex++;
+        if (typeof result === "object" && result !== null && "success" in result && result.success === false) {
+          return { issues: result.issues };
         }
-      }
 
-      return mapped;
-    });
-  }
-
-  assertAllFulfilled<U>(
-    this: Promised<readonly PromiseSettledResult<U>[]> | Promised<{ results: readonly PromiseSettledResult<any>[] }>,
-    errorMapper?: (reasons: unknown[], fulfilledCount: number, totalCount: number) => Error
-  ): Promised<any[]> {
-    return this.mapResults((results) => {
-      const fulfilled: any[] = [];
-      const rejected: unknown[] = [];
-
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          fulfilled.push(result.value);
-        } else {
-          rejected.push(result.reason);
-        }
-      }
-
-      if (rejected.length > 0) {
-        const error = errorMapper
-          ? errorMapper(rejected, fulfilled.length, results.length)
-          : new Error(
-              `${rejected.length} of ${results.length} operations failed: ${rejected.map((r: unknown) => String(r)).join(", ")}`
-            );
-        throw error;
-      }
-
-      return fulfilled;
-    });
-  }
+        return { value: result as T };
+      },
+    },
+  };
 }
