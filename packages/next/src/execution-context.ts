@@ -760,22 +760,16 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
   }
 
   exec<F extends Flow.UFlow>(
-    flow: F,
-    input: Flow.InferInput<F>
+    config: {
+      flow: F
+      key?: string
+      timeout?: number
+      retry?: number
+      tags?: Tag.Tagged[]
+    } & (Flow.InferInput<F> extends void | undefined
+      ? { input?: never }
+      : { input: Flow.InferInput<F> })
   ): Promised<Flow.InferOutput<F>>
-  exec<F extends Flow.UFlow>(
-    key: string,
-    flow: F,
-    input: Flow.InferInput<F>
-  ): Promised<Flow.InferOutput<F>>
-  exec<F extends Flow.UFlow>(config: {
-    flow: F
-    input: Flow.InferInput<F>
-    key?: string
-    timeout?: number
-    retry?: number
-    tags?: Tag.Tagged[]
-  }): Promised<Flow.InferOutput<F>>
   exec<T>(config: {
     fn: () => T | Promise<T>
     params?: never
@@ -793,114 +787,70 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     tags?: Tag.Tagged[]
   }): Promised<ReturnType<Fn>>
   exec<F extends Flow.UFlow>(
-    keyOrFlowOrConfig:
-      | string
-      | F
-      | {
-          flow?: F
-          fn?: (...args: readonly unknown[]) => unknown
-          input?: Flow.InferInput<F>
-          params?: readonly unknown[]
-          key?: string
-          timeout?: number
-          retry?: number
-          tags?: Tag.Tagged[]
-        },
-    flowOrInput?: F | Flow.InferInput<F>,
-    inputOrUndefined?: Flow.InferInput<F>
+    config: {
+      flow?: F
+      fn?: (...args: readonly unknown[]) => unknown
+      input?: Flow.InferInput<F>
+      params?: readonly unknown[]
+      key?: string
+      timeout?: number
+      retry?: number
+      tags?: Tag.Tagged[]
+    }
   ): Promised<any> {
     this.throwIfAborted()
     this.throwIfClosed()
 
-    const config = this.parseExecOverloads(
-      keyOrFlowOrConfig,
-      flowOrInput,
-      inputOrUndefined
-    )
+    const normalizedConfig = this.parseExecOverloads(config)
     const { controller, timeoutId } = createAbortWithTimeout(
-      config.timeout,
+      normalizedConfig.timeout,
       this.signal
     )
 
-    const descriptor = createExecutionDescriptor(config, this, controller)
+    const descriptor = createExecutionDescriptor(normalizedConfig, this, controller)
     const wrapped = () => executeAndWrap(descriptor, this)
 
-    const execution = executeWithTimeout(wrapped, config.timeout, timeoutId, controller)
+    const execution = executeWithTimeout(wrapped, normalizedConfig.timeout, timeoutId, controller)
     this["~trackExecution"](execution)
 
     return Promised.create(execution)
   }
 
   private parseExecOverloads<F extends Flow.UFlow>(
-    keyOrFlowOrConfig:
-      | string
-      | F
-      | {
-          flow?: F
-          fn?: (...args: readonly unknown[]) => unknown
-          input?: Flow.InferInput<F>
-          params?: readonly unknown[]
-          key?: string
-          timeout?: number
-          retry?: number
-          tags?: Tag.Tagged[]
-        },
-    flowOrInput?: F | Flow.InferInput<F>,
-    inputOrUndefined?: Flow.InferInput<F>
-  ): ExecConfig.Normalized {
-    if (
-      typeof keyOrFlowOrConfig === "object" &&
-      keyOrFlowOrConfig !== null &&
-      !("factory" in keyOrFlowOrConfig)
-    ) {
-      if (isFlowCallConfig<F>(keyOrFlowOrConfig)) {
-        return {
-          type: "flow",
-          flow: keyOrFlowOrConfig.flow,
-          input: keyOrFlowOrConfig.input,
-          key: keyOrFlowOrConfig.key,
-          timeout: keyOrFlowOrConfig.timeout,
-          retry: keyOrFlowOrConfig.retry,
-          tags: keyOrFlowOrConfig.tags
-        }
-      }
-      if (isFnCallConfig(keyOrFlowOrConfig)) {
-        return {
-          type: "fn",
-          fn: keyOrFlowOrConfig.fn,
-          params: keyOrFlowOrConfig.params ?? [],
-          key: keyOrFlowOrConfig.key,
-          timeout: keyOrFlowOrConfig.timeout,
-          retry: keyOrFlowOrConfig.retry,
-          tags: keyOrFlowOrConfig.tags
-        }
-      }
-      throw new Error("Invalid config: must have either 'flow' or 'fn'")
+    config: {
+      flow?: F
+      fn?: (...args: readonly unknown[]) => unknown
+      input?: Flow.InferInput<F>
+      params?: readonly unknown[]
+      key?: string
+      timeout?: number
+      retry?: number
+      tags?: Tag.Tagged[]
     }
-
-    const keyOrFlow = keyOrFlowOrConfig as string | F
-
-    if (typeof keyOrFlow === "string") {
+  ): ExecConfig.Normalized {
+    if (isFlowCallConfig<F>(config)) {
       return {
         type: "flow",
-        flow: flowOrInput as F,
-        input: inputOrUndefined as Flow.InferInput<F>,
-        key: keyOrFlow,
-        timeout: undefined,
-        retry: undefined,
-        tags: undefined
+        flow: config.flow,
+        input: config.input,
+        key: config.key,
+        timeout: config.timeout,
+        retry: config.retry,
+        tags: config.tags
       }
     }
-
-    return {
-      type: "flow",
-      flow: keyOrFlow as F,
-      input: flowOrInput as Flow.InferInput<F>,
-      key: undefined,
-      timeout: undefined,
-      retry: undefined,
-      tags: undefined
+    if (isFnCallConfig(config)) {
+      return {
+        type: "fn",
+        fn: config.fn,
+        params: config.params ?? [],
+        key: config.key,
+        timeout: config.timeout,
+        retry: config.retry,
+        tags: config.tags
+      }
     }
+    throw new Error("Invalid config: must have either 'flow' or 'fn'")
   }
 
   parallel<T extends readonly Promised<any>[]>(

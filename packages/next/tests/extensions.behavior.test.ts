@@ -62,8 +62,8 @@ describe("extensions behavior", () => {
     const incrementFlow = flow((_ctx, x: number) => x + 1)
     const doubleFlow = flow((_ctx, x: number) => x * 2)
     const composed = flow(async (ctx, input: { value: number }) => {
-      const incremented = await ctx.exec(incrementFlow, input.value)
-      const doubled = await ctx.exec(doubleFlow, incremented)
+      const incremented = await ctx.exec({ flow: incrementFlow, input: input.value })
+      const doubled = await ctx.exec({ flow: doubleFlow, input: incremented })
       return { original: input.value, result: doubled }
     })
     const composedResult = await flow.execute(composed, { value: 5 }, {
@@ -96,7 +96,7 @@ describe("extensions behavior", () => {
       ctx.exec({ key: "add-op", fn: () => api.add(input) }),
     )
     const parallelFlow = flow({ api }, async (_deps, ctx, input: number) => {
-      const { results } = await ctx.parallel([ctx.exec(multiplyFlow, input), ctx.exec(addFlow, input)])
+      const { results } = await ctx.parallel([ctx.exec({ flow: multiplyFlow, input: input }), ctx.exec({ flow: addFlow, input: input })])
       const combined = await ctx.exec({ key: "combine", fn: () => results[0] + results[1] })
       return { multiplied: results[0], added: results[1], combined }
     })
@@ -154,11 +154,11 @@ describe("extensions behavior", () => {
       ctx.exec({ key: "reserve", fn: () => deps.reserveInventory(items) }),
     )
     const processOrder = flow(services, async (deps, ctx, order: Order) => {
-      const validation = await ctx.exec(validateOrderFlow, order)
-      const inventory = await ctx.exec(checkInventoryFlow, order.items)
+      const validation = await ctx.exec({ flow: validateOrderFlow, input: order })
+      const inventory = await ctx.exec({ flow: checkInventoryFlow, input: order.items })
       const settled = await ctx.parallelSettled([
-        ctx.exec(chargePaymentFlow, { orderId: order.orderId, amount: order.total }),
-        ctx.exec(reserveInventoryFlow, order.items),
+        ctx.exec({ flow: chargePaymentFlow, input: { orderId: order.orderId, amount: order.total } }),
+        ctx.exec({ flow: reserveInventoryFlow, input: order.items }),
       ])
       const [paymentResult, inventoryResult] = settled.results
       if (paymentResult.status === "rejected") {
@@ -220,7 +220,7 @@ describe("extensions behavior", () => {
         name: "non-journaled subflow",
         run: async (scope) => {
           const child = flow((_ctx, n: number) => n * 2)
-          const parent = flow(async (ctx) => ctx.exec(child, 5))
+          const parent = flow(async (ctx) => ctx.exec({ flow: child, input: 5 }))
           return flow.execute(parent, undefined, { scope })
         },
       },
@@ -242,7 +242,7 @@ describe("extensions behavior", () => {
         name: "parallel",
         run: async (scope) => {
           const child = flow((_ctx, n: number) => n * 2)
-          const parent = flow(async (ctx) => ctx.parallel([ctx.exec(child, 1), ctx.exec(child, 2)]))
+          const parent = flow(async (ctx) => ctx.parallel([ctx.exec({ flow: child, input: 1 }), ctx.exec({ flow: child, input: 2 })]))
           return flow.execute(parent, undefined, { scope })
         },
       },
@@ -300,7 +300,7 @@ describe("extensions behavior", () => {
     }
     const depthScope = createScope({ extensions: [depthExt] })
     const child = flow((_ctx, n: number) => n * 2)
-    const parent = flow(async (ctx) => ctx.exec(child, 5))
+    const parent = flow(async (ctx) => ctx.exec({ flow: child, input: 5 }))
     await flow.execute(parent, undefined, { scope: depthScope })
     expect(depthRecords).toContain(0)
     expect(depthRecords).toContain(1)
@@ -315,7 +315,7 @@ describe("extensions behavior", () => {
     })
     expect(tagResult).toEqual({ scopeValue: "scopeValue", execValue: "execValue" })
     const inheritedTag = tag(custom<string>(), { label: "parentTag" })
-    const parentFlow = flow(async (ctx) => ctx.exec(flow((childCtx) => childCtx.get(inheritedTag)), undefined))
+    const parentFlow = flow(async (ctx) => ctx.exec({ flow: flow((childCtx) => childCtx.get(inheritedTag)), input: undefined }))
     const inherited = await flow.execute(parentFlow, undefined, {
       executionTags: [inheritedTag("parentValue")],
     })

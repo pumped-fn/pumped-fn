@@ -66,8 +66,8 @@ export const testFlows = {
 
   generic: <TInput, TSuccess>(
     name: string,
-    input: StandardSchemaV1<TInput, unknown>,
-    output: StandardSchemaV1<TSuccess, unknown>,
+    input: StandardSchemaV1<TInput>,
+    output: StandardSchemaV1<TSuccess>,
     handler: (ctx: Flow.Context, input: TInput) => Promise<TSuccess> | TSuccess
   ) =>
     flow({

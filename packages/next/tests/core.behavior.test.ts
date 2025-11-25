@@ -183,7 +183,7 @@ describe("core behavior", () => {
     const ctxVariantsParent = flow(async (ctx, n: number) => {
       const childFlow = flow((_ctx, value: number) => value * 2)
       const entries = [
-        await ctx.exec(childFlow, 5),
+        await ctx.exec({ flow: childFlow, input: 5 }),
         await ctx.exec({ flow: childFlow, input: 5, key: "step1" }),
         await ctx.exec({ fn: () => 10 }),
         await ctx.exec({ fn: () => 10, key: "calc" }),
@@ -341,8 +341,8 @@ describe("core behavior", () => {
 
     const parallelChild = flow((_ctx, n: number) => n * 2)
     const parallelFlow = flow(async (ctx, n: number) => {
-      const p1 = ctx.exec(parallelChild, n)
-      const p2 = ctx.exec(parallelChild, n + 1)
+      const p1 = ctx.exec({ flow: parallelChild, input: n })
+      const p2 = ctx.exec({ flow: parallelChild, input: n + 1 })
       const result = await ctx.parallel([p1, p2])
       expect(result.stats.total).toBe(2)
       expect(result.stats.succeeded).toBe(2)
@@ -358,8 +358,8 @@ describe("core behavior", () => {
       throw new Error("fail")
     })
     const settledParent = flow(async (ctx, n: number) => {
-      const p1 = ctx.exec(successFlow, n)
-      const p2 = ctx.exec(failFlow, n)
+      const p1 = ctx.exec({ flow: successFlow, input: n })
+      const p2 = ctx.exec({ flow: failFlow, input: n })
       const settled = await ctx.parallelSettled([p1, p2])
       expect(settled.stats.total).toBe(2)
       expect(settled.stats.succeeded).toBe(1)
@@ -900,9 +900,9 @@ describe("core behavior", () => {
     const fulfilledMain = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(2), input),
-          ctx.exec(createSuccessFlow(3), input),
-          ctx.exec(createSuccessFlow(4), input),
+          ctx.exec({ flow: createSuccessFlow(2), input: input }),
+          ctx.exec({ flow: createSuccessFlow(3), input: input }),
+          ctx.exec({ flow: createSuccessFlow(4), input: input }),
         ])
         .fulfilled(),
     )
@@ -912,8 +912,8 @@ describe("core behavior", () => {
     const rejectedMain = flow(async (ctx) =>
       ctx
         .parallelSettled([
-          ctx.exec(createFailureFlow("error1"), undefined),
-          ctx.exec(createFailureFlow("error2"), undefined),
+          ctx.exec({ flow: createFailureFlow("error1"), input: undefined }),
+          ctx.exec({ flow: createFailureFlow("error2"), input: undefined }),
         ])
         .rejected(),
     )
@@ -924,9 +924,9 @@ describe("core behavior", () => {
     const partitionMain = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(2), input),
-          ctx.exec(createFailureFlow(), undefined),
-          ctx.exec(createSuccessFlow(2), input),
+          ctx.exec({ flow: createSuccessFlow(2), input: input }),
+          ctx.exec({ flow: createFailureFlow(), input: undefined }),
+          ctx.exec({ flow: createSuccessFlow(2), input: input }),
         ])
         .partition(),
     )
@@ -937,9 +937,9 @@ describe("core behavior", () => {
     const firstFulfilledMain = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createFailureFlow(), undefined),
-          ctx.exec(createSuccessFlow(), input),
-          ctx.exec(createSuccessFlow(), input * 2),
+          ctx.exec({ flow: createFailureFlow(), input: undefined }),
+          ctx.exec({ flow: createSuccessFlow(), input: input }),
+          ctx.exec({ flow: createSuccessFlow(), input: input * 2 }),
         ])
         .firstFulfilled(),
     )
@@ -949,8 +949,8 @@ describe("core behavior", () => {
     const firstRejectedMain = flow(async (ctx) =>
       ctx
         .parallelSettled([
-          ctx.exec(createFailureFlow("first"), undefined),
-          ctx.exec(createFailureFlow("second"), undefined),
+          ctx.exec({ flow: createFailureFlow("first"), input: undefined }),
+          ctx.exec({ flow: createFailureFlow("second"), input: undefined }),
         ])
         .firstRejected(),
     )
@@ -960,9 +960,9 @@ describe("core behavior", () => {
     const findFulfilledMain = flow(async (ctx) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(), 1),
-          ctx.exec(createSuccessFlow(), 5),
-          ctx.exec(createSuccessFlow(), 10),
+          ctx.exec({ flow: createSuccessFlow(), input: 1 }),
+          ctx.exec({ flow: createSuccessFlow(), input: 5 }),
+          ctx.exec({ flow: createSuccessFlow(), input: 10 }),
         ])
         .findFulfilled((value: number) => value > 3),
     )
@@ -972,9 +972,9 @@ describe("core behavior", () => {
     const mapFulfilledMain = flow(async (ctx) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(), 1),
-          ctx.exec(createFailureFlow(), undefined),
-          ctx.exec(createSuccessFlow(), 3),
+          ctx.exec({ flow: createSuccessFlow(), input: 1 }),
+          ctx.exec({ flow: createFailureFlow(), input: undefined }),
+          ctx.exec({ flow: createSuccessFlow(), input: 3 }),
         ])
         .mapFulfilled((value: number) => value * 10),
     )
@@ -984,8 +984,8 @@ describe("core behavior", () => {
     const assertMain = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(2), input),
-          ctx.exec(createSuccessFlow(2), input * 2),
+          ctx.exec({ flow: createSuccessFlow(2), input: input }),
+          ctx.exec({ flow: createSuccessFlow(2), input: input * 2 }),
         ])
         .assertAllFulfilled(),
     )
@@ -995,8 +995,8 @@ describe("core behavior", () => {
     const assertFail = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(), input),
-          ctx.exec(createFailureFlow("operation failed"), undefined),
+          ctx.exec({ flow: createSuccessFlow(), input: input }),
+          ctx.exec({ flow: createFailureFlow("operation failed"), input: undefined }),
         ])
         .assertAllFulfilled(),
     )
@@ -1007,9 +1007,9 @@ describe("core behavior", () => {
     const customFail = flow(async (ctx, input: number) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(), input),
-          ctx.exec(createFailureFlow("op failed"), undefined),
-          ctx.exec(createFailureFlow("op failed"), undefined),
+          ctx.exec({ flow: createSuccessFlow(), input: input }),
+          ctx.exec({ flow: createFailureFlow("op failed"), input: undefined }),
+          ctx.exec({ flow: createFailureFlow("op failed"), input: undefined }),
         ])
         .assertAllFulfilled((reasons, fulfilledCount, totalCount) =>
           new Error(
@@ -1033,10 +1033,10 @@ describe("core behavior", () => {
     const chained = flow(async (ctx) =>
       ctx
         .parallelSettled([
-          ctx.exec(createSuccessFlow(), 1),
-          ctx.exec(createFailureFlow(), undefined),
-          ctx.exec(createSuccessFlow(), 5),
-          ctx.exec(createSuccessFlow(), 10),
+          ctx.exec({ flow: createSuccessFlow(), input: 1 }),
+          ctx.exec({ flow: createFailureFlow(), input: undefined }),
+          ctx.exec({ flow: createSuccessFlow(), input: 5 }),
+          ctx.exec({ flow: createSuccessFlow(), input: 10 }),
         ])
         .fulfilled()
         .map((values: number[]) => values.filter((value) => value > 3))

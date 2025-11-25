@@ -632,24 +632,16 @@ export namespace ExecutionContext {
     initializeExecutionContext(flowName: string, isParallel?: boolean): void;
 
     exec<F extends Flow.UFlow>(
-      flow: F,
-      input: Flow.InferInput<F>
+      config: {
+        flow: F;
+        key?: string;
+        timeout?: number;
+        retry?: number;
+        tags?: Tag.Tagged[];
+      } & (Flow.InferInput<F> extends void | undefined
+        ? { input?: never }
+        : { input: Flow.InferInput<F> })
     ): Promised<Flow.InferOutput<F>>;
-
-    exec<F extends Flow.UFlow>(
-      key: string,
-      flow: F,
-      input: Flow.InferInput<F>
-    ): Promised<Flow.InferOutput<F>>;
-
-    exec<F extends Flow.UFlow>(config: {
-      flow: F;
-      input: Flow.InferInput<F>;
-      key?: string;
-      timeout?: number;
-      retry?: number;
-      tags?: Tag.Tagged[];
-    }): Promised<Flow.InferOutput<F>>;
 
     exec<T>(config: {
       fn: () => T | Promise<T>;
