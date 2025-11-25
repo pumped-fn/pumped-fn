@@ -173,7 +173,7 @@ const trace = extension({
   name: "trace",
   wrap: (_scope, next, operation) => {
     if (operation.kind === "execution") {
-      console.log(`op:${operation.target.type}`);
+      console.log(`op:${operation.mode}`);
     }
     return next();
   },
