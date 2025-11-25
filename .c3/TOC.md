@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-24 14:38:05
+> Last generated: 2025-11-24 17:17:52
 
 ## Context Level
 
@@ -168,7 +168,29 @@ and nested flow support.
 
 ---
 
+## Architecture Decisions
+
+### [ADR-001-execution-context-lifecycle](./adr/adr-001-execution-context-lifecycle.md) - ExecutionContext Explicit Lifecycle with close()
+> Add close() method to ExecutionContext for middleware integration patterns,
+enabling explicit lifecycle management with graceful/abort modes and cascading
+to child contexts.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-001-status)
+- [Problem/Requirement](#adr-001-problem)
+- [Exploration Journey](#adr-001-exploration)
+- [Solution](#adr-001-solution)
+- [Changes Across Layers](#adr-001-changes)
+- [Verification](#adr-001-verification)
+- [Future Considerations](#adr-001-future)
+- [Alternatives Considered](#adr-001-alternatives)
+- [Related](#adr-001-related)
+
+---
+
 ## Quick Reference
 
-**Total Documents**: 10
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 0
+**Total Documents**: 11
+**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 1

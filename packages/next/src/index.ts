@@ -6,6 +6,7 @@ import type {
   Multi as InternalMulti,
   StandardSchemaV1 as InternalStandardSchemaV1,
   Core as InternalCore,
+  ExecutionContext as InternalExecutionContext,
 } from "./types"
 import type { Tag as TagType } from "./tag-types"
 import type * as TagTypes from "./tag-types"
@@ -153,6 +154,11 @@ export { FlowError } from "./types"
  * Error thrown when flow input or output validation fails.
  */
 export { FlowValidationError } from "./types"
+
+/**
+ * Error thrown when operations are attempted on a closed ExecutionContext.
+ */
+export { ExecutionContextClosedError } from "./errors"
 
 /**
  * Standard tag representing the friendly executor name.
@@ -506,6 +512,11 @@ export namespace Extension {
   export type ExecutionOperation = InternalExtension.ExecutionOperation
 
   /**
+   * Operation emitted during ExecutionContext lifecycle (create/closing/closed).
+   */
+  export type ContextLifecycleOperation = InternalExtension.ContextLifecycleOperation
+
+  /**
    * Union describing every supported extension operation.
    */
   export type Operation = InternalExtension.Operation
@@ -544,4 +555,24 @@ export namespace Multi {
    * Derived multi configuration attaching dependencies.
    */
   export type DeriveOption<K, D> = InternalMulti.DeriveOption<K, D>
+}
+
+/**
+ * ExecutionContext helper types for flow execution lifecycle.
+ */
+export namespace ExecutionContext {
+  /**
+   * Execution context lifecycle state.
+   */
+  export type ContextState = InternalExecutionContext.ContextState
+
+  /**
+   * Execution details tracking name, timing, and error state.
+   */
+  export type Details = InternalExecutionContext.Details
+
+  /**
+   * Flow execution context providing scope, tags, and nested execution.
+   */
+  export type Context = InternalExecutionContext.Context
 }
