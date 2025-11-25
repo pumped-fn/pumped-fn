@@ -3,21 +3,12 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    paths:
+      - "packages/**/*.ts"
+      - "examples/**/*.ts"
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
@@ -38,20 +29,105 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR: #${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            # RUTHLESS CODE REVIEW
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            You're reviewing code for a library used by 1000000000000zillion devs.
+            No mercy. No shortcuts. Ship only excellence.
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            ## PHASE 1: C3 ARCHITECTURE GATE (HARD FAIL)
 
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+            READ `.c3/` FIRST. Understand:
+            - `.c3/README.md` - system overview
+            - `.c3/TOC.md` - doc structure
+            - `.c3/c3-1-core/README.md` - core components
+
+            **FAIL THE REVIEW IF:**
+            - PR adds concepts not in C3 docs
+            - PR changes architecture without ADR
+            - PR violates component boundaries
+            - PR introduces coupling not documented in relationships diagram
+
+            ## PHASE 2: CLAUDE.md COMPLIANCE (HARD FAIL)
+
+            **INSTANT REJECT for:**
+            - `any` type (strict typing)
+            - `// inline comments` (code self-documents)
+            - Missing TSDoc on public API
+            - `import()` inline calls
+            - Non-type imports without `{ type ... }`
+
+            ## PHASE 3: BRUTAL QUALITY CHECK
+
+            ### Performance (zillions of users = every ns counts)
+            - Unnecessary allocations? REJECT
+            - O(n²) when O(n) possible? REJECT
+            - Closure captures causing memory leaks? REJECT
+            - Missing lazy evaluation opportunity? CALL IT OUT
+
+            ### DX (Developer Experience)
+            - Error message unclear? REJECT
+            - Type inference broken? REJECT
+            - API inconsistent with existing patterns? REJECT
+            - Missing overloads for common cases? CALL IT OUT
+
+            ### Design
+            - Leaky abstraction? REJECT
+            - God function (>30 lines)? REJECT
+            - Premature abstraction? REJECT
+            - Not generic enough for library? REJECT
+
+            ### Testing
+            - Missing edge cases? REJECT
+            - Testing implementation not behavior? REJECT
+            - No test for the change? REJECT
+
+            ## REVIEW FORMAT
+
+            Use this structure. Be terse. No fluff.
+
+            ```markdown
+            ## 🚦 VERDICT: [PASS | FAIL | NEEDS WORK]
+
+            ### C3 Check
+            [✅ Aligned | ❌ VIOLATION: {what}]
+
+            ### Code Issues
+            | File:Line | Severity | Issue | Fix |
+            |-----------|----------|-------|-----|
+            | ... | 🔴/🟡 | ... | ... |
+
+            ### Architecture (if relevant)
+            [mermaid diagram showing concern]
+
+            ### Performance
+            [specific bottleneck + fix, or ✅]
+
+            ### DX Impact
+            [how this affects library users]
+
+            ### Teaching Moment
+            [1-2 sentences explaining WHY, help them level up]
+            ```
+
+            ## TONE
+
+            - Curse if it helps: "this allocation is dumb as hell"
+            - No shoulder-tapping: say "wrong" not "maybe consider"
+            - Diagrams > walls of text
+            - Compact > verbose
+            - Teach > lecture
+
+            ## EXECUTION
+
+            1. `gh pr diff ${{ github.event.pull_request.number }}` - get changes
+            2. Read relevant `.c3/` docs for context
+            3. Read `CLAUDE.md` for style rules
+            4. Review ruthlessly
+            5. `gh pr comment ${{ github.event.pull_request.number }} -b "..."` - post review
+
+            GO.
+
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"'
 
