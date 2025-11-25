@@ -128,22 +128,22 @@ export { flowMeta } from "./flow"
 /**
  * Error thrown when schema validation fails.
  */
-export { SchemaError } from "./types"
+export { SchemaError } from "./errors"
 
 /**
  * Base executor resolution error capturing scope context.
  */
-export { ExecutorResolutionError } from "./types"
+export { ExecutorResolutionError } from "./errors"
 
 /**
  * Error thrown when executor factory throws or rejects.
  */
-export { FactoryExecutionError } from "./types"
+export { FactoryExecutionError } from "./errors"
 
 /**
  * Error thrown when dependencies cannot be resolved.
  */
-export { DependencyResolutionError } from "./types"
+export { DependencyResolutionError } from "./errors"
 
 /**
  * Flow-level error used for descriptive failures inside handlers.

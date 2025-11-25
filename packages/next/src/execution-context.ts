@@ -9,7 +9,7 @@ import { createAbortWithTimeout } from "./internal/abort-utils"
 import { createJournalKey, checkJournalReplay, type JournalEntry } from "./internal/journal-utils"
 import { createExecutor, isExecutor } from "./executor"
 import { isTag, isTagged } from "./tag-executors"
-import { createSystemError, codes, ExecutionContextClosedError } from "./errors"
+import { createSystemError, ExecutionContextClosedError } from "./errors"
 
 export const flowDefinitionMeta: Tag.Tag<Flow.Definition<any, any>, false> = tag(
   custom<Flow.Definition<any, any>>(),
@@ -481,14 +481,8 @@ const createFlowExecutionDescriptor = <F extends Flow.UFlow>(
   const definition = flowDefinitionMeta.readFrom(config.flow)
   if (!definition) {
     throw createSystemError(
-      codes.FLOW_CONTEXT_MISSING,
       parentCtx.find(flowMeta.flowName) ?? "flow-definition-missing",
-      [],
-      undefined,
-      {
-        reason: "flowDefinitionMissing",
-        flowIdentifier: config.flow
-      }
+      []
     )
   }
 

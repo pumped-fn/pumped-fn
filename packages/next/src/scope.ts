@@ -9,14 +9,15 @@ import {
 import {
   Core,
   Extension,
-  ExecutorResolutionError,
-  FactoryExecutionError,
-  DependencyResolutionError,
-  ErrorContext,
   executorSymbol,
   type Flow,
   type ExecutionContext,
 } from "./types";
+import {
+  ExecutorResolutionError,
+  FactoryExecutionError,
+  DependencyResolutionError,
+} from "./errors";
 import { type Tag, tagSymbol } from "./tag-types";
 import { isTag, isTagExecutor } from "./tag-executors";
 import { Promised } from "./promises";
@@ -154,7 +155,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         this.contextResolvedValue = NOT_SET;
       }
 
-      const { enhancedError, errorContext, originalError } =
+      const { enhancedError, originalError } =
         this.enhanceResolutionError(error);
 
       const state = this.scope["getOrCreateState"](this.requestor);
@@ -162,7 +163,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
       state.value = {
         kind: "rejected",
         error: originalError,
-        context: errorContext,
         enhancedError: enhancedError,
       };
 
@@ -277,15 +277,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
           const dependencyChain = [executorName];
 
           throw errors.createFactoryError(
-            errors.codes.FACTORY_ASYNC_ERROR,
             executorName,
             dependencyChain,
-            asyncError,
-            {
-              dependenciesResolved: resolvedDependencies !== undefined,
-              factoryType: typeof factory,
-              isAsyncFactory: true,
-            }
+            asyncError
           );
         }
       }
@@ -296,15 +290,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
       const dependencyChain = [executorName];
 
       throw errors.createFactoryError(
-        errors.codes.FACTORY_THREW_ERROR,
         executorName,
         dependencyChain,
-        syncError,
-        {
-          dependenciesResolved: resolvedDependencies !== undefined,
-          factoryType: typeof factory,
-          isAsyncFactory: false,
-        }
+        syncError
       );
     }
   }
@@ -331,20 +319,17 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
   private enhanceResolutionError(error: unknown): {
     enhancedError: ExecutorResolutionError;
-    errorContext: ErrorContext;
     originalError: unknown;
   } {
     if (
       error &&
       typeof error === "object" &&
-      "context" in error &&
-      "code" in error &&
-      error.context &&
-      error.code
+      "executorName" in error &&
+      "dependencyChain" in error &&
+      "code" in error
     ) {
       return {
         enhancedError: error as ExecutorResolutionError,
-        errorContext: error.context as ErrorContext,
         originalError: error,
       };
     }
@@ -353,20 +338,13 @@ class AccessorImpl implements Core.Accessor<unknown> {
     const dependencyChain = [executorName];
 
     const enhancedError = errors.createSystemError(
-      errors.codes.INTERNAL_RESOLUTION_ERROR,
       executorName,
       dependencyChain,
-      error,
-      {
-        errorType: error?.constructor?.name || "UnknownError",
-        resolutionPhase: "post-factory",
-        hasOriginalContext: false,
-      }
+      error
     );
 
     return {
       enhancedError,
-      errorContext: enhancedError.context,
       originalError: error,
     };
   }
@@ -561,18 +539,9 @@ class BaseScope implements Core.Scope {
       const dependencyChain = errors.buildDependencyChain(chainArray);
 
       throw errors.createDependencyError(
-        errors.codes.CIRCULAR_DEPENDENCY,
         errors.getExecutorName(executor),
         dependencyChain,
-        errors.getExecutorName(executor),
-        undefined,
-        {
-          circularPath:
-            dependencyChain.join(" -> ") +
-            " -> " +
-            errors.getExecutorName(executor),
-          detectedAt: errors.getExecutorName(resolvingExecutor),
-        }
+        errors.getExecutorName(executor)
       );
     }
   }
@@ -688,15 +657,9 @@ class BaseScope implements Core.Scope {
     if (e === ref) {
       const executorName = errors.getExecutorName(e);
       throw errors.createDependencyError(
-        errors.codes.CIRCULAR_DEPENDENCY,
         executorName,
         [executorName],
-        executorName,
-        undefined,
-        {
-          circularPath: `${executorName} -> ${executorName}`,
-          detectedAt: executorName,
-        }
+        executorName
       );
     }
 

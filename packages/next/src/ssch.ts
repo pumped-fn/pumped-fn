@@ -1,4 +1,5 @@
-import { SchemaError, StandardSchemaV1 } from "./types";
+import { StandardSchemaV1 } from "./types";
+import { SchemaError } from "./errors";
 
 export function validate<TSchema extends StandardSchemaV1>(
   schema: TSchema,

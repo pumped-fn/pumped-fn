@@ -56,93 +56,10 @@ export declare namespace StandardSchemaV1 {
   >["output"];
 }
 
-export class SchemaError extends Error {
-  public readonly issues: ReadonlyArray<StandardSchemaV1.Issue>;
-
-  constructor(issues: ReadonlyArray<StandardSchemaV1.Issue>) {
-    super(issues[0].message);
-    this.name = "SchemaError";
-    this.issues = issues;
-  }
-}
-
-export interface ErrorContext {
-  readonly executorName?: string;
-  readonly resolutionStage:
-    | "dependency-resolution"
-    | "factory-execution"
-    | "post-processing"
-    | "validation";
-  readonly dependencyChain: string[];
-  readonly scopeId?: string;
-  readonly timestamp: number;
-  readonly additionalInfo?: Record<string, unknown>;
-}
-
-export class ExecutorResolutionError extends Error {
-  public readonly context: ErrorContext;
-  public readonly code: string;
-  public readonly category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR";
-
-  constructor(
-    message: string,
-    context: ErrorContext,
-    code: string,
-    category: "USER_ERROR" | "SYSTEM_ERROR" | "VALIDATION_ERROR" = "USER_ERROR",
-    options?: { cause?: unknown }
-  ) {
-    super(message, options);
-    this.name = "ExecutorResolutionError";
-    this.context = context;
-    this.code = code;
-    this.category = category;
-  }
-}
-
-export class FactoryExecutionError extends ExecutorResolutionError {
-  constructor(
-    message: string,
-    context: Omit<ErrorContext, "resolutionStage">,
-    code: string,
-    options?: { cause?: unknown }
-  ) {
-    super(
-      message,
-      { ...context, resolutionStage: "factory-execution" },
-      code,
-      "USER_ERROR",
-      options
-    );
-    this.name = "FactoryExecutionError";
-  }
-}
-
-export class DependencyResolutionError extends ExecutorResolutionError {
-  public readonly missingDependency?: string;
-
-  constructor(
-    message: string,
-    context: Omit<ErrorContext, "resolutionStage">,
-    code: string,
-    missingDependency?: string,
-    options?: { cause?: unknown }
-  ) {
-    super(
-      message,
-      { ...context, resolutionStage: "dependency-resolution" },
-      code,
-      "USER_ERROR",
-      options
-    );
-    this.name = "DependencyResolutionError";
-    this.missingDependency = missingDependency;
-  }
-}
-
 export type ExecutorError =
-  | ExecutorResolutionError
-  | FactoryExecutionError
-  | DependencyResolutionError;
+  | import("./errors").ExecutorResolutionError
+  | import("./errors").FactoryExecutionError
+  | import("./errors").DependencyResolutionError;
 
 export declare namespace Core {
   export type Output<T> = T | Promise<T>;
@@ -225,8 +142,7 @@ export declare namespace Core {
   export type RejectedState = {
     kind: "rejected";
     error: unknown;
-    context?: ErrorContext;
-    enhancedError?: ExecutorResolutionError;
+    enhancedError?: import("./errors").ExecutorResolutionError;
   };
 
   export type ResolveState<T> =
