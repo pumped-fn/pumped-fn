@@ -2,12 +2,14 @@
 
 # Prerequisites
 
-This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, install them first:
+This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, clone and install them first:
 
 ```bash
-superpowers install c3-skill
-superpowers install superpowers
+git clone https://github.com/lagz0ne/c3-skill.git
+git clone https://github.com/obra/superpowers.git
 ```
+
+Then get started with those required skills.
 
 # IMPORTANT
 Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
