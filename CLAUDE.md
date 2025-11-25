@@ -1,5 +1,14 @@
 # Pumped-fn Project Instructions
 
+# Prerequisites
+
+This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, install them first:
+
+```bash
+superpowers install c3-skill
+superpowers install superpowers
+```
+
 # IMPORTANT
 Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
 
