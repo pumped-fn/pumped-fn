@@ -4,10 +4,9 @@
  *
  * Demonstrates:
  * - .map() for transforming values
- * - .switch() for chaining Promised
+ * - .then() for chaining Promised
  * - Promised.all() for parallel resolution
  * - .allSettled() with result handling
- * - .fulfilled(), .rejected(), .partition()
  *
  * Verify: pnpm -F @pumped-fn/examples typecheck
  * Run: pnpm -F @pumped-fn/examples dev:promised-comprehensive
@@ -57,27 +56,27 @@ async function mapExample() {
 }
 // #endregion promised-map
 
-// #region promised-switch
-async function switchExample() {
+// #region promised-then
+async function thenExample() {
   const scope = createScope()
 
   const userWithPosts = scope
     .resolve(userService)
-    .switch(service =>
-      Promised.create(service.getUser('123')).map(user =>
-        scope.resolve(postDb).map(posts => ({
-          user,
-          posts: posts.getPosts(user.id)
-        }))
-      )
-    )
+    .then(async service => {
+      const user = await service.getUser('123')
+      const postSvc = await scope.resolve(postDb)
+      return {
+        user,
+        posts: await postSvc.getPosts(user.id)
+      }
+    })
 
   const result = await userWithPosts
   console.log('User with posts:', result)
 
   await scope.dispose()
 }
-// #endregion promised-switch
+// #endregion promised-then
 
 // #region promised-parallel
 async function parallelExample() {
@@ -147,7 +146,7 @@ async function errorHandlingExample() {
 
 Promised.try(() => Promise.all([
   mapExample(),
-  switchExample(),
+  thenExample(),
   parallelExample(),
   settledExample(),
   errorHandlingExample()
