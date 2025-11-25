@@ -480,7 +480,7 @@ describe("core behavior", () => {
       name: "captureFlow",
       input: custom<string>(),
       output: custom<string>(),
-    }).handler(async (ctx, value) => {
+    }, async (ctx, value) => {
       childCtx = ctx
       expect(ctx.parent).toBe(parentCtx)
       expect(ctx.details.name).toBe("captureFlow")
@@ -497,7 +497,7 @@ describe("core behavior", () => {
       name: "readTag",
       input: custom<void>(),
       output: custom<string>(),
-    }).handler(async (ctx) => ctx.get(requestIdTag))
+    }, async (ctx) => ctx.get(requestIdTag))
     const tagValue = await tagCtx.exec({ flow: readTagFlow, input: undefined })
     expect(tagValue).toBe("req-123")
 
@@ -508,7 +508,7 @@ describe("core behavior", () => {
       name: "inheritTag",
       input: custom<void>(),
       output: custom<string>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       ctx.set(nameTag, "child-name")
       return ctx.get(nameTag)
     })
@@ -527,7 +527,7 @@ describe("core behavior", () => {
       name: "failingFlow",
       input: custom<void>(),
       output: custom<void>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       failingChild = ctx
       throw new Error("test error")
     })

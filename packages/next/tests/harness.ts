@@ -36,44 +36,45 @@ export namespace TestTypes {
 }
 
 export const testFlows = {
-  basic: (name: string) =>
+  basic: (name: string, handler: (ctx: Flow.Context, input: TestTypes.BasicInput) => Promise<TestTypes.SuccessResult<string>> | TestTypes.SuccessResult<string>) =>
     flow({
       name,
       input: custom<TestTypes.BasicInput>(),
       output: custom<TestTypes.SuccessResult<string>>(),
-    }),
+    }, handler),
 
-  math: (name: string) =>
+  math: (name: string, handler: (ctx: Flow.Context, input: TestTypes.MathInput) => Promise<TestTypes.SuccessResult<number>> | TestTypes.SuccessResult<number>) =>
     flow({
       name,
       input: custom<TestTypes.MathInput>(),
       output: custom<TestTypes.SuccessResult<number>>(),
-    }),
+    }, handler),
 
-  user: (name: string) =>
+  user: (name: string, handler: (ctx: Flow.Context, input: { userId: string }) => Promise<{ user: TestTypes.User }> | { user: TestTypes.User }) =>
     flow({
       name,
       input: custom<{ userId: string }>(),
       output: custom<{ user: TestTypes.User }>(),
-    }),
+    }, handler),
 
-  validation: (name: string) =>
+  validation: (name: string, handler: (ctx: Flow.Context, input: { email: string }) => Promise<{ valid: boolean }> | { valid: boolean }) =>
     flow({
       name,
       input: custom<{ email: string }>(),
       output: custom<{ valid: boolean }>(),
-    }),
+    }, handler),
 
   generic: <TInput, TSuccess>(
     name: string,
     input: StandardSchemaV1<TInput, unknown>,
     output: StandardSchemaV1<TSuccess, unknown>,
+    handler: (ctx: Flow.Context, input: TInput) => Promise<TSuccess> | TSuccess
   ) =>
     flow({
       name,
       input,
       output,
-    }),
+    }, handler),
 }
 
 export const MockExecutors = {

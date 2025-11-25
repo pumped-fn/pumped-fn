@@ -64,95 +64,66 @@ type DefineConfig<S, I> = {
   tags?: Tag.Tagged[]
 }
 
-class FlowDefinition<S, I> {
-  constructor(
-    public readonly name: string,
-    public readonly version: string,
-    public readonly input: StandardSchemaV1<I>,
-    public readonly output: StandardSchemaV1<S>,
-    public readonly tags: Tag.Tagged[] = []
-  ) {}
+const createFlowFromDefinition = <S, I>(
+  config: DefineConfig<S, I>,
+  handler: (ctx: Flow.Context, input: I) => Promise<S> | S
+): Flow.Flow<I, S> => {
+  const factory = (() => {
+    const flowHandler = async (ctx: Flow.Context, input: I) => {
+      return handler(ctx, input)
+    }
+    return flowHandler as Flow.Handler<S, I>
+  }) as Core.NoDependencyFn<Flow.Handler<S, I>>
 
-  handler(
-    handlerFn: (ctx: Flow.Context, input: I) => Promise<S> | S
-  ): Flow.Flow<I, S>
-
-  handler<D extends Core.DependencyLike>(
-    dependencies: D,
-    handlerFn: (
-      deps: Core.InferOutput<D>,
-      ctx: Flow.Context,
-      input: I
-    ) => Promise<S> | S
-  ): Flow.Flow<I, S>
-
-  handler<D extends Core.DependencyLike>(
-    dependenciesOrHandler:
-      | D
-      | ((ctx: Flow.Context, input: I) => Promise<S> | S),
-    handlerFn?: (
-      deps: Core.InferOutput<D>,
-      ctx: Flow.Context,
-      input: I
-    ) => Promise<S> | S
-  ): Flow.Flow<I, S> {
-    const hasDependencies = typeof dependenciesOrHandler !== "function"
-
-    const factory = hasDependencies
-      ? (((deps: unknown, _controller: Core.Controller) => {
-          const flowHandler = async (ctx: Flow.Context, input: I) => {
-            return handlerFn!(deps as Core.InferOutput<D>, ctx, input)
-          }
-          return flowHandler as Flow.Handler<S, I>
-        }) as Core.DependentFn<Flow.Handler<S, I>, unknown>)
-      : ((() => {
-          const noDepsHandler = dependenciesOrHandler as (
-            ctx: Flow.Context,
-            input: I
-          ) => Promise<S> | S
-          const flowHandler = async (ctx: Flow.Context, input: I) => {
-            return noDepsHandler(ctx, input)
-          }
-          return flowHandler as Flow.Handler<S, I>
-        }) as Core.NoDependencyFn<Flow.Handler<S, I>>)
-
-    const dependencies = hasDependencies
-      ? (dependenciesOrHandler as
-          | Core.UExecutor
-          | ReadonlyArray<Core.UExecutor>
-          | Record<string, Core.UExecutor>)
-      : undefined
-
-    const executor = createExecutor(factory, dependencies, [
-      ...this.tags,
-      flowDefinitionMeta(this)
-    ]) as Flow.Flow<I, S>
-
-    executor.definition = this
-    return executor
+  const definition = {
+    name: config.name || "anonymous",
+    version: config.version || "1.0.0",
+    input: config.input,
+    output: config.output
   }
+
+  const executor = createExecutor(factory, undefined, [
+    ...(config.tags || []),
+    flowDefinitionMeta(definition)
+  ]) as Flow.Flow<I, S>
+
+  executor.definition = definition
+  return executor
 }
 
-const define = <S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I> => {
-  return new FlowDefinition(
-    config.name || "anonymous",
-    config.version || "1.0.0",
-    config.input,
-    config.output,
-    config.tags || []
-  )
-}
-
-const attachDependencies = <S, I, D2 extends Core.DependencyLike>(
-  def: FlowDefinition<S, I>,
-  dependencies: D2,
+const createFlowWithDependencies = <S, I, D extends Core.DependencyLike>(
+  config: DefineConfig<S, I>,
+  dependencies: D,
   handler: (
-    deps: Core.InferOutput<D2>,
+    deps: Core.InferOutput<D>,
     ctx: Flow.Context,
     input: I
   ) => Promise<S> | S
 ): Flow.Flow<I, S> => {
-  return def.handler(dependencies, handler)
+  const factory = ((deps: unknown, _controller: Core.Controller) => {
+    const flowHandler = async (ctx: Flow.Context, input: I) => {
+      return handler(deps as Core.InferOutput<D>, ctx, input)
+    }
+    return flowHandler as Flow.Handler<S, I>
+  }) as Core.DependentFn<Flow.Handler<S, I>, unknown>
+
+  const definition = {
+    name: config.name || "anonymous",
+    version: config.version || "1.0.0",
+    input: config.input,
+    output: config.output
+  }
+
+  const executor = createExecutor(factory, dependencies as
+    | Core.UExecutor
+    | ReadonlyArray<Core.UExecutor>
+    | Record<string, Core.UExecutor>, [
+    ...(config.tags || []),
+    flowDefinitionMeta(definition)
+  ]) as Flow.Flow<I, S>
+
+  executor.definition = definition
+  return executor
 }
 
 namespace ExecConfig {
@@ -308,8 +279,6 @@ function flowImpl<D extends Core.DependencyLike, I, S>(
   ...tags: Tag.Tagged[]
 ): Flow.Flow<I, S>
 
-function flowImpl<S, I>(config: DefineConfig<S, I>): FlowDefinition<S, I>
-
 function flowImpl<S, I>(
   config: DefineConfig<S, I>,
   handler: (ctx: Flow.Context, input: I) => Promise<S> | S
@@ -347,7 +316,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       ) => Promise<S> | S)
     | Tag.Tagged,
   ...rest: Tag.Tagged[]
-): Flow.Flow<I, S> | FlowDefinition<S, I> {
+): Flow.Flow<I, S> {
   const allTags: Tag.Tagged[] = []
 
   const isHandlerOnly = typeof first === "function"
@@ -371,12 +340,11 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       throw new Error("flow(handler) requires handler function")
     }
     const handler = first as (ctx: Flow.Context, input: I) => Promise<S> | S
-    const def = define({
+    return createFlowFromDefinition({
       input: custom<I>(),
       output: custom<S>(),
       tags: allTags.length > 0 ? allTags : undefined
-    })
-    return def.handler(handler)
+    }, handler)
   }
 
   if (isDependencyCollection(first)) {
@@ -388,12 +356,11 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       ctx: Flow.Context,
       input: I
     ) => Promise<S> | S
-    const def = define({
+    return createFlowWithDependencies({
       input: custom<I>(),
       output: custom<S>(),
       tags: allTags.length > 0 ? allTags : undefined
-    })
-    return attachDependencies(def, first, handler)
+    }, first, handler)
   }
 
   if (isDefineConfig(first)) {
@@ -405,17 +372,15 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
       )
     }
 
-    const def = define(config)
-
     if (!second) {
-      return def
+      throw new Error("flow(config) requires handler as second argument")
     }
 
     if (typeof second === "function") {
       if (isTag(second)) {
         throw new Error("flow(config, handler) requires handler function")
       }
-      return def.handler(second as (ctx: Flow.Context, input: I) => Promise<S> | S)
+      return createFlowFromDefinition(config, second as (ctx: Flow.Context, input: I) => Promise<S> | S)
     }
 
     if (isExecutor(second)) {
@@ -424,7 +389,7 @@ function flowImpl<S, I, D extends Core.DependencyLike>(
           "flow(config, deps, handler) requires handler as third argument"
         )
       }
-      return attachDependencies(def, second, third)
+      return createFlowWithDependencies(config, second, third)
     }
 
     throw new Error(

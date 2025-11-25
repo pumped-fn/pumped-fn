@@ -14,7 +14,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "inner",
       input: custom<number>(),
       output: custom<number>()
-    }).handler(async (_ctx, value) => value + 1)
+    }, async (_ctx, value) => value + 1)
     const first = await ctx.exec({ key: "inner", flow: inner, input: 1 })
     const second = await ctx.exec({ key: "inner", flow: inner, input: 1 })
     expect(first).toBe(2)
@@ -38,7 +38,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "never",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(() => {})
     })
     const pending = ctx.exec({ flow: never, input: undefined, timeout: 5 })
@@ -55,7 +55,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "runner",
       input: custom<void>(),
       output: custom<number>()
-    }).handler(async () => {
+    }, async () => {
       calls()
       return calls.mock.calls.length
     })
@@ -76,7 +76,7 @@ describe("ExecutionContext.exec parity", () => {
       name: "faulty",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       throw boom
     })
     await expect(ctx.exec({ flow: faulty, input: undefined })).rejects.toThrow("explode")
@@ -197,7 +197,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "slow",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(r => setTimeout(r, 50))
       resolved = true
       return "done"
@@ -229,7 +229,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "never",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async (flowCtx) => {
+    }, async (flowCtx) => {
       handlerStarted = true
       await new Promise<void>((resolve, reject) => {
         if (flowCtx.signal.aborted) {
@@ -265,7 +265,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
     expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
   })
@@ -278,7 +278,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "slow",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async () => {
+    }, async () => {
       await new Promise(r => setTimeout(r, 100))
     })
 
@@ -289,7 +289,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
     expect(() => ctx.exec(simpleFlow, undefined)).toThrow(ExecutionContextClosedError)
 
@@ -321,7 +321,7 @@ describe("ExecutionContext lifecycle", () => {
       name: "nested",
       input: custom<void>(),
       output: custom<void>()
-    }).handler(async (flowCtx) => {
+    }, async (flowCtx) => {
       flowCtx.onStateChange((state) => {
         childStates.push(state)
       })

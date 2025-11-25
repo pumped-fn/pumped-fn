@@ -606,7 +606,7 @@ describe("extensions behavior", () => {
       name: "simple",
       input: custom<void>(),
       output: custom<string>()
-    }).handler(async () => "result")
+    }, async () => "result")
 
     await scope.exec({ flow: simpleFlow, input: undefined }).result
 

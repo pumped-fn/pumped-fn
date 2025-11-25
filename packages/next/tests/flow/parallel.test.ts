@@ -9,7 +9,7 @@ describe("ExecutionContext parallel helpers", () => {
       name: "parallel",
       input: custom<void>(),
       output: custom<{ total: number; succeeded: number; failed: number }>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       const { stats } = await ctx.parallel([
         Promised.create(Promise.resolve(1)),
         Promised.create(Promise.resolve(2)),
@@ -26,7 +26,7 @@ describe("ExecutionContext parallel helpers", () => {
       name: "parallel-settled",
       input: custom<void>(),
       output: custom<{ total: number; succeeded: number; failed: number }>(),
-    }).handler(async (ctx) => {
+    }, async (ctx) => {
       const { stats } = await ctx.parallelSettled([
         Promised.create(Promise.resolve("a")),
         Promised.create(Promise.reject(new Error("x"))),
