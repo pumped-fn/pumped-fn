@@ -198,6 +198,87 @@ const resolve = (deps, ctl) => {
 - **Dead code detection:** Know which dependencies are declared but unused
 - **Performance profiling:** Per-executor compilation metrics
 
+### Runtime Optimization Opportunities
+
+The inference data enables several runtime optimizations:
+
+#### 1. Minimal Controller Creation
+**Current:** Every factory execution creates full `Controller` with all 4 methods (cleanup, release, reload, scope).
+
+**Opportunity:** Use inference to create minimal controllers:
+- `!usesCleanup` → omit cleanup method or use shared noop
+- `!usesRelease` → omit release method or use shared noop
+- `!usesReload` → omit reload method or use shared noop
+- `!usesScope` → omit scope reference
+
+**Impact:** Reduces object allocation for simple executors (majority of real-world cases).
+
+#### 2. Dependency Resolution Short-circuit
+**Current:** `~resolveDependencies` always processes through `resolveShape()`.
+
+**Opportunity:** Skip entirely when:
+- `dependencyShape === 'none'` → return `undefined` immediately
+- `dependencyAccess.length === 0` → dependencies declared but unused
+
+**Impact:** Eliminates unnecessary function calls and Promise creation.
+
+#### 3. Executor Wrapper Elimination
+**Current:** `createExecutor` wraps every factory with runtime check:
+```typescript
+factory: (_: unknown, controller) => {
+  if (dependencies === undefined) { ... }
+  ...
+}
+```
+
+**Opportunity:** When `compiled` exists, the compiled function already has correct signature `(deps, ctl) => result`. The wrapper adds overhead for:
+- Function call indirection
+- Runtime `dependencies === undefined` check (known at compile time)
+
+**Impact:** Direct compiled function invocation removes wrapper overhead.
+
+#### 4. Lazy Executor Variant Creation
+**Current:** `createExecutor` eagerly creates `lazy`, `reactive`, `static` variants.
+
+**Opportunity:** Use property getters for on-demand creation:
+```typescript
+Object.defineProperty(executor, 'lazy', {
+  get() { return this._lazy ??= createLazyExecutor(this); }
+});
+```
+
+**Impact:** Reduces memory for executors whose variants are never accessed.
+
+#### 5. Sync Factory Fast Path
+**Current:** All factory results go through async handling with Promise checks.
+
+**Opportunity:** When `inference.async === false`:
+- Skip Promise wrapping
+- Avoid microtask queue delays
+- Direct synchronous return path
+
+**Impact:** Faster resolution for synchronous factories (common case).
+
+#### 6. Cleanup Infrastructure Elision
+**Current:** `ensureCleanups()` creates Set on first cleanup registration.
+
+**Opportunity:** When `!usesCleanup`, skip cleanup-related code paths entirely:
+- No Set creation
+- No cleanup iteration during release
+
+**Impact:** Memory savings for stateless executors.
+
+### Optimization Priority Matrix
+
+| Optimization | Memory | CPU | Risk | Complexity |
+|-------------|--------|-----|------|------------|
+| Minimal Controller | High | Low | Low | Low |
+| Dependency Short-circuit | Medium | Medium | Low | Low |
+| Wrapper Elimination | Medium | High | Medium | Medium |
+| Lazy Variants | Medium | Low | Low | Low |
+| Sync Fast Path | Low | Medium | Medium | Medium |
+| Cleanup Elision | Low | Low | Low | Low |
+
 ## Alternatives Considered {#adr-002-alternatives}
 
 ### A) Analysis at scope creation time
