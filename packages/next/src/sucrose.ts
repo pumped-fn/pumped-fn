@@ -119,6 +119,39 @@ export function analyze(
  * @param executorName - Name for sourceURL debugging comment
  * @returns Compiled function with unified (deps, ctl) signature
  */
+function splitFirstParam(params: string): [string, boolean] {
+  let depth = 0
+  let inString = false
+  let stringChar = ""
+
+  for (let i = 0; i < params.length; i++) {
+    const char = params[i]
+
+    if (inString) {
+      if (char === stringChar && params[i - 1] !== "\\") {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      inString = true
+      stringChar = char
+      continue
+    }
+
+    if (char === "[" || char === "{") {
+      depth++
+    } else if (char === "]" || char === "}") {
+      depth--
+    } else if (char === "," && depth === 0) {
+      return [params.slice(0, i).trim(), true]
+    }
+  }
+
+  return [params.trim(), false]
+}
+
 export function generate(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape,
@@ -133,14 +166,20 @@ export function generate(
   if (dependencyShape === "none") {
     bindings = ""
   } else {
-    const paramParts = params.split(",")
-    paramParts.pop()
-    const depsParam = paramParts.join(",").trim()
-    bindings = `const ${depsParam} = deps;`
+    const [depsParam, hasCtl] = splitFirstParam(params)
+
+    if (depsParam === "deps" || depsParam.startsWith("deps:")) {
+      bindings = ""
+    } else {
+      bindings = `const ${depsParam} = deps;`
+    }
   }
 
-  const hasReturn = body.includes("return ")
-  const bodyWithReturn = hasReturn ? body : `return ${body}`
+  const hasReturn = body.includes("return ") || body.includes("return;") || body.includes("return\n")
+  const startsWithStatement = body.trimStart().startsWith("throw ") || body.trimStart().match(/^(const|let|var|if|for|while|switch|try)\s/)
+  const isMultiStatement = body.includes(";") || body.includes("\n")
+
+  const bodyWithReturn = (hasReturn || isMultiStatement || startsWithStatement) ? body : `return ${body}`
 
   const fnBody = `
 "use strict";

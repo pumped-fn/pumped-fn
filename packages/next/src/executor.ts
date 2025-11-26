@@ -1,5 +1,15 @@
 import { Core, executorSymbol, type Escapable } from "./types";
 import type { Tag } from "./tag";
+import { compile, type Sucrose } from "./sucrose";
+
+function getDependencyShape(
+  dependencies: undefined | Core.UExecutor | ReadonlyArray<Core.UExecutor> | Record<string, Core.UExecutor>
+): Sucrose.DependencyShape {
+  if (dependencies === undefined) return "none"
+  if (Array.isArray(dependencies)) return "array"
+  if (typeof dependencies === "object" && !("factory" in dependencies)) return "record"
+  return "single"
+}
 
 export function createExecutor<T>(
   factory: Core.NoDependencyFn<T> | Core.DependentFn<T, unknown>,
@@ -8,8 +18,11 @@ export function createExecutor<T>(
     | Core.UExecutor
     | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>,
-  tags: Tag.Tagged[] | undefined
+  tags: Tag.Tagged[] | undefined,
+  originalFactory?: Function
 ): Core.Executor<T> {
+  const dependencyShape = getDependencyShape(dependencies)
+
   const executor = {
     [executorSymbol]: "main",
     factory: (_: unknown, controller: Core.Controller) => {
@@ -24,6 +37,13 @@ export function createExecutor<T>(
     dependencies,
     tags: tags,
   } as unknown as Core.Executor<T>;
+
+  try {
+    compile(originalFactory || factory, dependencyShape, executor, tags)
+  } catch {
+    // Compilation failed - this can happen with malformed factories or edge cases
+    // The executor will still work using the runtime factory
+  }
 
   const lazyExecutor = {
     [executorSymbol]: "lazy",
@@ -143,7 +163,7 @@ export function derive<T, D extends Core.DependencyLike>(
     | ReadonlyArray<Core.UExecutor>
     | Record<string, Core.UExecutor>;
 
-  return createExecutor(wrappedFactory, typedDependencies, tags);
+  return createExecutor(wrappedFactory, typedDependencies, tags, factory);
 }
 
 /**

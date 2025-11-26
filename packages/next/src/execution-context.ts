@@ -199,7 +199,7 @@ const createFlowWithDependencies = <S, I, D extends Core.DependencyLike>(
     | Record<string, Core.UExecutor>, [
     ...(config.tags || []),
     flowDefinitionMeta(definition)
-  ]) as Flow.Flow<I, S>
+  ], handler) as Flow.Flow<I, S>
 
   executor.definition = definition
   return executor

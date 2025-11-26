@@ -178,6 +178,51 @@ describe("Scope & Executor", () => {
     })
   })
 
+  describe("Sucrose integration", () => {
+    it("provide() stores Sucrose metadata", () => {
+      const counter = provide(() => 0)
+      const meta = getMetadata(counter)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("none")
+    })
+
+    it("derive() with array deps stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive([dep], ([d], ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("array")
+    })
+
+    it("derive() with record deps stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive({ d: dep }, ({ d }, ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("record")
+    })
+
+    it("derive() with single dep stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive(dep, (d, ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("single")
+    })
+
+    it("metadata includes name tag when provided", () => {
+      const named = provide(() => "value", name("myService"))
+      const meta = getMetadata(named)
+      expect(meta?.name).toBe("myService")
+    })
+
+    it("compiled function executes correctly", async () => {
+      const counter = provide(() => 42)
+      const meta = getMetadata(counter)
+      expect(meta?.compiled(undefined, {})).toBe(42)
+    })
+  })
+
   describe("preset()", () => {
     it("overrides executor value with static value", async () => {
       const counter = provide(() => 0)
