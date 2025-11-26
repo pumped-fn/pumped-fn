@@ -24,6 +24,7 @@ import { Promised, validate } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi, FlowExecutionImpl } from "./flow";
 import { flowDefinitionMeta, ExecutionContextImpl } from "./execution-context";
+import { getMetadata } from "./sucrose";
 
 export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
 type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
@@ -359,6 +360,9 @@ class AccessorImpl implements Core.Accessor<unknown> {
     resolvedDependencies: unknown,
     controller: Core.Controller
   ): Promise<unknown> {
+    const meta = getMetadata(this.requestor);
+    const callSite = meta?.callSite;
+
     try {
       const factoryResult =
         factory.length >= 2
@@ -378,7 +382,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
           throw errors.createFactoryError(
             executorName,
             dependencyChain,
-            asyncError
+            asyncError,
+            callSite
           );
         }
       }
@@ -391,7 +396,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
       throw errors.createFactoryError(
         executorName,
         dependencyChain,
-        syncError
+        syncError,
+        callSite
       );
     }
   }
@@ -435,11 +441,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const executorName = errors.getExecutorName(this.requestor);
     const dependencyChain = [executorName];
+    const meta = getMetadata(this.requestor);
+    const callSite = meta?.callSite;
 
     const enhancedError = errors.createSystemError(
       executorName,
       dependencyChain,
-      error
+      error,
+      callSite
     );
 
     return {
@@ -636,11 +645,15 @@ class BaseScope implements Core.Scope {
     if (currentChain && currentChain.has(executor)) {
       const chainArray = Array.from(currentChain);
       const dependencyChain = errors.buildDependencyChain(chainArray);
+      const meta = getMetadata(executor);
+      const callSite = meta?.callSite;
 
       throw errors.createDependencyError(
         errors.getExecutorName(executor),
         dependencyChain,
-        errors.getExecutorName(executor)
+        errors.getExecutorName(executor),
+        undefined,
+        callSite
       );
     }
   }
@@ -755,10 +768,14 @@ class BaseScope implements Core.Scope {
 
     if (e === ref) {
       const executorName = errors.getExecutorName(e);
+      const meta = getMetadata(e);
+      const callSite = meta?.callSite;
       throw errors.createDependencyError(
         executorName,
         [executorName],
-        executorName
+        executorName,
+        undefined,
+        callSite
       );
     }
 

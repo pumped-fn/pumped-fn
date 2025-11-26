@@ -1853,6 +1853,32 @@ describe("Error Classes", () => {
       expect(error.code).toBe("EC001")
     })
   })
+
+  describe("callSite enrichment", () => {
+    it("FactoryExecutionError includes callSite when available", () => {
+      const callSite = "at myFunction (file.ts:10:5)"
+      const error = new FactoryExecutionError("factory failed", "myExec", ["root", "myExec"], new Error("fail"), callSite)
+      expect(error.callSite).toBe(callSite)
+    })
+
+    it("errors from executor resolution include callSite from metadata", async () => {
+      const failingExec = provide(() => {
+        throw new Error("intentional")
+      }, name("failingService"))
+
+      const scope = createScope()
+      try {
+        await scope.resolve(failingExec)
+        expect.fail("Should have thrown")
+      } catch (e) {
+        expect(e).toBeInstanceOf(FactoryExecutionError)
+        const err = e as FactoryExecutionError
+        expect(err.callSite).toBeDefined()
+        expect(err.callSite).toContain(".ts:")
+      }
+      await scope.dispose()
+    })
+  })
 })
 
 describe("Realistic Scenario: Request Processing with Tags and Extensions", () => {
