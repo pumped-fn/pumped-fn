@@ -149,6 +149,13 @@ Sucrose analyzes factory functions at creation time to enable:
 | `dependencyShape` | `'single'` / `'array'` / `'record'` / `'none'` |
 | `dependencyAccess` | Which dependencies are actually accessed |
 
+**Supported function syntax:**
+
+- Arrow functions: `(x) => expr`, `(x) => { ... }`
+- Regular functions: `function(x) { ... }`
+- Named functions: `function name(x) { ... }`
+- Async variants of all above
+
 **Generated code signature:** `(deps, ctl) => result`
 
 ```typescript
@@ -158,6 +165,18 @@ Sucrose analyzes factory functions at creation time to enable:
 // derive([dbExec, cacheExec], ([db, cache], ctl) => new Repo(db, cache))
 // Generated: new Function('deps', 'ctl', `"use strict"; return new Repo(deps[0], deps[1])`)
 ```
+
+**Compilation skip reasons:**
+
+Compilation may be skipped when the factory cannot be safely compiled:
+
+| Skip Reason | When |
+|-------------|------|
+| `free-variables` | Factory references closure variables |
+| `unsupported-syntax` | Function parsing failed |
+| `compilation-error` | `new Function()` threw |
+
+When skipped, `metadata.skipReason` and `metadata.skipDetail` explain why. Original factory is still used at runtime.
 
 **Debugging support:**
 

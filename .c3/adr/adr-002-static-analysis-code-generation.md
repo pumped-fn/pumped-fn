@@ -73,6 +73,12 @@ Generate optimized factory via `new Function()`:
 
 **Unified signature:** `(deps, ctl) => result`
 
+**Supported function syntax:**
+- Arrow functions: `(x) => expr`, `(x) => { ... }`
+- Regular functions: `function(x) { ... }`
+- Named functions: `function name(x) { ... }`
+- Async variants of all above
+
 ```typescript
 // provide((ctl) => new Service())
 new Function('deps', 'ctl', `"use strict"; return new Service()`)
@@ -86,6 +92,29 @@ new Function('deps', 'ctl', `"use strict"; return new Repo(deps[0], deps[1])`)
 // derive({ db: dbExec }, ({ db }, ctl) => new Repo(db))
 new Function('deps', 'ctl', `"use strict"; return new Repo(deps.db)`)
 ```
+
+### Compilation Skip Reasons
+
+Compilation may be skipped when the factory cannot be safely compiled. Skip information is stored in metadata:
+
+| Skip Reason | When | Example |
+|-------------|------|---------|
+| `free-variables` | Factory references closure variables | `const x = 1; provide(() => x)` |
+| `unsupported-syntax` | Function parsing failed | Edge case syntax |
+| `compilation-error` | `new Function()` threw | Invalid generated code |
+
+**Free variable detection:**
+- Parses function body to identify identifiers
+- Allows known globals (Object, Array, Promise, JSON, Math, etc.)
+- Allows declared local variables (`const`, `let`, `var`)
+- Skips property access (`.foo` not counted as variable)
+- First detected free variable triggers skip with detail message
+
+When compilation is skipped:
+- `metadata.compiled` is `undefined`
+- `metadata.skipReason` explains why
+- `metadata.skipDetail` provides specific detail (e.g., variable name)
+- Original factory is still used at runtime (no performance gain, but works)
 
 ### Error Handling
 
@@ -147,16 +176,20 @@ const resolve = (deps, ctl) => {
 
 ## Verification {#adr-002-verification}
 
-- [ ] `provide()` analyzes factory and generates compiled function
-- [ ] `derive()` handles all dependency shapes (single, array, record)
-- [ ] Analysis correctly detects: async, usesCleanup, usesRelease, usesReload, usesScope
-- [ ] Generated code has `//# sourceURL` comment
-- [ ] Call site captured at creation time
-- [ ] Original factory preserved and accessible
-- [ ] Error enrichment includes `name` tag value
-- [ ] Error enrichment includes `callSite`
-- [ ] Generated functions are testable in isolation
-- [ ] Existing tests continue to pass (backward compatible)
+- [x] `provide()` analyzes factory and generates compiled function
+- [x] `derive()` handles all dependency shapes (single, array, record)
+- [x] Analysis correctly detects: async, usesCleanup, usesRelease, usesReload, usesScope
+- [x] Generated code has `//# sourceURL` comment
+- [x] Call site captured at creation time
+- [x] Original factory preserved and accessible
+- [x] Error enrichment includes `name` tag value
+- [x] Error enrichment includes `callSite`
+- [x] Generated functions are testable in isolation
+- [x] Existing tests continue to pass (backward compatible)
+- [x] Skip reasons (`free-variables`, `unsupported-syntax`, `compilation-error`) documented
+- [x] Free variable detection prevents closure compilation
+- [x] Regular function syntax supported (not just arrow functions)
+- [x] Compiled function actually used at resolution time (verified via spy test)
 
 ## Future Considerations {#adr-002-future}
 
