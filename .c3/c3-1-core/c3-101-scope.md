@@ -188,12 +188,12 @@ Scopes emit events for observability:
 
 ## Testing {#c3-101-testing}
 
-Primary tests: `core.behavior.test.ts`
+Primary tests: `index.test.ts` - "Scope & Executor" describe block
 
 Key test scenarios:
 - Dependency graph resolution
 - Circular dependency detection
 - Cache behavior
-- Cleanup ordering
-- Reactive updates
+- Cleanup ordering (LIFO)
+- Reactive updates via accessor
 - Preset overrides

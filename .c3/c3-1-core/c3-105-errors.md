@@ -143,7 +143,12 @@ Messages use template placeholders:
 
 ## Testing {#c3-105-testing}
 
-Error behavior is tested implicitly through:
-- `core.behavior.test.ts` - Resolution error scenarios
-- `execution-context.behavior.test.ts` - Flow error scenarios
-- `tag.test.ts` - Schema validation errors
+Primary tests: `index.test.ts` - "Error Classes" describe block
+
+Key test scenarios:
+- SchemaError with validation issues
+- ExecutorResolutionError with dependency chain
+- FactoryExecutionError wrapping factory errors
+- DependencyResolutionError for missing deps
+- ExecutionContextClosedError state validation
+- FlowError and FlowValidationError

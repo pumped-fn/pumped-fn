@@ -259,14 +259,12 @@ The `flow.execute()` convenience function:
 
 ## Testing {#c3-102-testing}
 
-Primary tests:
-- `execution-context.behavior.test.ts` - Context parity, journaling, timeouts
-- `flow/execute.test.ts` - Flow execution patterns
-- `flow/parallel.test.ts` - Parallel execution helpers
+Primary tests: `index.test.ts` - "Flow" and "ExecutionContext Lifecycle" describe blocks
 
 Key test scenarios:
-- Nested flow execution
+- Nested flow execution via ctx.exec
 - Tag propagation through context hierarchy
 - Journal replay behavior
 - Timeout and cancellation
-- Parallel execution stats
+- Parallel execution (ctx.parallel, ctx.parallelSettled)
+- ExecutionContext state transitions (active → closing → closed)

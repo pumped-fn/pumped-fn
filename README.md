@@ -1,5 +1,8 @@
 # pumped-fn // ExecutionContext-first activation
 
+[![npm version](https://img.shields.io/npm/v/@pumped-fn/core-next)](https://www.npmjs.com/package/@pumped-fn/core-next)
+[![Test Coverage](https://img.shields.io/badge/coverage-83%25-brightgreen)](packages/next/tests/)
+
 ## Activation
 - load layered map → memorize ExecutionContext outer, Flow medium, Scope core, Extensions detached
 - follow API grid rows top → bottom when coding
@@ -30,11 +33,9 @@ graph LR
   end
 
   subgraph Tests["Testing Mirror"]
-    T1["execution-context.test.ts"]
-    T2["flow-execution.test.ts"]
-    T3["scope-run.test.ts"]
-    T4["extensions.test.ts"]
-    TH["shared harness: tests/test-utils.ts"]
+    T1["index.test.ts - unified test suite"]
+    T2["160 tests covering all layers"]
+    T3["83% coverage"]
   end
 
   EC --> Flow
@@ -42,13 +43,9 @@ graph LR
   Ext -- "wrap/onError" --> EC
   Ext -- "dispose/reload" --> Resolution
   EC -.-> T1
-  Flow -.-> T2
-  Resolution -.-> T3
-  Ext -.-> T4
-  T1 --> TH
-  T2 --> TH
-  T3 --> TH
-  T4 --> TH
+  Flow -.-> T1
+  Resolution -.-> T1
+  Ext -.-> T1
 ```
 
 ## Atom graph
@@ -142,13 +139,13 @@ classDiagram
 ## API grid
 | Layer | API | Usage pulse | Tests |
 | --- | --- | --- | --- |
-| ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/execution-context.test.ts`, `flow-execution.test.ts`
-| Flow | `flow()`, `flowMeta`, `flow.execute`, `ExecutionContext.Context` (aka Flow.Context) | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
-| Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/scope-run.test.ts`, `core.test.ts`
-| Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`, `multi.test.ts`
-| Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/tag.test.ts`, `meta.test.ts`
-| Extensions | `extension()`, `extension.wrap/onError/dispose` | cross-cutting instrumentation via ExecutionContext + Scope only | `packages/next/tests/extensions.test.ts`, `flow-extensions.test.ts`
-| Promised & Utilities | `Promised`, `MaybePromised`, `standardSchema`, `errors.*` | unify sync+async, validate inputs/outputs, bubble typed errors | `packages/next/tests/promised-settled.test.ts`, `errors` suite
+| ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/index.test.ts`
+| Flow | `flow()`, `flowMeta`, `flow.execute`, `ExecutionContext.Context` (aka Flow.Context) | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/index.test.ts`
+| Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/index.test.ts`
+| Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`
+| Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/index.test.ts`
+| Extensions | `extension()`, `extension.wrap/onError/dispose` | cross-cutting instrumentation via ExecutionContext + Scope only | `packages/next/tests/index.test.ts`
+| Promised & Utilities | `Promised`, `MaybePromised`, `standardSchema`, `errors.*` | unify sync+async, validate inputs/outputs, bubble typed errors | `packages/next/tests/index.test.ts`
 
 ## Migration Notes
 
