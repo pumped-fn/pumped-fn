@@ -2,7 +2,7 @@
 
 # Prerequisites
 
-This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troublesshoting.md
+This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troubleshooting.md
 
 # IMPORTANT
 
