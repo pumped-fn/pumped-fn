@@ -595,7 +595,6 @@ class BaseScope implements Core.Scope {
       tags: details?.tags
     });
 
-    // Fire-and-forget: extension errors during create shouldn't prevent context usage
     context["~emitLifecycleOperation"]('create').catch((err) => {
       console.error('Extension error during context creation:', err)
     })
@@ -1412,7 +1411,6 @@ class BaseScope implements Core.Scope {
       } catch (error) {
         context.details.error = error;
         context.end();
-        // Best-effort cleanup: don't let close errors mask the original error
         await context.close().catch((closeErr) => {
           console.error('Error closing context after flow failure:', closeErr);
         });

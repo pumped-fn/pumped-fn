@@ -1121,9 +1121,7 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     for (const cb of this.stateChangeCallbacks) {
       try {
         cb(newState, prev)
-      } catch {
-        // Callback errors must not prevent state transitions from completing
-      }
+      } catch {}
     }
   }
 
@@ -1218,7 +1216,6 @@ export class ExecutionContextImpl implements ExecutionContext.Context {
     const tracked = promise.finally(() => {
       this.inFlight.delete(promise)
     })
-    // Suppress unhandled rejection - the caller is responsible for error handling
     tracked.catch(() => {})
     return promise
   }
