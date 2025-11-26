@@ -38,12 +38,7 @@ export function createExecutor<T>(
     tags: tags,
   } as unknown as Core.Executor<T>;
 
-  try {
-    compile(originalFactory || factory, dependencyShape, executor, tags)
-  } catch {
-    // Compilation failed - this can happen with malformed factories or edge cases
-    // The executor will still work using the runtime factory
-  }
+  compile(originalFactory || factory, dependencyShape, executor, tags)
 
   const lazyExecutor = {
     [executorSymbol]: "lazy",

@@ -14,20 +14,38 @@ export namespace Sucrose {
     dependencyAccess: (number | string)[]
   }
 
+  export type CompilationSkipReason =
+    | "free-variables"
+    | "non-arrow-function"
+    | "compilation-error"
+
   export interface Metadata {
     inference: Inference
     compiled: ((deps: unknown, ctl: unknown) => unknown) | undefined
     original: Function
     callSite: string
     name: string | undefined
+    skipReason: CompilationSkipReason | undefined
+    skipDetail: string | undefined
   }
 }
 
 /**
  * Separates arrow function into parameters and body strings.
+ *
+ * **Internal/Advanced API** - Used by the compilation pipeline.
+ * Most users should use `compile()` instead.
+ *
  * @param fn - Arrow function to parse
  * @returns Tuple of [parameters, body] as strings
  * @throws Error if fn is not an arrow function
+ *
+ * @example
+ * ```typescript
+ * const [params, body] = separateFunction((x, y) => x + y)
+ * // params: "x, y"
+ * // body: "x + y"
+ * ```
  */
 export function separateFunction(fn: Function): [string, string] {
   const content = fn.toString()
@@ -57,9 +75,20 @@ export function separateFunction(fn: Function): [string, string] {
 
 /**
  * Analyzes factory function to detect usage patterns.
+ *
+ * **Internal/Advanced API** - Used by the compilation pipeline.
+ * Most users should use `compile()` instead.
+ *
  * @param fn - Factory function to analyze
  * @param dependencyShape - Expected dependency structure
- * @returns Inference object with detected patterns
+ * @returns Inference object with detected patterns (async, controller usage, dependencies)
+ *
+ * @example
+ * ```typescript
+ * const inference = analyze(([dep], ctl) => { ctl.cleanup(() => {}); return dep }, "array")
+ * // inference.usesCleanup === true
+ * // inference.dependencyAccess === [0]
+ * ```
  */
 export function analyze(
   fn: Function,
@@ -143,9 +172,9 @@ function stripStrings(code: string): string {
 
 /**
  * Checks if function body likely references closure variables (free variables).
- * Returns true if compilation should be skipped.
+ * Returns the first detected free variable, or undefined if none found.
  */
-function hasFreeVariables(body: string, depsParam: string | undefined, ctlParam: string): boolean {
+function detectFreeVariable(body: string, depsParam: string | undefined, ctlParam: string): string | undefined {
   const strippedBody = stripStrings(body)
 
   const knownGlobals = new Set([
@@ -206,20 +235,13 @@ function hasFreeVariables(body: string, depsParam: string | undefined, ctlParam:
       continue
     }
     if (!knownGlobals.has(id) && !localVars.has(id)) {
-      return true
+      return id
     }
   }
 
-  return false
+  return undefined
 }
 
-/**
- * Generates optimized compiled function via `new Function()` for JIT execution.
- * @param fn - Factory function to compile
- * @param dependencyShape - Expected dependency structure
- * @param executorName - Name for sourceURL debugging comment
- * @returns Compiled function with unified (deps, ctl) signature, or undefined if compilation not safe
- */
 function splitFirstParam(params: string): [string, boolean] {
   let depth = 0
   let inString = false
@@ -253,13 +275,52 @@ function splitFirstParam(params: string): [string, boolean] {
   return [params.trim(), false]
 }
 
+export type GenerateResult =
+  | { compiled: (deps: unknown, ctl: unknown) => unknown; skipReason: undefined; skipDetail: undefined }
+  | { compiled: undefined; skipReason: Sucrose.CompilationSkipReason; skipDetail: string }
+
+/**
+ * Generates optimized compiled function via `new Function()` for JIT execution.
+ *
+ * **Limitations:**
+ * - Only arrow functions are supported
+ * - Factories with closure variables (free variables) cannot be compiled
+ * - Common globals (Object, Array, Promise, etc.) are allowed
+ *
+ * @param fn - Factory function to compile
+ * @param dependencyShape - Expected dependency structure
+ * @param executorName - Name for sourceURL debugging comment
+ * @returns Result object with either compiled function or skip reason
+ *
+ * @example
+ * ```typescript
+ * const result = generate(myFactory, "array", "myExecutor")
+ * if (result.compiled) {
+ *   // Use the optimized function
+ * } else {
+ *   console.log(`Skipped: ${result.skipReason} - ${result.skipDetail}`)
+ * }
+ * ```
+ */
 export function generate(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape,
   executorName: string
-): ((deps: unknown, ctl: unknown) => unknown) | undefined {
+): GenerateResult {
   const content = fn.toString()
-  const [params, body] = separateFunction(fn)
+
+  let params: string
+  let body: string
+  try {
+    [params, body] = separateFunction(fn)
+  } catch {
+    return {
+      compiled: undefined,
+      skipReason: "non-arrow-function",
+      skipDetail: "Only arrow functions can be compiled"
+    }
+  }
+
   const isAsync = content.trimStart().startsWith("async")
 
   let depsParam: string | undefined
@@ -274,8 +335,13 @@ export function generate(
     ctlParam = hasCtl ? params.slice(params.indexOf(",") + 1).trim() : ""
   }
 
-  if (hasFreeVariables(body, depsParam, ctlParam)) {
-    return undefined
+  const freeVar = detectFreeVariable(body, depsParam, ctlParam)
+  if (freeVar) {
+    return {
+      compiled: undefined,
+      skipReason: "free-variables",
+      skipDetail: `Closure variable detected: '${freeVar}'`
+    }
   }
 
   let bindings = ""
@@ -304,12 +370,20 @@ ${bodyWithReturn}
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
   const FunctionConstructor = isAsync ? AsyncFunction : Function
 
-  return new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown
+  return {
+    compiled: new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown,
+    skipReason: undefined,
+    skipDetail: undefined
+  }
 }
 
 /**
  * Captures call site information from stack trace for debugging.
- * @returns Stack trace line representing the call location
+ *
+ * **Internal/Advanced API** - Used by the compilation pipeline.
+ * Most users should use `compile()` or `getMetadata()` instead.
+ *
+ * @returns Stack trace line representing the call location (e.g., "at myFunction (file.ts:42:10)")
  */
 export function captureCallSite(): string {
   const err = new Error()
@@ -334,11 +408,29 @@ export function getMetadata(executor: object): Sucrose.Metadata | undefined {
 
 /**
  * Compiles a factory function with static analysis and stores metadata.
+ *
+ * **Important:** Compilation may be skipped for factories that:
+ * - Are not arrow functions
+ * - Reference closure variables (free variables)
+ *
+ * Check `metadata.compiled !== undefined` to verify compilation succeeded.
+ * When skipped, `metadata.skipReason` and `metadata.skipDetail` explain why.
+ *
  * @param fn - Factory function to compile
  * @param dependencyShape - Expected dependency structure
  * @param executor - Optional executor to associate metadata with
  * @param tags - Optional array of tags for extracting metadata (e.g., name tag)
- * @returns Compiled metadata including inference, compiled function, and debugging info
+ * @returns Compiled metadata including inference, compiled function (if successful), and debugging info
+ *
+ * @example
+ * ```typescript
+ * const meta = compile(myFactory, "array", myExecutor, [])
+ * if (meta.compiled) {
+ *   // Use optimized path
+ * } else {
+ *   console.warn(`Compilation skipped: ${meta.skipReason} - ${meta.skipDetail}`)
+ * }
+ * ```
  */
 export function compile(
   fn: Function,
@@ -357,15 +449,17 @@ export function compile(
   }
 
   const inference = analyze(fn, dependencyShape)
-  const compiled = generate(fn, dependencyShape, executorName || "anonymous")
+  const result = generate(fn, dependencyShape, executorName || "anonymous")
   const callSite = captureCallSite()
 
   const metadata: Sucrose.Metadata = {
     inference,
-    compiled,
+    compiled: result.compiled,
     original: fn,
     callSite,
     name: executorName,
+    skipReason: result.skipReason,
+    skipDetail: result.skipDetail,
   }
 
   if (executor) {

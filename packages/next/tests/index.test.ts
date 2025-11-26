@@ -219,7 +219,7 @@ describe("Scope & Executor", () => {
     it("compiled function executes correctly", async () => {
       const counter = provide(() => 42)
       const meta = getMetadata(counter)
-      expect(meta?.compiled(undefined, {})).toBe(42)
+      expect(meta?.compiled?.(undefined, {})).toBe(42)
     })
   })
 
@@ -2304,47 +2304,72 @@ describe("Sucrose (Static Analysis)", () => {
   describe("generate", () => {
     it("generates function for provide (no deps)", () => {
       const fn = (ctl: unknown) => "value"
-      const compiled = generate(fn, "none", "testExecutor")
-      expect(typeof compiled).toBe("function")
-      expect(compiled(undefined, {})).toBe("value")
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.skipReason).toBeUndefined()
+      expect(result.compiled!(undefined, {})).toBe("value")
     })
 
     it("generates function for derive with single dep", () => {
       const fn = (db: string, ctl: unknown) => `connected-${db}`
-      const compiled = generate(fn, "single", "testExecutor")
-      expect(compiled("postgres", {})).toBe("connected-postgres")
+      const result = generate(fn, "single", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!("postgres", {})).toBe("connected-postgres")
     })
 
     it("generates function for derive with array deps", () => {
       const fn = ([a, b]: [number, number], ctl: unknown) => a + b
-      const compiled = generate(fn, "array", "testExecutor")
-      expect(compiled([10, 5], {})).toBe(15)
+      const result = generate(fn, "array", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!([10, 5], {})).toBe(15)
     })
 
     it("generates function for derive with record deps", () => {
       const fn = ({ x, y }: { x: number; y: number }, ctl: unknown) => x * y
-      const compiled = generate(fn, "record", "testExecutor")
-      expect(compiled({ x: 3, y: 4 }, {})).toBe(12)
+      const result = generate(fn, "record", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!({ x: 3, y: 4 }, {})).toBe(12)
     })
 
     it("generates async function when factory is async", async () => {
       const fn = async (ctl: unknown) => "async-value"
-      const compiled = generate(fn, "none", "testExecutor")
-      const result = compiled(undefined, {})
-      expect(result).toBeInstanceOf(Promise)
-      expect(await result).toBe("async-value")
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      const promiseResult = result.compiled!(undefined, {})
+      expect(promiseResult).toBeInstanceOf(Promise)
+      expect(await promiseResult).toBe("async-value")
     })
 
     it("includes sourceURL comment", () => {
       const fn = (ctl: unknown) => "value"
-      const compiled = generate(fn, "none", "myExecutor")
-      expect(compiled.toString()).toContain("sourceURL=pumped-fn://myExecutor.js")
+      const result = generate(fn, "none", "myExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!.toString()).toContain("sourceURL=pumped-fn://myExecutor.js")
     })
 
     it("passes controller to factory", () => {
       const fn = (ctl: { value: number }) => ctl.value
-      const compiled = generate(fn, "none", "testExecutor")
-      expect(compiled(undefined, { value: 42 })).toBe(42)
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!(undefined, { value: 42 })).toBe(42)
+    })
+
+    it("returns skip reason for closure variables", () => {
+      const closureValue = "from closure"
+      const fn = () => closureValue
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeUndefined()
+      expect(result.skipReason).toBe("free-variables")
+      expect(result.skipDetail).toContain("closureValue")
+    })
+
+    it("returns skip reason for module-scoped constructors", () => {
+      class Service {}
+      const fn = () => new Service()
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeUndefined()
+      expect(result.skipReason).toBe("free-variables")
+      expect(result.skipDetail).toContain("Service")
     })
   })
 
@@ -2370,6 +2395,8 @@ describe("Sucrose (Static Analysis)", () => {
       expect(typeof meta.compiled).toBe("function")
       expect(meta.original).toBe(fn)
       expect(typeof meta.callSite).toBe("string")
+      expect(meta.skipReason).toBeUndefined()
+      expect(meta.skipDetail).toBeUndefined()
     })
 
     it("extracts name from tags", () => {
@@ -2385,6 +2412,24 @@ describe("Sucrose (Static Analysis)", () => {
       const meta = compile(fn, "none", executor, [])
       const retrieved = getMetadata(executor)
       expect(retrieved).toBe(meta)
+    })
+
+    it("includes skip reason when factory has closure variables", () => {
+      const closureValue = "from closure"
+      const fn = () => closureValue
+      const meta = compile(fn, "none", undefined, [])
+      expect(meta.compiled).toBeUndefined()
+      expect(meta.skipReason).toBe("free-variables")
+      expect(meta.skipDetail).toContain("closureValue")
+    })
+
+    it("includes skip reason when factory uses module-scoped constructors", () => {
+      class MyService {}
+      const fn = () => new MyService()
+      const meta = compile(fn, "none", undefined, [])
+      expect(meta.compiled).toBeUndefined()
+      expect(meta.skipReason).toBe("free-variables")
+      expect(meta.skipDetail).toContain("MyService")
     })
   })
 
@@ -2409,6 +2454,8 @@ describe("Sucrose (Static Analysis)", () => {
       const meta = getMetadata(executor)
 
       expect(meta?.compiled).toBeUndefined()
+      expect(meta?.skipReason).toBe("free-variables")
+      expect(meta?.skipDetail).toContain("closureValue")
 
       const scope = createScope()
       const result = await scope.resolve(executor)
