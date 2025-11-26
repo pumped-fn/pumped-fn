@@ -6,7 +6,7 @@ Always use /c3:c3-use skill to start a session, that'll help with architecture u
 
 # Coding Style
 
-- Strict typing: no `any`, `unknown` over casting
+- **NO `any`** - use `as unknown as TargetType` for intentional type violations
 - **NEVER** inline `//` comments - code self-documents via naming
 - **ALWAYS** TSDoc for public API (exports via packages/*/src/index.ts)
 - Group types using namespaces
@@ -39,7 +39,11 @@ pnpm -F @pumped-fn/examples typecheck       # examples
 
 ## Before Opening a PR
 
-Run `/c3-skill:c3-audit` to verify C3 documentation is in sync with codebase changes. This ensures architecture docs in `.c3/` reflect any structural modifications.
+1. Run `/c3-skill:c3-audit` - C3 docs MUST match code
+2. Add changeset: `.changeset/<name>.md`
+3. `grep -r "any" packages/next/` - zero tolerance
+
+**Test changes = C3 changes.** Update ALL `.c3/c3-1-core/c3-10*.md` Testing sections.
 
 ## Public API Export Rules
 
