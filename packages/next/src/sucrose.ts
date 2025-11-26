@@ -1,3 +1,6 @@
+import { type Core } from "./types"
+import { type Tag } from "./tag"
+
 export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
 
@@ -164,4 +167,58 @@ export function captureCallSite(): string {
   const relevantLines = lines.slice(2).filter((line) => !line.includes("sucrose.ts"))
 
   return relevantLines[0]?.trim() || "unknown"
+}
+
+const metadataStore = new WeakMap<object, Sucrose.Metadata>()
+
+/**
+ * Retrieves stored metadata for an executor.
+ * @param executor - Executor object to retrieve metadata for
+ * @returns Metadata if found, undefined otherwise
+ */
+export function getMetadata(executor: object): Sucrose.Metadata | undefined {
+  return metadataStore.get(executor)
+}
+
+/**
+ * Compiles a factory function with static analysis and stores metadata.
+ * @param fn - Factory function to compile
+ * @param dependencyShape - Expected dependency structure
+ * @param executor - Optional executor to associate metadata with
+ * @param tags - Optional array of tags for extracting metadata (e.g., name tag)
+ * @returns Compiled metadata including inference, compiled function, and debugging info
+ */
+export function compile(
+  fn: Function,
+  dependencyShape: Sucrose.DependencyShape,
+  executor: Core.Executor<unknown> | undefined,
+  tags: Tag.Tagged[] | undefined
+): Sucrose.Metadata {
+  const nameTagKey = Symbol.for("pumped-fn/name")
+  let executorName: string | undefined
+
+  if (tags) {
+    const nameTagged = tags.find((t) => t.key === nameTagKey)
+    if (nameTagged) {
+      executorName = nameTagged.value as string
+    }
+  }
+
+  const inference = analyze(fn, dependencyShape)
+  const compiled = generate(fn, dependencyShape, executorName || "anonymous")
+  const callSite = captureCallSite()
+
+  const metadata: Sucrose.Metadata = {
+    inference,
+    compiled,
+    original: fn,
+    callSite,
+    name: executorName,
+  }
+
+  if (executor) {
+    metadataStore.set(executor, metadata)
+  }
+
+  return metadata
 }

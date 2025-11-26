@@ -32,6 +32,8 @@ import {
   analyze,
   generate,
   captureCallSite,
+  compile,
+  getMetadata,
   type Core,
   type Flow,
   type Extension,
@@ -2285,6 +2287,33 @@ describe("Sucrose (Static Analysis)", () => {
     it("includes file path in call site", () => {
       const callSite = captureCallSite()
       expect(callSite).toMatch(/\.ts:|\.js:/)
+    })
+  })
+
+  describe("compile", () => {
+    it("compiles factory and returns metadata", () => {
+      const fn = (ctl: unknown) => "value"
+      const meta = compile(fn, "none", undefined, [])
+      expect(meta.inference.async).toBe(false)
+      expect(meta.inference.dependencyShape).toBe("none")
+      expect(typeof meta.compiled).toBe("function")
+      expect(meta.original).toBe(fn)
+      expect(typeof meta.callSite).toBe("string")
+    })
+
+    it("extracts name from tags", () => {
+      const nameTag = tag(custom<string>(), { label: "pumped-fn/name" })
+      const fn = (ctl: unknown) => "value"
+      const meta = compile(fn, "none", undefined, [nameTag("myService")])
+      expect(meta.name).toBe("myService")
+    })
+
+    it("stores metadata in WeakMap keyed by executor", () => {
+      const fn = (ctl: unknown) => "value"
+      const executor = {} as Core.Executor<unknown>
+      const meta = compile(fn, "none", executor, [])
+      const retrieved = getMetadata(executor)
+      expect(retrieved).toBe(meta)
     })
   })
 })

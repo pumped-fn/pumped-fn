@@ -163,7 +163,7 @@ export { ExecutionContextClosedError } from "./errors"
 /**
  * Static analysis namespace containing types and functions for factory introspection.
  */
-export { Sucrose, separateFunction, analyze, generate, captureCallSite } from "./sucrose"
+export { Sucrose, separateFunction, analyze, generate, captureCallSite, compile, getMetadata } from "./sucrose"
 
 /**
  * Standard tag representing the friendly executor name.
