@@ -213,7 +213,7 @@ describe("Scope & Executor", () => {
     it("compiled function executes correctly", async () => {
       const counter = provide(() => 42)
       const meta = getMetadata(counter)
-      expect(meta?.compiled?.(undefined, {})).toBe(42)
+      expect(meta?.fn?.(undefined, {})).toBe(42)
     })
   })
 
@@ -2378,7 +2378,6 @@ describe("Sucrose (Static Analysis)", () => {
       const result = generate(fn, "none", "testExecutor")
       expect(result.compiled).toBeUndefined()
       expect(result.skipReason).toBe("free-variables")
-      expect(result.skipDetail).toContain("closureValue")
     })
 
     it("returns skip reason for module-scoped constructors", () => {
@@ -2387,7 +2386,6 @@ describe("Sucrose (Static Analysis)", () => {
       const result = generate(fn, "none", "testExecutor")
       expect(result.compiled).toBeUndefined()
       expect(result.skipReason).toBe("free-variables")
-      expect(result.skipDetail).toContain("Service")
     })
 
     it("generates function for regular function (no deps)", () => {
@@ -2448,11 +2446,10 @@ describe("Sucrose (Static Analysis)", () => {
       const fn = (ctl: unknown) => "value"
       const meta = compile(fn, "none", undefined, [])
       expect(meta.inference.dependencyShape).toBe("none")
-      expect(typeof meta.compiled).toBe("function")
+      expect(typeof meta.fn).toBe("function")
       expect(meta.original).toBe(fn)
       expect(typeof meta.callSite).toBe("string")
       expect(meta.skipReason).toBeUndefined()
-      expect(meta.skipDetail).toBeUndefined()
     })
 
     it("extracts name from tags", () => {
@@ -2474,18 +2471,16 @@ describe("Sucrose (Static Analysis)", () => {
       const closureValue = "from closure"
       const fn = () => closureValue
       const meta = compile(fn, "none", undefined, [])
-      expect(meta.compiled).toBeUndefined()
+      expect(meta.fn).toBeDefined()
       expect(meta.skipReason).toBe("free-variables")
-      expect(meta.skipDetail).toContain("closureValue")
     })
 
     it("includes skip reason when factory uses module-scoped constructors", () => {
       class MyService {}
       const fn = () => new MyService()
       const meta = compile(fn, "none", undefined, [])
-      expect(meta.compiled).toBeUndefined()
+      expect(meta.fn).toBeDefined()
       expect(meta.skipReason).toBe("free-variables")
-      expect(meta.skipDetail).toContain("MyService")
     })
   })
 
@@ -2495,7 +2490,7 @@ describe("Sucrose (Static Analysis)", () => {
       const meta = getMetadata(executor)
 
       expect(meta).toBeDefined()
-      expect(meta?.compiled).toBeDefined()
+      expect(meta?.fn).toBeDefined()
 
       const scope = createScope()
       const result = await scope.resolve(executor)
@@ -2509,9 +2504,8 @@ describe("Sucrose (Static Analysis)", () => {
       const executor = provide(() => closureValue)
       const meta = getMetadata(executor)
 
-      expect(meta?.compiled).toBeUndefined()
+      expect(meta?.fn).toBeDefined()
       expect(meta?.skipReason).toBe("free-variables")
-      expect(meta?.skipDetail).toContain("closureValue")
 
       const scope = createScope()
       const result = await scope.resolve(executor)
@@ -2526,7 +2520,7 @@ describe("Sucrose (Static Analysis)", () => {
       const sum = derive([a, b], ([x, y]) => x + y)
 
       const meta = getMetadata(sum)
-      expect(meta?.compiled).toBeDefined()
+      expect(meta?.fn).toBeDefined()
 
       const scope = createScope()
       const result = await scope.resolve(sum)
@@ -2541,7 +2535,7 @@ describe("Sucrose (Static Analysis)", () => {
       const url = derive({ host, port }, ({ host, port }) => `https://${host}:${port}`)
 
       const meta = getMetadata(url)
-      expect(meta?.compiled).toBeDefined()
+      expect(meta?.fn).toBeDefined()
 
       const scope = createScope()
       const result = await scope.resolve(url)
@@ -2557,12 +2551,12 @@ describe("Sucrose (Static Analysis)", () => {
       })
 
       const meta = getMetadata(executor)
-      expect(meta?.compiled).toBeDefined()
+      expect(meta?.fn).toBeDefined()
 
-      const originalCompiled = meta!.compiled!
-      meta!.compiled = (deps: unknown, ctl: unknown) => {
+      const originalFn = meta!.fn
+      meta!.fn = (deps: unknown, ctl: unknown) => {
         compiledCallCount++
-        return originalCompiled(deps, ctl)
+        return originalFn(deps, ctl)
       }
 
       const scope = createScope()
@@ -2579,7 +2573,7 @@ describe("Sucrose (Static Analysis)", () => {
       const executor = provide(() => closureValue)
 
       const meta = getMetadata(executor)
-      expect(meta?.compiled).toBeUndefined()
+      expect(meta?.fn).toBeDefined()
       expect(meta?.skipReason).toBe("free-variables")
 
       const scope = createScope()

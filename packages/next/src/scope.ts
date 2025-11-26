@@ -370,8 +370,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
     const callSite = meta?.callSite;
 
     try {
-      const factoryResult = meta?.compiled
-        ? meta.compiled(resolvedDependencies, controller)
+      const factoryResult = meta?.fn
+        ? meta.fn(resolvedDependencies, controller)
         : factory.length >= 2
           ? (factory as Core.DependentFn<unknown, unknown>)(
               resolvedDependencies,

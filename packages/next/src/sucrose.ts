@@ -2,6 +2,10 @@ import { type Core } from "./types"
 import { type Tag } from "./tag"
 import { Promised } from "./primitives"
 
+export type ControllerFactory =
+  | "none"
+  | ((scope: Core.Scope, executor: Core.Executor<unknown>, registerCleanup: (fn: Core.Cleanup) => void) => Core.Controller)
+
 export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
 
@@ -20,13 +24,13 @@ export namespace Sucrose {
     | "compilation-error"
 
   export interface Metadata {
+    fn: (deps: unknown, ctl: unknown) => unknown
     inference: Inference
-    compiled: ((deps: unknown, ctl: unknown) => unknown) | undefined
-    original: Function
+    controllerFactory: ControllerFactory
     callSite: string
     name: string | undefined
-    skipReason: CompilationSkipReason | undefined
-    skipDetail: string | undefined
+    original: Function
+    skipReason?: CompilationSkipReason
   }
 }
 
@@ -39,10 +43,6 @@ export const NOOP_CONTROLLER: Core.Controller = Object.freeze({
   reload: () => RESOLVED_VOID,
   scope: null as unknown as Core.Scope,
 })
-
-export type ControllerFactory =
-  | "none"
-  | ((scope: Core.Scope, executor: Core.Executor<unknown>, registerCleanup: (fn: Core.Cleanup) => void) => Core.Controller)
 
 export function separateFunction(fn: Function): [string, string] {
   const content = fn.toString()
@@ -259,8 +259,8 @@ function splitFirstParam(params: string): [string, string] {
 }
 
 export type GenerateResult =
-  | { compiled: (deps: unknown, ctl: unknown) => unknown; skipReason: undefined; skipDetail: undefined }
-  | { compiled: undefined; skipReason: Sucrose.CompilationSkipReason; skipDetail: string }
+  | { compiled: (deps: unknown, ctl: unknown) => unknown; skipReason: undefined }
+  | { compiled: undefined; skipReason: Sucrose.CompilationSkipReason }
 
 export function generate(
   fn: Function,
@@ -276,8 +276,7 @@ export function generate(
   } catch {
     return {
       compiled: undefined,
-      skipReason: "unsupported-syntax",
-      skipDetail: "Function syntax could not be parsed"
+      skipReason: "unsupported-syntax"
     }
   }
 
@@ -299,8 +298,7 @@ export function generate(
   if (freeVar) {
     return {
       compiled: undefined,
-      skipReason: "free-variables",
-      skipDetail: `Closure variable detected: '${freeVar}'`
+      skipReason: "free-variables"
     }
   }
 
@@ -337,8 +335,7 @@ ${bodyWithReturn}
 
   return {
     compiled: new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown,
-    skipReason: undefined,
-    skipDetail: undefined
+    skipReason: undefined
   }
 }
 
@@ -377,15 +374,26 @@ export function compile(
   const inference = analyze(fn, dependencyShape)
   const result = generate(fn, dependencyShape, executorName || "anonymous")
   const callSite = captureCallSite()
+  const controllerFactory = createControllerFactory(inference)
+
+  let normalizedFn: (deps: unknown, ctl: unknown) => unknown
+
+  if (result.compiled) {
+    normalizedFn = result.compiled
+  } else {
+    normalizedFn = dependencyShape === "none"
+      ? (_deps: unknown, ctl: unknown) => (fn as (ctl: unknown) => unknown)(ctl)
+      : (fn as (deps: unknown, ctl: unknown) => unknown)
+  }
 
   const metadata: Sucrose.Metadata = {
+    fn: normalizedFn,
     inference,
-    compiled: result.compiled,
-    original: fn,
+    controllerFactory,
     callSite,
     name: executorName,
+    original: fn,
     skipReason: result.skipReason,
-    skipDetail: result.skipDetail,
   }
 
   if (executor) {
