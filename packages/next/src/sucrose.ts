@@ -108,3 +108,46 @@ export function analyze(
     dependencyAccess,
   }
 }
+
+/**
+ * Generates optimized compiled function via `new Function()` for JIT execution.
+ * @param fn - Factory function to compile
+ * @param dependencyShape - Expected dependency structure
+ * @param executorName - Name for sourceURL debugging comment
+ * @returns Compiled function with unified (deps, ctl) signature
+ */
+export function generate(
+  fn: Function,
+  dependencyShape: Sucrose.DependencyShape,
+  executorName: string
+): (deps: unknown, ctl: unknown) => unknown {
+  const content = fn.toString()
+  const [params, body] = separateFunction(fn)
+  const isAsync = content.trimStart().startsWith("async")
+
+  let bindings = ""
+
+  if (dependencyShape === "none") {
+    bindings = ""
+  } else {
+    const paramParts = params.split(",")
+    paramParts.pop()
+    const depsParam = paramParts.join(",").trim()
+    bindings = `const ${depsParam} = deps;`
+  }
+
+  const hasReturn = body.includes("return ")
+  const bodyWithReturn = hasReturn ? body : `return ${body}`
+
+  const fnBody = `
+"use strict";
+${bindings}
+${bodyWithReturn}
+//# sourceURL=pumped-fn://${executorName}.js
+`
+
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+  const FunctionConstructor = isAsync ? AsyncFunction : Function
+
+  return new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown
+}

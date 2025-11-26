@@ -30,6 +30,7 @@ import {
   Sucrose,
   separateFunction,
   analyze,
+  generate,
   type Core,
   type Flow,
   type Extension,
@@ -2223,6 +2224,53 @@ describe("Sucrose (Static Analysis)", () => {
       }
       const inference = analyze(fn, "record")
       expect(inference.dependencyAccess).toContain("db")
+    })
+  })
+
+  describe("generate", () => {
+    it("generates function for provide (no deps)", () => {
+      const fn = (ctl: unknown) => "value"
+      const compiled = generate(fn, "none", "testExecutor")
+      expect(typeof compiled).toBe("function")
+      expect(compiled(undefined, {})).toBe("value")
+    })
+
+    it("generates function for derive with single dep", () => {
+      const fn = (db: string, ctl: unknown) => `connected-${db}`
+      const compiled = generate(fn, "single", "testExecutor")
+      expect(compiled("postgres", {})).toBe("connected-postgres")
+    })
+
+    it("generates function for derive with array deps", () => {
+      const fn = ([a, b]: [number, number], ctl: unknown) => a + b
+      const compiled = generate(fn, "array", "testExecutor")
+      expect(compiled([10, 5], {})).toBe(15)
+    })
+
+    it("generates function for derive with record deps", () => {
+      const fn = ({ x, y }: { x: number; y: number }, ctl: unknown) => x * y
+      const compiled = generate(fn, "record", "testExecutor")
+      expect(compiled({ x: 3, y: 4 }, {})).toBe(12)
+    })
+
+    it("generates async function when factory is async", async () => {
+      const fn = async (ctl: unknown) => "async-value"
+      const compiled = generate(fn, "none", "testExecutor")
+      const result = compiled(undefined, {})
+      expect(result).toBeInstanceOf(Promise)
+      expect(await result).toBe("async-value")
+    })
+
+    it("includes sourceURL comment", () => {
+      const fn = (ctl: unknown) => "value"
+      const compiled = generate(fn, "none", "myExecutor")
+      expect(compiled.toString()).toContain("sourceURL=pumped-fn://myExecutor.js")
+    })
+
+    it("passes controller to factory", () => {
+      const fn = (ctl: { value: number }) => ctl.value
+      const compiled = generate(fn, "none", "testExecutor")
+      expect(compiled(undefined, { value: 42 })).toBe(42)
     })
   })
 })
