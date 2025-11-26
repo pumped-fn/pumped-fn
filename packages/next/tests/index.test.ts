@@ -29,6 +29,7 @@ import {
   SchemaError,
   Sucrose,
   separateFunction,
+  analyze,
   type Core,
   type Flow,
   type Extension,
@@ -2133,6 +2134,95 @@ describe("Sucrose (Static Analysis)", () => {
       expect(params).toBe("ctl")
       expect(body).toContain("const x = 1")
       expect(body).toContain("return x")
+    })
+  })
+
+  describe("analyze", () => {
+    it("detects async factory", () => {
+      const fn = async (ctl: unknown) => "value"
+      const inference = analyze(fn, "none")
+      expect(inference.async).toBe(true)
+    })
+
+    it("detects sync factory", () => {
+      const fn = (ctl: unknown) => "value"
+      const inference = analyze(fn, "none")
+      expect(inference.async).toBe(false)
+    })
+
+    it("detects ctl.cleanup usage", () => {
+      const fn = (ctl: { cleanup: (fn: () => void) => void }) => {
+        ctl.cleanup(() => {})
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesCleanup).toBe(true)
+    })
+
+    it("detects ctl.release usage", () => {
+      const fn = (ctl: { release: () => void }) => {
+        ctl.release()
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesRelease).toBe(true)
+    })
+
+    it("detects ctl.reload usage", () => {
+      const fn = (ctl: { reload: () => void }) => {
+        ctl.reload()
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesReload).toBe(true)
+    })
+
+    it("detects ctl.scope usage", () => {
+      const fn = (ctl: { scope: unknown }) => {
+        return ctl.scope
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesScope).toBe(true)
+    })
+
+    it("detects array dependency shape", () => {
+      const fn = ([db, cache]: [unknown, unknown], ctl: unknown) => db
+      const inference = analyze(fn, "array")
+      expect(inference.dependencyShape).toBe("array")
+    })
+
+    it("detects record dependency shape", () => {
+      const fn = ({ db }: { db: unknown }, ctl: unknown) => db
+      const inference = analyze(fn, "record")
+      expect(inference.dependencyShape).toBe("record")
+    })
+
+    it("detects single dependency shape", () => {
+      const fn = (db: unknown, ctl: unknown) => db
+      const inference = analyze(fn, "single")
+      expect(inference.dependencyShape).toBe("single")
+    })
+
+    it("detects no dependency shape for provide", () => {
+      const fn = (ctl: unknown) => "value"
+      const inference = analyze(fn, "none")
+      expect(inference.dependencyShape).toBe("none")
+    })
+
+    it("detects array index access", () => {
+      const fn = ([a, b, c]: [unknown, unknown, unknown], ctl: unknown) => {
+        return a
+      }
+      const inference = analyze(fn, "array")
+      expect(inference.dependencyAccess).toContain(0)
+    })
+
+    it("detects record key access", () => {
+      const fn = ({ db, cache }: { db: unknown; cache: unknown }, ctl: unknown) => {
+        return db
+      }
+      const inference = analyze(fn, "record")
+      expect(inference.dependencyAccess).toContain("db")
     })
   })
 })
