@@ -28,6 +28,7 @@ import {
   ExecutionContextClosedError,
   SchemaError,
   Sucrose,
+  separateFunction,
   type Core,
   type Flow,
   type Extension,
@@ -2091,6 +2092,47 @@ describe("Sucrose (Static Analysis)", () => {
         dependencyAccess: [],
       }
       expect(inference.async).toBe(false)
+    })
+  })
+
+  describe("separateFunction", () => {
+    it("parses arrow function with destructured params", () => {
+      const fn = ([db, cache]: [string, string], ctl: unknown) => db + cache
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("[db, cache], ctl")
+      expect(body).toContain("db + cache")
+    })
+
+    it("parses arrow function with single param", () => {
+      const fn = (ctl: unknown) => "value"
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("value")
+    })
+
+    it("parses arrow function with object destructuring", () => {
+      const fn = ({ db, cache }: { db: string; cache: string }, ctl: unknown) => db
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("{ db, cache }, ctl")
+      expect(body).toContain("db")
+    })
+
+    it("parses async arrow function", () => {
+      const fn = async (ctl: unknown) => "async-value"
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("async-value")
+    })
+
+    it("parses arrow function with block body", () => {
+      const fn = (ctl: unknown) => {
+        const x = 1
+        return x
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("const x = 1")
+      expect(body).toContain("return x")
     })
   })
 })
