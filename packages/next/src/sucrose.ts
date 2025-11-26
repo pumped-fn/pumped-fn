@@ -16,7 +16,7 @@ export namespace Sucrose {
 
   export interface Metadata {
     inference: Inference
-    compiled: (deps: unknown, ctl: unknown) => unknown
+    compiled: ((deps: unknown, ctl: unknown) => unknown) | undefined
     original: Function
     callSite: string
     name: string | undefined
@@ -113,11 +113,112 @@ export function analyze(
 }
 
 /**
+ * Strips string literals from code to avoid false positives in identifier detection.
+ */
+function stripStrings(code: string): string {
+  let result = ""
+  let i = 0
+  while (i < code.length) {
+    const char = code[i]
+    if (char === '"' || char === "'" || char === "`") {
+      const quote = char
+      i++
+      while (i < code.length) {
+        if (code[i] === "\\") {
+          i += 2
+        } else if (code[i] === quote) {
+          i++
+          break
+        } else {
+          i++
+        }
+      }
+    } else {
+      result += char
+      i++
+    }
+  }
+  return result
+}
+
+/**
+ * Checks if function body likely references closure variables (free variables).
+ * Returns true if compilation should be skipped.
+ */
+function hasFreeVariables(body: string, depsParam: string | undefined, ctlParam: string): boolean {
+  const strippedBody = stripStrings(body)
+
+  const knownGlobals = new Set([
+    "undefined", "null", "true", "false", "NaN", "Infinity",
+    "Object", "Array", "String", "Number", "Boolean", "Symbol", "BigInt",
+    "Function", "Date", "RegExp", "Error", "Map", "Set", "WeakMap", "WeakSet",
+    "Promise", "JSON", "Math", "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
+    "parseInt", "parseFloat", "isNaN", "isFinite", "encodeURI", "decodeURI",
+    "encodeURIComponent", "decodeURIComponent", "eval", "globalThis", "window", "global",
+    "process", "Buffer", "require", "module", "exports", "__dirname", "__filename",
+    "this", "new", "return", "throw", "if", "else", "for", "while", "do", "switch",
+    "case", "break", "continue", "try", "catch", "finally", "const", "let", "var",
+    "typeof", "instanceof", "in", "of", "async", "await", "yield", "class", "extends",
+    "import", "export", "default", "from", "as", "static", "get", "set",
+  ])
+
+  const identifierPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g
+  let match
+
+  const localVars = new Set<string>()
+  if (depsParam) {
+    if (depsParam.startsWith("[")) {
+      const arrayMatch = depsParam.match(/^\[([^\]]+)\]/)
+      if (arrayMatch) {
+        arrayMatch[1].split(",").forEach(v => localVars.add(v.trim()))
+      }
+    } else if (depsParam.startsWith("{")) {
+      const recordMatch = depsParam.match(/^\{([^}]+)\}/)
+      if (recordMatch) {
+        recordMatch[1].split(",").forEach(v => localVars.add(v.trim().split(":")[0].trim()))
+      }
+    } else {
+      localVars.add(depsParam.split(":")[0].trim())
+    }
+  }
+  if (ctlParam) {
+    localVars.add(ctlParam.split(":")[0].trim())
+  }
+  localVars.add("deps")
+  localVars.add("ctl")
+
+  const declPattern = /\b(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g
+  let declMatch
+  while ((declMatch = declPattern.exec(strippedBody)) !== null) {
+    localVars.add(declMatch[1])
+  }
+
+  const propertyAccessPositions = new Set<number>()
+  const dotAccessPattern = /\.([a-zA-Z_$][a-zA-Z0-9_$]*)/g
+  let dotMatch
+  while ((dotMatch = dotAccessPattern.exec(strippedBody)) !== null) {
+    propertyAccessPositions.add(dotMatch.index + 1)
+  }
+
+  while ((match = identifierPattern.exec(strippedBody)) !== null) {
+    const id = match[1]
+    if (propertyAccessPositions.has(match.index)) {
+      continue
+    }
+    if (!knownGlobals.has(id) && !localVars.has(id)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * Generates optimized compiled function via `new Function()` for JIT execution.
  * @param fn - Factory function to compile
  * @param dependencyShape - Expected dependency structure
  * @param executorName - Name for sourceURL debugging comment
- * @returns Compiled function with unified (deps, ctl) signature
+ * @returns Compiled function with unified (deps, ctl) signature, or undefined if compilation not safe
  */
 function splitFirstParam(params: string): [string, boolean] {
   let depth = 0
@@ -156,18 +257,30 @@ export function generate(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape,
   executorName: string
-): (deps: unknown, ctl: unknown) => unknown {
+): ((deps: unknown, ctl: unknown) => unknown) | undefined {
   const content = fn.toString()
   const [params, body] = separateFunction(fn)
   const isAsync = content.trimStart().startsWith("async")
 
-  let bindings = ""
+  let depsParam: string | undefined
+  let ctlParam: string
 
   if (dependencyShape === "none") {
-    bindings = ""
+    depsParam = undefined
+    ctlParam = params.trim()
   } else {
-    const [depsParam, hasCtl] = splitFirstParam(params)
+    const [dp, hasCtl] = splitFirstParam(params)
+    depsParam = dp
+    ctlParam = hasCtl ? params.slice(params.indexOf(",") + 1).trim() : ""
+  }
 
+  if (hasFreeVariables(body, depsParam, ctlParam)) {
+    return undefined
+  }
+
+  let bindings = ""
+
+  if (dependencyShape !== "none" && depsParam) {
     if (depsParam === "deps" || depsParam.startsWith("deps:")) {
       bindings = ""
     } else {

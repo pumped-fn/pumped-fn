@@ -2387,4 +2387,64 @@ describe("Sucrose (Static Analysis)", () => {
       expect(retrieved).toBe(meta)
     })
   })
+
+  describe("JIT execution integration", () => {
+    it("uses compiled function when resolving simple executors", async () => {
+      const executor = provide(() => 42)
+      const meta = getMetadata(executor)
+
+      expect(meta).toBeDefined()
+      expect(meta?.compiled).toBeDefined()
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe(42)
+
+      await scope.dispose()
+    })
+
+    it("falls back to original factory when closure variables detected", async () => {
+      const closureValue = "from closure"
+      const executor = provide(() => closureValue)
+      const meta = getMetadata(executor)
+
+      expect(meta?.compiled).toBeUndefined()
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe("from closure")
+
+      await scope.dispose()
+    })
+
+    it("compiled function produces same result as original for array dependencies", async () => {
+      const a = provide(() => 10)
+      const b = provide(() => 3)
+      const sum = derive([a, b], ([x, y]) => x + y)
+
+      const meta = getMetadata(sum)
+      expect(meta?.compiled).toBeDefined()
+
+      const scope = createScope()
+      const result = await scope.resolve(sum)
+      expect(result).toBe(13)
+
+      await scope.dispose()
+    })
+
+    it("compiled function produces same result as original for record dependencies", async () => {
+      const host = provide(() => "example.com")
+      const port = provide(() => 8080)
+      const url = derive({ host, port }, ({ host, port }) => `https://${host}:${port}`)
+
+      const meta = getMetadata(url)
+      expect(meta?.compiled).toBeDefined()
+
+      const scope = createScope()
+      const result = await scope.resolve(url)
+      expect(result).toBe("https://example.com:8080")
+
+      await scope.dispose()
+    })
+  })
 })

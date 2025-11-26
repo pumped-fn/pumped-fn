@@ -156,6 +156,7 @@ interface ReplacerResult {
     | Core.UExecutor[]
     | Record<string, Core.UExecutor>;
   immediateValue?: unknown;
+  effectiveExecutor: Core.Executor<unknown>;
 }
 
 const NOT_SET = Symbol("accessor-value-not-set");
@@ -192,7 +193,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveCore(): Promise<unknown> {
-    const { factory, dependencies, immediateValue } = this.processReplacer();
+    const { factory, dependencies, immediateValue, effectiveExecutor } = this.processReplacer();
 
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -223,7 +224,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
     const result = await this.executeFactory(
       factory,
       resolvedDependencies,
-      controller
+      controller,
+      effectiveExecutor
     );
 
     const processedResult = await this.processChangeEvents(result);
@@ -336,6 +338,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
       return {
         factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
+        effectiveExecutor: this.requestor,
       };
     }
 
@@ -346,26 +349,30 @@ class AccessorImpl implements Core.Accessor<unknown> {
         factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
         immediateValue: value,
+        effectiveExecutor: this.requestor,
       };
     }
 
     return {
       factory: value.factory!,
       dependencies: value.dependencies,
+      effectiveExecutor: value as Core.Executor<unknown>,
     };
   }
 
   private async executeFactory(
     factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>,
     resolvedDependencies: unknown,
-    controller: Core.Controller
+    controller: Core.Controller,
+    effectiveExecutor: Core.Executor<unknown>
   ): Promise<unknown> {
-    const meta = getMetadata(this.requestor);
+    const meta = getMetadata(effectiveExecutor);
     const callSite = meta?.callSite;
 
     try {
-      const factoryResult =
-        factory.length >= 2
+      const factoryResult = meta?.compiled
+        ? meta.compiled(resolvedDependencies, controller)
+        : factory.length >= 2
           ? (factory as Core.DependentFn<unknown, unknown>)(
               resolvedDependencies,
               controller
