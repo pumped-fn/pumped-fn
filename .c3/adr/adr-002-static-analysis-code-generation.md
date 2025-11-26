@@ -1,15 +1,17 @@
 ---
 id: ADR-002-static-analysis-code-generation
-title: Static Code Analysis and JIT Compilation for Executors
+title: Static Code Analysis and Bridge Optimization for Executors
 summary: >
-  Add Sucrose-inspired static analysis at executor creation time to generate
-  optimized factory functions via new Function(), enabling fail-fast validation,
-  better error context with call site capture, and foundation for future devtools.
+  Add Sucrose-inspired static analysis at executor creation time to optimize
+  the resolution bridge (dependency resolution, controller creation) based on
+  inference data. Original factory preserved - optimization targets infrastructure
+  overhead, not the user's closure. Enables fail-fast validation, better error
+  context with call site capture, and foundation for future devtools.
 status: accepted
 date: 2025-11-26
 ---
 
-# [ADR-002] Static Code Analysis and JIT Compilation for Executors
+# [ADR-002] Static Code Analysis and Bridge Optimization for Executors
 
 ## Status {#adr-002-status}
 **Accepted** - 2025-11-26
@@ -67,63 +69,72 @@ At `provide()`/`derive()` call time, analyze the factory function via `fn.toStri
 | `dependencyShape` | `'single'` / `'array'` / `'record'` / `'none'` |
 | `dependencyAccess` | Which dependencies are actually accessed |
 
-### Code Generation
+### Bridge Optimization (Not JIT Compilation)
 
-Generate optimized factory via `new Function()`:
+**Key insight:** `new Function()` cannot access closures or imports - it runs in a fresh global scope. Since most real-world factories use imported classes/modules, JIT compilation would skip 90%+ of executors.
 
-**Unified signature:** `(deps, ctl) => result`
+**Correct approach:** Keep the original factory function, optimize the **bridge** between our infrastructure and the user's closure.
 
-**Supported function syntax:**
-- Arrow functions: `(x) => expr`, `(x) => { ... }`
-- Regular functions: `function(x) { ... }`
-- Named functions: `function name(x) { ... }`
-- Async variants of all above
-
-```typescript
-// provide((ctl) => new Service())
-new Function('deps', 'ctl', `"use strict"; return new Service()`)
-
-// derive(dbExecutor, (db, ctl) => new Repo(db))
-new Function('deps', 'ctl', `"use strict"; return new Repo(deps)`)
-
-// derive([dbExecutor, cache], ([db, c], ctl) => new Repo(db, c))
-new Function('deps', 'ctl', `"use strict"; return new Repo(deps[0], deps[1])`)
-
-// derive({ db: dbExec }, ({ db }, ctl) => new Repo(db))
-new Function('deps', 'ctl', `"use strict"; return new Repo(deps.db)`)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Resolution Path                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Scope.resolve()                                                │
+│       │                                                         │
+│       ▼                                                         │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              BRIDGE (optimize this)                      │   │
+│  │  • Dependency resolution (skip if none needed)           │   │
+│  │  • Controller creation (skip if not used)                │   │
+│  │  • Argument preparation (match expected shape)           │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│       │                                                         │
+│       ▼                                                         │
+│  originalFactory(deps, ctl)  ← user's closure, untouched        │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Compilation Skip Reasons
+**What we optimize based on inference:**
 
-Compilation may be skipped when the factory cannot be safely compiled. Skip information is stored in metadata:
+| Inference | Bridge Optimization |
+|-----------|---------------------|
+| `dependencyShape: "none"` | Skip dependency resolution entirely |
+| `usesCleanup/Release/Reload/Scope: false` | Don't create controller, pass `undefined` or skip arg |
+| `dependencyAccess: []` | Dependencies declared but unused - skip resolution |
+| All controller flags false | Call `fn(deps)` instead of `fn(deps, ctl)` |
 
-| Skip Reason | When | Example |
-|-------------|------|---------|
-| `free-variables` | Factory references closure variables | `const x = 1; provide(() => x)` |
-| `unsupported-syntax` | Function parsing failed | Edge case syntax |
-| `compilation-error` | `new Function()` threw | Invalid generated code |
+**Example transformations:**
 
-**Free variable detection:**
-- Parses function body to identify identifiers
-- Allows known globals (Object, Array, Promise, JSON, Math, etc.)
-- Allows declared local variables (`const`, `let`, `var`)
-- Skips property access (`.foo` not counted as variable)
-- First detected free variable triggers skip with detail message
+```typescript
+// User writes:
+provide(() => new Service())
+// Inference: dependencyShape=none, all uses*=false
+// Optimized call: originalFactory() - no args needed
 
-When compilation is skipped:
-- `metadata.compiled` is `undefined`
-- `metadata.skipReason` explains why
-- `metadata.skipDetail` provides specific detail (e.g., variable name)
-- Original factory is still used at runtime (no performance gain, but works)
+// User writes:
+derive([db], ([db]) => new Repository(db))
+// Inference: dependencyShape=array, all uses*=false
+// Optimized call: originalFactory([resolvedDb]) - no controller
+
+// User writes:
+provide((ctl) => {
+  ctl.cleanup(() => connection.close())
+  return new Connection()
+})
+// Inference: dependencyShape=none, usesCleanup=true
+// Optimized call: originalFactory(controller) - controller needed
+```
+
+**No `new Function()` compilation** - the original factory is always called directly. Optimization happens in the resolution infrastructure, not the factory itself.
 
 ### Error Handling
 
-Runtime wrapper (not in generated code) enriches errors:
+Resolution wrapper enriches errors with call site and executor name:
 
 ```typescript
-const resolve = (deps, ctl) => {
+const resolve = () => {
   try {
-    return compiled(deps, ctl)
+    return originalFactory(deps, ctl)
   } catch (e) {
     throw enrichError(e, {
       name: meta.name,        // from name() tag
@@ -134,18 +145,17 @@ const resolve = (deps, ctl) => {
 }
 ```
 
-### Debugging Support (V1)
+### Debugging Support
 
 - **Call site capture:** `new Error().stack` at `provide()`/`derive()` time
-- **Original factory:** Reference preserved for debugging
-- **sourceURL:** `//# sourceURL=pumped-fn://executorName.js` in generated code
-- **API designed for future source map support**
+- **Original factory:** Always preserved (no JIT replacement)
+- **Inference data:** Available via `getMetadata(executor)` for devtools
 
 ### Storage
 
-- Original factory preserved
-- Compiled function + metadata stored in WeakMap keyed by executor
-- Both accessible for debugging/devtools
+- Original factory preserved in metadata
+- Inference + metadata stored in WeakMap keyed by executor
+- Accessible for debugging/devtools
 
 ## Changes Across Layers {#adr-002-changes}
 
@@ -176,125 +186,114 @@ const resolve = (deps, ctl) => {
 
 ## Verification {#adr-002-verification}
 
-- [x] `provide()` analyzes factory and generates compiled function
+### Static Analysis
+- [x] `provide()` analyzes factory at creation time
 - [x] `derive()` handles all dependency shapes (single, array, record)
-- [x] Analysis correctly detects: async, usesCleanup, usesRelease, usesReload, usesScope
-- [x] Generated code has `//# sourceURL` comment
+- [x] Analysis correctly detects: usesCleanup, usesRelease, usesReload, usesScope
 - [x] Call site captured at creation time
 - [x] Original factory preserved and accessible
-- [x] Error enrichment includes `name` tag value
-- [x] Error enrichment includes `callSite`
-- [x] Generated functions are testable in isolation
+- [x] Error enrichment includes `name` tag value and `callSite`
+
+### Bridge Optimization
+- [ ] Skip dependency resolution when `dependencyShape === "none"`
+- [ ] Use NOOP_CONTROLLER when no controller methods used
+- [ ] Skip controller argument when not needed
+- [ ] Lazy variant getters (lazy/reactive/static on-demand)
+
+### Compatibility
 - [x] Existing tests continue to pass (backward compatible)
-- [x] Skip reasons (`free-variables`, `unsupported-syntax`, `compilation-error`) documented
-- [x] Free variable detection prevents closure compilation
 - [x] Regular function syntax supported (not just arrow functions)
-- [x] Compiled function actually used at resolution time (verified via spy test)
 
-## Future Considerations {#adr-002-future}
+## Bridge Optimization Details {#adr-002-bridge-optimization}
 
-- **Real source maps:** API designed to add source map generation later
-- **Devtools integration:** Analysis metadata enables dependency graph visualization
-- **Dead code detection:** Know which dependencies are declared but unused
-- **Performance profiling:** Per-executor compilation metrics
+The inference data enables optimizations in the resolution bridge:
 
-### Runtime Optimization Opportunities
+### 1. Controller Creation Strategy
 
-The inference data enables several runtime optimizations:
-
-#### 1. Minimal Controller Creation
-**Current:** Every factory execution creates full `Controller` with all 4 methods (cleanup, release, reload, scope).
-
-**Opportunity:** Use inference to create minimal controllers:
-- `!usesCleanup` → omit cleanup method or use shared noop
-- `!usesRelease` → omit release method or use shared noop
-- `!usesReload` → omit reload method or use shared noop
-- `!usesScope` → omit scope reference
-
-**Impact:** Reduces object allocation for simple executors (majority of real-world cases).
-
-#### 2. Dependency Resolution Short-circuit
-**Current:** `~resolveDependencies` always processes through `resolveShape()`.
-
-**Opportunity:** Skip entirely when:
-- `dependencyShape === 'none'` → return `undefined` immediately
-- `dependencyAccess.length === 0` → dependencies declared but unused
-
-**Impact:** Eliminates unnecessary function calls and Promise creation.
-
-#### 3. Executor Wrapper Elimination
-**Current:** `createExecutor` wraps every factory with runtime check:
+**Pre-computed at analyze time:**
 ```typescript
-factory: (_: unknown, controller) => {
-  if (dependencies === undefined) { ... }
-  ...
-}
+type ControllerFactory =
+  | "none"           // No controller needed
+  | "cleanup-only"   // Only ctl.cleanup used
+  | "full"           // Multiple controller methods used
+  | (scope, exec) => Controller  // Custom factory
 ```
 
-**Opportunity:** When `compiled` exists, the compiled function already has correct signature `(deps, ctl) => result`. The wrapper adds overhead for:
-- Function call indirection
-- Runtime `dependencies === undefined` check (known at compile time)
+**At resolution time:**
+- `"none"` → pass `undefined` or omit controller argument
+- `"cleanup-only"` → minimal object with just cleanup method
+- `"full"` → create complete controller
 
-**Impact:** Direct compiled function invocation removes wrapper overhead.
+**Impact:** Most executors (`provide(() => value)`) need no controller.
 
-#### 4. Lazy Executor Variant Creation
-**Current:** `createExecutor` eagerly creates `lazy`, `reactive`, `static` variants.
+### 2. Dependency Resolution Short-circuit
 
-**Opportunity:** Use property getters for on-demand creation:
+**When `dependencyShape === "none"`:**
+- Skip `resolveDependencies()` entirely
+- No Promise creation
+- No function call overhead
+
+**Impact:** Eliminates unnecessary work for `provide()` executors.
+
+### 3. Lazy Variant Creation
+
+**Current:** Eagerly creates `lazy`, `reactive`, `static` variants.
+
+**Optimized:** Property getters for on-demand creation:
 ```typescript
 Object.defineProperty(executor, 'lazy', {
   get() { return this._lazy ??= createLazyExecutor(this); }
 });
 ```
 
-**Impact:** Reduces memory for executors whose variants are never accessed.
+**Impact:** 75% memory reduction for executors whose variants aren't used.
 
-#### 5. Sync Factory Fast Path
-**Current:** All factory results go through async handling with Promise checks.
+### 4. Thenable Detection
 
-**Opportunity:** When `inference.async === false`:
-- Skip Promise wrapping
-- Avoid microtask queue delays
-- Direct synchronous return path
-
-**Impact:** Faster resolution for synchronous factories (common case).
-
-#### 6. Cleanup Infrastructure Elision
-**Current:** `ensureCleanups()` creates Set on first cleanup registration.
-
-**Opportunity:** When `!usesCleanup`, skip cleanup-related code paths entirely:
-- No Set creation
-- No cleanup iteration during release
-
-**Impact:** Memory savings for stateless executors.
+**Use `isThenable()` instead of `instanceof Promise`:**
+- Cross-realm safe
+- Handles custom thenables (Bluebird, Q, etc.)
+- Correct behavior for all Promise-like objects
 
 ### Optimization Priority Matrix
 
 | Optimization | Memory | CPU | Risk | Complexity |
 |-------------|--------|-----|------|------------|
-| Minimal Controller | High | Low | Low | Low |
+| NOOP_CONTROLLER | High | Low | Low | Low |
 | Dependency Short-circuit | Medium | Medium | Low | Low |
-| Wrapper Elimination | Medium | High | Medium | Medium |
 | Lazy Variants | Medium | Low | Low | Low |
-| Sync Fast Path | Low | Medium | Medium | Medium |
-| Cleanup Elision | Low | Low | Low | Low |
+| isThenable | Low | Low | Low | Low |
+
+## Future Considerations {#adr-002-future}
+
+- **Devtools integration:** Analysis metadata enables dependency graph visualization
+- **Dead code detection:** Know which dependencies are declared but unused
+- **Performance profiling:** Per-executor resolution metrics
 
 ## Alternatives Considered {#adr-002-alternatives}
 
-### A) Analysis at scope creation time
+### A) JIT Compilation via `new Function()`
+- Pro: Could eliminate wrapper overhead entirely
+- Con: `new Function()` runs in fresh global scope - cannot access closures or imports
+- Con: Most real-world factories use imported classes, so 90%+ would skip compilation
+- **Rejected:** Optimization benefit limited to trivial cases (inline literals, built-in globals)
+
+### B) Analysis at scope creation time
 - Pro: Full graph visibility
 - Con: Delays startup, can't fail-fast at definition site
 - **Rejected:** Fail-fast is a key requirement
 
-### B) JIT compilation at first resolution (like Elysia)
+### C) JIT compilation at first resolution (like Elysia)
 - Pro: Zero startup cost until needed
 - Con: Errors surface later, first resolution slower
 - **Rejected:** Fail-fast and better error context are priorities
 
-### C) Inline error handling in generated code
-- Pro: Single code path
-- Con: Multiple code versions to maintain, larger generated code
-- **Rejected:** Separation of concerns, single generated code path preferred
+### D) Bridge optimization (chosen)
+- Pro: Works with all factories including closures and imports
+- Pro: Optimizes infrastructure overhead (controller, dependency resolution)
+- Pro: Original factory preserved - no debugging issues
+- Con: Less aggressive than full JIT, but applies to 100% of cases
+- **Accepted:** Universal applicability beats theoretical maximum optimization
 
 ## Related {#adr-002-related}
 

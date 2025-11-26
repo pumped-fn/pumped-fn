@@ -366,24 +366,34 @@ class AccessorImpl implements Core.Accessor<unknown> {
       throw new Error("Executor metadata not found. Executors must be created using sucrose compilation.")
     }
 
-    const callSite = meta.callSite
+    const { inference, controllerFactory, callSite, original } = meta
+    const { dependencyShape } = inference
+    const usesController = controllerFactory !== "none"
 
-    const controller = meta.controllerFactory === "none"
-      ? NOOP_CONTROLLER
-      : meta.controllerFactory
-        ? meta.controllerFactory(
-            this.scope,
-            this.requestor,
-            (fn: Core.Cleanup) => {
-              const state = this.scope["getOrCreateState"](this.requestor)
-              const cleanups = this.scope["ensureCleanups"](state)
-              cleanups.add(fn)
-            }
-          )
-        : this.createControllerLegacy()
+    const controller = usesController
+      ? (controllerFactory as Exclude<typeof controllerFactory, "none">)(
+          this.scope,
+          this.requestor,
+          (fn: Core.Cleanup) => {
+            const state = this.scope["getOrCreateState"](this.requestor)
+            const cleanups = this.scope["ensureCleanups"](state)
+            cleanups.add(fn)
+          }
+        )
+      : NOOP_CONTROLLER
 
     try {
-      const factoryResult = meta.fn(resolvedDependencies, controller)
+      let factoryResult: unknown
+
+      if (dependencyShape === "none" && !usesController) {
+        factoryResult = (original as () => unknown)()
+      } else if (dependencyShape === "none" && usesController) {
+        factoryResult = (original as (ctl: Core.Controller) => unknown)(controller)
+      } else if (!usesController) {
+        factoryResult = (original as (deps: unknown) => unknown)(resolvedDependencies)
+      } else {
+        factoryResult = (original as (deps: unknown, ctl: Core.Controller) => unknown)(resolvedDependencies, controller)
+      }
 
       if (isThenable(factoryResult)) {
         try {

@@ -1,10 +1,13 @@
 import { type Core } from "./types"
 import { type Tag } from "./tag"
-import { Promised } from "./primitives"
+import { Promised, isThenable } from "./primitives"
+import * as errors from "./errors"
 
 export type ControllerFactory =
   | "none"
   | ((scope: Core.Scope, executor: Core.Executor<unknown>, registerCleanup: (fn: Core.Cleanup) => void) => Core.Controller)
+
+export type ExecutionWrapper = (scope: Core.Scope, deps: Core.DependencyLike | undefined) => Promise<unknown>
 
 export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
@@ -18,19 +21,13 @@ export namespace Sucrose {
     dependencyAccess: (number | string)[]
   }
 
-  export type CompilationSkipReason =
-    | "free-variables"
-    | "unsupported-syntax"
-    | "compilation-error"
-
   export interface Metadata {
-    fn: (deps: unknown, ctl: unknown) => unknown
     inference: Inference
     controllerFactory: ControllerFactory
     callSite: string
     name: string | undefined
     original: Function
-    skipReason?: CompilationSkipReason
+    executor?: Core.Executor<unknown>
   }
 }
 
@@ -88,7 +85,21 @@ export function analyze(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape
 ): Sucrose.Inference {
-  const [params, body] = separateFunction(fn)
+  let params: string
+  let body: string
+
+  try {
+    [params, body] = separateFunction(fn)
+  } catch {
+    return {
+      usesCleanup: true,
+      usesRelease: true,
+      usesReload: true,
+      usesScope: true,
+      dependencyShape,
+      dependencyAccess: [],
+    }
+  }
 
   const ctlParam = dependencyShape === "none" ? params : params.split(",").pop()?.trim() || ""
   const ctlName = ctlParam.split(":")[0].trim()
@@ -135,214 +146,6 @@ export function analyze(
   }
 }
 
-function stripStrings(code: string): string {
-  let result = ""
-  let i = 0
-  while (i < code.length) {
-    const char = code[i]
-    if (char === '"' || char === "'" || char === "`") {
-      const quote = char
-      i++
-      while (i < code.length) {
-        if (code[i] === "\\") {
-          i += 2
-        } else if (code[i] === quote) {
-          i++
-          break
-        } else {
-          i++
-        }
-      }
-    } else {
-      result += char
-      i++
-    }
-  }
-  return result
-}
-
-const KNOWN_GLOBALS = new Set([
-  "undefined", "null", "true", "false", "NaN", "Infinity",
-  "Object", "Array", "String", "Number", "Boolean", "Symbol", "BigInt",
-  "Function", "Date", "RegExp", "Error", "Map", "Set", "WeakMap", "WeakSet",
-  "Promise", "JSON", "Math", "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
-  "parseInt", "parseFloat", "isNaN", "isFinite", "encodeURI", "decodeURI",
-  "encodeURIComponent", "decodeURIComponent", "eval", "globalThis", "window", "global",
-  "process", "Buffer", "require", "module", "exports", "__dirname", "__filename",
-  "this", "new", "return", "throw", "if", "else", "for", "while", "do", "switch",
-  "case", "break", "continue", "try", "catch", "finally", "const", "let", "var",
-  "typeof", "instanceof", "in", "of", "async", "await", "yield", "class", "extends",
-  "import", "export", "default", "from", "as", "static", "get", "set",
-])
-
-function detectFreeVariable(body: string, depsParam: string | undefined, ctlParam: string): string | undefined {
-  const strippedBody = stripStrings(body)
-
-  const identifierPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g
-  let match
-
-  const localVars = new Set<string>()
-  if (depsParam) {
-    if (depsParam.startsWith("[")) {
-      const arrayMatch = depsParam.match(/^\[([^\]]+)\]/)
-      if (arrayMatch) {
-        arrayMatch[1].split(",").forEach(v => localVars.add(v.trim()))
-      }
-    } else if (depsParam.startsWith("{")) {
-      const recordMatch = depsParam.match(/^\{([^}]+)\}/)
-      if (recordMatch) {
-        recordMatch[1].split(",").forEach(v => localVars.add(v.trim().split(":")[0].trim()))
-      }
-    } else {
-      localVars.add(depsParam.split(":")[0].trim())
-    }
-  }
-  if (ctlParam) {
-    localVars.add(ctlParam.split(":")[0].trim())
-  }
-  localVars.add("deps")
-  localVars.add("ctl")
-
-  const declPattern = /\b(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g
-  let declMatch
-  while ((declMatch = declPattern.exec(strippedBody)) !== null) {
-    localVars.add(declMatch[1])
-  }
-
-  const propertyAccessPositions = new Set<number>()
-  const dotAccessPattern = /\.([a-zA-Z_$][a-zA-Z0-9_$]*)/g
-  let dotMatch
-  while ((dotMatch = dotAccessPattern.exec(strippedBody)) !== null) {
-    propertyAccessPositions.add(dotMatch.index + 1)
-  }
-
-  while ((match = identifierPattern.exec(strippedBody)) !== null) {
-    const id = match[1]
-    if (propertyAccessPositions.has(match.index)) {
-      continue
-    }
-    if (!KNOWN_GLOBALS.has(id) && !localVars.has(id)) {
-      return id
-    }
-  }
-
-  return undefined
-}
-
-function splitFirstParam(params: string): [string, string] {
-  let depth = 0
-  let inString = false
-  let stringChar = ""
-
-  for (let i = 0; i < params.length; i++) {
-    const char = params[i]
-
-    if (inString) {
-      if (char === stringChar && params[i - 1] !== "\\") {
-        inString = false
-      }
-      continue
-    }
-
-    if (char === '"' || char === "'" || char === "`") {
-      inString = true
-      stringChar = char
-      continue
-    }
-
-    if (char === "[" || char === "{" || char === "<" || char === "(") {
-      depth++
-    } else if (char === "]" || char === "}" || char === ">" || char === ")") {
-      depth--
-    } else if (char === "," && depth === 0) {
-      return [params.slice(0, i).trim(), params.slice(i + 1).trim()]
-    }
-  }
-
-  return [params.trim(), ""]
-}
-
-export type GenerateResult =
-  | { compiled: (deps: unknown, ctl: unknown) => unknown; skipReason: undefined }
-  | { compiled: undefined; skipReason: Sucrose.CompilationSkipReason }
-
-export function generate(
-  fn: Function,
-  dependencyShape: Sucrose.DependencyShape,
-  executorName: string
-): GenerateResult {
-  const content = fn.toString()
-
-  let params: string
-  let body: string
-  try {
-    [params, body] = separateFunction(fn)
-  } catch {
-    return {
-      compiled: undefined,
-      skipReason: "unsupported-syntax"
-    }
-  }
-
-  const isAsync = content.trimStart().startsWith("async")
-
-  let depsParam: string | undefined
-  let ctlParam: string
-
-  if (dependencyShape === "none") {
-    depsParam = undefined
-    ctlParam = params.trim()
-  } else {
-    const [dp, rest] = splitFirstParam(params)
-    depsParam = dp
-    ctlParam = rest
-  }
-
-  const freeVar = detectFreeVariable(body, depsParam, ctlParam)
-  if (freeVar) {
-    return {
-      compiled: undefined,
-      skipReason: "free-variables"
-    }
-  }
-
-  let bindings = ""
-
-  if (dependencyShape !== "none" && depsParam) {
-    if (depsParam === "deps" || depsParam.startsWith("deps:")) {
-      bindings = ""
-    } else {
-      bindings = `const ${depsParam} = deps;`
-    }
-  }
-
-  const ctlName = ctlParam.split(":")[0].trim()
-  if (ctlName && ctlName !== "ctl" && !ctlName.startsWith("{") && !ctlName.startsWith("[")) {
-    bindings += `\nconst ${ctlName} = ctl;`
-  }
-
-  const hasReturn = body.includes("return ") || body.includes("return;") || body.includes("return\n")
-  const startsWithStatement = body.trimStart().startsWith("throw ") || body.trimStart().match(/^(const|let|var|if|for|while|switch|try)\s/)
-  const isMultiStatement = body.includes(";") || body.includes("\n")
-
-  const bodyWithReturn = (hasReturn || isMultiStatement || startsWithStatement) ? body : `return ${body}`
-
-  const fnBody = `
-"use strict";
-${bindings}
-${bodyWithReturn}
-//# sourceURL=pumped-fn://${executorName}.js
-`
-
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
-  const FunctionConstructor = isAsync ? AsyncFunction : Function
-
-  return {
-    compiled: new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown,
-    skipReason: undefined
-  }
-}
-
 export function captureCallSite(): string {
   const err = new Error()
   const stack = err.stack || ""
@@ -376,28 +179,16 @@ export function compile(
   }
 
   const inference = analyze(fn, dependencyShape)
-  const result = generate(fn, dependencyShape, executorName || "anonymous")
   const callSite = captureCallSite()
   const controllerFactory = createControllerFactory(inference)
 
-  let normalizedFn: (deps: unknown, ctl: unknown) => unknown
-
-  if (result.compiled) {
-    normalizedFn = result.compiled
-  } else {
-    normalizedFn = dependencyShape === "none"
-      ? (_deps: unknown, ctl: unknown) => (fn as (ctl: unknown) => unknown)(ctl)
-      : (fn as (deps: unknown, ctl: unknown) => unknown)
-  }
-
   const metadata: Sucrose.Metadata = {
-    fn: normalizedFn,
     inference,
     controllerFactory,
     callSite,
     name: executorName,
     original: fn,
-    skipReason: result.skipReason,
+    executor,
   }
 
   if (executor) {
@@ -422,4 +213,122 @@ export function createControllerFactory(inference: Sucrose.Inference): Controlle
       scope,
     }
   }
+}
+
+function enrichError(err: unknown, meta: Sucrose.Metadata): Error {
+  const executorName = meta.name || "anonymous"
+  const dependencyChain = [executorName]
+  return errors.createFactoryError(executorName, dependencyChain, err, meta.callSite)
+}
+
+export function generateExecutionWrapper(
+  meta: Sucrose.Metadata,
+  resolvedDeps: Core.DependencyLike | undefined,
+  registerCleanup: (fn: Core.Cleanup) => void
+): ExecutionWrapper {
+  const { inference, controllerFactory, original } = meta
+  const { dependencyShape } = inference
+  const usesController = controllerFactory !== "none"
+
+  let resolveDepsCode: string
+  switch (dependencyShape) {
+    case "none":
+      resolveDepsCode = ""
+      break
+    case "single":
+      resolveDepsCode = "const resolved = await scope.resolve(deps)"
+      break
+    case "array":
+      resolveDepsCode = "const resolved = await Promise.all(deps.map(d => scope.resolve(d)))"
+      break
+    case "record":
+      resolveDepsCode = `
+        const entries = await Promise.all(
+          Object.entries(deps).map(async ([k, v]) => [k, await scope.resolve(v)])
+        )
+        const resolved = Object.fromEntries(entries)`
+      break
+  }
+
+  let createControllerCode: string
+  if (usesController) {
+    createControllerCode = "const ctl = ctlFactory(scope, meta.executor, registerCleanup)"
+  } else {
+    createControllerCode = ""
+  }
+
+  let callFactoryCode: string
+  if (dependencyShape === "none" && !usesController) {
+    callFactoryCode = "originalFn()"
+  } else if (dependencyShape === "none" && usesController) {
+    callFactoryCode = "originalFn(ctl)"
+  } else if (!usesController) {
+    callFactoryCode = "originalFn(resolved)"
+  } else {
+    callFactoryCode = "originalFn(resolved, ctl)"
+  }
+
+  const fnBody = `
+    return async function execute(scope, deps) {
+      try {
+        ${resolveDepsCode}
+        ${createControllerCode}
+        const result = ${callFactoryCode}
+        if (isThenable(result)) {
+          return result.catch(err => { throw enrichError(err, meta) })
+        }
+        return result
+      } catch (err) {
+        throw enrichError(err, meta)
+      }
+    }
+  `
+
+  const wrapper = new Function(
+    "originalFn",
+    "meta",
+    "ctlFactory",
+    "registerCleanup",
+    "isThenable",
+    "enrichError",
+    "NOOP_CONTROLLER",
+    fnBody
+  )(
+    original,
+    meta,
+    controllerFactory === "none" ? null : controllerFactory,
+    registerCleanup,
+    isThenable,
+    enrichError,
+    NOOP_CONTROLLER
+  ) as ExecutionWrapper
+
+  return wrapper
+}
+
+const executionCache = new WeakMap<Core.Scope, WeakMap<Core.Executor<unknown>, ExecutionWrapper>>()
+
+export function getOrCreateExecutionWrapper(
+  scope: Core.Scope,
+  executor: Core.Executor<unknown>,
+  resolvedDeps: Core.DependencyLike | undefined,
+  registerCleanup: (fn: Core.Cleanup) => void
+): ExecutionWrapper {
+  let scopeCache = executionCache.get(scope)
+  if (!scopeCache) {
+    scopeCache = new WeakMap()
+    executionCache.set(scope, scopeCache)
+  }
+
+  let wrapper = scopeCache.get(executor)
+  if (!wrapper) {
+    const meta = getMetadata(executor)
+    if (!meta) {
+      throw new Error("Executor metadata not found")
+    }
+    wrapper = generateExecutionWrapper(meta, resolvedDeps, registerCleanup)
+    scopeCache.set(executor, wrapper)
+  }
+
+  return wrapper
 }
