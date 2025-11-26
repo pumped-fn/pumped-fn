@@ -161,22 +161,22 @@ function stripStrings(code: string): string {
   return result
 }
 
+const KNOWN_GLOBALS = new Set([
+  "undefined", "null", "true", "false", "NaN", "Infinity",
+  "Object", "Array", "String", "Number", "Boolean", "Symbol", "BigInt",
+  "Function", "Date", "RegExp", "Error", "Map", "Set", "WeakMap", "WeakSet",
+  "Promise", "JSON", "Math", "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
+  "parseInt", "parseFloat", "isNaN", "isFinite", "encodeURI", "decodeURI",
+  "encodeURIComponent", "decodeURIComponent", "eval", "globalThis", "window", "global",
+  "process", "Buffer", "require", "module", "exports", "__dirname", "__filename",
+  "this", "new", "return", "throw", "if", "else", "for", "while", "do", "switch",
+  "case", "break", "continue", "try", "catch", "finally", "const", "let", "var",
+  "typeof", "instanceof", "in", "of", "async", "await", "yield", "class", "extends",
+  "import", "export", "default", "from", "as", "static", "get", "set",
+])
+
 function detectFreeVariable(body: string, depsParam: string | undefined, ctlParam: string): string | undefined {
   const strippedBody = stripStrings(body)
-
-  const knownGlobals = new Set([
-    "undefined", "null", "true", "false", "NaN", "Infinity",
-    "Object", "Array", "String", "Number", "Boolean", "Symbol", "BigInt",
-    "Function", "Date", "RegExp", "Error", "Map", "Set", "WeakMap", "WeakSet",
-    "Promise", "JSON", "Math", "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
-    "parseInt", "parseFloat", "isNaN", "isFinite", "encodeURI", "decodeURI",
-    "encodeURIComponent", "decodeURIComponent", "eval", "globalThis", "window", "global",
-    "process", "Buffer", "require", "module", "exports", "__dirname", "__filename",
-    "this", "new", "return", "throw", "if", "else", "for", "while", "do", "switch",
-    "case", "break", "continue", "try", "catch", "finally", "const", "let", "var",
-    "typeof", "instanceof", "in", "of", "async", "await", "yield", "class", "extends",
-    "import", "export", "default", "from", "as", "static", "get", "set",
-  ])
 
   const identifierPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g
   let match
@@ -221,7 +221,7 @@ function detectFreeVariable(body: string, depsParam: string | undefined, ctlPara
     if (propertyAccessPositions.has(match.index)) {
       continue
     }
-    if (!knownGlobals.has(id) && !localVars.has(id)) {
+    if (!KNOWN_GLOBALS.has(id) && !localVars.has(id)) {
       return id
     }
   }
