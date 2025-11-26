@@ -5,7 +5,6 @@ export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
 
   export interface Inference {
-    async: boolean
     usesCleanup: boolean
     usesRelease: boolean
     usesReload: boolean
@@ -74,10 +73,7 @@ export function analyze(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape
 ): Sucrose.Inference {
-  const content = fn.toString()
   const [params, body] = separateFunction(fn)
-
-  const isAsync = content.trimStart().startsWith("async")
 
   const ctlParam = dependencyShape === "none" ? params : params.split(",").pop()?.trim() || ""
 
@@ -111,7 +107,6 @@ export function analyze(
   }
 
   return {
-    async: isAsync,
     usesCleanup,
     usesRelease,
     usesReload,

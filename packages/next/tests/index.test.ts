@@ -2153,7 +2153,6 @@ describe("Sucrose (Static Analysis)", () => {
   describe("types", () => {
     it("exports Sucrose namespace with Inference type", async () => {
       const inference: Sucrose.Inference = {
-        async: false,
         usesCleanup: false,
         usesRelease: false,
         usesReload: false,
@@ -2161,7 +2160,7 @@ describe("Sucrose (Static Analysis)", () => {
         dependencyShape: "none",
         dependencyAccess: [],
       }
-      expect(inference.async).toBe(false)
+      expect(inference.usesCleanup).toBe(false)
     })
   })
 
@@ -2244,18 +2243,6 @@ describe("Sucrose (Static Analysis)", () => {
   })
 
   describe("analyze", () => {
-    it("detects async factory", () => {
-      const fn = async (ctl: unknown) => "value"
-      const inference = analyze(fn, "none")
-      expect(inference.async).toBe(true)
-    })
-
-    it("detects sync factory", () => {
-      const fn = (ctl: unknown) => "value"
-      const inference = analyze(fn, "none")
-      expect(inference.async).toBe(false)
-    })
-
     it("detects ctl.cleanup usage", () => {
       const fn = (ctl: { cleanup: (fn: () => void) => void }) => {
         ctl.cleanup(() => {})
@@ -2460,7 +2447,6 @@ describe("Sucrose (Static Analysis)", () => {
     it("compiles factory and returns metadata", () => {
       const fn = (ctl: unknown) => "value"
       const meta = compile(fn, "none", undefined, [])
-      expect(meta.inference.async).toBe(false)
       expect(meta.inference.dependencyShape).toBe("none")
       expect(typeof meta.compiled).toBe("function")
       expect(meta.original).toBe(fn)
