@@ -195,10 +195,10 @@ const resolve = () => {
 - [x] Error enrichment includes `name` tag value and `callSite`
 
 ### Bridge Optimization
-- [ ] Skip dependency resolution when `dependencyShape === "none"`
-- [ ] Use NOOP_CONTROLLER when no controller methods used
-- [ ] Skip controller argument when not needed
-- [ ] Lazy variant getters (lazy/reactive/static on-demand)
+- [x] Skip dependency resolution when `dependencyShape === "none"` (scope.ts:217-221)
+- [x] Use NOOP_CONTROLLER when no controller methods used (scope.ts:383)
+- [x] Skip controller argument when not needed (scope.ts:388-396)
+- [x] Lazy variant getters (lazy/reactive/static on-demand) (executor.ts:41,54,67)
 
 ### Compatibility
 - [x] Existing tests continue to pass (backward compatible)

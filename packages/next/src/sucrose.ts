@@ -1,13 +1,11 @@
 import { type Core } from "./types"
 import { type Tag } from "./tag"
-import { Promised, isThenable } from "./primitives"
-import * as errors from "./errors"
+import { Promised } from "./primitives"
 
 export type ControllerFactory =
   | "none"
   | ((scope: Core.Scope, executor: Core.Executor<unknown>, registerCleanup: (fn: Core.Cleanup) => void) => Core.Controller)
 
-export type ExecutionWrapper = (scope: Core.Scope, deps: Core.DependencyLike | undefined) => Promise<unknown>
 
 export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
@@ -215,120 +213,3 @@ export function createControllerFactory(inference: Sucrose.Inference): Controlle
   }
 }
 
-function enrichError(err: unknown, meta: Sucrose.Metadata): Error {
-  const executorName = meta.name || "anonymous"
-  const dependencyChain = [executorName]
-  return errors.createFactoryError(executorName, dependencyChain, err, meta.callSite)
-}
-
-export function generateExecutionWrapper(
-  meta: Sucrose.Metadata,
-  resolvedDeps: Core.DependencyLike | undefined,
-  registerCleanup: (fn: Core.Cleanup) => void
-): ExecutionWrapper {
-  const { inference, controllerFactory, original } = meta
-  const { dependencyShape } = inference
-  const usesController = controllerFactory !== "none"
-
-  let resolveDepsCode: string
-  switch (dependencyShape) {
-    case "none":
-      resolveDepsCode = ""
-      break
-    case "single":
-      resolveDepsCode = "const resolved = await scope.resolve(deps)"
-      break
-    case "array":
-      resolveDepsCode = "const resolved = await Promise.all(deps.map(d => scope.resolve(d)))"
-      break
-    case "record":
-      resolveDepsCode = `
-        const entries = await Promise.all(
-          Object.entries(deps).map(async ([k, v]) => [k, await scope.resolve(v)])
-        )
-        const resolved = Object.fromEntries(entries)`
-      break
-  }
-
-  let createControllerCode: string
-  if (usesController) {
-    createControllerCode = "const ctl = ctlFactory(scope, meta.executor, registerCleanup)"
-  } else {
-    createControllerCode = ""
-  }
-
-  let callFactoryCode: string
-  if (dependencyShape === "none" && !usesController) {
-    callFactoryCode = "originalFn()"
-  } else if (dependencyShape === "none" && usesController) {
-    callFactoryCode = "originalFn(ctl)"
-  } else if (!usesController) {
-    callFactoryCode = "originalFn(resolved)"
-  } else {
-    callFactoryCode = "originalFn(resolved, ctl)"
-  }
-
-  const fnBody = `
-    return async function execute(scope, deps) {
-      try {
-        ${resolveDepsCode}
-        ${createControllerCode}
-        const result = ${callFactoryCode}
-        if (isThenable(result)) {
-          return result.catch(err => { throw enrichError(err, meta) })
-        }
-        return result
-      } catch (err) {
-        throw enrichError(err, meta)
-      }
-    }
-  `
-
-  const wrapper = new Function(
-    "originalFn",
-    "meta",
-    "ctlFactory",
-    "registerCleanup",
-    "isThenable",
-    "enrichError",
-    "NOOP_CONTROLLER",
-    fnBody
-  )(
-    original,
-    meta,
-    controllerFactory === "none" ? null : controllerFactory,
-    registerCleanup,
-    isThenable,
-    enrichError,
-    NOOP_CONTROLLER
-  ) as ExecutionWrapper
-
-  return wrapper
-}
-
-const executionCache = new WeakMap<Core.Scope, WeakMap<Core.Executor<unknown>, ExecutionWrapper>>()
-
-export function getOrCreateExecutionWrapper(
-  scope: Core.Scope,
-  executor: Core.Executor<unknown>,
-  resolvedDeps: Core.DependencyLike | undefined,
-  registerCleanup: (fn: Core.Cleanup) => void
-): ExecutionWrapper {
-  let scopeCache = executionCache.get(scope)
-  if (!scopeCache) {
-    scopeCache = new WeakMap()
-    executionCache.set(scope, scopeCache)
-  }
-
-  let wrapper = scopeCache.get(executor)
-  if (!wrapper) {
-    const meta = getMetadata(executor)
-    if (!meta) {
-      throw new Error("Executor metadata not found")
-    }
-    wrapper = generateExecutionWrapper(meta, resolvedDeps, registerCleanup)
-    scopeCache.set(executor, wrapper)
-  }
-
-  return wrapper
-}
