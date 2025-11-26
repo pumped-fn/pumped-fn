@@ -1,5 +1,6 @@
 import { type Core } from "./types"
 import { type Tag } from "./tag"
+import { Promised } from "./primitives"
 
 export namespace Sucrose {
   export type DependencyShape = "none" | "single" | "array" | "record"
@@ -28,6 +29,20 @@ export namespace Sucrose {
     skipDetail: string | undefined
   }
 }
+
+const NOOP_CLEANUP = () => {}
+const RESOLVED_VOID = Promised.create(Promise.resolve())
+
+export const NOOP_CONTROLLER: Core.Controller = Object.freeze({
+  cleanup: NOOP_CLEANUP,
+  release: () => RESOLVED_VOID,
+  reload: () => RESOLVED_VOID,
+  scope: null as unknown as Core.Scope,
+})
+
+export type ControllerFactory =
+  | "none"
+  | ((scope: Core.Scope, executor: Core.Executor<unknown>, registerCleanup: (fn: Core.Cleanup) => void) => Core.Controller)
 
 export function separateFunction(fn: Function): [string, string] {
   const content = fn.toString()
@@ -378,4 +393,31 @@ export function compile(
   }
 
   return metadata
+}
+
+export function createControllerFactory(inference: Sucrose.Inference): ControllerFactory {
+  const { usesCleanup, usesRelease, usesReload, usesScope } = inference
+
+  if (!usesCleanup && !usesRelease && !usesReload && !usesScope) {
+    return "none"
+  }
+
+  return (scope, executor, registerCleanup) => {
+    const ctl: Partial<Core.Controller> = {}
+
+    if (usesCleanup) {
+      ctl.cleanup = registerCleanup
+    }
+    if (usesRelease) {
+      ctl.release = () => scope.release(executor)
+    }
+    if (usesReload) {
+      ctl.reload = () => scope.resolve(executor, true).map(() => undefined)
+    }
+    if (usesScope) {
+      ctl.scope = scope
+    }
+
+    return ctl as Core.Controller
+  }
 }
