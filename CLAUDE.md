@@ -2,43 +2,35 @@
 
 # Prerequisites
 
-This repo requires `c3-skill` and `superpowers` skill sets. If those cannot be found, install them first:
-
-```bash
-# Install c3-skill
-/plugin marketplace add Lagz0ne/c3-skill
-/plugin install c3-skill
-
-# Install superpowers
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
-```
-
-Verify installation with `/help` - you should see `/c3:*` and `/superpowers:*` commands available.
+This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troublesshoting.md
 
 # IMPORTANT
-Always use /c3:c3-use skill to start a session, that'll help with architecture understanding
 
+Always use /c3-skill:c3-use skill to start a session, that'll help with architecture understanding
+Whenever attempting to make changes to the library, use /c3-skill:c3 to analyze and creating an ADR to address change
+
+Prior to finish, always use /c3-skill:audit to up date corresponding docs
 
 # Coding Style
 
 - **NO `any`** - use `as unknown as TargetType` for intentional type violations
 - **NEVER** inline `//` comments - code self-documents via naming
-- **ALWAYS** TSDoc for public API (exports via packages/*/src/index.ts)
+- **ALWAYS** TSDoc for public API (exports via packages/\*/src/index.ts)
 - Group types using namespaces
 - Use `import { type ... }` for type-only imports
 - Never inline `import()`
 - **Type guards**: use `symbol in obj` pattern, not duck typing
+
   ```typescript
   // YES: symbol-based guard
-  const fooSymbol: unique symbol = Symbol.for("@pumped-fn/foo")
+  const fooSymbol: unique symbol = Symbol.for("@pumped-fn/foo");
   function isFoo(x: unknown): x is Foo {
-    return typeof x === "object" && x !== null && fooSymbol in x
+    return typeof x === "object" && x !== null && fooSymbol in x;
   }
 
   // NO: duck typing
   function isFoo(x: unknown): x is Foo {
-    return "someMethod" in x && typeof x.someMethod === "function"
+    return "someMethod" in x && typeof x.someMethod === "function";
   }
   ```
 
@@ -51,6 +43,7 @@ Always use /c3:c3-use skill to start a session, that'll help with architecture u
 # Making Changes
 
 API changes in packages/next require updates to:
+
 1. Implementation (packages/next/src/)
 2. Tests (packages/next/tests/)
 3. Examples (examples/)
@@ -77,12 +70,13 @@ pnpm -F @pumped-fn/examples typecheck       # examples
 ## Public API Export Rules
 
 **Pattern:**
+
 - Direct re-exports: `export { X } from "./module"`
 - Namespace exports via const (not `export * as`):
   ```typescript
-  import * as moduleExports from "./module"
-  const name: typeof moduleExports = moduleExports
-  export { name }
+  import * as moduleExports from "./module";
+  const name: typeof moduleExports = moduleExports;
+  export { name };
   ```
 
 **Type exports:** Only types used in public function signatures.
