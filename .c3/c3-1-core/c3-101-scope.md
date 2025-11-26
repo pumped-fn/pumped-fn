@@ -29,8 +29,9 @@ An executor is a blueprint for producing a value. Think of it as a "recipe" - it
 1. **Factory** - The function that creates the value
 2. **Dependencies** - Other executors this one needs
 3. **Tags** - Metadata attached to the executor
+4. **Compiled** - JIT-compiled optimized factory (via Sucrose analysis)
 
-Executors are created declaratively at module load time, but their factories only run when resolved within a scope.
+Executors are created declaratively at module load time. At creation time, Sucrose analyzes the factory function and generates an optimized compiled version. The compiled factory runs when resolved within a scope.
 
 **Creation patterns:**
 
@@ -128,6 +129,42 @@ provide((ctl) => {
 });
 ```
 
+### Sucrose (Static Analysis)
+
+Sucrose analyzes factory functions at creation time to enable:
+
+1. **Fail-fast validation** - Detect issues before runtime
+2. **Code generation** - Produce optimized compiled factories via `new Function()`
+3. **Metadata extraction** - Know what the factory actually uses
+
+**Analysis detects:**
+
+| Property | Purpose |
+|----------|---------|
+| `async` | Is factory async? |
+| `usesCleanup` | Calls `ctl.cleanup()`? |
+| `usesRelease` | Calls `ctl.release()`? |
+| `usesReload` | Calls `ctl.reload()`? |
+| `usesScope` | Accesses `ctl.scope`? |
+| `dependencyShape` | `'single'` / `'array'` / `'record'` / `'none'` |
+| `dependencyAccess` | Which dependencies are actually accessed |
+
+**Generated code signature:** `(deps, ctl) => result`
+
+```typescript
+// provide((ctl) => new Service())
+// Generated: new Function('deps', 'ctl', `"use strict"; return new Service()`)
+
+// derive([dbExec, cacheExec], ([db, cache], ctl) => new Repo(db, cache))
+// Generated: new Function('deps', 'ctl', `"use strict"; return new Repo(deps[0], deps[1])`)
+```
+
+**Debugging support:**
+
+- Call site captured at creation via `new Error().stack`
+- Original factory preserved for inspection
+- `//# sourceURL=pumped-fn://executorName.js` in generated code
+
 ### Preset (Override)
 
 Presets allow overriding executor values in a scope:
@@ -184,6 +221,7 @@ Scopes emit events for observability:
 |------|----------|
 | `scope.ts` | BaseScope, AccessorImpl, createScope, ScopeOption |
 | `executor.ts` | provide, derive, preset, isExecutor, type guards |
+| `sucrose.ts` | Static analysis, code generation, metadata extraction (ADR-002) |
 | `internal/dependency-utils.ts` | resolveShape - dependency tree resolution |
 
 ## Testing {#c3-101-testing}
@@ -197,3 +235,7 @@ Key test scenarios:
 - Cleanup ordering (LIFO)
 - Reactive updates via accessor
 - Preset overrides
+- Sucrose analysis detection (async, ctl methods, dependency access)
+- Generated code correctness (all dependency shapes)
+- Call site capture in errors
+- Error enrichment with `name` tag

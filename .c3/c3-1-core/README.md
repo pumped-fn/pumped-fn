@@ -43,6 +43,7 @@ flowchart TB
     end
 
     subgraph "Core Internals"
+        Sucrose[Sucrose Analysis]
         Executor[Executor]
         Scope[Scope]
         Accessor[Accessor]
@@ -58,7 +59,8 @@ flowchart TB
         Schema[StandardSchema]
     end
 
-    provide --> Executor
+    provide --> Sucrose
+    Sucrose --> Executor
     createScope --> Scope
     Scope --> Accessor
     Scope --> Extension
@@ -77,6 +79,26 @@ flowchart TB
 ## Data Flow {#c3-1-data-flow}
 <!-- Execution sequence -->
 
+### Executor Creation (Compile Time)
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant API as provide/derive
+    participant Sucrose as Sucrose Analysis
+    participant Exec as Executor
+
+    App->>API: provide(factory) / derive(deps, factory)
+    API->>Sucrose: analyze(factory)
+    Note over Sucrose: Parse fn.toString()<br/>Detect async, deps, ctl usage
+    Sucrose->>Sucrose: generate compiled function
+    Note over Sucrose: new Function('deps', 'ctl', ...)<br/>Capture call site
+    Sucrose-->>API: { compiled, meta, original }
+    API-->>App: Executor<T>
+```
+
+### Resolution (Runtime)
+
 ```mermaid
 sequenceDiagram
     participant App as Application
@@ -88,7 +110,7 @@ sequenceDiagram
     App->>Scope: createScope(options)
     App->>Scope: resolve(executor)
     Scope->>Ext: wrap(operation)
-    Ext->>Exec: factory(controller)
+    Ext->>Exec: compiled(deps, ctl)
     Exec-->>Ext: value
     Ext-->>Scope: wrapped value
     Scope-->>App: Accessor<T>
@@ -180,6 +202,7 @@ packages/next/src/
 ├── types.ts              # Core type definitions
 ├── scope.ts              # Scope implementation
 ├── executor.ts           # Executor factory functions
+├── sucrose.ts            # Static analysis + code generation (ADR-002)
 ├── flow.ts               # Flow definition + FlowExecutionImpl
 ├── execution-context.ts  # ExecutionContext lifecycle
 ├── tag.ts                # Tag system (types, executors, merge)
@@ -196,7 +219,7 @@ Tests are organized in a unified test suite covering all layers:
 
 | Test File | Focus |
 |-----------|-------|
-| index.test.ts | Unified test suite - 160 tests covering Scope, Flow, Tag, Extension, ExecutionContext, Multi, Promised, Errors |
+| index.test.ts | Unified test suite - 198 tests covering Scope, Flow, Tag, Extension, ExecutionContext, Multi, Promised, Errors, Sucrose |
 
 **Coverage**: 83% (82.9% statements, 85% functions, 68% branches)
 

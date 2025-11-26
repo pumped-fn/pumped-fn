@@ -26,8 +26,8 @@ Errors carry enough context to diagnose issues without needing to reproduce them
 |-------------|------|-------------|
 | `SchemaError` | Error | Schema validation failure |
 | `ExecutorResolutionError` | Error | Generic resolution failure |
-| `FactoryExecutionError` | ExecutorResolutionError | Factory threw during resolution |
-| `DependencyResolutionError` | ExecutorResolutionError | Dependency could not be resolved |
+| `FactoryExecutionError` | Error | Factory threw during resolution |
+| `DependencyResolutionError` | Error | Dependency could not be resolved |
 | `FlowError` | Error | Flow-level descriptive error |
 | `FlowValidationError` | FlowError | Flow input/output validation failed |
 
@@ -37,9 +37,10 @@ Base class for resolution failures. Contains:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `context` | ErrorContext | Rich debugging context |
-| `code` | Code | Error code from catalog |
-| `category` | string | Error category |
+| `executorName` | string | Name of failing executor |
+| `dependencyChain` | string[] | Path from root to failure |
+| `callSite` | string? | Stack trace where executor was created (ADR-002) |
+| `code` | string | Error code (e.g., "E001") |
 
 ### FactoryExecutionError
 
@@ -88,26 +89,26 @@ Codes are organized by category:
 
 ## Error Context {#c3-105-context}
 
-Every resolution error includes rich context:
+Every resolution error includes context as direct properties:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `executorName` | string | Name of failing executor |
+| `executorName` | string | Name of failing executor (from `name` tag) |
 | `dependencyChain` | string[] | Path from root to failure |
-| `resolutionStage` | string | Where in resolution it failed |
-| `timestamp` | number | When error occurred |
-| `additionalInfo` | object | Extra debugging data |
+| `callSite` | string? | Stack trace where executor was created (ADR-002) |
 
 **Example:**
 ```
-FactoryExecutionError: Factory function threw an error in executor 'UserService': Connection refused
-  code: F002
-  context: {
-    executorName: 'UserService',
-    dependencyChain: ['AppRoot', 'AuthService', 'UserService'],
-    timestamp: 1700000000000
-  }
+FactoryExecutionError: Factory failed for "UserService": Connection refused
+  code: F001
+  executorName: 'UserService'
+  dependencyChain: ['AppRoot', 'AuthService', 'UserService']
+  callSite: 'at createUserService (src/services/user.ts:15:20)'
 ```
+
+The `callSite` field is captured at executor creation time via Sucrose analysis, enabling debugging to trace back to where the executor was defined, not just where it failed.
+
+**Note:** The original factory function is preserved in `Sucrose.Metadata` (accessible via `getMetadata(executor)`) for debugging/devtools, not on the error itself.
 
 ## Error Factory Functions {#c3-105-factories}
 

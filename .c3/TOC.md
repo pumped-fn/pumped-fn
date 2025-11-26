@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-25 15:36:28
+> Last generated: 2025-11-26 10:28:08
 
 ## Context Level
 
@@ -171,6 +171,26 @@ and nested flow support.
 
 ## Architecture Decisions
 
+### [ADR-002-static-analysis-code-generation](./adr/adr-002-static-analysis-code-generation.md) - Static Code Analysis and JIT Compilation for Executors
+> Add Sucrose-inspired static analysis at executor creation time to generate
+optimized factory functions via new Function(), enabling fail-fast validation,
+better error context with call site capture, and foundation for future devtools.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-002-status)
+- [Problem/Requirement](#adr-002-problem)
+- [Exploration Journey](#adr-002-exploration)
+- [Solution](#adr-002-solution)
+- [Changes Across Layers](#adr-002-changes)
+- [Verification](#adr-002-verification)
+- [Future Considerations](#adr-002-future)
+- [Alternatives Considered](#adr-002-alternatives)
+- [Related](#adr-002-related)
+
+---
+
 ### [ADR-001-execution-context-lifecycle](./adr/adr-001-execution-context-lifecycle.md) - ExecutionContext Explicit Lifecycle with close()
 > Add close() method to ExecutionContext for middleware integration patterns,
 enabling explicit lifecycle management with graceful/abort modes and cascading
@@ -193,5 +213,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 11
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 1
+**Total Documents**: 12
+**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 2
