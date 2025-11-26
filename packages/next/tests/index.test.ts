@@ -31,6 +31,7 @@ import {
   separateFunction,
   analyze,
   generate,
+  captureCallSite,
   type Core,
   type Flow,
   type Extension,
@@ -2271,6 +2272,19 @@ describe("Sucrose (Static Analysis)", () => {
       const fn = (ctl: { value: number }) => ctl.value
       const compiled = generate(fn, "none", "testExecutor")
       expect(compiled(undefined, { value: 42 })).toBe(42)
+    })
+  })
+
+  describe("captureCallSite", () => {
+    it("captures stack trace string", () => {
+      const callSite = captureCallSite()
+      expect(typeof callSite).toBe("string")
+      expect(callSite.length).toBeGreaterThan(0)
+    })
+
+    it("includes file path in call site", () => {
+      const callSite = captureCallSite()
+      expect(callSite).toMatch(/\.ts:|\.js:/)
     })
   })
 })

@@ -151,3 +151,17 @@ ${bodyWithReturn}
 
   return new FunctionConstructor("deps", "ctl", fnBody) as (deps: unknown, ctl: unknown) => unknown
 }
+
+/**
+ * Captures call site information from stack trace for debugging.
+ * @returns Stack trace line representing the call location
+ */
+export function captureCallSite(): string {
+  const err = new Error()
+  const stack = err.stack || ""
+
+  const lines = stack.split("\n")
+  const relevantLines = lines.slice(2).filter((line) => !line.includes("sucrose.ts"))
+
+  return relevantLines[0]?.trim() || "unknown"
+}
