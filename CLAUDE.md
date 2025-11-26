@@ -12,6 +12,19 @@ Always use /c3:c3-use skill to start a session, that'll help with architecture u
 - Group types using namespaces
 - Use `import { type ... }` for type-only imports
 - Never inline `import()`
+- **Type guards**: use `symbol in obj` pattern, not duck typing
+  ```typescript
+  // YES: symbol-based guard
+  const fooSymbol: unique symbol = Symbol.for("@pumped-fn/foo")
+  function isFoo(x: unknown): x is Foo {
+    return typeof x === "object" && x !== null && fooSymbol in x
+  }
+
+  // NO: duck typing
+  function isFoo(x: unknown): x is Foo {
+    return "someMethod" in x && typeof x.someMethod === "function"
+  }
+  ```
 
 # Coding Workflow
 
