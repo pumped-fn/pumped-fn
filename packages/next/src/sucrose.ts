@@ -16,7 +16,7 @@ export namespace Sucrose {
 
   export type CompilationSkipReason =
     | "free-variables"
-    | "non-arrow-function"
+    | "unsupported-syntax"
     | "compilation-error"
 
   export interface Metadata {
@@ -31,20 +31,29 @@ export namespace Sucrose {
 }
 
 /**
- * Separates arrow function into parameters and body strings.
+ * Separates function into parameters and body strings.
  *
  * **Internal/Advanced API** - Used by the compilation pipeline.
  * Most users should use `compile()` instead.
  *
- * @param fn - Arrow function to parse
+ * Supports:
+ * - Arrow functions: `(x, y) => x + y`
+ * - Regular functions: `function(x, y) { return x + y }`
+ * - Named functions: `function add(x, y) { return x + y }`
+ * - Async variants of all above
+ *
+ * @param fn - Function to parse
  * @returns Tuple of [parameters, body] as strings
- * @throws Error if fn is not an arrow function
  *
  * @example
  * ```typescript
  * const [params, body] = separateFunction((x, y) => x + y)
  * // params: "x, y"
  * // body: "x + y"
+ *
+ * const [params2, body2] = separateFunction(function(x, y) { return x + y })
+ * // params2: "x, y"
+ * // body2: "return x + y"
  * ```
  */
 export function separateFunction(fn: Function): [string, string] {
@@ -54,23 +63,37 @@ export function separateFunction(fn: Function): [string, string] {
   const withoutAsync = asyncMatch ? content.slice(asyncMatch[0].length) : content
 
   const arrowIndex = withoutAsync.indexOf("=>")
-  if (arrowIndex === -1) {
-    throw new Error("Only arrow functions are supported")
+  if (arrowIndex !== -1) {
+    let params = withoutAsync.slice(0, arrowIndex).trim()
+
+    if (params.startsWith("(") && params.endsWith(")")) {
+      params = params.slice(1, -1).trim()
+    }
+
+    let body = withoutAsync.slice(arrowIndex + 2).trim()
+
+    if (body.startsWith("{") && body.endsWith("}")) {
+      body = body.slice(1, -1).trim()
+    }
+
+    return [params, body]
   }
 
-  let params = withoutAsync.slice(0, arrowIndex).trim()
-
-  if (params.startsWith("(") && params.endsWith(")")) {
-    params = params.slice(1, -1).trim()
+  const funcMatch = withoutAsync.match(/^function\s*[^(]*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
+  if (funcMatch) {
+    const params = funcMatch[1].trim()
+    const body = funcMatch[2].trim()
+    return [params, body]
   }
 
-  let body = withoutAsync.slice(arrowIndex + 2).trim()
-
-  if (body.startsWith("{") && body.endsWith("}")) {
-    body = body.slice(1, -1).trim()
+  const methodMatch = withoutAsync.match(/^[^(]*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
+  if (methodMatch) {
+    const params = methodMatch[1].trim()
+    const body = methodMatch[2].trim()
+    return [params, body]
   }
 
-  return [params, body]
+  throw new Error("Unsupported function syntax")
 }
 
 /**
@@ -316,8 +339,8 @@ export function generate(
   } catch {
     return {
       compiled: undefined,
-      skipReason: "non-arrow-function",
-      skipDetail: "Only arrow functions can be compiled"
+      skipReason: "unsupported-syntax",
+      skipDetail: "Function syntax could not be parsed"
     }
   }
 

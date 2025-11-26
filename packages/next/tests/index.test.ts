@@ -2210,6 +2210,43 @@ describe("Sucrose (Static Analysis)", () => {
       expect(body).toContain("const x = 1")
       expect(body).toContain("return x")
     })
+
+    it("parses regular function", () => {
+      const fn = function (ctl: unknown) {
+        return "value"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("return")
+      expect(body).toContain("value")
+    })
+
+    it("parses named function", () => {
+      const fn = function myFactory(ctl: unknown) {
+        return "named"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("named")
+    })
+
+    it("parses async regular function", () => {
+      const fn = async function (ctl: unknown) {
+        return "async-regular"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("async-regular")
+    })
+
+    it("parses function with multiple params", () => {
+      const fn = function (deps: unknown, ctl: unknown) {
+        return deps
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toContain("deps")
+      expect(params).toContain("ctl")
+    })
   })
 
   describe("analyze", () => {
@@ -2370,6 +2407,45 @@ describe("Sucrose (Static Analysis)", () => {
       expect(result.compiled).toBeUndefined()
       expect(result.skipReason).toBe("free-variables")
       expect(result.skipDetail).toContain("Service")
+    })
+
+    it("generates function for regular function (no deps)", () => {
+      const fn = function (ctl: unknown) {
+        return "regular-value"
+      }
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.skipReason).toBeUndefined()
+      expect(result.compiled!(undefined, {})).toBe("regular-value")
+    })
+
+    it("generates function for regular function with deps", () => {
+      const fn = function (deps: string, ctl: unknown) {
+        return `got-${deps}`
+      }
+      const result = generate(fn, "single", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!("input", {})).toBe("got-input")
+    })
+
+    it("generates function for async regular function", async () => {
+      const fn = async function (ctl: unknown) {
+        return "async-regular"
+      }
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      const promiseResult = result.compiled!(undefined, {})
+      expect(promiseResult).toBeInstanceOf(Promise)
+      expect(await promiseResult).toBe("async-regular")
+    })
+
+    it("generates function for named function", () => {
+      const fn = function myFactory(ctl: unknown) {
+        return "named-result"
+      }
+      const result = generate(fn, "none", "testExecutor")
+      expect(result.compiled).toBeDefined()
+      expect(result.compiled!(undefined, {})).toBe("named-result")
     })
   })
 
