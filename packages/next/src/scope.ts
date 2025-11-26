@@ -149,7 +149,6 @@ type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
 interface ReplacerResult {
-  factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>;
   dependencies:
     | undefined
     | Core.UExecutor
@@ -193,7 +192,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveCore(): Promise<unknown> {
-    const { factory, dependencies, immediateValue, effectiveExecutor } = this.processReplacer();
+    const { dependencies, immediateValue, effectiveExecutor } = this.processReplacer();
 
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -224,7 +223,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
         );
 
     const result = await this.executeFactory(
-      factory,
       resolvedDependencies,
       effectiveExecutor
     );
@@ -337,7 +335,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     if (!replacer) {
       return {
-        factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
         effectiveExecutor: this.requestor,
       };
@@ -347,7 +344,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     if (!isExecutor(value)) {
       return {
-        factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
         immediateValue: value,
         effectiveExecutor: this.requestor,
@@ -355,23 +351,26 @@ class AccessorImpl implements Core.Accessor<unknown> {
     }
 
     return {
-      factory: value.factory!,
       dependencies: value.dependencies,
       effectiveExecutor: value as Core.Executor<unknown>,
     };
   }
 
   private async executeFactory(
-    factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>,
     resolvedDependencies: unknown,
     effectiveExecutor: Core.Executor<unknown>
   ): Promise<unknown> {
     const meta = getMetadata(effectiveExecutor)
-    const callSite = meta?.callSite
 
-    const controller = meta?.controllerFactory === "none"
+    if (!meta) {
+      throw new Error("Executor metadata not found. Executors must be created using sucrose compilation.")
+    }
+
+    const callSite = meta.callSite
+
+    const controller = meta.controllerFactory === "none"
       ? NOOP_CONTROLLER
-      : meta?.controllerFactory
+      : meta.controllerFactory
         ? meta.controllerFactory(
             this.scope,
             this.requestor,
@@ -384,14 +383,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
         : this.createControllerLegacy()
 
     try {
-      const factoryResult = meta?.fn
-        ? meta.fn(resolvedDependencies, controller)
-        : factory.length >= 2
-          ? (factory as Core.DependentFn<unknown, unknown>)(
-              resolvedDependencies,
-              controller
-            )
-          : (factory as Core.NoDependencyFn<unknown>)(controller)
+      const factoryResult = meta.fn(resolvedDependencies, controller)
 
       if (isThenable(factoryResult)) {
         try {
