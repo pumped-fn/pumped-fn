@@ -27,6 +27,7 @@ import {
   DependencyResolutionError,
   ExecutionContextClosedError,
   SchemaError,
+  Sucrose,
   type Core,
   type Flow,
   type Extension,
@@ -2074,5 +2075,22 @@ describe("Realistic Scenario: Request Processing with Tags and Extensions", () =
 
     await connectionPool.release(scope)
     await scope.dispose()
+  })
+})
+
+describe("Sucrose (Static Analysis)", () => {
+  describe("types", () => {
+    it("exports Sucrose namespace with Inference type", async () => {
+      const inference: Sucrose.Inference = {
+        async: false,
+        usesCleanup: false,
+        usesRelease: false,
+        usesReload: false,
+        usesScope: false,
+        dependencyShape: "none",
+        dependencyAccess: [],
+      }
+      expect(inference.async).toBe(false)
+    })
   })
 })

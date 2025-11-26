@@ -161,6 +161,11 @@ export { FlowValidationError } from "./types"
 export { ExecutionContextClosedError } from "./errors"
 
 /**
+ * Static analysis namespace containing types and functions for factory introspection.
+ */
+export { Sucrose } from "./sucrose"
+
+/**
  * Standard tag representing the friendly executor name.
  */
 export const name: TagType.Tag<string, false> = tagImpl(customSchema<string>(), {
