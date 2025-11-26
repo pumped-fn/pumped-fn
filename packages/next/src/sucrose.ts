@@ -242,7 +242,7 @@ function detectFreeVariable(body: string, depsParam: string | undefined, ctlPara
   return undefined
 }
 
-function splitFirstParam(params: string): [string, boolean] {
+function splitFirstParam(params: string): [string, string] {
   let depth = 0
   let inString = false
   let stringChar = ""
@@ -263,16 +263,16 @@ function splitFirstParam(params: string): [string, boolean] {
       continue
     }
 
-    if (char === "[" || char === "{") {
+    if (char === "[" || char === "{" || char === "<" || char === "(") {
       depth++
-    } else if (char === "]" || char === "}") {
+    } else if (char === "]" || char === "}" || char === ">" || char === ")") {
       depth--
     } else if (char === "," && depth === 0) {
-      return [params.slice(0, i).trim(), true]
+      return [params.slice(0, i).trim(), params.slice(i + 1).trim()]
     }
   }
 
-  return [params.trim(), false]
+  return [params.trim(), ""]
 }
 
 export type GenerateResult =
@@ -330,9 +330,9 @@ export function generate(
     depsParam = undefined
     ctlParam = params.trim()
   } else {
-    const [dp, hasCtl] = splitFirstParam(params)
+    const [dp, rest] = splitFirstParam(params)
     depsParam = dp
-    ctlParam = hasCtl ? params.slice(params.indexOf(",") + 1).trim() : ""
+    ctlParam = rest
   }
 
   const freeVar = detectFreeVariable(body, depsParam, ctlParam)
@@ -352,6 +352,11 @@ export function generate(
     } else {
       bindings = `const ${depsParam} = deps;`
     }
+  }
+
+  const ctlName = ctlParam.split(":")[0].trim()
+  if (ctlName && ctlName !== "ctl" && !ctlName.startsWith("{") && !ctlName.startsWith("[")) {
+    bindings += `\nconst ${ctlName} = ctl;`
   }
 
   const hasReturn = body.includes("return ") || body.includes("return;") || body.includes("return\n")
