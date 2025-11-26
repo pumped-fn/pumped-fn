@@ -218,3 +218,7 @@ export function custom<T>(
     },
   };
 }
+
+export function isThenable(val: unknown): val is PromiseLike<unknown> {
+  return val !== null && typeof val === "object" && typeof (val as unknown as { then: unknown }).then === "function"
+}
