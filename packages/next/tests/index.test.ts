@@ -27,18 +27,12 @@ import {
   DependencyResolutionError,
   ExecutionContextClosedError,
   SchemaError,
-  Sucrose,
-  separateFunction,
-  analyze,
-  generate,
-  captureCallSite,
-  compile,
-  getMetadata,
   type Core,
   type Flow,
   type Extension,
   type Tag,
 } from "../src/index"
+import { type Sucrose, separateFunction, analyze, generate, captureCallSite, compile, getMetadata } from "../src/sucrose"
 
 describe("Scope & Executor", () => {
   describe("provide()", () => {

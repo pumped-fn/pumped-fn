@@ -160,18 +160,6 @@ export { FlowValidationError } from "./types"
  */
 export { ExecutionContextClosedError } from "./errors"
 
-/**
- * Static analysis namespace containing types and functions for factory introspection.
- *
- * The Sucrose system provides:
- * - `compile()` - Main entry point for JIT compilation
- * - `getMetadata()` - Retrieve compiled metadata for an executor
- * - `analyze()` - Analyze factory usage patterns (internal)
- * - `generate()` - Generate optimized function (internal)
- * - `separateFunction()` - Parse arrow functions (internal)
- * - `captureCallSite()` - Capture stack trace location (internal)
- */
-export { type Sucrose, separateFunction, analyze, generate, captureCallSite, compile, getMetadata, type GenerateResult } from "./sucrose"
 
 /**
  * Standard tag representing the friendly executor name.

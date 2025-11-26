@@ -30,32 +30,6 @@ export namespace Sucrose {
   }
 }
 
-/**
- * Separates function into parameters and body strings.
- *
- * **Internal/Advanced API** - Used by the compilation pipeline.
- * Most users should use `compile()` instead.
- *
- * Supports:
- * - Arrow functions: `(x, y) => x + y`
- * - Regular functions: `function(x, y) { return x + y }`
- * - Named functions: `function add(x, y) { return x + y }`
- * - Async variants of all above
- *
- * @param fn - Function to parse
- * @returns Tuple of [parameters, body] as strings
- *
- * @example
- * ```typescript
- * const [params, body] = separateFunction((x, y) => x + y)
- * // params: "x, y"
- * // body: "x + y"
- *
- * const [params2, body2] = separateFunction(function(x, y) { return x + y })
- * // params2: "x, y"
- * // body2: "return x + y"
- * ```
- */
 export function separateFunction(fn: Function): [string, string] {
   const content = fn.toString()
 
@@ -96,23 +70,6 @@ export function separateFunction(fn: Function): [string, string] {
   throw new Error("Unsupported function syntax")
 }
 
-/**
- * Analyzes factory function to detect usage patterns.
- *
- * **Internal/Advanced API** - Used by the compilation pipeline.
- * Most users should use `compile()` instead.
- *
- * @param fn - Factory function to analyze
- * @param dependencyShape - Expected dependency structure
- * @returns Inference object with detected patterns (async, controller usage, dependencies)
- *
- * @example
- * ```typescript
- * const inference = analyze(([dep], ctl) => { ctl.cleanup(() => {}); return dep }, "array")
- * // inference.usesCleanup === true
- * // inference.dependencyAccess === [0]
- * ```
- */
 export function analyze(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape
@@ -164,9 +121,6 @@ export function analyze(
   }
 }
 
-/**
- * Strips string literals from code to avoid false positives in identifier detection.
- */
 function stripStrings(code: string): string {
   let result = ""
   let i = 0
@@ -193,10 +147,6 @@ function stripStrings(code: string): string {
   return result
 }
 
-/**
- * Checks if function body likely references closure variables (free variables).
- * Returns the first detected free variable, or undefined if none found.
- */
 function detectFreeVariable(body: string, depsParam: string | undefined, ctlParam: string): string | undefined {
   const strippedBody = stripStrings(body)
 
@@ -302,29 +252,6 @@ export type GenerateResult =
   | { compiled: (deps: unknown, ctl: unknown) => unknown; skipReason: undefined; skipDetail: undefined }
   | { compiled: undefined; skipReason: Sucrose.CompilationSkipReason; skipDetail: string }
 
-/**
- * Generates optimized compiled function via `new Function()` for JIT execution.
- *
- * **Limitations:**
- * - Only arrow functions are supported
- * - Factories with closure variables (free variables) cannot be compiled
- * - Common globals (Object, Array, Promise, etc.) are allowed
- *
- * @param fn - Factory function to compile
- * @param dependencyShape - Expected dependency structure
- * @param executorName - Name for sourceURL debugging comment
- * @returns Result object with either compiled function or skip reason
- *
- * @example
- * ```typescript
- * const result = generate(myFactory, "array", "myExecutor")
- * if (result.compiled) {
- *   // Use the optimized function
- * } else {
- *   console.log(`Skipped: ${result.skipReason} - ${result.skipDetail}`)
- * }
- * ```
- */
 export function generate(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape,
@@ -405,14 +332,6 @@ ${bodyWithReturn}
   }
 }
 
-/**
- * Captures call site information from stack trace for debugging.
- *
- * **Internal/Advanced API** - Used by the compilation pipeline.
- * Most users should use `compile()` or `getMetadata()` instead.
- *
- * @returns Stack trace line representing the call location (e.g., "at myFunction (file.ts:42:10)")
- */
 export function captureCallSite(): string {
   const err = new Error()
   const stack = err.stack || ""
@@ -425,41 +344,10 @@ export function captureCallSite(): string {
 
 const metadataStore = new WeakMap<object, Sucrose.Metadata>()
 
-/**
- * Retrieves stored metadata for an executor.
- * @param executor - Executor object to retrieve metadata for
- * @returns Metadata if found, undefined otherwise
- */
 export function getMetadata(executor: object): Sucrose.Metadata | undefined {
   return metadataStore.get(executor)
 }
 
-/**
- * Compiles a factory function with static analysis and stores metadata.
- *
- * **Important:** Compilation may be skipped for factories that:
- * - Are not arrow functions
- * - Reference closure variables (free variables)
- *
- * Check `metadata.compiled !== undefined` to verify compilation succeeded.
- * When skipped, `metadata.skipReason` and `metadata.skipDetail` explain why.
- *
- * @param fn - Factory function to compile
- * @param dependencyShape - Expected dependency structure
- * @param executor - Optional executor to associate metadata with
- * @param tags - Optional array of tags for extracting metadata (e.g., name tag)
- * @returns Compiled metadata including inference, compiled function (if successful), and debugging info
- *
- * @example
- * ```typescript
- * const meta = compile(myFactory, "array", myExecutor, [])
- * if (meta.compiled) {
- *   // Use optimized path
- * } else {
- *   console.warn(`Compilation skipped: ${meta.skipReason} - ${meta.skipDetail}`)
- * }
- * ```
- */
 export function compile(
   fn: Function,
   dependencyShape: Sucrose.DependencyShape,
