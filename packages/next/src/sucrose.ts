@@ -91,11 +91,15 @@ export function analyze(
   const [params, body] = separateFunction(fn)
 
   const ctlParam = dependencyShape === "none" ? params : params.split(",").pop()?.trim() || ""
+  const ctlName = ctlParam.split(":")[0].trim()
 
-  const usesCleanup = new RegExp(`${ctlParam}\\.cleanup`).test(body)
-  const usesRelease = new RegExp(`${ctlParam}\\.release`).test(body)
-  const usesReload = new RegExp(`${ctlParam}\\.reload`).test(body)
-  const usesScope = new RegExp(`${ctlParam}\\.scope`).test(body)
+  const usesCleanup = !!ctlName && new RegExp(`${ctlName}\\.cleanup`).test(body)
+  const usesRelease = !!ctlName && new RegExp(`${ctlName}\\.release`).test(body)
+  const usesReload = !!ctlName && new RegExp(`${ctlName}\\.reload`).test(body)
+  const usesScope = !!ctlName && new RegExp(`${ctlName}\\.scope`).test(body)
+
+  const controllerPassedToFunction = !!ctlName && new RegExp(`\\b${ctlName}\\b`).test(body)
+    && !(usesCleanup || usesRelease || usesReload || usesScope)
 
   const dependencyAccess: (number | string)[] = []
 
@@ -122,10 +126,10 @@ export function analyze(
   }
 
   return {
-    usesCleanup,
-    usesRelease,
-    usesReload,
-    usesScope,
+    usesCleanup: usesCleanup || controllerPassedToFunction,
+    usesRelease: usesRelease || controllerPassedToFunction,
+    usesReload: usesReload || controllerPassedToFunction,
+    usesScope: usesScope || controllerPassedToFunction,
     dependencyShape,
     dependencyAccess,
   }
@@ -411,21 +415,11 @@ export function createControllerFactory(inference: Sucrose.Inference): Controlle
   }
 
   return (scope, executor, registerCleanup) => {
-    const ctl: Partial<Core.Controller> = {}
-
-    if (usesCleanup) {
-      ctl.cleanup = registerCleanup
+    return {
+      cleanup: registerCleanup,
+      release: () => scope.release(executor),
+      reload: () => scope.resolve(executor, true).map(() => undefined),
+      scope,
     }
-    if (usesRelease) {
-      ctl.release = () => scope.release(executor)
-    }
-    if (usesReload) {
-      ctl.reload = () => scope.resolve(executor, true).map(() => undefined)
-    }
-    if (usesScope) {
-      ctl.scope = scope
-    }
-
-    return ctl as Core.Controller
   }
 }

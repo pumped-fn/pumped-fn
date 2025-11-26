@@ -20,11 +20,11 @@ import {
   DependencyResolutionError,
 } from "./errors";
 import { type Tag, tagSymbol, isTag, isTagExecutor, mergeFlowTags } from "./tag";
-import { Promised, validate } from "./primitives";
+import { Promised, validate, isThenable } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi, FlowExecutionImpl } from "./flow";
 import { flowDefinitionMeta, ExecutionContextImpl } from "./execution-context";
-import { getMetadata } from "./sucrose";
+import { getMetadata, NOOP_CONTROLLER } from "./sucrose";
 
 export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
 type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
@@ -213,18 +213,19 @@ class AccessorImpl implements Core.Accessor<unknown> {
       return immediateValue;
     }
 
-    const controller = this.createController();
+    const meta = getMetadata(effectiveExecutor)
 
-    const resolvedDependencies = await this.scope["~resolveDependencies"](
-      dependencies,
-      this.requestor,
-      this.executionContext
-    );
+    const resolvedDependencies = dependencies === undefined
+      ? undefined
+      : await this.scope["~resolveDependencies"](
+          dependencies,
+          this.requestor,
+          this.executionContext
+        );
 
     const result = await this.executeFactory(
       factory,
       resolvedDependencies,
-      controller,
       effectiveExecutor
     );
 
@@ -363,11 +364,24 @@ class AccessorImpl implements Core.Accessor<unknown> {
   private async executeFactory(
     factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>,
     resolvedDependencies: unknown,
-    controller: Core.Controller,
     effectiveExecutor: Core.Executor<unknown>
   ): Promise<unknown> {
-    const meta = getMetadata(effectiveExecutor);
-    const callSite = meta?.callSite;
+    const meta = getMetadata(effectiveExecutor)
+    const callSite = meta?.callSite
+
+    const controller = meta?.controllerFactory === "none"
+      ? NOOP_CONTROLLER
+      : meta?.controllerFactory
+        ? meta.controllerFactory(
+            this.scope,
+            this.requestor,
+            (fn: Core.Cleanup) => {
+              const state = this.scope["getOrCreateState"](this.requestor)
+              const cleanups = this.scope["ensureCleanups"](state)
+              cleanups.add(fn)
+            }
+          )
+        : this.createControllerLegacy()
 
     try {
       const factoryResult = meta?.fn
@@ -377,35 +391,49 @@ class AccessorImpl implements Core.Accessor<unknown> {
               resolvedDependencies,
               controller
             )
-          : (factory as Core.NoDependencyFn<unknown>)(controller);
+          : (factory as Core.NoDependencyFn<unknown>)(controller)
 
-      if (factoryResult instanceof Promise) {
+      if (isThenable(factoryResult)) {
         try {
-          return await factoryResult;
+          return await factoryResult
         } catch (asyncError) {
-          const executorName = errors.getExecutorName(this.requestor);
-          const dependencyChain = [executorName];
+          const executorName = errors.getExecutorName(this.requestor)
+          const dependencyChain = [executorName]
 
           throw errors.createFactoryError(
             executorName,
             dependencyChain,
             asyncError,
             callSite
-          );
+          )
         }
       }
 
-      return factoryResult;
+      return factoryResult
     } catch (syncError) {
-      const executorName = errors.getExecutorName(this.requestor);
-      const dependencyChain = [executorName];
+      const executorName = errors.getExecutorName(this.requestor)
+      const dependencyChain = [executorName]
 
       throw errors.createFactoryError(
         executorName,
         dependencyChain,
         syncError,
         callSite
-      );
+      )
+    }
+  }
+
+  private createControllerLegacy(): Core.Controller {
+    return {
+      cleanup: (cleanup: Core.Cleanup) => {
+        const state = this.scope["getOrCreateState"](this.requestor)
+        const cleanups = this.scope["ensureCleanups"](state)
+        cleanups.add(cleanup)
+      },
+      release: () => this.scope.release(this.requestor),
+      reload: () =>
+        this.scope.resolve(this.requestor, true).map(() => undefined),
+      scope: this.scope,
     }
   }
 
@@ -508,20 +536,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
   subscribe(cb: (value: unknown) => void): Core.Cleanup {
     this.scope["~ensureNotDisposed"]();
     return this.scope.onUpdate(this.requestor, cb);
-  }
-
-  private createController(): Core.Controller {
-    return {
-      cleanup: (cleanup: Core.Cleanup) => {
-        const state = this.scope["getOrCreateState"](this.requestor);
-        const cleanups = this.scope["ensureCleanups"](state);
-        cleanups.add(cleanup);
-      },
-      release: () => this.scope.release(this.requestor),
-      reload: () =>
-        this.scope.resolve(this.requestor, true).map(() => undefined),
-      scope: this.scope,
-    };
   }
 }
 
