@@ -2493,5 +2493,44 @@ describe("Sucrose (Static Analysis)", () => {
 
       await scope.dispose()
     })
+
+    it("PROVES compiled function is actually called (not just exists)", async () => {
+      let compiledCallCount = 0
+      const executor = provide(() => {
+        return "original-value"
+      })
+
+      const meta = getMetadata(executor)
+      expect(meta?.compiled).toBeDefined()
+
+      const originalCompiled = meta!.compiled!
+      meta!.compiled = (deps: unknown, ctl: unknown) => {
+        compiledCallCount++
+        return originalCompiled(deps, ctl)
+      }
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+
+      expect(result).toBe("original-value")
+      expect(compiledCallCount).toBe(1)
+
+      await scope.dispose()
+    })
+
+    it("does NOT call compiled when it is undefined (closure case)", async () => {
+      const closureValue = "closure-value"
+      const executor = provide(() => closureValue)
+
+      const meta = getMetadata(executor)
+      expect(meta?.compiled).toBeUndefined()
+      expect(meta?.skipReason).toBe("free-variables")
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe("closure-value")
+
+      await scope.dispose()
+    })
   })
 })
