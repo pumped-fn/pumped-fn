@@ -85,7 +85,7 @@ export async function resolveShape<T extends ResolvableItem | ReadonlyArray<Reso
   }
 
   if (typeof shape === "object") {
-    if ("factory" in shape) {
+    if (executorSymbol in shape) {
       return await resolveItem(shape as Core.UExecutor);
     }
 

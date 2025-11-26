@@ -7,7 +7,7 @@ function getDependencyShape(
 ): Sucrose.DependencyShape {
   if (dependencies === undefined) return "none"
   if (Array.isArray(dependencies)) return "array"
-  if (typeof dependencies === "object" && !("factory" in dependencies)) return "record"
+  if (typeof dependencies === "object" && !(executorSymbol in dependencies)) return "record"
   return "single"
 }
 
@@ -23,69 +23,61 @@ export function createExecutor<T>(
 ): Core.Executor<T> {
   const dependencyShape = getDependencyShape(dependencies)
 
+  let _lazy: Core.Lazy<T> | undefined
+  let _reactive: Core.Reactive<T> | undefined
+  let _static: Core.Static<T> | undefined
+
   const executor = {
     [executorSymbol]: "main",
-    factory: (_: unknown, controller: Core.Controller) => {
-      if (dependencies === undefined) {
-        const f = factory as Core.NoDependencyFn<T>;
-        return f(controller);
-      }
-
-      const f = factory as Core.DependentFn<T, unknown>;
-      return f(_, controller);
-    },
     dependencies,
     tags: tags,
-  } as unknown as Core.Executor<T>;
+  } as unknown as Core.Executor<T>
 
   compile(originalFactory || factory, dependencyShape, executor, tags)
 
-  const lazyExecutor = {
-    [executorSymbol]: "lazy",
-    dependencies: undefined,
-    executor,
-    factory: undefined,
-    tags: tags,
-  } satisfies Core.Lazy<T>;
-
-  const reactiveExecutor = {
-    [executorSymbol]: "reactive",
-    executor,
-    factory: undefined,
-    dependencies: undefined,
-    tags: tags,
-  } satisfies Core.Reactive<T>;
-
-  const staticExecutor = {
-    [executorSymbol]: "static",
-    dependencies: undefined,
-    factory: undefined,
-    tags: tags,
-    executor,
-  } satisfies Core.Static<T>;
-
   Object.defineProperties(executor, {
     lazy: {
-      value: lazyExecutor,
-      writable: false,
-      configurable: false,
+      get() {
+        return _lazy ??= {
+          [executorSymbol]: "lazy",
+          dependencies: undefined,
+          executor,
+          factory: undefined,
+          tags: tags,
+        } as Core.Lazy<T>
+      },
       enumerable: false,
+      configurable: false,
     },
     reactive: {
-      value: reactiveExecutor,
-      writable: false,
-      configurable: false,
+      get() {
+        return _reactive ??= {
+          [executorSymbol]: "reactive",
+          executor,
+          factory: undefined,
+          dependencies: undefined,
+          tags: tags,
+        } as Core.Reactive<T>
+      },
       enumerable: false,
+      configurable: false,
     },
     static: {
-      value: staticExecutor,
-      writable: false,
-      configurable: false,
+      get() {
+        return _static ??= {
+          [executorSymbol]: "static",
+          dependencies: undefined,
+          factory: undefined,
+          tags: tags,
+          executor,
+        } as Core.Static<T>
+      },
       enumerable: false,
+      configurable: false,
     },
-  });
+  })
 
-  return executor;
+  return executor
 }
 
 export function isLazyExecutor(
