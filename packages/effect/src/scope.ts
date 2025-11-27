@@ -1,4 +1,4 @@
-import { accessorSymbol } from "./symbols"
+import { accessorSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 import { isAtom, isLazy } from "./atom"
 
@@ -152,7 +152,7 @@ class ScopeImpl implements Lite.Scope {
         result[key] = await this.resolve(dep)
       } else if (isLazy(dep)) {
         result[key] = new AccessorImpl(dep.atom, this)
-      } else if ("mode" in dep && "tag" in dep) {
+      } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as unknown as Lite.TagExecutor<unknown, boolean>
 
         switch (tagExecutor.mode) {

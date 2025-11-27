@@ -5,3 +5,4 @@ export const taggedSymbol: unique symbol = Symbol.for("@pumped-fn/effect/tagged"
 export const lazySymbol: unique symbol = Symbol.for("@pumped-fn/effect/lazy")
 export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/effect/preset")
 export const accessorSymbol: unique symbol = Symbol.for("@pumped-fn/effect/accessor")
+export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/effect/tag-executor")

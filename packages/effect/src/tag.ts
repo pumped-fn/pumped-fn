@@ -1,4 +1,4 @@
-import { tagSymbol, taggedSymbol } from "./symbols"
+import { tagSymbol, taggedSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite } from "./types"
 
 export interface TagOptions<T, HasDefault extends boolean> {
@@ -39,56 +39,43 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     }
   }
 
-  function normalizeSource(source: Lite.TagSource): Lite.Tagged<unknown>[] {
-    if (Array.isArray(source)) {
-      return source
-    }
-    return source.tags ?? []
-  }
-
   function get(source: Lite.TagSource): T {
-    const tags = normalizeSource(source)
-    const found = tags.find((t) => t.key === key)
-    if (found) {
-      return found.value as T
+    const tags = Array.isArray(source) ? source : source.tags ?? []
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i]!.key === key) return tags[i]!.value as unknown as T
     }
-    if (hasDefault) {
-      return defaultValue as T
-    }
+    if (hasDefault) return defaultValue as unknown as T
     throw new Error(`Tag "${options.label}" not found and has no default`)
   }
 
   function find(source: Lite.TagSource): T | undefined {
-    const tags = normalizeSource(source)
-    const found = tags.find((t) => t.key === key)
-    if (found) {
-      return found.value as T
+    const tags = Array.isArray(source) ? source : source.tags ?? []
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i]!.key === key) return tags[i]!.value as unknown as T
     }
-    if (hasDefault) {
-      return defaultValue as T
-    }
+    if (hasDefault) return defaultValue as unknown as T
     return undefined
   }
 
   function collect(source: Lite.TagSource): T[] {
-    const tags = normalizeSource(source)
-    return tags.filter((t) => t.key === key).map((t) => t.value as T)
+    const tags = Array.isArray(source) ? source : source.tags ?? []
+    const result: T[] = []
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i]!.key === key) result.push(tags[i]!.value as unknown as T)
+    }
+    return result
   }
 
-  const tagInstance = createTagged as Lite.Tag<T, boolean>
-
-  Object.defineProperties(tagInstance, {
-    [tagSymbol]: { value: true, enumerable: false },
-    key: { value: key, enumerable: true },
-    label: { value: options.label, enumerable: true },
-    hasDefault: { value: hasDefault, enumerable: true },
-    defaultValue: { value: defaultValue, enumerable: true },
-    get: { value: get, enumerable: false },
-    find: { value: find, enumerable: false },
-    collect: { value: collect, enumerable: false },
-  })
-
-  return tagInstance
+  return Object.assign(createTagged, {
+    [tagSymbol]: true as const,
+    key,
+    label: options.label,
+    hasDefault,
+    defaultValue,
+    get,
+    find,
+    collect,
+  }) as unknown as Lite.Tag<T, boolean>
 }
 
 /**
@@ -151,7 +138,7 @@ export const tags = {
    * ```
    */
   required<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T, T> {
-    return { tag, mode: "required" }
+    return { [tagExecutorSymbol]: true, tag, mode: "required" }
   },
 
   /**
@@ -169,7 +156,7 @@ export const tags = {
    * ```
    */
   optional<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T | undefined, T> {
-    return { tag, mode: "optional" }
+    return { [tagExecutorSymbol]: true, tag, mode: "optional" }
   },
 
   /**
@@ -187,6 +174,6 @@ export const tags = {
    * ```
    */
   all<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T[], T> {
-    return { tag, mode: "all" }
+    return { [tagExecutorSymbol]: true, tag, mode: "all" }
   },
 }

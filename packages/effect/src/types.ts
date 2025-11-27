@@ -6,6 +6,7 @@ import type {
   lazySymbol,
   presetSymbol,
   accessorSymbol,
+  tagExecutorSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -97,6 +98,7 @@ export namespace Lite {
   export type TagSource = Tagged<unknown>[] | { tags?: Tagged<unknown>[] }
 
   export interface TagExecutor<TOutput, TTag = TOutput> {
+    readonly [tagExecutorSymbol]: true
     readonly tag: Tag<TTag, boolean>
     readonly mode: "required" | "optional" | "all"
   }
