@@ -3,6 +3,7 @@ import { createScope } from "../src/scope"
 import { atom, lazy } from "../src/atom"
 import { preset } from "../src/preset"
 import { tag, tags } from "../src/tag"
+import { flow } from "../src/flow"
 
 describe("Scope", () => {
   describe("createScope()", () => {
@@ -233,6 +234,181 @@ describe("Scope", () => {
 
       expect(cleanups).toContain("a")
       expect(cleanups).toContain("b")
+    })
+  })
+})
+
+describe("ExecutionContext", () => {
+  describe("createContext()", () => {
+    it("creates execution context", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      expect(ctx).toBeDefined()
+      expect(ctx.exec).toBeTypeOf("function")
+      expect(ctx.close).toBeTypeOf("function")
+    })
+
+    it("creates context with tags", async () => {
+      const requestId = tag<string>({ label: "requestId" })
+      const scope = await createScope()
+      const ctx = scope.createContext({
+        tags: [requestId("req-123")],
+      })
+
+      expect(ctx).toBeDefined()
+    })
+  })
+
+  describe("ctx.exec() with flow", () => {
+    it("executes flow without deps", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      const myFlow = flow({
+        factory: (ctx) => `input: ${ctx.input}`,
+      })
+
+      const result = await ctx.exec({
+        flow: myFlow,
+        input: "hello",
+      })
+
+      expect(result).toBe("input: hello")
+      await ctx.close()
+    })
+
+    it("executes flow with deps", async () => {
+      const dbAtom = atom({ factory: () => ({ query: () => "data" }) })
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      const myFlow = flow({
+        deps: { db: dbAtom },
+        factory: (ctx, { db }) => db.query(),
+      })
+
+      const result = await ctx.exec({
+        flow: myFlow,
+        input: null,
+      })
+
+      expect(result).toBe("data")
+      await ctx.close()
+    })
+
+    it("resolves tag deps from merged sources", async () => {
+      const requestId = tag<string>({ label: "requestId" })
+      const tenantId = tag<string>({ label: "tenantId" })
+
+      const scope = await createScope({
+        tags: [tenantId("tenant-1")],
+      })
+
+      const ctx = scope.createContext({
+        tags: [requestId("req-123")],
+      })
+
+      const myFlow = flow({
+        deps: {
+          reqId: tags.required(requestId),
+          tenant: tags.required(tenantId),
+        },
+        factory: (ctx, { reqId, tenant }) => ({ reqId, tenant }),
+      })
+
+      const result = await ctx.exec({
+        flow: myFlow,
+        input: null,
+      })
+
+      expect(result).toEqual({
+        reqId: "req-123",
+        tenant: "tenant-1",
+      })
+
+      await ctx.close()
+    })
+
+    it("exec tags override context tags", async () => {
+      const requestId = tag<string>({ label: "requestId" })
+
+      const scope = await createScope()
+      const ctx = scope.createContext({
+        tags: [requestId("ctx-id")],
+      })
+
+      const myFlow = flow({
+        deps: { reqId: tags.required(requestId) },
+        factory: (ctx, { reqId }) => reqId,
+      })
+
+      const result = await ctx.exec({
+        flow: myFlow,
+        input: null,
+        tags: [requestId("exec-id")],
+      })
+
+      expect(result).toBe("exec-id")
+      await ctx.close()
+    })
+  })
+
+  describe("ctx.exec() with fn", () => {
+    it("executes plain function", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      const result = await ctx.exec({
+        fn: (a: number, b: number) => a + b,
+        params: [1, 2],
+      })
+
+      expect(result).toBe(3)
+      await ctx.close()
+    })
+  })
+
+  describe("ctx.onClose()", () => {
+    it("runs cleanup on close", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      let cleaned = false
+      ctx.onClose(() => {
+        cleaned = true
+      })
+
+      expect(cleaned).toBe(false)
+      await ctx.close()
+      expect(cleaned).toBe(true)
+    })
+
+    it("runs cleanups in LIFO order", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+
+      const order: number[] = []
+      ctx.onClose(() => order.push(1))
+      ctx.onClose(() => order.push(2))
+      ctx.onClose(() => order.push(3))
+
+      await ctx.close()
+      expect(order).toEqual([3, 2, 1])
+    })
+  })
+
+  describe("closed context", () => {
+    it("throws when executing on closed context", async () => {
+      const scope = await createScope()
+      const ctx = scope.createContext()
+      await ctx.close()
+
+      const myFlow = flow({ factory: () => 42 })
+
+      await expect(
+        ctx.exec({ flow: myFlow, input: null })
+      ).rejects.toThrow("closed")
     })
   })
 })
