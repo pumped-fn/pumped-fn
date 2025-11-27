@@ -57,13 +57,13 @@ class ScopeImpl implements Lite.Scope {
   }
 
   getState<T>(atom: Lite.Atom<T>): ResolveState<T> | undefined {
-    return this.cache.get(atom) as ResolveState<T> | undefined
+    return this.cache.get(atom) as unknown as ResolveState<T> | undefined
   }
 
   async resolve<T>(atom: Lite.Atom<T>): Promise<T> {
     const cached = this.cache.get(atom)
     if (cached) {
-      return cached.value as T
+      return cached.value as unknown as T
     }
 
     if (this.resolving.has(atom)) {
@@ -73,10 +73,10 @@ class ScopeImpl implements Lite.Scope {
     const presetValue = this.presets.get(atom)
     if (presetValue !== undefined) {
       if (isAtom(presetValue)) {
-        return this.resolve(presetValue as Lite.Atom<T>)
+        return this.resolve(presetValue as unknown as Lite.Atom<T>)
       }
       const state: ResolveState<T> = {
-        value: presetValue as T,
+        value: presetValue as unknown as T,
         cleanups: [],
       }
       this.cache.set(atom, state)
@@ -95,7 +95,7 @@ class ScopeImpl implements Lite.Scope {
       }
 
       let value: T
-      const factory = atom.factory as (
+      const factory = atom.factory as unknown as (
         ctx: Lite.ResolveContext,
         deps?: Record<string, unknown>
       ) => MaybePromise<T>
@@ -153,7 +153,7 @@ class ScopeImpl implements Lite.Scope {
       } else if (isLazy(dep)) {
         result[key] = new AccessorImpl(dep.atom, this)
       } else if ("mode" in dep && "tag" in dep) {
-        const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
+        const tagExecutor = dep as unknown as Lite.TagExecutor<unknown, boolean>
 
         switch (tagExecutor.mode) {
           case "required":
@@ -196,7 +196,7 @@ class ScopeImpl implements Lite.Scope {
 
     const atoms = Array.from(this.cache.keys())
     for (const atom of atoms) {
-      await this.release(atom as Lite.Atom<unknown>)
+      await this.release(atom as unknown as Lite.Atom<unknown>)
     }
   }
 
@@ -249,7 +249,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     this._input = input
 
-    const factory = flow.factory as (
+    const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
@@ -303,6 +303,21 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 }
 
+/**
+ * Creates a DI container that manages Atom resolution, caching, and lifecycle.
+ *
+ * @param options - Optional configuration for extensions, presets, and tags
+ * @returns A Promise that resolves to a Scope instance
+ *
+ * @example
+ * ```typescript
+ * const scope = await createScope({
+ *   extensions: [loggingExtension],
+ *   presets: [preset(dbAtom, testDb)]
+ * })
+ * const db = await scope.resolve(dbAtom)
+ * ```
+ */
 export async function createScope(
   options?: Lite.ScopeOptions
 ): Promise<Lite.Scope> {

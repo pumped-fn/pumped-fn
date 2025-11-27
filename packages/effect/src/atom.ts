@@ -7,6 +7,19 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
   tags?: Lite.Tagged<unknown>[]
 }
 
+/**
+ * Creates a long-lived dependency that can be resolved and reused within a scope.
+ *
+ * @param config - Configuration object containing factory function, optional dependencies, and tags
+ * @returns An Atom instance that can be resolved to produce a value of type T
+ *
+ * @example
+ * ```typescript
+ * const dbAtom = atom({
+ *   factory: async (ctx) => createDatabase()
+ * })
+ * ```
+ */
 export function atom<T>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
@@ -27,12 +40,25 @@ export function atom<T, D extends Record<string, Lite.Dependency>>(
 ): Lite.Atom<T> {
   return {
     [atomSymbol]: true,
-    factory: config.factory as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
-    deps: config.deps as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
+    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
 }
 
+/**
+ * Type guard to check if a value is an Atom.
+ *
+ * @param value - The value to check
+ * @returns True if the value is an Atom, false otherwise
+ *
+ * @example
+ * ```typescript
+ * if (isAtom(value)) {
+ *   await scope.resolve(value)
+ * }
+ * ```
+ */
 export function isAtom(value: unknown): value is Lite.Atom<unknown> {
   return (
     typeof value === "object" &&
@@ -41,6 +67,21 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
   )
 }
 
+/**
+ * Wraps an Atom for deferred resolution, providing an accessor instead of the resolved value.
+ *
+ * @param atom - The Atom to wrap
+ * @returns A Lazy wrapper that resolves to an Accessor for the Atom
+ *
+ * @example
+ * ```typescript
+ * const lazyDb = lazy(dbAtom)
+ * const myAtom = atom({
+ *   deps: { db: lazyDb },
+ *   factory: (ctx, { db }) => db.get()
+ * })
+ * ```
+ */
 export function lazy<T>(atom: Lite.Atom<T>): Lite.Lazy<T> {
   return {
     [lazySymbol]: true,
@@ -48,6 +89,19 @@ export function lazy<T>(atom: Lite.Atom<T>): Lite.Lazy<T> {
   }
 }
 
+/**
+ * Type guard to check if a value is a Lazy wrapper.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a Lazy wrapper, false otherwise
+ *
+ * @example
+ * ```typescript
+ * if (isLazy(dep)) {
+ *   const accessor = await scope.resolveDeps({ dep })
+ * }
+ * ```
+ */
 export function isLazy(value: unknown): value is Lite.Lazy<unknown> {
   return (
     typeof value === "object" &&
