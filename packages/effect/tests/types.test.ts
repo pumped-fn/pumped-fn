@@ -136,5 +136,31 @@ describe("Type Inference", () => {
         },
       })
     })
+
+    it("should infer mixed deps for flow with atoms and tags", () => {
+      const configAtom = atom({ factory: () => ({ port: 3000 }) })
+      const serviceAtom = atom({ factory: () => ({ name: "service" }) })
+      const requestIdTag = tag<string>({ label: "requestId" })
+      const countTag = tag<number>({ label: "count" })
+      const featureTag = tag<string>({ label: "feature" })
+
+      const handler = flow({
+        deps: {
+          cfg: configAtom,
+          svc: lazy(serviceAtom),
+          reqId: tags.required(requestIdTag),
+          count: tags.optional(countTag),
+          features: tags.all(featureTag),
+        },
+        factory: (ctx, deps) => {
+          expectTypeOf(deps.cfg).toEqualTypeOf<{ port: number }>()
+          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Accessor<{ name: string }>>()
+          expectTypeOf(deps.reqId).toEqualTypeOf<string>()
+          expectTypeOf(deps.count).toEqualTypeOf<number | undefined>()
+          expectTypeOf(deps.features).toEqualTypeOf<string[]>()
+          return { input: ctx.input }
+        },
+      })
+    })
   })
 })

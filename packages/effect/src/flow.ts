@@ -19,9 +19,9 @@ export function flow<TOutput, TInput = unknown>(config: {
 export function flow<
   TOutput,
   TInput,
-  D extends Record<string, Lite.Dependency>,
+  const D extends Record<string, Lite.Dependency>,
 >(config: {
-  deps: D
+  deps: { [K in keyof D]: D[K] }
   factory: (
     ctx: Lite.ExecutionContext,
     deps: Lite.InferDeps<D>

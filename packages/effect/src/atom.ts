@@ -12,8 +12,8 @@ export function atom<T>(config: {
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Atom<T>
 
-export function atom<T, D extends Record<string, Lite.Dependency>>(config: {
-  deps: D
+export function atom<T, const D extends Record<string, Lite.Dependency>>(config: {
+  deps: { [K in keyof D]: D[K] }
   factory: (
     ctx: Lite.ResolveContext,
     deps: Lite.InferDeps<D>
