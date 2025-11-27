@@ -209,13 +209,16 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: (() => MaybePromise<void>)[] = []
   private closed = false
   private _input: unknown = undefined
-  private tags: Lite.Tagged<unknown>[]
+  private readonly baseTags: Lite.Tagged<unknown>[]
 
   constructor(
     readonly scope: ScopeImpl,
     options?: Lite.CreateContextOptions
   ) {
-    this.tags = options?.tags ?? []
+    const ctxTags = options?.tags
+    this.baseTags = ctxTags?.length
+      ? [...ctxTags, ...scope.tags]
+      : scope.tags
   }
 
   get input(): unknown {
@@ -237,12 +240,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private async execFlow<T>(options: Lite.ExecFlowOptions<T>): Promise<T> {
     const { flow, input, tags: execTags } = options
 
-    const allTags = [
-      ...(execTags ?? []),
-      ...this.tags,
-      ...this.scope.tags,
-      ...(flow.tags ?? []),
-    ]
+    const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
+    const allTags = hasExtraTags
+      ? [...(execTags ?? []), ...this.baseTags, ...(flow.tags ?? [])]
+      : this.baseTags
 
     const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
 
@@ -264,9 +265,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.applyExecExtensions(flow, doExec)
   }
 
-  private async execFn<T>(options: Lite.ExecFnOptions<T>): Promise<T> {
+  private execFn<T>(options: Lite.ExecFnOptions<T>): Promise<T> {
     const { fn, params } = options
-    return fn(...params) as Promise<T>
+    return Promise.resolve(fn(...params))
   }
 
   private async applyExecExtensions<T>(
