@@ -1,7 +1,6 @@
 import { accessorSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 import { isAtom, isLazy } from "./atom"
-import { isPreset } from "./preset"
 
 interface ResolveState<T> {
   value: T
@@ -36,9 +35,9 @@ class AccessorImpl<T> implements Lite.Accessor<T> {
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, ResolveState<unknown>>()
   private presets = new Map<Lite.Atom<unknown>, unknown | Lite.Atom<unknown>>()
-  private extensions: Lite.Extension[]
-  private tags: Lite.Tagged<unknown>[]
   private resolving = new Set<Lite.Atom<unknown>>()
+  readonly extensions: Lite.Extension[]
+  readonly tags: Lite.Tagged<unknown>[]
 
   constructor(options?: Lite.ScopeOptions) {
     this.extensions = options?.extensions ?? []
@@ -128,8 +127,8 @@ class ScopeImpl implements Lite.Scope {
     let next = doResolve
 
     for (let i = this.extensions.length - 1; i >= 0; i--) {
-      const ext = this.extensions[i]
-      if (ext?.wrapResolve) {
+      const ext = this.extensions[i]!
+      if (ext.wrapResolve) {
         const currentNext = next
         const wrap = ext.wrapResolve.bind(ext)
         next = () => wrap(currentNext, atom, this)
@@ -139,12 +138,14 @@ class ScopeImpl implements Lite.Scope {
     return next()
   }
 
-  private async resolveDeps(
-    deps: Record<string, Lite.Dependency> | undefined
+  async resolveDeps(
+    deps: Record<string, Lite.Dependency> | undefined,
+    tagSource?: Lite.Tagged<unknown>[]
   ): Promise<Record<string, unknown>> {
     if (!deps) return {}
 
     const result: Record<string, unknown> = {}
+    const tags = tagSource ?? this.tags
 
     for (const [key, dep] of Object.entries(deps)) {
       if (isAtom(dep)) {
@@ -153,17 +154,16 @@ class ScopeImpl implements Lite.Scope {
         result[key] = new AccessorImpl(dep.atom, this)
       } else if ("mode" in dep && "tag" in dep) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
-        const source = this.tags
 
         switch (tagExecutor.mode) {
           case "required":
-            result[key] = tagExecutor.tag.get(source)
+            result[key] = tagExecutor.tag.get(tags)
             break
           case "optional":
-            result[key] = tagExecutor.tag.find(source)
+            result[key] = tagExecutor.tag.find(tags)
             break
           case "all":
-            result[key] = tagExecutor.tag.collect(source)
+            result[key] = tagExecutor.tag.collect(tags)
             break
         }
       }
@@ -181,10 +181,7 @@ class ScopeImpl implements Lite.Scope {
     if (!state) return
 
     for (let i = state.cleanups.length - 1; i >= 0; i--) {
-      const cleanup = state.cleanups[i]
-      if (cleanup) {
-        await cleanup()
-      }
+      await state.cleanups[i]!()
     }
 
     this.cache.delete(atom)
@@ -243,11 +240,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const allTags = [
       ...(execTags ?? []),
       ...this.tags,
-      ...(this.scope as ScopeImpl)["tags"],
+      ...this.scope.tags,
       ...(flow.tags ?? []),
     ]
 
-    const resolvedDeps = await this.resolveDepsWithTags(flow.deps, allTags)
+    const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
 
     this._input = input
 
@@ -276,12 +273,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     target: Lite.Flow<T, unknown> | ((...args: unknown[]) => MaybePromise<T>),
     doExec: () => Promise<T>
   ): Promise<T> {
-    const extensions = (this.scope as ScopeImpl)["extensions"]
     let next = doExec
 
-    for (let i = extensions.length - 1; i >= 0; i--) {
-      const ext = extensions[i]
-      if (ext?.wrapExec) {
+    for (let i = this.scope.extensions.length - 1; i >= 0; i--) {
+      const ext = this.scope.extensions[i]!
+      if (ext.wrapExec) {
         const currentNext = next
         const wrap = ext.wrapExec.bind(ext)
         next = () => wrap(currentNext, target, this)
@@ -289,39 +285,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
 
     return next()
-  }
-
-  private async resolveDepsWithTags(
-    deps: Record<string, Lite.Dependency> | undefined,
-    tags: Lite.Tagged<unknown>[]
-  ): Promise<Record<string, unknown>> {
-    if (!deps) return {}
-
-    const result: Record<string, unknown> = {}
-
-    for (const [key, dep] of Object.entries(deps)) {
-      if (isAtom(dep)) {
-        result[key] = await this.scope.resolve(dep)
-      } else if (isLazy(dep)) {
-        result[key] = new AccessorImpl(dep.atom, this.scope as ScopeImpl)
-      } else if ("mode" in dep && "tag" in dep) {
-        const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
-
-        switch (tagExecutor.mode) {
-          case "required":
-            result[key] = tagExecutor.tag.get(tags)
-            break
-          case "optional":
-            result[key] = tagExecutor.tag.find(tags)
-            break
-          case "all":
-            result[key] = tagExecutor.tag.collect(tags)
-            break
-        }
-      }
-    }
-
-    return result
   }
 
   onClose(fn: () => MaybePromise<void>): void {
@@ -334,10 +297,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.closed = true
 
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
-      const cleanup = this.cleanups[i]
-      if (cleanup) {
-        await cleanup()
-      }
+      await this.cleanups[i]!()
     }
   }
 }

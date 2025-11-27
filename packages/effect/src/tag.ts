@@ -4,7 +4,6 @@ import type { Lite } from "./types"
 export interface TagOptions<T, HasDefault extends boolean> {
   label: string
   default?: HasDefault extends true ? T : never
-  schema?: unknown
 }
 
 export function tag<T>(options: { label: string }): Lite.Tag<T, false>
