@@ -51,12 +51,14 @@ describe("Extension", () => {
       expect(calls).toEqual(["before", "after"])
     })
 
-    it("can transform result", async () => {
+    it("can observe and pass through result", async () => {
+      let observedValue: unknown
       const ext: Lite.Extension = {
         name: "test",
-        wrapResolve: async (next) => {
+        wrapResolve: async <T>(next: () => Promise<T>) => {
           const result = await next()
-          return (result as number) * 2
+          observedValue = result
+          return result
         },
       }
 
@@ -64,7 +66,8 @@ describe("Extension", () => {
       const myAtom = atom({ factory: () => 21 })
 
       const result = await scope.resolve(myAtom)
-      expect(result).toBe(42)
+      expect(result).toBe(21)
+      expect(observedValue).toBe(21)
     })
 
     it("chains multiple extensions", async () => {
@@ -127,12 +130,14 @@ describe("Extension", () => {
       await ctx.close()
     })
 
-    it("can transform flow result", async () => {
+    it("can observe and pass through flow result", async () => {
+      let observedValue: unknown
       const ext: Lite.Extension = {
         name: "test",
-        wrapExec: async (next) => {
+        wrapExec: async <T>(next: () => Promise<T>) => {
           const result = await next()
-          return (result as number) * 2
+          observedValue = result
+          return result
         },
       }
 
@@ -141,7 +146,8 @@ describe("Extension", () => {
       const myFlow = flow({ factory: () => 21 })
 
       const result = await ctx.exec({ flow: myFlow, input: null })
-      expect(result).toBe(42)
+      expect(result).toBe(21)
+      expect(observedValue).toBe(21)
 
       await ctx.close()
     })

@@ -22,6 +22,7 @@
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },

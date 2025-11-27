@@ -52,7 +52,7 @@ export namespace Lite {
     readonly input: unknown
     readonly scope: Scope
     exec<T>(options: ExecFlowOptions<T>): Promise<T>
-    exec<T>(options: ExecFnOptions<T>): Promise<T>
+    exec<T, Args extends unknown[]>(options: ExecFnOptions<T, Args>): Promise<T>
     onClose(fn: () => MaybePromise<void>): void
     close(): Promise<void>
   }
@@ -63,9 +63,9 @@ export namespace Lite {
     tags?: Tagged<unknown>[]
   }
 
-  export interface ExecFnOptions<T> {
-    fn: (...args: unknown[]) => MaybePromise<T>
-    params: unknown[]
+  export interface ExecFnOptions<T, Args extends unknown[] = unknown[]> {
+    fn: (...args: Args) => MaybePromise<T>
+    params: Args
     tags?: Tagged<unknown>[]
   }
 
@@ -131,13 +131,13 @@ export namespace Lite {
   export type Dependency =
     | Atom<unknown>
     | Lazy<unknown>
-    | TagExecutor<unknown, unknown>
+    | TagExecutor<unknown>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
     : D extends Lazy<infer T>
       ? Accessor<T>
-      : D extends TagExecutor<infer TOutput, unknown>
+      : D extends TagExecutor<infer TOutput, infer _TTag>
         ? TOutput
         : never
 

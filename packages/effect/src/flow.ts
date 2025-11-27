@@ -12,6 +12,7 @@ export interface FlowConfig<
 }
 
 export function flow<TOutput, TInput = unknown>(config: {
+  deps?: undefined
   factory: (ctx: Lite.ExecutionContext) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
@@ -19,13 +20,10 @@ export function flow<TOutput, TInput = unknown>(config: {
 export function flow<
   TOutput,
   TInput,
-  const D extends Record<string, Lite.Dependency>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.Lazy<unknown> | { mode: string }>,
 >(config: {
-  deps: { [K in keyof D]: D[K] }
-  factory: (
-    ctx: Lite.ExecutionContext,
-    deps: Lite.InferDeps<D>
-  ) => MaybePromise<TOutput>
+  deps: D
+  factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 

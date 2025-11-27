@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { tag, tags, isTag, isTagged } from "../src/tag"
+import type { Lite } from "../src/types"
 
 describe("Tag", () => {
   describe("tag()", () => {
@@ -38,14 +39,14 @@ describe("Tag", () => {
 
     it("throws when tag not found and no default", () => {
       const myTag = tag<string>({ label: "myTag" })
-      const source: unknown[] = []
+      const source: Lite.Tagged<unknown>[] = []
 
       expect(() => myTag.get(source)).toThrow()
     })
 
     it("returns default when tag not found", () => {
       const myTag = tag<number>({ label: "count", default: 42 })
-      const source: unknown[] = []
+      const source: Lite.Tagged<unknown>[] = []
 
       expect(myTag.get(source)).toBe(42)
     })
@@ -61,14 +62,14 @@ describe("Tag", () => {
 
     it("returns undefined when tag not found", () => {
       const myTag = tag<string>({ label: "myTag" })
-      const source: unknown[] = []
+      const source: Lite.Tagged<unknown>[] = []
 
       expect(myTag.find(source)).toBeUndefined()
     })
 
     it("returns default when tag not found and has default", () => {
       const myTag = tag<number>({ label: "count", default: 42 })
-      const source: unknown[] = []
+      const source: Lite.Tagged<unknown>[] = []
 
       expect(myTag.find(source)).toBe(42)
     })
@@ -84,7 +85,7 @@ describe("Tag", () => {
 
     it("returns empty array when tag not found", () => {
       const myTag = tag<string>({ label: "myTag" })
-      const source: unknown[] = []
+      const source: Lite.Tagged<unknown>[] = []
 
       expect(myTag.collect(source)).toEqual([])
     })

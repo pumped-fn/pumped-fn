@@ -196,9 +196,9 @@ describe("Scope", () => {
       const order: number[] = []
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.cleanup(() => order.push(1))
-          ctx.cleanup(() => order.push(2))
-          ctx.cleanup(() => order.push(3))
+          ctx.cleanup(() => { order.push(1) })
+          ctx.cleanup(() => { order.push(2) })
+          ctx.cleanup(() => { order.push(3) })
           return 42
         },
       })
@@ -217,13 +217,13 @@ describe("Scope", () => {
 
       const a = atom({
         factory: (ctx) => {
-          ctx.cleanup(() => cleanups.push("a"))
+          ctx.cleanup(() => { cleanups.push("a") })
           return "a"
         },
       })
       const b = atom({
         factory: (ctx) => {
-          ctx.cleanup(() => cleanups.push("b"))
+          ctx.cleanup(() => { cleanups.push("b") })
           return "b"
         },
       })
@@ -389,9 +389,9 @@ describe("ExecutionContext", () => {
       const ctx = scope.createContext()
 
       const order: number[] = []
-      ctx.onClose(() => order.push(1))
-      ctx.onClose(() => order.push(2))
-      ctx.onClose(() => order.push(3))
+      ctx.onClose(() => { order.push(1) })
+      ctx.onClose(() => { order.push(2) })
+      ctx.onClose(() => { order.push(3) })
 
       await ctx.close()
       expect(order).toEqual([3, 2, 1])
