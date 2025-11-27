@@ -8,5 +8,6 @@ export {
   presetSymbol,
   accessorSymbol,
 } from "./symbols"
+export { tag, tags, isTag, isTagged } from "./tag"
 
 export const VERSION = "0.0.1"
