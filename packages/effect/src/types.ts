@@ -96,8 +96,8 @@ export namespace Lite {
 
   export type TagSource = Tagged<unknown>[] | { tags?: Tagged<unknown>[] }
 
-  export interface TagExecutor<T, TRequired extends boolean = true> {
-    readonly tag: Tag<T, boolean>
+  export interface TagExecutor<TOutput, TTag = TOutput> {
+    readonly tag: Tag<TTag, boolean>
     readonly mode: "required" | "optional" | "all"
   }
 
@@ -131,21 +131,17 @@ export namespace Lite {
   export type Dependency =
     | Atom<unknown>
     | Lazy<unknown>
-    | TagExecutor<unknown, boolean>
+    | TagExecutor<unknown, unknown>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
     : D extends Lazy<infer T>
       ? Accessor<T>
-      : D extends TagExecutor<infer T, infer R>
-        ? R extends true
-          ? T
-          : T | undefined
+      : D extends TagExecutor<infer TOutput, unknown>
+        ? TOutput
         : never
 
-  export type InferDeps<D extends Record<string, Dependency>> = {
-    [K in keyof D]: InferDep<D[K]>
-  }
+  export type InferDeps<D> = { [K in keyof D]: InferDep<D[K]> }
 
   export type AtomFactory<T, D extends Record<string, Dependency>> =
     keyof D extends never

@@ -93,15 +93,15 @@ export function isTagged(value: unknown): value is Lite.Tagged<unknown> {
 }
 
 export const tags = {
-  required<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T, true> {
+  required<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T, T> {
     return { tag, mode: "required" }
   },
 
-  optional<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T | undefined, false> {
-    return { tag, mode: "optional" } as Lite.TagExecutor<T | undefined, false>
+  optional<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T | undefined, T> {
+    return { tag, mode: "optional" }
   },
 
-  all<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T[], true> {
-    return { tag, mode: "all" } as unknown as Lite.TagExecutor<T[], true>
+  all<T>(tag: Lite.Tag<T, boolean>): Lite.TagExecutor<T[], T> {
+    return { tag, mode: "all" }
   },
 }
