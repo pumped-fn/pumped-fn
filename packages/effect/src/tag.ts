@@ -177,3 +177,24 @@ export const tags = {
     return { [tagExecutorSymbol]: true, tag, mode: "all" }
   },
 }
+
+/**
+ * Type guard to check if a value is a TagExecutor.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a TagExecutor, false otherwise
+ *
+ * @example
+ * ```typescript
+ * if (isTagExecutor(value)) {
+ *   console.log(value.mode, value.tag)
+ * }
+ * ```
+ */
+export function isTagExecutor(value: unknown): value is Lite.TagExecutor<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    tagExecutorSymbol in value
+  )
+}

@@ -139,6 +139,30 @@ describe("Extension", () => {
       await ctx.close()
     })
 
+    it("wraps plain function execution", async () => {
+      const calls: string[] = []
+      const ext: Lite.Extension = {
+        name: "test",
+        wrapExec: async (next) => {
+          calls.push("before")
+          const result = await next()
+          calls.push("after")
+          return result
+        },
+      }
+
+      const scope = await createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      await ctx.exec({
+        fn: (a: number, b: number) => a + b,
+        params: [1, 2],
+      })
+      expect(calls).toEqual(["before", "after"])
+
+      await ctx.close()
+    })
+
   })
 
   describe("dispose", () => {

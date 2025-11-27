@@ -402,4 +402,58 @@ describe("ExecutionContext", () => {
       ).rejects.toThrow("closed")
     })
   })
+
+  describe("circular dependency", () => {
+    it("throws on circular dependency", async () => {
+      const scope = await createScope()
+
+      const atomA: ReturnType<typeof atom<string>> = atom({
+        deps: { b: undefined as unknown as ReturnType<typeof atom<string>> },
+        factory: (_, { b }) => `a:${b}`,
+      })
+
+      const atomB = atom({
+        deps: { a: atomA },
+        factory: (_, { a }) => `b:${a}`,
+      })
+
+      Object.assign(atomA.deps!, { b: atomB })
+
+      await expect(scope.resolve(atomA)).rejects.toThrow("Circular")
+    })
+  })
+
+  describe("accessor edge cases", () => {
+    it("throws when get called before resolve", async () => {
+      const scope = await createScope()
+      const myAtom = atom({ factory: () => 42 })
+
+      const accessor = scope.accessor(myAtom)
+      expect(() => accessor.get()).toThrow("not resolved")
+    })
+  })
+
+  describe("concurrent resolution", () => {
+    it("handles concurrent resolution of same atom", async () => {
+      const scope = await createScope()
+      let resolveCount = 0
+
+      const slowAtom = atom({
+        factory: async () => {
+          resolveCount++
+          await new Promise((r) => setTimeout(r, 20))
+          return resolveCount
+        },
+      })
+
+      const [a, b] = await Promise.all([
+        scope.resolve(slowAtom),
+        scope.resolve(slowAtom),
+      ])
+
+      expect(a).toBe(1)
+      expect(b).toBe(1)
+      expect(resolveCount).toBe(1)
+    })
+  })
 })

@@ -36,6 +36,7 @@ class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, ResolveState<unknown>>()
   private presets = new Map<Lite.Atom<unknown>, unknown | Lite.Atom<unknown>>()
   private resolving = new Set<Lite.Atom<unknown>>()
+  private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
 
@@ -66,6 +67,11 @@ class ScopeImpl implements Lite.Scope {
       return cached.value as unknown as T
     }
 
+    const pendingPromise = this.pending.get(atom)
+    if (pendingPromise) {
+      return pendingPromise as unknown as Promise<T>
+    }
+
     if (this.resolving.has(atom)) {
       throw new Error("Circular dependency detected")
     }
@@ -85,39 +91,47 @@ class ScopeImpl implements Lite.Scope {
 
     this.resolving.add(atom)
 
+    const promise = this.doResolve(atom)
+    this.pending.set(atom, promise as unknown as Promise<unknown>)
+
     try {
-      const resolvedDeps = await this.resolveDeps(atom.deps)
-      const cleanups: (() => MaybePromise<void>)[] = []
-
-      const ctx: Lite.ResolveContext = {
-        cleanup: (fn) => cleanups.push(fn),
-        scope: this,
-      }
-
-      let value: T
-      const factory = atom.factory as unknown as (
-        ctx: Lite.ResolveContext,
-        deps?: Record<string, unknown>
-      ) => MaybePromise<T>
-
-      const doResolve = async () => {
-        if (atom.deps && Object.keys(atom.deps).length > 0) {
-          value = await factory(ctx, resolvedDeps)
-        } else {
-          value = await factory(ctx)
-        }
-        return value
-      }
-
-      value = await this.applyResolveExtensions(atom, doResolve)
-
-      const state: ResolveState<T> = { value, cleanups }
-      this.cache.set(atom, state)
-
-      return value
+      return await promise
     } finally {
       this.resolving.delete(atom)
+      this.pending.delete(atom)
     }
+  }
+
+  private async doResolve<T>(atom: Lite.Atom<T>): Promise<T> {
+    const resolvedDeps = await this.resolveDeps(atom.deps)
+    const cleanups: (() => MaybePromise<void>)[] = []
+
+    const ctx: Lite.ResolveContext = {
+      cleanup: (fn) => cleanups.push(fn),
+      scope: this,
+    }
+
+    let value: T
+    const factory = atom.factory as unknown as (
+      ctx: Lite.ResolveContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<T>
+
+    const doResolve = async () => {
+      if (atom.deps && Object.keys(atom.deps).length > 0) {
+        value = await factory(ctx, resolvedDeps)
+      } else {
+        value = await factory(ctx)
+      }
+      return value
+    }
+
+    value = await this.applyResolveExtensions(atom, doResolve)
+
+    const state: ResolveState<T> = { value, cleanups }
+    this.cache.set(atom, state)
+
+    return value
   }
 
   private async applyResolveExtensions<T>(
@@ -267,7 +281,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   private execFn<T>(options: Lite.ExecFnOptions<T>): Promise<T> {
     const { fn, params } = options
-    return Promise.resolve(fn(...params))
+    const doExec = () => Promise.resolve(fn(...params))
+    return this.applyExecExtensions(fn, doExec)
   }
 
   private async applyExecExtensions<T>(

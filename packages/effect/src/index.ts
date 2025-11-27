@@ -7,8 +7,9 @@ export {
   lazySymbol,
   presetSymbol,
   accessorSymbol,
+  tagExecutorSymbol,
 } from "./symbols"
-export { tag, tags, isTag, isTagged } from "./tag"
+export { tag, tags, isTag, isTagged, isTagExecutor } from "./tag"
 export { atom, isAtom, lazy, isLazy } from "./atom"
 export { flow, isFlow } from "./flow"
 export { preset, isPreset } from "./preset"
