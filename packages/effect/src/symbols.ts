@@ -1,0 +1,7 @@
+export const atomSymbol: unique symbol = Symbol.for("@pumped-fn/effect/atom")
+export const flowSymbol: unique symbol = Symbol.for("@pumped-fn/effect/flow")
+export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/effect/tag")
+export const taggedSymbol: unique symbol = Symbol.for("@pumped-fn/effect/tagged")
+export const lazySymbol: unique symbol = Symbol.for("@pumped-fn/effect/lazy")
+export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/effect/preset")
+export const accessorSymbol: unique symbol = Symbol.for("@pumped-fn/effect/accessor")

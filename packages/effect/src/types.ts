@@ -1,0 +1,162 @@
+import type {
+  atomSymbol,
+  flowSymbol,
+  tagSymbol,
+  taggedSymbol,
+  lazySymbol,
+  presetSymbol,
+  accessorSymbol,
+} from "./symbols"
+
+export type MaybePromise<T> = T | Promise<T>
+
+export namespace Lite {
+  export interface Scope {
+    resolve<T>(atom: Atom<T>): Promise<T>
+    accessor<T>(atom: Atom<T>): Accessor<T>
+    release<T>(atom: Atom<T>): Promise<void>
+    dispose(): Promise<void>
+    createContext(options?: CreateContextOptions): ExecutionContext
+  }
+
+  export interface CreateContextOptions {
+    tags?: Tagged<unknown>[]
+  }
+
+  export interface ScopeOptions {
+    extensions?: Extension[]
+    tags?: Tagged<unknown>[]
+    presets?: Preset<unknown>[]
+  }
+
+  export interface Atom<T> {
+    readonly [atomSymbol]: true
+    readonly factory: AtomFactory<T, Record<string, Dependency>>
+    readonly deps?: Record<string, Dependency>
+    readonly tags?: Tagged<unknown>[]
+  }
+
+  export interface Flow<TOutput, TInput = unknown> {
+    readonly [flowSymbol]: true
+    readonly factory: FlowFactory<TOutput, TInput, Record<string, Dependency>>
+    readonly deps?: Record<string, Dependency>
+    readonly tags?: Tagged<unknown>[]
+  }
+
+  export interface ResolveContext {
+    cleanup(fn: () => MaybePromise<void>): void
+    readonly scope: Scope
+  }
+
+  export interface ExecutionContext {
+    readonly input: unknown
+    readonly scope: Scope
+    exec<T>(options: ExecFlowOptions<T>): Promise<T>
+    exec<T>(options: ExecFnOptions<T>): Promise<T>
+    onClose(fn: () => MaybePromise<void>): void
+    close(): Promise<void>
+  }
+
+  export interface ExecFlowOptions<T> {
+    flow: Flow<T, unknown>
+    input: unknown
+    tags?: Tagged<unknown>[]
+  }
+
+  export interface ExecFnOptions<T> {
+    fn: (...args: unknown[]) => MaybePromise<T>
+    params: unknown[]
+    tags?: Tagged<unknown>[]
+  }
+
+  export interface Accessor<T> {
+    readonly [accessorSymbol]: true
+    get(): T
+    resolve(): Promise<T>
+    release(): Promise<void>
+  }
+
+  export interface Tag<T, HasDefault extends boolean = false> {
+    readonly [tagSymbol]: true
+    readonly key: symbol
+    readonly label: string
+    readonly defaultValue: HasDefault extends true ? T : undefined
+    readonly hasDefault: HasDefault
+    (value: T): Tagged<T>
+    get(source: TagSource): HasDefault extends true ? T : T
+    find(source: TagSource): HasDefault extends true ? T : T | undefined
+    collect(source: TagSource): T[]
+  }
+
+  export interface Tagged<T> {
+    readonly [taggedSymbol]: true
+    readonly key: symbol
+    readonly value: T
+  }
+
+  export type TagSource = Tagged<unknown>[] | { tags?: Tagged<unknown>[] }
+
+  export interface TagExecutor<T, TRequired extends boolean = true> {
+    readonly tag: Tag<T, boolean>
+    readonly mode: "required" | "optional" | "all"
+  }
+
+  export interface Lazy<T> {
+    readonly [lazySymbol]: true
+    readonly atom: Atom<T>
+  }
+
+  export interface Preset<T> {
+    readonly [presetSymbol]: true
+    readonly atom: Atom<T>
+    readonly value: T | Atom<T>
+  }
+
+  export interface Extension {
+    readonly name: string
+    init?(scope: Scope): MaybePromise<void>
+    wrapResolve?<T>(
+      next: () => Promise<T>,
+      atom: Atom<T>,
+      scope: Scope
+    ): Promise<T>
+    wrapExec?<T>(
+      next: () => Promise<T>,
+      target: Flow<T, unknown> | ((...args: unknown[]) => MaybePromise<T>),
+      ctx: ExecutionContext
+    ): Promise<T>
+    dispose?(scope: Scope): MaybePromise<void>
+  }
+
+  export type Dependency =
+    | Atom<unknown>
+    | Lazy<unknown>
+    | TagExecutor<unknown, boolean>
+
+  export type InferDep<D> = D extends Atom<infer T>
+    ? T
+    : D extends Lazy<infer T>
+      ? Accessor<T>
+      : D extends TagExecutor<infer T, infer R>
+        ? R extends true
+          ? T
+          : T | undefined
+        : never
+
+  export type InferDeps<D extends Record<string, Dependency>> = {
+    [K in keyof D]: InferDep<D[K]>
+  }
+
+  export type AtomFactory<T, D extends Record<string, Dependency>> =
+    keyof D extends never
+      ? (ctx: ResolveContext) => MaybePromise<T>
+      : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
+
+  export type FlowFactory<
+    TOutput,
+    TInput,
+    D extends Record<string, Dependency>,
+  > = keyof D extends never
+    ? (ctx: ExecutionContext) => MaybePromise<TOutput>
+    : (ctx: ExecutionContext, deps: InferDeps<D>) => MaybePromise<TOutput>
+}
