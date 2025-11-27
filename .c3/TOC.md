@@ -191,7 +191,28 @@ to child contexts.
 
 ---
 
+### [ADR-002-lightweight-effect-package](./adr/adr-002-lightweight-effect-package.md) - Lightweight Effect Package (@pumped-fn/effect)
+> Create a minimal DI/effect package as an alternative to core-next, focusing on
+zero-dependency simplicity with a reduced API surface for lightweight applications.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-002-status)
+- [Problem/Requirement](#adr-002-problem)
+- [Exploration Journey](#adr-002-exploration)
+- [Solution](#adr-002-solution)
+- [Changes Across Layers](#adr-002-changes)
+- [Comparison with core-next](#adr-002-comparison)
+- [Migration Path](#adr-002-migration)
+- [Verification](#adr-002-verification)
+- [Future Considerations](#adr-002-future)
+- [Alternatives Considered](#adr-002-alternatives)
+- [Related](#adr-002-related)
+
+---
+
 ## Quick Reference
 
-**Total Documents**: 11
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 1
+**Total Documents**: 12
+**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 2
