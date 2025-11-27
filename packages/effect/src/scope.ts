@@ -256,16 +256,39 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
 
-    if (flow.deps && Object.keys(flow.deps).length > 0) {
-      return factory(this, resolvedDeps)
-    } else {
-      return factory(this)
+    const doExec = async (): Promise<T> => {
+      if (flow.deps && Object.keys(flow.deps).length > 0) {
+        return factory(this, resolvedDeps)
+      } else {
+        return factory(this)
+      }
     }
+
+    return this.applyExecExtensions(flow, doExec)
   }
 
   private async execFn<T>(options: Lite.ExecFnOptions<T>): Promise<T> {
     const { fn, params } = options
     return fn(...params) as Promise<T>
+  }
+
+  private async applyExecExtensions<T>(
+    target: Lite.Flow<T, unknown> | ((...args: unknown[]) => MaybePromise<T>),
+    doExec: () => Promise<T>
+  ): Promise<T> {
+    const extensions = (this.scope as ScopeImpl)["extensions"]
+    let next = doExec
+
+    for (let i = extensions.length - 1; i >= 0; i--) {
+      const ext = extensions[i]
+      if (ext?.wrapExec) {
+        const currentNext = next
+        const wrap = ext.wrapExec.bind(ext)
+        next = () => wrap(currentNext, target, this)
+      }
+    }
+
+    return next()
   }
 
   private async resolveDepsWithTags(
