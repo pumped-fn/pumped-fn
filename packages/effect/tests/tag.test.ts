@@ -92,26 +92,18 @@ describe("Tag", () => {
   })
 
   describe("tags helpers", () => {
-    it("tags.required() creates required tag executor", () => {
+    it("creates tag executors with correct modes", () => {
       const myTag = tag<string>({ label: "myTag" })
-      const executor = tags.required(myTag)
 
-      expect(executor.mode).toBe("required")
-      expect(executor.tag).toBe(myTag)
-    })
+      const required = tags.required(myTag)
+      expect(required.mode).toBe("required")
+      expect(required.tag).toBe(myTag)
 
-    it("tags.optional() creates optional tag executor", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const executor = tags.optional(myTag)
+      const optional = tags.optional(myTag)
+      expect(optional.mode).toBe("optional")
 
-      expect(executor.mode).toBe("optional")
-    })
-
-    it("tags.all() creates all tag executor", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const executor = tags.all(myTag)
-
-      expect(executor.mode).toBe("all")
+      const all = tags.all(myTag)
+      expect(all.mode).toBe("all")
     })
   })
 })

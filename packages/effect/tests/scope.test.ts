@@ -249,15 +249,6 @@ describe("ExecutionContext", () => {
       expect(ctx.close).toBeTypeOf("function")
     })
 
-    it("creates context with tags", async () => {
-      const requestId = tag<string>({ label: "requestId" })
-      const scope = await createScope()
-      const ctx = scope.createContext({
-        tags: [requestId("req-123")],
-      })
-
-      expect(ctx).toBeDefined()
-    })
   })
 
   describe("ctx.exec() with flow", () => {

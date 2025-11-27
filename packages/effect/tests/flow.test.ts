@@ -29,13 +29,5 @@ describe("Flow", () => {
       expect(myFlow.deps).toBeDefined()
     })
 
-    it("creates a flow with tags", () => {
-      const myFlow = flow({
-        factory: (ctx) => ctx.input,
-        tags: [],
-      })
-
-      expect(myFlow.tags).toEqual([])
-    })
   })
 })

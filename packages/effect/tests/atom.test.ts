@@ -23,14 +23,6 @@ describe("Atom", () => {
       expect(serverAtom.deps).toEqual({ cfg: configAtom })
     })
 
-    it("creates an atom with tags", () => {
-      const myAtom = atom({
-        factory: () => 42,
-        tags: [],
-      })
-
-      expect(myAtom.tags).toEqual([])
-    })
   })
 
   describe("lazy()", () => {

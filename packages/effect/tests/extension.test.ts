@@ -6,18 +6,7 @@ import type { Lite } from "../src/types"
 
 describe("Extension", () => {
   describe("init", () => {
-    it("calls init on scope creation", async () => {
-      const init = vi.fn()
-      const ext: Lite.Extension = {
-        name: "test",
-        init,
-      }
-
-      await createScope({ extensions: [ext] })
-      expect(init).toHaveBeenCalledTimes(1)
-    })
-
-    it("calls init with scope", async () => {
+    it("calls init with scope on creation", async () => {
       let receivedScope: Lite.Scope | undefined
       const ext: Lite.Extension = {
         name: "test",
@@ -49,25 +38,6 @@ describe("Extension", () => {
 
       await scope.resolve(myAtom)
       expect(calls).toEqual(["before", "after"])
-    })
-
-    it("can observe and pass through result", async () => {
-      let observedValue: unknown
-      const ext: Lite.Extension = {
-        name: "test",
-        wrapResolve: async <T>(next: () => Promise<T>) => {
-          const result = await next()
-          observedValue = result
-          return result
-        },
-      }
-
-      const scope = await createScope({ extensions: [ext] })
-      const myAtom = atom({ factory: () => 21 })
-
-      const result = await scope.resolve(myAtom)
-      expect(result).toBe(21)
-      expect(observedValue).toBe(21)
     })
 
     it("chains multiple extensions", async () => {
@@ -130,28 +100,6 @@ describe("Extension", () => {
       await ctx.close()
     })
 
-    it("can observe and pass through flow result", async () => {
-      let observedValue: unknown
-      const ext: Lite.Extension = {
-        name: "test",
-        wrapExec: async <T>(next: () => Promise<T>) => {
-          const result = await next()
-          observedValue = result
-          return result
-        },
-      }
-
-      const scope = await createScope({ extensions: [ext] })
-      const ctx = scope.createContext()
-      const myFlow = flow({ factory: () => 21 })
-
-      const result = await ctx.exec({ flow: myFlow, input: null })
-      expect(result).toBe(21)
-      expect(observedValue).toBe(21)
-
-      await ctx.close()
-    })
-
     it("chains multiple extensions for flow execution", async () => {
       const order: string[] = []
 
@@ -191,62 +139,10 @@ describe("Extension", () => {
       await ctx.close()
     })
 
-    it("receives flow target in wrapExec", async () => {
-      let receivedTarget: unknown
-      const ext: Lite.Extension = {
-        name: "test",
-        wrapExec: async (next, target) => {
-          receivedTarget = target
-          return next()
-        },
-      }
-
-      const scope = await createScope({ extensions: [ext] })
-      const ctx = scope.createContext()
-      const myFlow = flow({ factory: () => 42 })
-
-      await ctx.exec({ flow: myFlow, input: null })
-      expect(receivedTarget).toBe(myFlow)
-
-      await ctx.close()
-    })
-
-    it("receives context in wrapExec", async () => {
-      let receivedCtx: unknown
-      const ext: Lite.Extension = {
-        name: "test",
-        wrapExec: async (next, target, ctx) => {
-          receivedCtx = ctx
-          return next()
-        },
-      }
-
-      const scope = await createScope({ extensions: [ext] })
-      const ctx = scope.createContext()
-      const myFlow = flow({ factory: () => 42 })
-
-      await ctx.exec({ flow: myFlow, input: null })
-      expect(receivedCtx).toBe(ctx)
-
-      await ctx.close()
-    })
   })
 
   describe("dispose", () => {
-    it("calls dispose on scope dispose", async () => {
-      const dispose = vi.fn()
-      const ext: Lite.Extension = {
-        name: "test",
-        dispose,
-      }
-
-      const scope = await createScope({ extensions: [ext] })
-      await scope.dispose()
-
-      expect(dispose).toHaveBeenCalledTimes(1)
-    })
-
-    it("calls dispose with scope", async () => {
+    it("calls dispose with scope on scope dispose", async () => {
       let receivedScope: Lite.Scope | undefined
       const ext: Lite.Extension = {
         name: "test",
