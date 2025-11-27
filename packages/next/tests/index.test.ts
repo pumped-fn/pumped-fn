@@ -32,6 +32,7 @@ import {
   type Extension,
   type Tag,
 } from "../src/index"
+import { type Sucrose, separateFunction, analyze, captureCallSite, compile, getMetadata } from "../src/sucrose"
 
 describe("Scope & Executor", () => {
   describe("provide()", () => {
@@ -168,6 +169,53 @@ describe("Scope & Executor", () => {
       const scope = createScope()
       await expect(scope.resolve(a)).rejects.toThrow()
       await scope.dispose()
+    })
+  })
+
+  describe("Sucrose integration", () => {
+    it("provide() stores Sucrose metadata", () => {
+      const counter = provide(() => 0)
+      const meta = getMetadata(counter)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("none")
+    })
+
+    it("derive() with array deps stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive([dep], ([d], ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("array")
+    })
+
+    it("derive() with record deps stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive({ d: dep }, ({ d }, ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("record")
+    })
+
+    it("derive() with single dep stores correct metadata", () => {
+      const dep = provide(() => "dep")
+      const derived = derive(dep, (d, ctl) => d.toUpperCase())
+      const meta = getMetadata(derived)
+      expect(meta).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("single")
+    })
+
+    it("metadata includes name tag when provided", () => {
+      const named = provide(() => "value", name("myService"))
+      const meta = getMetadata(named)
+      expect(meta?.name).toBe("myService")
+    })
+
+    it("original function is preserved in metadata", async () => {
+      const factory = () => 42
+      const counter = provide(factory)
+      const meta = getMetadata(counter)
+      expect(meta?.original).toBe(factory)
+      expect(meta?.original()).toBe(42)
     })
   })
 
@@ -1801,6 +1849,32 @@ describe("Error Classes", () => {
       expect(error.code).toBe("EC001")
     })
   })
+
+  describe("callSite enrichment", () => {
+    it("FactoryExecutionError includes callSite when available", () => {
+      const callSite = "at myFunction (file.ts:10:5)"
+      const error = new FactoryExecutionError("factory failed", "myExec", ["root", "myExec"], new Error("fail"), callSite)
+      expect(error.callSite).toBe(callSite)
+    })
+
+    it("errors from executor resolution include callSite from metadata", async () => {
+      const failingExec = provide(() => {
+        throw new Error("intentional")
+      }, name("failingService"))
+
+      const scope = createScope()
+      try {
+        await scope.resolve(failingExec)
+        expect.fail("Should have thrown")
+      } catch (e) {
+        expect(e).toBeInstanceOf(FactoryExecutionError)
+        const err = e as FactoryExecutionError
+        expect(err.callSite).toBeDefined()
+        expect(err.callSite).toContain(".ts:")
+      }
+      await scope.dispose()
+    })
+  })
 })
 
 describe("Realistic Scenario: Request Processing with Tags and Extensions", () => {
@@ -2074,5 +2148,321 @@ describe("Realistic Scenario: Request Processing with Tags and Extensions", () =
 
     await connectionPool.release(scope)
     await scope.dispose()
+  })
+})
+
+describe("Sucrose (Static Analysis)", () => {
+  describe("types", () => {
+    it("exports Sucrose namespace with Inference type", async () => {
+      const inference: Sucrose.Inference = {
+        usesCleanup: false,
+        usesRelease: false,
+        usesReload: false,
+        usesScope: false,
+        dependencyShape: "none",
+        dependencyAccess: [],
+      }
+      expect(inference.usesCleanup).toBe(false)
+    })
+  })
+
+  describe("separateFunction", () => {
+    it("parses arrow function with destructured params", () => {
+      const fn = ([db, cache]: [string, string], ctl: unknown) => db + cache
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("[db, cache], ctl")
+      expect(body).toContain("db + cache")
+    })
+
+    it("parses arrow function with single param", () => {
+      const fn = (ctl: unknown) => "value"
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("value")
+    })
+
+    it("parses arrow function with object destructuring", () => {
+      const fn = ({ db, cache }: { db: string; cache: string }, ctl: unknown) => db
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("{ db, cache }, ctl")
+      expect(body).toContain("db")
+    })
+
+    it("parses async arrow function", () => {
+      const fn = async (ctl: unknown) => "async-value"
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("async-value")
+    })
+
+    it("parses arrow function with block body", () => {
+      const fn = (ctl: unknown) => {
+        const x = 1
+        return x
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("const x = 1")
+      expect(body).toContain("return x")
+    })
+
+    it("parses regular function", () => {
+      const fn = function (ctl: unknown) {
+        return "value"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("return")
+      expect(body).toContain("value")
+    })
+
+    it("parses named function", () => {
+      const fn = function myFactory(ctl: unknown) {
+        return "named"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("named")
+    })
+
+    it("parses async regular function", () => {
+      const fn = async function (ctl: unknown) {
+        return "async-regular"
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toBe("ctl")
+      expect(body).toContain("async-regular")
+    })
+
+    it("parses function with multiple params", () => {
+      const fn = function (deps: unknown, ctl: unknown) {
+        return deps
+      }
+      const [params, body] = separateFunction(fn)
+      expect(params).toContain("deps")
+      expect(params).toContain("ctl")
+    })
+  })
+
+  describe("analyze", () => {
+    it("detects ctl.cleanup usage", () => {
+      const fn = (ctl: { cleanup: (fn: () => void) => void }) => {
+        ctl.cleanup(() => {})
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesCleanup).toBe(true)
+    })
+
+    it("detects ctl.release usage", () => {
+      const fn = (ctl: { release: () => void }) => {
+        ctl.release()
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesRelease).toBe(true)
+    })
+
+    it("detects ctl.reload usage", () => {
+      const fn = (ctl: { reload: () => void }) => {
+        ctl.reload()
+        return "value"
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesReload).toBe(true)
+    })
+
+    it("detects ctl.scope usage", () => {
+      const fn = (ctl: { scope: unknown }) => {
+        return ctl.scope
+      }
+      const inference = analyze(fn, "none")
+      expect(inference.usesScope).toBe(true)
+    })
+
+    it("detects array dependency shape", () => {
+      const fn = ([db, cache]: [unknown, unknown], ctl: unknown) => db
+      const inference = analyze(fn, "array")
+      expect(inference.dependencyShape).toBe("array")
+    })
+
+    it("detects record dependency shape", () => {
+      const fn = ({ db }: { db: unknown }, ctl: unknown) => db
+      const inference = analyze(fn, "record")
+      expect(inference.dependencyShape).toBe("record")
+    })
+
+    it("detects single dependency shape", () => {
+      const fn = (db: unknown, ctl: unknown) => db
+      const inference = analyze(fn, "single")
+      expect(inference.dependencyShape).toBe("single")
+    })
+
+    it("detects no dependency shape for provide", () => {
+      const fn = (ctl: unknown) => "value"
+      const inference = analyze(fn, "none")
+      expect(inference.dependencyShape).toBe("none")
+    })
+
+    it("detects array index access", () => {
+      const fn = ([a, b, c]: [unknown, unknown, unknown], ctl: unknown) => {
+        return a
+      }
+      const inference = analyze(fn, "array")
+      expect(inference.dependencyAccess).toContain(0)
+    })
+
+    it("detects record key access", () => {
+      const fn = ({ db, cache }: { db: unknown; cache: unknown }, ctl: unknown) => {
+        return db
+      }
+      const inference = analyze(fn, "record")
+      expect(inference.dependencyAccess).toContain("db")
+    })
+  })
+
+  describe("captureCallSite", () => {
+    it("captures stack trace string", () => {
+      const callSite = captureCallSite()
+      expect(typeof callSite).toBe("string")
+      expect(callSite.length).toBeGreaterThan(0)
+    })
+
+    it("includes file path in call site", () => {
+      const callSite = captureCallSite()
+      expect(callSite).toMatch(/\.ts:|\.js:/)
+    })
+  })
+
+  describe("compile", () => {
+    it("compiles factory and returns metadata", () => {
+      const fn = (ctl: unknown) => "value"
+      const meta = compile(fn, "none", undefined, [])
+      expect(meta.inference.dependencyShape).toBe("none")
+      expect(meta.original).toBe(fn)
+      expect(typeof meta.callSite).toBe("string")
+    })
+
+    it("extracts name from tags", () => {
+      const nameTag = tag(custom<string>(), { label: "pumped-fn/name" })
+      const fn = (ctl: unknown) => "value"
+      const meta = compile(fn, "none", undefined, [nameTag("myService")])
+      expect(meta.name).toBe("myService")
+    })
+
+    it("stores metadata in WeakMap keyed by executor", () => {
+      const fn = (ctl: unknown) => "value"
+      const executor = {} as Core.Executor<unknown>
+      const meta = compile(fn, "none", executor, [])
+      const retrieved = getMetadata(executor)
+      expect(retrieved).toBe(meta)
+    })
+
+    it("stores original factory for closure execution", () => {
+      const closureValue = "from closure"
+      const fn = () => closureValue
+      const meta = compile(fn, "none", undefined, [])
+      expect(meta.original).toBe(fn)
+    })
+  })
+
+  describe("Bridge optimization integration", () => {
+    it("resolves simple executors with metadata", async () => {
+      const executor = provide(() => 42)
+      const meta = getMetadata(executor)
+
+      expect(meta).toBeDefined()
+      expect(meta?.original).toBeDefined()
+      expect(meta?.controllerFactory).toBe("none")
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe(42)
+
+      await scope.dispose()
+    })
+
+    it("handles closures correctly (original factory preserved)", async () => {
+      const closureValue = "from closure"
+      const executor = provide(() => closureValue)
+      const meta = getMetadata(executor)
+
+      expect(meta?.original).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("none")
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe("from closure")
+
+      await scope.dispose()
+    })
+
+    it("resolves array dependencies correctly", async () => {
+      const a = provide(() => 10)
+      const b = provide(() => 3)
+      const sum = derive([a, b], ([x, y]) => x + y)
+
+      const meta = getMetadata(sum)
+      expect(meta?.original).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("array")
+
+      const scope = createScope()
+      const result = await scope.resolve(sum)
+      expect(result).toBe(13)
+
+      await scope.dispose()
+    })
+
+    it("resolves record dependencies correctly", async () => {
+      const host = provide(() => "example.com")
+      const port = provide(() => 8080)
+      const url = derive({ host, port }, ({ host, port }) => `https://${host}:${port}`)
+
+      const meta = getMetadata(url)
+      expect(meta?.original).toBeDefined()
+      expect(meta?.inference.dependencyShape).toBe("record")
+
+      const scope = createScope()
+      const result = await scope.resolve(url)
+      expect(result).toBe("https://example.com:8080")
+
+      await scope.dispose()
+    })
+
+    it("creates controller only when needed", async () => {
+      let cleanupCalled = false
+      const executor = provide((ctl) => {
+        ctl.cleanup(() => { cleanupCalled = true })
+        return "with-cleanup"
+      })
+
+      const meta = getMetadata(executor)
+      expect(meta?.controllerFactory).not.toBe("none")
+      expect(meta?.inference.usesCleanup).toBe(true)
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe("with-cleanup")
+
+      await scope.dispose()
+      expect(cleanupCalled).toBe(true)
+    })
+
+    it("skips controller for simple factories", async () => {
+      const executor = provide(() => "simple")
+      const meta = getMetadata(executor)
+
+      expect(meta?.controllerFactory).toBe("none")
+      expect(meta?.inference.usesCleanup).toBe(false)
+      expect(meta?.inference.usesRelease).toBe(false)
+      expect(meta?.inference.usesReload).toBe(false)
+      expect(meta?.inference.usesScope).toBe(false)
+
+      const scope = createScope()
+      const result = await scope.resolve(executor)
+      expect(result).toBe("simple")
+
+      await scope.dispose()
+    })
   })
 })

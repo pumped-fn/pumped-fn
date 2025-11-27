@@ -20,10 +20,11 @@ import {
   DependencyResolutionError,
 } from "./errors";
 import { type Tag, tagSymbol, isTag, isTagExecutor, mergeFlowTags } from "./tag";
-import { Promised, validate } from "./primitives";
+import { Promised, validate, isThenable } from "./primitives";
 import * as errors from "./errors";
 import { flow as flowApi, FlowExecutionImpl } from "./flow";
 import { flowDefinitionMeta, ExecutionContextImpl } from "./execution-context";
+import { getMetadata, NOOP_CONTROLLER } from "./sucrose";
 
 export type ResolvableItem = Core.UExecutor | Tag.Tag<unknown, boolean> | Tag.TagExecutor<unknown> | Escapable<unknown>;
 type ResolveFn = (item: ResolvableItem) => Promise<unknown>;
@@ -84,7 +85,7 @@ export async function resolveShape<T extends ResolvableItem | ReadonlyArray<Reso
   }
 
   if (typeof shape === "object") {
-    if ("factory" in shape) {
+    if (executorSymbol in shape) {
       return await resolveItem(shape as Core.UExecutor);
     }
 
@@ -148,13 +149,13 @@ type UE = Core.Executor<unknown>;
 type OnUpdateFn = (accessor: Core.Accessor<unknown>) => void | Promise<void>;
 
 interface ReplacerResult {
-  factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>;
   dependencies:
     | undefined
     | Core.UExecutor
     | Core.UExecutor[]
     | Record<string, Core.UExecutor>;
   immediateValue?: unknown;
+  effectiveExecutor: Core.Executor<unknown>;
 }
 
 const NOT_SET = Symbol("accessor-value-not-set");
@@ -191,7 +192,7 @@ class AccessorImpl implements Core.Accessor<unknown> {
   }
 
   private async resolveCore(): Promise<unknown> {
-    const { factory, dependencies, immediateValue } = this.processReplacer();
+    const { dependencies, immediateValue, effectiveExecutor } = this.processReplacer();
 
     if (immediateValue !== undefined) {
       await new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -211,18 +212,19 @@ class AccessorImpl implements Core.Accessor<unknown> {
       return immediateValue;
     }
 
-    const controller = this.createController();
+    const meta = getMetadata(effectiveExecutor)
 
-    const resolvedDependencies = await this.scope["~resolveDependencies"](
-      dependencies,
-      this.requestor,
-      this.executionContext
-    );
+    const resolvedDependencies = dependencies === undefined
+      ? undefined
+      : await this.scope["~resolveDependencies"](
+          dependencies,
+          this.requestor,
+          this.executionContext
+        );
 
     const result = await this.executeFactory(
-      factory,
       resolvedDependencies,
-      controller
+      effectiveExecutor
     );
 
     const processedResult = await this.processChangeEvents(result);
@@ -333,8 +335,8 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     if (!replacer) {
       return {
-        factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
+        effectiveExecutor: this.requestor,
       };
     }
 
@@ -342,57 +344,98 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     if (!isExecutor(value)) {
       return {
-        factory: this.requestor.factory!,
         dependencies: this.requestor.dependencies,
         immediateValue: value,
+        effectiveExecutor: this.requestor,
       };
     }
 
     return {
-      factory: value.factory!,
       dependencies: value.dependencies,
+      effectiveExecutor: value as Core.Executor<unknown>,
     };
   }
 
   private async executeFactory(
-    factory: Core.NoDependencyFn<unknown> | Core.DependentFn<unknown, unknown>,
     resolvedDependencies: unknown,
-    controller: Core.Controller
+    effectiveExecutor: Core.Executor<unknown>
   ): Promise<unknown> {
-    try {
-      const factoryResult =
-        factory.length >= 2
-          ? (factory as Core.DependentFn<unknown, unknown>)(
-              resolvedDependencies,
-              controller
-            )
-          : (factory as Core.NoDependencyFn<unknown>)(controller);
+    const meta = getMetadata(effectiveExecutor)
 
-      if (factoryResult instanceof Promise) {
+    if (!meta) {
+      throw new Error("Executor metadata not found. Executors must be created using sucrose compilation.")
+    }
+
+    const { inference, controllerFactory, callSite, original } = meta
+    const { dependencyShape } = inference
+    const usesController = controllerFactory !== "none"
+
+    const controller = usesController
+      ? (controllerFactory as Exclude<typeof controllerFactory, "none">)(
+          this.scope,
+          this.requestor,
+          (fn: Core.Cleanup) => {
+            const state = this.scope["getOrCreateState"](this.requestor)
+            const cleanups = this.scope["ensureCleanups"](state)
+            cleanups.add(fn)
+          }
+        )
+      : NOOP_CONTROLLER
+
+    try {
+      let factoryResult: unknown
+
+      if (dependencyShape === "none" && !usesController) {
+        factoryResult = (original as () => unknown)()
+      } else if (dependencyShape === "none" && usesController) {
+        factoryResult = (original as (ctl: Core.Controller) => unknown)(controller)
+      } else if (!usesController) {
+        factoryResult = (original as (deps: unknown) => unknown)(resolvedDependencies)
+      } else {
+        factoryResult = (original as (deps: unknown, ctl: Core.Controller) => unknown)(resolvedDependencies, controller)
+      }
+
+      if (isThenable(factoryResult)) {
         try {
-          return await factoryResult;
+          return await factoryResult
         } catch (asyncError) {
-          const executorName = errors.getExecutorName(this.requestor);
-          const dependencyChain = [executorName];
+          const executorName = errors.getExecutorName(this.requestor)
+          const dependencyChain = [executorName]
 
           throw errors.createFactoryError(
             executorName,
             dependencyChain,
-            asyncError
-          );
+            asyncError,
+            callSite
+          )
         }
       }
 
-      return factoryResult;
+      return factoryResult
     } catch (syncError) {
-      const executorName = errors.getExecutorName(this.requestor);
-      const dependencyChain = [executorName];
+      const executorName = errors.getExecutorName(this.requestor)
+      const dependencyChain = [executorName]
 
       throw errors.createFactoryError(
         executorName,
         dependencyChain,
-        syncError
-      );
+        syncError,
+        callSite
+      )
+    }
+  }
+
+  private createControllerLegacy(): Core.Controller {
+    return {
+      cleanup: (cleanup: Core.Cleanup) => {
+        const state = this.scope["getOrCreateState"](this.requestor)
+        const cleanups = this.scope["ensureCleanups"](state)
+        cleanups.add(cleanup)
+      },
+      release: () => this.scope.release(this.requestor),
+      reload: () =>
+        this.scope.resolve(this.requestor, true).map(() => undefined),
+      scope: this.scope,
     }
   }
 
@@ -435,11 +478,14 @@ class AccessorImpl implements Core.Accessor<unknown> {
 
     const executorName = errors.getExecutorName(this.requestor);
     const dependencyChain = [executorName];
+    const meta = getMetadata(this.requestor);
+    const callSite = meta?.callSite;
 
     const enhancedError = errors.createSystemError(
       executorName,
       dependencyChain,
-      error
+      error,
+      callSite
     );
 
     return {
@@ -492,20 +538,6 @@ class AccessorImpl implements Core.Accessor<unknown> {
   subscribe(cb: (value: unknown) => void): Core.Cleanup {
     this.scope["~ensureNotDisposed"]();
     return this.scope.onUpdate(this.requestor, cb);
-  }
-
-  private createController(): Core.Controller {
-    return {
-      cleanup: (cleanup: Core.Cleanup) => {
-        const state = this.scope["getOrCreateState"](this.requestor);
-        const cleanups = this.scope["ensureCleanups"](state);
-        cleanups.add(cleanup);
-      },
-      release: () => this.scope.release(this.requestor),
-      reload: () =>
-        this.scope.resolve(this.requestor, true).map(() => undefined),
-      scope: this.scope,
-    };
   }
 }
 
@@ -573,7 +605,6 @@ class BaseScope implements Core.Scope {
       tags: details?.tags
     });
 
-    // Fire-and-forget: extension errors during create shouldn't prevent context usage
     context["~emitLifecycleOperation"]('create').catch((err) => {
       console.error('Extension error during context creation:', err)
     })
@@ -636,11 +667,15 @@ class BaseScope implements Core.Scope {
     if (currentChain && currentChain.has(executor)) {
       const chainArray = Array.from(currentChain);
       const dependencyChain = errors.buildDependencyChain(chainArray);
+      const meta = getMetadata(executor);
+      const callSite = meta?.callSite;
 
       throw errors.createDependencyError(
         errors.getExecutorName(executor),
         dependencyChain,
-        errors.getExecutorName(executor)
+        errors.getExecutorName(executor),
+        undefined,
+        callSite
       );
     }
   }
@@ -755,10 +790,14 @@ class BaseScope implements Core.Scope {
 
     if (e === ref) {
       const executorName = errors.getExecutorName(e);
+      const meta = getMetadata(e);
+      const callSite = meta?.callSite;
       throw errors.createDependencyError(
         executorName,
         [executorName],
-        executorName
+        executorName,
+        undefined,
+        callSite
       );
     }
 
@@ -1382,7 +1421,6 @@ class BaseScope implements Core.Scope {
       } catch (error) {
         context.details.error = error;
         context.end();
-        // Best-effort cleanup: don't let close errors mask the original error
         await context.close().catch((closeErr) => {
           console.error('Error closing context after flow failure:', closeErr);
         });

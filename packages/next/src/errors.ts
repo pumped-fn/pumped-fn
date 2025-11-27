@@ -19,12 +19,14 @@ export class ExecutorResolutionError extends Error {
   readonly code: typeof ExecutorResolutionError.CODE = ExecutorResolutionError.CODE
   readonly executorName: string
   readonly dependencyChain: string[]
+  readonly callSite?: string
 
-  constructor(message: string, executorName: string, dependencyChain: string[], cause?: unknown) {
+  constructor(message: string, executorName: string, dependencyChain: string[], cause?: unknown, callSite?: string) {
     super(message, { cause })
     this.name = "ExecutorResolutionError"
     this.executorName = executorName
     this.dependencyChain = dependencyChain
+    this.callSite = callSite
   }
 }
 
@@ -33,12 +35,14 @@ export class FactoryExecutionError extends Error {
   readonly code: typeof FactoryExecutionError.CODE = FactoryExecutionError.CODE
   readonly executorName: string
   readonly dependencyChain: string[]
+  readonly callSite?: string
 
-  constructor(message: string, executorName: string, dependencyChain: string[], cause?: unknown) {
+  constructor(message: string, executorName: string, dependencyChain: string[], cause?: unknown, callSite?: string) {
     super(message, { cause })
     this.name = "FactoryExecutionError"
     this.executorName = executorName
     this.dependencyChain = dependencyChain
+    this.callSite = callSite
   }
 }
 
@@ -48,13 +52,15 @@ export class DependencyResolutionError extends Error {
   readonly executorName: string
   readonly dependencyChain: string[]
   readonly missingDependency?: string
+  readonly callSite?: string
 
-  constructor(message: string, executorName: string, dependencyChain: string[], missingDependency?: string, cause?: unknown) {
+  constructor(message: string, executorName: string, dependencyChain: string[], missingDependency?: string, cause?: unknown, callSite?: string) {
     super(message, { cause })
     this.name = "DependencyResolutionError"
     this.executorName = executorName
     this.dependencyChain = dependencyChain
     this.missingDependency = missingDependency
+    this.callSite = callSite
   }
 }
 
@@ -75,14 +81,16 @@ export class ExecutionContextClosedError extends Error {
 export function createFactoryError(
   executorName: string,
   dependencyChain: string[],
-  cause: unknown
+  cause: unknown,
+  callSite?: string
 ): FactoryExecutionError {
   const causeMsg = cause instanceof Error ? cause.message : String(cause)
   return new FactoryExecutionError(
     `Factory failed for "${executorName}": ${causeMsg}`,
     executorName,
     dependencyChain,
-    cause
+    cause,
+    callSite
   )
 }
 
@@ -90,25 +98,28 @@ export function createDependencyError(
   executorName: string,
   dependencyChain: string[],
   missingDependency?: string,
-  cause?: unknown
+  cause?: unknown,
+  callSite?: string
 ): DependencyResolutionError {
   const msg = missingDependency
     ? `Dependency "${missingDependency}" not found for "${executorName}"`
     : `Dependency resolution failed for "${executorName}"`
-  return new DependencyResolutionError(msg, executorName, dependencyChain, missingDependency, cause)
+  return new DependencyResolutionError(msg, executorName, dependencyChain, missingDependency, cause, callSite)
 }
 
 export function createSystemError(
   executorName: string,
   dependencyChain: string[],
-  cause?: unknown
+  cause?: unknown,
+  callSite?: string
 ): ExecutorResolutionError {
   const causeMsg = cause instanceof Error ? cause.message : String(cause)
   return new ExecutorResolutionError(
     `System error for "${executorName}": ${causeMsg}`,
     executorName,
     dependencyChain,
-    cause
+    cause,
+    callSite
   )
 }
 

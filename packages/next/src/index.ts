@@ -23,7 +23,7 @@ const errors: typeof errorsModule = errorsModule
 /**
  * Promise-aware helper returned by several APIs to carry execution metadata.
  */
-export { Promised } from "./primitives"
+export { Promised, isThenable } from "./primitives"
 
 /**
  * Toolkit for defining schema primitives compatible with Pumped-fn tags.
@@ -159,6 +159,7 @@ export { FlowValidationError } from "./types"
  * Error thrown when operations are attempted on a closed ExecutionContext.
  */
 export { ExecutionContextClosedError } from "./errors"
+
 
 /**
  * Standard tag representing the friendly executor name.
