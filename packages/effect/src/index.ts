@@ -12,5 +12,6 @@ export { tag, tags, isTag, isTagged } from "./tag"
 export { atom, isAtom, lazy, isLazy } from "./atom"
 export { flow, isFlow } from "./flow"
 export { preset, isPreset } from "./preset"
+export { createScope } from "./scope"
 
 export const VERSION = "0.0.1"
