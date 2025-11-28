@@ -1,14 +1,43 @@
 # @pumped-fn/lite
 
-Lightweight dependency injection with minimal reactivity for TypeScript.
+A lightweight effect system for TypeScript with managed lifecycles and minimal reactivity.
 
-## Features
+## What is an Effect System?
 
-- **Atoms** - Long-lived dependencies with caching and cleanup
-- **Flows** - Short-lived request/response execution
-- **Tags** - Contextual metadata for request-scoped data
-- **Controllers** - Deferred resolution with state subscriptions
-- **Zero dependencies** - No external runtime dependencies
+An effect system manages **how** and **when** computations run, handling:
+- **Resource lifecycle** - acquire, use, release
+- **Computation ordering** - what depends on what
+- **Side effect isolation** - controlled execution boundaries
+- **State transitions** - idle → resolving → resolved → failed
+
+## Core Concepts
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         Scope                               │
+│  (execution boundary with shared state)                     │
+│                                                             │
+│   ┌─────────┐      ┌─────────┐      ┌─────────┐            │
+│   │  Atom   │ ──── │  Atom   │ ──── │  Atom   │            │
+│   │ (effect)│      │ (effect)│      │ (effect)│            │
+│   └─────────┘      └─────────┘      └─────────┘            │
+│        │                                  │                 │
+│        └──────────┬───────────────────────┘                 │
+│                   ▼                                         │
+│            ┌─────────────┐                                  │
+│            │    Flow     │                                  │
+│            │ (operation) │                                  │
+│            └─────────────┘                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Concept | Purpose |
+|---------|---------|
+| **Atom** | A managed effect with lifecycle (create, cache, cleanup, recreate) |
+| **Flow** | A short-lived operation that consumes atoms |
+| **Scope** | Execution boundary that manages atom lifecycles |
+| **Controller** | Handle for observing and controlling an atom's state |
+| **Tag** | Contextual value passed through execution |
 
 ## Install
 
@@ -16,43 +45,57 @@ Lightweight dependency injection with minimal reactivity for TypeScript.
 npm install @pumped-fn/lite
 ```
 
-## Quick Start
+## Quick Example
 
 ```typescript
-import { atom, flow, createScope, controller, tag, tags } from '@pumped-fn/lite'
+import { atom, flow, createScope } from '@pumped-fn/lite'
 
-// Define atoms (long-lived dependencies)
-const configAtom = atom({
-  factory: () => ({ apiUrl: 'https://api.example.com' })
-})
-
-const apiClientAtom = atom({
-  deps: { config: configAtom },
-  factory: (ctx, { config }) => {
-    const client = createApiClient(config.apiUrl)
-    ctx.cleanup(() => client.close())
-    return client
+// Define effects (atoms)
+const dbAtom = atom({
+  factory: async (ctx) => {
+    const conn = await createConnection()
+    ctx.cleanup(() => conn.close())  // cleanup when released
+    return conn
   }
 })
 
-// Define flows (request handlers)
+const repoAtom = atom({
+  deps: { db: dbAtom },
+  factory: (ctx, { db }) => new UserRepository(db)
+})
+
+// Define operation (flow)
 const getUserFlow = flow({
-  deps: { api: apiClientAtom },
-  factory: async (ctx, { api }) => {
-    const userId = ctx.input as string
-    return api.getUser(userId)
+  deps: { repo: repoAtom },
+  factory: async (ctx, { repo }) => {
+    return repo.findById(ctx.input as string)
   }
 })
 
-// Create scope and use
+// Execute
 const scope = await createScope()
 const user = await scope.createContext().exec({
   flow: getUserFlow,
   input: 'user-123'
 })
+await scope.dispose()  // runs all cleanups
 ```
 
-## Lifecycle
+## Effect Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> resolving: resolve()
+    resolving --> resolved: success
+    resolving --> failed: error
+    resolved --> resolving: invalidate()
+    failed --> resolving: invalidate()
+    resolved --> idle: release()
+    failed --> idle: release()
+```
+
+## Resolution Flow
 
 ```mermaid
 sequenceDiagram
@@ -76,7 +119,9 @@ sequenceDiagram
     Atom-->>App: value
 ```
 
-## Invalidation & Reactivity
+## Invalidation (Re-execution)
+
+Atoms can be invalidated to re-run their effect:
 
 ```mermaid
 sequenceDiagram
@@ -87,121 +132,104 @@ sequenceDiagram
     participant Factory
 
     App->>Controller: invalidate()
-    Controller->>Scope: invalidate(atom)
-    Scope->>Queue: add to queue
+    Controller->>Scope: queue invalidation
+    Scope->>Queue: add atom
 
-    Note over Queue: queueMicrotask
+    Note over Queue: queueMicrotask (batched)
 
     Queue->>Scope: flush
     Scope->>Scope: run cleanups
     Scope->>Scope: state = resolving
-    Scope->>Scope: notify listeners
     Scope->>Factory: factory(ctx, deps)
     Factory-->>Scope: new value
     Scope->>Scope: state = resolved
     Scope->>Scope: notify listeners
 ```
 
+Invalidations are **batched** via microtask queue - multiple invalidations in one tick become a single re-execution.
+
 ## Controller Pattern
 
-Use controllers for deferred resolution and reactive subscriptions:
+Controllers provide a handle to observe and control atom state:
 
 ```typescript
-const expensiveAtom = atom({
-  factory: async () => {
-    const data = await fetchExpensiveData()
-    return data
+const configAtom = atom({
+  factory: async (ctx) => {
+    const config = await fetchConfig()
+    setTimeout(() => ctx.invalidate(), 60000)  // refresh every minute
+    return config
   }
 })
 
-const consumerAtom = atom({
-  deps: { expensive: controller(expensiveAtom) },
-  factory: async (ctx, { expensive }) => {
-    // Subscribe to changes
-    expensive.on(() => {
-      console.log('expensive atom changed, new state:', expensive.state)
+const appAtom = atom({
+  deps: { config: controller(configAtom) },  // controller, not direct
+  factory: (ctx, { config }) => {
+    // Subscribe to config changes
+    config.on(() => {
+      console.log('config updated:', config.state)
+      ctx.invalidate()  // re-run this atom too
     })
 
-    // Resolve when needed
-    const data = await expensive.resolve()
-    return process(data)
+    return new App(config.get())
   }
 })
 ```
 
-## Self-Invalidation
+## Tags (Contextual Values)
 
-Atoms can schedule their own re-resolution:
-
-```typescript
-const pollingAtom = atom({
-  factory: async (ctx) => {
-    const data = await fetchData()
-
-    // Re-fetch every 60 seconds
-    const timer = setTimeout(() => ctx.invalidate(), 60000)
-    ctx.cleanup(() => clearTimeout(timer))
-
-    return data
-  }
-})
-```
-
-## Tags (Request-Scoped Data)
+Tags pass contextual values through execution without explicit wiring:
 
 ```typescript
 const requestIdTag = tag<string>({ label: 'requestId' })
-const userIdTag = tag<string>({ label: 'userId' })
 
-const auditFlow = flow({
-  deps: {
-    requestId: tags.required(requestIdTag),
-    userId: tags.optional(userIdTag)
-  },
-  factory: (ctx, { requestId, userId }) => {
-    return { requestId, userId: userId ?? 'anonymous' }
-  }
+const loggingAtom = atom({
+  deps: { requestId: tags.required(requestIdTag) },
+  factory: (ctx, { requestId }) => new Logger(requestId)
 })
 
-// Execute with tags
-const ctx = scope.createContext()
+// Pass tag at execution time
 await ctx.exec({
-  flow: auditFlow,
-  input: null,
-  tags: [requestIdTag('req-123'), userIdTag('user-456')]
+  flow: myFlow,
+  input: data,
+  tags: [requestIdTag('req-abc-123')]
 })
 ```
 
-## Extensions
+## Extensions (Cross-cutting Effects)
 
-Add cross-cutting concerns:
+Wrap resolution and execution with cross-cutting behavior:
 
 ```typescript
-const loggingExtension: Lite.Extension = {
-  name: 'logging',
-  wrapResolve: async (next, atom) => {
-    console.log('resolving...')
+const timingExtension: Lite.Extension = {
+  name: 'timing',
+  wrapResolve: async (next, atom, scope) => {
+    const start = performance.now()
     const result = await next()
-    console.log('resolved')
+    console.log(`resolved in ${performance.now() - start}ms`)
     return result
   }
 }
 
-const scope = await createScope({
-  extensions: [loggingExtension]
-})
+const scope = await createScope({ extensions: [timingExtension] })
 ```
 
-## API
+## API Reference
 
 | Function | Description |
 |----------|-------------|
-| `createScope(options?)` | Create DI container |
-| `atom(config)` | Define long-lived dependency |
-| `flow(config)` | Define request handler |
-| `tag(config)` | Define metadata tag |
-| `controller(atom)` | Create controller dependency |
-| `preset(atom, value)` | Override atom value |
+| `createScope(options?)` | Create execution boundary |
+| `atom(config)` | Define managed effect |
+| `flow(config)` | Define operation |
+| `tag(config)` | Define contextual value |
+| `controller(atom)` | Wrap atom for deferred resolution |
+| `preset(atom, value)` | Override atom value in scope |
+
+## Design Principles
+
+1. **Minimal API** - Every export is expensive to learn
+2. **Zero dependencies** - No runtime dependencies
+3. **Explicit lifecycle** - No magic, clear state transitions
+4. **Composable** - Effects compose through deps
 
 ## License
 
