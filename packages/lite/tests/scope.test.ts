@@ -602,6 +602,25 @@ describe("ExecutionContext", () => {
       expect(ctrl.get()).toBe(2)
     })
 
+    it("sets state to resolving immediately after invalidate", async () => {
+      const scope = await createScope()
+      const myAtom = atom({
+        factory: async () => {
+          await new Promise(r => setTimeout(r, 50))
+          return "value"
+        }
+      })
+
+      const ctrl = scope.controller(myAtom)
+      await ctrl.resolve()
+      expect(ctrl.state).toBe('resolved')
+      expect(ctrl.get()).toBe("value")
+
+      ctrl.invalidate()
+      expect(ctrl.state).toBe('resolving')
+      expect(ctrl.get()).toBe("value")
+    })
+
     it("queues invalidation if called during resolving", async () => {
       const scope = await createScope()
       let resolveCount = 0

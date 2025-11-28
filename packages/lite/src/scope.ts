@@ -26,16 +26,19 @@ class ControllerImpl<T> implements Lite.Controller<T> {
 
   get(): T {
     const entry = this.scope.getEntry(this.atom)
-    if (!entry) {
+    if (!entry || entry.state === 'idle') {
       throw new Error("Atom not resolved")
     }
     if (entry.state === 'failed' && entry.error) {
       throw entry.error
     }
-    if (entry.value === undefined) {
-      throw new Error("Atom not resolved")
+    if (entry.state === 'resolving' && entry.value !== undefined) {
+      return entry.value as T
     }
-    return entry.value as T
+    if (entry.state === 'resolved' && entry.value !== undefined) {
+      return entry.value as T
+    }
+    throw new Error("Atom not resolved")
   }
 
   async resolve(): Promise<T> {
@@ -326,7 +329,7 @@ class ScopeImpl implements Lite.Scope {
       await entry.cleanups[i]!()
     }
     entry.cleanups = []
-    entry.state = 'idle'
+    entry.state = 'resolving'
     entry.value = previousValue
     entry.error = undefined
     entry.pendingInvalidate = false
