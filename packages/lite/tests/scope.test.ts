@@ -684,6 +684,29 @@ describe("ExecutionContext", () => {
 
       expect(notifyCount).toBe(countAfterResolve)
     })
+
+    it("notifies on invalidation", async () => {
+      const scope = await createScope()
+      const states: string[] = []
+      const myAtom = atom({
+        factory: async () => {
+          await new Promise(r => setTimeout(r, 10))
+          return 42
+        }
+      })
+
+      const ctrl = scope.controller(myAtom)
+      await ctrl.resolve()
+      expect(ctrl.state).toBe('resolved')
+
+      ctrl.on(() => states.push(ctrl.state))
+      ctrl.invalidate()
+
+      expect(states).toContain('resolving')
+
+      await new Promise(r => setTimeout(r, 50))
+      expect(states).toContain('resolved')
+    })
   })
 
   describe("scope.on()", () => {

@@ -335,6 +335,8 @@ class ScopeImpl implements Lite.Scope {
     entry.pendingInvalidate = false
     this.pending.delete(atom)
     this.resolving.delete(atom)
+    this.emitStateChange('resolving', atom)
+    this.notifyListeners(atom)
 
     this.resolve(atom).catch(() => {})
   }
