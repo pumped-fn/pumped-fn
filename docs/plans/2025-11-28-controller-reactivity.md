@@ -2,7 +2,7 @@
 
 **Date:** 2025-11-28
 **ADR:** [ADR-003 Controller-based Reactivity](../../.c3/adr/adr-003-controller-reactivity.md)
-**Package:** `@pumped-fn/lite` (packages/effect/)
+**Package:** `@pumped-fn/lite` (packages/lite/)
 
 ## Overview
 
@@ -16,7 +16,7 @@ This plan implements minimal reactivity for `@pumped-fn/lite` through:
 ## Prerequisites
 
 ```bash
-cd packages/effect
+cd packages/lite
 pnpm test         # Verify baseline passes
 pnpm typecheck    # Verify types compile
 ```
@@ -25,7 +25,7 @@ pnpm typecheck    # Verify types compile
 
 ## Task 1: Add New Symbols
 
-**File:** `packages/effect/src/symbols.ts`
+**File:** `packages/lite/src/symbols.ts`
 
 ### 1.1 Add controllerSymbol and controllerDepSymbol
 
@@ -67,7 +67,7 @@ pnpm typecheck  # Will fail until types.ts updated
 
 ## Task 2: Update Types
 
-**File:** `packages/effect/src/types.ts`
+**File:** `packages/lite/src/types.ts`
 
 ### 2.1 Update symbol imports
 
@@ -244,7 +244,7 @@ pnpm typecheck  # Will fail until atom.ts updated
 
 ## Task 3: Update Atom Module
 
-**File:** `packages/effect/src/atom.ts`
+**File:** `packages/lite/src/atom.ts`
 
 ### 3.1 Update imports
 
@@ -394,7 +394,7 @@ pnpm typecheck  # Will fail until scope.ts updated
 
 ## Task 4: Implement Controller in Scope
 
-**File:** `packages/effect/src/scope.ts`
+**File:** `packages/lite/src/scope.ts`
 
 This is the largest change. We need to:
 1. Add state tracking with AtomState
@@ -832,7 +832,7 @@ pnpm typecheck  # Will fail until index.ts updated
 
 ## Task 5: Update Index Exports
 
-**File:** `packages/effect/src/index.ts`
+**File:** `packages/lite/src/index.ts`
 
 **Current:**
 ```typescript
@@ -887,7 +887,7 @@ pnpm typecheck  # Should pass now
 
 ## Task 6: Update Tests
 
-**File:** `packages/effect/tests/scope.test.ts`
+**File:** `packages/lite/tests/scope.test.ts`
 
 ### 6.1 Update imports
 
@@ -1354,7 +1354,7 @@ pnpm test  # All tests should pass
 
 ## Task 7: Rename Package (Optional - if not already done)
 
-**File:** `packages/effect/package.json`
+**File:** `packages/lite/package.json`
 
 **Update name field:**
 ```json
@@ -1371,7 +1371,7 @@ pnpm test  # All tests should pass
 After completing all tasks, run:
 
 ```bash
-cd packages/effect
+cd packages/lite
 pnpm typecheck       # Types compile
 pnpm test            # All tests pass
 ```

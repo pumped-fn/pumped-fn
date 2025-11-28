@@ -191,8 +191,8 @@ to child contexts.
 
 ---
 
-### [ADR-002-lightweight-effect-package](./adr/adr-002-lightweight-effect-package.md) - Lightweight Effect Package (@pumped-fn/effect)
-> Create a minimal DI/effect package as an alternative to core-next, focusing on
+### [ADR-002-lightweight-lite-package](./adr/adr-002-lightweight-lite-package.md) - Lightweight Lite Package (@pumped-fn/lite)
+> Create a minimal DI package as an alternative to core-next, focusing on
 zero-dependency simplicity with a reduced API surface for lightweight applications.
 
 **Status**: Accepted
@@ -212,7 +212,28 @@ zero-dependency simplicity with a reduced API surface for lightweight applicatio
 
 ---
 
+### [ADR-003-controller-reactivity](./adr/adr-003-controller-reactivity.md) - Controller-based Reactivity (@pumped-fn/lite)
+> Add minimal reactivity to @pumped-fn/lite through Controller pattern,
+enabling atoms to self-invalidate and subscribers to react to state changes
+while maintaining the package's lightweight principles.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-003-status)
+- [Problem/Requirement](#adr-003-problem)
+- [Exploration Journey](#adr-003-exploration)
+- [Solution](#adr-003-solution)
+- [Changes Across Layers](#adr-003-changes)
+- [Migration from ADR-002](#adr-003-migration)
+- [Verification](#adr-003-verification)
+- [Performance Considerations](#adr-003-performance)
+- [Alternatives Considered](#adr-003-alternatives)
+- [Related](#adr-003-related)
+
+---
+
 ## Quick Reference
 
-**Total Documents**: 12
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 2
+**Total Documents**: 13
+**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 3

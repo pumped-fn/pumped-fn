@@ -68,7 +68,7 @@ graph TB
 | Container | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
 | @pumped-fn/core-next | Library | Core effect system - scopes, executors, flows, tags, extensions | [c3-1-core](./c3-1-core/) |
-| @pumped-fn/effect | Library | Lightweight effect system - minimal DI with atoms, flows, tags | [ADR-002](./adr/adr-002-lightweight-effect-package.md) |
+| @pumped-fn/lite | Library | Lightweight DI with minimal reactivity - atoms, flows, tags, controllers | [ADR-002](./adr/adr-002-lightweight-lite-package.md), [ADR-003](./adr/adr-003-controller-reactivity.md) |
 | @pumped-fn/react | Library | React hooks and components for pumped-fn integration | (out of scope) |
 | @pumped-fn/devtools | Library + CLI | Development tools with terminal UI | (out of scope) |
 | docs | Static Site | VitePress documentation site | (out of scope) |

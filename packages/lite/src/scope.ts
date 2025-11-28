@@ -64,6 +64,10 @@ class ScopeImpl implements Lite.Scope {
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
 
+  private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
+    setTimeout(() => this.invalidate(atom), 0)
+  }
+
   constructor(options?: Lite.ScopeOptions) {
     this.extensions = options?.extensions ?? []
     this.tags = options?.tags ?? []
@@ -200,7 +204,7 @@ class ScopeImpl implements Lite.Scope {
     const ctx: Lite.ResolveContext = {
       cleanup: (fn) => entry.cleanups.push(fn),
       invalidate: () => {
-        setTimeout(() => this.invalidate(atom), 0)
+        this.scheduleInvalidation(atom)
       },
       scope: this,
     }
@@ -228,7 +232,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
-        setTimeout(() => this.invalidate(atom), 0)
+        this.scheduleInvalidation(atom)
       }
 
       return value
@@ -241,7 +245,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
-        setTimeout(() => this.invalidate(atom), 0)
+        this.scheduleInvalidation(atom)
       }
 
       throw entry.error

@@ -5,14 +5,14 @@ summary: >
   Add minimal reactivity to the lite package through Controller pattern,
   enabling atoms to self-invalidate and subscribers to react to state changes
   while maintaining the package's lightweight principles.
-status: proposed
+status: accepted
 date: 2025-11-28
 ---
 
 # [ADR-003] Controller-based Reactivity for @pumped-fn/lite
 
 ## Status {#adr-003-status}
-**Proposed** - 2025-11-28
+**Accepted** - 2025-11-28
 
 ## Problem/Requirement {#adr-003-problem}
 
