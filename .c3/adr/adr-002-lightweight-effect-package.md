@@ -230,6 +230,26 @@ For now, the package is simple enough that this ADR serves as primary documentat
 
 No changes to core-next components. Effect package is independent.
 
+## Performance Trade-offs {#adr-002-performance}
+
+**Tag Resolution: O(n) Linear Search**
+
+Tag lookup (`tag.get()`, `tag.find()`, `tag.collect()`) uses linear array iteration rather than Map-based O(1) lookup. This is an intentional trade-off:
+
+- **Typical use case:** Applications use <10 tags per source
+- **Simplicity:** No Map construction/synchronization overhead
+- **Memory:** No additional data structure allocation
+- **Iteration cost:** For n=10 tags, linear scan is negligible (~100ns)
+
+**When to use core-next instead:**
+- Applications with 50+ tags per source
+- Hot paths executing thousands of flows per second with many tag lookups
+- Performance-critical scenarios where O(1) tag lookup matters
+
+**Concurrent Resolution: Promise Sharing**
+
+When multiple concurrent `resolve()` calls target the same atom, they share a single pending promise rather than executing the factory multiple times. This prevents duplicate work and race conditions.
+
 ## Comparison with core-next {#adr-002-comparison}
 
 | Feature | @pumped-fn/core-next | @pumped-fn/effect |
@@ -244,6 +264,7 @@ No changes to core-next components. Effect package is independent.
 | Type inference | Yes | Yes |
 | Bundle size | ~25KB | <10KB target |
 | Dependencies | 0 | 0 |
+| Tag lookup | O(1) Map-based | O(n) array scan |
 
 ## Migration Path {#adr-002-migration}
 
