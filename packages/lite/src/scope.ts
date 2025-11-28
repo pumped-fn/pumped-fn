@@ -149,10 +149,17 @@ class ScopeImpl implements Lite.Scope {
       stateMap.set(atom, listeners)
     }
     listeners.add(listener)
+
+    const capturedStateMap = stateMap
+    const capturedListeners = listeners
+
     return () => {
-      listeners!.delete(listener)
-      if (listeners!.size === 0) {
-        stateMap!.delete(atom)
+      capturedListeners.delete(listener)
+      if (capturedListeners.size === 0) {
+        capturedStateMap.delete(atom)
+        if (capturedStateMap.size === 0) {
+          this.stateListeners.delete(event)
+        }
       }
     }
   }
@@ -267,11 +274,10 @@ class ScopeImpl implements Lite.Scope {
     let next = doResolve
 
     for (let i = this.extensions.length - 1; i >= 0; i--) {
-      const ext = this.extensions[i]!
-      if (ext.wrapResolve) {
+      const ext = this.extensions[i]
+      if (ext?.wrapResolve) {
         const currentNext = next
-        const wrap = ext.wrapResolve.bind(ext)
-        next = () => wrap(currentNext, atom, this)
+        next = ext.wrapResolve.bind(ext, currentNext, atom, this) as () => Promise<T>
       }
     }
 
@@ -333,7 +339,8 @@ class ScopeImpl implements Lite.Scope {
   private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<void> {
     const previousValue = entry.value
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
-      await entry.cleanups[i]!()
+      const cleanup = entry.cleanups[i]
+      if (cleanup) await cleanup()
     }
     entry.cleanups = []
     entry.state = 'resolving'
@@ -353,7 +360,8 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
 
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
-      await entry.cleanups[i]!()
+      const cleanup = entry.cleanups[i]
+      if (cleanup) await cleanup()
     }
 
     this.cache.delete(atom)
@@ -450,11 +458,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     let next = doExec
 
     for (let i = this.scope.extensions.length - 1; i >= 0; i--) {
-      const ext = this.scope.extensions[i]!
-      if (ext.wrapExec) {
+      const ext = this.scope.extensions[i]
+      if (ext?.wrapExec) {
         const currentNext = next
-        const wrap = ext.wrapExec.bind(ext)
-        next = () => wrap(currentNext, target, this)
+        next = ext.wrapExec.bind(ext, currentNext, target, this) as () => Promise<T>
       }
     }
 
@@ -471,7 +478,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.closed = true
 
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
-      await this.cleanups[i]!()
+      const cleanup = this.cleanups[i]
+      if (cleanup) await cleanup()
     }
   }
 }
