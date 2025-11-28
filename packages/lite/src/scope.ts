@@ -321,13 +321,17 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<void> {
+    const previousValue = entry.value
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       await entry.cleanups[i]!()
     }
     entry.cleanups = []
     entry.state = 'idle'
+    entry.value = previousValue
     entry.error = undefined
     entry.pendingInvalidate = false
+    this.pending.delete(atom)
+    this.resolving.delete(atom)
 
     this.resolve(atom).catch(() => {})
   }
