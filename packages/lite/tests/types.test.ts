@@ -46,7 +46,7 @@ describe("Type Inference", () => {
         factory: () => ({ expensive: true }),
       })
 
-      atom({
+      const consumerAtom = atom({
         deps: { svc: controller(serviceAtom) },
         factory: async (ctx, deps) => {
           expectTypeOf(deps.svc).toEqualTypeOf<Lite.Controller<{ expensive: boolean }>>()
@@ -56,42 +56,54 @@ describe("Type Inference", () => {
           return value
         },
       })
+
+      type ConsumerType = typeof consumerAtom extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<ConsumerType>().toEqualTypeOf<{ expensive: boolean }>()
     })
 
     it("should infer required tag as T", () => {
       const userIdTag = tag<string>({ label: "userId" })
 
-      atom({
+      const userAtom = atom({
         deps: { userId: tags.required(userIdTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.userId).toEqualTypeOf<string>()
           return { id: deps.userId }
         },
       })
+
+      type UserType = typeof userAtom extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<UserType>().toEqualTypeOf<{ id: string }>()
     })
 
     it("should infer optional tag as T | undefined", () => {
       const countTag = tag<number>({ label: "count" })
 
-      atom({
+      const counterAtom = atom({
         deps: { count: tags.optional(countTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.count).toEqualTypeOf<number | undefined>()
           return deps.count ?? 0
         },
       })
+
+      type CounterType = typeof counterAtom extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<CounterType>().toEqualTypeOf<number>()
     })
 
     it("should infer all tag as T[]", () => {
       const featureTag = tag<string>({ label: "feature" })
 
-      atom({
+      const featuresAtom = atom({
         deps: { features: tags.all(featureTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.features).toEqualTypeOf<string[]>()
           return deps.features
         },
       })
+
+      type FeaturesType = typeof featuresAtom extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<FeaturesType>().toEqualTypeOf<string[]>()
     })
 
     it("should infer mixed dependencies correctly", () => {
@@ -101,7 +113,7 @@ describe("Type Inference", () => {
       const countTag = tag<number>({ label: "count" })
       const featureTag = tag<string>({ label: "feature" })
 
-      atom({
+      const combinedAtom = atom({
         deps: {
           cfg: configAtom,
           svc: controller(serviceAtom),
@@ -118,6 +130,9 @@ describe("Type Inference", () => {
           return "combined"
         },
       })
+
+      type CombinedType = typeof combinedAtom extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<CombinedType>().toEqualTypeOf<string>()
     })
   })
 
@@ -127,13 +142,16 @@ describe("Type Inference", () => {
         factory: () => ({ query: (sql: string) => [] }),
       })
 
-      flow({
+      const queryFlow = flow({
         deps: { db: dbAtom },
         factory: (ctx, deps) => {
           expectTypeOf(deps.db).toEqualTypeOf<{ query: (sql: string) => never[] }>()
           return deps.db.query("SELECT 1")
         },
       })
+
+      type QueryFlowType = typeof queryFlow extends Lite.Flow<infer T, unknown> ? T : never
+      expectTypeOf<QueryFlowType>().toEqualTypeOf<never[]>()
     })
 
     it("should infer mixed deps for flow with atoms and tags", () => {
@@ -143,7 +161,7 @@ describe("Type Inference", () => {
       const countTag = tag<number>({ label: "count" })
       const featureTag = tag<string>({ label: "feature" })
 
-      flow({
+      const mixedFlow = flow({
         deps: {
           cfg: configAtom,
           svc: controller(serviceAtom),
@@ -160,6 +178,9 @@ describe("Type Inference", () => {
           return { input: ctx.input }
         },
       })
+
+      type MixedFlowType = typeof mixedFlow extends Lite.Flow<infer T, unknown> ? T : never
+      expectTypeOf<MixedFlowType>().toEqualTypeOf<{ input: unknown }>()
     })
   })
 })
