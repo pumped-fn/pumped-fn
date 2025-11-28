@@ -4,7 +4,7 @@
 
 This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troubleshooting.md
 
-Diagrams meant thousand words, make and use diagram to communicate, making comment, making feedbacks and requesting review
+Diagrams mean a thousand words; make and use diagrams to communicate, make comments, give feedback, and request reviews.
 
 # IMPORTANT
 

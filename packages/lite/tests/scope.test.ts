@@ -70,6 +70,18 @@ describe("Scope", () => {
       expect(result).toBe("async result")
     })
 
+    it("handles undefined as valid resolved value", async () => {
+      const scope = await createScope()
+      const undefinedAtom = atom({ factory: () => undefined })
+
+      const result = await scope.resolve(undefinedAtom)
+      expect(result).toBe(undefined)
+
+      const ctrl = scope.controller(undefinedAtom)
+      expect(ctrl.state).toBe("resolved")
+      expect(ctrl.get()).toBe(undefined)
+    })
+
     it("uses preset value", async () => {
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const scope = await createScope({

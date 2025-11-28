@@ -1,11 +1,10 @@
-import { describe, it, expect, expectTypeOf } from "vitest"
+import { describe, it, expectTypeOf } from "vitest"
 import {
   atom,
   flow,
   tag,
   tags,
   controller,
-  createScope,
   type Lite,
 } from "../src/index"
 
@@ -47,7 +46,7 @@ describe("Type Inference", () => {
         factory: () => ({ expensive: true }),
       })
 
-      const consumerAtom = atom({
+      atom({
         deps: { svc: controller(serviceAtom) },
         factory: async (ctx, deps) => {
           expectTypeOf(deps.svc).toEqualTypeOf<Lite.Controller<{ expensive: boolean }>>()
@@ -62,7 +61,7 @@ describe("Type Inference", () => {
     it("should infer required tag as T", () => {
       const userIdTag = tag<string>({ label: "userId" })
 
-      const userAtom = atom({
+      atom({
         deps: { userId: tags.required(userIdTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.userId).toEqualTypeOf<string>()
@@ -74,7 +73,7 @@ describe("Type Inference", () => {
     it("should infer optional tag as T | undefined", () => {
       const countTag = tag<number>({ label: "count" })
 
-      const counterAtom = atom({
+      atom({
         deps: { count: tags.optional(countTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.count).toEqualTypeOf<number | undefined>()
@@ -86,7 +85,7 @@ describe("Type Inference", () => {
     it("should infer all tag as T[]", () => {
       const featureTag = tag<string>({ label: "feature" })
 
-      const featuresAtom = atom({
+      atom({
         deps: { features: tags.all(featureTag) },
         factory: (ctx, deps) => {
           expectTypeOf(deps.features).toEqualTypeOf<string[]>()
@@ -102,7 +101,7 @@ describe("Type Inference", () => {
       const countTag = tag<number>({ label: "count" })
       const featureTag = tag<string>({ label: "feature" })
 
-      const combinedAtom = atom({
+      atom({
         deps: {
           cfg: configAtom,
           svc: controller(serviceAtom),
@@ -128,7 +127,7 @@ describe("Type Inference", () => {
         factory: () => ({ query: (sql: string) => [] }),
       })
 
-      const handler = flow({
+      flow({
         deps: { db: dbAtom },
         factory: (ctx, deps) => {
           expectTypeOf(deps.db).toEqualTypeOf<{ query: (sql: string) => never[] }>()
@@ -144,7 +143,7 @@ describe("Type Inference", () => {
       const countTag = tag<number>({ label: "count" })
       const featureTag = tag<string>({ label: "feature" })
 
-      const handler = flow({
+      flow({
         deps: {
           cfg: configAtom,
           svc: controller(serviceAtom),

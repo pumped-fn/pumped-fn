@@ -5,6 +5,7 @@ import { isAtom, isControllerDep } from "./atom"
 interface AtomEntry<T> {
   state: AtomState
   value?: T
+  hasValue: boolean
   error?: Error
   cleanups: (() => MaybePromise<void>)[]
   listeners: Set<() => void>
@@ -32,10 +33,10 @@ class ControllerImpl<T> implements Lite.Controller<T> {
     if (entry.state === 'failed' && entry.error) {
       throw entry.error
     }
-    if (entry.state === 'resolving' && entry.value !== undefined) {
+    if (entry.state === 'resolving' && entry.hasValue) {
       return entry.value as T
     }
-    if (entry.state === 'resolved' && entry.value !== undefined) {
+    if (entry.state === 'resolved' && entry.hasValue) {
       return entry.value as T
     }
     throw new Error("Atom not resolved")
@@ -97,6 +98,7 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) {
       entry = {
         state: 'idle',
+        hasValue: false,
         cleanups: [],
         listeners: new Set(),
         pendingInvalidate: false,
@@ -178,6 +180,7 @@ class ScopeImpl implements Lite.Scope {
       const newEntry = this.getOrCreateEntry(atom)
       newEntry.state = 'resolved'
       newEntry.value = presetValue as T
+      newEntry.hasValue = true
       this.emitStateChange('resolved', atom)
       this.notifyListeners(atom)
       return newEntry.value
@@ -229,6 +232,7 @@ class ScopeImpl implements Lite.Scope {
       const value = await this.applyResolveExtensions(atom, doResolve)
       entry.state = 'resolved'
       entry.value = value
+      entry.hasValue = true
       entry.error = undefined
       this.emitStateChange('resolved', atom)
       this.notifyListeners(atom)
@@ -243,6 +247,7 @@ class ScopeImpl implements Lite.Scope {
       entry.state = 'failed'
       entry.error = err instanceof Error ? err : new Error(String(err))
       entry.value = undefined
+      entry.hasValue = false
       this.emitStateChange('failed', atom)
       this.notifyListeners(atom)
 
