@@ -25,21 +25,6 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  .claude/skills/pumped-design/examples/skill-examples:
-    devDependencies:
-      '@pumped-fn/core-next':
-        specifier: workspace:*
-        version: link:../../../../../packages/next
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.0
-      hono:
-        specifier: ^4.0.0
-        version: 4.10.4
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
   docs:
     dependencies:
       '@braintree/sanitize-url':
@@ -134,6 +119,18 @@ importers:
         version: 0.16.5(typescript@5.9.3)
       typescript:
         specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.5
+        version: 4.0.5(@types/debug@4.1.12)(@types/node@24.10.0)(jiti@2.6.1)(jsdom@26.1.0)(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/lite:
+    devDependencies:
+      tsdown:
+        specifier: ^0.16.5
+        version: 0.16.5(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
         version: 5.9.3
       vitest:
         specifier: ^4.0.5
@@ -1122,9 +1119,6 @@ packages:
   '@types/node@20.19.22':
     resolution: {integrity: sha512-hRnu+5qggKDSyWHlnmThnUqg62l29Aj/6vcYgUaSFL9oc7DVjeWEQN3PRgdSc6F8d9QRMWkf36CLMch1Do/+RQ==}
 
-  '@types/node@22.19.0':
-    resolution: {integrity: sha512-xpr/lmLPQEj+TUnHmR+Ab91/glhJvsqcjB+yY0Ix9GO70H6Lb4FHH5GeqdOE5btAx7eIMwuHkp4H2MSkLcqWbA==}
-
   '@types/node@24.10.0':
     resolution: {integrity: sha512-qzQZRBqkFsYyaSWXuEHc2WR9c0a0CXwiE5FWUvn7ZM+vdy1uZLfCunD38UzhuB7YN/J11ndbDBcTmOdxJo9Q7A==}
 
@@ -1878,10 +1872,6 @@ packages:
 
   hast-util-whitespace@3.0.0:
     resolution: {integrity: sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw==}
-
-  hono@4.10.4:
-    resolution: {integrity: sha512-YG/fo7zlU3KwrBL5vDpWKisLYiM+nVstBQqfr7gCPbSYURnNEP9BDxEMz8KfsDR9JX0lJWDRNc6nXX31v7ZEyg==}
-    engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
@@ -4084,10 +4074,6 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@22.19.0':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@24.10.0':
     dependencies:
       undici-types: 7.16.0
@@ -4880,8 +4866,6 @@ snapshots:
   hast-util-whitespace@3.0.0:
     dependencies:
       '@types/hast': 3.0.4
-
-  hono@4.10.4: {}
 
   hookable@5.5.3: {}
 

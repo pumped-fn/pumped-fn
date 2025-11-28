@@ -4,6 +4,8 @@
 
 This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troubleshooting.md
 
+Diagrams mean a thousand words; make and use diagrams to communicate, make comments, give feedback, and request reviews.
+
 # IMPORTANT
 
 Always use /c3-skill:c3-use skill to start a session, that'll help with architecture understanding

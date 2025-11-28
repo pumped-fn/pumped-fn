@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-25 15:36:28
+> Last generated: 2025-11-28 11:55:11
 
 ## Context Level
 
@@ -38,6 +38,25 @@ for TypeScript dependency injection and execution orchestration.
 - [Components](#c3-1-components) - Component inventory
 - [Source Organization](#c3-1-source) - File structure
 - [Testing](#c3-1-testing) - Testing strategy
+
+---
+
+### [c3-2](./c3-2-lite/) - Lite Library (@pumped-fn/lite)
+> Lightweight dependency injection with minimal reactivity - atoms, flows, tags,
+and controllers for TypeScript applications with zero external dependencies.
+
+**Sections**:
+- [Overview](#c3-2-overview) - Lightweight DI with minimal reactivity
+- [Technology Stack](#c3-2-stack) - Runtime and build tooling
+- [Component Relationships](#c3-2-relationships) - How internal modules connect
+- [Data Flow](#c3-2-data-flow) - Execution sequence
+- [Public API](#c3-2-api) - Exported functions and types
+- [Comparison with core-next](#c3-2-comparison) - Feature comparison
+- [Source Organization](#c3-2-source) - File structure
+- [Components](#c3-2-components) - Component inventory
+- [Extension System](#c3-2-extension) - Cross-cutting concern hooks
+- [Testing](#c3-2-testing) - Testing strategy
+- [Related](#c3-2-related)
 
 ---
 
@@ -169,7 +188,169 @@ and nested flow support.
 
 ---
 
+### Lite Library (@pumped-fn/lite) Components
+
+#### [c3-201](./c3-2-lite/c3-201-scope.md) - Scope & Controller
+> Core DI container with resolution caching, lifecycle states, and reactive
+Controller pattern for subscribing to atom state changes.
+
+**Sections**:
+- [Overview](#c3-201-overview) - Foundation of the DI system
+- [Concepts](#c3-201-concepts)
+- [Scope API](#c3-201-api)
+- [Resolution](#c3-201-resolution)
+- [Controller Usage](#c3-201-controller)
+- [Invalidation](#c3-201-invalidation)
+- [Event Listening](#c3-201-events)
+- [Cleanup & Disposal](#c3-201-cleanup)
+- [Source Files](#c3-201-source)
+- [Testing](#c3-201-testing)
+- [Related](#c3-201-related)
+
+---
+
+#### [c3-202](./c3-2-lite/c3-202-atom.md) - Atom
+> Long-lived dependency definition with factory function, optional dependencies,
+and controller dependency helper for reactive patterns.
+
+**Sections**:
+- [Overview](#c3-202-overview) - Long-lived dependency definition
+- [Concepts](#c3-202-concepts)
+- [Creating Atoms](#c3-202-creating)
+- [Type Inference](#c3-202-types)
+- [Controller Dependency](#c3-202-controller)
+- [Cleanup Registration](#c3-202-cleanup)
+- [Self-Invalidation](#c3-202-invalidation)
+- [Type Guard](#c3-202-guards)
+- [Source Files](#c3-202-source)
+- [Testing](#c3-202-testing)
+- [Related](#c3-202-related)
+
+---
+
+#### [c3-203](./c3-2-lite/c3-203-flow.md) - Flow & ExecutionContext
+> Short-lived request/response execution pattern with input handling,
+context lifecycle, and dependency resolution.
+
+**Sections**:
+- [Overview](#c3-203-overview) - Request handling pattern
+- [Concepts](#c3-203-concepts)
+- [Creating Flows](#c3-203-creating)
+- [Executing Flows](#c3-203-executing)
+- [ExecutionContext Lifecycle](#c3-203-lifecycle)
+- [Nested Execution](#c3-203-nested)
+- [Type Safety](#c3-203-types)
+- [Type Guard](#c3-203-guards)
+- [Common Patterns](#c3-203-patterns)
+- [Source Files](#c3-203-source)
+- [Testing](#c3-203-testing)
+- [Related](#c3-203-related)
+
+---
+
+#### [c3-204](./c3-2-lite/c3-204-tag.md) - Tag System
+> Metadata attachment and extraction with required, optional, and collect modes
+for cross-cutting data propagation.
+
+**Sections**:
+- [Overview](#c3-204-overview) - Metadata attachment and extraction
+- [Concepts](#c3-204-concepts)
+- [Creating Tags](#c3-204-creating)
+- [Tag Extraction Modes](#c3-204-modes)
+- [Tag Sources](#c3-204-sources)
+- [Direct Tag Methods](#c3-204-methods)
+- [Type Inference](#c3-204-types)
+- [Type Guards](#c3-204-guards)
+- [Common Patterns](#c3-204-patterns)
+- [Performance Note](#c3-204-performance)
+- [Source Files](#c3-204-source)
+- [Testing](#c3-204-testing)
+- [Related](#c3-204-related)
+
+---
+
+#### [c3-205](./c3-2-lite/c3-205-preset.md) - Preset
+> Value injection and atom redirection for testing and configuration,
+allowing factory bypassing or atom substitution at scope creation.
+
+**Sections**:
+- [Overview](#c3-205-overview) - Value injection and atom redirection
+- [Concepts](#c3-205-concepts)
+- [Creating Presets](#c3-205-creating)
+- [Using Presets](#c3-205-using)
+- [Testing Patterns](#c3-205-patterns)
+- [Preset vs Factory Override](#c3-205-comparison)
+- [Type Safety](#c3-205-types)
+- [Type Guard](#c3-205-guards)
+- [Limitations](#c3-205-limitations)
+- [Source Files](#c3-205-source)
+- [Testing](#c3-205-testing)
+- [Related](#c3-205-related)
+
+---
+
 ## Architecture Decisions
+
+### [ADR-004-lite-c3-documentation](./adr/adr-004-lite-c3-documentation.md) - C3 Documentation Structure for @pumped-fn/lite
+> Create Container and Component level C3 documentation for @pumped-fn/lite
+to make the package consumer-ready with clear architecture documentation.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-004-status)
+- [Problem/Requirement](#adr-004-problem)
+- [Exploration Journey](#adr-004-exploration)
+- [Solution](#adr-004-solution)
+- [Changes Across Layers](#adr-004-changes)
+- [Implementation Plan](#adr-004-plan)
+- [Verification](#adr-004-verification)
+- [Related](#adr-004-related)
+
+---
+
+### [ADR-003-controller-reactivity](./adr/adr-003-controller-reactivity.md) - Controller-based Reactivity for @pumped-fn/lite
+> Add minimal reactivity to the lite package through Controller pattern,
+enabling atoms to self-invalidate and subscribers to react to state changes
+while maintaining the package's lightweight principles.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-003-status)
+- [Problem/Requirement](#adr-003-problem)
+- [Exploration Journey](#adr-003-exploration)
+- [Solution](#adr-003-solution)
+- [Changes Across Layers](#adr-003-changes)
+- [Migration from ADR-002](#adr-003-migration)
+- [Verification](#adr-003-verification)
+- [Performance Considerations](#adr-003-performance)
+- [Alternatives Considered](#adr-003-alternatives)
+- [Related](#adr-003-related)
+
+---
+
+### [ADR-002-lightweight-lite-package](./adr/adr-002-lightweight-lite-package.md) - Lightweight Lite Package (@pumped-fn/lite)
+> Create a minimal DI/effect package as an alternative to core-next, focusing on
+zero-dependency simplicity with a reduced API surface for lightweight applications.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-002-status)
+- [Problem/Requirement](#adr-002-problem)
+- [Exploration Journey](#adr-002-exploration)
+- [Solution](#adr-002-solution)
+- [Changes Across Layers](#adr-002-changes)
+- [Performance Trade-offs](#adr-002-performance)
+- [Comparison with core-next](#adr-002-comparison)
+- [Migration Path](#adr-002-migration)
+- [Verification](#adr-002-verification)
+- [Future Considerations](#adr-002-future)
+- [Alternatives Considered](#adr-002-alternatives)
+- [Related](#adr-002-related)
+
+---
 
 ### [ADR-001-execution-context-lifecycle](./adr/adr-001-execution-context-lifecycle.md) - ExecutionContext Explicit Lifecycle with close()
 > Add close() method to ExecutionContext for middleware integration patterns,
@@ -193,5 +374,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 11
-**Contexts**: 1 | **Containers**: 1 | **Components**: 8 | **ADRs**: 1
+**Total Documents**: 20
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 4
