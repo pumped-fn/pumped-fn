@@ -65,11 +65,26 @@ class ScopeImpl implements Lite.Scope {
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
+  private invalidationQueue = new Set<Lite.Atom<unknown>>()
+  private invalidationScheduled = false
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
-    setTimeout(() => this.invalidate(atom), 0)
+    this.invalidationQueue.add(atom)
+    if (!this.invalidationScheduled) {
+      this.invalidationScheduled = true
+      queueMicrotask(() => this.flushInvalidations())
+    }
+  }
+
+  private flushInvalidations(): void {
+    this.invalidationScheduled = false
+    const atoms = [...this.invalidationQueue]
+    this.invalidationQueue.clear()
+    for (const atom of atoms) {
+      this.invalidate(atom)
+    }
   }
 
   constructor(options?: Lite.ScopeOptions) {

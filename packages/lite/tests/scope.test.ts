@@ -556,19 +556,34 @@ describe("ExecutionContext", () => {
     it("does not interrupt current factory execution", async () => {
       const scope = await createScope()
       const events: string[] = []
+      let executionCount = 0
+
       const myAtom = atom({
         factory: async (ctx) => {
-          events.push("start")
+          const thisExecution = ++executionCount
+          events.push(`${thisExecution}:start`)
           ctx.invalidate()
-          events.push("after-invalidate")
+          events.push(`${thisExecution}:after-invalidate`)
           await new Promise(r => setTimeout(r, 10))
-          events.push("end")
-          return events.length
+          events.push(`${thisExecution}:end`)
+          return thisExecution
         }
       })
 
-      await scope.resolve(myAtom)
-      expect(events).toEqual(["start", "after-invalidate", "end"])
+      const result = await scope.resolve(myAtom)
+      expect(result).toBe(1)
+
+      await new Promise(r => setTimeout(r, 50))
+
+      const firstExecEvents = events.filter(e => e.startsWith("1:"))
+      expect(firstExecEvents).toEqual(["1:start", "1:after-invalidate", "1:end"])
+
+      const secondExecEvents = events.filter(e => e.startsWith("2:"))
+      expect(secondExecEvents).toEqual(["2:start", "2:after-invalidate", "2:end"])
+
+      const firstEndIndex = events.indexOf("1:end")
+      const secondStartIndex = events.indexOf("2:start")
+      expect(firstEndIndex).toBeLessThan(secondStartIndex)
     })
   })
 
@@ -650,8 +665,8 @@ describe("ExecutionContext", () => {
 
       ctrl.invalidate()
 
-      await resolvePromise
-      expect(resolveCount).toBe(1)
+      const firstResult = await resolvePromise
+      expect(firstResult).toBe(1)
 
       await new Promise(r => setTimeout(r, 100))
       expect(resolveCount).toBe(2)
