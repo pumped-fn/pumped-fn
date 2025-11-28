@@ -3,21 +3,24 @@ import type {
   flowSymbol,
   tagSymbol,
   taggedSymbol,
-  lazySymbol,
+  controllerDepSymbol,
   presetSymbol,
-  accessorSymbol,
+  controllerSymbol,
   tagExecutorSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
 
+export type AtomState = 'idle' | 'resolving' | 'resolved' | 'failed'
+
 export namespace Lite {
   export interface Scope {
     resolve<T>(atom: Atom<T>): Promise<T>
-    accessor<T>(atom: Atom<T>): Accessor<T>
+    controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
+    on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
   }
 
   export interface CreateContextOptions {
@@ -46,6 +49,7 @@ export namespace Lite {
 
   export interface ResolveContext {
     cleanup(fn: () => MaybePromise<void>): void
+    invalidate(): void
     readonly scope: Scope
   }
 
@@ -70,11 +74,14 @@ export namespace Lite {
     tags?: Tagged<unknown>[]
   }
 
-  export interface Accessor<T> {
-    readonly [accessorSymbol]: true
+  export interface Controller<T> {
+    readonly [controllerSymbol]: true
+    readonly state: AtomState
     get(): T
     resolve(): Promise<T>
     release(): Promise<void>
+    invalidate(): void
+    on(listener: () => void): () => void
   }
 
   export interface Tag<T, HasDefault extends boolean = false> {
@@ -103,8 +110,8 @@ export namespace Lite {
     readonly mode: "required" | "optional" | "all"
   }
 
-  export interface Lazy<T> {
-    readonly [lazySymbol]: true
+  export interface ControllerDep<T> {
+    readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
   }
 
@@ -132,13 +139,13 @@ export namespace Lite {
 
   export type Dependency =
     | Atom<unknown>
-    | Lazy<unknown>
+    | ControllerDep<unknown>
     | TagExecutor<unknown>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
-    : D extends Lazy<infer T>
-      ? Accessor<T>
+    : D extends ControllerDep<infer T>
+      ? Controller<T>
       : D extends TagExecutor<infer TOutput, infer _TTag>
         ? TOutput
         : never

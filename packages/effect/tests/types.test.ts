@@ -4,7 +4,7 @@ import {
   flow,
   tag,
   tags,
-  lazy,
+  controller,
   createScope,
   type Lite,
 } from "../src/index"
@@ -42,15 +42,15 @@ describe("Type Inference", () => {
       }>()
     })
 
-    it("should infer lazy dependency as Accessor", () => {
+    it("should infer controller dependency as Controller", () => {
       const serviceAtom = atom({
         factory: () => ({ expensive: true }),
       })
 
       const consumerAtom = atom({
-        deps: { svc: lazy(serviceAtom) },
+        deps: { svc: controller(serviceAtom) },
         factory: async (ctx, deps) => {
-          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Accessor<{ expensive: boolean }>>()
+          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Controller<{ expensive: boolean }>>()
           await deps.svc.resolve()
           const value = deps.svc.get()
           expectTypeOf(value).toEqualTypeOf<{ expensive: boolean }>()
@@ -105,14 +105,14 @@ describe("Type Inference", () => {
       const combinedAtom = atom({
         deps: {
           cfg: configAtom,
-          svc: lazy(serviceAtom),
+          svc: controller(serviceAtom),
           userId: tags.required(userIdTag),
           count: tags.optional(countTag),
           features: tags.all(featureTag),
         },
         factory: (ctx, deps) => {
           expectTypeOf(deps.cfg).toEqualTypeOf<{ port: number }>()
-          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Accessor<{ name: string }>>()
+          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Controller<{ name: string }>>()
           expectTypeOf(deps.userId).toEqualTypeOf<string>()
           expectTypeOf(deps.count).toEqualTypeOf<number | undefined>()
           expectTypeOf(deps.features).toEqualTypeOf<string[]>()
@@ -147,14 +147,14 @@ describe("Type Inference", () => {
       const handler = flow({
         deps: {
           cfg: configAtom,
-          svc: lazy(serviceAtom),
+          svc: controller(serviceAtom),
           reqId: tags.required(requestIdTag),
           count: tags.optional(countTag),
           features: tags.all(featureTag),
         },
         factory: (ctx, deps) => {
           expectTypeOf(deps.cfg).toEqualTypeOf<{ port: number }>()
-          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Accessor<{ name: string }>>()
+          expectTypeOf(deps.svc).toEqualTypeOf<Lite.Controller<{ name: string }>>()
           expectTypeOf(deps.reqId).toEqualTypeOf<string>()
           expectTypeOf(deps.count).toEqualTypeOf<number | undefined>()
           expectTypeOf(deps.features).toEqualTypeOf<string[]>()

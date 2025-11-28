@@ -1,7 +1,7 @@
 {
-  "name": "@pumped-fn/effect",
+  "name": "@pumped-fn/lite",
   "version": "0.0.1",
-  "description": "Lightweight dependency injection and execution library",
+  "description": "Lightweight dependency injection with minimal reactivity",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -32,6 +32,6 @@
     "vitest": "^4.0.5"
   },
   "peerDependencies": {},
-  "keywords": ["dependency-injection", "di", "effects", "typescript"],
+  "keywords": ["dependency-injection", "di", "lite", "reactivity", "typescript"],
   "license": "MIT"
 }

@@ -36,7 +36,7 @@ export function flow<TOutput, TInput = unknown>(config: {
 export function flow<
   TOutput,
   TInput,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.Lazy<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
 >(config: {
   deps: D
   factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>

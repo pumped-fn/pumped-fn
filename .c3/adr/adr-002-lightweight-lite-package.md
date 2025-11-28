@@ -1,6 +1,6 @@
 ---
-id: ADR-002-lightweight-effect-package
-title: Lightweight Effect Package (@pumped-fn/effect)
+id: ADR-002-lightweight-lite-package
+title: Lightweight Lite Package (@pumped-fn/lite)
 summary: >
   Create a minimal DI/effect package as an alternative to core-next, focusing on
   zero-dependency simplicity with a reduced API surface for lightweight applications.
@@ -8,7 +8,7 @@ status: accepted
 date: 2025-11-27
 ---
 
-# [ADR-002] Lightweight Effect Package (@pumped-fn/effect)
+# [ADR-002] Lightweight Lite Package (@pumped-fn/lite)
 
 ## Status {#adr-002-status}
 **Accepted** - 2025-11-27
@@ -69,13 +69,13 @@ However, many use cases require only core DI functionality:
 
 ## Solution {#adr-002-solution}
 
-Create `@pumped-fn/effect` as a new package with:
+Create `@pumped-fn/lite` as a new package with:
 
 ### Core API
 
 ```typescript
-import { atom, flow, tag, tags, lazy, preset, createScope } from '@pumped-fn/effect'
-import type { Lite } from '@pumped-fn/effect'
+import { atom, flow, tag, tags, lazy, preset, createScope } from '@pumped-fn/lite'
+import type { Lite } from '@pumped-fn/lite'
 
 const configAtom = atom({
   factory: () => ({ port: 3000 })
@@ -192,7 +192,7 @@ interface ExecutionContext {
 ### Source Organization
 
 ```
-packages/effect/
+packages/lite/
 ├── src/
 │   ├── index.ts      # Public exports
 │   ├── types.ts      # Lite namespace with all interfaces
@@ -218,11 +218,11 @@ Update README.md Containers table to include:
 
 | Container | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
-| @pumped-fn/effect | Library | Lightweight effect system - minimal DI with atoms, flows, tags | c3-2-effect |
+| @pumped-fn/lite | Library | Lightweight effect system - minimal DI with atoms, flows, tags | c3-2-lite |
 
 ### Container Level
 
-Create new container documentation: `c3-2-effect/` (future work if package grows)
+Create new container documentation: `c3-2-lite/` (future work if package grows)
 
 For now, the package is simple enough that this ADR serves as primary documentation.
 
@@ -268,8 +268,8 @@ When multiple concurrent `resolve()` calls target the same atom, they share a si
 
 ## Migration Path {#adr-002-migration}
 
-**From effect to core-next:**
-1. Change import `@pumped-fn/effect` → `@pumped-fn/core-next`
+**From lite to core-next:**
+1. Change import `@pumped-fn/lite` → `@pumped-fn/core-next`
 2. Rename `Lite` namespace → specific imports
 3. Add schema validation if desired
 4. No API changes needed for basic usage
@@ -307,10 +307,10 @@ When multiple concurrent `resolve()` calls target the same atom, they share a si
 ## Future Considerations {#adr-002-future}
 
 ### C3 Documentation
-If the package grows significantly, create full container documentation at `c3-2-effect/`.
+If the package grows significantly, create full container documentation at `c3-2-lite/`.
 
 ### Feature Requests
-Keep effect minimal. Features that require significant complexity belong in core-next.
+Keep lite minimal. Features that require significant complexity belong in core-next.
 
 ### Shared Types Package
 Consider `@pumped-fn/types` if type sharing between packages becomes valuable.

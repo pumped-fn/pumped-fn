@@ -1,26 +1,41 @@
-import { accessorSymbol, tagExecutorSymbol } from "./symbols"
-import type { Lite, MaybePromise } from "./types"
-import { isAtom, isLazy } from "./atom"
+import { controllerSymbol, tagExecutorSymbol } from "./symbols"
+import type { Lite, MaybePromise, AtomState } from "./types"
+import { isAtom, isControllerDep } from "./atom"
 
-interface ResolveState<T> {
-  value: T
+interface AtomEntry<T> {
+  state: AtomState
+  value?: T
+  error?: Error
   cleanups: (() => MaybePromise<void>)[]
+  listeners: Set<() => void>
+  pendingInvalidate: boolean
 }
 
-class AccessorImpl<T> implements Lite.Accessor<T> {
-  readonly [accessorSymbol] = true
+class ControllerImpl<T> implements Lite.Controller<T> {
+  readonly [controllerSymbol] = true
 
   constructor(
     private atom: Lite.Atom<T>,
     private scope: ScopeImpl
   ) {}
 
+  get state(): AtomState {
+    const entry = this.scope.getEntry(this.atom)
+    return entry?.state ?? 'idle'
+  }
+
   get(): T {
-    const state = this.scope.getState(this.atom)
-    if (!state) {
+    const entry = this.scope.getEntry(this.atom)
+    if (!entry) {
       throw new Error("Atom not resolved")
     }
-    return state.value
+    if (entry.state === 'failed' && entry.error) {
+      throw entry.error
+    }
+    if (entry.value === undefined) {
+      throw new Error("Atom not resolved")
+    }
+    return entry.value as T
   }
 
   async resolve(): Promise<T> {
@@ -30,13 +45,22 @@ class AccessorImpl<T> implements Lite.Accessor<T> {
   async release(): Promise<void> {
     return this.scope.release(this.atom)
   }
+
+  invalidate(): void {
+    this.scope.invalidate(this.atom)
+  }
+
+  on(listener: () => void): () => void {
+    return this.scope.addListener(this.atom, listener)
+  }
 }
 
 class ScopeImpl implements Lite.Scope {
-  private cache = new Map<Lite.Atom<unknown>, ResolveState<unknown>>()
+  private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
   private presets = new Map<Lite.Atom<unknown>, unknown | Lite.Atom<unknown>>()
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
+  private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
 
@@ -57,19 +81,82 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  getState<T>(atom: Lite.Atom<T>): ResolveState<T> | undefined {
-    return this.cache.get(atom) as unknown as ResolveState<T> | undefined
+  getEntry<T>(atom: Lite.Atom<T>): AtomEntry<T> | undefined {
+    return this.cache.get(atom) as AtomEntry<T> | undefined
+  }
+
+  private getOrCreateEntry<T>(atom: Lite.Atom<T>): AtomEntry<T> {
+    let entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry) {
+      entry = {
+        state: 'idle',
+        cleanups: [],
+        listeners: new Set(),
+        pendingInvalidate: false,
+      }
+      this.cache.set(atom, entry as AtomEntry<unknown>)
+    }
+    return entry
+  }
+
+  addListener<T>(atom: Lite.Atom<T>, listener: () => void): () => void {
+    const entry = this.getOrCreateEntry(atom)
+    entry.listeners.add(listener)
+    return () => {
+      entry.listeners.delete(listener)
+    }
+  }
+
+  private notifyListeners<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (entry) {
+      for (const listener of entry.listeners) {
+        listener()
+      }
+    }
+  }
+
+  private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>): void {
+    const stateMap = this.stateListeners.get(state)
+    if (stateMap) {
+      const listeners = stateMap.get(atom)
+      if (listeners) {
+        for (const listener of listeners) {
+          listener()
+        }
+      }
+    }
+  }
+
+  on(event: AtomState, atom: Lite.Atom<unknown>, listener: () => void): () => void {
+    let stateMap = this.stateListeners.get(event)
+    if (!stateMap) {
+      stateMap = new Map()
+      this.stateListeners.set(event, stateMap)
+    }
+    let listeners = stateMap.get(atom)
+    if (!listeners) {
+      listeners = new Set()
+      stateMap.set(atom, listeners)
+    }
+    listeners.add(listener)
+    return () => {
+      listeners!.delete(listener)
+      if (listeners!.size === 0) {
+        stateMap!.delete(atom)
+      }
+    }
   }
 
   async resolve<T>(atom: Lite.Atom<T>): Promise<T> {
-    const cached = this.cache.get(atom)
-    if (cached) {
-      return cached.value as unknown as T
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (entry?.state === 'resolved') {
+      return entry.value as T
     }
 
     const pendingPromise = this.pending.get(atom)
     if (pendingPromise) {
-      return pendingPromise as unknown as Promise<T>
+      return pendingPromise as Promise<T>
     }
 
     if (this.resolving.has(atom)) {
@@ -79,20 +166,20 @@ class ScopeImpl implements Lite.Scope {
     const presetValue = this.presets.get(atom)
     if (presetValue !== undefined) {
       if (isAtom(presetValue)) {
-        return this.resolve(presetValue as unknown as Lite.Atom<T>)
+        return this.resolve(presetValue as Lite.Atom<T>)
       }
-      const state: ResolveState<T> = {
-        value: presetValue as unknown as T,
-        cleanups: [],
-      }
-      this.cache.set(atom, state)
-      return state.value
+      const newEntry = this.getOrCreateEntry(atom)
+      newEntry.state = 'resolved'
+      newEntry.value = presetValue as T
+      this.emitStateChange('resolved', atom)
+      this.notifyListeners(atom)
+      return newEntry.value
     }
 
     this.resolving.add(atom)
 
     const promise = this.doResolve(atom)
-    this.pending.set(atom, promise as unknown as Promise<unknown>)
+    this.pending.set(atom, promise as Promise<unknown>)
 
     try {
       return await promise
@@ -103,35 +190,62 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doResolve<T>(atom: Lite.Atom<T>): Promise<T> {
+    const entry = this.getOrCreateEntry(atom)
+    entry.state = 'resolving'
+    this.emitStateChange('resolving', atom)
+    this.notifyListeners(atom)
+
     const resolvedDeps = await this.resolveDeps(atom.deps)
-    const cleanups: (() => MaybePromise<void>)[] = []
 
     const ctx: Lite.ResolveContext = {
-      cleanup: (fn) => cleanups.push(fn),
+      cleanup: (fn) => entry.cleanups.push(fn),
+      invalidate: () => {
+        setTimeout(() => this.invalidate(atom), 0)
+      },
       scope: this,
     }
 
-    let value: T
-    const factory = atom.factory as unknown as (
+    const factory = atom.factory as (
       ctx: Lite.ResolveContext,
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
 
     const doResolve = async () => {
       if (atom.deps && Object.keys(atom.deps).length > 0) {
-        value = await factory(ctx, resolvedDeps)
+        return factory(ctx, resolvedDeps)
       } else {
-        value = await factory(ctx)
+        return factory(ctx)
       }
-      return value
     }
 
-    value = await this.applyResolveExtensions(atom, doResolve)
+    try {
+      const value = await this.applyResolveExtensions(atom, doResolve)
+      entry.state = 'resolved'
+      entry.value = value
+      entry.error = undefined
+      this.emitStateChange('resolved', atom)
+      this.notifyListeners(atom)
 
-    const state: ResolveState<T> = { value, cleanups }
-    this.cache.set(atom, state)
+      if (entry.pendingInvalidate) {
+        entry.pendingInvalidate = false
+        setTimeout(() => this.invalidate(atom), 0)
+      }
 
-    return value
+      return value
+    } catch (err) {
+      entry.state = 'failed'
+      entry.error = err instanceof Error ? err : new Error(String(err))
+      entry.value = undefined
+      this.emitStateChange('failed', atom)
+      this.notifyListeners(atom)
+
+      if (entry.pendingInvalidate) {
+        entry.pendingInvalidate = false
+        setTimeout(() => this.invalidate(atom), 0)
+      }
+
+      throw entry.error
+    }
   }
 
   private async applyResolveExtensions<T>(
@@ -164,10 +278,10 @@ class ScopeImpl implements Lite.Scope {
     for (const [key, dep] of Object.entries(deps)) {
       if (isAtom(dep)) {
         result[key] = await this.resolve(dep)
-      } else if (isLazy(dep)) {
-        result[key] = new AccessorImpl(dep.atom, this)
+      } else if (isControllerDep(dep)) {
+        result[key] = new ControllerImpl(dep.atom, this)
       } else if (tagExecutorSymbol in (dep as object)) {
-        const tagExecutor = dep as unknown as Lite.TagExecutor<unknown, boolean>
+        const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 
         switch (tagExecutor.mode) {
           case "required":
@@ -186,16 +300,40 @@ class ScopeImpl implements Lite.Scope {
     return result
   }
 
-  accessor<T>(atom: Lite.Atom<T>): Lite.Accessor<T> {
-    return new AccessorImpl(atom, this)
+  controller<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
+    return new ControllerImpl(atom, this)
+  }
+
+  invalidate<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (!entry) return
+
+    if (entry.state === 'resolving') {
+      entry.pendingInvalidate = true
+      return
+    }
+
+    this.doInvalidate(atom, entry as AtomEntry<T>)
+  }
+
+  private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<void> {
+    for (let i = entry.cleanups.length - 1; i >= 0; i--) {
+      await entry.cleanups[i]!()
+    }
+    entry.cleanups = []
+    entry.state = 'idle'
+    entry.error = undefined
+    entry.pendingInvalidate = false
+
+    this.resolve(atom).catch(() => {})
   }
 
   async release<T>(atom: Lite.Atom<T>): Promise<void> {
-    const state = this.cache.get(atom)
-    if (!state) return
+    const entry = this.cache.get(atom)
+    if (!entry) return
 
-    for (let i = state.cleanups.length - 1; i >= 0; i--) {
-      await state.cleanups[i]!()
+    for (let i = entry.cleanups.length - 1; i >= 0; i--) {
+      await entry.cleanups[i]!()
     }
 
     this.cache.delete(atom)
@@ -210,7 +348,7 @@ class ScopeImpl implements Lite.Scope {
 
     const atoms = Array.from(this.cache.keys())
     for (const atom of atoms) {
-      await this.release(atom as unknown as Lite.Atom<unknown>)
+      await this.release(atom as Lite.Atom<unknown>)
     }
   }
 

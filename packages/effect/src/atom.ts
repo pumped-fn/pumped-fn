@@ -1,4 +1,4 @@
-import { atomSymbol, lazySymbol } from "./symbols"
+import { atomSymbol, controllerDepSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
 export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
@@ -28,7 +28,7 @@ export function atom<T>(config: {
 
 export function atom<
   T,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.Lazy<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
@@ -68,44 +68,49 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
 }
 
 /**
- * Wraps an Atom for deferred resolution, providing an accessor instead of the resolved value.
+ * Wraps an Atom to receive a Controller instead of the resolved value.
+ * The Controller provides full lifecycle control: get, resolve, release, invalidate, and subscribe.
  *
  * @param atom - The Atom to wrap
- * @returns A Lazy wrapper that resolves to an Accessor for the Atom
+ * @returns A ControllerDep that resolves to a Controller for the Atom
  *
  * @example
  * ```typescript
- * const lazyDb = lazy(dbAtom)
- * const myAtom = atom({
- *   deps: { db: lazyDb },
- *   factory: (ctx, { db }) => db.get()
+ * const configAtom = atom({ factory: () => fetchConfig() })
+ * const serverAtom = atom({
+ *   deps: { config: controller(configAtom) },
+ *   factory: (ctx, { config }) => {
+ *     const unsub = config.on(() => ctx.invalidate())
+ *     ctx.cleanup(unsub)
+ *     return createServer(config.get().port)
+ *   }
  * })
  * ```
  */
-export function lazy<T>(atom: Lite.Atom<T>): Lite.Lazy<T> {
+export function controller<T>(atom: Lite.Atom<T>): Lite.ControllerDep<T> {
   return {
-    [lazySymbol]: true,
+    [controllerDepSymbol]: true,
     atom,
   }
 }
 
 /**
- * Type guard to check if a value is a Lazy wrapper.
+ * Type guard to check if a value is a ControllerDep wrapper.
  *
  * @param value - The value to check
- * @returns True if the value is a Lazy wrapper, false otherwise
+ * @returns True if the value is a ControllerDep wrapper, false otherwise
  *
  * @example
  * ```typescript
- * if (isLazy(dep)) {
- *   const accessor = await scope.resolveDeps({ dep })
+ * if (isControllerDep(dep)) {
+ *   const ctrl = scope.controller(dep.atom)
  * }
  * ```
  */
-export function isLazy(value: unknown): value is Lite.Lazy<unknown> {
+export function isControllerDep(value: unknown): value is Lite.ControllerDep<unknown> {
   return (
     typeof value === "object" &&
     value !== null &&
-    (value as Record<symbol, unknown>)[lazySymbol] === true
+    (value as Record<symbol, unknown>)[controllerDepSymbol] === true
   )
 }

@@ -1,16 +1,16 @@
-export type { Lite } from "./types"
+export type { Lite, AtomState } from "./types"
 export {
   atomSymbol,
   flowSymbol,
   tagSymbol,
   taggedSymbol,
-  lazySymbol,
+  controllerDepSymbol,
   presetSymbol,
-  accessorSymbol,
+  controllerSymbol,
   tagExecutorSymbol,
 } from "./symbols"
 export { tag, tags, isTag, isTagged, isTagExecutor } from "./tag"
-export { atom, isAtom, lazy, isLazy } from "./atom"
+export { atom, isAtom, controller, isControllerDep } from "./atom"
 export { flow, isFlow } from "./flow"
 export { preset, isPreset } from "./preset"
 export { createScope } from "./scope"

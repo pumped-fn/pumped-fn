@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { atom, isAtom, lazy, isLazy } from "../src/atom"
+import { atom, isAtom, controller, isControllerDep } from "../src/atom"
 
 describe("Atom", () => {
   describe("atom()", () => {
@@ -25,13 +25,13 @@ describe("Atom", () => {
 
   })
 
-  describe("lazy()", () => {
-    it("wraps an atom as lazy", () => {
+  describe("controller()", () => {
+    it("wraps an atom as controller dep", () => {
       const myAtom = atom({ factory: () => 42 })
-      const lazyAtom = lazy(myAtom)
+      const ctrlDep = controller(myAtom)
 
-      expect(isLazy(lazyAtom)).toBe(true)
-      expect(lazyAtom.atom).toBe(myAtom)
+      expect(isControllerDep(ctrlDep)).toBe(true)
+      expect(ctrlDep.atom).toBe(myAtom)
     })
   })
 })
