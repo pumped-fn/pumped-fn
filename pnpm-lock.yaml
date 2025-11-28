@@ -124,7 +124,7 @@ importers:
         specifier: ^4.0.5
         version: 4.0.5(@types/debug@4.1.12)(@types/node@24.10.0)(jiti@2.6.1)(jsdom@26.1.0)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/effect:
+  packages/lite:
     devDependencies:
       tsdown:
         specifier: ^0.12.6
