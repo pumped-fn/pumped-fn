@@ -42,9 +42,9 @@
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/ws": "^8.5.13",
-    "tsdown": "^0.16.5",
+    "tsdown": "^0.16.8",
     "typescript": "^5.9.2",
-    "vitest": "^4.0.5"
+    "vitest": "^4.0.14"
   },
   "engines": {
     "node": ">=18"
