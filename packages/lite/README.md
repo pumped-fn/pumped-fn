@@ -15,27 +15,27 @@ An effect system manages **how** and **when** computations run, handling:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         Scope                               │
-│  (execution boundary with shared state)                     │
+│  (long-lived execution boundary)                            │
 │                                                             │
 │   ┌─────────┐      ┌─────────┐      ┌─────────┐            │
 │   │  Atom   │ ──── │  Atom   │ ──── │  Atom   │            │
 │   │ (effect)│      │ (effect)│      │ (effect)│            │
 │   └─────────┘      └─────────┘      └─────────┘            │
 │        │                                  │                 │
-│        └──────────┬───────────────────────┘                 │
-│                   ▼                                         │
-│            ┌─────────────┐                                  │
-│            │    Flow     │                                  │
-│            │ (operation) │                                  │
-│            └─────────────┘                                  │
+│        └──────────────┬───────────────────┘                 │
+│                       ▼                                     │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              ExecutionContext                       │   │
+│   │  (short-lived operation with input, tags, cleanup)  │   │
+│   └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 | Concept | Purpose |
 |---------|---------|
+| **Scope** | Long-lived boundary that manages atom lifecycles |
 | **Atom** | A managed effect with lifecycle (create, cache, cleanup, recreate) |
-| **Flow** | A short-lived operation that consumes atoms |
-| **Scope** | Execution boundary that manages atom lifecycles |
+| **ExecutionContext** | Short-lived context for running operations with input and tags |
 | **Controller** | Handle for observing and controlling an atom's state |
 | **Tag** | Contextual value passed through execution |
 
@@ -50,11 +50,11 @@ npm install @pumped-fn/lite
 ```typescript
 import { atom, flow, createScope } from '@pumped-fn/lite'
 
-// Define effects (atoms)
+// Define effects (atoms) - long-lived, cached
 const dbAtom = atom({
   factory: async (ctx) => {
     const conn = await createConnection()
-    ctx.cleanup(() => conn.close())  // cleanup when released
+    ctx.cleanup(() => conn.close())
     return conn
   }
 })
@@ -64,21 +64,28 @@ const repoAtom = atom({
   factory: (ctx, { db }) => new UserRepository(db)
 })
 
-// Define operation (flow)
-const getUserFlow = flow({
+// Define operation template
+const getUser = flow({
   deps: { repo: repoAtom },
   factory: async (ctx, { repo }) => {
     return repo.findById(ctx.input as string)
   }
 })
 
-// Execute
+// Create scope (long-lived boundary)
 const scope = await createScope()
-const user = await scope.createContext().exec({
-  flow: getUserFlow,
-  input: 'user-123'
-})
-await scope.dispose()  // runs all cleanups
+
+// Create ExecutionContext (short-lived, per-operation)
+const ctx = scope.createContext()
+
+// Execute - resolves atoms, runs operation, provides input
+const user = await ctx.exec({ flow: getUser, input: 'user-123' })
+
+// ExecutionContext cleanup (operation complete)
+await ctx.close()
+
+// Scope cleanup (application shutdown)
+await scope.dispose()
 ```
 
 ## Effect Lifecycle
@@ -187,11 +194,15 @@ const loggingAtom = atom({
   factory: (ctx, { requestId }) => new Logger(requestId)
 })
 
-// Pass tag at execution time
+// Pass tags when creating ExecutionContext or at exec time
+const ctx = scope.createContext({ tags: [requestIdTag('req-abc-123')] })
+await ctx.exec({ flow: myFlow, input: data })
+
+// Or per-execution
 await ctx.exec({
   flow: myFlow,
   input: data,
-  tags: [requestIdTag('req-abc-123')]
+  tags: [requestIdTag('req-xyz-456')]
 })
 ```
 
@@ -218,11 +229,14 @@ const scope = await createScope({ extensions: [timingExtension] })
 | Function | Description |
 |----------|-------------|
 | `createScope(options?)` | Create execution boundary |
-| `atom(config)` | Define managed effect |
-| `flow(config)` | Define operation |
+| `atom(config)` | Define managed effect (long-lived) |
+| `flow(config)` | Define operation template (used by ExecutionContext) |
 | `tag(config)` | Define contextual value |
 | `controller(atom)` | Wrap atom for deferred resolution |
 | `preset(atom, value)` | Override atom value in scope |
+| `scope.createContext(options?)` | Create ExecutionContext for operations |
+| `ctx.exec(options)` | Execute operation with input and tags |
+| `ctx.close()` | Cleanup ExecutionContext resources |
 
 ## Design Principles
 
