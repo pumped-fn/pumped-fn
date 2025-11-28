@@ -174,7 +174,7 @@ const myAtom: Lite.Atom<Config> = atom({ factory: () => loadConfig() })
 
 | Feature | @pumped-fn/lite | @pumped-fn/core-next |
 |---------|-----------------|---------------------|
-| Atoms/Executors | `atom()` | `make()`, `define()` |
+| Atoms/Executors | `atom()` | `provide()`, `derive()` |
 | Flows | `flow()` | `flow()` |
 | Tags | `tag()`, `tags.required/optional/all` | `tag()`, `tags.required/optional/all` |
 | Extensions | Simple 4-hook interface | Full lifecycle hooks |
