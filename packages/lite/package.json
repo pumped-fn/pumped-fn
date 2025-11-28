@@ -4,13 +4,13 @@
   "description": "Lightweight dependency injection with minimal reactivity",
   "type": "module",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
       },
       "require": {
         "types": "./dist/index.d.cts",
@@ -18,20 +18,43 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "typecheck:full": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "tsdown": "^0.12.6",
+    "tsdown": "^0.16.5",
     "typescript": "^5.9.3",
     "vitest": "^4.0.5"
   },
-  "peerDependencies": {},
-  "keywords": ["dependency-injection", "di", "lite", "reactivity", "typescript"],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "packages/lite",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
+  "keywords": [
+    "dependency-injection",
+    "di",
+    "lite",
+    "reactivity",
+    "typescript",
+    "ioc",
+    "inversion-of-control"
+  ],
   "license": "MIT"
 }
