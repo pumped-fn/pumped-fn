@@ -645,6 +645,49 @@ describe("ExecutionContext", () => {
       expect(resolveCount).toBe(2)
       expect(ctrl.get()).toBe(2)
     })
+
+    it("no-ops when invalidate called on idle atom", async () => {
+      const scope = await createScope()
+      let factoryCallCount = 0
+      const myAtom = atom({
+        factory: () => {
+          factoryCallCount++
+          return "value"
+        }
+      })
+
+      const ctrl = scope.controller(myAtom)
+      expect(ctrl.state).toBe('idle')
+
+      ctrl.invalidate()
+      expect(ctrl.state).toBe('idle')
+
+      await new Promise(r => setTimeout(r, 10))
+      expect(factoryCallCount).toBe(0)
+    })
+
+    it("transitions failed state to resolving on invalidate", async () => {
+      const scope = await createScope()
+      let shouldFail = true
+      const myAtom = atom({
+        factory: () => {
+          if (shouldFail) throw new Error("test error")
+          return "success"
+        }
+      })
+
+      const ctrl = scope.controller(myAtom)
+      await expect(ctrl.resolve()).rejects.toThrow("test error")
+      expect(ctrl.state).toBe('failed')
+
+      shouldFail = false
+      ctrl.invalidate()
+      expect(ctrl.state).toBe('resolving')
+
+      await new Promise(r => setTimeout(r, 10))
+      expect(ctrl.state).toBe('resolved')
+      expect(ctrl.get()).toBe("success")
+    })
   })
 
   describe("controller.on()", () => {

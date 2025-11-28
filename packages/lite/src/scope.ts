@@ -315,6 +315,8 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.cache.get(atom)
     if (!entry) return
 
+    if (entry.state === 'idle') return
+
     if (entry.state === 'resolving') {
       entry.pendingInvalidate = true
       return
