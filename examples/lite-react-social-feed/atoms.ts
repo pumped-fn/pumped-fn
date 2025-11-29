@@ -7,28 +7,40 @@
 
 import { atom, controller } from "@pumped-fn/lite"
 import type { Lite } from "@pumped-fn/lite"
-import { api } from "./api"
+import { api as defaultApi } from "./api"
 import type { User, Post, Notification } from "./types"
+
+/**
+ * API atom - wraps the API for testability
+ *
+ * In tests, use preset(apiAtom, mockApi) to inject a mock.
+ */
+export const apiAtom = atom({
+  factory: () => defaultApi,
+})
 
 /**
  * User atom - current authenticated user
  */
 export const userAtom: Lite.Atom<User> = atom({
-  factory: async () => api.fetchUser(),
+  deps: { api: apiAtom },
+  factory: async (ctx, { api }) => api.fetchUser(),
 })
 
 /**
  * Posts atom - feed posts
  */
 export const postsAtom: Lite.Atom<Post[]> = atom({
-  factory: async () => api.fetchPosts(),
+  deps: { api: apiAtom },
+  factory: async (ctx, { api }) => api.fetchPosts(),
 })
 
 /**
  * Notifications atom
  */
 export const notificationsAtom: Lite.Atom<Notification[]> = atom({
-  factory: async () => api.fetchNotifications(),
+  deps: { api: apiAtom },
+  factory: async (ctx, { api }) => api.fetchNotifications(),
 })
 
 /**
@@ -44,12 +56,13 @@ export const notificationsAtom: Lite.Atom<Notification[]> = atom({
  */
 export const feedControllerAtom = atom({
   deps: {
+    api: apiAtom,
     user: controller(userAtom),
     posts: controller(postsAtom),
     notifications: controller(notificationsAtom),
   },
 
-  factory: (ctx, { user, posts, notifications }) => {
+  factory: (ctx, { api, user, posts, notifications }) => {
     const optimistic = new Map<string, Partial<Post>>()
     const listeners = new Set<() => void>()
 
