@@ -349,7 +349,8 @@ const equals = {
 interface MachineConfig<
   TAtoms extends Record<string, Lite.Atom<unknown>>,
   TEvents extends Record<string, unknown>,
-  TState extends string = string
+  TState extends string = string,
+  TMutations extends Record<string, unknown> = Record<string, unknown>
 > {
   atoms: TAtoms
 
@@ -401,8 +402,8 @@ interface Machine<TAtoms, TEvents, TState> {
   dispose(): Promise<void>
 }
 
-async function createMachine<TAtoms, TEvents, TState>(
-  config: MachineConfig<TAtoms, TEvents, TState>,
+async function createMachine<TAtoms, TEvents, TState, TMutations = Record<string, unknown>>(
+  config: MachineConfig<TAtoms, TEvents, TState, TMutations>,
   options?: { scope?: Lite.Scope }
 ): Promise<Machine<TAtoms, TEvents, TState>>
 ```
