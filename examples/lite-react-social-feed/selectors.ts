@@ -1,23 +1,67 @@
 /**
- * Selectors for granular state subscriptions
+ * Selectors - Granular subscriptions to atom slices
  *
- * Selectors derive "slices" from atoms. Components using a selector
- * only re-render when the specific slice changes, not when unrelated
- * parts of the atom change.
- *
- * Example: Avatar component uses userAvatarSelector
- *          → Only re-renders when avatar changes
- *          → Does NOT re-render when user.stats.followers changes
+ * Selectors let components subscribe to specific parts of an atom.
+ * When only the slice changes, only subscribed components re-render.
  */
 
-import { selector, equals } from "@pumped-fn/lite-react"
+import type { Lite } from "@pumped-fn/lite"
 import { userAtom, postsAtom, notificationsAtom } from "./atoms"
-import type { User, Post, Notification } from "./types"
+import type { User, Post } from "./types"
 
 /**
- * User profile selectors
- *
- * Break down the user object into specific slices that components need.
+ * Selector type definition
+ */
+export interface Selector<TSource, TSlice> {
+  source: Lite.Atom<TSource>
+  select: (source: TSource) => TSlice
+  equals: (a: TSlice, b: TSlice) => boolean
+}
+
+/**
+ * Create a selector
+ */
+export function selector<TSource, TSlice>(config: {
+  source: Lite.Atom<TSource>
+  select: (source: TSource) => TSlice
+  equals?: (a: TSlice, b: TSlice) => boolean
+}): Selector<TSource, TSlice> {
+  return {
+    source: config.source,
+    select: config.select,
+    equals: config.equals ?? Object.is,
+  }
+}
+
+/**
+ * Equality helpers
+ */
+export const equals = {
+  strict: Object.is,
+
+  shallow: <T>(a: T, b: T): boolean => {
+    if (a === b) return true
+    if (!a || !b) return false
+    if (typeof a !== "object" || typeof b !== "object") return false
+
+    const keysA = Object.keys(a)
+    const keysB = Object.keys(b)
+    if (keysA.length !== keysB.length) return false
+
+    return keysA.every(
+      (key) => (a as Record<string, unknown>)[key] === (b as Record<string, unknown>)[key]
+    )
+  },
+
+  shallowArray: <T>(a: T[], b: T[]): boolean => {
+    if (a === b) return true
+    if (a.length !== b.length) return false
+    return a.every((item, i) => item === b[i])
+  },
+}
+
+/**
+ * User selectors
  */
 export const userNameSelector = selector({
   source: userAtom,
@@ -29,32 +73,43 @@ export const userAvatarSelector = selector({
   select: (user): string | null => user?.avatar ?? null,
 })
 
-export const userBioSelector = selector({
-  source: userAtom,
-  select: (user): string | null => user?.bio ?? null,
-})
-
 export const userStatsSelector = selector({
   source: userAtom,
   select: (user): User["stats"] | null => user?.stats ?? null,
   equals: equals.shallow,
 })
 
-export const userSettingsSelector = selector({
-  source: userAtom,
-  select: (user): User["settings"] | null => user?.settings ?? null,
-  equals: equals.shallow,
-})
-
-export const themeSelector = selector({
-  source: userAtom,
-  select: (user): "light" | "dark" => user?.settings.theme ?? "light",
-})
-
 export const isAuthenticatedSelector = selector({
   source: userAtom,
   select: (user): boolean => user !== null,
 })
+
+/**
+ * Posts selectors
+ */
+export const postIdsSelector = selector({
+  source: postsAtom,
+  select: (posts): string[] => posts.map((p) => p.id),
+  equals: equals.shallowArray,
+})
+
+export const postCountSelector = selector({
+  source: postsAtom,
+  select: (posts): number => posts.length,
+})
+
+/**
+ * Single post selector factory
+ *
+ * Usage: const post = useSelector(useMemo(() => postSelector(id), [id]))
+ */
+export function postSelector(postId: string): Selector<Post[], Post | undefined> {
+  return selector({
+    source: postsAtom,
+    select: (posts) => posts.find((p) => p.id === postId),
+    equals: equals.shallow,
+  })
+}
 
 /**
  * Notification selectors
@@ -68,95 +123,3 @@ export const hasUnreadSelector = selector({
   source: notificationsAtom,
   select: (notifications): boolean => notifications.some((n) => !n.read),
 })
-
-export const unreadNotificationsSelector = selector({
-  source: notificationsAtom,
-  select: (notifications): Notification[] => notifications.filter((n) => !n.read),
-  equals: equals.shallow,
-})
-
-/**
- * Posts selectors
- */
-export const postCountSelector = selector({
-  source: postsAtom,
-  select: (posts): number => posts.length,
-})
-
-export const likedPostsSelector = selector({
-  source: postsAtom,
-  select: (posts): Post[] => posts.filter((p) => p.liked),
-  equals: equals.shallow,
-})
-
-export const topPostsSelector = selector({
-  source: postsAtom,
-  select: (posts): Post[] =>
-    [...posts].sort((a, b) => b.likeCount - a.likeCount).slice(0, 5),
-  equals: equals.shallow,
-})
-
-/**
- * Multi-source selector
- *
- * Combines data from multiple atoms into a single derived value.
- * Only re-renders when the combined result changes.
- */
-export const dashboardStatsSelector = selector({
-  sources: { user: userAtom, posts: postsAtom, notifications: notificationsAtom },
-  select: ({ user, posts, notifications }): DashboardStats => ({
-    userName: user?.name ?? "Guest",
-    totalPosts: posts.length,
-    likedPosts: posts.filter((p) => p.liked).length,
-    unreadNotifications: notifications.filter((n) => !n.read).length,
-  }),
-  equals: equals.shallow,
-})
-
-export interface DashboardStats {
-  userName: string
-  totalPosts: number
-  likedPosts: number
-  unreadNotifications: number
-}
-
-/**
- * Parameterized selector factory
- *
- * For selecting a specific post by ID.
- * Returns a selector that can be used with useSelector.
- */
-export const createPostSelector = (postId: string) =>
-  selector({
-    source: postsAtom,
-    select: (posts): Post | undefined => posts.find((p) => p.id === postId),
-    equals: equals.shallow,
-  })
-
-/**
- * Selector with custom equality
- *
- * Uses deep equality for complex nested objects.
- */
-export const fullUserProfileSelector = selector({
-  source: userAtom,
-  select: (user): UserProfile | null => {
-    if (!user) return null
-    return {
-      id: user.id,
-      name: user.name,
-      avatar: user.avatar,
-      bio: user.bio,
-      stats: user.stats,
-    }
-  },
-  equals: equals.deep,
-})
-
-export interface UserProfile {
-  id: string
-  name: string
-  avatar: string
-  bio: string
-  stats: User["stats"]
-}

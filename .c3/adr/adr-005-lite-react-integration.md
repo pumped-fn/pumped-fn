@@ -1,10 +1,10 @@
 ---
 id: ADR-005-lite-react-integration
-title: React Integration for @pumped-fn/lite with Centralized Machine Pattern
+title: React Integration for @pumped-fn/lite with Composite Controller Pattern
 summary: >
-  Design a React binding for @pumped-fn/lite that uses a centralized machine pattern
-  for state orchestration, with support for selectors (slices), optimistic updates,
-  and explicit transition states.
+  Design a React binding for @pumped-fn/lite using a composite controller pattern
+  for orchestrated mutations, selectors for granular subscriptions, and optimized
+  list rendering through ID-based item subscriptions.
 status: proposed
 date: 2025-11-29
 ---
@@ -16,130 +16,20 @@ date: 2025-11-29
 
 ## Problem/Requirement {#adr-005-problem}
 
-`@pumped-fn/lite` provides lightweight DI with Controller-based reactivity (ADR-003), making it suitable for frontend state management. However, direct integration with React requires addressing several frontend-specific concerns:
+`@pumped-fn/lite` provides lightweight DI with Controller-based reactivity (ADR-003). To use it effectively with React, we need:
 
-### Core Requirements
+1. **Efficient subscriptions** - Components should only re-render when their data changes
+2. **Granular slices** - Subscribe to parts of an atom, not the whole thing
+3. **List optimization** - Changing one item shouldn't re-render the entire list
+4. **Orchestrated mutations** - Control load order and coordinate invalidations
+5. **Optimistic updates** - Immediate UI feedback with rollback on failure
 
-1. **React Integration**
-   - Connect atoms to React's rendering lifecycle
-   - Support Concurrent React features (Suspense, transitions)
-   - Efficient re-rendering (only affected components)
+### Design Principles
 
-2. **Slices (Granular Subscriptions)**
-   - Components often need only a portion of an atom's state
-   - Changing unrelated fields shouldn't trigger re-renders
-   - Example: Avatar component only needs `user.profile.avatar`, not entire user object
-
-3. **Optimistic Updates**
-   - Show immediate feedback before server confirmation
-   - Automatic rollback on failure
-   - Support multiple concurrent mutations
-
-4. **Transition States**
-   - Beyond simple loading/error states
-   - Explicit state machines for complex flows (forms, wizards, multi-step processes)
-   - Predictable state transitions
-
-### Architectural Decision Point
-
-Two patterns emerged during exploration:
-
-**Pattern A: Decentralized (Controller-per-atom)**
-```
-atomA.invalidate() → atomB.on() → atomB.invalidate() → atomC.on() → ...
-```
-- Each atom manages its own reactivity
-- Downstream subscribes to upstream via `controller.on()`
-- Emergent behavior from composition
-
-**Pattern B: Centralized (Machine orchestrator)**
-```
-machine.send('EVENT') → machine decides which atoms to invalidate
-```
-- Single source of truth for state transitions
-- Explicit event-to-invalidation mapping
-- Predictable, debuggable flows
-
-This ADR proposes **Pattern B** for complex frontend state, while preserving Pattern A for simple cases.
-
-## Exploration Journey {#adr-005-exploration}
-
-### Phase 1: Direct Controller → React Mapping
-
-**Initial hypothesis:** Map Controller directly to `useSyncExternalStore`.
-
-```typescript
-function useAtom<T>(atom: Atom<T>): T {
-  const ctrl = scope.controller(atom)
-  return useSyncExternalStore(ctrl.on, ctrl.get)
-}
-```
-
-**Result:** Works for simple cases. Controller's `on()` and `get()` align perfectly with `useSyncExternalStore`'s subscribe/getSnapshot pattern.
-
-**Problem discovered:** For complex state flows, reactivity is scattered across atoms. Debugging requires tracing through multiple `controller.on()` subscriptions.
-
-### Phase 2: Centralized Machine Pattern
-
-**Insight:** Frontend state often follows explicit event-driven patterns:
-- User actions trigger state changes
-- Multiple atoms may need coordinated updates
-- The "what happens when" should be in one place
-
-**Solution:** Introduce a `machine()` that wraps atoms and defines event handlers.
-
-```typescript
-const appMachine = machine({
-  atoms: { user, posts, notifications },
-  on: {
-    LOGIN: (ctx) => ctx.invalidate(ctx.atoms.user),
-    LOGOUT: (ctx) => ctx.invalidateAll(),
-    REFRESH: (ctx) => ctx.invalidate(ctx.atoms.posts)
-  }
-})
-```
-
-### Phase 3: Slices/Selectors
-
-**Problem:** Component subscribes to `userAtom` but only uses `user.name`. When `user.avatar` changes, component re-renders unnecessarily.
-
-**Explored solutions:**
-
-1. **Split into multiple atoms:** `userNameAtom`, `userAvatarAtom`, etc.
-   - Rejected: Explosion of atoms, loses cohesion
-
-2. **Selector with memoization:** Derive slice, compare with previous
-   - Selected: Natural, composable, familiar pattern (Redux selectors, Recoil selectors)
-
-**Implementation insight:** Selector wraps atom subscription, compares slice values, only triggers React update when slice changes.
-
-### Phase 4: Optimistic Updates
-
-**Problem:** User clicks "Like" → wait for server → show result. Poor UX.
-
-**Desired flow:**
-1. Apply optimistic change immediately
-2. Send request to server
-3. On success: keep or refresh from server
-4. On failure: rollback to previous state
-
-**Key insight:** Two-layer state model:
-- **Server layer:** Atom values (source of truth)
-- **Optimistic layer:** Pending mutations (temporary overlay)
-- **Computed view:** Merge of both layers (what components see)
-
-**Design decision:** Optimistic updates are scoped to mutations, not general atom writes. This preserves type safety (factory return type is the only value source).
-
-### Phase 5: Transition States
-
-**Problem:** Atom states (idle/resolving/resolved/failed) don't capture all UI states.
-
-**Examples:**
-- Form: `idle → validating → submitting → success/error`
-- Delete: `idle → confirming → deleting → deleted`
-- Upload: `idle → selecting → uploading(50%) → done`
-
-**Solution:** Machine has its own state, separate from atom states. This enables XState-like patterns without XState dependency.
+1. **Minimal API** - Few hooks, leverage existing lite primitives
+2. **Read/Write separation** - Direct atom reads, orchestrated writes
+3. **No new concepts** - Build on atoms, controllers, selectors
+4. **Composition over configuration** - Controller pattern, not state machines
 
 ## Solution {#adr-005-solution}
 
@@ -147,149 +37,76 @@ const appMachine = machine({
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     @pumped-fn/lite-react Architecture                  │
+│                    Composite Controller Pattern                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐ │
-│  │                         Machine                                   │ │
-│  │  ┌─────────────────────────────────────────────────────────────┐ │ │
-│  │  │  State: 'authenticated' | 'anonymous' | ...                 │ │ │
-│  │  │  Events: { LOGIN, LOGOUT, REFRESH, LIKE, ... }              │ │ │
-│  │  └─────────────────────────────────────────────────────────────┘ │ │
-│  │                              │                                    │ │
-│  │              ┌───────────────┼───────────────┐                   │ │
-│  │              ▼               ▼               ▼                   │ │
-│  │  ┌─────────────────────────────────────────────────────────────┐ │ │
-│  │  │                 Atoms (Server Truth)                        │ │ │
-│  │  │   userAtom        postsAtom        notificationsAtom        │ │ │
-│  │  └─────────────────────────────────────────────────────────────┘ │ │
-│  │              │               │               │                   │ │
-│  │              └───────────────┼───────────────┘                   │ │
-│  │                              ▼                                    │ │
-│  │  ┌─────────────────────────────────────────────────────────────┐ │ │
-│  │  │              Optimistic Layer                               │ │ │
-│  │  │   Map<MutationId, { atom, previous, optimistic }>           │ │ │
-│  │  └─────────────────────────────────────────────────────────────┘ │ │
-│  │                              │                                    │ │
-│  │                              ▼                                    │ │
-│  │  ┌─────────────────────────────────────────────────────────────┐ │ │
-│  │  │              Selectors (Slices)                             │ │ │
-│  │  │   avatarSelector     themeSelector     unreadCountSelector  │ │ │
-│  │  └─────────────────────────────────────────────────────────────┘ │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
-│                                    │                                    │
-│                                    ▼                                    │
-│  ┌───────────────────────────────────────────────────────────────────┐ │
-│  │                       React Components                            │ │
-│  │                                                                   │ │
-│  │   useAtom(atom)              → full atom value                    │ │
-│  │   useSelector(selector)      → sliced value (optimized)           │ │
-│  │   useMachineState()          → machine state + send               │ │
-│  │   useMutation(name)          → optimistic mutation                │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
+│                     ┌─────────────────────────┐                         │
+│                     │   Composite Controller  │                         │
+│                     │   (atom that returns    │                         │
+│                     │    orchestration API)   │                         │
+│                     └───────────┬─────────────┘                         │
+│                                 │                                       │
+│                    deps: { posts: controller(postsAtom), ... }          │
+│                                 │                                       │
+│              ┌──────────────────┼──────────────────┐                    │
+│              ▼                  ▼                  ▼                    │
+│         ┌─────────┐       ┌──────────┐      ┌──────────────┐           │
+│         │  users  │       │  posts   │      │ notifications│           │
+│         │  Atom   │       │   Atom   │      │     Atom     │           │
+│         └─────────┘       └──────────┘      └──────────────┘           │
+│              │                  │                  │                    │
+│              │                  │                  │                    │
+│              ▼                  ▼                  ▼                    │
+│         ┌─────────┐       ┌──────────┐      ┌──────────────┐           │
+│         │ Slices  │       │  Slices  │      │    Slices    │           │
+│         │ name,   │       │ postIds, │      │ unreadCount  │           │
+│         │ avatar  │       │ post(id) │      │              │           │
+│         └─────────┘       └──────────┘      └──────────────┘           │
+│                                                                         │
+│   READ PATH:  useAtom(atom) / useSelector(slice) - direct, granular    │
+│   WRITE PATH: useAtom(controllerAtom).method() - orchestrated          │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1. Core React Bindings
-
-#### Provider
-
-```typescript
-interface LiteProviderProps {
-  scope: Lite.Scope
-  children: React.ReactNode
-}
-
-function LiteProvider({ scope, children }: LiteProviderProps): JSX.Element
-```
-
-Injects scope into React context. All hooks consume this context.
-
-#### useScope
-
-```typescript
-function useScope(): Lite.Scope
-```
-
-Access the scope directly for advanced use cases.
+### 1. Core Hooks
 
 #### useAtom
+
+Subscribe to an atom's value. Re-renders when atom changes.
 
 ```typescript
 function useAtom<T>(atom: Lite.Atom<T>): T
 ```
 
-Subscribe to atom value. Uses `useSyncExternalStore` internally.
-
 **Implementation:**
 ```typescript
 function useAtom<T>(atom: Lite.Atom<T>): T {
   const scope = useScope()
-  const controllerRef = useRef<Lite.Controller<T>>()
+  const ctrlRef = useRef<Lite.Controller<T>>()
 
-  if (!controllerRef.current) {
-    controllerRef.current = scope.controller(atom)
+  if (!ctrlRef.current) {
+    ctrlRef.current = scope.controller(atom)
   }
 
-  const ctrl = controllerRef.current
-
   return useSyncExternalStore(
-    useCallback((onStoreChange) => ctrl.on(onStoreChange), [ctrl]),
-    useCallback(() => ctrl.get(), [ctrl]),
-    useCallback(() => ctrl.get(), [ctrl])
+    useCallback(cb => ctrlRef.current!.on(cb), []),
+    useCallback(() => ctrlRef.current!.get(), [])
   )
 }
 ```
 
-#### useController
+#### useSelector
+
+Subscribe to a derived slice. Re-renders only when slice changes.
 
 ```typescript
-function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
-```
-
-Get controller for manual control (invalidation, state inspection).
-
-### 2. Selectors (Slices)
-
-#### selector factory
-
-```typescript
-interface SelectorConfig<TSource, TSlice> {
+interface Selector<TSource, TSlice> {
   source: Lite.Atom<TSource>
   select: (source: TSource) => TSlice
-  equals?: (prev: TSlice, next: TSlice) => boolean
+  equals?: (a: TSlice, b: TSlice) => boolean
 }
 
-interface Selector<TSource, TSlice> {
-  readonly [selectorSymbol]: true
-  readonly source: Lite.Atom<TSource>
-  readonly select: (source: TSource) => TSlice
-  readonly equals: (prev: TSlice, next: TSlice) => boolean
-}
-
-function selector<TSource, TSlice>(
-  config: SelectorConfig<TSource, TSlice>
-): Selector<TSource, TSlice>
-```
-
-#### Multi-source selector
-
-```typescript
-interface MultiSelectorConfig<TSources, TSlice> {
-  sources: { [K in keyof TSources]: Lite.Atom<TSources[K]> }
-  select: (sources: TSources) => TSlice
-  equals?: (prev: TSlice, next: TSlice) => boolean
-}
-
-function selector<TSources extends Record<string, unknown>, TSlice>(
-  config: MultiSelectorConfig<TSources, TSlice>
-): Selector<TSources, TSlice>
-```
-
-#### useSelector hook
-
-```typescript
 function useSelector<TSource, TSlice>(
   selector: Selector<TSource, TSlice>
 ): TSlice
@@ -302,556 +119,346 @@ function useSelector<TSource, TSlice>(
 ): TSlice {
   const scope = useScope()
   const ctrl = scope.controller(selector.source)
-  const selectFn = selector.select
-  const equalsFn = selector.equals
-
-  const sliceRef = useRef<TSlice | undefined>(undefined)
-  const initializedRef = useRef(false)
+  const sliceRef = useRef<TSlice>()
+  const equalsFn = selector.equals ?? Object.is
 
   const getSnapshot = useCallback(() => {
-    const fullValue = ctrl.get()
-    const nextSlice = selectFn(fullValue)
+    const source = ctrl.get()
+    const nextSlice = selector.select(source)
 
-    if (initializedRef.current && sliceRef.current !== undefined) {
-      if (equalsFn(sliceRef.current, nextSlice)) {
-        return sliceRef.current
-      }
+    if (sliceRef.current !== undefined &&
+        equalsFn(sliceRef.current, nextSlice)) {
+      return sliceRef.current
     }
 
-    initializedRef.current = true
     sliceRef.current = nextSlice
     return nextSlice
-  }, [ctrl, selectFn, equalsFn])
+  }, [ctrl, selector.select, equalsFn])
 
   return useSyncExternalStore(
-    useCallback((onStoreChange) => ctrl.on(onStoreChange), [ctrl]),
-    getSnapshot,
+    useCallback(cb => ctrl.on(cb), [ctrl]),
     getSnapshot
   )
 }
 ```
 
-#### Equality functions
+#### useController
 
+Get raw controller for advanced use cases.
+
+```typescript
+function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
+```
+
+### 2. Selector Factory
+
+```typescript
+function selector<TSource, TSlice>(config: {
+  source: Lite.Atom<TSource>
+  select: (source: TSource) => TSlice
+  equals?: (a: TSlice, b: TSlice) => boolean
+}): Selector<TSource, TSlice>
+```
+
+**Equality helpers:**
 ```typescript
 const equals = {
-  shallow: <T>(a: T, b: T) => shallowEqual(a, b),
-  deep: <T>(a: T, b: T) => deepEqual(a, b),
-  strict: <T>(a: T, b: T) => Object.is(a, b)
+  strict: Object.is,
+  shallow: shallowEqual,
+  shallowArray: (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
 }
 ```
 
-### 3. Machine Pattern
+### 3. Composite Controller Pattern
 
-#### machine factory
+The composite controller is an atom that depends on other atoms' controllers and returns an orchestration API.
 
 ```typescript
-interface MachineConfig<
-  TAtoms extends Record<string, Lite.Atom<unknown>>,
-  TEvents extends Record<string, unknown>,
-  TState extends string = string
-> {
-  atoms: TAtoms
+const feedControllerAtom = atom({
+  deps: {
+    user: controller(userAtom),
+    posts: controller(postsAtom),
+    notifications: controller(notificationsAtom),
+  },
 
-  on?: {
-    [E in keyof TEvents]?: (
-      ctx: MachineEventContext<TAtoms>,
-      payload: TEvents[E]
-    ) => void | Promise<void>
-  }
+  factory: (ctx, { user, posts, notifications }) => ({
+    /**
+     * Initialize with controlled load order
+     */
+    async initialize() {
+      await user.resolve()
+      await Promise.all([
+        posts.resolve(),
+        notifications.resolve()
+      ])
+    },
 
-  initial?: TState
+    /**
+     * Refresh specific data
+     */
+    refresh() {
+      posts.invalidate()
+      notifications.invalidate()
+    },
 
-  states?: {
-    [S in TState]?: {
-      entry?: (ctx: MachineStateContext<TAtoms>) => void | Promise<void>
-      exit?: (ctx: MachineStateContext<TAtoms>) => void | Promise<void>
-      on?: {
-        [E in keyof TEvents]?: TState | {
-          target?: TState
-          guard?: (ctx: MachineEventContext<TAtoms>, payload: TEvents[E]) => boolean
-          action?: (ctx: MachineEventContext<TAtoms>, payload: TEvents[E]) => void
-        }
-      }
+    /**
+     * Orchestrated mutation
+     */
+    async likePost(postId: string) {
+      await api.likePost(postId)
+      posts.invalidate()
+    },
+
+    /**
+     * Cascading invalidation
+     */
+    async logout() {
+      await api.logout()
+      user.invalidate()
+      posts.invalidate()
+      notifications.invalidate()
     }
-  }
-
-  mutations?: {
-    [M in keyof TMutations]?: Mutation<TAtoms, TMutations[M]>
-  }
-}
-
-interface Machine<TAtoms, TEvents, TState> {
-  readonly scope: Lite.Scope
-  readonly atoms: TAtoms
-  readonly state: TState
-
-  send<E extends keyof TEvents>(event: E, payload?: TEvents[E]): void
-
-  controller<K extends keyof TAtoms>(
-    key: K
-  ): Lite.Controller<TAtoms[K] extends Lite.Atom<infer T> ? T : never>
-
-  on(listener: () => void): () => void
-
-  matches(state: TState): boolean
-
-  can<E extends keyof TEvents>(event: E): boolean
-
-  dispose(): Promise<void>
-}
-
-async function createMachine<TAtoms, TEvents, TState>(
-  config: MachineConfig<TAtoms, TEvents, TState>,
-  options?: { scope?: Lite.Scope }
-): Promise<Machine<TAtoms, TEvents, TState>>
+  })
+})
 ```
 
-#### MachineEventContext
+### 4. List Rendering Optimization
 
-```typescript
-interface MachineEventContext<TAtoms> {
-  readonly atoms: TAtoms
-  readonly scope: Lite.Scope
-  readonly payload: unknown
+The key insight: split list subscription into **IDs** and **items**.
 
-  invalidate<K extends keyof TAtoms>(...keys: K[]): void
-
-  invalidateAll(): void
-
-  invalidateWithDependents<K extends keyof TAtoms>(key: K): void
-
-  send(event: string, payload?: unknown): void
-}
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    List Optimization Pattern                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   BEFORE (naive): Every change re-renders all items                     │
+│                                                                         │
+│   postsAtom ──► PostList ──┬──► PostItem(post1) ◄── re-renders         │
+│     (all)                  ├──► PostItem(post2) ◄── re-renders         │
+│                            └──► PostItem(post3) ◄── re-renders         │
+│                                                                         │
+│   ─────────────────────────────────────────────────────────────────     │
+│                                                                         │
+│   AFTER (optimized): Only changed item re-renders                       │
+│                                                                         │
+│   postIdsSelector ──► PostList ──┬──► <PostItem id="1" />              │
+│   (IDs only)                     ├──► <PostItem id="2" />              │
+│                                  └──► <PostItem id="3" />              │
+│                                              │                         │
+│   postSelector(id) ──────────────────► PostItem                        │
+│   (single post)                        (own subscription)              │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### MachineStateContext
-
+**Selectors:**
 ```typescript
-interface MachineStateContext<TAtoms> {
-  readonly atoms: TAtoms
-  readonly scope: Lite.Scope
-  readonly previousState: string | undefined
-  readonly currentState: string
+const postIdsSelector = selector({
+  source: postsAtom,
+  select: posts => posts.map(p => p.id),
+  equals: equals.shallowArray
+})
 
-  invalidate<K extends keyof TAtoms>(...keys: K[]): void
-
-  send(event: string, payload?: unknown): void
+function postSelector(postId: string) {
+  return selector({
+    source: postsAtom,
+    select: posts => posts.find(p => p.id === postId),
+    equals: equals.shallow
+  })
 }
 ```
 
-#### React hooks for Machine
-
-```typescript
-interface MachineProviderProps<TAtoms, TEvents, TState> {
-  machine: Machine<TAtoms, TEvents, TState>
-  children: React.ReactNode
+**Components:**
+```tsx
+function PostList() {
+  const postIds = useSelector(postIdsSelector)
+  return (
+    <div>
+      {postIds.map(id => <PostItem key={id} postId={id} />)}
+    </div>
+  )
 }
 
-function MachineProvider<TAtoms, TEvents, TState>(
-  props: MachineProviderProps<TAtoms, TEvents, TState>
-): JSX.Element
+function PostItem({ postId }: { postId: string }) {
+  const post = useSelector(useMemo(() => postSelector(postId), [postId]))
+  const ctrl = useAtom(feedControllerAtom)
 
-function useMachine<TAtoms, TEvents, TState>(): Machine<TAtoms, TEvents, TState>
+  if (!post) return null
 
-function useMachineState<TState extends string>(): {
-  state: TState
-  matches: (state: TState) => boolean
-  can: (event: string) => boolean
-}
-
-function useSend<TEvents>(): <E extends keyof TEvents>(
-  event: E,
-  payload?: TEvents[E]
-) => void
-
-function useMachineAtom<T>(key: string): T
-```
-
-### 4. Optimistic Updates
-
-#### Mutation definition
-
-```typescript
-interface MutationConfig<TAtoms, TPayload, TResult = void> {
-  optimistic?: <K extends keyof TAtoms>(
-    current: TAtoms[K] extends Lite.Atom<infer T> ? T : never,
-    payload: TPayload,
-    atomKey: K
-  ) => TAtoms[K] extends Lite.Atom<infer T> ? T : never
-
-  mutate: (
-    ctx: MutationContext<TAtoms>,
-    payload: TPayload
-  ) => Promise<TResult>
-
-  onSuccess?: (
-    ctx: MutationContext<TAtoms>,
-    result: TResult,
-    payload: TPayload
-  ) => void
-
-  onError?: (
-    ctx: MutationContext<TAtoms>,
-    error: Error,
-    payload: TPayload
-  ) => void
-
-  invalidates?: (keyof TAtoms)[]
-
-  retry?: number | {
-    count: number
-    delay: number | ((attempt: number) => number)
-  }
-}
-
-interface Mutation<TAtoms, TPayload, TResult = void> {
-  readonly [mutationSymbol]: true
-  readonly config: MutationConfig<TAtoms, TPayload, TResult>
-}
-
-function mutation<TAtoms, TPayload, TResult = void>(
-  config: MutationConfig<TAtoms, TPayload, TResult>
-): Mutation<TAtoms, TPayload, TResult>
-```
-
-#### MutationContext
-
-```typescript
-interface MutationContext<TAtoms> {
-  readonly atoms: TAtoms
-  readonly scope: Lite.Scope
-  readonly mutationId: string
-
-  invalidate<K extends keyof TAtoms>(...keys: K[]): void
-
-  get<K extends keyof TAtoms>(
-    key: K
-  ): TAtoms[K] extends Lite.Atom<infer T> ? T : never
-}
-```
-
-#### useMutation hook
-
-```typescript
-interface MutationResult<TPayload> {
-  mutate: (payload: TPayload) => Promise<void>
-
-  mutateAsync: (payload: TPayload) => Promise<void>
-
-  readonly isPending: boolean
-
-  readonly isOptimistic: boolean
-
-  readonly error: Error | undefined
-
-  reset: () => void
-}
-
-function useMutation<TPayload>(
-  mutationName: string
-): MutationResult<TPayload>
-```
-
-#### Optimistic state implementation
-
-```typescript
-interface OptimisticEntry<T> {
-  readonly mutationId: string
-  readonly atom: Lite.Atom<T>
-  readonly previous: T
-  readonly optimistic: T
-  readonly timestamp: number
-}
-
-class OptimisticStore {
-  private entries = new Map<string, OptimisticEntry<unknown>>()
-  private listeners = new Set<() => void>()
-
-  apply<T>(mutationId: string, atom: Lite.Atom<T>, previous: T, optimistic: T): void
-
-  rollback(mutationId: string): void
-
-  commit(mutationId: string): void
-
-  getForAtom<T>(atom: Lite.Atom<T>): OptimisticEntry<T>[]
-
-  computeValue<T>(atom: Lite.Atom<T>, serverValue: T): T
-
-  on(listener: () => void): () => void
-}
-```
-
-#### Optimistic merge algorithm
-
-```typescript
-function computeOptimisticValue<T>(
-  serverValue: T,
-  entries: OptimisticEntry<T>[]
-): T {
-  if (entries.length === 0) {
-    return serverValue
-  }
-
-  const sortedEntries = entries.sort((a, b) => a.timestamp - b.timestamp)
-
-  return sortedEntries.reduce(
-    (value, entry) => entry.optimistic,
-    serverValue
+  return (
+    <article>
+      <p>{post.content}</p>
+      <button onClick={() => ctrl.likePost(postId)}>
+        {post.liked ? '♥' : '♡'} {post.likeCount}
+      </button>
+    </article>
   )
 }
 ```
 
-### 5. Transition States
+### 5. Optimistic Updates
 
-#### State machine within Machine
-
-The `states` configuration in `machine()` enables explicit state transitions:
+Optimistic updates are handled inside the composite controller using an overlay layer.
 
 ```typescript
-const formMachine = machine({
-  atoms: { form: formAtom, errors: errorsAtom },
+const feedControllerAtom = atom({
+  deps: {
+    posts: controller(postsAtom),
+  },
 
-  initial: 'idle',
+  factory: (ctx, { posts }) => {
+    const optimistic = new Map<string, Partial<Post>>()
+    const listeners = new Set<() => void>()
 
-  states: {
-    idle: {
-      on: {
-        SUBMIT: 'validating',
-        CHANGE: { action: (ctx) => ctx.invalidate('form') }
-      }
-    },
+    const notify = () => listeners.forEach(fn => fn())
 
-    validating: {
-      entry: async (ctx) => {
-        const errors = await validate(ctx.scope.resolve(ctx.atoms.form))
-        if (errors.length > 0) {
-          ctx.send('VALIDATION_FAILED', { errors })
-        } else {
-          ctx.send('VALIDATION_PASSED')
+    return {
+      /**
+       * Get post with optimistic overlay
+       */
+      getPost(id: string): Post | undefined {
+        const serverPost = posts.get().find(p => p.id === id)
+        if (!serverPost) return undefined
+
+        const overlay = optimistic.get(id)
+        return overlay ? { ...serverPost, ...overlay } : serverPost
+      },
+
+      /**
+       * Get all posts with optimistic overlay
+       */
+      getPosts(): Post[] {
+        return posts.get().map(post => {
+          const overlay = optimistic.get(post.id)
+          return overlay ? { ...post, ...overlay } : post
+        })
+      },
+
+      /**
+       * Subscribe to controller changes
+       */
+      subscribe(listener: () => void): () => void {
+        listeners.add(listener)
+        const unsubPosts = posts.on(listener)
+        return () => {
+          listeners.delete(listener)
+          unsubPosts()
         }
       },
-      on: {
-        VALIDATION_PASSED: 'submitting',
-        VALIDATION_FAILED: {
-          target: 'idle',
-          action: (ctx, { errors }) => {
-            ctx.scope.resolve(ctx.atoms.errors).then(e => {
-              ctx.invalidate('errors')
-            })
-          }
-        }
-      }
-    },
 
-    submitting: {
-      entry: async (ctx) => {
+      /**
+       * Optimistic like mutation
+       */
+      async likePost(postId: string) {
+        const currentPost = posts.get().find(p => p.id === postId)
+        if (!currentPost) return
+
+        optimistic.set(postId, {
+          liked: true,
+          likeCount: currentPost.likeCount + 1
+        })
+        notify()
+
         try {
-          await submitForm(ctx.scope.resolve(ctx.atoms.form))
-          ctx.send('SUBMIT_SUCCESS')
+          await api.likePost(postId)
+          posts.invalidate()
         } catch (error) {
-          ctx.send('SUBMIT_ERROR', { error })
+          optimistic.delete(postId)
+          notify()
+          throw error
+        } finally {
+          optimistic.delete(postId)
         }
-      },
-      on: {
-        SUBMIT_SUCCESS: 'success',
-        SUBMIT_ERROR: 'error'
-      }
-    },
-
-    success: {
-      on: {
-        RESET: 'idle'
-      }
-    },
-
-    error: {
-      on: {
-        RETRY: 'submitting',
-        RESET: 'idle'
       }
     }
   }
 })
 ```
 
-#### State transition diagram
+**Usage with optimistic controller:**
+```tsx
+function PostItem({ postId }: { postId: string }) {
+  const ctrl = useAtom(feedControllerAtom)
+  const post = useSyncExternalStore(
+    ctrl.subscribe,
+    () => ctrl.getPost(postId)
+  )
 
-```
-                              SUBMIT
-                    ┌─────────────────────────┐
-                    │                         │
-                    ▼                         │
-   ┌──────────┐    ┌────────────┐    ┌───────┴────┐
-   │   idle   │───►│ validating │───►│ submitting │
-   └────▲─────┘    └─────┬──────┘    └───┬────┬───┘
-        │                │               │    │
-        │     VALIDATION_FAILED          │    │
-        │◄───────────────┘               │    │
-        │                                │    │
-        │    RESET                       │    │
-        │◄───────────────────────────────┼────┤
-        │                                │    │
-        │                         SUCCESS│    │ERROR
-        │                                │    │
-        │                                ▼    ▼
-        │                          ┌─────────────┐
-        │           RESET          │   success   │
-        │◄─────────────────────────├─────────────┤
-        │                          │    error    │──► RETRY ──┐
-        │◄─────────────────────────┴─────────────┘            │
-        │           RESET                                      │
-        │                                                      │
-        └───────────────────────── (to submitting) ◄───────────┘
-```
+  if (!post) return null
 
-### 6. Async Resolution & Suspense
-
-#### Suspense integration
-
-```typescript
-function useAtom<T>(atom: Lite.Atom<T>): T {
-  const scope = useScope()
-  const ctrl = scope.controller(atom)
-
-  if (ctrl.state === 'idle') {
-    throw ctrl.resolve()
-  }
-
-  if (ctrl.state === 'resolving') {
-    throw new Promise<void>((resolve) => {
-      const unsub = ctrl.on(() => {
-        if (ctrl.state !== 'resolving') {
-          unsub()
-          resolve()
-        }
-      })
-    })
-  }
-
-  if (ctrl.state === 'failed') {
-    throw ctrl.error
-  }
-
-  return useSyncExternalStore(
-    (onStoreChange) => ctrl.on(onStoreChange),
-    () => ctrl.get(),
-    () => ctrl.get()
+  return (
+    <article>
+      <p>{post.content}</p>
+      <button onClick={() => ctrl.likePost(postId)}>
+        {post.liked ? '♥' : '♡'} {post.likeCount}
+      </button>
+    </article>
   )
 }
 ```
 
-#### Non-Suspense async hook
+## API Summary {#adr-005-api}
 
-```typescript
-interface AtomValue<T> {
-  value: T | undefined
-  state: AtomState
-  error: Error | undefined
-  refresh: () => void
-}
+### Hooks
 
-function useAtomValue<T>(atom: Lite.Atom<T>): AtomValue<T>
+| Hook | Purpose | Re-renders |
+|------|---------|------------|
+| `useAtom(atom)` | Full atom subscription | Any atom change |
+| `useSelector(selector)` | Slice subscription | When slice changes |
+| `useController(atom)` | Raw controller access | Never |
+| `useScope()` | Access scope | Never |
+
+### Utilities
+
+| Utility | Purpose |
+|---------|---------|
+| `selector(config)` | Create selector definition |
+| `equals.strict` | `Object.is` comparison |
+| `equals.shallow` | Shallow object comparison |
+| `equals.shallowArray` | Shallow array comparison |
+
+### Provider
+
+```tsx
+<LiteProvider scope={scope}>
+  <App />
+</LiteProvider>
 ```
 
-### 7. Package Structure
+## Package Structure {#adr-005-structure}
 
 ```
 packages/lite-react/
 ├── src/
-│   ├── index.ts              # Public exports
-│   ├── types.ts              # Type definitions
-│   ├── symbols.ts            # Unique symbols
-│   │
-│   ├── core/
-│   │   ├── context.ts        # React contexts (ScopeContext, MachineContext)
-│   │   ├── provider.tsx      # LiteProvider, MachineProvider
-│   │   └── hooks.ts          # useScope, useAtom, useController
-│   │
-│   ├── selector/
-│   │   ├── selector.ts       # selector() factory
-│   │   ├── hooks.ts          # useSelector
-│   │   └── equals.ts         # Equality functions
-│   │
-│   ├── machine/
-│   │   ├── machine.ts        # createMachine(), Machine implementation
-│   │   ├── context.ts        # MachineEventContext, MachineStateContext
-│   │   ├── hooks.ts          # useMachine, useMachineState, useSend
-│   │   └── types.ts          # Machine type definitions
-│   │
-│   ├── mutation/
-│   │   ├── mutation.ts       # mutation() factory
-│   │   ├── store.ts          # OptimisticStore
-│   │   ├── hooks.ts          # useMutation
-│   │   └── types.ts          # Mutation type definitions
-│   │
-│   └── suspense/
-│       ├── hooks.ts          # useAtomValue (non-suspense async)
-│       └── boundary.tsx      # AtomErrorBoundary helper
-│
+│   ├── index.ts          # Public exports
+│   ├── context.ts        # ScopeContext, LiteProvider
+│   ├── hooks.ts          # useAtom, useSelector, useController, useScope
+│   ├── selector.ts       # selector factory, equals helpers
+│   └── types.ts          # Type definitions
 ├── tests/
-│   ├── core.test.tsx
+│   ├── hooks.test.tsx
 │   ├── selector.test.tsx
-│   ├── machine.test.tsx
-│   ├── mutation.test.tsx
-│   └── suspense.test.tsx
-│
-├── package.json
-├── tsconfig.json
-└── tsdown.config.ts
+│   └── optimization.test.tsx
+└── package.json
 ```
 
-## API Summary {#adr-005-api}
+## Examples {#adr-005-examples}
 
-### Core
-
-| Export | Description |
-|--------|-------------|
-| `LiteProvider` | Injects scope into React tree |
-| `useScope` | Access scope directly |
-| `useAtom` | Subscribe to atom value (Suspense-compatible) |
-| `useController` | Get controller for manual control |
-| `useAtomValue` | Subscribe with explicit loading state |
-
-### Selectors
-
-| Export | Description |
-|--------|-------------|
-| `selector` | Create selector from atom(s) |
-| `useSelector` | Subscribe to selector slice |
-| `equals` | Equality function helpers |
-
-### Machine
-
-| Export | Description |
-|--------|-------------|
-| `machine` | Define machine configuration |
-| `createMachine` | Create machine instance |
-| `MachineProvider` | Inject machine into React tree |
-| `useMachine` | Access machine instance |
-| `useMachineState` | Get machine state and helpers |
-| `useMachineAtom` | Subscribe to atom via machine |
-| `useSend` | Get event dispatch function |
-
-### Mutations
-
-| Export | Description |
-|--------|-------------|
-| `mutation` | Define mutation configuration |
-| `useMutation` | Execute mutation with optimistic support |
-
-## Usage Examples {#adr-005-examples}
-
-### Example 1: Simple Atom Subscription
+### Example 1: Basic Usage
 
 ```tsx
-import { atom } from '@pumped-fn/lite'
-import { LiteProvider, useAtom } from '@pumped-fn/lite-react'
+import { atom, controller, createScope } from '@pumped-fn/lite'
+import { LiteProvider, useAtom, useSelector, selector } from '@pumped-fn/lite-react'
 
 const countAtom = atom({ factory: () => 0 })
 
+const countSelector = selector({
+  source: countAtom,
+  select: n => n
+})
+
 function Counter() {
-  const count = useAtom(countAtom)
+  const count = useSelector(countSelector)
   const ctrl = useController(countAtom)
 
   return (
@@ -863,7 +470,7 @@ function Counter() {
 }
 
 function App() {
-  const scope = useMemo(() => createScope(), [])
+  const [scope] = useState(() => createScope())
 
   return (
     <LiteProvider scope={scope}>
@@ -873,509 +480,128 @@ function App() {
 }
 ```
 
-### Example 2: Selector for Optimized Rendering
+### Example 2: Composite Controller
 
 ```tsx
-const userAtom = atom({
-  factory: async () => fetchUser()
-})
+const userAtom = atom({ factory: () => api.fetchUser() })
+const postsAtom = atom({ factory: () => api.fetchPosts() })
 
-const avatarSelector = selector({
-  source: userAtom,
-  select: (user) => user.profile.avatar
-})
-
-const statsSelector = selector({
-  source: userAtom,
-  select: (user) => user.stats,
-  equals: equals.shallow
-})
-
-function Avatar() {
-  const avatar = useSelector(avatarSelector)
-  return <img src={avatar} />
-}
-
-function Stats() {
-  const stats = useSelector(statsSelector)
-  return <div>Posts: {stats.posts}, Followers: {stats.followers}</div>
-}
-```
-
-### Example 3: Machine with State Transitions
-
-```tsx
-const authMachine = machine({
-  atoms: { user: userAtom, session: sessionAtom },
-
-  initial: 'anonymous',
-
-  states: {
-    anonymous: {
-      on: {
-        LOGIN: 'authenticating'
-      }
+const appControllerAtom = atom({
+  deps: {
+    user: controller(userAtom),
+    posts: controller(postsAtom),
+  },
+  factory: (ctx, { user, posts }) => ({
+    async initialize() {
+      await user.resolve()
+      await posts.resolve()
     },
-    authenticating: {
-      entry: async (ctx) => {
-        try {
-          await authenticate()
-          ctx.invalidate('user', 'session')
-          ctx.send('AUTH_SUCCESS')
-        } catch {
-          ctx.send('AUTH_FAILURE')
-        }
-      },
-      on: {
-        AUTH_SUCCESS: 'authenticated',
-        AUTH_FAILURE: 'anonymous'
-      }
+    refresh() {
+      posts.invalidate()
     },
-    authenticated: {
-      on: {
-        LOGOUT: {
-          target: 'anonymous',
-          action: (ctx) => ctx.invalidateAll()
-        }
-      }
+    async likePost(id: string) {
+      await api.likePost(id)
+      posts.invalidate()
     }
-  }
+  })
 })
-
-function LoginButton() {
-  const { state, send, matches } = useMachineState()
-
-  if (matches('authenticated')) {
-    return <button onClick={() => send('LOGOUT')}>Logout</button>
-  }
-
-  return (
-    <button
-      onClick={() => send('LOGIN')}
-      disabled={matches('authenticating')}
-    >
-      {matches('authenticating') ? 'Logging in...' : 'Login'}
-    </button>
-  )
-}
-```
-
-### Example 4: Optimistic Mutation
-
-```tsx
-const likeMutation = mutation({
-  optimistic: (posts, { postId }) =>
-    posts.map(p => p.id === postId
-      ? { ...p, liked: true, likeCount: p.likeCount + 1 }
-      : p
-    ),
-
-  mutate: async (ctx, { postId }) => {
-    await api.likePost(postId)
-  },
-
-  onError: (ctx, error) => {
-    toast.error('Failed to like post')
-  },
-
-  invalidates: ['posts']
-})
-
-const feedMachine = machine({
-  atoms: { posts: postsAtom },
-  mutations: { LIKE: likeMutation }
-})
-
-function LikeButton({ post }) {
-  const { mutate, isPending, isOptimistic } = useMutation('LIKE')
-
-  return (
-    <button
-      onClick={() => mutate({ postId: post.id })}
-      disabled={isPending}
-      className={isOptimistic ? 'optimistic' : ''}
-    >
-      {post.liked ? '♥' : '♡'} {post.likeCount}
-    </button>
-  )
-}
-```
-
-### Example 5: Complete Application
-
-```tsx
-import { atom, createScope } from '@pumped-fn/lite'
-import {
-  LiteProvider,
-  machine,
-  createMachine,
-  MachineProvider,
-  useSelector,
-  useMachineState,
-  useMutation,
-  selector,
-  mutation
-} from '@pumped-fn/lite-react'
-
-const userAtom = atom({ factory: fetchUser })
-const postsAtom = atom({
-  deps: { user: userAtom },
-  factory: (ctx, { user }) => fetchPosts(user.id)
-})
-const notificationsAtom = atom({
-  deps: { user: userAtom },
-  factory: (ctx, { user }) => fetchNotifications(user.id)
-})
-
-const userNameSelector = selector({
-  source: userAtom,
-  select: u => u.name
-})
-
-const unreadCountSelector = selector({
-  source: notificationsAtom,
-  select: n => n.filter(x => !x.read).length
-})
-
-const likeMutation = mutation({
-  optimistic: (posts, { postId }) =>
-    posts.map(p => p.id === postId ? { ...p, liked: true } : p),
-  mutate: (ctx, { postId }) => api.like(postId)
-})
-
-const appMachineConfig = machine({
-  atoms: { user: userAtom, posts: postsAtom, notifications: notificationsAtom },
-  mutations: { LIKE: likeMutation },
-
-  initial: 'idle',
-
-  on: {
-    REFRESH: (ctx) => ctx.invalidate('posts', 'notifications')
-  },
-
-  states: {
-    idle: {
-      on: { REFRESH: 'refreshing' }
-    },
-    refreshing: {
-      entry: (ctx) => ctx.invalidate('posts', 'notifications'),
-      on: { DONE: 'idle' }
-    }
-  }
-})
-
-async function bootstrap() {
-  const scope = await createScope()
-  const appMachine = await createMachine(appMachineConfig, { scope })
-
-  return { scope, appMachine }
-}
 
 function App() {
-  const [ready, setReady] = useState(false)
-  const [context, setContext] = useState<{ scope: Scope; appMachine: Machine }>()
+  const ctrl = useAtom(appControllerAtom)
 
   useEffect(() => {
-    bootstrap().then(ctx => {
-      setContext(ctx)
-      setReady(true)
-    })
-  }, [])
+    ctrl.initialize()
+  }, [ctrl])
 
-  if (!ready || !context) return <Loading />
-
-  return (
-    <LiteProvider scope={context.scope}>
-      <MachineProvider machine={context.appMachine}>
-        <Suspense fallback={<Loading />}>
-          <Dashboard />
-        </Suspense>
-      </MachineProvider>
-    </LiteProvider>
-  )
+  return <Feed />
 }
 
-function Header() {
-  const userName = useSelector(userNameSelector)
-  const unreadCount = useSelector(unreadCountSelector)
-
-  return (
-    <header>
-      <h1>Welcome, {userName}</h1>
-      <NotificationBadge count={unreadCount} />
-    </header>
-  )
-}
-
-function RefreshButton() {
-  const { state, send, matches } = useMachineState()
-
-  return (
-    <button onClick={() => send('REFRESH')} disabled={matches('refreshing')}>
-      {matches('refreshing') ? <Spinner /> : 'Refresh'}
-    </button>
-  )
-}
-
-function PostList() {
-  const posts = useMachineAtom('posts')
-
-  return (
-    <ul>
-      {posts.map(post => <PostItem key={post.id} post={post} />)}
-    </ul>
-  )
-}
-
-function PostItem({ post }) {
-  const { mutate, isPending } = useMutation('LIKE')
-
-  return (
-    <li>
-      <p>{post.content}</p>
-      <button onClick={() => mutate({ postId: post.id })} disabled={isPending}>
-        {post.liked ? '♥' : '♡'}
-      </button>
-    </li>
-  )
-}
-
-function Dashboard() {
+function Feed() {
+  const ctrl = useAtom(appControllerAtom)
   return (
     <div>
-      <Header />
-      <RefreshButton />
+      <button onClick={() => ctrl.refresh()}>Refresh</button>
       <PostList />
     </div>
   )
 }
 ```
 
-## Performance Considerations {#adr-005-performance}
+### Example 3: Optimized List
 
-### Selector Memoization
-
-Selectors use referential equality by default (`Object.is`). For object slices, use `equals.shallow` or `equals.deep`:
-
-```typescript
-const statsSelector = selector({
-  source: userAtom,
-  select: u => ({ posts: u.stats.posts, followers: u.stats.followers }),
-  equals: equals.shallow
-})
-```
-
-### Optimistic Store Overhead
-
-- Optimistic entries stored in Map with mutation ID keys
-- Each pending mutation adds ~100 bytes overhead
-- Entries cleaned up immediately on commit/rollback
-- Typical apps have <10 concurrent mutations
-
-### Machine Event Processing
-
-- Events processed synchronously when possible
-- Async state entry functions use microtask scheduling
-- State listeners notified in batch after transition completes
-
-### Re-render Optimization
-
-| Pattern | Re-renders When |
-|---------|-----------------|
-| `useAtom(atom)` | Any atom value change |
-| `useSelector(selector)` | Slice value change (per equality fn) |
-| `useMachineState()` | Machine state change |
-| `useMutation(name)` | isPending/isOptimistic change |
-
-## Comparison with Alternatives {#adr-005-comparison}
-
-| Feature | lite-react | Zustand | Jotai | Redux Toolkit | TanStack Query |
-|---------|------------|---------|-------|---------------|----------------|
-| Bundle size | ~3KB* | ~1KB | ~2KB | ~12KB | ~13KB |
-| Async built-in | ✓ | Middleware | ✓ | Middleware | ✓ |
-| Selectors | ✓ | ✓ | Derived atoms | ✓ | Select option |
-| Optimistic updates | ✓ | Manual | Manual | Manual | ✓ |
-| State machine | ✓ | External | External | External | ✗ |
-| DI/Composition | ✓ | ✗ | Partial | ✗ | ✗ |
-| Backend sharing | ✓** | ✗ | ✗ | ✗ | ✗ |
-| Cleanup hooks | ✓ | ✗ | ✗ | ✗ | ✗ |
-| Suspense | ✓ | ✗ | ✓ | ✗ | ✓ |
-
-\* Excludes @pumped-fn/lite (~17KB) which may already be in bundle
-\** Same atoms can run on Node.js backend and React frontend
-
-## Migration Paths {#adr-005-migration}
-
-### From Zustand
-
-```typescript
-// Zustand
-const useStore = create((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 }))
-}))
-
-// lite-react
-const countAtom = atom({ factory: () => 0 })
-
-const counterMachine = machine({
-  atoms: { count: countAtom },
-  on: {
-    INCREMENT: (ctx) => ctx.invalidate('count')
-  }
-})
-```
-
-### From Redux Toolkit
-
-```typescript
-// Redux Toolkit
-const counterSlice = createSlice({
-  name: 'counter',
-  initialState: { value: 0 },
-  reducers: {
-    increment: (state) => { state.value += 1 }
-  }
+```tsx
+const postIdsSelector = selector({
+  source: postsAtom,
+  select: posts => posts.map(p => p.id),
+  equals: equals.shallowArray
 })
 
-// lite-react
-const counterAtom = atom({ factory: () => ({ value: 0 }) })
-
-const counterMachine = machine({
-  atoms: { counter: counterAtom },
-  on: {
-    INCREMENT: (ctx) => ctx.invalidate('counter')
-  }
-})
-```
-
-### From TanStack Query (for mutations)
-
-```typescript
-// TanStack Query
-const likeMutation = useMutation({
-  mutationFn: (postId) => api.like(postId),
-  onMutate: async (postId) => {
-    await queryClient.cancelQueries(['posts'])
-    const previous = queryClient.getQueryData(['posts'])
-    queryClient.setQueryData(['posts'], (old) =>
-      old.map(p => p.id === postId ? { ...p, liked: true } : p)
-    )
-    return { previous }
-  },
-  onError: (err, postId, context) => {
-    queryClient.setQueryData(['posts'], context.previous)
-  }
+const createPostSelector = (id: string) => selector({
+  source: postsAtom,
+  select: posts => posts.find(p => p.id === id)
 })
 
-// lite-react
-const likeMutation = mutation({
-  optimistic: (posts, { postId }) =>
-    posts.map(p => p.id === postId ? { ...p, liked: true } : p),
-  mutate: (ctx, { postId }) => api.like(postId)
-})
+function PostList() {
+  const ids = useSelector(postIdsSelector)
+  return (
+    <ul>
+      {ids.map(id => <PostItem key={id} postId={id} />)}
+    </ul>
+  )
+}
+
+function PostItem({ postId }: { postId: string }) {
+  const postSel = useMemo(() => createPostSelector(postId), [postId])
+  const post = useSelector(postSel)
+  const ctrl = useAtom(appControllerAtom)
+
+  if (!post) return null
+
+  return (
+    <li>
+      {post.content}
+      <button onClick={() => ctrl.likePost(postId)}>
+        {post.liked ? '♥' : '♡'}
+      </button>
+    </li>
+  )
+}
 ```
 
 ## Verification {#adr-005-verification}
 
 ### Type System
-
 - [ ] `useAtom<T>` returns `T` with correct inference
-- [ ] `useSelector` returns slice type with correct inference
-- [ ] `machine()` config is fully typed (atoms, events, states)
-- [ ] `useMutation` payload type inferred from mutation definition
-- [ ] `useSend` event names and payloads are type-checked
+- [ ] `useSelector` returns slice type correctly
+- [ ] Selector `select` function is properly typed
+- [ ] Controller atom factory return type is inferred
 
 ### Runtime Behavior
-
-- [ ] `useAtom` triggers re-render on atom invalidation
-- [ ] `useSelector` only re-renders when slice changes (per equality fn)
-- [ ] Machine state transitions are atomic
+- [ ] `useAtom` re-renders on atom invalidation
+- [ ] `useSelector` only re-renders when slice changes
+- [ ] List optimization: item change doesn't re-render siblings
 - [ ] Optimistic updates apply immediately
-- [ ] Optimistic rollback restores previous value
-- [ ] Multiple concurrent mutations handled correctly
-- [ ] Suspense boundary catches pending resolution
-- [ ] Error boundary catches failed resolution
+- [ ] Optimistic rollback works on error
 
 ### React Integration
-
 - [ ] Works with React 18 Concurrent features
-- [ ] No tearing in concurrent renders
-- [ ] StrictMode compatible (double-invoke safe)
-- [ ] Server-side rendering support
-- [ ] React DevTools integration (component names)
-
-### Performance
-
-- [ ] Selector memoization prevents unnecessary re-renders
-- [ ] Machine event dispatch is O(1)
-- [ ] Optimistic store operations are O(1)
+- [ ] StrictMode compatible
 - [ ] No memory leaks on unmount
+- [ ] Suspense support for async atoms
 
-## Alternatives Considered {#adr-005-alternatives}
+## Comparison {#adr-005-comparison}
 
-### 1. Keep decentralized pattern only
-
-**Rejected:** While simpler for basic cases, complex apps benefit from centralized state transitions. The machine pattern is opt-in; simple apps can use `useAtom` directly.
-
-### 2. Use XState for state machines
-
-**Rejected:** Adds significant bundle size (~15KB). The machine pattern here is lighter and integrated with lite's atom system.
-
-### 3. Use Immer for optimistic updates
-
-**Rejected:** Adds dependency, and lite atoms are already immutable-by-design (factory returns new value).
-
-### 4. Separate packages (lite-react-core, lite-react-machine, lite-react-mutation)
-
-**Considered:** Could reduce bundle for simple apps. Deferred to future if needed. Tree-shaking should handle unused exports.
-
-### 5. Observable/RxJS integration
-
-**Rejected:** Adds complexity and learning curve. Simple callback-based subscription is sufficient and lighter.
-
-## Future Considerations {#adr-005-future}
-
-### DevTools
-
-Browser extension for:
-- Visualizing atom dependency graph
-- Inspecting machine state transitions
-- Time-travel debugging for mutations
-- Performance profiling
-
-### Server Components
-
-React Server Components integration:
-- Atom resolution on server
-- Hydration of resolved values
-- Streaming suspense boundaries
-
-### Persistence
-
-Optional persistence layer:
-- localStorage/sessionStorage
-- IndexedDB for large data
-- Rehydration on app start
-
-### Testing Utilities
-
-```typescript
-import { createTestMachine, mockAtom } from '@pumped-fn/lite-react/testing'
-
-const testMachine = createTestMachine(appMachineConfig, {
-  presets: [
-    mockAtom(userAtom, { id: '1', name: 'Test User' })
-  ]
-})
-
-await testMachine.send('LOGIN')
-expect(testMachine.state).toBe('authenticated')
-```
+| Aspect | lite-react | Zustand | Jotai | Redux |
+|--------|------------|---------|-------|-------|
+| Bundle size | ~2KB | ~1KB | ~2KB | ~7KB |
+| Boilerplate | Low | Low | Low | High |
+| Selectors | Yes | Yes | Derived atoms | Yes |
+| List optimization | Manual (pattern) | Manual | Atom per item | Manual |
+| Async built-in | Yes | Middleware | Yes | Middleware |
+| DI/Testing | Yes (presets) | No | No | No |
 
 ## Related {#adr-005-related}
 
-- [ADR-002](./adr-002-lightweight-lite-package.md) - Base @pumped-fn/lite package design
-- [ADR-003](./adr-003-controller-reactivity.md) - Controller pattern that enables React integration
+- [ADR-003](./adr-003-controller-reactivity.md) - Controller pattern that enables this integration
 - [c3-201](../c3-2-lite/c3-201-scope.md) - Scope and Controller documentation
 - [c3-202](../c3-2-lite/c3-202-atom.md) - Atom documentation
