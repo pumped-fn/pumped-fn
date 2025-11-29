@@ -13,14 +13,8 @@ import type { User, Post, Notification } from "./types"
 /**
  * User atom - current authenticated user
  */
-export const userAtom: Lite.Atom<User | null> = atom({
-  factory: async () => {
-    try {
-      return await api.fetchUser()
-    } catch {
-      return null
-    }
-  },
+export const userAtom: Lite.Atom<User> = atom({
+  factory: async () => api.fetchUser(),
 })
 
 /**
@@ -122,6 +116,9 @@ export const feedControllerAtom = atom({
 
       /**
        * Like post with optimistic update
+       *
+       * Pattern: apply optimistic → execute → cleanup via finally
+       * Errors propagate to framework (React Error Boundary, etc.)
        */
       async likePost(postId: string) {
         const currentPost = posts.get().find((p) => p.id === postId)
@@ -133,16 +130,11 @@ export const feedControllerAtom = atom({
         })
         notify()
 
-        try {
-          await api.likePost(postId)
-          posts.invalidate()
-        } catch (error) {
+        await api.likePost(postId).finally(() => {
           optimistic.delete(postId)
-          notify()
-          throw error
-        } finally {
-          optimistic.delete(postId)
-        }
+        })
+
+        posts.invalidate()
       },
 
       /**
@@ -158,16 +150,11 @@ export const feedControllerAtom = atom({
         })
         notify()
 
-        try {
-          await api.unlikePost(postId)
-          posts.invalidate()
-        } catch (error) {
+        await api.unlikePost(postId).finally(() => {
           optimistic.delete(postId)
-          notify()
-          throw error
-        } finally {
-          optimistic.delete(postId)
-        }
+        })
+
+        posts.invalidate()
       },
 
       /**

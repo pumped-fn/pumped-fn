@@ -65,23 +65,18 @@ export const equals = {
  */
 export const userNameSelector = selector({
   source: userAtom,
-  select: (user): string | null => user?.name ?? null,
+  select: (user): string => user.name,
 })
 
 export const userAvatarSelector = selector({
   source: userAtom,
-  select: (user): string | null => user?.avatar ?? null,
+  select: (user): string => user.avatar,
 })
 
 export const userStatsSelector = selector({
   source: userAtom,
-  select: (user): User["stats"] | null => user?.stats ?? null,
+  select: (user): User["stats"] => user.stats,
   equals: equals.shallow,
-})
-
-export const isAuthenticatedSelector = selector({
-  source: userAtom,
-  select: (user): boolean => user !== null,
 })
 
 /**

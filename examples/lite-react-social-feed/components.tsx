@@ -22,6 +22,7 @@ import {
   unreadCountSelector,
   type Selector,
 } from "./selectors"
+import type { Post } from "./types"
 
 /**
  * ============================================================================
@@ -112,7 +113,7 @@ function Header() {
         <button className="notification-bell" onClick={() => ctrl.refresh()}>
           🔔 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
         </button>
-        {avatar && <img src={avatar} alt={name ?? ""} className="avatar" />}
+        <img src={avatar} alt={name} className="avatar" />
         <span>{name}</span>
         <button onClick={() => ctrl.logout()}>Logout</button>
       </div>
