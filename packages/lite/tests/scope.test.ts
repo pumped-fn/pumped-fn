@@ -907,5 +907,98 @@ describe("ExecutionContext", () => {
       expect(capturedData).toBeInstanceOf(Map)
       expect(capturedData?.get("key")).toBe("value")
     })
+
+    it("persists data across invalidations", async () => {
+      const scope = await createScope()
+      let resolveCount = 0
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          resolveCount++
+          const prev = ctx.data.get("count") as number | undefined
+          ctx.data.set("count", (prev ?? 0) + 1)
+          return ctx.data.get("count")
+        },
+      })
+
+      const first = await scope.resolve(myAtom)
+      expect(first).toBe(1)
+
+      const ctrl = scope.controller(myAtom)
+      ctrl.invalidate()
+      await ctrl.resolve()
+
+      const second = ctrl.get()
+      expect(second).toBe(2)
+      expect(resolveCount).toBe(2)
+    })
+
+    it("clears data when atom is released", async () => {
+      const scope = await createScope()
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          const prev = ctx.data.get("count") as number | undefined
+          ctx.data.set("count", (prev ?? 0) + 1)
+          return ctx.data.get("count")
+        },
+      })
+
+      const first = await scope.resolve(myAtom)
+      expect(first).toBe(1)
+
+      await scope.release(myAtom)
+
+      const second = await scope.resolve(myAtom)
+      expect(second).toBe(1)
+    })
+
+    it("creates data Map lazily on first access", async () => {
+      const scope = await createScope()
+      let dataAccessed = false
+
+      const noDataAtom = atom({
+        factory: () => {
+          return "no data access"
+        },
+      })
+
+      const withDataAtom = atom({
+        factory: (ctx) => {
+          dataAccessed = true
+          ctx.data.set("key", "value")
+          return "data accessed"
+        },
+      })
+
+      await scope.resolve(noDataAtom)
+      await scope.resolve(withDataAtom)
+
+      expect(dataAccessed).toBe(true)
+    })
+
+    it("has independent data per atom", async () => {
+      const scope = await createScope()
+
+      const atomA = atom({
+        factory: (ctx) => {
+          ctx.data.set("name", "A")
+          return ctx.data.get("name")
+        },
+      })
+
+      const atomB = atom({
+        factory: (ctx) => {
+          ctx.data.set("name", "B")
+          return ctx.data.get("name")
+        },
+      })
+
+      const resultA = await scope.resolve(atomA)
+      const resultB = await scope.resolve(atomB)
+
+      expect(resultA).toBe("A")
+      expect(resultB).toBe("B")
+    })
   })
 })
