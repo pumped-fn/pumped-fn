@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/core-next",
   "version": "0.5.94",
+  "deprecated": "This package is deprecated. Use @pumped-fn/lite instead.",
   "description": "Enhanced function utilities for TypeScript",
   "type": "module",
   "main": "./dist/index.cjs",

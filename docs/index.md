@@ -1,203 +1,146 @@
-# pumped-fn // ExecutionContext-first activation
+# pumped-fn
+
+A lightweight effect system for TypeScript with managed lifecycles and minimal reactivity.
 
 ## Activation
-- load layered map → memorize ExecutionContext outer, Flow medium, Scope core, Extensions detached
-- follow API grid rows top → bottom when coding
-- never skip tests listed per row
+- load layered map → understand Scope boundary, Atom effects, ExecutionContext operations
+- follow API grid when coding
 - twoslash snippet shows canonical usage; copy + adapt
 
 ## Layered map
 ```mermaid
 graph LR
-  subgraph EC[ExecutionContext Ring]
-    A["scope.createExecution / ctx.exec / ctx.set-find-get / ctx.end / throwIfAborted"]
-    B["Promised normalization + TagStore + AbortSignal"]
+  subgraph Scope[Scope Boundary]
+    A["createScope / scope.dispose"]
+    B["atom resolution + caching + cleanup"]
   end
 
-  subgraph Flow[Flow Medium]
-    C["flow() definitions + schema validation + flowMeta tags"]
-    D["ExecutionContext.Context (Flow ctx) parallel + resetJournal + exec overloads"]
-    E["Extension.Operation dispatch"]
+  subgraph Atoms[Atom Effects]
+    C["atom() definitions + deps"]
+    D["controller() for observation"]
+    E["invalidate / release lifecycle"]
   end
 
-  subgraph Resolution["Resolution & Scope Core"]
-    F["createExecutor + dependency graph + controller cleanup"]
-    G["scope.run + scope.resolve + journal/abort utilities"]
+  subgraph Exec[ExecutionContext]
+    F["scope.createContext()"]
+    G["ctx.exec() operations"]
+    H["ctx.close() cleanup"]
   end
 
-  subgraph Ext["Extension Ring (SPI)"]
-    X["extension() modules"]
+  subgraph Tags[Tag System]
+    T["tag() definitions"]
+    U["tags.required / tags.optional"]
   end
 
-  subgraph Tests["Testing Mirror"]
-    T1["execution-context.test.ts"]
-    T2["flow-execution.test.ts"]
-    T3["scope-run.test.ts"]
-    T4["extensions.test.ts"]
-    TH["shared harness: tests/test-utils.ts"]
+  subgraph Ext[Extensions]
+    X["wrapResolve / wrapExec hooks"]
   end
 
-  EC --> Flow
-  Flow --> Resolution
-  Ext -- "wrap/onError" --> EC
-  Ext -- "dispose/reload" --> Resolution
-  EC -.-> T1
-  Flow -.-> T2
-  Resolution -.-> T3
-  Ext -.-> T4
-  T1 --> TH
-  T2 --> TH
-  T3 --> TH
-  T4 --> TH
+  Scope --> Atoms
+  Atoms --> Exec
+  Tags --> Atoms
+  Ext -- "wrap" --> Scope
+  Ext -- "wrap" --> Exec
 ```
 
-## Atom graph
-```mermaid
-classDiagram
-  class ExecutionContext {
-    <<API>>
-    +scope: Core.Scope
-    +parent?: ExecutionContext
-    +id: string
-    +details: Details
-    +tagStore: Tag.Store
-    +signal: AbortSignal
-    +exec(name, fn)
-    +set(tag, value)
-    +get(tag)
-    +find(tag)
-    +end()
-    +throwIfAborted()
-  }
+## Core Concepts
 
-  class FlowDefinition {
-    <<API>>
-    +define(inputSchema, outputSchema)
-    +handler(dependencies?, fn)
-    +meta(flowMeta tags)
-  }
-
-  class FlowContext {
-    <<Core>>
-    +exec(flowOrFn, input)
-    +parallel(flows)
-    +parallelSettled(flows)
-    +resetJournal()
-    +createSnapshot()
-  }
-
-  class Scope {
-    <<Core>>
-    +createExecution(details)
-    +executeFlow(flow, input)
-    +run(deps, fn)
-    +resolve(executor)
-    +dispose()
-  }
-
-  class ExecutorFactory {
-    <<Core>>
-    +provide()
-    +derive()
-    +preset()
-    +isExecutor()
-    +multi()
-  }
-
-  class Promised {
-    <<Utility>>
-    +wrap(valueOrPromise)
-    +settled(entries)
-  }
-
-  class InternalUtils {
-    <<Utility>>
-    +createAbortWithTimeout()
-    +createJournalKey()
-    +checkJournalReplay()
-  }
-
-  class ExtensionModule {
-    <<SPI>>
-    +name
-    +init(scope)
-    +wrap(operation)
-    +onError(error, scope)
-    +dispose(scope)
-  }
-
-  ExecutionContext <|-- ExecutionContextImpl
-  FlowDefinition --* ExecutionContextImpl
-  FlowDefinition --> ExecutorFactory
-  ExecutorFactory --> Scope
-  ExecutionContext --> Scope : controller access
-  ExecutionContext --> Promised
-  ExecutionContext --> InternalUtils : journal/abort helpers
-  Promised --> Scope
-  ExtensionModule --> ExecutionContext : wrap/onError hooks
-  ExtensionModule --> Scope : dispose lifecycle
-  InternalUtils --> Scope
 ```
+┌─────────────────────────────────────────────────────────────┐
+│                         Scope                               │
+│  (long-lived execution boundary)                            │
+│                                                             │
+│   ┌─────────┐      ┌─────────┐      ┌─────────┐            │
+│   │  Atom   │ ──── │  Atom   │ ──── │  Atom   │            │
+│   │ (effect)│      │ (effect)│      │ (effect)│            │
+│   └─────────┘      └─────────┘      └─────────┘            │
+│        │                                  │                 │
+│        └──────────────┬───────────────────┘                 │
+│                       ▼                                     │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              ExecutionContext                       │   │
+│   │  (short-lived operation with input, tags, cleanup)  │   │
+│   └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Concept | Purpose |
+|---------|---------|
+| **Scope** | Long-lived boundary that manages atom lifecycles |
+| **Atom** | A managed effect with lifecycle (create, cache, cleanup, recreate) |
+| **ExecutionContext** | Short-lived context for running operations with input and tags |
+| **Controller** | Handle for observing and controlling an atom's state |
+| **Tag** | Contextual value passed through execution |
 
 ## API grid
-| Layer | API | Usage pulse | Tests |
+| Layer | API | Usage | Tests |
 | --- | --- | --- | --- |
-| ExecutionContext | `scope.createExecution`, `ctx.exec/find/set/end`, `ctx.parallel`, `ctx.parallelSettled`, `ctx.resetJournal` | always outer entry, manage tags + abort + journaling | `packages/next/tests/execution-context.test.ts`, `flow-execution.test.ts`
-| Flow | `flow()`, `flowMeta`, `flow.execute`, `ExecutionContext.Context` (aka Flow.Context) | orchestrate handlers, enforce schemas, emit Extension operations | `packages/next/tests/flow-execution.test.ts`, `flow-extensions.test.ts`
-| Scope | `createScope`, `scope.run`, `scope.resolve`, `scope.useExtension`, `scope.dispose` | life-cycle + dependency graph resolution | `packages/next/tests/scope-run.test.ts`, `core.test.ts`
-| Executors | `provide`, `derive`, `preset`, `multi.*`, `tags()` | define nodes, dependency wiring, modifiers (`lazy/reactive/static`) | `packages/next/tests/index.test.ts`, `multi.test.ts`
-| Tags & Meta | `tag`, `tags`, `flowMeta`, `name` tag | inject runtime data, enforce invariants, label executors | `packages/next/tests/tag.test.ts`, `meta.test.ts`
-| Extensions | `extension()`, `extension.wrap/onError/dispose` | cross-cutting instrumentation via ExecutionContext + Scope only | `packages/next/tests/extensions.test.ts`, `flow-extensions.test.ts`
-| Promised & Utilities | `Promised`, `MaybePromised`, `standardSchema`, `errors.*` | unify sync+async, validate inputs/outputs, bubble typed errors | `packages/next/tests/promised-settled.test.ts`, `errors` suite
+| Scope | `createScope`, `scope.dispose`, `scope.createContext` | lifecycle boundary, create execution contexts | `packages/lite/tests/` |
+| Atoms | `atom`, `controller`, `preset` | define managed effects, observe state, override values | `packages/lite/tests/` |
+| ExecutionContext | `ctx.exec`, `ctx.close`, `ctx.cleanup` | run operations, manage cleanup | `packages/lite/tests/` |
+| Flow | `flow` | define operation templates with deps | `packages/lite/tests/` |
+| Tags | `tag`, `tags.required`, `tags.optional` | contextual values through execution | `packages/lite/tests/` |
+| Extensions | `Lite.Extension` | cross-cutting wrapResolve/wrapExec hooks | `packages/lite/tests/` |
+
+## Effect Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> resolving: resolve()
+    resolving --> resolved: success
+    resolving --> failed: error
+    resolved --> resolving: invalidate()
+    failed --> resolving: invalidate()
+    resolved --> idle: release()
+    failed --> idle: release()
+```
 
 ## Canonical twoslash
 ```ts twoslash
-import {
-  createScope,
-  flow,
-  provide,
-  derive,
-  extension,
-  tag,
-  custom,
-} from "@pumped-fn/core-next";
+import { atom, flow, createScope, tag, controller } from "@pumped-fn/lite";
 
-const requestId = tag(custom<string>(), { label: "req.id" });
+const requestId = tag<string>({ label: "req.id" });
 
-const clock = provide(() => () => new Date().toISOString());
-const logger = derive(clock, (now) => ({
-  info: (msg: string) => `[${now()}] ${msg}`,
-}));
-
-const trace = extension({
-  name: "trace",
-  wrap: (_scope, next, operation) => {
-    if (operation.kind === "execution") {
-      console.log(`op:${operation.mode}`);
-    }
-    return next();
+const dbAtom = atom({
+  factory: async (ctx) => {
+    const conn = { query: async (sql: string) => ({ rows: [] }) };
+    ctx.cleanup(() => console.log("closing db"));
+    return conn;
   },
 });
 
-const toUpper = flow(async (_ctx, name: string) => name.toUpperCase());
-
-const greet = flow({ logger }, async ({ logger }, ctx, name: string) => {
-  const upper = await ctx.exec({ flow: toUpper, input: name, key: "upper" });
-  ctx.set(requestId, upper);
-  await ctx.parallel([
-    ctx.exec({ fn: () => logger.info(upper) }),
-  ]);
-  return { upper, tagged: ctx.get(requestId) };
+const repoAtom = atom({
+  deps: { db: dbAtom },
+  factory: (ctx, { db }) => ({
+    findById: async (id: string) => db.query(`SELECT * WHERE id = ${id}`),
+  }),
 });
 
-const scope = createScope({ extensions: [trace] });
-const execution = flow.execute(greet, "Ada", { scope });
+const getUser = flow({
+  deps: { repo: repoAtom },
+  factory: async (ctx, { repo }) => {
+    return repo.findById(ctx.input as string);
+  },
+});
 
-type ExecutionResult = Awaited<typeof execution>;
-const expectUpper: ExecutionResult["upper"] = "ADA";
+const scope = await createScope();
+const ctx = scope.createContext();
+
+const user = await ctx.exec({ flow: getUser, input: "user-123" });
+
+await ctx.close();
+await scope.dispose();
 ```
 
 ## Verification
-- `pnpm -F @pumped-fn/core-next typecheck`
-- `pnpm -F @pumped-fn/core-next test`
+- `pnpm -F @pumped-fn/lite typecheck`
+- `pnpm -F @pumped-fn/lite test`
 - `pnpm docs:build`
+
+## Deprecated Packages
+
+The following packages are deprecated:
+- `@pumped-fn/core-next` - Use `@pumped-fn/lite` instead
+- `@pumped-fn/react` - Legacy React bindings
+- `@pumped-fn/devtools` - Legacy devtools

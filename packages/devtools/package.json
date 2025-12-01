@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/devtools",
   "version": "0.2.16",
+  "deprecated": "This package is deprecated and no longer maintained.",
   "description": "Development tools for pumped-fn applications",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/react",
   "version": "0.5.90",
+  "deprecated": "This package is deprecated and no longer maintained.",
   "description": "React bindings for Pumped Functions",
   "keywords": [
     "pumped-fn",
