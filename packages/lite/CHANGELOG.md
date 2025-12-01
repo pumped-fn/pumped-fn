@@ -1,5 +1,16 @@
 # @pumped-fn/lite
 
+## 1.0.1
+
+### Patch Changes
+
+- 219fce4: Update MIGRATION.md with accurate API documentation
+
+  - Add Controller.on() event filtering (`'resolved'`, `'resolving'`, `'*'`)
+  - Add scope.select() fine-grained subscription example
+  - Add Fine-grained select() to feature comparison table
+  - Fix Quick Reference table with event filtering syntax
+
 ## 1.0.0
 
 ### Major Changes
