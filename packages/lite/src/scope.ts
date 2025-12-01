@@ -399,6 +399,16 @@ class ScopeImpl implements Lite.Scope {
     return new ControllerImpl(atom, this)
   }
 
+  select<T, S>(
+    atom: Lite.Atom<T>,
+    selector: (value: T) => S,
+    options?: Lite.SelectOptions<S>
+  ): Lite.SelectHandle<S> {
+    const ctrl = this.controller(atom)
+    const eq = options?.eq ?? ((a, b) => a === b)
+    return new SelectHandleImpl(ctrl, selector, eq)
+  }
+
   invalidate<T>(atom: Lite.Atom<T>): void {
     const entry = this.cache.get(atom)
     if (!entry) return
