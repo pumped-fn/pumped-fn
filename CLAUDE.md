@@ -94,3 +94,12 @@ pnpm -F @pumped-fn/examples typecheck       # examples
 # Priority
 
 Library is GENERIC. No case-specific concepts in core API design.
+
+# C3 Audit Exclusions
+
+The following packages are **obsolete/deprecated** and excluded from C3 audits:
+
+- `@pumped-fn/react` - Legacy React bindings, not actively maintained
+- `@pumped-fn/devtools` - Legacy devtools, not actively maintained
+
+These packages exist in `packages/` but should NOT be documented in `.c3/`.

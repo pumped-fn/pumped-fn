@@ -15,6 +15,7 @@ export type AtomState = 'idle' | 'resolving' | 'resolved' | 'failed'
 
 export namespace Lite {
   export interface Scope {
+    readonly ready: Promise<void>
     resolve<T>(atom: Atom<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
@@ -80,6 +81,8 @@ export namespace Lite {
     tags?: Tagged<unknown>[]
   }
 
+  export type ControllerEvent = 'resolving' | 'resolved' | '*'
+
   export interface Controller<T> {
     readonly [controllerSymbol]: true
     readonly state: AtomState
@@ -88,6 +91,7 @@ export namespace Lite {
     release(): Promise<void>
     invalidate(): void
     on(listener: () => void): () => void
+    on(event: ControllerEvent, listener: () => void): () => void
   }
 
   export interface SelectOptions<S> {

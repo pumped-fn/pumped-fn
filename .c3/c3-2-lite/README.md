@@ -131,7 +131,7 @@ sequenceDiagram
 
 | Function | Description | Returns |
 |----------|-------------|---------|
-| `createScope(options?)` | Create DI container | `Promise<Scope>` |
+| `createScope(options?)` | Create DI container (sync, with `ready` promise) | `Scope` |
 | `atom(config)` | Define long-lived dependency | `Atom<T>` |
 | `flow(config)` | Define request handler | `Flow<T, I>` |
 | `tag(config)` | Define metadata tag | `Tag<T>` |
@@ -260,7 +260,7 @@ const loggingExtension: Lite.Extension = {
   }
 }
 
-const scope = await createScope({ extensions: [loggingExtension] })
+const scope = createScope({ extensions: [loggingExtension] })
 ```
 
 ## Testing {#c3-2-testing}
@@ -269,7 +269,7 @@ const scope = await createScope({ extensions: [loggingExtension] })
 **Test organization:**
 - Unit tests per source file
 - Type tests using `expectTypeOf` from Vitest
-- 84 tests covering all components
+- 102 tests covering all components
 
 **Running tests:**
 ```bash
@@ -283,4 +283,6 @@ pnpm -F @pumped-fn/lite typecheck:full  # Type check src + tests
 
 - [ADR-002](../adr/adr-002-lightweight-lite-package.md) - Initial package design decisions
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller-based reactivity design
+- [ADR-008](../adr/adr-008-sync-create-scope.md) - Synchronous createScope with ready promise
+- [ADR-009](../adr/adr-009-fix-duplicate-listener-notifications.md) - Controller.on() state filtering
 - [c3-1-core](../c3-1-core/) - Core library (feature comparison)

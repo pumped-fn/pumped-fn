@@ -46,13 +46,16 @@ Transitions:
 A Controller provides deferred, reactive access to an atom:
 
 ```typescript
+type ControllerEvent = 'resolving' | 'resolved' | '*'
+
 interface Controller<T> {
   readonly state: AtomState    // Current lifecycle state
   get(): T                     // Get value (throws if not resolved)
   resolve(): Promise<T>        // Trigger resolution
   release(): Promise<void>     // Run cleanup, remove from cache
   invalidate(): void           // Trigger re-resolution
-  on(listener: () => void): () => void  // Subscribe to changes
+  on(listener: () => void): () => void  // Subscribe to all changes
+  on(event: ControllerEvent, listener: () => void): () => void  // Subscribe to specific state
 }
 ```
 
@@ -75,7 +78,7 @@ interface ExecutionContext {
 ### createScope
 
 ```typescript
-async function createScope(options?: ScopeOptions): Promise<Scope>
+function createScope(options?: ScopeOptions): Scope
 
 interface ScopeOptions {
   extensions?: Extension[]       // Cross-cutting hooks
@@ -84,10 +87,14 @@ interface ScopeOptions {
 }
 ```
 
+Returns a Scope synchronously. The `ready` promise resolves when all extensions
+have been initialized. Resolution methods automatically wait for `ready`.
+
 ### Scope Interface
 
 ```typescript
 interface Scope {
+  readonly ready: Promise<void>  // Resolves when extensions initialized
   resolve<T>(atom: Atom<T>): Promise<T>
   controller<T>(atom: Atom<T>): Controller<T>
   release<T>(atom: Atom<T>): Promise<void>
@@ -102,8 +109,13 @@ interface Scope {
 ### Basic Resolution
 
 ```typescript
-const scope = await createScope()
+const scope = createScope()
 
+// Option 1: resolve() waits for ready internally
+const db = await scope.resolve(dbAtom)
+
+// Option 2: explicit wait
+await scope.ready
 const db = await scope.resolve(dbAtom)
 ```
 
@@ -163,18 +175,29 @@ console.log(ctrl.get())  // { port: 3000 }
 ```typescript
 const ctrl = scope.controller(configAtom)
 
-const unsub = ctrl.on(() => {
+// Subscribe to resolved state only (most common)
+ctrl.on('resolved', () => {
+  console.log('New value:', ctrl.get())
+})
+
+// Subscribe to resolving state only
+ctrl.on('resolving', () => {
+  console.log('Loading...')
+})
+
+// Subscribe to all state changes
+ctrl.on('*', () => {
   console.log('State changed:', ctrl.state)
-  if (ctrl.state === 'resolved') {
-    console.log('New value:', ctrl.get())
-  }
+})
+
+// Legacy syntax (equivalent to '*')
+ctrl.on(() => {
+  console.log('State changed:', ctrl.state)
 })
 
 await ctrl.resolve()
 ctrl.invalidate()
-// Logs: "State changed: resolving"
-// Logs: "State changed: resolved"
-// Logs: "New value: { port: 3001 }"
+// With on('resolved', ...) - logs once per invalidation cycle
 
 unsub() // Stop listening
 ```
@@ -244,11 +267,13 @@ await ctrl.resolve()
 ctrl.invalidate()
 // 1. Runs cleanups (LIFO order)
 // 2. Transitions to 'resolving'
-// 3. Notifies listeners
+// 3. Notifies 'resolving' and '*' listeners
 // 4. Re-runs factory
 // 5. Transitions to 'resolved' or 'failed'
-// 6. Notifies listeners again
+// 6. Notifies 'resolved' and '*' listeners
 ```
+
+Note: Listeners are notified exactly twice per invalidation cycle (once for 'resolving', once for 'resolved').
 
 ### Self-Invalidation from Factory
 
@@ -357,3 +382,5 @@ Key test scenarios in `tests/scope.test.ts`:
 - [c3-202](./c3-202-atom.md) - Atom definition
 - [c3-203](./c3-203-flow.md) - ExecutionContext usage in flows
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller design decisions
+- [ADR-008](../adr/adr-008-sync-create-scope.md) - Synchronous createScope with ready promise
+- [ADR-009](../adr/adr-009-fix-duplicate-listener-notifications.md) - Controller.on() state filtering

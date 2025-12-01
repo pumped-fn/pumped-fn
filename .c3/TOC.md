@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 12:27:28
+> Last generated: 2025-12-01 14:11:01
 
 ## Context Level
 
@@ -293,6 +293,44 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ## Architecture Decisions
 
+### [ADR-009-fix-duplicate-listener-notifications](./adr/adr-009-fix-duplicate-listener-notifications.md) - Fix Duplicate Listener Notifications and Improve Controller.on() API
+> Fix bug where Controller.on() listeners are called 3 times per invalidation
+cycle, and improve API to allow filtering by state ('resolving', 'resolved', '*').
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-009-status)
+- [Problem/Requirement](#adr-009-problem)
+- [Exploration Journey](#adr-009-exploration)
+- [Solution](#adr-009-solution)
+- [Changes Across Layers](#adr-009-changes)
+- [Implementation](#adr-009-implementation)
+- [Verification](#adr-009-verification)
+- [Test Cases](#adr-009-test)
+- [Related](#adr-009-related)
+
+---
+
+### [ADR-008-sync-create-scope](./adr/adr-008-sync-create-scope.md) - Synchronous createScope with Ready Promise
+> Change createScope() from async function to sync function that returns
+a Scope with a `ready` promise property for extension initialization.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-008-status)
+- [Problem/Requirement](#adr-008-problem)
+- [Exploration Journey](#adr-008-exploration)
+- [Solution](#adr-008-solution)
+- [Changes Across Layers](#adr-008-changes)
+- [Implementation](#adr-008-implementation)
+- [Verification](#adr-008-verification)
+- [Migration](#adr-008-migration)
+- [Related](#adr-008-related)
+
+---
+
 ### [ADR-007-resolve-context-data](./adr/adr-007-resolve-context-data.md) - Per-Atom Private Storage via ctx.data
 > Add lazy per-atom storage to ResolveContext, enabling state that survives
 invalidation while remaining truly private to the atom factory.
@@ -431,5 +469,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 23
-**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 7
+**Total Documents**: 25
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 9
