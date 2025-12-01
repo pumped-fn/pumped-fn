@@ -10,6 +10,7 @@ interface AtomEntry<T> {
   cleanups: (() => MaybePromise<void>)[]
   listeners: Set<() => void>
   pendingInvalidate: boolean
+  data?: Map<string, unknown>
 }
 
 class ControllerImpl<T> implements Lite.Controller<T> {
@@ -235,6 +236,12 @@ class ScopeImpl implements Lite.Scope {
         this.scheduleInvalidation(atom)
       },
       scope: this,
+      get data() {
+        if (!entry.data) {
+          entry.data = new Map()
+        }
+        return entry.data
+      },
     }
 
     const factory = atom.factory as (
