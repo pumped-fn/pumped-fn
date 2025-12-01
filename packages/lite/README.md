@@ -171,9 +171,9 @@ const configAtom = atom({
 const appAtom = atom({
   deps: { config: controller(configAtom) },  // controller, not direct
   factory: (ctx, { config }) => {
-    // Subscribe to config changes
-    config.on(() => {
-      console.log('config updated:', config.state)
+    // Subscribe to config changes (must specify event type)
+    config.on('resolved', () => {
+      console.log('config updated:', config.get())
       ctx.invalidate()  // re-run this atom too
     })
 

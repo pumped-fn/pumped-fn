@@ -31,9 +31,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
 
     this.currentValue = selector(ctrl.get())
 
-    this.ctrlUnsub = ctrl.on(() => {
-      if (this.ctrl.state !== 'resolved') return
-
+    this.ctrlUnsub = ctrl.on('resolved', () => {
       const nextValue = this.selector(this.ctrl.get())
       if (!this.eq(this.currentValue, nextValue)) {
         this.currentValue = nextValue
@@ -112,18 +110,7 @@ class ControllerImpl<T> implements Lite.Controller<T> {
     this.scope.invalidate(this.atom)
   }
 
-  on(eventOrListener: ListenerEvent | (() => void), maybeListener?: () => void): () => void {
-    let event: ListenerEvent
-    let listener: () => void
-
-    if (typeof eventOrListener === 'function') {
-      event = '*'
-      listener = eventOrListener
-    } else {
-      event = eventOrListener
-      listener = maybeListener!
-    }
-
+  on(event: ListenerEvent, listener: () => void): () => void {
     return this.scope.addListener(this.atom, event, listener)
   }
 }

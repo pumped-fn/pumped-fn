@@ -729,7 +729,7 @@ describe("ExecutionContext", () => {
       })
 
       const ctrl = scope.controller(myAtom)
-      ctrl.on(() => states.push(ctrl.state))
+      ctrl.on('*', () => states.push(ctrl.state))
 
       await ctrl.resolve()
 
@@ -743,7 +743,7 @@ describe("ExecutionContext", () => {
       const myAtom = atom({ factory: () => 42 })
 
       const ctrl = scope.controller(myAtom)
-      const unsub = ctrl.on(() => notifyCount++)
+      const unsub = ctrl.on('*', () => notifyCount++)
 
       await ctrl.resolve()
       const countAfterResolve = notifyCount
@@ -769,7 +769,7 @@ describe("ExecutionContext", () => {
       await ctrl.resolve()
       expect(ctrl.state).toBe('resolved')
 
-      ctrl.on(() => states.push(ctrl.state))
+      ctrl.on('*', () => states.push(ctrl.state))
       ctrl.invalidate()
 
       expect(states).toContain('resolving')
@@ -809,20 +809,6 @@ describe("ExecutionContext", () => {
       await new Promise(r => setTimeout(r, 50))
 
       expect(calls).toEqual(['resolving', 'resolved'])
-    })
-
-    it("supports legacy on(listener) syntax", async () => {
-      const scope = createScope()
-      let callCount = 0
-
-      const myAtom = atom({ factory: () => 'value' })
-      const ctl = scope.controller(myAtom)
-
-      ctl.on(() => callCount++)
-
-      await ctl.resolve()
-
-      expect(callCount).toBe(2)
     })
 
     it("only notifies '*' listeners on failed state, not 'resolved'", async () => {

@@ -15,7 +15,19 @@ const scope = createScope()
 await scope.ready
 ```
 
+**BREAKING**: `Controller.on()` now requires explicit event type.
+
+Migration:
+```typescript
+// Before
+ctl.on(() => { ... })
+
+// After
+ctl.on('resolved', () => { ... })  // Most common: react to new values
+ctl.on('resolving', () => { ... }) // Loading states
+ctl.on('*', () => { ... })         // All state changes
+```
+
 Other changes:
-- Add `Controller.on()` state filtering: `ctl.on('resolved', fn)`, `ctl.on('resolving', fn)`, `ctl.on('*', fn)`
 - Fix duplicate listener notifications (was 3x per invalidation, now 2x)
 - On failed state, only `'*'` listeners are notified (not `'resolved'`)

@@ -132,12 +132,11 @@ doInvalidate() ─┬─► state = 'resolving'
 
 ### Part 2: Improve Controller.on() API
 
-Change the signature to accept an optional state filter:
+Change the signature to require an explicit state filter:
 
 ```typescript
 interface Controller<T> {
-  on(listener: () => void): () => void                           // '*' - all states
-  on(state: 'resolving' | 'resolved' | '*', listener: () => void): () => void
+  on(event: 'resolving' | 'resolved' | '*', listener: () => void): () => void
 }
 ```
 
@@ -154,13 +153,8 @@ ctl.on('resolving', () => {
   console.log('Loading...')
 })
 
-// Listen to all state changes (backwards compatible)
+// Listen to all state changes
 ctl.on('*', () => {
-  console.log('State:', ctl.state)
-})
-
-// Legacy: no filter = '*'
-ctl.on(() => {
   console.log('State:', ctl.state)
 })
 ```
@@ -185,8 +179,7 @@ export interface Controller<T> {
   resolve(): Promise<T>
   release(): Promise<void>
   invalidate(): void
-  on(listener: () => void): () => void
-  on(state: 'resolving' | 'resolved' | '*', listener: () => void): () => void
+  on(event: ControllerEvent, listener: () => void): () => void
 }
 ```
 
@@ -211,19 +204,8 @@ interface AtomEntry<T> {
 class ControllerImpl<T> implements Lite.Controller<T> {
   // ...
 
-  on(listenerOrState: (() => void) | 'resolving' | 'resolved' | '*', maybeListener?: () => void): () => void {
-    let state: 'resolving' | 'resolved' | '*'
-    let listener: () => void
-
-    if (typeof listenerOrState === 'function') {
-      state = '*'
-      listener = listenerOrState
-    } else {
-      state = listenerOrState
-      listener = maybeListener!
-    }
-
-    return this.scope.addListener(this.atom, state, listener)
+  on(event: ListenerEvent, listener: () => void): () => void {
+    return this.scope.addListener(this.atom, event, listener)
   }
 }
 ```
@@ -350,11 +332,10 @@ private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<
 - [x] `ctl.on('resolved', ...)` fires only on resolved
 - [x] `ctl.on('resolving', ...)` fires only on resolving
 - [x] `ctl.on('*', ...)` fires on both (resolving + resolved)
-- [x] `ctl.on(() => ...)` (legacy) fires on both
 - [x] `scope.on('resolving', ...)` fires exactly once per invalidation
 - [x] `scope.on('resolved', ...)` fires exactly once per invalidation
 - [x] On failure, only '*' listeners fire (not 'resolved')
-- [x] All 106 tests pass
+- [x] All 105 tests pass
 
 ## Test Cases {#adr-009-test}
 
@@ -393,20 +374,6 @@ describe('Controller.on() state filtering', () => {
     await new Promise(r => setTimeout(r, 50))
 
     expect(calls).toEqual(['resolving', 'resolved'])
-  })
-
-  it('supports legacy on(listener) syntax', async () => {
-    const scope = createScope()
-    let callCount = 0
-
-    const myAtom = atom({ factory: () => 'value' })
-    const ctl = scope.controller(myAtom)
-
-    ctl.on(() => callCount++)
-
-    await ctl.resolve()
-
-    expect(callCount).toBe(2)  // resolving + resolved
   })
 
   it("only notifies '*' listeners on failed state, not 'resolved'", async () => {

@@ -90,7 +90,6 @@ export namespace Lite {
     resolve(): Promise<T>
     release(): Promise<void>
     invalidate(): void
-    on(listener: () => void): () => void
     on(event: ControllerEvent, listener: () => void): () => void
   }
 
