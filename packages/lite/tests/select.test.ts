@@ -23,5 +23,14 @@ describe("scope.select()", () => {
       expect(handle.subscribe).toBeTypeOf("function")
       expect(handle.get()).toEqual({ id: "1", text: "Learn TypeScript" })
     })
+
+    it("throws if atom not resolved", async () => {
+      const scope = await createScope()
+      const todosAtom = atom({ factory: () => [{ id: "1", text: "Test" }] })
+
+      expect(() => {
+        scope.select(todosAtom, (todos) => todos[0])
+      }).toThrow("Cannot select from unresolved atom")
+    })
   })
 })
