@@ -33,4 +33,49 @@ describe("scope.select()", () => {
       }).toThrow("Cannot select from unresolved atom")
     })
   })
+
+  describe("equality", () => {
+    it("uses reference equality by default", async () => {
+      const scope = await createScope()
+      const obj1 = { id: "1" }
+      const obj2 = { id: "1" }
+      let resolveCount = 0
+      const dataAtom = atom({
+        factory: () => {
+          resolveCount++
+          return resolveCount === 1 ? obj1 : obj2
+        }
+      })
+
+      await scope.resolve(dataAtom)
+      const handle = scope.select(dataAtom, (data) => data)
+
+      let notifyCount = 0
+      handle.subscribe(() => notifyCount++)
+
+      const ctrl = scope.controller(dataAtom)
+      ctrl.invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notifyCount).toBe(1)
+    })
+
+    it("does not notify when reference is same", async () => {
+      const scope = await createScope()
+      const sharedObj = { id: "1" }
+      const dataAtom = atom({ factory: () => sharedObj })
+
+      await scope.resolve(dataAtom)
+      const handle = scope.select(dataAtom, (data) => data)
+
+      let notifyCount = 0
+      handle.subscribe(() => notifyCount++)
+
+      const ctrl = scope.controller(dataAtom)
+      ctrl.invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notifyCount).toBe(0)
+    })
+  })
 })
