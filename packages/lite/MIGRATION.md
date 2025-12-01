@@ -12,6 +12,7 @@ This guide helps AI agents migrate code from `@pumped-fn/core-next` to `@pumped-
 | `Core.Accessor<T>` | `Lite.Controller<T>` | Renamed + reactive |
 | `Core.Controller` | `ResolveContext` | Factory context |
 | `scope.accessor(exec)` | `scope.controller(atom)` | Get controller |
+| `accessor.on(fn)` | `ctrl.on(event, fn)` | Event filtering: `'resolved'`, `'resolving'`, `'*'` |
 | `Promised<T>` | `Promise<T>` | Use native |
 | `multi()` | ❌ Not available | Use Map pattern |
 | `standardSchema` | ❌ Not available | Validate manually |
@@ -137,7 +138,7 @@ const config = await scope.resolve(configExecutor)
 const accessor = scope.accessor(configExecutor)
 
 // AFTER (lite)
-const scope = await createScope({
+const scope = createScope({
   presets: [preset(configAtom, mockConfig)],
   extensions: [loggingExtension],
 })
@@ -326,10 +327,27 @@ const configAtom = atom({
   }
 })
 
-// lite-only: subscribe to changes
+// lite-only: subscribe to changes with state filtering
 const ctrl = scope.controller(configAtom)
-ctrl.on(() => {
-  console.log('Config changed:', ctrl.get())
+
+// Subscribe to specific events
+ctrl.on('resolved', () => {
+  console.log('Config resolved:', ctrl.get())
+})
+
+ctrl.on('resolving', () => {
+  console.log('Config is re-resolving...')
+})
+
+// Subscribe to all state changes
+ctrl.on('*', () => {
+  console.log('Config state changed:', ctrl.state)
+})
+
+// Fine-grained subscriptions with select()
+const portSelect = scope.select(configAtom, (config) => config.port)
+portSelect.subscribe(() => {
+  console.log('Port changed:', portSelect.get())
 })
 ```
 
@@ -377,5 +395,6 @@ Keep using `@pumped-fn/core-next` if you need:
 | Rich errors | ❌ | ✅ |
 | Controller reactivity | ✅ | ❌ |
 | Self-invalidation | ✅ | ❌ |
+| Fine-grained select() | ✅ | ❌ |
 | Bundle size | <17KB | ~75KB |
 | Dependencies | 0 | 0 |
