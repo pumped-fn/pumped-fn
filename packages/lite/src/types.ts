@@ -21,6 +21,11 @@ export namespace Lite {
     dispose(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
     on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+    select<T, S>(
+      atom: Atom<T>,
+      selector: (value: T) => S,
+      options?: SelectOptions<S>
+    ): SelectHandle<S>
   }
 
   export interface CreateContextOptions {
@@ -83,6 +88,15 @@ export namespace Lite {
     release(): Promise<void>
     invalidate(): void
     on(listener: () => void): () => void
+  }
+
+  export interface SelectOptions<S> {
+    eq?: (prev: S, next: S) => boolean
+  }
+
+  export interface SelectHandle<S> {
+    get(): S
+    subscribe(listener: () => void): () => void
   }
 
   export interface Tag<T, HasDefault extends boolean = false> {

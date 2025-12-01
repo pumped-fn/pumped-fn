@@ -188,6 +188,51 @@ unsub() // Stop listening
 | `resolved` | Returns current value |
 | `failed` | Throws the error that caused failure |
 
+## Select Usage {#c3-201-select}
+
+### Creating a SelectHandle
+
+```typescript
+const handle = scope.select(
+  todosAtom,
+  (todos) => todos.find(t => t.id === itemId),
+  { eq: (a, b) => a?.updatedAt === b?.updatedAt }
+)
+```
+
+### SelectHandle Interface
+
+```typescript
+interface SelectHandle<S> {
+  get(): S                                    // Current sliced value
+  subscribe(listener: () => void): () => void // Subscribe to changes
+}
+```
+
+### Usage Pattern
+
+```typescript
+// Get current value
+const todo = handle.get()
+
+// Subscribe to changes
+const unsub = handle.subscribe(() => {
+  console.log('Changed:', handle.get())
+})
+
+// Cleanup
+unsub() // Auto-cleans handle when last subscriber leaves
+```
+
+### Behavior
+
+| Condition | Result |
+|-----------|--------|
+| Atom not resolved | Throws error |
+| eq returns true | No notification |
+| eq returns false | Notify + update value |
+| Last subscriber leaves | Auto-cleanup |
+
 ## Invalidation {#c3-201-invalidation}
 
 ### External Invalidation
