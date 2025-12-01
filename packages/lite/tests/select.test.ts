@@ -226,4 +226,35 @@ describe("scope.select()", () => {
       expect(callsAfterResolved).toBe(2)
     })
   })
+
+  describe("multiple selects", () => {
+    it("multiple selects on same atom work independently", async () => {
+      const scope = await createScope()
+      let count = 0
+      const dataAtom = atom({
+        factory: () => ({ a: count++, b: count++ })
+      })
+
+      await scope.resolve(dataAtom)
+
+      const handleA = scope.select(dataAtom, (d) => d.a)
+      const handleB = scope.select(dataAtom, (d) => d.b)
+
+      expect(handleA.get()).toBe(0)
+      expect(handleB.get()).toBe(1)
+
+      let notifyA = 0
+      let notifyB = 0
+      handleA.subscribe(() => notifyA++)
+      handleB.subscribe(() => notifyB++)
+
+      scope.controller(dataAtom).invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notifyA).toBe(1)
+      expect(notifyB).toBe(1)
+      expect(handleA.get()).toBe(2)
+      expect(handleB.get()).toBe(3)
+    })
+  })
 })
