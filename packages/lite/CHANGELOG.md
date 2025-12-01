@@ -1,5 +1,26 @@
 # @pumped-fn/lite
 
+## 1.0.1
+
+### Patch Changes
+
+- 9ee6ac2: Add comprehensive README documentation for release
+
+  - Add installation instructions
+  - Add quick start guide with complete example
+  - Document all core concepts (Atoms, Flows, Controllers, Tags, Presets, Extensions)
+  - Add lifecycle diagrams (state machine, resolution flow, invalidation flow)
+  - Add complete API reference tables
+  - Add comparison with @pumped-fn/core-next
+  - Add guidance on when to choose lite vs core-next
+
+- 219fce4: Update MIGRATION.md with accurate API documentation
+
+  - Add Controller.on() event filtering (`'resolved'`, `'resolving'`, `'*'`)
+  - Add scope.select() fine-grained subscription example
+  - Add Fine-grained select() to feature comparison table
+  - Fix Quick Reference table with event filtering syntax
+
 ## 1.0.0
 
 ### Major Changes
