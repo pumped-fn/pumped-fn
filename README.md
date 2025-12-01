@@ -73,100 +73,86 @@ stateDiagram-v2
 
 ## Example: Snake Game
 
-A complete example showing **tags**, **ctx.data**, **controller**, **invalidate**, and **cleanup** working together. State is split into focused atoms for fine-grained reactivity:
-
 ```typescript
 import { atom, tag, tags, controller, createScope } from '@pumped-fn/lite'
 
 type Point = { x: number; y: number }
 type Dir = 'up' | 'down' | 'left' | 'right'
+type GameState = { snake: Point[]; food: Point; dir: Dir; score: number; hi: number; dead: boolean; size: number }
 
-// Config via tags
 const gridSize = tag<number>({ label: 'gridSize', default: 20 })
 const tickMs = tag<number>({ label: 'tickMs', default: 100 })
 
-// Split state into focused atoms - each can invalidate independently
-const dirAtom = atom({ factory: () => 'right' as Dir })
-
-const snakeAtom = atom({
+const gameAtom = atom({
   deps: { size: tags.required(gridSize) },
-  factory: (ctx, { size }) => [{ x: Math.floor(size/2), y: Math.floor(size/2) }] as Point[]
+  factory: (ctx, { size }): GameState => {
+    let state = ctx.data.get('state') as GameState | undefined
+    if (!state) {
+      state = {
+        snake: [{ x: Math.floor(size/2), y: Math.floor(size/2) }],
+        food: { x: Math.floor(size/4), y: Math.floor(size/4) },
+        dir: 'right', score: 0, hi: 0, dead: false, size
+      }
+      ctx.data.set('state', state)
+    }
+    return state
+  }
 })
 
-const foodAtom = atom({
-  deps: { size: tags.required(gridSize) },
-  factory: (ctx, { size }) => ({ x: Math.floor(size/4), y: Math.floor(size/4) }) as Point
-})
-
-const scoreAtom = atom({
-  factory: (ctx) => ({
-    current: 0,
-    hi: (ctx.data.get('hi') as number) ?? 0  // persists across resets
-  })
-})
-
-// Auto-ticker - lazily loaded via controller
 const tickerAtom = atom({
-  deps: { ms: tags.required(tickMs), snake: controller(snakeAtom) },
-  factory: (ctx, { ms, snake }) => {
-    const id = setInterval(() => snake.invalidate(), ms)
+  deps: { ms: tags.required(tickMs), game: controller(gameAtom) },
+  factory: (ctx, { ms, game }) => {
+    const id = setInterval(() => {
+      const state = game.get()
+      if (!state.dead) {
+        tick(state)
+        game.invalidate()
+      }
+    }, ms)
     ctx.cleanup(() => clearInterval(id))
   }
 })
 
-// Facade - clean API for UI
-async function createSnakeGame(size = 20, tick = 100) {
-  const scope = createScope({ tags: [gridSize(size), tickMs(tick)] })
-  const [dirCtrl, snakeCtrl, foodCtrl, scoreCtrl, tickerCtrl] = [
-    scope.controller(dirAtom),
-    scope.controller(snakeAtom),
-    scope.controller(foodAtom),
-    scope.controller(scoreAtom),
-    scope.controller(tickerAtom)
-  ]
-  await Promise.all([dirCtrl, snakeCtrl, foodCtrl, scoreCtrl].map(c => c.resolve()))
+function tick(s: GameState) { /* move snake, check collisions, update score */ }
+
+async function createSnakeGame(size = 20, tickInterval = 100) {
+  const scope = createScope({ tags: [gridSize(size), tickMs(tickInterval)] })
+  const gameCtrl = scope.controller(gameAtom)
+  const tickerCtrl = scope.controller(tickerAtom)
+  await gameCtrl.resolve()
 
   const turn = (dir: Dir) => {
+    const state = gameCtrl.get()
     const opposite: Record<Dir, Dir> = { up: 'down', down: 'up', left: 'right', right: 'left' }
-    if (opposite[dir] !== dirCtrl.get()) dirCtrl.invalidate()
+    if (opposite[dir] !== state.dir && !state.dead) state.dir = dir
   }
 
   return {
-    // Reactive state - UI subscribes to specific pieces
-    dir: dirCtrl,
-    snake: snakeCtrl,
-    food: foodCtrl,
-    score: scoreCtrl,
-
-    // Actions
+    state: gameCtrl,
     up: () => turn('up'),
     down: () => turn('down'),
     left: () => turn('left'),
     right: () => turn('right'),
+    step: () => { tick(gameCtrl.get()); gameCtrl.invalidate() },
     start: () => tickerCtrl.resolve(),
     pause: () => tickerCtrl.release(),
-    reset: () => Promise.all([snakeCtrl, foodCtrl, dirCtrl].map(c => c.invalidate())),
     dispose: () => scope.dispose()
   }
 }
 
-// Usage - subscribe to only what you need
 const game = await createSnakeGame(15, 100)
-game.snake.on('resolved', () => renderSnake(game.snake.get()))
-game.food.on('resolved', () => renderFood(game.food.get()))
-game.score.on('resolved', () => renderScore(game.score.get()))
-
+game.state.on('resolved', () => render(game.state.get()))
 await game.start()
 game.down()
 ```
 
 **What's demonstrated:**
 - **`tag`** - `gridSize`, `tickMs` configure game per-instance
-- **`ctx.data`** - High score in `scoreAtom` persists across `reset()`
-- **`controller()`** - Ticker lazily loaded; fine-grained state access
-- **`invalidate()`** - Each atom updates independently (direction, snake, food, score)
+- **`ctx.data`** - State persists across `invalidate()` calls
+- **`controller()`** - Ticker gets `Controller<GameState>`, calls `.get()` and `.invalidate()`
+- **`invalidate()`** - Re-runs factory, notifies subscribers
 - **`cleanup()`** - Ticker interval cleared on `pause()`
-- **`ctrl.on()`** - UI subscribes to specific state slices for efficient re-renders
+- **`ctrl.on('resolved')`** - UI subscribes to state changes
 
 ## Design Principles
 
