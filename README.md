@@ -118,7 +118,10 @@ async function createSnakeGame(size = 20, tick = 100) {
   const turn = (dir: Dir) => {
     const s = stateCtrl.get()
     const opposite: Record<Dir, Dir> = { up: 'down', down: 'up', left: 'right', right: 'left' }
-    if (opposite[dir] !== s.dir) s.dir = dir
+    if (opposite[dir] !== s.dir) {
+      s.dir = dir
+      stateCtrl.invalidate()  // notify subscribers of state change
+    }
   }
 
   return {
