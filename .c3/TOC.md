@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 11:37:19
+> Last generated: 2025-12-01 11:53:22
 
 ## Context Level
 
@@ -296,7 +296,7 @@ allowing factory bypassing or atom substitution at scope creation.
 > Add lazy per-atom storage to ResolveContext, enabling state that survives
 invalidation while remaining truly private to the atom factory.
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 - [Status](#adr-007-status)
@@ -323,6 +323,8 @@ change detection, enabling fine-grained reactivity for frontend rendering optimi
 - [Solution](#adr-006-solution)
 - [Changes Across Layers](#adr-006-changes)
 - [Verification](#adr-006-verification)
+- [React Integration Considerations](#adr-006-react)
+- [Future Considerations](#adr-006-future)
 - [Related](#adr-006-related)
 
 ---
