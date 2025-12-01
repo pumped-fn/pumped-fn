@@ -191,4 +191,39 @@ describe("scope.select()", () => {
       expect(handle.get()).toBe(1)
     })
   })
+
+  describe("selector execution", () => {
+    it("only runs selector when atom is resolved", async () => {
+      const scope = await createScope()
+      let selectorCalls = 0
+      const asyncAtom = atom({
+        factory: async () => {
+          await new Promise(r => setTimeout(r, 30))
+          return 42
+        }
+      })
+
+      await scope.resolve(asyncAtom)
+      const handle = scope.select(asyncAtom, (n) => {
+        selectorCalls++
+        return n * 2
+      })
+
+      expect(selectorCalls).toBe(1)
+      expect(handle.get()).toBe(84)
+
+      handle.subscribe(() => {})
+
+      scope.controller(asyncAtom).invalidate()
+
+      await new Promise(r => setTimeout(r, 10))
+      const callsDuringResolving = selectorCalls
+
+      await new Promise(r => setTimeout(r, 50))
+      const callsAfterResolved = selectorCalls
+
+      expect(callsDuringResolving).toBe(1)
+      expect(callsAfterResolved).toBe(2)
+    })
+  })
 })
