@@ -127,4 +127,48 @@ describe("scope.select()", () => {
       expect(handle.get().id).toBe("2")
     })
   })
+
+  describe("subscription", () => {
+    it("supports multiple subscribers", async () => {
+      const scope = await createScope()
+      let value = 1
+      const numAtom = atom({ factory: () => value++ })
+
+      await scope.resolve(numAtom)
+      const handle = scope.select(numAtom, (n) => n)
+
+      let count1 = 0
+      let count2 = 0
+      handle.subscribe(() => count1++)
+      handle.subscribe(() => count2++)
+
+      scope.controller(numAtom).invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(count1).toBe(1)
+      expect(count2).toBe(1)
+    })
+
+    it("unsubscribe removes specific listener", async () => {
+      const scope = await createScope()
+      let value = 1
+      const numAtom = atom({ factory: () => value++ })
+
+      await scope.resolve(numAtom)
+      const handle = scope.select(numAtom, (n) => n)
+
+      let count1 = 0
+      let count2 = 0
+      const unsub1 = handle.subscribe(() => count1++)
+      handle.subscribe(() => count2++)
+
+      unsub1()
+
+      scope.controller(numAtom).invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(count1).toBe(0)
+      expect(count2).toBe(1)
+    })
+  })
 })
