@@ -47,7 +47,15 @@ interface ResolveContext {
   cleanup(fn: () => MaybePromise<void>): void  // Register cleanup
   invalidate(): void                           // Schedule re-resolution
   readonly scope: Scope                        // Parent scope
-  readonly data: Map<string, unknown>          // Per-atom private storage (lazy)
+  readonly data: DataStore                     // Per-atom private storage (lazy)
+}
+
+interface DataStore {
+  get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
+  set<T>(tag: Tag<T, boolean>, value: T): void
+  has(tag: Tag<unknown, boolean>): boolean
+  delete(tag: Tag<unknown, boolean>): boolean
+  clear(): void
 }
 ```
 
@@ -259,20 +267,22 @@ const dataAtom = atom({
 
 ## Per-Atom Private Storage {#c3-202-data}
 
-The `ctx.data` Map provides private storage that survives invalidation but is cleared on release. Useful for internal bookkeeping that shouldn't be exposed publicly.
+The `ctx.data` DataStore provides typed private storage using Tags as keys. Data survives invalidation but is cleared on release. Useful for internal bookkeeping that shouldn't be exposed publicly.
 
-### Pattern: Change Detection
+### Pattern: Optional Value (no default)
 
 ```typescript
+const prevTag = tag<Data>({ label: 'prev' })
+
 const pollingAtom = atom({
   factory: async (ctx) => {
-    const prev = ctx.data.get('prev') as Data | undefined
+    const prev = ctx.data.get(prevTag)  // Data | undefined - type enforced!
     const current = await fetchData()
 
     if (prev !== undefined && current !== prev) {
       console.log('Data changed!')
     }
-    ctx.data.set('prev', current)
+    ctx.data.set(prevTag, current)  // Type checked - must be Data
 
     setTimeout(() => ctx.invalidate(), 5000)
     return current
@@ -280,14 +290,58 @@ const pollingAtom = atom({
 })
 ```
 
+### Pattern: With Default Value
+
+```typescript
+const countTag = tag<number>({ label: 'count', default: 0 })
+
+const counterAtom = atom({
+  factory: async (ctx) => {
+    const count = ctx.data.get(countTag)  // number - guaranteed by default!
+    ctx.data.set(countTag, count + 1)
+    return count
+  }
+})
+```
+
+### Pattern: Complex Types
+
+```typescript
+const cacheTag = tag<Map<string, Result>>({ label: 'cache' })
+
+const cacheAtom = atom({
+  factory: async (ctx) => {
+    let cache = ctx.data.get(cacheTag)
+    if (!cache) {
+      cache = new Map()
+      ctx.data.set(cacheTag, cache)
+    }
+    return cache
+  }
+})
+```
+
+### Type Safety
+
+Tags enforce types at compile time:
+
+```typescript
+const numTag = tag<number>({ label: 'num' })
+
+ctx.data.set(numTag, 123)      // ✅ OK
+ctx.data.set(numTag, "oops")   // ❌ Compile error!
+
+const n = ctx.data.get(numTag) // type is number | undefined
+```
+
 ### Lifecycle
 
 | Event | `ctx.data` Behavior |
 |-------|---------------------|
-| First access | Map created lazily |
-| `invalidate()` | Map preserved |
-| `release()` | Map cleared |
-| `scope.dispose()` | Map cleared |
+| First access | DataStore created lazily |
+| `invalidate()` | Data preserved |
+| `release()` | Data cleared |
+| `scope.dispose()` | Data cleared |
 
 ### When to Use
 
@@ -346,14 +400,18 @@ Key test scenarios in `tests/atom.test.ts`:
 - Type guards
 
 Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
+- Tag-based get/set with type safety
+- Default value handling for tags with defaults
 - Data persists across invalidations
 - Data cleared on release
-- Data lazily created
-- Independent data per atom
+- DataStore lazily created
+- Independent data per atom (same tag, different storage)
+- has(), delete(), clear() operations
 
 ## Related {#c3-202-related}
 
 - [c3-201](./c3-201-scope.md) - Scope resolution and Controller
-- [c3-204](./c3-204-tag.md) - Tag dependencies
+- [c3-204](./c3-204-tag.md) - Tag dependencies (tags also used as DataStore keys)
 - [c3-205](./c3-205-preset.md) - Atom value presets
-- [ADR-007](../adr/adr-007-resolve-context-data.md) - Per-atom private storage design
+- [ADR-007](../adr/adr-007-resolve-context-data.md) - Original per-atom private storage design
+- [ADR-010](../adr/adr-010-typed-data-store.md) - Tag-based typed DataStore API

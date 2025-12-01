@@ -53,11 +53,19 @@ export namespace Lite {
     readonly tags?: Tagged<unknown>[]
   }
 
+  export interface DataStore {
+    get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
+    set<T>(tag: Tag<T, boolean>, value: T): void
+    has(tag: Tag<unknown, boolean>): boolean
+    delete(tag: Tag<unknown, boolean>): boolean
+    clear(): void
+  }
+
   export interface ResolveContext {
     cleanup(fn: () => MaybePromise<void>): void
     invalidate(): void
     readonly scope: Scope
-    readonly data: Map<string, unknown>
+    readonly data: DataStore
   }
 
   export interface ExecutionContext {

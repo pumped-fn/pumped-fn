@@ -82,18 +82,19 @@ type GameState = { snake: Point[]; food: Point; dir: Dir; score: number; hi: num
 
 const gridSize = tag<number>({ label: 'gridSize', default: 20 })
 const tickMs = tag<number>({ label: 'tickMs', default: 100 })
+const stateTag = tag<GameState>({ label: 'state' })
 
 const gameAtom = atom({
   deps: { size: tags.required(gridSize) },
   factory: (ctx, { size }): GameState => {
-    let state = ctx.data.get('state') as GameState | undefined
+    let state = ctx.data.get(stateTag)  // GameState | undefined - type safe!
     if (!state) {
       state = {
         snake: [{ x: Math.floor(size/2), y: Math.floor(size/2) }],
         food: { x: Math.floor(size/4), y: Math.floor(size/4) },
         dir: 'right', score: 0, hi: 0, dead: false, size
       }
-      ctx.data.set('state', state)
+      ctx.data.set(stateTag, state)  // Type checked
     }
     return state
   }
@@ -147,8 +148,8 @@ game.down()
 ```
 
 **What's demonstrated:**
-- **`tag`** - `gridSize`, `tickMs` configure game per-instance
-- **`ctx.data`** - State persists across `invalidate()` calls
+- **`tag`** - `gridSize`, `tickMs` configure game per-instance; `stateTag` provides typed storage key
+- **`ctx.data`** - State persists across `invalidate()` calls with type-safe tag-based API
 - **`controller()`** - Ticker gets `Controller<GameState>`, calls `.get()` and `.invalidate()`
 - **`invalidate()`** - Re-runs factory, notifies subscribers
 - **`cleanup()`** - Ticker interval cleared on `pause()`

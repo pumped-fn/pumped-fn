@@ -4,6 +4,36 @@ import { isAtom, isControllerDep } from "./atom"
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
+class DataStoreImpl implements Lite.DataStore {
+  private readonly map = new Map<symbol, unknown>()
+
+  get<T, H extends boolean>(tag: Lite.Tag<T, H>): H extends true ? T : T | undefined {
+    if (this.map.has(tag.key)) {
+      return this.map.get(tag.key) as T
+    }
+    if (tag.hasDefault) {
+      return tag.defaultValue as T
+    }
+    return undefined as H extends true ? T : T | undefined
+  }
+
+  set<T>(tag: Lite.Tag<T, boolean>, value: T): void {
+    this.map.set(tag.key, value)
+  }
+
+  has(tag: Lite.Tag<unknown, boolean>): boolean {
+    return this.map.has(tag.key)
+  }
+
+  delete(tag: Lite.Tag<unknown, boolean>): boolean {
+    return this.map.delete(tag.key)
+  }
+
+  clear(): void {
+    this.map.clear()
+  }
+}
+
 interface AtomEntry<T> {
   state: AtomState
   value?: T
@@ -12,7 +42,7 @@ interface AtomEntry<T> {
   cleanups: (() => MaybePromise<void>)[]
   listeners: Map<ListenerEvent, Set<() => void>>
   pendingInvalidate: boolean
-  data?: Map<string, unknown>
+  data?: Lite.DataStore
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -333,7 +363,7 @@ class ScopeImpl implements Lite.Scope {
       scope: this,
       get data() {
         if (!entry.data) {
-          entry.data = new Map()
+          entry.data = new DataStoreImpl()
         }
         return entry.data
       },

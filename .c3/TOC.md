@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 14:11:01
+> Last generated: 2025-12-01 18:15:43
 
 ## Context Level
 
@@ -293,6 +293,25 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ## Architecture Decisions
 
+### [ADR-010-typed-data-store](./adr/adr-010-typed-data-store.md) - Tag-based Typed DataStore API for ctx.data
+> Replace Map<string, unknown> with typed DataStore interface using Tag as
+keys for compile-time type safety, consistent API with existing tag system,
+and default value support.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-010-status)
+- [Problem/Requirement](#adr-010-problem)
+- [Exploration Journey](#adr-010-exploration)
+- [Solution](#adr-010-solution)
+- [Changes Across Layers](#adr-010-changes)
+- [Verification](#adr-010-verification)
+- [Migration Guide](#adr-010-migration)
+- [Related](#adr-010-related)
+
+---
+
 ### [ADR-009-fix-duplicate-listener-notifications](./adr/adr-009-fix-duplicate-listener-notifications.md) - Fix Duplicate Listener Notifications and Improve Controller.on() API
 > Fix bug where Controller.on() listeners are called 3 times per invalidation
 cycle, and improve API to allow filtering by state ('resolving', 'resolved', '*').
@@ -469,5 +488,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 25
-**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 9
+**Total Documents**: 26
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 10

@@ -184,18 +184,20 @@ const appAtom = atom({
 
 ## Per-Atom Private Storage
 
-The `ctx.data` Map provides private storage that survives invalidation but clears on release. Useful for internal state that shouldn't be exposed:
+The `ctx.data` DataStore provides typed private storage using Tags as keys. Data survives invalidation but clears on release:
 
 ```typescript
+const prevTag = tag<Data>({ label: 'prev' })
+
 const pollingAtom = atom({
   factory: async (ctx) => {
-    const prev = ctx.data.get('prev') as Data | undefined
+    const prev = ctx.data.get(prevTag)  // Data | undefined - type enforced!
     const current = await fetchData()
 
     if (prev && current !== prev) {
       console.log('Data changed!')
     }
-    ctx.data.set('prev', current)
+    ctx.data.set(prevTag, current)  // Type checked
 
     setTimeout(() => ctx.invalidate(), 5000)
     return current
@@ -203,11 +205,25 @@ const pollingAtom = atom({
 })
 ```
 
+Tags with defaults guarantee non-undefined values:
+
+```typescript
+const countTag = tag<number>({ label: 'count', default: 0 })
+
+const counterAtom = atom({
+  factory: (ctx) => {
+    const count = ctx.data.get(countTag)  // number - guaranteed!
+    ctx.data.set(countTag, count + 1)
+    return count
+  }
+})
+```
+
 | Event | `ctx.data` Behavior |
 |-------|---------------------|
-| First access | Map created lazily |
-| `invalidate()` | Map preserved |
-| `release()` | Map cleared |
+| First access | DataStore created lazily |
+| `invalidate()` | Data preserved |
+| `release()` | Data cleared |
 
 ## Tags (Contextual Values)
 

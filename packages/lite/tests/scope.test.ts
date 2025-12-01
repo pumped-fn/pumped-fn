@@ -942,36 +942,80 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("ctx.data", () => {
-    it("provides a Map for storing data", async () => {
+  describe("ctx.data (tag-based DataStore)", () => {
+    it("stores and retrieves typed values using tags", async () => {
       const scope = createScope()
-      let capturedData: Map<string, unknown> | undefined
+      const valueTag = tag<string>({ label: "value" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          capturedData = ctx.data
-          ctx.data.set("key", "value")
-          return ctx.data.get("key")
+          ctx.data.set(valueTag, "hello")
+          return ctx.data.get(valueTag)
         },
       })
 
       const result = await scope.resolve(myAtom)
 
-      expect(result).toBe("value")
-      expect(capturedData).toBeInstanceOf(Map)
-      expect(capturedData?.get("key")).toBe("value")
+      expect(result).toBe("hello")
+    })
+
+    it("returns undefined for missing keys without default", async () => {
+      const scope = createScope()
+      const missingTag = tag<string>({ label: "missing" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          return ctx.data.get(missingTag)
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBeUndefined()
+    })
+
+    it("returns default value for missing keys with default", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          return ctx.data.get(countTag)
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBe(0)
+    })
+
+    it("returns stored value over default when set", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(countTag, 42)
+          return ctx.data.get(countTag)
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBe(42)
     })
 
     it("persists data across invalidations", async () => {
       const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
       let resolveCount = 0
 
       const myAtom = atom({
         factory: (ctx) => {
           resolveCount++
-          const prev = ctx.data.get("count") as number | undefined
-          ctx.data.set("count", (prev ?? 0) + 1)
-          return ctx.data.get("count")
+          const prev = ctx.data.get(countTag)
+          ctx.data.set(countTag, prev + 1)
+          return ctx.data.get(countTag)
         },
       })
 
@@ -989,12 +1033,13 @@ describe("ExecutionContext", () => {
 
     it("clears data when atom is released", async () => {
       const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
 
       const myAtom = atom({
         factory: (ctx) => {
-          const prev = ctx.data.get("count") as number | undefined
-          ctx.data.set("count", (prev ?? 0) + 1)
-          return ctx.data.get("count")
+          const prev = ctx.data.get(countTag)
+          ctx.data.set(countTag, prev + 1)
+          return ctx.data.get(countTag)
         },
       })
 
@@ -1007,8 +1052,9 @@ describe("ExecutionContext", () => {
       expect(second).toBe(1)
     })
 
-    it("creates data Map lazily on first access", async () => {
+    it("creates DataStore lazily on first access", async () => {
       const scope = createScope()
+      const keyTag = tag<string>({ label: "key" })
       let dataAccessed = false
 
       const noDataAtom = atom({
@@ -1020,7 +1066,7 @@ describe("ExecutionContext", () => {
       const withDataAtom = atom({
         factory: (ctx) => {
           dataAccessed = true
-          ctx.data.set("key", "value")
+          ctx.data.set(keyTag, "value")
           return "data accessed"
         },
       })
@@ -1031,20 +1077,21 @@ describe("ExecutionContext", () => {
       expect(dataAccessed).toBe(true)
     })
 
-    it("has independent data per atom", async () => {
+    it("has independent data per atom even with same tag", async () => {
       const scope = createScope()
+      const nameTag = tag<string>({ label: "name" })
 
       const atomA = atom({
         factory: (ctx) => {
-          ctx.data.set("name", "A")
-          return ctx.data.get("name")
+          ctx.data.set(nameTag, "A")
+          return ctx.data.get(nameTag)
         },
       })
 
       const atomB = atom({
         factory: (ctx) => {
-          ctx.data.set("name", "B")
-          return ctx.data.get("name")
+          ctx.data.set(nameTag, "B")
+          return ctx.data.get(nameTag)
         },
       })
 
@@ -1053,6 +1100,113 @@ describe("ExecutionContext", () => {
 
       expect(resultA).toBe("A")
       expect(resultB).toBe("B")
+    })
+
+    it("supports has() to check if key exists", async () => {
+      const scope = createScope()
+      const existsTag = tag<string>({ label: "exists" })
+      const missingTag = tag<string>({ label: "missing" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(existsTag, "value")
+          return {
+            hasExists: ctx.data.has(existsTag),
+            hasMissing: ctx.data.has(missingTag),
+          }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.hasExists).toBe(true)
+      expect(result.hasMissing).toBe(false)
+    })
+
+    it("supports delete() to remove key", async () => {
+      const scope = createScope()
+      const valueTag = tag<string>({ label: "value" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(valueTag, "hello")
+          const before = ctx.data.get(valueTag)
+          const deleted = ctx.data.delete(valueTag)
+          const after = ctx.data.get(valueTag)
+          return { before, deleted, after }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.before).toBe("hello")
+      expect(result.deleted).toBe(true)
+      expect(result.after).toBeUndefined()
+    })
+
+    it("delete() returns default after deletion for tags with default", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(countTag, 5)
+          const before = ctx.data.get(countTag)
+          ctx.data.delete(countTag)
+          const after = ctx.data.get(countTag)
+          return { before, after }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.before).toBe(5)
+      expect(result.after).toBe(0)
+    })
+
+    it("supports clear() to remove all keys", async () => {
+      const scope = createScope()
+      const aTag = tag<string>({ label: "a" })
+      const bTag = tag<number>({ label: "b" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(aTag, "hello")
+          ctx.data.set(bTag, 42)
+          ctx.data.clear()
+          return {
+            a: ctx.data.get(aTag),
+            b: ctx.data.get(bTag),
+          }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.a).toBeUndefined()
+      expect(result.b).toBeUndefined()
+    })
+
+    it("works with complex types", async () => {
+      const scope = createScope()
+      const cacheTag = tag<Map<string, number>>({ label: "cache" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          let cache = ctx.data.get(cacheTag)
+          if (!cache) {
+            cache = new Map()
+            ctx.data.set(cacheTag, cache)
+          }
+          cache.set("key", 123)
+          return cache
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBeInstanceOf(Map)
+      expect(result.get("key")).toBe(123)
     })
   })
 })
