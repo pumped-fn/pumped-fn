@@ -887,4 +887,25 @@ describe("ExecutionContext", () => {
       expect(serverCreateCount).toBe(2)
     })
   })
+
+  describe("ctx.data", () => {
+    it("provides a Map for storing data", async () => {
+      const scope = await createScope()
+      let capturedData: Map<string, unknown> | undefined
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          capturedData = ctx.data
+          ctx.data.set("key", "value")
+          return ctx.data.get("key")
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBe("value")
+      expect(capturedData).toBeInstanceOf(Map)
+      expect(capturedData?.get("key")).toBe("value")
+    })
+  })
 })
