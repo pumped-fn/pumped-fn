@@ -77,5 +77,54 @@ describe("scope.select()", () => {
 
       expect(notifyCount).toBe(0)
     })
+
+    it("uses custom eq function", async () => {
+      const scope = await createScope()
+      let version = 1
+      const dataAtom = atom({
+        factory: () => ({ id: "1", version: version++ })
+      })
+
+      await scope.resolve(dataAtom)
+      const handle = scope.select(
+        dataAtom,
+        (data) => data,
+        { eq: (a, b) => a.id === b.id }
+      )
+
+      let notifyCount = 0
+      handle.subscribe(() => notifyCount++)
+
+      const ctrl = scope.controller(dataAtom)
+      ctrl.invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notifyCount).toBe(0)
+    })
+
+    it("notifies when custom eq returns false", async () => {
+      const scope = await createScope()
+      let id = 1
+      const dataAtom = atom({
+        factory: () => ({ id: String(id++) })
+      })
+
+      await scope.resolve(dataAtom)
+      const handle = scope.select(
+        dataAtom,
+        (data) => data,
+        { eq: (a, b) => a.id === b.id }
+      )
+
+      let notifyCount = 0
+      handle.subscribe(() => notifyCount++)
+
+      const ctrl = scope.controller(dataAtom)
+      ctrl.invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notifyCount).toBe(1)
+      expect(handle.get().id).toBe("2")
+    })
   })
 })
