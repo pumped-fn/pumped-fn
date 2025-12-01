@@ -4,7 +4,7 @@ title: Fine-Grained Reactivity with select()
 summary: >
   Add select() method to Scope for derived subscriptions with equality-based
   change detection, enabling fine-grained reactivity for frontend rendering optimization.
-status: proposed
+status: accepted
 date: 2025-12-01
 ---
 

@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 11:53:22
+> Last generated: 2025-12-01 12:27:28
 
 ## Context Level
 
@@ -200,6 +200,7 @@ Controller pattern for subscribing to atom state changes.
 - [Scope API](#c3-201-api)
 - [Resolution](#c3-201-resolution)
 - [Controller Usage](#c3-201-controller)
+- [Select Usage](#c3-201-select)
 - [Invalidation](#c3-201-invalidation)
 - [Event Listening](#c3-201-events)
 - [Cleanup & Disposal](#c3-201-cleanup)
@@ -314,16 +315,17 @@ invalidation while remaining truly private to the atom factory.
 > Add select() method to Scope for derived subscriptions with equality-based
 change detection, enabling fine-grained reactivity for frontend rendering optimization.
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 - [Status](#adr-006-status)
 - [Problem/Requirement](#adr-006-problem)
 - [Exploration Journey](#adr-006-exploration)
 - [Solution](#adr-006-solution)
+- [Implementation](#adr-006-implementation)
 - [Changes Across Layers](#adr-006-changes)
 - [Verification](#adr-006-verification)
-- [React Integration Considerations](#adr-006-react)
+- [React Integration](#adr-006-react)
 - [Future Considerations](#adr-006-future)
 - [Related](#adr-006-related)
 
