@@ -170,5 +170,25 @@ describe("scope.select()", () => {
       expect(count1).toBe(0)
       expect(count2).toBe(1)
     })
+
+    it("auto-cleans when last subscriber unsubscribes", async () => {
+      const scope = await createScope()
+      let value = 1
+      const numAtom = atom({ factory: () => value++ })
+
+      await scope.resolve(numAtom)
+      const handle = scope.select(numAtom, (n) => n)
+
+      const unsub1 = handle.subscribe(() => {})
+      const unsub2 = handle.subscribe(() => {})
+
+      unsub1()
+      unsub2()
+
+      scope.controller(numAtom).invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(handle.get()).toBe(1)
+    })
   })
 })
