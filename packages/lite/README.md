@@ -182,6 +182,33 @@ const appAtom = atom({
 })
 ```
 
+## Per-Atom Private Storage
+
+The `ctx.data` Map provides private storage that survives invalidation but clears on release. Useful for internal state that shouldn't be exposed:
+
+```typescript
+const pollingAtom = atom({
+  factory: async (ctx) => {
+    const prev = ctx.data.get('prev') as Data | undefined
+    const current = await fetchData()
+
+    if (prev && current !== prev) {
+      console.log('Data changed!')
+    }
+    ctx.data.set('prev', current)
+
+    setTimeout(() => ctx.invalidate(), 5000)
+    return current
+  }
+})
+```
+
+| Event | `ctx.data` Behavior |
+|-------|---------------------|
+| First access | Map created lazily |
+| `invalidate()` | Map preserved |
+| `release()` | Map cleared |
+
 ## Tags (Contextual Values)
 
 Tags pass contextual values through execution without explicit wiring:
