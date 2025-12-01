@@ -8,7 +8,7 @@ import { flow } from "../src/flow"
 describe("Scope", () => {
   describe("createScope()", () => {
     it("creates a scope", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       expect(scope).toBeDefined()
       expect(scope.resolve).toBeTypeOf("function")
       expect(scope.controller).toBeTypeOf("function")
@@ -20,7 +20,7 @@ describe("Scope", () => {
 
   describe("scope.resolve()", () => {
     it("resolves atom without deps", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({ factory: () => 42 })
 
       const result = await scope.resolve(myAtom)
@@ -28,7 +28,7 @@ describe("Scope", () => {
     })
 
     it("resolves atom with deps", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const serverAtom = atom({
         deps: { cfg: configAtom },
@@ -40,7 +40,7 @@ describe("Scope", () => {
     })
 
     it("caches resolved values", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let callCount = 0
       const myAtom = atom({
         factory: () => {
@@ -58,7 +58,7 @@ describe("Scope", () => {
     })
 
     it("resolves async factories", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({
         factory: async () => {
           await new Promise((r) => setTimeout(r, 10))
@@ -71,7 +71,7 @@ describe("Scope", () => {
     })
 
     it("handles undefined as valid resolved value", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const undefinedAtom = atom({ factory: () => undefined })
 
       const result = await scope.resolve(undefinedAtom)
@@ -106,7 +106,7 @@ describe("Scope", () => {
 
   describe("scope.controller()", () => {
     it("returns controller for atom", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({ factory: () => 42 })
 
       const ctrl = scope.controller(myAtom)
@@ -119,7 +119,7 @@ describe("Scope", () => {
     })
 
     it("controller.get() throws if not resolved", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({ factory: () => 42 })
 
       const ctrl = scope.controller(myAtom)
@@ -127,7 +127,7 @@ describe("Scope", () => {
     })
 
     it("controller.get() throws error on failed state", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({
         factory: () => {
           throw new Error("factory failed")
@@ -141,7 +141,7 @@ describe("Scope", () => {
     })
 
     it("controller.get() returns stale value during resolving", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
       const myAtom = atom({
         factory: async () => {
@@ -168,7 +168,7 @@ describe("Scope", () => {
 
   describe("controller deps", () => {
     it("resolves controller dep", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const optionalAtom = atom({ factory: () => "optional" })
       const mainAtom = atom({
         deps: { opt: controller(optionalAtom) },
@@ -183,7 +183,7 @@ describe("Scope", () => {
     })
 
     it("controller dep has full interface", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const innerAtom = atom({ factory: () => 42 })
       const outerAtom = atom({
         deps: { inner: controller(innerAtom) },
@@ -221,7 +221,7 @@ describe("Scope", () => {
 
     it("throws for missing required tag", async () => {
       const tenantId = tag<string>({ label: "tenantId" })
-      const scope = await createScope()
+      const scope = createScope()
 
       const myAtom = atom({
         deps: { tenant: tags.required(tenantId) },
@@ -233,7 +233,7 @@ describe("Scope", () => {
 
     it("resolves optional tag as undefined", async () => {
       const tenantId = tag<string>({ label: "tenantId" })
-      const scope = await createScope()
+      const scope = createScope()
 
       const myAtom = atom({
         deps: { tenant: tags.optional(tenantId) },
@@ -247,7 +247,7 @@ describe("Scope", () => {
 
   describe("cleanup", () => {
     it("runs cleanup on release", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let cleaned = false
       const myAtom = atom({
         factory: (ctx) => {
@@ -266,7 +266,7 @@ describe("Scope", () => {
     })
 
     it("runs cleanups in LIFO order", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const order: number[] = []
       const myAtom = atom({
         factory: (ctx) => {
@@ -286,7 +286,7 @@ describe("Scope", () => {
 
   describe("dispose", () => {
     it("releases all atoms", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const cleanups: string[] = []
 
       const a = atom({
@@ -315,7 +315,7 @@ describe("Scope", () => {
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       expect(ctx).toBeDefined()
@@ -327,7 +327,7 @@ describe("ExecutionContext", () => {
 
   describe("ctx.exec() with flow", () => {
     it("executes flow without deps", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       const myFlow = flow({
@@ -345,7 +345,7 @@ describe("ExecutionContext", () => {
 
     it("executes flow with deps", async () => {
       const dbAtom = atom({ factory: () => ({ query: () => "data" }) })
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       const myFlow = flow({
@@ -398,7 +398,7 @@ describe("ExecutionContext", () => {
     it("exec tags override context tags", async () => {
       const requestId = tag<string>({ label: "requestId" })
 
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext({
         tags: [requestId("ctx-id")],
       })
@@ -421,7 +421,7 @@ describe("ExecutionContext", () => {
 
   describe("ctx.exec() with fn", () => {
     it("executes plain function", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
@@ -436,7 +436,7 @@ describe("ExecutionContext", () => {
 
   describe("ctx.onClose()", () => {
     it("runs cleanup on close", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       let cleaned = false
@@ -450,7 +450,7 @@ describe("ExecutionContext", () => {
     })
 
     it("runs cleanups in LIFO order", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
 
       const order: number[] = []
@@ -465,7 +465,7 @@ describe("ExecutionContext", () => {
 
   describe("closed context", () => {
     it("throws when executing on closed context", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const ctx = scope.createContext()
       await ctx.close()
 
@@ -479,7 +479,7 @@ describe("ExecutionContext", () => {
 
   describe("circular dependency", () => {
     it("throws on circular dependency", async () => {
-      const scope = await createScope()
+      const scope = createScope()
 
       const atomA: ReturnType<typeof atom<string>> = atom({
         deps: { b: undefined as unknown as ReturnType<typeof atom<string>> },
@@ -499,7 +499,7 @@ describe("ExecutionContext", () => {
 
   describe("controller edge cases", () => {
     it("throws when get called before resolve", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({ factory: () => 42 })
 
       const ctrl = scope.controller(myAtom)
@@ -509,7 +509,7 @@ describe("ExecutionContext", () => {
 
   describe("concurrent resolution", () => {
     it("handles concurrent resolution of same atom", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
 
       const slowAtom = atom({
@@ -533,7 +533,7 @@ describe("ExecutionContext", () => {
 
   describe("ctx.invalidate()", () => {
     it("schedules re-resolution after factory completes", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
       const myAtom = atom({
         factory: (ctx) => {
@@ -554,7 +554,7 @@ describe("ExecutionContext", () => {
     })
 
     it("does not interrupt current factory execution", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const events: string[] = []
       let executionCount = 0
 
@@ -589,7 +589,7 @@ describe("ExecutionContext", () => {
 
   describe("controller.invalidate()", () => {
     it("runs cleanups in LIFO order", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const order: number[] = []
       const myAtom = atom({
         factory: (ctx) => {
@@ -609,7 +609,7 @@ describe("ExecutionContext", () => {
     })
 
     it("triggers re-resolution", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
       const myAtom = atom({
         factory: () => {
@@ -630,7 +630,7 @@ describe("ExecutionContext", () => {
     })
 
     it("sets state to resolving immediately after invalidate", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const myAtom = atom({
         factory: async () => {
           await new Promise(r => setTimeout(r, 50))
@@ -649,7 +649,7 @@ describe("ExecutionContext", () => {
     })
 
     it("queues invalidation if called during resolving", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
       const myAtom = atom({
         factory: async () => {
@@ -674,7 +674,7 @@ describe("ExecutionContext", () => {
     })
 
     it("no-ops when invalidate called on idle atom", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let factoryCallCount = 0
       const myAtom = atom({
         factory: () => {
@@ -694,7 +694,7 @@ describe("ExecutionContext", () => {
     })
 
     it("transitions failed state to resolving on invalidate", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let shouldFail = true
       const myAtom = atom({
         factory: () => {
@@ -719,7 +719,7 @@ describe("ExecutionContext", () => {
 
   describe("controller.on()", () => {
     it("notifies on state change", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const states: string[] = []
       const myAtom = atom({
         factory: async () => {
@@ -738,7 +738,7 @@ describe("ExecutionContext", () => {
     })
 
     it("returns unsubscribe function", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let notifyCount = 0
       const myAtom = atom({ factory: () => 42 })
 
@@ -756,7 +756,7 @@ describe("ExecutionContext", () => {
     })
 
     it("notifies on invalidation", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const states: string[] = []
       const myAtom = atom({
         factory: async () => {
@@ -777,11 +777,79 @@ describe("ExecutionContext", () => {
       await new Promise(r => setTimeout(r, 50))
       expect(states).toContain('resolved')
     })
+
+    it("filters by state - only notifies resolved listeners on resolved", async () => {
+      const scope = createScope()
+      const calls: string[] = []
+
+      const myAtom = atom({ factory: () => 'value' })
+      const ctl = scope.controller(myAtom)
+
+      ctl.on('resolving', () => calls.push('resolving'))
+      ctl.on('resolved', () => calls.push('resolved'))
+      ctl.on('*', () => calls.push('*'))
+
+      await ctl.resolve()
+
+      expect(calls).toEqual(['resolving', '*', 'resolved', '*'])
+    })
+
+    it("notifies exactly twice per invalidation cycle", async () => {
+      const scope = createScope()
+      const calls: string[] = []
+
+      const myAtom = atom({ factory: () => 'value' })
+      const ctl = scope.controller(myAtom)
+      await ctl.resolve()
+
+      ctl.on('resolving', () => calls.push('resolving'))
+      ctl.on('resolved', () => calls.push('resolved'))
+
+      ctl.invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(calls).toEqual(['resolving', 'resolved'])
+    })
+
+    it("supports legacy on(listener) syntax", async () => {
+      const scope = createScope()
+      let callCount = 0
+
+      const myAtom = atom({ factory: () => 'value' })
+      const ctl = scope.controller(myAtom)
+
+      ctl.on(() => callCount++)
+
+      await ctl.resolve()
+
+      expect(callCount).toBe(2)
+    })
+
+    it("only notifies '*' listeners on failed state, not 'resolved'", async () => {
+      const scope = createScope()
+      const calls: string[] = []
+
+      const failingAtom = atom({
+        factory: () => {
+          throw new Error("intentional failure")
+        }
+      })
+
+      const ctl = scope.controller(failingAtom)
+
+      ctl.on('resolving', () => calls.push('resolving'))
+      ctl.on('resolved', () => calls.push('resolved'))
+      ctl.on('*', () => calls.push('*'))
+
+      await expect(ctl.resolve()).rejects.toThrow("intentional failure")
+
+      expect(calls).toEqual(['resolving', '*', '*'])
+    })
   })
 
   describe("scope.on()", () => {
     it("fires for specific state transitions", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const events: string[] = []
       const myAtom = atom({
         factory: async () => {
@@ -799,7 +867,7 @@ describe("ExecutionContext", () => {
     })
 
     it("fires failed event on error", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let failedCalled = false
       const myAtom = atom({
         factory: () => {
@@ -814,7 +882,7 @@ describe("ExecutionContext", () => {
     })
 
     it("returns unsubscribe function", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let count = 0
       const myAtom = atom({ factory: () => count++ })
 
@@ -832,7 +900,7 @@ describe("ExecutionContext", () => {
 
   describe("self-invalidating atom", () => {
     it("supports polling pattern", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let pollCount = 0
       const myAtom = atom({
         factory: (ctx) => {
@@ -855,7 +923,7 @@ describe("ExecutionContext", () => {
 
   describe("downstream subscribes to upstream", () => {
     it("invalidates when upstream changes", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let configValue = "initial"
       let serverCreateCount = 0
 
@@ -890,7 +958,7 @@ describe("ExecutionContext", () => {
 
   describe("ctx.data", () => {
     it("provides a Map for storing data", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let capturedData: Map<string, unknown> | undefined
 
       const myAtom = atom({
@@ -909,7 +977,7 @@ describe("ExecutionContext", () => {
     })
 
     it("persists data across invalidations", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let resolveCount = 0
 
       const myAtom = atom({
@@ -934,7 +1002,7 @@ describe("ExecutionContext", () => {
     })
 
     it("clears data when atom is released", async () => {
-      const scope = await createScope()
+      const scope = createScope()
 
       const myAtom = atom({
         factory: (ctx) => {
@@ -954,7 +1022,7 @@ describe("ExecutionContext", () => {
     })
 
     it("creates data Map lazily on first access", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let dataAccessed = false
 
       const noDataAtom = atom({
@@ -978,7 +1046,7 @@ describe("ExecutionContext", () => {
     })
 
     it("has independent data per atom", async () => {
-      const scope = await createScope()
+      const scope = createScope()
 
       const atomA = atom({
         factory: (ctx) => {

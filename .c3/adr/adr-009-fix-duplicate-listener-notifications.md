@@ -312,9 +312,21 @@ private async doResolve<T>(atom: Lite.Atom<T>): Promise<T> {
     entry.value = undefined
     entry.hasValue = false
     this.emitStateChange('failed', atom)
-    this.notifyListeners(atom, 'resolved')  // Notify resolved listeners on failure too
+    this.notifyAllListeners(atom)  // Only notify '*' listeners on failure
 
     // ... rest unchanged ...
+  }
+}
+
+private notifyAllListeners<T>(atom: Lite.Atom<T>): void {
+  const entry = this.cache.get(atom)
+  if (!entry) return
+
+  const allListeners = entry.listeners.get('*')
+  if (allListeners) {
+    for (const listener of allListeners) {
+      listener()
+    }
   }
 }
 
@@ -332,26 +344,29 @@ private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<
 
 ## Verification {#adr-009-verification}
 
-- [ ] Self-invalidating atom notifies listeners exactly 2x per cycle
-- [ ] First resolution (idle → resolving → resolved) notifies 2x
-- [ ] External `controller.invalidate()` notifies 2x
-- [ ] `ctl.on('resolved', ...)` fires only on resolved
-- [ ] `ctl.on('resolving', ...)` fires only on resolving
-- [ ] `ctl.on('*', ...)` fires on both
-- [ ] `ctl.on(() => ...)` (legacy) fires on both
-- [ ] `scope.on('resolving', ...)` fires exactly once per invalidation
-- [ ] `scope.on('resolved', ...)` fires exactly once per invalidation
-- [ ] Existing tests pass
+- [x] Self-invalidating atom notifies listeners exactly 2x per cycle
+- [x] First resolution (idle → resolving → resolved) notifies 2x
+- [x] External `controller.invalidate()` notifies 2x
+- [x] `ctl.on('resolved', ...)` fires only on resolved
+- [x] `ctl.on('resolving', ...)` fires only on resolving
+- [x] `ctl.on('*', ...)` fires on both (resolving + resolved)
+- [x] `ctl.on(() => ...)` (legacy) fires on both
+- [x] `scope.on('resolving', ...)` fires exactly once per invalidation
+- [x] `scope.on('resolved', ...)` fires exactly once per invalidation
+- [x] On failure, only '*' listeners fire (not 'resolved')
+- [x] All 106 tests pass
 
 ## Test Cases {#adr-009-test}
 
+Tests are located in `packages/lite/tests/scope.test.ts` under `describe("controller.on()")`.
+
 ```typescript
 describe('Controller.on() state filtering', () => {
-  it('should only notify resolved listeners on resolved', async () => {
+  it('filters by state - only notifies resolved listeners on resolved', async () => {
+    const scope = createScope()
     const calls: string[] = []
 
     const myAtom = atom({ factory: () => 'value' })
-    const scope = await createScope()
     const ctl = scope.controller(myAtom)
 
     ctl.on('resolving', () => calls.push('resolving'))
@@ -363,11 +378,11 @@ describe('Controller.on() state filtering', () => {
     expect(calls).toEqual(['resolving', '*', 'resolved', '*'])
   })
 
-  it('should notify exactly twice per invalidation cycle', async () => {
+  it('notifies exactly twice per invalidation cycle', async () => {
+    const scope = createScope()
     const calls: string[] = []
 
     const myAtom = atom({ factory: () => 'value' })
-    const scope = await createScope()
     const ctl = scope.controller(myAtom)
     await ctl.resolve()
 
@@ -375,16 +390,16 @@ describe('Controller.on() state filtering', () => {
     ctl.on('resolved', () => calls.push('resolved'))
 
     ctl.invalidate()
-    await ctl.resolve()
+    await new Promise(r => setTimeout(r, 50))
 
     expect(calls).toEqual(['resolving', 'resolved'])
   })
 
-  it('should support legacy on(listener) syntax', async () => {
+  it('supports legacy on(listener) syntax', async () => {
+    const scope = createScope()
     let callCount = 0
 
     const myAtom = atom({ factory: () => 'value' })
-    const scope = await createScope()
     const ctl = scope.controller(myAtom)
 
     ctl.on(() => callCount++)
@@ -392,6 +407,25 @@ describe('Controller.on() state filtering', () => {
     await ctl.resolve()
 
     expect(callCount).toBe(2)  // resolving + resolved
+  })
+
+  it("only notifies '*' listeners on failed state, not 'resolved'", async () => {
+    const scope = createScope()
+    const calls: string[] = []
+
+    const failingAtom = atom({
+      factory: () => { throw new Error("intentional failure") }
+    })
+
+    const ctl = scope.controller(failingAtom)
+
+    ctl.on('resolving', () => calls.push('resolving'))
+    ctl.on('resolved', () => calls.push('resolved'))
+    ctl.on('*', () => calls.push('*'))
+
+    await expect(ctl.resolve()).rejects.toThrow("intentional failure")
+
+    expect(calls).toEqual(['resolving', '*', '*'])  // No 'resolved' on failure
   })
 })
 ```

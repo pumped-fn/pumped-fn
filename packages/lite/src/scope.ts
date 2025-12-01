@@ -229,6 +229,18 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
+  private notifyAllListeners<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (!entry) return
+
+    const allListeners = entry.listeners.get('*')
+    if (allListeners) {
+      for (const listener of allListeners) {
+        listener()
+      }
+    }
+  }
+
   private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>): void {
     const stateMap = this.stateListeners.get(state)
     if (stateMap) {
@@ -374,7 +386,7 @@ class ScopeImpl implements Lite.Scope {
       entry.value = undefined
       entry.hasValue = false
       this.emitStateChange('failed', atom)
-      this.notifyListeners(atom, 'resolved')
+      this.notifyAllListeners(atom)
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false

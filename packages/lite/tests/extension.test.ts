@@ -15,7 +15,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       expect(receivedScope).toBe(scope)
     })
   })
@@ -33,7 +33,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       const myAtom = atom({ factory: () => 42 })
 
       await scope.resolve(myAtom)
@@ -63,7 +63,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext1, ext2] })
+      const scope = createScope({ extensions: [ext1, ext2] })
       const myAtom = atom({ factory: () => 42 })
 
       await scope.resolve(myAtom)
@@ -90,7 +90,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       const ctx = scope.createContext()
       const myFlow = flow({ factory: () => 42 })
 
@@ -123,7 +123,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext1, ext2] })
+      const scope = createScope({ extensions: [ext1, ext2] })
       const ctx = scope.createContext()
       const myFlow = flow({ factory: () => 42 })
 
@@ -151,7 +151,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       const ctx = scope.createContext()
 
       await ctx.exec({
@@ -175,7 +175,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       await scope.dispose()
 
       expect(receivedScope).toBe(scope)
@@ -195,7 +195,7 @@ describe("Extension", () => {
         dispose: dispose2,
       }
 
-      const scope = await createScope({ extensions: [ext1, ext2] })
+      const scope = createScope({ extensions: [ext1, ext2] })
       await scope.dispose()
 
       expect(dispose1).toHaveBeenCalledTimes(1)
@@ -229,7 +229,7 @@ describe("Extension", () => {
         },
       }
 
-      const scope = await createScope({ extensions: [ext] })
+      const scope = createScope({ extensions: [ext] })
       expect(events).toEqual(["init"])
 
       const myAtom = atom({ factory: () => "value" })
