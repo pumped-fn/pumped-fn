@@ -5,7 +5,7 @@ import { atom } from "../src/atom"
 describe("scope.select()", () => {
   describe("basic functionality", () => {
     it("returns SelectHandle with get()", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const todosAtom = atom({ factory: () => [
         { id: "1", text: "Learn TypeScript" },
         { id: "2", text: "Build app" }
@@ -25,7 +25,7 @@ describe("scope.select()", () => {
     })
 
     it("throws if atom not resolved", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const todosAtom = atom({ factory: () => [{ id: "1", text: "Test" }] })
 
       expect(() => {
@@ -36,7 +36,7 @@ describe("scope.select()", () => {
 
   describe("equality", () => {
     it("uses reference equality by default", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const obj1 = { id: "1" }
       const obj2 = { id: "1" }
       let resolveCount = 0
@@ -61,7 +61,7 @@ describe("scope.select()", () => {
     })
 
     it("does not notify when reference is same", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       const sharedObj = { id: "1" }
       const dataAtom = atom({ factory: () => sharedObj })
 
@@ -79,7 +79,7 @@ describe("scope.select()", () => {
     })
 
     it("uses custom eq function", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let version = 1
       const dataAtom = atom({
         factory: () => ({ id: "1", version: version++ })
@@ -103,7 +103,7 @@ describe("scope.select()", () => {
     })
 
     it("notifies when custom eq returns false", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let id = 1
       const dataAtom = atom({
         factory: () => ({ id: String(id++) })
@@ -130,7 +130,7 @@ describe("scope.select()", () => {
 
   describe("subscription", () => {
     it("supports multiple subscribers", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let value = 1
       const numAtom = atom({ factory: () => value++ })
 
@@ -150,7 +150,7 @@ describe("scope.select()", () => {
     })
 
     it("unsubscribe removes specific listener", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let value = 1
       const numAtom = atom({ factory: () => value++ })
 
@@ -172,7 +172,7 @@ describe("scope.select()", () => {
     })
 
     it("auto-cleans when last subscriber unsubscribes", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let value = 1
       const numAtom = atom({ factory: () => value++ })
 
@@ -194,7 +194,7 @@ describe("scope.select()", () => {
 
   describe("selector execution", () => {
     it("only runs selector when atom is resolved", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let selectorCalls = 0
       const asyncAtom = atom({
         factory: async () => {
@@ -229,7 +229,7 @@ describe("scope.select()", () => {
 
   describe("multiple selects", () => {
     it("multiple selects on same atom work independently", async () => {
-      const scope = await createScope()
+      const scope = createScope()
       let count = 0
       const dataAtom = atom({
         factory: () => ({ a: count++, b: count++ })
@@ -266,7 +266,7 @@ describe("scope.select()", () => {
         updatedAt: number
       }
 
-      const scope = await createScope()
+      const scope = createScope()
       let todos: Todo[] = [
         { id: "1", text: "Learn", updatedAt: 100 },
         { id: "2", text: "Build", updatedAt: 200 },
