@@ -257,4 +257,54 @@ describe("scope.select()", () => {
       expect(handleB.get()).toBe(3)
     })
   })
+
+  describe("TodoItem use case", () => {
+    it("only notifies when specific todo changes", async () => {
+      interface Todo {
+        id: string
+        text: string
+        updatedAt: number
+      }
+
+      const scope = await createScope()
+      let todos: Todo[] = [
+        { id: "1", text: "Learn", updatedAt: 100 },
+        { id: "2", text: "Build", updatedAt: 200 },
+        { id: "3", text: "Ship", updatedAt: 300 }
+      ]
+
+      const todosAtom = atom({ factory: () => [...todos] })
+      await scope.resolve(todosAtom)
+
+      const handle1 = scope.select(
+        todosAtom,
+        (t) => t.find(x => x.id === "1"),
+        { eq: (a, b) => a?.updatedAt === b?.updatedAt }
+      )
+
+      const handle2 = scope.select(
+        todosAtom,
+        (t) => t.find(x => x.id === "2"),
+        { eq: (a, b) => a?.updatedAt === b?.updatedAt }
+      )
+
+      let notify1 = 0
+      let notify2 = 0
+      handle1.subscribe(() => notify1++)
+      handle2.subscribe(() => notify2++)
+
+      todos = [
+        { id: "1", text: "Learn", updatedAt: 100 },
+        { id: "2", text: "Build MORE", updatedAt: 201 },
+        { id: "3", text: "Ship", updatedAt: 300 }
+      ]
+
+      scope.controller(todosAtom).invalidate()
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(notify1).toBe(0)
+      expect(notify2).toBe(1)
+      expect(handle2.get()?.text).toBe("Build MORE")
+    })
+  })
 })
