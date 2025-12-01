@@ -46,40 +46,6 @@ npm install @pumped-fn/lite
 | **Controller** | Handle for observing and controlling an atom's state |
 | **Tag** | Contextual value passed through execution |
 
-## Quick Example
-
-```typescript
-import { atom, flow, createScope } from '@pumped-fn/lite'
-
-const dbAtom = atom({
-  factory: async (ctx) => {
-    const conn = await createConnection()
-    ctx.cleanup(() => conn.close())
-    return conn
-  }
-})
-
-const repoAtom = atom({
-  deps: { db: dbAtom },
-  factory: (ctx, { db }) => new UserRepository(db)
-})
-
-const getUser = flow({
-  deps: { repo: repoAtom },
-  factory: async (ctx, { repo }) => {
-    return repo.findById(ctx.input as string)
-  }
-})
-
-const scope = await createScope()
-const ctx = scope.createContext()
-
-const user = await ctx.exec({ flow: getUser, input: 'user-123' })
-
-await ctx.close()
-await scope.dispose()
-```
-
 ## Effect Lifecycle
 
 ```mermaid
@@ -105,12 +71,12 @@ stateDiagram-v2
 | `controller(atom)` | Wrap atom for deferred resolution |
 | `preset(atom, value)` | Override atom value in scope |
 
-## Features in Action: Snake Game
+## Example: Snake Game
 
 A complete example showing **tags**, **ctx.data**, **controller**, **invalidate**, and **cleanup** working together:
 
 ```typescript
-import { atom, flow, tag, tags, controller, createScope } from '@pumped-fn/lite'
+import { atom, tag, tags, controller, createScope } from '@pumped-fn/lite'
 
 type Point = { x: number; y: number }
 type Dir = 'up' | 'down' | 'left' | 'right'
@@ -119,7 +85,7 @@ type Dir = 'up' | 'down' | 'left' | 'right'
 const gridSize = tag<number>({ label: 'gridSize', default: 20 })
 const tickMs = tag<number>({ label: 'tickMs', default: 100 })
 
-// Reactive state - UI subscribes to this
+// Game state - UI subscribes to this
 const stateAtom = atom({
   deps: { size: tags.required(gridSize) },
   factory: (ctx, { size }) => ({
@@ -142,34 +108,28 @@ const tickerAtom = atom({
   }
 })
 
-// Actions as flows
-const moveFlow = flow({
-  deps: { state: stateAtom },
-  factory: (ctx, { state }) => {
-    if (state.dead) return state
-    const head = { ...state.snake[0]! }
-    // ... move head based on state.dir, check collisions
-    // ... update state.snake, state.food, state.score
-    // if (collision) { state.dead = true; ctx.data.set('hi', Math.max(state.hi, state.score)) }
-    return state
-  }
-})
-
-// Facade for UI
+// Facade - clean API for UI
 async function createSnakeGame(size = 20, tick = 100) {
   const scope = createScope({ tags: [gridSize(size), tickMs(tick)] })
-  const ctx = scope.createContext()
   const stateCtrl = scope.controller(stateAtom)
   const tickerCtrl = scope.controller(tickerAtom)
   await stateCtrl.resolve()
 
+  const turn = (dir: Dir) => {
+    const s = stateCtrl.get()
+    const opposite: Record<Dir, Dir> = { up: 'down', down: 'up', left: 'right', right: 'left' }
+    if (opposite[dir] !== s.dir) s.dir = dir
+  }
+
   return {
-    state: stateCtrl,                                    // reactive: .on(), .get()
-    move: () => ctx.exec({ flow: moveFlow, input: null }),
-    turn: (d: Dir) => { stateCtrl.get().dir = d },
-    start: () => tickerCtrl.resolve(),                   // lazy-load ticker
-    stop: () => tickerCtrl.release(),
-    restart: () => stateCtrl.invalidate(),               // hi-score preserved
+    state: stateCtrl,                        // reactive: .on('resolved', ...), .get()
+    up: () => turn('up'),
+    down: () => turn('down'),
+    left: () => turn('left'),
+    right: () => turn('right'),
+    start: () => tickerCtrl.resolve(),       // lazy-load ticker
+    pause: () => tickerCtrl.release(),       // stop & cleanup interval
+    reset: () => stateCtrl.invalidate(),     // restart game, hi-score preserved
     dispose: () => scope.dispose()
   }
 }
@@ -178,15 +138,17 @@ async function createSnakeGame(size = 20, tick = 100) {
 const game = await createSnakeGame(15, 100)
 game.state.on('resolved', () => render(game.state.get()))  // UI subscribes
 await game.start()                                          // begin auto-tick
-game.turn('down')                                           // user input
+game.down()                                                 // user input
+game.pause()                                                // pause game
+game.reset()                                                // restart, keeps hi-score
 ```
 
 **What's demonstrated:**
 - **`tag`** - `gridSize`, `tickMs` configure game per-instance
-- **`ctx.data`** - High score persists across `restart()` (survives invalidation)
+- **`ctx.data`** - High score persists across `reset()` (survives invalidation)
 - **`controller()`** - Ticker atom lazily loaded only when `start()` called
-- **`invalidate()`** - Ticker triggers state refresh; `restart()` resets game
-- **`cleanup()`** - Interval cleared when ticker released
+- **`invalidate()`** - Ticker triggers state refresh; `reset()` restarts game
+- **`cleanup()`** - Interval cleared when ticker released via `pause()`
 - **`ctrl.on()`** - UI subscribes to state changes for re-render
 
 ## Design Principles
