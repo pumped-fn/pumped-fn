@@ -13,6 +13,61 @@ interface AtomEntry<T> {
   data?: Map<string, unknown>
 }
 
+class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
+  private listeners = new Set<() => void>()
+  private currentValue: S
+  private ctrlUnsub: (() => void) | null = null
+
+  constructor(
+    private ctrl: Lite.Controller<T>,
+    private selector: (value: T) => S,
+    private eq: (prev: S, next: S) => boolean
+  ) {
+    if (ctrl.state !== 'resolved') {
+      throw new Error("Cannot select from unresolved atom")
+    }
+
+    this.currentValue = selector(ctrl.get())
+
+    this.ctrlUnsub = ctrl.on(() => {
+      if (this.ctrl.state !== 'resolved') return
+
+      const nextValue = this.selector(this.ctrl.get())
+      if (!this.eq(this.currentValue, nextValue)) {
+        this.currentValue = nextValue
+        this.notifyListeners()
+      }
+    })
+  }
+
+  get(): S {
+    return this.currentValue
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+
+    return () => {
+      this.listeners.delete(listener)
+      if (this.listeners.size === 0) {
+        this.cleanup()
+      }
+    }
+  }
+
+  private notifyListeners(): void {
+    for (const listener of this.listeners) {
+      listener()
+    }
+  }
+
+  private cleanup(): void {
+    this.ctrlUnsub?.()
+    this.ctrlUnsub = null
+    this.listeners.clear()
+  }
+}
+
 class ControllerImpl<T> implements Lite.Controller<T> {
   readonly [controllerSymbol] = true
 
