@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-11-28 11:55:11
+> Last generated: 2025-12-01 11:07:54
 
 ## Context Level
 
@@ -291,6 +291,23 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ## Architecture Decisions
 
+### [ADR-005-parser-functions](./adr/adr-005-flow-schema-slots.md) - Parser Functions for Type-Safe Input/Output Validation
+> Add parser functions to Flow and Tag for library-agnostic validation with
+full TypeScript type inference. TInput/TOutput inferred from parser return types.
+
+**Status**: Abandoned
+
+**Sections**:
+- [Status](#adr-005-status)
+- [Problem/Requirement](#adr-005-problem)
+- [Exploration Journey](#adr-005-exploration)
+- [Solution](#adr-005-solution)
+- [Changes Across Layers](#adr-005-changes)
+- [Verification](#adr-005-verification)
+- [Related](#adr-005-related)
+
+---
+
 ### [ADR-004-lite-c3-documentation](./adr/adr-004-lite-c3-documentation.md) - C3 Documentation Structure for @pumped-fn/lite
 > Create Container and Component level C3 documentation for @pumped-fn/lite
 to make the package consumer-ready with clear architecture documentation.
@@ -374,5 +391,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 20
-**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 4
+**Total Documents**: 21
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 5

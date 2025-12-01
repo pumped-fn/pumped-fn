@@ -4,14 +4,14 @@ title: Parser Functions for Type-Safe Input/Output Validation
 summary: >
   Add parser functions to Flow and Tag for library-agnostic validation with
   full TypeScript type inference. TInput/TOutput inferred from parser return types.
-status: proposed
+status: abandoned
 date: 2025-11-28
 ---
 
 # [ADR-005] Parser Functions for Type-Safe Input/Output Validation
 
 ## Status {#adr-005-status}
-**Proposed** - 2025-11-28
+**Abandoned** - 2025-12-01
 
 ## Problem/Requirement {#adr-005-problem}
 
