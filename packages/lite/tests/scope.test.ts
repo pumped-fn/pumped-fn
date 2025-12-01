@@ -84,7 +84,7 @@ describe("Scope", () => {
 
     it("uses preset value", async () => {
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
-      const scope = await createScope({
+      const scope = createScope({
         presets: [preset(configAtom, { port: 8080 })],
       })
 
@@ -95,7 +95,7 @@ describe("Scope", () => {
     it("uses preset atom", async () => {
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const testConfigAtom = atom({ factory: () => ({ port: 9999 }) })
-      const scope = await createScope({
+      const scope = createScope({
         presets: [preset(configAtom, testConfigAtom)],
       })
 
@@ -206,7 +206,7 @@ describe("Scope", () => {
   describe("tag deps", () => {
     it("resolves required tag from scope tags", async () => {
       const tenantId = tag<string>({ label: "tenantId" })
-      const scope = await createScope({
+      const scope = createScope({
         tags: [tenantId("tenant-123")],
       })
 
@@ -366,7 +366,7 @@ describe("ExecutionContext", () => {
       const requestId = tag<string>({ label: "requestId" })
       const tenantId = tag<string>({ label: "tenantId" })
 
-      const scope = await createScope({
+      const scope = createScope({
         tags: [tenantId("tenant-1")],
       })
 
