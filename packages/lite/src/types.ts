@@ -51,6 +51,7 @@ export namespace Lite {
     cleanup(fn: () => MaybePromise<void>): void
     invalidate(): void
     readonly scope: Scope
+    readonly data: Map<string, unknown>
   }
 
   export interface ExecutionContext {
