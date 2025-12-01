@@ -137,6 +137,7 @@ sequenceDiagram
 | `tag(config)` | Define metadata tag | `Tag<T>` |
 | `preset(atom, value)` | Create preset injection | `Preset<T>` |
 | `controller(atom)` | Create controller dependency | `ControllerDep<T>` |
+| `scope.select(atom, selector, options?)` | Create fine-grained subscription | `SelectHandle<S>` |
 
 ### Type Guards
 
