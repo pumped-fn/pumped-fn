@@ -47,6 +47,7 @@ interface ResolveContext {
   cleanup(fn: () => MaybePromise<void>): void  // Register cleanup
   invalidate(): void                           // Schedule re-resolution
   readonly scope: Scope                        // Parent scope
+  readonly data: Map<string, unknown>          // Per-atom private storage (lazy)
 }
 ```
 
@@ -256,6 +257,50 @@ const dataAtom = atom({
 })
 ```
 
+## Per-Atom Private Storage {#c3-202-data}
+
+The `ctx.data` Map provides private storage that survives invalidation but is cleared on release. Useful for internal bookkeeping that shouldn't be exposed publicly.
+
+### Pattern: Change Detection
+
+```typescript
+const pollingAtom = atom({
+  factory: async (ctx) => {
+    const prev = ctx.data.get('prev') as Data | undefined
+    const current = await fetchData()
+
+    if (prev !== undefined && current !== prev) {
+      console.log('Data changed!')
+    }
+    ctx.data.set('prev', current)
+
+    setTimeout(() => ctx.invalidate(), 5000)
+    return current
+  }
+})
+```
+
+### Lifecycle
+
+| Event | `ctx.data` Behavior |
+|-------|---------------------|
+| First access | Map created lazily |
+| `invalidate()` | Map preserved |
+| `release()` | Map cleared |
+| `scope.dispose()` | Map cleared |
+
+### When to Use
+
+Use `ctx.data` for:
+- Internal state that survives invalidation
+- Bookkeeping not meant for external access
+- Values that don't warrant a separate atom
+
+Use a separate atom instead when:
+- State should be shared across atoms
+- State needs its own invalidation lifecycle
+- State should be externally accessible/controllable
+
 ## Type Guard {#c3-202-guards}
 
 ### isAtom
@@ -300,8 +345,15 @@ Key test scenarios in `tests/atom.test.ts`:
 - Controller dependency creation
 - Type guards
 
+Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
+- Data persists across invalidations
+- Data cleared on release
+- Data lazily created
+- Independent data per atom
+
 ## Related {#c3-202-related}
 
 - [c3-201](./c3-201-scope.md) - Scope resolution and Controller
 - [c3-204](./c3-204-tag.md) - Tag dependencies
 - [c3-205](./c3-205-preset.md) - Atom value presets
+- [ADR-007](../adr/adr-007-resolve-context-data.md) - Per-atom private storage design

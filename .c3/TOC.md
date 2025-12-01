@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 11:07:54
+> Last generated: 2025-12-01 11:37:19
 
 ## Context Level
 
@@ -221,6 +221,7 @@ and controller dependency helper for reactive patterns.
 - [Controller Dependency](#c3-202-controller)
 - [Cleanup Registration](#c3-202-cleanup)
 - [Self-Invalidation](#c3-202-invalidation)
+- [Per-Atom Private Storage](#c3-202-data)
 - [Type Guard](#c3-202-guards)
 - [Source Files](#c3-202-source)
 - [Testing](#c3-202-testing)
@@ -290,6 +291,41 @@ allowing factory bypassing or atom substitution at scope creation.
 ---
 
 ## Architecture Decisions
+
+### [ADR-007-resolve-context-data](./adr/adr-007-resolve-context-data.md) - Per-Atom Private Storage via ctx.data
+> Add lazy per-atom storage to ResolveContext, enabling state that survives
+invalidation while remaining truly private to the atom factory.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-007-status)
+- [Problem/Requirement](#adr-007-problem)
+- [Exploration Journey](#adr-007-exploration)
+- [Solution](#adr-007-solution)
+- [Changes Across Layers](#adr-007-changes)
+- [Verification](#adr-007-verification)
+- [Alternatives Considered](#adr-007-alternatives)
+- [Related](#adr-007-related)
+
+---
+
+### [ADR-006-select-fine-grained-reactivity](./adr/adr-006-select-fine-grained-reactivity.md) - Fine-Grained Reactivity with select()
+> Add select() method to Scope for derived subscriptions with equality-based
+change detection, enabling fine-grained reactivity for frontend rendering optimization.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-006-status)
+- [Problem/Requirement](#adr-006-problem)
+- [Exploration Journey](#adr-006-exploration)
+- [Solution](#adr-006-solution)
+- [Changes Across Layers](#adr-006-changes)
+- [Verification](#adr-006-verification)
+- [Related](#adr-006-related)
+
+---
 
 ### [ADR-005-parser-functions](./adr/adr-005-flow-schema-slots.md) - Parser Functions for Type-Safe Input/Output Validation
 > Add parser functions to Flow and Tag for library-agnostic validation with
@@ -391,5 +427,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 21
-**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 5
+**Total Documents**: 23
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 7
