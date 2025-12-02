@@ -55,4 +55,35 @@ describe("invalidation chain", () => {
       [],
     ])
   })
+
+  it("throws on infinite loop", async () => {
+    const atomA = atom({
+      factory: () => "a",
+    })
+    const atomB = atom({
+      factory: () => "b",
+    })
+
+    const scope = createScope()
+
+    const ctrlA = scope.controller(atomA)
+    const ctrlB = scope.controller(atomB)
+
+    await scope.resolve(atomA)
+    await scope.resolve(atomB)
+
+    ctrlA.on("resolved", () => ctrlB.invalidate())
+    ctrlB.on("resolved", () => ctrlA.invalidate())
+
+    ctrlA.invalidate()
+
+    await expect(
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Timeout - no loop detected")), 100)
+        scope.ready.then(() => {
+          queueMicrotask(() => queueMicrotask(() => {}))
+        })
+      })
+    ).rejects.toThrow(/loop/i)
+  })
 })
