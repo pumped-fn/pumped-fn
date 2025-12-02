@@ -592,6 +592,12 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
+  async flush(): Promise<void> {
+    if (this.chainPromise) {
+      await this.chainPromise
+    }
+  }
+
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     return new ExecutionContextImpl(this, options)
   }
