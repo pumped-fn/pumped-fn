@@ -532,7 +532,7 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    this.doInvalidate(atom, entry as AtomEntry<T>)
+    this.scheduleInvalidation(atom)
   }
 
   private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<void> {
