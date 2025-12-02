@@ -86,4 +86,24 @@ describe("invalidation chain", () => {
       })
     ).rejects.toThrow(/loop/i)
   })
+
+  it("allows self-invalidation during factory (deferred)", async () => {
+    let count = 0
+    const atomA = atom({
+      factory: (ctx) => {
+        count++
+        if (count < 3) ctx.invalidate()
+        return count
+      },
+    })
+
+    const scope = createScope()
+    const result = await scope.resolve(atomA)
+
+    expect(result).toBe(1)
+
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(count).toBe(3)
+  })
 })
