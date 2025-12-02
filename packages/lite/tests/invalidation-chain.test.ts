@@ -106,4 +106,23 @@ describe("invalidation chain", () => {
 
     expect(count).toBe(3)
   })
+
+  it("deduplicates concurrent invalidate() calls", async () => {
+    let count = 0
+    const atomA = atom({ factory: () => ++count })
+
+    const scope = createScope()
+    await scope.resolve(atomA)
+
+    count = 0
+    const ctrl = scope.controller(atomA)
+
+    ctrl.invalidate()
+    ctrl.invalidate()
+    ctrl.invalidate()
+
+    await ctrl.resolve()
+
+    expect(count).toBe(1)
+  })
 })
