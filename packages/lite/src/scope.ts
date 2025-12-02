@@ -153,6 +153,10 @@ class ScopeImpl implements Lite.Scope {
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
   private invalidationQueue = new Set<Lite.Atom<unknown>>()
   private invalidationScheduled = false
+  private invalidationChain: Set<Lite.Atom<unknown>> | null = null
+  private chainPromise: Promise<void> | null = null
+  private processingChain = false
+  private currentlyInvalidating: Lite.Atom<unknown> | null = null
   private initialized = false
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
