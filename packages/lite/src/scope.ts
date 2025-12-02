@@ -176,16 +176,6 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    const previousValue = entry.value
-    entry.state = "resolving"
-    entry.value = previousValue
-    entry.error = undefined
-    entry.pendingInvalidate = false
-    this.pending.delete(atom)
-    this.resolving.delete(atom)
-    this.emitStateChange("resolving", atom)
-    this.notifyListeners(atom, "resolving")
-
     this.invalidationQueue.add(atom)
 
     if (!this.chainPromise) {
