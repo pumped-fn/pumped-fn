@@ -7,6 +7,7 @@ import type {
   presetSymbol,
   controllerSymbol,
   tagExecutorSymbol,
+  typedSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -144,6 +145,10 @@ export namespace Lite {
   export interface ControllerDep<T> {
     readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
+  }
+
+  export interface Typed<T> {
+    readonly [typedSymbol]: true
   }
 
   export interface Preset<T> {

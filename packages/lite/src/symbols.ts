@@ -6,3 +6,4 @@ export const controllerDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/co
 export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/lite/preset")
 export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller")
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
+export const typedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/typed")

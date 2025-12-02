@@ -2,6 +2,7 @@ import { describe, it, expect, expectTypeOf } from "vitest"
 import {
   atom,
   flow,
+  typed,
   tag,
   tags,
   controller,
@@ -217,7 +218,8 @@ describe("Type Inference", () => {
             }
             return { name: obj["name"] }
           },
-          factory: (ctx: Lite.ExecutionContext<ParsedInput>) => {
+          factory: (ctx) => {
+            expectTypeOf(ctx.input).toEqualTypeOf<ParsedInput>()
             return ctx.input.name.toUpperCase()
           },
         })
@@ -253,6 +255,32 @@ describe("Type Inference", () => {
         const ctx = scope.createContext()
         const result = await ctx.exec({ flow: myFlow, input: "test" })
         expect(result).toBe("test")
+        await ctx.close()
+      })
+
+      it("infers ctx.input from typed() marker", async () => {
+        type TypedInput = { id: number; name: string }
+
+        const myFlow = flow({
+          parse: typed<TypedInput>(),
+          factory: (ctx) => {
+            expectTypeOf(ctx.input).toEqualTypeOf<TypedInput>()
+            return `${ctx.input.id}: ${ctx.input.name}`
+          },
+        })
+
+        type FlowInputType = typeof myFlow extends Lite.Flow<unknown, infer TInput>
+          ? TInput
+          : never
+        expectTypeOf<FlowInputType>().toEqualTypeOf<TypedInput>()
+
+        const scope = createScope()
+        const ctx = scope.createContext()
+        const result = await ctx.exec({
+          flow: myFlow as unknown as Lite.Flow<string, unknown>,
+          input: { id: 1, name: "test" },
+        })
+        expect(result).toBe("1: test")
         await ctx.close()
       })
     })
