@@ -1,5 +1,25 @@
 # @pumped-fn/lite
 
+## 1.1.0
+
+### Minor Changes
+
+- 2dd9ee9: Add parse functions for Tag and Flow with full type inference
+
+  - Add `parse` property to Tag for runtime validation (sync-only)
+  - Add `parse` property to Flow for input validation (async-supported)
+  - Add `ParseError` class with structured error context (phase, label, cause)
+  - Add optional `name` property to Flow for better error messages
+  - Type inference: `TInput` automatically inferred from parser return type
+
+- ee381f5: Add sequential invalidation chain with loop detection
+
+  - Invalidations now execute sequentially in dependency order (A → B → C)
+  - Infinite loop detection throws with helpful error message showing chain path
+  - New `scope.flush()` method to await pending invalidations
+  - State transitions now happen AFTER cleanups complete (matching C3-201 docs)
+  - Self-invalidation during factory execution remains deferred (poll-and-refresh pattern)
+
 ## 1.0.1
 
 ### Patch Changes
