@@ -170,13 +170,37 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private flushInvalidations(): void {
-    this.invalidationScheduled = false
-    const atoms = [...this.invalidationQueue]
-    this.invalidationQueue.clear()
-    for (const atom of atoms) {
-      this.invalidate(atom)
+  private async processInvalidationChain(): Promise<void> {
+    this.processingChain = true
+
+    try {
+      while (this.invalidationQueue.size > 0) {
+        const atom = this.invalidationQueue.values().next().value as Lite.Atom<unknown>
+        this.invalidationQueue.delete(atom)
+
+        if (this.invalidationChain!.has(atom)) {
+          const path = this.buildChainPath(atom)
+          throw new Error(`Infinite invalidation loop detected: ${path}`)
+        }
+
+        this.invalidationChain!.add(atom)
+        this.currentlyInvalidating = atom
+        await this.doInvalidateSequential(atom)
+        this.currentlyInvalidating = null
+      }
+    } finally {
+      this.processingChain = false
+      this.invalidationChain = null
+      this.chainPromise = null
+      this.invalidationScheduled = false
     }
+  }
+
+  private buildChainPath(loopAtom: Lite.Atom<unknown>): string {
+    const atoms = Array.from(this.invalidationChain!)
+    const labels = atoms.map((a, i) => `atom${i + 1}`)
+    labels.push(labels[0] ?? "atom")
+    return labels.join(" → ")
   }
 
   constructor(options?: Lite.ScopeOptions) {
