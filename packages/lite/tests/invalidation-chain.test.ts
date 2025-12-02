@@ -39,12 +39,11 @@ describe("invalidation chain", () => {
   })
 
   it("throws on infinite loop", async () => {
-    const atomA = atom({
-      factory: () => "a",
-    })
-    const atomB = atom({
-      factory: () => "b",
-    })
+    function factoryA() { return "a" }
+    function factoryB() { return "b" }
+
+    const atomA = atom({ factory: factoryA })
+    const atomB = atom({ factory: factoryB })
 
     const scope = createScope()
 
@@ -57,42 +56,9 @@ describe("invalidation chain", () => {
     ctrlA.on("resolved", () => ctrlB.invalidate())
     ctrlB.on("resolved", () => ctrlA.invalidate())
 
-    let loopError: Error | null = null
+    ctrlA.invalidate()
 
-    const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
-      if (event.reason?.message?.includes("loop")) {
-        loopError = event.reason
-        event.preventDefault()
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("unhandledrejection", unhandledRejectionHandler)
-    }
-
-    const originalHandler = process.listeners("unhandledRejection")[0] as ((reason: unknown) => void) | undefined
-    process.removeAllListeners("unhandledRejection")
-    process.on("unhandledRejection", (reason) => {
-      if ((reason as Error)?.message?.includes("loop")) {
-        loopError = reason as Error
-      }
-    })
-
-    try {
-      ctrlA.invalidate()
-      await new Promise(r => setTimeout(r, 100))
-    } finally {
-      process.removeAllListeners("unhandledRejection")
-      if (originalHandler) {
-        process.on("unhandledRejection", originalHandler)
-      }
-      if (typeof window !== "undefined") {
-        window.removeEventListener("unhandledrejection", unhandledRejectionHandler)
-      }
-    }
-
-    expect(loopError).not.toBeNull()
-    expect(loopError?.message).toMatch(/loop/i)
+    await expect(scope.flush()).rejects.toThrow(/Infinite invalidation loop detected/)
   })
 
   it("allows self-invalidation during factory (deferred)", async () => {
