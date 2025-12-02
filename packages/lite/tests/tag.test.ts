@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { tag, tags, isTag, isTagged } from "../src/tag"
+import { ParseError } from "../src/errors"
 import type { Lite } from "../src/types"
 
 describe("Tag", () => {
@@ -26,6 +27,69 @@ describe("Tag", () => {
       expect(isTagged(tagged)).toBe(true)
       expect(tagged.value).toBe("hello")
       expect(tagged.key).toBe(myTag.key)
+    })
+
+    it("creates a tag with parse function", () => {
+      const numberTag = tag({
+        label: "count",
+        parse: (raw: unknown) => {
+          const n = Number(raw)
+          if (isNaN(n)) throw new Error("Must be a number")
+          return n
+        },
+      })
+
+      expect(isTag(numberTag)).toBe(true)
+      expect(numberTag.parse).toBeDefined()
+    })
+
+    it("validates value through parse on creation", () => {
+      const numberTag = tag({
+        label: "count",
+        parse: (raw: unknown) => {
+          const n = Number(raw)
+          if (isNaN(n)) throw new Error("Must be a number")
+          return n
+        },
+      })
+
+      const tagged = numberTag(42)
+      expect(tagged.value).toBe(42)
+    })
+
+    it("throws ParseError when parse fails", () => {
+      const numberTag = tag({
+        label: "count",
+        parse: (raw: unknown) => {
+          const n = Number(raw)
+          if (isNaN(n)) throw new Error("Must be a number")
+          return n
+        },
+      })
+
+      expect(() => numberTag("not-a-number" as unknown as number)).toThrow()
+    })
+
+    it("ParseError has correct properties when parse fails", () => {
+      const numberTag = tag({
+        label: "count",
+        parse: (raw: unknown) => {
+          const n = Number(raw)
+          if (isNaN(n)) throw new Error("Must be a number")
+          return n
+        },
+      })
+
+      try {
+        numberTag("not-a-number" as unknown as number)
+        expect.fail("Should have thrown")
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError)
+        const parseErr = err as ParseError
+        expect(parseErr.phase).toBe("tag")
+        expect(parseErr.label).toBe("count")
+        expect(parseErr.cause).toBeInstanceOf(Error)
+      }
     })
   })
 
