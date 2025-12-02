@@ -117,6 +117,7 @@ export namespace Lite {
     readonly label: string
     readonly defaultValue: HasDefault extends true ? T : undefined
     readonly hasDefault: HasDefault
+    readonly parse?: (raw: unknown) => T
     (value: T): Tagged<T>
     get(source: TagSource): HasDefault extends true ? T : T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
