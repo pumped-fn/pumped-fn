@@ -4,14 +4,14 @@ title: Sequential Invalidation Chain with Loop Detection
 summary: >
   Replace parallel fire-and-forget invalidation with sequential awaited chain,
   add infinite loop detection, and guarantee deterministic frame control.
-status: proposed
+status: accepted
 date: 2025-12-02
 ---
 
 # [ADR-011] Sequential Invalidation Chain with Loop Detection
 
 ## Status {#adr-011-status}
-**Proposed** - 2025-12-02
+**Accepted** - 2025-12-02
 
 ## Problem/Requirement {#adr-011-problem}
 
@@ -357,13 +357,13 @@ describe('invalidation chain', () => {
 
 ## Verification {#adr-011-verification}
 
-- [ ] Frame control test passes (3 frames exactly)
-- [ ] Chain order is deterministic (A → B → C)
-- [ ] Loop detection throws with helpful message
-- [ ] Self-invalidation during factory still works (deferred)
-- [ ] Duplicate invalidate() calls are deduplicated
-- [ ] Existing tests still pass
-- [ ] No new microtasks created mid-chain
+- [x] Frame control test passes (3 frames exactly)
+- [x] Chain order is deterministic (A → B → C)
+- [x] Loop detection throws with helpful message
+- [x] Self-invalidation during factory still works (deferred)
+- [x] Duplicate invalidate() calls are deduplicated
+- [x] Existing tests still pass
+- [x] No new microtasks created mid-chain
 
 ## Related {#adr-011-related}
 

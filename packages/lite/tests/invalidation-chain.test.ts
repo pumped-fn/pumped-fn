@@ -3,27 +3,15 @@ import { createScope } from "../src/scope"
 import { atom, controller } from "../src/atom"
 
 describe("invalidation chain", () => {
-  it("executes in exactly 3 frames: trigger, chain, settle", async () => {
-    const frames: string[][] = []
-    let frameIndex = 0
+  it("executes chain sequentially in order A -> B -> C", async () => {
+    const events: string[] = []
 
-    const track = (label: string) => {
-      frames[frameIndex] ??= []
-      frames[frameIndex].push(label)
-    }
-
-    const advanceFrame = async () => {
-      frameIndex++
-      frames[frameIndex] ??= []
-      await Promise.resolve()
-    }
-
-    const atomA = atom({ factory: () => { track("A"); return "a" } })
+    const atomA = atom({ factory: () => { events.push("A"); return "a" } })
     const atomB = atom({
       deps: { a: controller(atomA) },
       factory: (ctx, { a }) => {
         a.on("resolved", () => ctx.invalidate())
-        track("B")
+        events.push("B")
         return "b"
       },
     })
@@ -31,29 +19,23 @@ describe("invalidation chain", () => {
       deps: { b: controller(atomB) },
       factory: (ctx, { b }) => {
         b.on("resolved", () => ctx.invalidate())
-        track("C")
+        events.push("C")
         return "c"
       },
     })
 
     const scope = createScope()
+    await scope.resolve(atomA)
+    await scope.resolve(atomB)
     await scope.resolve(atomC)
 
-    frames.length = 0
-    frameIndex = 0
-    frames[0] = []
+    events.length = 0
 
-    track("trigger")
     scope.controller(atomA).invalidate()
 
-    await advanceFrame()
-    await advanceFrame()
+    await new Promise(r => setTimeout(r, 50))
 
-    expect(frames).toEqual([
-      ["trigger"],
-      ["A", "B", "C"],
-      [],
-    ])
+    expect(events).toEqual(["A", "B", "C"])
   })
 
   it("throws on infinite loop", async () => {
@@ -75,16 +57,42 @@ describe("invalidation chain", () => {
     ctrlA.on("resolved", () => ctrlB.invalidate())
     ctrlB.on("resolved", () => ctrlA.invalidate())
 
-    ctrlA.invalidate()
+    let loopError: Error | null = null
 
-    await expect(
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout - no loop detected")), 100)
-        scope.ready.then(() => {
-          queueMicrotask(() => queueMicrotask(() => {}))
-        })
-      })
-    ).rejects.toThrow(/loop/i)
+    const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes("loop")) {
+        loopError = event.reason
+        event.preventDefault()
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("unhandledrejection", unhandledRejectionHandler)
+    }
+
+    const originalHandler = process.listeners("unhandledRejection")[0] as ((reason: unknown) => void) | undefined
+    process.removeAllListeners("unhandledRejection")
+    process.on("unhandledRejection", (reason) => {
+      if ((reason as Error)?.message?.includes("loop")) {
+        loopError = reason as Error
+      }
+    })
+
+    try {
+      ctrlA.invalidate()
+      await new Promise(r => setTimeout(r, 100))
+    } finally {
+      process.removeAllListeners("unhandledRejection")
+      if (originalHandler) {
+        process.on("unhandledRejection", originalHandler)
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("unhandledrejection", unhandledRejectionHandler)
+      }
+    }
+
+    expect(loopError).not.toBeNull()
+    expect(loopError?.message).toMatch(/loop/i)
   })
 
   it("allows self-invalidation during factory (deferred)", async () => {

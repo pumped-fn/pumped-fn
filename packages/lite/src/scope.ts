@@ -163,13 +163,28 @@ class ScopeImpl implements Lite.Scope {
   readonly ready: Promise<void>
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
-    if (this.currentlyInvalidating === atom) {
-      const entry = this.cache.get(atom)
-      if (entry) {
-        entry.pendingInvalidate = true
-      }
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry || entry.state === "idle") return
+
+    if (entry.state === "resolving") {
+      entry.pendingInvalidate = true
       return
     }
+
+    if (this.currentlyInvalidating === atom && entry.state !== "resolved") {
+      entry.pendingInvalidate = true
+      return
+    }
+
+    const previousValue = entry.value
+    entry.state = "resolving"
+    entry.value = previousValue
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    this.pending.delete(atom)
+    this.resolving.delete(atom)
+    this.emitStateChange("resolving", atom)
+    this.notifyListeners(atom, "resolving")
 
     this.invalidationQueue.add(atom)
 
@@ -435,6 +450,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
+        this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
       }
 
@@ -449,6 +465,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
+        this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
       }
 
@@ -559,20 +576,11 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
     if (entry.state === "idle") return
 
-    const previousValue = entry.value
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
     }
     entry.cleanups = []
-    entry.state = "resolving"
-    entry.value = previousValue
-    entry.error = undefined
-    entry.pendingInvalidate = false
-    this.pending.delete(atom)
-    this.resolving.delete(atom)
-    this.emitStateChange("resolving", atom)
-    this.notifyListeners(atom, "resolving")
 
     await this.resolve(atom)
   }
