@@ -155,8 +155,6 @@ class ScopeImpl implements Lite.Scope {
   private invalidationScheduled = false
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
-  private processingChain = false
-  private currentlyInvalidating: Lite.Atom<unknown> | null = null
   private initialized = false
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
@@ -167,11 +165,6 @@ class ScopeImpl implements Lite.Scope {
     if (!entry || entry.state === "idle") return
 
     if (entry.state === "resolving") {
-      entry.pendingInvalidate = true
-      return
-    }
-
-    if (this.currentlyInvalidating === atom && entry.state !== "resolved") {
       entry.pendingInvalidate = true
       return
     }
@@ -190,8 +183,6 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async processInvalidationChain(): Promise<void> {
-    this.processingChain = true
-
     try {
       while (this.invalidationQueue.size > 0) {
         const atom = this.invalidationQueue.values().next().value as Lite.Atom<unknown>
@@ -207,12 +198,9 @@ class ScopeImpl implements Lite.Scope {
         }
 
         this.invalidationChain!.add(atom)
-        this.currentlyInvalidating = atom
         await this.doInvalidateSequential(atom)
-        this.currentlyInvalidating = null
       }
     } finally {
-      this.processingChain = false
       this.invalidationChain = null
       this.chainPromise = null
       this.invalidationScheduled = false

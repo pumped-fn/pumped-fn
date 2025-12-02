@@ -33,7 +33,7 @@ describe("invalidation chain", () => {
 
     scope.controller(atomA).invalidate()
 
-    await new Promise(r => setTimeout(r, 50))
+    await scope.flush()
 
     expect(events).toEqual(["A", "B", "C"])
   })
@@ -76,7 +76,7 @@ describe("invalidation chain", () => {
 
     expect(result).toBe(1)
 
-    await new Promise((r) => setTimeout(r, 50))
+    await scope.flush()
 
     expect(count).toBe(3)
   })
