@@ -186,6 +186,27 @@ const createUserFlow = flow({
 })
 ```
 
+### Flow with Parse Validation
+
+```typescript
+const createUserFlow = flow({
+  name: 'createUser',
+  parse: (raw) => {
+    const obj = raw as Record<string, unknown>
+    if (typeof obj.name !== 'string') throw new Error('name required')
+    if (typeof obj.email !== 'string') throw new Error('email required')
+    return { name: obj.name, email: obj.email }
+  },
+  deps: { repo: userRepoAtom },
+  factory: async (ctx, { repo }) => {
+    // ctx.input is typed as { name: string; email: string }
+    return repo.create(ctx.input)
+  }
+})
+```
+
+Parse runs before the factory, and `ctx.input` type is inferred from the parse return type. On validation failure, throws `ParseError` with phase `'flow-input'`.
+
 ### Executing Flows
 
 ```typescript
@@ -308,6 +329,18 @@ Tags pass contextual values through execution without explicit wiring.
 ```typescript
 const tenantIdTag = tag<string>({ label: 'tenantId' })
 const userRolesTag = tag<string[]>({ label: 'userRoles', default: [] })
+
+// With parse validation
+const userId = tag({
+  label: 'userId',
+  parse: (raw) => {
+    if (typeof raw !== 'string') throw new Error('Must be string')
+    return raw
+  }
+})
+
+userId('abc-123')  // OK
+userId(123)        // Throws ParseError
 ```
 
 ### Using Tags as Dependencies
@@ -563,8 +596,8 @@ sequenceDiagram
 |----------|-------------|
 | `createScope(options?)` | Create DI container (returns Scope with `ready` promise) |
 | `atom(config)` | Define long-lived cached dependency |
-| `flow(config)` | Define short-lived operation template |
-| `tag(config)` | Define contextual value |
+| `flow(config)` | Define short-lived operation template (optional `name`, `parse`) |
+| `tag(config)` | Define contextual value (optional `parse` for validation) |
 | `controller(atom)` | Create controller dependency helper |
 | `preset(atom, value)` | Create value injection preset |
 
@@ -650,6 +683,7 @@ const myTag: Lite.Tag<string> = tag({ label: 'myTag' })
 | Controller reactivity | ✅ Built-in | No |
 | Self-invalidation | ✅ Built-in | No |
 | Fine-grained select() | ✅ Built-in | No |
+| Tag/Flow parse functions | ✅ Built-in | No |
 | Bundle size | <17KB | ~75KB |
 
 **Choose `@pumped-fn/lite` when:**

@@ -1,6 +1,7 @@
 import { controllerSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise, AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
+import { ParseError } from "./errors"
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
@@ -621,7 +622,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   private async execFlow<T>(options: Lite.ExecFlowOptions<T>): Promise<T> {
-    const { flow, input, tags: execTags } = options
+    const { flow, input, tags: execTags, name: execName } = options
 
     const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
     const allTags = hasExtraTags
@@ -630,7 +631,22 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
 
-    this._input = input
+    let parsedInput: unknown = input
+    if (flow.parse) {
+      const label = execName ?? flow.name ?? "anonymous"
+      try {
+        parsedInput = await flow.parse(input)
+      } catch (err) {
+        throw new ParseError(
+          `Failed to parse flow input "${label}"`,
+          "flow-input",
+          label,
+          err
+        )
+      }
+    }
+
+    this._input = parsedInput
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,

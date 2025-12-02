@@ -165,13 +165,19 @@ const handleRequest = flow(
 // Execution
 const result = await scope.exec(handleRequest, { userId: '123' })
 
-// AFTER (lite) - No schema validation
+// AFTER (lite) - Optional parse validation
 const handleRequest = flow({
+  name: 'handleRequest',
   deps: { db: dbAtom },
   tags: [apiTag('users')],
+  parse: (raw) => {
+    const obj = raw as Record<string, unknown>
+    if (typeof obj.userId !== 'string') throw new Error('userId required')
+    return { userId: obj.userId }
+  },
   factory: async (ctx, { db }) => {
-    const input = ctx.input as RequestInput  // Manual cast
-    return db.query(input.userId)
+    // ctx.input is typed as { userId: string }
+    return db.query(ctx.input.userId)
   }
 })
 
@@ -186,11 +192,24 @@ await context.close()
 
 ### 6. Migrate Tags
 
-Tags work the same in both packages:
+Tags work the same in both packages, with lite adding optional `parse` for validation:
 
 ```typescript
 // Same in both
 const tenantId = tag<string>({ label: 'tenantId' })
+
+// lite-only: tag with parse validation
+const userId = tag({
+  label: 'userId',
+  parse: (raw) => {
+    if (typeof raw !== 'string') throw new Error('Must be string')
+    if (raw.length < 1) throw new Error('Cannot be empty')
+    return raw
+  }
+})
+
+userId('abc-123')  // OK - returns Tagged<string>
+userId(123)        // Throws ParseError
 
 const myAtom = atom({
   deps: { tenant: tags.required(tenantId) },
@@ -264,15 +283,17 @@ const userFlow = flow({
   ...
 })
 
-// AFTER (lite) - Manual validation
+// AFTER (lite) - Use parse function
 import { z } from 'zod'
 
 const userSchema = z.object({ id: z.string() })
 
 const userFlow = flow({
-  factory: async (ctx, deps) => {
-    const input = userSchema.parse(ctx.input)  // Manual
-    ...
+  name: 'userFlow',
+  parse: (raw) => userSchema.parse(raw),  // Validates before factory
+  factory: async (ctx) => {
+    // ctx.input is typed as { id: string }
+    return ctx.input.id
   }
 })
 ```
@@ -396,5 +417,6 @@ Keep using `@pumped-fn/core-next` if you need:
 | Controller reactivity | ✅ | ❌ |
 | Self-invalidation | ✅ | ❌ |
 | Fine-grained select() | ✅ | ❌ |
+| Tag/Flow parse functions | ✅ | ❌ |
 | Bundle size | <17KB | ~75KB |
 | Dependencies | 0 | 0 |

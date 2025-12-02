@@ -14,5 +14,6 @@ export { atom, isAtom, controller, isControllerDep } from "./atom"
 export { flow, isFlow } from "./flow"
 export { preset, isPreset } from "./preset"
 export { createScope } from "./scope"
+export { ParseError } from "./errors"
 
 export const VERSION = "0.0.1"

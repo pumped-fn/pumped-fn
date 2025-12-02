@@ -1,10 +1,11 @@
-import { describe, it, expectTypeOf } from "vitest"
+import { describe, it, expect, expectTypeOf } from "vitest"
 import {
   atom,
   flow,
   tag,
   tags,
   controller,
+  createScope,
   type Lite,
 } from "../src/index"
 
@@ -181,6 +182,79 @@ describe("Type Inference", () => {
 
       type MixedFlowType = typeof mixedFlow extends Lite.Flow<infer T, unknown> ? T : never
       expectTypeOf<MixedFlowType>().toEqualTypeOf<{ input: unknown }>()
+    })
+  })
+
+  describe("parse type inference", () => {
+    describe("Tag with parse", () => {
+      it("infers type from parse return", () => {
+        const numberTag = tag({
+          label: "count",
+          parse: (raw: unknown): number => {
+            const n = Number(raw)
+            if (isNaN(n)) throw new Error("Must be number")
+            return n
+          },
+        })
+
+        const tagged = numberTag(42)
+        expectTypeOf(tagged.value).toEqualTypeOf<number>()
+      })
+    })
+
+    describe("Flow with parse", () => {
+      it("infers ctx.input from parse return", async () => {
+        type ParsedInput = { name: string }
+
+        const myFlow = flow({
+          parse: (raw: unknown): ParsedInput => {
+            if (typeof raw !== "object" || raw === null) {
+              throw new Error("Must be object")
+            }
+            const obj = raw as Record<string, unknown>
+            if (typeof obj["name"] !== "string") {
+              throw new Error("name must be string")
+            }
+            return { name: obj["name"] }
+          },
+          factory: (ctx: Lite.ExecutionContext<ParsedInput>) => {
+            return ctx.input.name.toUpperCase()
+          },
+        })
+
+        type FlowInputType = typeof myFlow extends Lite.Flow<unknown, infer TInput>
+          ? TInput
+          : never
+        expectTypeOf<FlowInputType>().toEqualTypeOf<ParsedInput>()
+
+        const scope = createScope()
+        const ctx = scope.createContext()
+        const result = await ctx.exec({
+          flow: myFlow as unknown as Lite.Flow<string, unknown>,
+          input: { name: "test" },
+        })
+        expect(result).toBe("TEST")
+        await ctx.close()
+      })
+
+      it("ctx.input is unknown without parse", async () => {
+        const myFlow = flow({
+          factory: (ctx) => {
+            return String(ctx.input)
+          },
+        })
+
+        type FlowInputType = typeof myFlow extends Lite.Flow<unknown, infer TInput>
+          ? TInput
+          : never
+        expectTypeOf<FlowInputType>().toEqualTypeOf<unknown>()
+
+        const scope = createScope()
+        const ctx = scope.createContext()
+        const result = await ctx.exec({ flow: myFlow, input: "test" })
+        expect(result).toBe("test")
+        await ctx.close()
+      })
     })
   })
 })

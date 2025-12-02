@@ -49,6 +49,8 @@ export namespace Lite {
 
   export interface Flow<TOutput, TInput = unknown> {
     readonly [flowSymbol]: true
+    readonly name?: string
+    readonly parse?: (raw: unknown) => MaybePromise<TInput>
     readonly factory: FlowFactory<TOutput, TInput, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>
     readonly tags?: Tagged<unknown>[]
@@ -69,8 +71,8 @@ export namespace Lite {
     readonly data: DataStore
   }
 
-  export interface ExecutionContext {
-    readonly input: unknown
+  export interface ExecutionContext<TInput = unknown> {
+    readonly input: TInput
     readonly scope: Scope
     exec<T>(options: ExecFlowOptions<T>): Promise<T>
     exec<T, Args extends unknown[]>(options: ExecFnOptions<T, Args>): Promise<T>
@@ -81,6 +83,7 @@ export namespace Lite {
   export interface ExecFlowOptions<T> {
     flow: Flow<T, unknown>
     input: unknown
+    name?: string
     tags?: Tagged<unknown>[]
   }
 
@@ -117,6 +120,7 @@ export namespace Lite {
     readonly label: string
     readonly defaultValue: HasDefault extends true ? T : undefined
     readonly hasDefault: HasDefault
+    readonly parse?: (raw: unknown) => T
     (value: T): Tagged<T>
     get(source: TagSource): HasDefault extends true ? T : T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
@@ -189,6 +193,6 @@ export namespace Lite {
     TInput,
     D extends Record<string, Dependency>,
   > = keyof D extends never
-    ? (ctx: ExecutionContext) => MaybePromise<TOutput>
-    : (ctx: ExecutionContext, deps: InferDeps<D>) => MaybePromise<TOutput>
+    ? (ctx: ExecutionContext<TInput>) => MaybePromise<TOutput>
+    : (ctx: ExecutionContext<TInput>, deps: InferDeps<D>) => MaybePromise<TOutput>
 }

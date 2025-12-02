@@ -27,6 +27,8 @@ Flows are the primary pattern for handling requests, commands, or any operation 
 ```typescript
 interface Flow<TOutput, TInput = unknown> {
   readonly [flowSymbol]: true
+  readonly name?: string
+  readonly parse?: (raw: unknown) => MaybePromise<TInput>
   readonly factory: FlowFactory<TOutput, TInput, D>
   readonly deps?: Record<string, Dependency>
   readonly tags?: Tagged<unknown>[]
@@ -99,6 +101,51 @@ const adminFlow = flow({
   factory: (ctx) => {
     return performAdminAction(ctx.input)
   }
+})
+```
+
+### Flow with Parse
+
+Flows can include a parse function for input validation:
+
+```typescript
+const createUser = flow({
+  name: 'createUser',
+  parse: (raw) => {
+    const obj = raw as Record<string, unknown>
+    if (typeof obj.name !== 'string') throw new Error('name required')
+    if (typeof obj.email !== 'string') throw new Error('email required')
+    return { name: obj.name, email: obj.email }
+  },
+  factory: (ctx) => {
+    // ctx.input is typed as { name: string; email: string }
+    return db.users.create(ctx.input)
+  }
+})
+```
+
+**Parse behavior:**
+- Runs before factory in `ctx.exec()`
+- Can be sync or async
+- Throws `ParseError` with `phase: 'flow-input'` on failure
+- `ctx.input` type is inferred from parse return type
+- Error label priority: exec name > flow name > 'anonymous'
+
+### Flow Naming
+
+Flows can have optional names for debugging:
+
+```typescript
+const myFlow = flow({
+  name: 'myFlow',
+  factory: (ctx) => { ... }
+})
+
+// Or override at execution
+await ctx.exec({
+  flow: myFlow,
+  input: data,
+  name: 'specificExecution'
 })
 ```
 
