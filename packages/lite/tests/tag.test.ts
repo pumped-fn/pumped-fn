@@ -91,6 +91,23 @@ describe("Tag", () => {
         expect(parseErr.cause).toBeInstanceOf(Error)
       }
     })
+
+    it("default value bypasses parse validation", () => {
+      let parseCalled = false
+      const numberTag = tag({
+        label: "count",
+        parse: (raw: unknown) => {
+          parseCalled = true
+          const n = Number(raw)
+          if (isNaN(n)) throw new Error("Must be a number")
+          return n
+        },
+        default: 0,
+      })
+
+      expect(numberTag.defaultValue).toBe(0)
+      expect(parseCalled).toBe(false)
+    })
   })
 
   describe("tag.get()", () => {
