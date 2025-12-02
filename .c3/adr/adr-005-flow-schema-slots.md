@@ -4,14 +4,19 @@ title: Parser Functions for Type-Safe Input/Output Validation
 summary: >
   Add parser functions to Flow and Tag for library-agnostic validation with
   full TypeScript type inference. TInput/TOutput inferred from parser return types.
-status: abandoned
+status: accepted
 date: 2025-11-28
 ---
 
 # [ADR-005] Parser Functions for Type-Safe Input/Output Validation
 
 ## Status {#adr-005-status}
-**Abandoned** - 2025-12-01
+**Accepted** - 2025-12-02
+
+Implementation completed with minor variations from original proposal:
+- Property named `parse` instead of `input`/`output`
+- No output validation (input-only by design decision)
+- Phase values: `'tag'` and `'flow-input'` (no output phase)
 
 ## Problem/Requirement {#adr-005-problem}
 
@@ -327,31 +332,29 @@ ParseError: Failed to parse value for tag "userId"
 ## Verification {#adr-005-verification}
 
 ### Type Inference
-- [ ] `TInput` inferred from `input` parser return type
-- [ ] `TOutput` inferred from `output` parser return type (or factory return)
-- [ ] `ctx.input` typed as `TInput` in factory
-- [ ] Tag value type inferred from `parse` return type
-- [ ] No type errors in examples with Zod/Valibot patterns
+- [x] `TInput` inferred from `parse` return type
+- [x] `ctx.input` typed as `TInput` in factory
+- [x] Tag value type inferred from `parse` return type
+- [x] No type errors with Zod/Valibot patterns
 
 ### Runtime Behavior
-- [ ] Flow `input` parser called before factory
-- [ ] Flow `output` parser called after factory
-- [ ] Tag `parse` called when creating tagged value
-- [ ] Tag `defaultValue` NOT parsed
-- [ ] Flow parsers support async (`MaybePromise`)
-- [ ] Tag parsers sync only
+- [x] Flow `parse` called before factory
+- [x] Tag `parse` called when creating tagged value
+- [x] Tag `defaultValue` NOT parsed
+- [x] Flow parsers support async (`MaybePromise`)
+- [x] Tag parsers sync only
 
 ### Error Handling
-- [ ] `ParseError` thrown with phase context
-- [ ] Original error preserved as `cause`
-- [ ] Tag label included in tag parse errors
-- [ ] Errors distinguishable (input vs output vs tag)
+- [x] `ParseError` thrown with phase context (`'tag'` or `'flow-input'`)
+- [x] Original error preserved as `cause`
+- [x] Tag label included in tag parse errors
+- [x] Flow name/exec name used as label with priority: exec > flow > 'anonymous'
 
 ### Existing Behavior
-- [ ] Flows without parsers work as before (`ctx.input` is `unknown`)
-- [ ] Tags without parsers work as before
-- [ ] All existing tests pass
-- [ ] Typecheck passes: `pnpm -F @pumped-fn/lite typecheck`
+- [x] Flows without parsers work as before (`ctx.input` is `unknown`)
+- [x] Tags without parsers work as before
+- [x] All existing tests pass (134 tests)
+- [x] Typecheck passes: `pnpm -F @pumped-fn/lite typecheck`
 
 ## Related {#adr-005-related}
 
