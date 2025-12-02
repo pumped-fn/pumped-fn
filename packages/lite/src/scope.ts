@@ -566,11 +566,22 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
     if (entry.state === "idle") return
 
+    const previousValue = entry.value
+
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
     }
     entry.cleanups = []
+
+    entry.state = "resolving"
+    entry.value = previousValue
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    this.pending.delete(atom)
+    this.resolving.delete(atom)
+    this.emitStateChange("resolving", atom)
+    this.notifyListeners(atom, "resolving")
 
     await this.resolve(atom)
   }
