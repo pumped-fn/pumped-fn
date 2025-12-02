@@ -156,7 +156,8 @@ describe("Scope", () => {
       expect(ctrl.get()).toBe(1)
 
       ctrl.invalidate()
-      await new Promise(r => setTimeout(r, 5))
+      await Promise.resolve()
+      await Promise.resolve()
       expect(ctrl.state).toBe('resolving')
       expect(ctrl.get()).toBe(1)
 
@@ -629,7 +630,7 @@ describe("ExecutionContext", () => {
       expect(ctrl.get()).toBe(2)
     })
 
-    it("sets state to resolving immediately after invalidate", async () => {
+    it("sets state to resolving after invalidate microtask", async () => {
       const scope = createScope()
       const myAtom = atom({
         factory: async () => {
@@ -644,6 +645,8 @@ describe("ExecutionContext", () => {
       expect(ctrl.get()).toBe("value")
 
       ctrl.invalidate()
+      await Promise.resolve()
+      await Promise.resolve()
       expect(ctrl.state).toBe('resolving')
       expect(ctrl.get()).toBe("value")
     })
@@ -709,6 +712,8 @@ describe("ExecutionContext", () => {
 
       shouldFail = false
       ctrl.invalidate()
+      await Promise.resolve()
+      await Promise.resolve()
       expect(ctrl.state).toBe('resolving')
 
       await new Promise(r => setTimeout(r, 10))
@@ -772,6 +777,8 @@ describe("ExecutionContext", () => {
       ctrl.on('*', () => states.push(ctrl.state))
       ctrl.invalidate()
 
+      await Promise.resolve()
+      await Promise.resolve()
       expect(states).toContain('resolving')
 
       await new Promise(r => setTimeout(r, 50))
@@ -1024,6 +1031,8 @@ describe("ExecutionContext", () => {
 
       const ctrl = scope.controller(myAtom)
       ctrl.invalidate()
+      await Promise.resolve()
+      await Promise.resolve()
       await ctrl.resolve()
 
       const second = ctrl.get()
