@@ -6,6 +6,8 @@ export interface FlowConfig<
   TInput,
   D extends Record<string, Lite.Dependency>,
 > {
+  name?: string
+  parse?: (raw: unknown) => MaybePromise<TInput>
   deps?: D
   factory: Lite.FlowFactory<TOutput, TInput, D>
   tags?: Lite.Tagged<unknown>[]
@@ -27,19 +29,40 @@ export interface FlowConfig<
  * })
  * ```
  */
-export function flow<TOutput, TInput = unknown>(config: {
+export function flow<TOutput>(config: {
+  name?: string
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
+}): Lite.Flow<TOutput, unknown>
+
+export function flow<TOutput, TInput>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
+  deps?: undefined
+  factory: (ctx: Lite.ExecutionContext<TInput>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
+
+export function flow<
+  TOutput,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+>(config: {
+  name?: string
+  deps: D
+  factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<unknown>[]
+}): Lite.Flow<TOutput, unknown>
 
 export function flow<
   TOutput,
   TInput,
   const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
 >(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
   deps: D
-  factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext<TInput>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 
@@ -50,6 +73,8 @@ export function flow<
 >(config: FlowConfig<TOutput, TInput, D>): Lite.Flow<TOutput, TInput> {
   return {
     [flowSymbol]: true,
+    name: config.name,
+    parse: config.parse,
     factory: config.factory as unknown as Lite.FlowFactory<
       TOutput,
       TInput,

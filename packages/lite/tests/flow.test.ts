@@ -29,5 +29,26 @@ describe("Flow", () => {
       expect(myFlow.deps).toBeDefined()
     })
 
+    it("creates a flow with name", () => {
+      const myFlow = flow({
+        name: "myFlow",
+        factory: (ctx) => ctx.input,
+      })
+
+      expect(myFlow.name).toBe("myFlow")
+    })
+
+    it("creates a flow with parse function", () => {
+      const myFlow = flow({
+        parse: (raw) => {
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw
+        },
+        factory: (ctx) => ctx.input.toUpperCase(),
+      })
+
+      expect(myFlow.parse).toBeDefined()
+    })
+
   })
 })
