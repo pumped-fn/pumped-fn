@@ -4,6 +4,7 @@ import { atom, controller } from "../src/atom"
 import { preset } from "../src/preset"
 import { tag, tags } from "../src/tag"
 import { flow } from "../src/flow"
+import type { Lite } from "../src/types"
 
 describe("Scope", () => {
   describe("createScope()", () => {
@@ -946,6 +947,129 @@ describe("ExecutionContext", () => {
       const serverCtrl = scope.controller(serverAtom)
       expect(serverCtrl.get()).toBe("server:updated")
       expect(serverCreateCount).toBe(2)
+    })
+  })
+
+  describe("flow parse", () => {
+    it("parses input before factory execution", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      const parseOrder: string[] = []
+
+      const myFlow = flow({
+        parse: (raw: unknown): string => {
+          parseOrder.push("parse")
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw.toUpperCase()
+        },
+        factory: (ctx) => {
+          parseOrder.push("factory")
+          return ctx.input as string
+        },
+      })
+
+      const result = await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })
+
+      expect(result).toBe("HELLO")
+      expect(parseOrder).toEqual(["parse", "factory"])
+      await ctx.close()
+    })
+
+    it("throws ParseError when flow parse fails", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const { ParseError } = await import("../src/errors")
+
+      const myFlow = flow({
+        name: "stringFlow",
+        parse: (raw: unknown): string => {
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw
+        },
+        factory: (ctx) => ctx.input as string,
+      })
+
+      try {
+        await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: 123 })
+        expect.fail("Should have thrown")
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError)
+        const parseErr = err as InstanceType<typeof ParseError>
+        expect(parseErr.phase).toBe("flow-input")
+        expect(parseErr.label).toBe("stringFlow")
+      }
+
+      await ctx.close()
+    })
+
+    it("uses exec name over flow name in ParseError", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const { ParseError } = await import("../src/errors")
+
+      const myFlow = flow({
+        name: "flowName",
+        parse: (raw: unknown): string => {
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw
+        },
+        factory: (ctx) => ctx.input as string,
+      })
+
+      try {
+        await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: 123, name: "execName" })
+        expect.fail("Should have thrown")
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError)
+        const parseErr = err as InstanceType<typeof ParseError>
+        expect(parseErr.label).toBe("execName")
+      }
+
+      await ctx.close()
+    })
+
+    it("uses 'anonymous' when no name provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const { ParseError } = await import("../src/errors")
+
+      const myFlow = flow({
+        parse: (raw: unknown): string => {
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw
+        },
+        factory: (ctx) => ctx.input as string,
+      })
+
+      try {
+        await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: 123 })
+        expect.fail("Should have thrown")
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError)
+        const parseErr = err as InstanceType<typeof ParseError>
+        expect(parseErr.label).toBe("anonymous")
+      }
+
+      await ctx.close()
+    })
+
+    it("supports async parse", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      const myFlow = flow({
+        parse: async (raw: unknown): Promise<string> => {
+          await new Promise((r) => setTimeout(r, 1))
+          if (typeof raw !== "string") throw new Error("Must be string")
+          return raw.toUpperCase()
+        },
+        factory: (ctx) => ctx.input as string,
+      })
+
+      const result = await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })
+      expect(result).toBe("HELLO")
+      await ctx.close()
     })
   })
 

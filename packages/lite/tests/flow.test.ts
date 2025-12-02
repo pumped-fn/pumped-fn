@@ -40,11 +40,11 @@ describe("Flow", () => {
 
     it("creates a flow with parse function", () => {
       const myFlow = flow({
-        parse: (raw) => {
+        parse: (raw: unknown): string => {
           if (typeof raw !== "string") throw new Error("Must be string")
           return raw
         },
-        factory: (ctx) => ctx.input.toUpperCase(),
+        factory: (ctx) => (ctx.input as string).toUpperCase(),
       })
 
       expect(myFlow.parse).toBeDefined()
