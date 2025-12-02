@@ -268,12 +268,76 @@ ctrl.invalidate()
 // 1. Runs cleanups (LIFO order)
 // 2. Transitions to 'resolving'
 // 3. Notifies 'resolving' and '*' listeners
-// 4. Re-runs factory
+// 4. Re-runs factory (awaited)
 // 5. Transitions to 'resolved' or 'failed'
 // 6. Notifies 'resolved' and '*' listeners
 ```
 
 Note: Listeners are notified exactly twice per invalidation cycle (once for 'resolving', once for 'resolved').
+
+### Invalidation Chain
+
+When a listener triggers another invalidation, they form a **sequential chain**:
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Scope
+    participant A as Atom A
+    participant B as Atom B (subscribes to A)
+
+    Note over App,B: Frame 0 (sync)
+    App->>Scope: ctrl.invalidate(A)
+    Scope->>Scope: queue A, schedule microtask
+
+    Note over App,B: Frame 1 (microtask)
+    Scope->>A: cleanups → resolving → await factory → resolved
+    A->>Scope: listener calls invalidate(B)
+    Scope->>Scope: queue B (sync, same chain)
+    Scope->>B: cleanups → resolving → await factory → resolved
+
+    Note over App,B: Frame 2 (settled)
+```
+
+**Frame guarantees:**
+
+| Frame | What happens |
+|-------|--------------|
+| 0 | Sync: `invalidate()` called, atom queued, microtask scheduled |
+| 1 | Microtask: entire chain processes sequentially |
+| 2 | Nothing: chain settled, no pending work |
+
+**Key behaviors:**
+- Each atom fully resolves (`await factory()`) before the next starts
+- Listeners see resolved upstream before deciding to invalidate
+- Chain order is deterministic (upstream before downstream)
+- Duplicate `invalidate()` calls on same atom are deduplicated
+
+### Loop Detection
+
+Infinite loops are detected and throw immediately:
+
+```typescript
+// A subscribes to B, B subscribes to A
+const atomA = atom({
+  deps: { b: controller(atomB) },
+  factory: (ctx, { b }) => {
+    b.on('resolved', () => ctx.invalidate())
+    return 'a'
+  }
+})
+
+const atomB = atom({
+  deps: { a: controller(atomA) },
+  factory: (ctx, { a }) => {
+    a.on('resolved', () => ctx.invalidate())
+    return 'b'
+  }
+})
+
+scope.controller(atomA).invalidate()
+// Throws: "Infinite invalidation loop detected: atomA → atomB → atomA"
+```
 
 ### Self-Invalidation from Factory
 
@@ -290,7 +354,7 @@ const configAtom = atom({
 })
 ```
 
-Note: `ctx.invalidate()` schedules invalidation after the current factory completes.
+Note: `ctx.invalidate()` during own factory is **deferred** via `pendingInvalidate` flag, not part of the chain. This preserves the poll-and-refresh pattern.
 
 ### Invalidation During Resolution
 

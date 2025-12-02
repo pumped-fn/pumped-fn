@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-01 18:15:43
+> Last generated: 2025-12-02 10:17:55
 
 ## Context Level
 
@@ -293,6 +293,23 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ## Architecture Decisions
 
+### [adr-011](./adr/adr-011-sequential-invalidation-chain.md) - Sequential Invalidation Chain with Loop Detection
+> Replace parallel fire-and-forget invalidation with sequential awaited chain,
+add infinite loop detection, and guarantee deterministic frame control.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-011-status)
+- [Problem/Requirement](#adr-011-problem)
+- [Exploration Journey](#adr-011-exploration)
+- [Solution](#adr-011-solution)
+- [Changes Across Layers](#adr-011-changes)
+- [Verification](#adr-011-verification)
+- [Related](#adr-011-related)
+
+---
+
 ### [ADR-010-typed-data-store](./adr/adr-010-typed-data-store.md) - Tag-based Typed DataStore API for ctx.data
 > Replace Map<string, unknown> with typed DataStore interface using Tag as
 keys for compile-time type safety, consistent API with existing tag system,
@@ -488,5 +505,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 26
-**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 10
+**Total Documents**: 27
+**Contexts**: 1 | **Containers**: 2 | **Components**: 13 | **ADRs**: 11
