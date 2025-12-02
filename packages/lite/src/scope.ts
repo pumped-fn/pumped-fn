@@ -163,10 +163,24 @@ class ScopeImpl implements Lite.Scope {
   readonly ready: Promise<void>
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
+    if (this.currentlyInvalidating === atom) {
+      const entry = this.cache.get(atom)
+      if (entry) {
+        entry.pendingInvalidate = true
+      }
+      return
+    }
+
     this.invalidationQueue.add(atom)
-    if (!this.invalidationScheduled) {
+
+    if (!this.chainPromise) {
+      this.invalidationChain = new Set()
       this.invalidationScheduled = true
-      queueMicrotask(() => this.flushInvalidations())
+      this.chainPromise = new Promise<void>((resolve, reject) => {
+        queueMicrotask(() => {
+          this.processInvalidationChain().then(resolve).catch(reject)
+        })
+      })
     }
   }
 
