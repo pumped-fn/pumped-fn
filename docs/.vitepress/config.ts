@@ -80,6 +80,11 @@ export default withMermaid(defineConfig({
           twoslashOptions: {
             compilerOptions: {
               noImplicitAny: false,
+              baseUrl: "..",
+              paths: {
+                "@pumped-fn/lite": ["./packages/lite/src/index.ts"],
+                "@pumped-fn/core-next": ["./packages/next/src/index.ts"],
+              },
             },
           },
         }),

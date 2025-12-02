@@ -20,6 +20,7 @@ export namespace Lite {
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
+    flush(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
     on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
     select<T, S>(

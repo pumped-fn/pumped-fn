@@ -153,25 +153,57 @@ class ScopeImpl implements Lite.Scope {
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
   private invalidationQueue = new Set<Lite.Atom<unknown>>()
   private invalidationScheduled = false
+  private invalidationChain: Set<Lite.Atom<unknown>> | null = null
+  private chainPromise: Promise<void> | null = null
   private initialized = false
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
   readonly ready: Promise<void>
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry || entry.state === "idle") return
+
+    if (entry.state === "resolving") {
+      entry.pendingInvalidate = true
+      return
+    }
+
     this.invalidationQueue.add(atom)
-    if (!this.invalidationScheduled) {
+
+    if (!this.chainPromise) {
+      this.invalidationChain = new Set()
       this.invalidationScheduled = true
-      queueMicrotask(() => this.flushInvalidations())
+      this.chainPromise = new Promise<void>((resolve, reject) => {
+        queueMicrotask(() => {
+          this.processInvalidationChain().then(resolve).catch(reject)
+        })
+      })
     }
   }
 
-  private flushInvalidations(): void {
-    this.invalidationScheduled = false
-    const atoms = [...this.invalidationQueue]
-    this.invalidationQueue.clear()
-    for (const atom of atoms) {
-      this.invalidate(atom)
+  private async processInvalidationChain(): Promise<void> {
+    try {
+      while (this.invalidationQueue.size > 0) {
+        const atom = this.invalidationQueue.values().next().value as Lite.Atom<unknown>
+        this.invalidationQueue.delete(atom)
+
+        if (this.invalidationChain!.has(atom)) {
+          const chainAtoms = Array.from(this.invalidationChain!)
+          chainAtoms.push(atom)
+          const path = chainAtoms
+            .map(a => a.factory?.name || "<anonymous>")
+            .join(" → ")
+          throw new Error(`Infinite invalidation loop detected: ${path}`)
+        }
+
+        this.invalidationChain!.add(atom)
+        await this.doInvalidateSequential(atom)
+      }
+    } finally {
+      this.invalidationChain = null
+      this.chainPromise = null
+      this.invalidationScheduled = false
     }
   }
 
@@ -393,6 +425,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
+        this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
       }
 
@@ -407,6 +440,7 @@ class ScopeImpl implements Lite.Scope {
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
+        this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
       }
 
@@ -490,26 +524,32 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    this.doInvalidate(atom, entry as AtomEntry<T>)
+    this.scheduleInvalidation(atom)
   }
 
-  private async doInvalidate<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): Promise<void> {
+  private async doInvalidateSequential<T>(atom: Lite.Atom<T>): Promise<void> {
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry) return
+    if (entry.state === "idle") return
+
     const previousValue = entry.value
+
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
     }
     entry.cleanups = []
-    entry.state = 'resolving'
+
+    entry.state = "resolving"
     entry.value = previousValue
     entry.error = undefined
     entry.pendingInvalidate = false
     this.pending.delete(atom)
     this.resolving.delete(atom)
-    this.emitStateChange('resolving', atom)
-    this.notifyListeners(atom, 'resolving')
+    this.emitStateChange("resolving", atom)
+    this.notifyListeners(atom, "resolving")
 
-    this.resolve(atom).catch(() => {})
+    await this.resolve(atom)
   }
 
   async release<T>(atom: Lite.Atom<T>): Promise<void> {
@@ -534,6 +574,12 @@ class ScopeImpl implements Lite.Scope {
     const atoms = Array.from(this.cache.keys())
     for (const atom of atoms) {
       await this.release(atom as Lite.Atom<unknown>)
+    }
+  }
+
+  async flush(): Promise<void> {
+    if (this.chainPromise) {
+      await this.chainPromise
     }
   }
 
