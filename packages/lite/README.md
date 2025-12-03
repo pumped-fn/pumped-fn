@@ -64,23 +64,15 @@ await scope.dispose()
 
 ## Core Concepts
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Scope                               │
-│  (long-lived execution boundary)                            │
-│                                                             │
-│   ┌─────────┐      ┌─────────┐      ┌─────────┐            │
-│   │  Atom   │ ──── │  Atom   │ ──── │  Atom   │            │
-│   │ (effect)│      │ (effect)│      │ (effect)│            │
-│   └─────────┘      └─────────┘      └─────────┘            │
-│        │                                  │                 │
-│        └──────────────┬───────────────────┘                 │
-│                       ▼                                     │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │              ExecutionContext                       │   │
-│   │  (short-lived operation with input, tags, cleanup)  │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Scope["Scope (long-lived execution boundary)"]
+        A1["Atom (effect)"] --- A2["Atom (effect)"]
+        A2 --- A3["Atom (effect)"]
+        A1 --> EC
+        A3 --> EC
+        EC["ExecutionContext<br/>(short-lived operation with input, tags, cleanup)"]
+    end
 ```
 
 | Concept | Purpose |
@@ -95,6 +87,16 @@ await scope.dispose()
 ## Atoms
 
 Atoms are long-lived dependencies that are cached within a scope.
+
+```mermaid
+flowchart TB
+    subgraph Scope
+        Config["configAtom"] --> API["apiClientAtom"]
+        DB["dbAtom"] --> Repo["userRepoAtom"]
+        API --> Service["userServiceAtom"]
+        Repo --> Service
+    end
+```
 
 ### Basic Atom
 
@@ -174,6 +176,22 @@ const counterAtom = atom({
 
 Flows are templates for short-lived operations.
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Context as ExecutionContext
+    participant Flow
+    participant Atoms
+
+    Client->>Context: exec({ flow, input })
+    Context->>Atoms: resolve dependencies
+    Atoms-->>Context: deps
+    Context->>Flow: factory(ctx, deps)
+    Flow-->>Context: result
+    Context-->>Client: result
+    Client->>Context: close()
+```
+
 ### Basic Flow
 
 ```typescript
@@ -210,18 +228,11 @@ Parse runs before the factory, and `ctx.input` type is inferred from the parse r
 ### Executing Flows
 
 ```typescript
-const scope = createScope()
-await scope.ready
-
 const context = scope.createContext()
-
-// Execute with input
 const user = await context.exec({
   flow: createUserFlow,
   input: { name: 'Alice', email: 'alice@example.com' }
 })
-
-// Always close the context when done
 await context.close()
 ```
 
@@ -251,78 +262,77 @@ await context.exec({
 
 Controllers provide reactive access to atom state.
 
+```mermaid
+flowchart LR
+    subgraph Controller
+        State["state: idle|resolving|resolved|failed"]
+        Get["get()"]
+        Inv["invalidate()"]
+    end
+
+    App -->|subscribe| Controller
+    Controller -->|on 'resolved'| App
+    Controller -->|on 'resolving'| App
+```
+
 ### Basic Usage
 
 ```typescript
 const ctrl = scope.controller(configAtom)
 
-// Access state
-console.log(ctrl.state)  // 'idle' | 'resolving' | 'resolved' | 'failed'
-
-// Get resolved value (throws if not resolved)
-const config = ctrl.get()
-
-// Resolve and wait
-const config = await ctrl.resolve()
-
-// Manual invalidation
-ctrl.invalidate()
+ctrl.state              // 'idle' | 'resolving' | 'resolved' | 'failed'
+ctrl.get()              // value (throws if not resolved)
+await ctrl.resolve()    // resolve and wait
+ctrl.invalidate()       // trigger re-resolution
 ```
 
 ### Subscribing to Changes
 
 ```typescript
-// Subscribe to specific events
-ctrl.on('resolved', () => {
-  console.log('Config updated:', ctrl.get())
-})
-
-ctrl.on('resolving', () => {
-  console.log('Config is refreshing...')
-})
-
-// Subscribe to all state changes
-ctrl.on('*', () => {
-  console.log('State changed:', ctrl.state)
-})
+ctrl.on('resolved', () => console.log('Updated:', ctrl.get()))
+ctrl.on('resolving', () => console.log('Refreshing...'))
+ctrl.on('*', () => console.log('State:', ctrl.state))
 ```
 
 ### Controller as Dependency
 
-Use `controller()` to get a Controller instead of the resolved value:
+Use `controller()` to receive a Controller instead of the resolved value:
 
 ```typescript
 const appAtom = atom({
   deps: { config: controller(configAtom) },
   factory: (ctx, { config }) => {
-    // Subscribe to config changes
-    config.on('resolved', () => {
-      console.log('Config updated, reinitializing...')
-      ctx.invalidate()
-    })
-
+    config.on('resolved', () => ctx.invalidate())
     return new App(config.get())
   }
 })
 ```
 
-### Fine-Grained Reactivity with select()
+### Fine-Grained Reactivity
+
+Use `select()` to subscribe only when a derived value changes:
 
 ```typescript
-const portSelect = scope.select(
-  configAtom,
-  (config) => config.port,
-  { eq: (a, b) => a === b }  // Optional custom equality
-)
-
-portSelect.subscribe(() => {
-  console.log('Port changed:', portSelect.get())
-})
+const portSelect = scope.select(configAtom, (c) => c.port)
+portSelect.subscribe(() => console.log('Port changed:', portSelect.get()))
 ```
 
 ## Tags
 
 Tags pass contextual values through execution without explicit wiring.
+
+```mermaid
+flowchart LR
+    subgraph Definition
+        T["tag({ label: 'tenantId' })"]
+    end
+
+    subgraph Usage
+        R["tags.required(tag)"] --> |"throws if missing"| V1["string"]
+        O["tags.optional(tag)"] --> |"undefined if missing"| V2["string | undefined"]
+        A["tags.all(tag)"] --> |"collects all"| V3["string[]"]
+    end
+```
 
 ### Creating Tags
 
@@ -372,24 +382,25 @@ const multiAtom = atom({
 
 ### Passing Tags
 
-```typescript
-// At scope creation
-const scope = createScope({
-  tags: [tenantIdTag('tenant-123')]
-})
+Tags can be passed at different levels, with inner levels inheriting from outer:
 
-// At context creation
-const context = scope.createContext({
-  tags: [userRolesTag(['admin', 'user'])]
-})
+```mermaid
+flowchart LR
+    subgraph Scope["createScope()"]
+        ST["tenantId: 'tenant-123'"]
+        subgraph Context["createContext()"]
+            CT["userRoles: ['admin']"]
+            subgraph Exec["exec()"]
+                ET["requestId: 'req-456'"]
+            end
+        end
+    end
 
-// At execution time
-await context.exec({
-  flow: myFlow,
-  input: data,
-  tags: [requestIdTag('req-456')]
-})
+    ST -.->|inherited| CT
+    CT -.->|inherited| ET
 ```
+
+All three tag levels are available during flow execution.
 
 ### Direct Tag Methods
 
@@ -410,37 +421,56 @@ const allRoles = userRolesTag.collect(tags)
 
 Presets inject or redirect atom values, useful for testing.
 
-### Value Injection
+```mermaid
+flowchart LR
+    subgraph Normal["Normal Resolution"]
+        A1[resolve dbAtom] --> F1[factory]
+        F1 --> V1[real connection]
+    end
 
+    subgraph Preset["With Preset"]
+        A2[resolve dbAtom] --> P[preset check]
+        P -->|value| V2[mockDb]
+        P -->|atom| F2[testAtom.factory]
+    end
+```
+
+**Value injection** bypasses the factory entirely:
 ```typescript
-const mockDb = { query: jest.fn() }
-
 const scope = createScope({
   presets: [preset(dbAtom, mockDb)]
 })
-
-// resolves to mockDb without calling factory
-const db = await scope.resolve(dbAtom)
 ```
 
-### Atom Redirection
-
+**Atom redirection** uses another atom's factory:
 ```typescript
-const testConfigAtom = atom({
-  factory: () => ({ apiUrl: 'http://localhost:3000' })
-})
-
 const scope = createScope({
   presets: [preset(configAtom, testConfigAtom)]
 })
-
-// resolves testConfigAtom instead of configAtom
-const config = await scope.resolve(configAtom)
 ```
 
 ## Extensions
 
 Extensions provide cross-cutting behavior via AOP-style hooks.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Ext1 as Extension 1
+    participant Ext2 as Extension 2
+    participant Core as Core Logic
+
+    App->>Ext1: resolve(atom)
+    Ext1->>Ext1: before logic
+    Ext1->>Ext2: next()
+    Ext2->>Ext2: before logic
+    Ext2->>Core: next()
+    Core-->>Ext2: value
+    Ext2->>Ext2: after logic
+    Ext2-->>Ext1: value
+    Ext1->>Ext1: after logic
+    Ext1-->>App: value
+```
 
 ### Extension Interface
 
@@ -454,73 +484,21 @@ interface Extension {
 }
 ```
 
-### Example: Logging Extension
+### Example: Timing Extension
 
 ```typescript
-const loggingExtension: Lite.Extension = {
-  name: 'logging',
-
-  init: (scope) => {
-    console.log('Scope initialized')
-  },
+const timingExtension: Lite.Extension = {
+  name: 'timing',
 
   wrapResolve: async (next, atom, scope) => {
     const start = performance.now()
-    console.log('Resolving atom...')
-
-    try {
-      const result = await next()
-      console.log(`Resolved in ${performance.now() - start}ms`)
-      return result
-    } catch (error) {
-      console.error('Resolution failed:', error)
-      throw error
-    }
-  },
-
-  wrapExec: async (next, target, ctx) => {
-    console.log('Executing:', 'flow' in target ? 'flow' : 'function')
-    return next()
-  },
-
-  dispose: (scope) => {
-    console.log('Scope disposed')
+    const result = await next()
+    console.log(`Resolved in ${performance.now() - start}ms`)
+    return result
   }
 }
 
-const scope = createScope({ extensions: [loggingExtension] })
-```
-
-### Example: Metrics Extension
-
-```typescript
-const metricsExtension: Lite.Extension = {
-  name: 'metrics',
-
-  wrapResolve: async (next, atom, scope) => {
-    const start = performance.now()
-    try {
-      const result = await next()
-      metrics.recordResolution(atom, performance.now() - start, 'success')
-      return result
-    } catch (error) {
-      metrics.recordResolution(atom, performance.now() - start, 'error')
-      throw error
-    }
-  },
-
-  wrapExec: async (next, target, ctx) => {
-    const start = performance.now()
-    try {
-      const result = await next()
-      metrics.recordExecution(target, performance.now() - start, 'success')
-      return result
-    } catch (error) {
-      metrics.recordExecution(target, performance.now() - start, 'error')
-      throw error
-    }
-  }
-}
+const scope = createScope({ extensions: [timingExtension] })
 ```
 
 ## Lifecycle
