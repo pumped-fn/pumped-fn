@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/lite": minor
+"@pumped-fn/lite": patch
 ---
 
 Improve README documentation clarity and reduce size by 19%
