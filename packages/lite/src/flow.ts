@@ -49,6 +49,7 @@ export interface FlowConfig<
  */
 export function flow<TOutput>(config: {
   name?: string
+  parse?: undefined
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
@@ -75,6 +76,7 @@ export function flow<
   const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
 >(config: {
   name?: string
+  parse?: undefined
   deps: D
   factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]

@@ -1,54 +1,53 @@
-import { describe, it, expect } from "vitest"
-import { flow, isFlow } from "../src/flow"
-import { atom } from "../src/atom"
-import { tag, tags } from "../src/tag"
+import { describe, it, expect } from "vitest";
+import { flow, isFlow } from "../src/flow";
+import { atom } from "../src/atom";
+import { tag, tags } from "../src/tag";
 
 describe("Flow", () => {
   describe("flow()", () => {
     it("creates a flow without deps", () => {
       const myFlow = flow({
         factory: (ctx) => ctx.input,
-      })
+      });
 
-      expect(isFlow(myFlow)).toBe(true)
-      expect(myFlow.deps).toBeUndefined()
-    })
+      expect(isFlow(myFlow)).toBe(true);
+      expect(myFlow.deps).toBeUndefined();
+    });
 
     it("creates a flow with deps", () => {
-      const dbAtom = atom({ factory: () => ({ query: () => [] }) })
-      const requestId = tag<string>({ label: "requestId" })
+      const dbAtom = atom({ factory: () => ({ query: () => [] }) });
+      const requestId = tag<string>({ label: "requestId" });
 
       const myFlow = flow({
         deps: { db: dbAtom, reqId: tags.required(requestId) },
         factory: (ctx, { db, reqId }) => {
-          return { db, reqId, input: ctx.input }
+          return { db, reqId, input: ctx.input };
         },
-      })
+      });
 
-      expect(isFlow(myFlow)).toBe(true)
-      expect(myFlow.deps).toBeDefined()
-    })
+      expect(isFlow(myFlow)).toBe(true);
+      expect(myFlow.deps).toBeDefined();
+    });
 
     it("creates a flow with name", () => {
       const myFlow = flow({
         name: "myFlow",
         factory: (ctx) => ctx.input,
-      })
+      });
 
-      expect(myFlow.name).toBe("myFlow")
-    })
+      expect(myFlow.name).toBe("myFlow");
+    });
 
     it("creates a flow with parse function", () => {
       const myFlow = flow({
         parse: (raw: unknown): string => {
-          if (typeof raw !== "string") throw new Error("Must be string")
-          return raw
+          if (typeof raw !== "string") throw new Error("Must be string");
+          return raw;
         },
-        factory: (ctx) => (ctx.input as string).toUpperCase(),
-      })
+        factory: (ctx) => ctx.input.toUpperCase(),
+      });
 
-      expect(myFlow.parse).toBeDefined()
-    })
-
-  })
-})
+      expect(myFlow.parse).toBeDefined();
+    });
+  });
+});
