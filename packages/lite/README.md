@@ -64,17 +64,6 @@ await scope.dispose()
 
 ## Core Concepts
 
-```mermaid
-graph TB
-    subgraph Scope["Scope (long-lived execution boundary)"]
-        A1["Atom (effect)"] --- A2["Atom (effect)"]
-        A2 --- A3["Atom (effect)"]
-        A1 --> EC
-        A3 --> EC
-        EC["ExecutionContext<br/>(short-lived operation with input, tags, cleanup)"]
-    end
-```
-
 | Concept | Purpose |
 |---------|---------|
 | **Scope** | Long-lived boundary that manages atom lifecycles |
@@ -110,6 +99,8 @@ const dbAtom = atom({
 })
 ```
 
+**`ctx.cleanup()` lifecycle:** Runs on every `invalidate()` (before re-resolution) and on `release()`. Cleanups execute in LIFO order. For resources that should survive invalidation, use `ctx.data` instead.
+
 ### Atom with Dependencies
 
 ```typescript
@@ -134,6 +125,8 @@ const configAtom = atom({
   }
 })
 ```
+
+**`ctx.invalidate()` behavior:** Schedules re-resolution after the current factory completes — does not interrupt execution. Use `scope.flush()` in tests to wait for pending invalidations.
 
 ### Per-Atom Private Storage
 
@@ -172,39 +165,27 @@ const counterAtom = atom({
 })
 ```
 
-## Flows
-
-Flows are templates for short-lived operations.
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Context as ExecutionContext
-    participant Flow
-    participant Atoms
-
-    Client->>Context: exec({ flow, input })
-    Context->>Atoms: resolve dependencies
-    Atoms-->>Context: deps
-    Context->>Flow: factory(ctx, deps)
-    Flow-->>Context: result
-    Context-->>Client: result
-    Client->>Context: close()
-```
-
-### Basic Flow
+Use `getOrSet()` to initialize and retrieve in one call:
 
 ```typescript
-const createUserFlow = flow({
-  deps: { repo: userRepoAtom },
-  factory: async (ctx, { repo }) => {
-    const input = ctx.input as CreateUserInput
-    return repo.create(input)
+const cacheTag = tag<Map<string, Result>>({ label: 'cache' })
+
+const cachedAtom = atom({
+  factory: (ctx) => {
+    const cache = ctx.data.getOrSet(cacheTag, new Map())
+    return fetchWithCache(cache)
   }
 })
 ```
 
-### Flow with Parse Validation
+**`ctx.data` lifecycle:**
+- **Persists** across `invalidate()` cycles
+- **Cleared** on `release()` or `scope.dispose()`
+- Each atom has independent storage (same tag, different atoms = separate data)
+
+## Flows
+
+Flows are templates for short-lived operations with input validation.
 
 ```typescript
 const createUserFlow = flow({
@@ -212,51 +193,24 @@ const createUserFlow = flow({
   parse: (raw) => {
     const obj = raw as Record<string, unknown>
     if (typeof obj.name !== 'string') throw new Error('name required')
-    if (typeof obj.email !== 'string') throw new Error('email required')
-    return { name: obj.name, email: obj.email }
+    return { name: obj.name }
   },
   deps: { repo: userRepoAtom },
   factory: async (ctx, { repo }) => {
-    // ctx.input is typed as { name: string; email: string }
-    return repo.create(ctx.input)
+    return repo.create(ctx.input)  // ctx.input typed from parse
   }
 })
-```
 
-Parse runs before the factory, and `ctx.input` type is inferred from the parse return type. On validation failure, throws `ParseError` with phase `'flow-input'`.
-
-### Executing Flows
-
-```typescript
+// Execute
 const context = scope.createContext()
 const user = await context.exec({
   flow: createUserFlow,
-  input: { name: 'Alice', email: 'alice@example.com' }
+  input: { name: 'Alice' }
 })
 await context.close()
 ```
 
-### Flow with Tags
-
-```typescript
-const requestIdTag = tag<string>({ label: 'requestId' })
-
-const loggingFlow = flow({
-  deps: { requestId: tags.required(requestIdTag) },
-  factory: (ctx, { requestId }) => {
-    console.log(`[${requestId}] Processing request`)
-    return processRequest(ctx.input)
-  }
-})
-
-// Pass tags at execution time
-const context = scope.createContext()
-await context.exec({
-  flow: loggingFlow,
-  input: data,
-  tags: [requestIdTag('req-abc-123')]
-})
-```
+Parse runs before factory. On failure, throws `ParseError`.
 
 ## Controllers
 
@@ -286,6 +240,8 @@ await ctrl.resolve()    // resolve and wait
 ctrl.invalidate()       // trigger re-resolution
 ```
 
+**Stale reads:** During `'resolving'` state, `ctrl.get()` returns the previous value. This enables optimistic UI patterns.
+
 ### Subscribing to Changes
 
 ```typescript
@@ -296,17 +252,28 @@ ctrl.on('*', () => console.log('State:', ctrl.state))
 
 ### Controller as Dependency
 
-Use `controller()` to receive a Controller instead of the resolved value:
+Use `controller()` when you need reactive access to an atom's state, not just its value.
+
+**Key difference:**
+- Regular dep `{ x: atom }` — auto-resolved, you receive the value
+- Controller dep `{ x: controller(atom) }` — **unresolved**, you receive a reactive handle
 
 ```typescript
 const appAtom = atom({
   deps: { config: controller(configAtom) },
-  factory: (ctx, { config }) => {
-    config.on('resolved', () => ctx.invalidate())
+  factory: async (ctx, { config }) => {
+    await config.resolve()  // Must resolve manually
+
+    // Subscribe to upstream changes
+    const unsub = config.on('resolved', () => ctx.invalidate())
+    ctx.cleanup(unsub)
+
     return new App(config.get())
   }
 })
 ```
+
+**When to use:** React to upstream invalidations, conditional/lazy resolution, access atom state.
 
 ### Fine-Grained Reactivity
 
@@ -402,21 +369,6 @@ flowchart LR
 
 All three tag levels are available during flow execution.
 
-### Direct Tag Methods
-
-```typescript
-const tags = [tenantIdTag('tenant-123'), userRolesTag(['admin'])]
-
-// Get (throws if not found for tags without default)
-const tenantId = tenantIdTag.get(tags)
-
-// Find (returns undefined if not found)
-const roles = userRolesTag.find(tags)
-
-// Collect all matching values
-const allRoles = userRolesTag.collect(tags)
-```
-
 ## Presets
 
 Presets inject or redirect atom values, useful for testing.
@@ -451,45 +403,11 @@ const scope = createScope({
 
 ## Extensions
 
-Extensions provide cross-cutting behavior via AOP-style hooks.
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant Ext1 as Extension 1
-    participant Ext2 as Extension 2
-    participant Core as Core Logic
-
-    App->>Ext1: resolve(atom)
-    Ext1->>Ext1: before logic
-    Ext1->>Ext2: next()
-    Ext2->>Ext2: before logic
-    Ext2->>Core: next()
-    Core-->>Ext2: value
-    Ext2->>Ext2: after logic
-    Ext2-->>Ext1: value
-    Ext1->>Ext1: after logic
-    Ext1-->>App: value
-```
-
-### Extension Interface
-
-```typescript
-interface Extension {
-  readonly name: string
-  init?(scope: Scope): MaybePromise<void>
-  wrapResolve?<T>(next: () => Promise<T>, atom: Atom<T>, scope: Scope): Promise<T>
-  wrapExec?<T>(next: () => Promise<T>, target: Flow | Function, ctx: ExecutionContext): Promise<T>
-  dispose?(scope: Scope): MaybePromise<void>
-}
-```
-
-### Example: Timing Extension
+Extensions wrap atom resolution and flow execution (AOP-style middleware).
 
 ```typescript
 const timingExtension: Lite.Extension = {
   name: 'timing',
-
   wrapResolve: async (next, atom, scope) => {
     const start = performance.now()
     const result = await next()
@@ -501,9 +419,9 @@ const timingExtension: Lite.Extension = {
 const scope = createScope({ extensions: [timingExtension] })
 ```
 
-## Lifecycle
+Interface: `{ name, init?, wrapResolve?, wrapExec?, dispose? }`
 
-### Effect Lifecycle
+## Lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -517,54 +435,11 @@ stateDiagram-v2
     failed --> idle: release()
 ```
 
-### Resolution Flow
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant Scope
-    participant Atom
-    participant Factory
-
-    App->>Scope: resolve(atom)
-    Scope->>Atom: check state
-
-    alt idle
-        Scope->>Atom: state = resolving
-        Scope->>Factory: factory(ctx, deps)
-        Factory-->>Scope: value
-        Scope->>Atom: state = resolved
-    else resolved
-        Atom-->>App: cached value
-    end
-
-    Atom-->>App: value
-```
-
-### Invalidation Flow
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant Controller
-    participant Scope
-    participant Queue
-    participant Factory
-
-    App->>Controller: invalidate()
-    Controller->>Scope: queue invalidation
-    Scope->>Queue: add atom
-
-    Note over Queue: queueMicrotask (batched)
-
-    Queue->>Scope: flush
-    Scope->>Scope: run cleanups (LIFO)
-    Scope->>Scope: state = resolving
-    Scope->>Factory: factory(ctx, deps)
-    Factory-->>Scope: new value
-    Scope->>Scope: state = resolved
-    Scope->>Scope: notify listeners
-```
+**Invalidation sequence:**
+1. `invalidate()` → queued (microtask batched)
+2. Cleanups run (LIFO)
+3. State = resolving → factory()
+4. State = resolved → listeners notified
 
 ## API Reference
 
@@ -591,6 +466,7 @@ sequenceDiagram
 | `scope.dispose()` | Dispose scope (release all atoms, cleanup extensions) |
 | `scope.createContext(options?)` | Create ExecutionContext for flows |
 | `scope.on(event, atom, listener)` | Subscribe to atom state changes |
+| `scope.flush()` | Wait for pending invalidation queue to process |
 
 ### Controller Methods
 
