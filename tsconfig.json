@@ -14,8 +14,8 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@pumped-fn/core-next": ["packages/next/src/index.ts"],
-      "@pumped-fn/core-next/*": ["packages/next/src/*"]
+      "@pumped-fn/lite": ["packages/lite/src/index.ts"],
+      "@pumped-fn/lite/*": ["packages/lite/src/*"]
     }
   },
   "exclude": ["node_modules", "dist"]

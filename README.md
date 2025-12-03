@@ -162,13 +162,6 @@ game.down()
 3. **Explicit lifecycle** - No magic, clear state transitions
 4. **Composable** - Effects compose through deps
 
-## Deprecated Packages
-
-The following packages are deprecated and no longer maintained:
-- `@pumped-fn/core-next` - Use `@pumped-fn/lite` instead
-- `@pumped-fn/react` - Legacy React bindings
-- `@pumped-fn/devtools` - Legacy devtools
-
 ## License
 
 MIT

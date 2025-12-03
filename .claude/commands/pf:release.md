@@ -7,8 +7,8 @@ Automate release preparation for pumped-fn with changesets and CI validation.
 Execute following steps sequentially:
 
 1. **Run typecheck**
-   - Run `pnpm -F @pumped-fn/core-next typecheck` for src code types
-   - Run `pnpm -F @pumped-fn/core-next typecheck:full` for test code types
+   - Run `pnpm -F @pumped-fn/lite typecheck` for src code types
+   - Run `pnpm -F @pumped-fn/lite typecheck:full` for test code types
    - If typecheck fails, fix errors and re-run until passing
    - Both src and test typecheck must pass before proceeding
 

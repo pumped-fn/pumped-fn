@@ -3,7 +3,6 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@pumped-fn/core-next": ["../packages/next/src/index.ts"],
       "@pumped-fn/lite": ["../packages/lite/src/index.ts"]
     },
     "types": ["node"],

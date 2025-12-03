@@ -170,24 +170,6 @@ import type { Lite } from '@pumped-fn/lite'
 const myAtom: Lite.Atom<Config> = atom({ factory: () => loadConfig() })
 ```
 
-## Comparison with core-next {#c3-2-comparison}
-<!-- Feature comparison -->
-
-| Feature | @pumped-fn/lite | @pumped-fn/core-next |
-|---------|-----------------|---------------------|
-| Atoms/Executors | `atom()` | `provide()`, `derive()` |
-| Flows | `flow()` | `flow()` |
-| Tags | `tag()`, `tags.required/optional/all` | `tag()`, `tags.required/optional/all` |
-| Extensions | Simple 4-hook interface | Full lifecycle hooks |
-| Schema validation | No | StandardSchema |
-| Journaling | No | Yes |
-| Multi-executor pools | No | `multi()` |
-| Enhanced Promise | No | `Promised` class |
-| Error classes | Simple Error | Rich hierarchy |
-| Tag lookup | O(n) array scan | O(1) Map-based |
-| Reactivity | Controller + invalidation | No built-in |
-| Bundle size | <17KB | ~75KB |
-
 ## Source Organization {#c3-2-source}
 <!-- File structure -->
 
@@ -285,4 +267,3 @@ pnpm -F @pumped-fn/lite typecheck:full  # Type check src + tests
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller-based reactivity design
 - [ADR-008](../adr/adr-008-sync-create-scope.md) - Synchronous createScope with ready promise
 - [ADR-009](../adr/adr-009-fix-duplicate-listener-notifications.md) - Controller.on() state filtering
-- [c3-1-core](../c3-1-core/) - Core library (feature comparison)

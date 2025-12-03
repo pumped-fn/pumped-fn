@@ -138,9 +138,3 @@ await scope.dispose();
 - `pnpm -F @pumped-fn/lite test`
 - `pnpm docs:build`
 
-## Deprecated Packages
-
-The following packages are deprecated:
-- `@pumped-fn/core-next` - Use `@pumped-fn/lite` instead
-- `@pumped-fn/react` - Legacy React bindings
-- `@pumped-fn/devtools` - Legacy devtools

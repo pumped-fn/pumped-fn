@@ -33,13 +33,9 @@ This is a pnpm workspace monorepo with the following structure:
 ```
 /
 ├── packages/
-│   ├── next/     - Core library (@pumped-fn/core-next)
-│   ├── react/    - React bindings (@pumped-fn/react)
-│   ├── extra/    - Full-stack utilities (@pumped-fn/extra)
-│   └── cli/      - CLI tool (@pumped-fn/cli)
+│   └── lite/     - Core library (@pumped-fn/lite)
 ├── docs/         - Documentation site
-├── examples/     - Usage examples
-└── tests/        - Cross-package integration tests
+└── .c3/          - C3 architecture documentation
 ```
 
 ## 🔄 Development Workflow
@@ -103,7 +99,7 @@ We use [changesets](https://github.com/changesets/changesets) to manage versions
 pnpm test
 
 # Run tests in watch mode for a specific package
-cd packages/next
+cd packages/lite
 pnpm test:watch
 
 # Run type checking

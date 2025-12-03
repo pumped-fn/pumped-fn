@@ -83,7 +83,6 @@ export default withMermaid(defineConfig({
               baseUrl: "..",
               paths: {
                 "@pumped-fn/lite": ["./packages/lite/src/index.ts"],
-                "@pumped-fn/core-next": ["./packages/next/src/index.ts"],
               },
             },
           },

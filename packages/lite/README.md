@@ -645,37 +645,6 @@ const myController: Lite.Controller<Config> = scope.controller(myAtom)
 const myTag: Lite.Tag<string> = tag({ label: 'myTag' })
 ```
 
-## Comparison with @pumped-fn/core-next
-
-| Feature | @pumped-fn/lite | @pumped-fn/core-next |
-|---------|-----------------|----------------------|
-| Atoms/Executors | `atom()` | `provide()`, `derive()` |
-| Flows | `flow()` | `flow()` |
-| Tags | `tag()`, `tags.*` | `tag()`, `tags.*` |
-| Extensions | Simple 4-hook interface | Full lifecycle hooks |
-| Schema validation | No | StandardSchema |
-| Journaling | No | Yes |
-| Multi-executor pools | No | `multi()` |
-| Enhanced Promise | No | `Promised` class |
-| Error classes | Simple Error | Rich hierarchy |
-| Controller reactivity | ✅ Built-in | No |
-| Self-invalidation | ✅ Built-in | No |
-| Fine-grained select() | ✅ Built-in | No |
-| Tag/Flow parse functions | ✅ Built-in | No |
-| Bundle size | <17KB | ~75KB |
-
-**Choose `@pumped-fn/lite` when:**
-- Bundle size matters
-- You need built-in reactivity (Controller pattern)
-- You want a minimal API surface
-- Schema validation can be done manually
-
-**Choose `@pumped-fn/core-next` when:**
-- You need StandardSchema validation
-- You need multi-executor pools
-- You need journaling/debugging features
-- You need rich error context
-
 ## Design Principles
 
 1. **Minimal API** - Every export is expensive to learn

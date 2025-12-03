@@ -39,35 +39,33 @@ Prior to finish, always use /c3-skill:audit to up date corresponding docs
 # Coding Workflow
 
 - Always use pnpm
-- Typecheck before commit: `pnpm -F @pumped-fn/core-next typecheck`
+- Typecheck before commit: `pnpm -F @pumped-fn/lite typecheck`
 - Brainstorm before implementation
 
 # Making Changes
 
-API changes in packages/next require updates to:
+API changes in packages/lite require updates to:
 
-1. Implementation (packages/next/src/)
-2. Tests (packages/next/tests/)
-3. Examples (examples/)
-4. Docs (docs/guides/)
-5. **C3 docs** (.c3/c3-1-core/) - if architecture changes
+1. Implementation (packages/lite/src/)
+2. Tests (packages/lite/tests/)
+3. Docs (docs/)
+4. **C3 docs** (.c3/c3-2-lite/) - if architecture changes
 
 ## Verification Commands
 
 ```bash
-pnpm -F @pumped-fn/core-next typecheck      # src types
-pnpm -F @pumped-fn/core-next typecheck:full # include tests
-pnpm -F @pumped-fn/core-next test           # run tests
-pnpm -F @pumped-fn/examples typecheck       # examples
+pnpm -F @pumped-fn/lite typecheck      # src types
+pnpm -F @pumped-fn/lite typecheck:full # include tests
+pnpm -F @pumped-fn/lite test           # run tests
 ```
 
 ## Before Opening a PR
 
 1. Run `/c3-skill:c3-audit` - C3 docs MUST match code
 2. Add changeset: `.changeset/<name>.md`
-3. `grep -r "any" packages/next/` - zero tolerance
+3. `grep -r "any" packages/lite/` - zero tolerance
 
-**Test changes = C3 changes.** Update ALL `.c3/c3-1-core/c3-10*.md` Testing sections.
+**Test changes = C3 changes.** Update ALL `.c3/c3-2-lite/c3-20*.md` Testing sections.
 
 ## Public API Export Rules
 
@@ -83,8 +81,6 @@ pnpm -F @pumped-fn/examples typecheck       # examples
 
 **Type exports:** Only types used in public function signatures.
 
-**Verification:** `pnpm -F @pumped-fn/core-next verify:public-docs` (release-only)
-
 # Plans Directory
 
 - Location: `plans/` (project root)
@@ -95,11 +91,3 @@ pnpm -F @pumped-fn/examples typecheck       # examples
 
 Library is GENERIC. No case-specific concepts in core API design.
 
-# C3 Audit Exclusions
-
-The following packages are **obsolete/deprecated** and excluded from C3 audits:
-
-- `@pumped-fn/react` - Legacy React bindings, not actively maintained
-- `@pumped-fn/devtools` - Legacy devtools, not actively maintained
-
-These packages exist in `packages/` but should NOT be documented in `.c3/`.

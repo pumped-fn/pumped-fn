@@ -3,7 +3,7 @@ id: c3-0
 c3-version: 3
 title: pumped-fn System Overview
 summary: >
-  Effect system for TypeScript providing scope-based dependency injection,
+  Lightweight effect system for TypeScript providing scope-based dependency injection,
   flow execution patterns, and metadata tagging.
 ---
 
@@ -12,13 +12,14 @@ summary: >
 ## Overview {#c3-0-overview}
 <!-- TypeScript effect system for dependency injection and execution orchestration -->
 
-pumped-fn is a TypeScript effect system that provides:
+pumped-fn is a lightweight TypeScript effect system that provides:
 - Scope-based dependency injection with automatic lifecycle management
 - Flow execution patterns for request/response handling
 - Tag-based metadata system for cross-cutting concerns
 - Extension hooks for observability and behavior modification
+- Controller-based reactivity for state observation
 
-The library is designed to be framework-agnostic, with separate packages providing integrations for React, devtools, and other ecosystems.
+The library is designed to be framework-agnostic with zero runtime dependencies.
 
 ## Architecture {#c3-0-architecture}
 <!-- High-level view of system components -->
@@ -30,10 +31,8 @@ graph TB
         LibAuthor[Library Author]
     end
 
-    subgraph "pumped-fn Ecosystem"
-        Core["@pumped-fn/core-next<br/>(Core Library)"]
-        React["@pumped-fn/react<br/>(React Bindings)"]
-        Devtools["@pumped-fn/devtools<br/>(Dev Tools)"]
+    subgraph "pumped-fn"
+        Lite["@pumped-fn/lite<br/>(Core Library)"]
     end
 
     subgraph "Framework Integrations"
@@ -42,16 +41,12 @@ graph TB
         TanStack[TanStack Start]
     end
 
-    AppDev -->|uses| Core
-    AppDev -->|uses| React
-    LibAuthor -->|extends| Core
+    AppDev -->|uses| Lite
+    LibAuthor -->|extends| Lite
 
-    React -->|peer dep| Core
-    Devtools -->|peer dep| Core
-
-    Hono -.->|integrates| Core
-    NextJS -.->|integrates| Core
-    TanStack -.->|integrates| Core
+    Hono -.->|integrates| Lite
+    NextJS -.->|integrates| Lite
+    TanStack -.->|integrates| Lite
 ```
 
 ## Actors {#c3-0-actors}
@@ -60,17 +55,14 @@ graph TB
 | Actor | Description |
 |-------|-------------|
 | Application Developer | Builds applications using pumped-fn for dependency management and flow execution |
-| Library Author | Creates extensions, framework integrations, or custom tooling on top of core |
+| Library Author | Creates extensions, framework integrations, or custom tooling on top of lite |
 
 ## Containers {#c3-0-containers}
 <!-- Separately deployable/publishable units -->
 
 | Container | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
-| @pumped-fn/core-next | Library | Core effect system - scopes, executors, flows, tags, extensions | [c3-1-core](./c3-1-core/) |
 | @pumped-fn/lite | Library | Lightweight DI with minimal reactivity - atoms, flows, tags, controllers | [c3-2-lite](./c3-2-lite/) |
-| @pumped-fn/react | Library | React hooks and components for pumped-fn integration | (out of scope) |
-| @pumped-fn/devtools | Library + CLI | Development tools with terminal UI | (out of scope) |
 | docs | Static Site | VitePress documentation site | (out of scope) |
 
 ## Protocols {#c3-0-protocols}
@@ -78,9 +70,7 @@ graph TB
 
 | From | To | Protocol | Description |
 |------|-----|----------|-------------|
-| @pumped-fn/react | @pumped-fn/core-next | npm peer dependency | React bindings consume Core types and functions |
-| @pumped-fn/devtools | @pumped-fn/core-next | npm peer dependency | Devtools observe Core execution |
-| Framework integrations | @pumped-fn/core-next | npm dependency | Frameworks use Core for DI and flow handling |
+| Framework integrations | @pumped-fn/lite | npm dependency | Frameworks use lite for DI and flow handling |
 
 Containers are npm packages with no runtime protocol - communication is through TypeScript types and function imports.
 
@@ -88,24 +78,19 @@ Containers are npm packages with no runtime protocol - communication is through 
 <!-- Decisions that affect multiple containers -->
 
 ### Extension System
-Cross-cutting behavior (logging, tracing, caching, error handling) is implemented via the Extension interface. Extensions hook into executor resolution and flow execution lifecycle.
+Cross-cutting behavior (logging, tracing, caching, error handling) is implemented via the Extension interface. Extensions hook into atom resolution and flow execution lifecycle via `wrapResolve` and `wrapExec` hooks.
 
-Implemented in: [c3-1-core#c3-1-extension](./c3-1-core/#c3-1-extension)
+Implemented in: [c3-2-lite](./c3-2-lite/)
 
 ### Tag-Based Metadata
-Metadata propagation across execution boundaries uses the Tag system. Tags can be attached to executors, flows, and scopes, then extracted at various points.
+Metadata propagation across execution boundaries uses the Tag system. Tags can be attached to atoms, flows, and scopes, then extracted at various points with `required`, `optional`, or `all` modes.
 
-Implemented in: [c3-1-core#c3-1-tag](./c3-1-core/#c3-1-tag)
+Implemented in: [c3-204-tag](./c3-2-lite/c3-204-tag.md)
 
-### Error Handling
-Structured error hierarchy with context-rich error classes. All errors include resolution paths and execution context for debugging.
+### Controller Reactivity
+Reactive state observation through the Controller pattern. Atoms can self-invalidate and listeners can subscribe to state changes with event filtering (`resolved`, `resolving`, `*`).
 
-Implemented in: [c3-1-core#c3-1-errors](./c3-1-core/#c3-1-errors)
-
-### Schema Validation
-StandardSchema-based validation for flow inputs/outputs and tag values. Library-agnostic validation contract.
-
-Implemented in: [c3-1-core#c3-1-schema](./c3-1-core/#c3-1-schema)
+Implemented in: [c3-201-scope](./c3-2-lite/c3-201-scope.md)
 
 ## Deployment {#c3-0-deployment}
 <!-- How this system is distributed -->
@@ -113,7 +98,7 @@ Implemented in: [c3-1-core#c3-1-schema](./c3-1-core/#c3-1-schema)
 pumped-fn is distributed as npm packages:
 - Published to npm registry via changesets
 - Semantic versioning with automated changelog generation
-- Peer dependencies for framework-specific packages
+- Zero runtime dependencies
 
 No container/infrastructure deployment - this is a library ecosystem.
 
@@ -123,6 +108,6 @@ No container/infrastructure deployment - this is a library ecosystem.
 Testing is per-package using Vitest:
 - Unit tests for individual modules
 - Behavior tests for integration scenarios
-- Memory profiling tests for performance
+- Type tests for TypeScript inference
 
-No cross-container system tests - packages are independently testable via their public APIs.
+Packages are independently testable via their public APIs.
