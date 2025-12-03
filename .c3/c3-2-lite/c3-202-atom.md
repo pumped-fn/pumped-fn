@@ -53,9 +53,11 @@ interface ResolveContext {
 interface DataStore {
   get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
   set<T>(tag: Tag<T, boolean>, value: T): void
-  has(tag: Tag<unknown, boolean>): boolean
-  delete(tag: Tag<unknown, boolean>): boolean
+  has<T, H extends boolean>(tag: Tag<T, H>): boolean
+  delete<T, H extends boolean>(tag: Tag<T, H>): boolean
   clear(): void
+  getOrSet<T>(tag: Tag<T, true>): T
+  getOrSet<T>(tag: Tag<T, false>, defaultValue: T): T
 }
 ```
 
@@ -304,22 +306,35 @@ const counterAtom = atom({
 })
 ```
 
-### Pattern: Complex Types
+### Pattern: Complex Types with getOrSet
+
+Use `getOrSet` to eliminate repetitive initialization boilerplate:
 
 ```typescript
 const cacheTag = tag<Map<string, Result>>({ label: 'cache' })
 
 const cacheAtom = atom({
   factory: async (ctx) => {
-    let cache = ctx.data.get(cacheTag)
-    if (!cache) {
-      cache = new Map()
-      ctx.data.set(cacheTag, cache)
-    }
-    return cache
+    return ctx.data.getOrSet(cacheTag, new Map())
   }
 })
 ```
+
+For tags with defaults, no second argument is needed:
+
+```typescript
+const countTag = tag<number>({ label: 'count', default: 0 })
+
+const counterAtom = atom({
+  factory: (ctx) => {
+    const count = ctx.data.getOrSet(countTag)  // number, now stored
+    ctx.data.set(countTag, count + 1)
+    return count
+  }
+})
+```
+
+`getOrSet` always materializes the value into storage, so `has()` returns `true` afterward.
 
 ### Type Safety
 
@@ -407,6 +422,11 @@ Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
 - DataStore lazily created
 - Independent data per atom (same tag, different storage)
 - has(), delete(), clear() operations
+- getOrSet() returns existing value when present
+- getOrSet() stores and returns default when missing
+- getOrSet() uses tag default when available
+- getOrSet() materializes value so has() returns true
+- delete() then getOrSet() re-initializes value
 
 ## Related {#c3-202-related}
 
@@ -415,3 +435,4 @@ Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
 - [c3-205](./c3-205-preset.md) - Atom value presets
 - [ADR-007](../adr/adr-007-resolve-context-data.md) - Original per-atom private storage design
 - [ADR-010](../adr/adr-010-typed-data-store.md) - Tag-based typed DataStore API
+- [ADR-012](../adr/adr-012-datastore-api-improvements.md) - DataStore API improvements (getOrSet, relaxed signatures)

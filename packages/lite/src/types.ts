@@ -60,9 +60,11 @@ export namespace Lite {
   export interface DataStore {
     get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
     set<T>(tag: Tag<T, boolean>, value: T): void
-    has(tag: Tag<unknown, boolean>): boolean
-    delete(tag: Tag<unknown, boolean>): boolean
+    has<T, H extends boolean>(tag: Tag<T, H>): boolean
+    delete<T, H extends boolean>(tag: Tag<T, H>): boolean
     clear(): void
+    getOrSet<T>(tag: Tag<T, true>): T
+    getOrSet<T>(tag: Tag<T, false>, defaultValue: T): T
   }
 
   export interface ResolveContext {

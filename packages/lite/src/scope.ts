@@ -22,16 +22,27 @@ class DataStoreImpl implements Lite.DataStore {
     this.map.set(tag.key, value)
   }
 
-  has(tag: Lite.Tag<unknown, boolean>): boolean {
+  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
     return this.map.has(tag.key)
   }
 
-  delete(tag: Lite.Tag<unknown, boolean>): boolean {
+  delete<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
     return this.map.delete(tag.key)
   }
 
   clear(): void {
     this.map.clear()
+  }
+
+  getOrSet<T>(tag: Lite.Tag<T, true>): T
+  getOrSet<T>(tag: Lite.Tag<T, false>, defaultValue: T): T
+  getOrSet<T>(tag: Lite.Tag<T, boolean>, defaultValue?: T): T {
+    if (this.map.has(tag.key)) {
+      return this.map.get(tag.key) as T
+    }
+    const value = tag.hasDefault ? (tag.defaultValue as T) : (defaultValue as T)
+    this.map.set(tag.key, value)
+    return value
   }
 }
 

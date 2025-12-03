@@ -1341,5 +1341,114 @@ describe("ExecutionContext", () => {
       expect(result).toBeInstanceOf(Map)
       expect(result.get("key")).toBe(123)
     })
+
+    it("getOrSet returns existing value when present", async () => {
+      const scope = createScope()
+      const valueTag = tag<string>({ label: "value" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(valueTag, "existing")
+          return ctx.data.getOrSet(valueTag, "default")
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBe("existing")
+    })
+
+    it("getOrSet stores and returns default when missing (tag without default)", async () => {
+      const scope = createScope()
+      const valueTag = tag<string>({ label: "value" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          const value = ctx.data.getOrSet(valueTag, "default")
+          const hasIt = ctx.data.has(valueTag)
+          return { value, hasIt }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.value).toBe("default")
+      expect(result.hasIt).toBe(true)
+    })
+
+    it("getOrSet uses tag default when available (no second arg needed)", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 42 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          const value = ctx.data.getOrSet(countTag)
+          const hasIt = ctx.data.has(countTag)
+          return { value, hasIt }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.value).toBe(42)
+      expect(result.hasIt).toBe(true)
+    })
+
+    it("getOrSet materializes value so has() returns true", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          const beforeHas = ctx.data.has(countTag)
+          ctx.data.getOrSet(countTag)
+          const afterHas = ctx.data.has(countTag)
+          return { beforeHas, afterHas }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.beforeHas).toBe(false)
+      expect(result.afterHas).toBe(true)
+    })
+
+    it("delete then getOrSet re-initializes value", async () => {
+      const scope = createScope()
+      const countTag = tag<number>({ label: "count", default: 0 })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.data.set(countTag, 99)
+          const before = ctx.data.get(countTag)
+          ctx.data.delete(countTag)
+          const afterDelete = ctx.data.getOrSet(countTag)
+          return { before, afterDelete }
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result.before).toBe(99)
+      expect(result.afterDelete).toBe(0)
+    })
+
+    it("getOrSet with complex types replaces boilerplate pattern", async () => {
+      const scope = createScope()
+      const cacheTag = tag<Map<string, number>>({ label: "cache" })
+
+      const myAtom = atom({
+        factory: (ctx) => {
+          const cache = ctx.data.getOrSet(cacheTag, new Map())
+          cache.set("key", 456)
+          return cache
+        },
+      })
+
+      const result = await scope.resolve(myAtom)
+
+      expect(result).toBeInstanceOf(Map)
+      expect(result.get("key")).toBe(456)
+    })
   })
 })
