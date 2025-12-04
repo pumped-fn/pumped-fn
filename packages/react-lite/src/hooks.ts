@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
@@ -176,4 +176,134 @@ function useAtom<T>(atom: Lite.Atom<T>): T {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export { useScope, useController, useAtom }
+/**
+ * React hook to select and subscribe to a derived value from an atom with fine-grained reactivity.
+ *
+ * @remarks
+ * This hook provides fine-grained subscriptions by memoizing a selected portion of an atom's value.
+ * It only triggers re-renders when the selected value changes according to the equality function.
+ * This is useful for optimizing components that only need part of an atom's state.
+ *
+ * The selector function is stabilized using refs, allowing inline selector functions without
+ * causing unnecessary re-subscriptions. The hook integrates with React Suspense and Error
+ * Boundaries just like useAtom.
+ *
+ * @example
+ * Basic selection with default equality
+ * ```tsx
+ * import { useSelect } from '@pumped-fn/react-lite'
+ * import { userAtom } from './atoms'
+ *
+ * function UserName() {
+ *   // Only re-renders when user.name changes
+ *   const name = useSelect(userAtom, (user) => user.name)
+ *   return <div>{name}</div>
+ * }
+ * ```
+ *
+ * @example
+ * Custom equality function for complex selections
+ * ```tsx
+ * import { useSelect } from '@pumped-fn/react-lite'
+ * import { storeAtom } from './atoms'
+ *
+ * function CartCount() {
+ *   const cart = useSelect(
+ *     storeAtom,
+ *     (state) => state.cart,
+ *     (a, b) => a.length === b.length
+ *   )
+ *   return <div>Items: {cart.length}</div>
+ * }
+ * ```
+ *
+ * @example
+ * With Suspense and ErrorBoundary
+ * ```tsx
+ * import { Suspense } from 'react'
+ * import { ErrorBoundary } from 'react-error-boundary'
+ * import { useSelect } from '@pumped-fn/react-lite'
+ * import { dataAtom } from './atoms'
+ *
+ * function DataTitle() {
+ *   const title = useSelect(dataAtom, (data) => data.title)
+ *   return <h1>{title}</h1>
+ * }
+ *
+ * function App() {
+ *   return (
+ *     <ScopeProvider scope={scope}>
+ *       <ErrorBoundary fallback={<div>Error loading data</div>}>
+ *         <Suspense fallback={<div>Loading...</div>}>
+ *           <DataTitle />
+ *         </Suspense>
+ *       </ErrorBoundary>
+ *     </ScopeProvider>
+ *   )
+ * }
+ * ```
+ *
+ * @typeParam T - The type of value stored in the atom
+ * @typeParam S - The type of the selected value
+ * @param atom - The atom to select from
+ * @param selector - Function to extract a derived value from the atom
+ * @param eq - Optional equality function to determine if the selected value changed
+ * @returns The current selected value
+ *
+ * @throws {Error} When atom is in idle state (not resolved)
+ * @throws {Promise} When atom is resolving (caught by Suspense)
+ * @throws {Error} When atom resolution failed (caught by ErrorBoundary)
+ *
+ * @public
+ */
+function useSelect<T, S>(
+  atom: Lite.Atom<T>,
+  selector: (value: T) => S,
+  eq?: (a: S, b: S) => boolean
+): S {
+  const scope = useScope()
+  const ctrl = useController(atom)
+
+  const selectorRef = useRef(selector)
+  const eqRef = useRef(eq)
+  useEffect(() => {
+    selectorRef.current = selector
+    eqRef.current = eq
+  })
+
+  const handleRef = useRef<Lite.SelectHandle<S> | null>(null)
+
+  const getSnapshot = useCallback((): S => {
+    switch (ctrl.state) {
+      case 'idle':
+        throw new Error("Atom not resolved. Call scope.resolve() before rendering.")
+      case 'resolving':
+        throw ctrl.resolve()
+      case 'failed':
+        throw ctrl.get()
+      case 'resolved':
+        if (!handleRef.current) {
+          handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+        }
+        return handleRef.current.get()
+      default: {
+        const exhaustiveCheck: never = ctrl.state
+        throw new Error(`Unhandled atom state: ${exhaustiveCheck}`)
+      }
+    }
+  }, [scope, atom, ctrl])
+
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    if (ctrl.state !== 'resolved') {
+      return () => {}
+    }
+    if (!handleRef.current) {
+      handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+    }
+    return handleRef.current.subscribe(onStoreChange)
+  }, [scope, atom, ctrl])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+export { useScope, useController, useAtom, useSelect }
