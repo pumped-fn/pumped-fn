@@ -109,13 +109,22 @@ function useSelect<T, S>(
   selectorRef.current = selector
   eqRef.current = eq
 
-  const handleRef = useRef<Lite.SelectHandle<S> | null>(null)
+  const handleRef = useRef<{
+    scope: Lite.Scope
+    atom: Lite.Atom<T>
+    handle: Lite.SelectHandle<S>
+  } | null>(null)
 
   const getOrCreateHandle = useCallback(() => {
-    if (!handleRef.current) {
-      handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+    if (
+      !handleRef.current ||
+      handleRef.current.scope !== scope ||
+      handleRef.current.atom !== atom
+    ) {
+      const handle = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+      handleRef.current = { scope, atom, handle }
     }
-    return handleRef.current
+    return handleRef.current.handle
   }, [scope, atom])
 
   const getSnapshot = useCallback((): S => {
