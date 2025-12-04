@@ -170,7 +170,8 @@ function useSelect<T, S>(
 
 **Key implementation details:**
 - Selector stabilized via `useRef` to allow inline functions
-- SelectHandle created lazily on first resolved access
+- SelectHandle uses identity-tracking ref `{scope, atom, handle}` to detect changes
+- New SelectHandle created when scope or atom changes
 - Subscribes to SelectHandle, not Controller directly
 
 **Usage:**
