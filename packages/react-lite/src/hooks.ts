@@ -1,4 +1,4 @@
-import { useContext } from 'react'
+import { useContext, useMemo } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
@@ -38,4 +38,41 @@ function useScope(): Lite.Scope {
   return scope
 }
 
-export { useScope }
+/**
+ * React hook to create a memoized controller for an atom.
+ *
+ * @remarks
+ * This hook must be called within a component that is a descendant of a
+ * ScopeProvider. It creates a controller for the given atom using the current
+ * scope and memoizes it to prevent unnecessary recreations.
+ *
+ * @example
+ * ```tsx
+ * import { useController } from '@pumped-fn/react-lite'
+ * import { counterAtom } from './atoms'
+ *
+ * function Counter() {
+ *   const controller = useController(counterAtom)
+ *
+ *   const handleIncrement = () => {
+ *     controller.set(controller.get() + 1)
+ *   }
+ *
+ *   return <button onClick={handleIncrement}>Increment</button>
+ * }
+ * ```
+ *
+ * @typeParam T - The type of value stored in the atom
+ * @param atom - The atom to create a controller for
+ * @returns A memoized Lite.Controller instance for the atom
+ *
+ * @throws {Error} When called outside of a ScopeProvider
+ *
+ * @public
+ */
+function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
+  const scope = useScope()
+  return useMemo(() => scope.controller(atom), [scope, atom])
+}
+
+export { useScope, useController }

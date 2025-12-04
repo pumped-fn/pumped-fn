@@ -5,4 +5,4 @@
 
 export { ScopeContext, ScopeProvider } from './context'
 export type { ScopeProviderProps } from './context'
-export { useScope } from './hooks'
+export { useScope, useController } from './hooks'
