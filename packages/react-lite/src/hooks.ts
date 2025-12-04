@@ -111,6 +111,12 @@ function useSelect<T, S>(
 
   const handleRef = useRef<Lite.SelectHandle<S> | null>(null)
 
+  useEffect(() => {
+    return () => {
+      handleRef.current = null
+    }
+  }, [scope, atom])
+
   const getOrCreateHandle = useCallback(() => {
     if (!handleRef.current) {
       handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
