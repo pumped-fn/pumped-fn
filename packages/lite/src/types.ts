@@ -57,14 +57,40 @@ export namespace Lite {
     readonly tags?: Tagged<unknown>[]
   }
 
+  /**
+   * Per-atom private storage using Tags as keys. Data survives invalidation
+   * but is cleared on release.
+   */
   export interface DataStore {
-    get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
+    /**
+     * Pure lookup - returns stored value or undefined.
+     * Does NOT use tag defaults (Map-like semantics).
+     * Use `getOrSet()` when you need defaults.
+     */
+    get<T>(tag: Tag<T, boolean>): T | undefined
+    /** Store value for tag */
     set<T>(tag: Tag<T, boolean>, value: T): void
+    /** Check if tag has stored value */
     has<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /** Remove stored value, returns true if existed */
     delete<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /** Remove all stored values */
     clear(): void
+    /**
+     * Get existing value or initialize with tag's default.
+     * Stores and returns the value (materializes it).
+     */
     getOrSet<T>(tag: Tag<T, true>): T
-    getOrSet<T>(tag: Tag<T, false>, defaultValue: T): T
+    /**
+     * Get existing value or initialize with provided value.
+     * Stores and returns the value (materializes it).
+     */
+    getOrSet<T>(tag: Tag<T, true>, value: T): T
+    /**
+     * Get existing value or initialize with provided value.
+     * Required for tags without defaults.
+     */
+    getOrSet<T>(tag: Tag<T, false>, value: T): T
   }
 
   export interface ResolveContext {
@@ -98,13 +124,39 @@ export namespace Lite {
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'
 
+  /**
+   * Reactive handle for observing and controlling atom state.
+   */
   export interface Controller<T> {
     readonly [controllerSymbol]: true
+    /** Current lifecycle state */
     readonly state: AtomState
+    /**
+     * Get current value synchronously.
+     * @throws If atom is idle or failed
+     * @returns Current value (stale value during resolving)
+     */
     get(): T
+    /** Trigger resolution if not already resolved */
     resolve(): Promise<T>
+    /** Run cleanups and remove from cache */
     release(): Promise<void>
+    /** Schedule re-resolution (runs factory) */
     invalidate(): void
+    /**
+     * Replace value directly without running factory.
+     * Runs cleanups, transitions resolving→resolved, notifies listeners.
+     * @throws If atom is idle or failed
+     */
+    set(value: T): void
+    /**
+     * Transform value using function without running factory.
+     * Equivalent to `set(fn(get()))` but queued atomically.
+     * Runs cleanups, transitions resolving→resolved, notifies listeners.
+     * @throws If atom is idle or failed
+     */
+    update(fn: (prev: T) => T): void
+    /** Subscribe to state changes */
     on(event: ControllerEvent, listener: () => void): () => void
   }
 

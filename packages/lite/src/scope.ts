@@ -8,14 +8,8 @@ type ListenerEvent = 'resolving' | 'resolved' | '*'
 class DataStoreImpl implements Lite.DataStore {
   private readonly map = new Map<symbol, unknown>()
 
-  get<T, H extends boolean>(tag: Lite.Tag<T, H>): H extends true ? T : T | undefined {
-    if (this.map.has(tag.key)) {
-      return this.map.get(tag.key) as T
-    }
-    if (tag.hasDefault) {
-      return tag.defaultValue as T
-    }
-    return undefined as H extends true ? T : T | undefined
+  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.map.get(tag.key) as T | undefined
   }
 
   set<T>(tag: Lite.Tag<T, boolean>, value: T): void {
@@ -35,14 +29,15 @@ class DataStoreImpl implements Lite.DataStore {
   }
 
   getOrSet<T>(tag: Lite.Tag<T, true>): T
-  getOrSet<T>(tag: Lite.Tag<T, false>, defaultValue: T): T
-  getOrSet<T>(tag: Lite.Tag<T, boolean>, defaultValue?: T): T {
+  getOrSet<T>(tag: Lite.Tag<T, true>, value: T): T
+  getOrSet<T>(tag: Lite.Tag<T, false>, value: T): T
+  getOrSet<T>(tag: Lite.Tag<T, boolean>, value?: T): T {
     if (this.map.has(tag.key)) {
       return this.map.get(tag.key) as T
     }
-    const value = tag.hasDefault ? (tag.defaultValue as T) : (defaultValue as T)
-    this.map.set(tag.key, value)
-    return value
+    const storedValue = value !== undefined ? value : (tag.defaultValue as T)
+    this.map.set(tag.key, storedValue)
+    return storedValue
   }
 }
 
@@ -54,6 +49,7 @@ interface AtomEntry<T> {
   cleanups: (() => MaybePromise<void>)[]
   listeners: Map<ListenerEvent, Set<() => void>>
   pendingInvalidate: boolean
+  pendingSet?: { value: T } | { fn: (prev: T) => T }
   data?: Lite.DataStore
 }
 
@@ -150,6 +146,14 @@ class ControllerImpl<T> implements Lite.Controller<T> {
 
   invalidate(): void {
     this.scope.invalidate(this.atom)
+  }
+
+  set(value: T): void {
+    this.scope.scheduleSet(this.atom, value)
+  }
+
+  update(fn: (prev: T) => T): void {
+    this.scope.scheduleUpdate(this.atom, fn)
   }
 
   on(event: ListenerEvent, listener: () => void): () => void {
@@ -439,6 +443,9 @@ class ScopeImpl implements Lite.Scope {
         entry.pendingInvalidate = false
         this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
+      } else if (entry.pendingSet) {
+        this.invalidationChain?.delete(atom)
+        this.scheduleInvalidation(atom)
       }
 
       return value
@@ -539,12 +546,50 @@ class ScopeImpl implements Lite.Scope {
     this.scheduleInvalidation(atom)
   }
 
+  scheduleSet<T>(atom: Lite.Atom<T>, value: T): void {
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry || entry.state === 'idle') {
+      throw new Error("Atom not resolved")
+    }
+    if (entry.state === 'failed' && entry.error) {
+      throw entry.error
+    }
+
+    if (entry.state === 'resolving') {
+      entry.pendingSet = { value }
+      return
+    }
+
+    entry.pendingSet = { value }
+    this.scheduleInvalidation(atom)
+  }
+
+  scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T): void {
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry || entry.state === 'idle') {
+      throw new Error("Atom not resolved")
+    }
+    if (entry.state === 'failed' && entry.error) {
+      throw entry.error
+    }
+
+    if (entry.state === 'resolving') {
+      entry.pendingSet = { fn }
+      return
+    }
+
+    entry.pendingSet = { fn }
+    this.scheduleInvalidation(atom)
+  }
+
   private async doInvalidateSequential<T>(atom: Lite.Atom<T>): Promise<void> {
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (!entry) return
     if (entry.state === "idle") return
 
     const previousValue = entry.value
+    const pendingSet = entry.pendingSet
+    entry.pendingSet = undefined
 
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
@@ -560,6 +605,19 @@ class ScopeImpl implements Lite.Scope {
     this.resolving.delete(atom)
     this.emitStateChange("resolving", atom)
     this.notifyListeners(atom, "resolving")
+
+    if (pendingSet) {
+      if ('value' in pendingSet) {
+        entry.value = pendingSet.value
+      } else {
+        entry.value = pendingSet.fn(previousValue as T)
+      }
+      entry.state = 'resolved'
+      entry.hasValue = true
+      this.emitStateChange('resolved', atom)
+      this.notifyListeners(atom, 'resolved')
+      return
+    }
 
     await this.resolve(atom)
   }

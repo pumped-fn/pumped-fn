@@ -51,13 +51,14 @@ interface ResolveContext {
 }
 
 interface DataStore {
-  get<T, H extends boolean>(tag: Tag<T, H>): H extends true ? T : T | undefined
+  get<T>(tag: Tag<T, boolean>): T | undefined     // Always lookup-only
   set<T>(tag: Tag<T, boolean>, value: T): void
   has<T, H extends boolean>(tag: Tag<T, H>): boolean
   delete<T, H extends boolean>(tag: Tag<T, H>): boolean
   clear(): void
-  getOrSet<T>(tag: Tag<T, true>): T
-  getOrSet<T>(tag: Tag<T, false>, defaultValue: T): T
+  getOrSet<T>(tag: Tag<T, true>): T               // Uses tag default
+  getOrSet<T>(tag: Tag<T, true>, value: T): T     // Prefers stored, falls back to arg
+  getOrSet<T>(tag: Tag<T, false>, value: T): T    // Requires explicit value
 }
 ```
 
@@ -294,12 +295,14 @@ const pollingAtom = atom({
 
 ### Pattern: With Default Value
 
+Use `getOrSet` for tags with defaults - `get()` always returns `T | undefined`:
+
 ```typescript
 const countTag = tag<number>({ label: 'count', default: 0 })
 
 const counterAtom = atom({
   factory: async (ctx) => {
-    const count = ctx.data.get(countTag)  // number - guaranteed by default!
+    const count = ctx.data.getOrSet(countTag)  // number - uses tag default!
     ctx.data.set(countTag, count + 1)
     return count
   }
@@ -342,11 +345,14 @@ Tags enforce types at compile time:
 
 ```typescript
 const numTag = tag<number>({ label: 'num' })
+const countTag = tag<number>({ label: 'count', default: 0 })
 
 ctx.data.set(numTag, 123)      // ✅ OK
 ctx.data.set(numTag, "oops")   // ❌ Compile error!
 
-const n = ctx.data.get(numTag) // type is number | undefined
+ctx.data.get(numTag)           // number | undefined (always)
+ctx.data.get(countTag)         // number | undefined (always - Map semantics)
+ctx.data.getOrSet(countTag)    // number (guaranteed - uses default)
 ```
 
 ### Lifecycle
@@ -436,3 +442,4 @@ Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
 - [ADR-007](../adr/adr-007-resolve-context-data.md) - Original per-atom private storage design
 - [ADR-010](../adr/adr-010-typed-data-store.md) - Tag-based typed DataStore API
 - [ADR-012](../adr/adr-012-datastore-api-improvements.md) - DataStore API improvements (getOrSet, relaxed signatures)
+- [ADR-014](../adr/adr-014-datastore-map-semantics.md) - DataStore Map-like semantics (get() always returns T | undefined)

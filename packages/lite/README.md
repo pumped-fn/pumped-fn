@@ -167,7 +167,9 @@ Reactive handle for observing and controlling atom state.
 - `ctrl.state` — sync access: `'idle' | 'resolving' | 'resolved' | 'failed'`
 - `ctrl.get()` — sync value access (throws if not resolved, returns stale during resolving)
 - `ctrl.resolve()` — async resolution
-- `ctrl.invalidate()` — trigger re-resolution
+- `ctrl.invalidate()` — trigger re-resolution (runs factory)
+- `ctrl.set(value)` — replace value directly (skips factory)
+- `ctrl.update(fn)` — transform value: `fn(currentValue) → newValue` (skips factory)
 - `ctrl.on(event, listener)` — subscribe to `'resolved' | 'resolving' | '*'`
 - Use `controller(atom)` in deps for reactive dependency (unresolved, you control timing)
 
@@ -197,6 +199,31 @@ All types available under the `Lite` namespace:
 
 ```typescript
 import type { Lite } from '@pumped-fn/lite'
+```
+
+## Edge Cases
+
+### Controller.set() / update()
+
+| State | Behavior |
+|-------|----------|
+| `idle` | Throws "Atom not resolved" |
+| `resolving` | Queues, applies after resolution completes |
+| `resolved` | Queues normally |
+| `failed` | Throws the stored error |
+
+Both run cleanups before applying the new value.
+
+### DataStore.get()
+
+`ctx.data.get(tag)` always returns `T | undefined` (Map-like semantics). Use `getOrSet(tag)` when you need the tag's default value.
+
+```typescript
+const countTag = tag<number>({ label: 'count', default: 0 })
+
+ctx.data.get(countTag)       // undefined (not stored)
+ctx.data.getOrSet(countTag)  // 0 (uses default, now stored)
+ctx.data.get(countTag)       // 0 (now stored)
 ```
 
 ## License

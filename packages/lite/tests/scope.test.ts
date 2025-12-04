@@ -723,6 +723,143 @@ describe("ExecutionContext", () => {
     })
   })
 
+  describe("controller.set()", () => {
+    it("replaces value and notifies listeners", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => ({ name: "Guest" }) })
+      const ctrl = scope.controller(myAtom)
+
+      await ctrl.resolve()
+
+      const notifications: string[] = []
+      ctrl.on("resolved", () => notifications.push("resolved"))
+
+      ctrl.set({ name: "Alice" })
+      await scope.flush()
+
+      expect(ctrl.get()).toEqual({ name: "Alice" })
+      expect(notifications).toEqual(["resolved"])
+    })
+
+    it("runs cleanups before setting", async () => {
+      const scope = createScope()
+      const cleanups: string[] = []
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.cleanup(() => { cleanups.push("cleanup") })
+          return { name: "Guest" }
+        },
+      })
+
+      const ctrl = scope.controller(myAtom)
+      await ctrl.resolve()
+
+      ctrl.set({ name: "Alice" })
+      await scope.flush()
+
+      expect(cleanups).toEqual(["cleanup"])
+    })
+
+    it("throws when atom not resolved", () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => ({ name: "Guest" }) })
+      const ctrl = scope.controller(myAtom)
+
+      expect(() => ctrl.set({ name: "Alice" })).toThrow("Atom not resolved")
+    })
+
+    it("queues when atom is resolving", async () => {
+      const scope = createScope()
+      let resolveFactory: () => void
+      const myAtom = atom({
+        factory: () =>
+          new Promise<{ name: string }>((r) => {
+            resolveFactory = () => r({ name: "Guest" })
+          }),
+      })
+
+      const ctrl = scope.controller(myAtom)
+      const resolvePromise = ctrl.resolve()
+
+      await Promise.resolve()
+
+      ctrl.set({ name: "Alice" })
+
+      resolveFactory!()
+      await resolvePromise
+      await scope.flush()
+
+      expect(ctrl.get()).toEqual({ name: "Alice" })
+    })
+
+    it("does not run factory", async () => {
+      const scope = createScope()
+      let factoryCount = 0
+      const myAtom = atom({
+        factory: () => {
+          factoryCount++
+          return factoryCount
+        },
+      })
+
+      const ctrl = scope.controller(myAtom)
+      await ctrl.resolve()
+      expect(factoryCount).toBe(1)
+
+      ctrl.set(100)
+      await scope.flush()
+
+      expect(ctrl.get()).toBe(100)
+      expect(factoryCount).toBe(1)
+    })
+  })
+
+  describe("controller.update()", () => {
+    it("transforms value using function", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 0 })
+      const ctrl = scope.controller(myAtom)
+
+      await ctrl.resolve()
+
+      ctrl.update((n) => n + 1)
+      await scope.flush()
+
+      expect(ctrl.get()).toBe(1)
+    })
+
+    it("chains multiple updates", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 0 })
+      const ctrl = scope.controller(myAtom)
+
+      await ctrl.resolve()
+
+      ctrl.update((n) => n + 1)
+      await scope.flush()
+      ctrl.update((n) => n * 2)
+      await scope.flush()
+
+      expect(ctrl.get()).toBe(2)
+    })
+
+    it("notifies listeners", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 0 })
+      const ctrl = scope.controller(myAtom)
+
+      await ctrl.resolve()
+
+      const notifications: string[] = []
+      ctrl.on("resolved", () => notifications.push("resolved"))
+
+      ctrl.update((n) => n + 1)
+      await scope.flush()
+
+      expect(notifications).toEqual(["resolved"])
+    })
+  })
+
   describe("controller.on()", () => {
     it("notifies on state change", async () => {
       const scope = createScope()
@@ -1105,7 +1242,7 @@ describe("ExecutionContext", () => {
       expect(result).toBeUndefined()
     })
 
-    it("returns default value for missing keys with default", async () => {
+    it("returns undefined for missing keys (Map-like semantics)", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 0 })
 
@@ -1117,7 +1254,7 @@ describe("ExecutionContext", () => {
 
       const result = await scope.resolve(myAtom)
 
-      expect(result).toBe(0)
+      expect(result).toBe(undefined)
     })
 
     it("returns stored value over default when set", async () => {
@@ -1144,7 +1281,7 @@ describe("ExecutionContext", () => {
       const myAtom = atom({
         factory: (ctx) => {
           resolveCount++
-          const prev = ctx.data.get(countTag)
+          const prev = ctx.data.getOrSet(countTag)
           ctx.data.set(countTag, prev + 1)
           return ctx.data.get(countTag)
         },
@@ -1170,7 +1307,7 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => {
-          const prev = ctx.data.get(countTag)
+          const prev = ctx.data.getOrSet(countTag)
           ctx.data.set(countTag, prev + 1)
           return ctx.data.get(countTag)
         },
@@ -1277,7 +1414,7 @@ describe("ExecutionContext", () => {
       expect(result.after).toBeUndefined()
     })
 
-    it("delete() returns default after deletion for tags with default", async () => {
+    it("delete() returns undefined after deletion (Map-like semantics)", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 0 })
 
@@ -1294,7 +1431,7 @@ describe("ExecutionContext", () => {
       const result = await scope.resolve(myAtom)
 
       expect(result.before).toBe(5)
-      expect(result.after).toBe(0)
+      expect(result.after).toBe(undefined)
     })
 
     it("supports clear() to remove all keys", async () => {
