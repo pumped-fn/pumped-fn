@@ -67,6 +67,10 @@ function useAtom<T>(atom: Lite.Atom<T>): T {
         throw ctrl.get()
       case 'resolved':
         return ctrl.get()
+      default: {
+        const _exhaustive: never = ctrl.state
+        throw new Error(`Unhandled state: ${_exhaustive}`)
+      }
     }
   }, [ctrl])
 
@@ -102,12 +106,17 @@ function useSelect<T, S>(
 
   const selectorRef = useRef(selector)
   const eqRef = useRef(eq)
-  useEffect(() => {
-    selectorRef.current = selector
-    eqRef.current = eq
-  })
+  selectorRef.current = selector
+  eqRef.current = eq
 
   const handleRef = useRef<Lite.SelectHandle<S> | null>(null)
+
+  const getOrCreateHandle = useCallback(() => {
+    if (!handleRef.current) {
+      handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+    }
+    return handleRef.current
+  }, [scope, atom])
 
   const getSnapshot = useCallback((): S => {
     switch (ctrl.state) {
@@ -118,22 +127,20 @@ function useSelect<T, S>(
       case 'failed':
         throw ctrl.get()
       case 'resolved':
-        if (!handleRef.current) {
-          handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
-        }
-        return handleRef.current.get()
+        return getOrCreateHandle().get()
+      default: {
+        const _exhaustive: never = ctrl.state
+        throw new Error(`Unhandled state: ${_exhaustive}`)
+      }
     }
-  }, [scope, atom, ctrl])
+  }, [ctrl, getOrCreateHandle])
 
   const subscribe = useCallback((onStoreChange: () => void) => {
     if (ctrl.state !== 'resolved') {
       return () => {}
     }
-    if (!handleRef.current) {
-      handleRef.current = scope.select(atom, selectorRef.current, { eq: eqRef.current })
-    }
-    return handleRef.current.subscribe(onStoreChange)
-  }, [scope, atom, ctrl])
+    return getOrCreateHandle().subscribe(onStoreChange)
+  }, [ctrl, getOrCreateHandle])
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
