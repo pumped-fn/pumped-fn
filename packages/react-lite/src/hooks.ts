@@ -161,6 +161,10 @@ function useAtom<T>(atom: Lite.Atom<T>): T {
         throw ctrl.get()
       case 'resolved':
         return ctrl.get()
+      default: {
+        const exhaustiveCheck: never = ctrl.state
+        throw new Error(`Unhandled atom state: ${exhaustiveCheck}`)
+      }
     }
   }, [ctrl])
 
