@@ -1,2 +1,5 @@
 *.* text=auto
 claude-skill/skills/pumped-fn-typescript/examples symlink
+
+# Use bd merge for beads JSONL files
+.beads/issues.jsonl merge=beads
