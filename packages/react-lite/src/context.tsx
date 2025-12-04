@@ -42,7 +42,9 @@ interface ScopeProviderProps {
  *
  * @example
  * ```tsx
- * const rootScope = Lite.Scope()
+ * import { createScope } from '@pumped-fn/lite'
+ *
+ * const rootScope = createScope()
  *
  * function App() {
  *   return (
