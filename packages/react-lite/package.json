@@ -1,0 +1,67 @@
+{
+  "name": "@pumped-fn/react-lite",
+  "version": "0.1.0",
+  "description": "React integration for @pumped-fn/lite",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": ">=1.4.0",
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@types/react": "^18.3.18",
+    "react": "^18.3.1",
+    "tsdown": "^0.16.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "packages/react-lite",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
+  "keywords": [
+    "react",
+    "hooks",
+    "dependency-injection",
+    "di",
+    "lite",
+    "reactivity",
+    "typescript"
+  ],
+  "license": "MIT"
+}

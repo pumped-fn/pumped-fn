@@ -83,6 +83,27 @@ importers:
         specifier: ^4.0.5
         version: 4.0.5(@types/debug@4.1.12)(@types/node@24.10.0)(jiti@2.6.1)(jsdom@26.1.0)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/react-lite:
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../lite
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.26
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      tsdown:
+        specifier: ^0.16.5
+        version: 0.16.5(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.5
+        version: 4.0.5(@types/debug@4.1.12)(@types/node@24.10.0)(jiti@2.6.1)(jsdom@26.1.0)(tsx@4.20.6)(yaml@2.8.1)
+
 packages:
 
   '@algolia/abtesting@1.8.0':
@@ -3638,14 +3659,12 @@ snapshots:
       undici-types: 7.16.0
     optional: true
 
-  '@types/prop-types@15.7.15':
-    optional: true
+  '@types/prop-types@15.7.15': {}
 
   '@types/react@18.3.26':
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.1.3
-    optional: true
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -4405,8 +4424,7 @@ snapshots:
   jiti@2.6.1:
     optional: true
 
-  js-tokens@4.0.0:
-    optional: true
+  js-tokens@4.0.0: {}
 
   js-yaml@3.14.2:
     dependencies:
@@ -4490,7 +4508,6 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
-    optional: true
 
   lru-cache@10.4.3:
     optional: true
@@ -4955,7 +4972,6 @@ snapshots:
   react@18.3.1:
     dependencies:
       loose-envify: 1.4.0
-    optional: true
 
   read-yaml-file@1.1.0:
     dependencies:
