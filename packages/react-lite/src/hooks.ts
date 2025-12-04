@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
@@ -110,12 +110,6 @@ function useSelect<T, S>(
   eqRef.current = eq
 
   const handleRef = useRef<Lite.SelectHandle<S> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      handleRef.current = null
-    }
-  }, [scope, atom])
 
   const getOrCreateHandle = useCallback(() => {
     if (!handleRef.current) {
