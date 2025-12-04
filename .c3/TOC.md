@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-03 10:10:14
+> Last generated: 2025-12-04 09:14:38
 
 ## Context Level
 
@@ -148,6 +148,60 @@ allowing factory bypassing or atom substitution at scope creation.
 ---
 
 ## Architecture Decisions
+
+### [adr-014](./adr/adr-014-datastore-map-semantics.md) - DataStore Map-like Semantics
+> Align DataStore with Map semantics - get() always returns T | undefined
+(pure lookup), defaults only used by getOrSet() not get().
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-014-status)
+- [Problem/Requirement](#adr-014-problem)
+- [Exploration Journey](#adr-014-exploration)
+- [Solution](#adr-014-solution)
+- [Changes Across Layers](#adr-014-changes)
+- [Verification](#adr-014-verification)
+- [Migration Guide](#adr-014-migration)
+- [Related](#adr-014-related)
+
+---
+
+### [adr-013](./adr/adr-013-controller-set-update.md) - Controller.set() and Controller.update() for Direct Value Mutation
+> Add set() and update() methods to Controller for pushing values directly
+without re-running the factory, enabling external data sources (WebSocket,
+etc.) to update atom values reactively while preserving the invalidation queue.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-013-status)
+- [Problem/Requirement](#adr-013-problem)
+- [Exploration Journey](#adr-013-exploration)
+- [Solution](#adr-013-solution)
+- [Changes Across Layers](#adr-013-changes)
+- [Direct Value Mutation](#c3-201-set-update)
+- [Verification](#adr-013-verification)
+- [Related](#adr-013-related)
+
+---
+
+### [ADR-012-datastore-api-improvements](./adr/adr-012-datastore-api-improvements.md) - DataStore API Improvements - Relaxed Signatures and getOrSet
+> Fix overly strict has/delete signatures that reject valid Tag types, and add
+getOrSet convenience method to eliminate repetitive get-check-set boilerplate.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-012-status)
+- [Problem/Requirement](#adr-012-problem)
+- [Exploration Journey](#adr-012-exploration)
+- [Solution](#adr-012-solution)
+- [Changes Across Layers](#adr-012-changes)
+- [Verification](#adr-012-verification)
+- [Related](#adr-012-related)
+
+---
 
 ### [adr-011](./adr/adr-011-sequential-invalidation-chain.md) - Sequential Invalidation Chain with Loop Detection
 > Replace parallel fire-and-forget invalidation with sequential awaited chain,
@@ -361,5 +415,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 18
-**Contexts**: 1 | **Containers**: 1 | **Components**: 5 | **ADRs**: 11
+**Total Documents**: 21
+**Contexts**: 1 | **Containers**: 1 | **Components**: 5 | **ADRs**: 14
