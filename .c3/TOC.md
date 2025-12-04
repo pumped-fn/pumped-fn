@@ -42,6 +42,25 @@ and controllers for TypeScript applications with zero external dependencies.
 
 ---
 
+### [c3-3](./c3-3-react-lite/) - React Lite Library (@pumped-fn/react-lite)
+> Minimal React bindings for @pumped-fn/lite with Suspense and ErrorBoundary
+integration via useSyncExternalStore for React 18+ applications.
+
+**Sections**:
+- [Overview](#c3-3-overview) - Thin React wrappers for lite
+- [Technology Stack](#c3-3-stack) - React 18+ integration
+- [Component Relationships](#c3-3-relationships) - Hook to lite connections
+- [State Handling](#c3-3-states) - Atom state to React pattern mapping
+- [Public API](#c3-3-api) - Hooks and context exports
+- [Source Organization](#c3-3-source) - File structure
+- [Components](#c3-3-components) - Component inventory
+- [Usage Patterns](#c3-3-patterns) - Common usage examples
+- [Testing](#c3-3-testing) - Testing strategy
+- [SSR Compatibility](#c3-3-ssr) - Server-side rendering notes
+- [Related](#c3-3-related)
+
+---
+
 ## Component Level
 
 ### Lite Library (@pumped-fn/lite) Components
@@ -144,6 +163,25 @@ allowing factory bypassing or atom substitution at scope creation.
 - [Source Files](#c3-205-source)
 - [Testing](#c3-205-testing)
 - [Related](#c3-205-related)
+
+---
+
+### React Lite Library (@pumped-fn/react-lite) Components
+
+#### [c3-301](./c3-3-react-lite/c3-301-hooks.md) - React Hooks
+> React hooks for @pumped-fn/lite integration - useScope, useAtom, useSelect,
+and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
+
+**Sections**:
+- [Overview](#c3-301-overview) - Hook overview and purpose
+- [Concepts](#c3-301-concepts) - Explicit lifecycle and state mapping
+- [useScope](#c3-301-use-scope) - Access scope from context
+- [useController](#c3-301-use-controller) - Get memoized controller
+- [useAtom](#c3-301-use-atom) - Subscribe to atom value
+- [useSelect](#c3-301-use-select) - Fine-grained selection
+- [Source Files](#c3-301-source) - Implementation files
+- [Testing](#c3-301-testing) - Test coverage
+- [Related](#c3-301-related)
 
 ---
 
@@ -415,5 +453,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 21
-**Contexts**: 1 | **Containers**: 1 | **Components**: 5 | **ADRs**: 14
+**Total Documents**: 23
+**Contexts**: 1 | **Containers**: 2 | **Components**: 6 | **ADRs**: 14
