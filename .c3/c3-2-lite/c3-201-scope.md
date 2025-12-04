@@ -53,7 +53,9 @@ interface Controller<T> {
   get(): T                     // Get value (throws if not resolved)
   resolve(): Promise<T>        // Trigger resolution
   release(): Promise<void>     // Run cleanup, remove from cache
-  invalidate(): void           // Trigger re-resolution
+  invalidate(): void           // Trigger re-resolution (runs factory)
+  set(value: T): void          // Replace value directly (skips factory)
+  update(fn: (prev: T) => T): void  // Transform value (skips factory)
   on(listener: () => void): () => void  // Subscribe to all changes
   on(event: ControllerEvent, listener: () => void): () => void  // Subscribe to specific state
 }
@@ -362,6 +364,80 @@ If `invalidate()` is called while the atom is already resolving:
 - The invalidation is queued (pendingInvalidate = true)
 - After current resolution completes, invalidation runs again
 
+## Direct Value Mutation {#c3-201-set-update}
+
+### Controller.set() and Controller.update()
+
+Push values directly without re-running the factory:
+
+```typescript
+const ctrl = scope.controller(userAtom)
+await ctrl.resolve()
+
+// Replace value directly
+ctrl.set({ name: 'Alice' })
+
+// Transform value
+ctrl.update(user => ({ ...user, lastSeen: Date.now() }))
+```
+
+### Behavior
+
+Both methods follow the same flow as `invalidate()`:
+1. Queue via same invalidation mechanism
+2. Run cleanups (LIFO)
+3. State: `resolved → resolving → resolved`
+4. Replace value (from argument, not factory)
+5. Notify listeners
+
+### Comparison with invalidate()
+
+| | `invalidate()` | `set(value)` / `update(fn)` |
+|---|---|---|
+| Runs cleanups | Yes | Yes |
+| State transition | resolving → resolved | resolving → resolved |
+| Gets value from | Factory (async) | Argument (sync) |
+| Triggers listeners | Yes | Yes |
+| Uses queue | Yes | Yes |
+
+### Use Cases
+
+| Use Case | Method |
+|----------|--------|
+| External data source pushes value (WebSocket) | `set()` |
+| Transform based on current value | `update()` |
+| Re-fetch from source | `invalidate()` |
+
+### Example: WebSocket Updates
+
+```typescript
+const wsAtom = atom({
+  deps: { user: controller(userAtom) },
+  factory: (ctx, { user }) => {
+    const ws = new WebSocket('wss://api.example.com')
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.type === 'user-update') {
+        user.set(data.payload)  // Push directly, no factory re-run
+      }
+    }
+
+    ctx.cleanup(() => ws.close())
+    return ws
+  }
+})
+```
+
+### State Requirements
+
+| State | `set()` / `update()` Behavior |
+|-------|-------------------------------|
+| `idle` | Throws "Atom not resolved" |
+| `resolving` | Queues, executes after resolution |
+| `resolved` | Queues normally |
+| `failed` | Throws the stored error |
+
 ## Event Listening {#c3-201-events}
 
 ### Scope-Level Events
@@ -448,3 +524,4 @@ Key test scenarios in `tests/scope.test.ts`:
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller design decisions
 - [ADR-008](../adr/adr-008-sync-create-scope.md) - Synchronous createScope with ready promise
 - [ADR-009](../adr/adr-009-fix-duplicate-listener-notifications.md) - Controller.on() state filtering
+- [ADR-013](../adr/adr-013-controller-set-update.md) - Controller.set() and Controller.update() design
