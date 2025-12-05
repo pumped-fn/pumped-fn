@@ -152,7 +152,7 @@ describe("Type Inference", () => {
         },
       })
 
-      type QueryFlowType = typeof queryFlow extends Lite.Flow<infer T, unknown> ? T : never
+      type QueryFlowType = typeof queryFlow extends Lite.Flow<infer T, infer _> ? T : never
       expectTypeOf<QueryFlowType>().toEqualTypeOf<never[]>()
     })
 
@@ -181,7 +181,7 @@ describe("Type Inference", () => {
         },
       })
 
-      type MixedFlowType = typeof mixedFlow extends Lite.Flow<infer T, unknown> ? T : never
+      type MixedFlowType = typeof mixedFlow extends Lite.Flow<infer T, infer _> ? T : never
       expectTypeOf<MixedFlowType>().toEqualTypeOf<{ input: unknown }>()
     })
   })
@@ -239,7 +239,7 @@ describe("Type Inference", () => {
         await ctx.close()
       })
 
-      it("ctx.input is unknown without parse", async () => {
+      it("ctx.input is void without parse (no input required)", async () => {
         const myFlow = flow({
           factory: (ctx) => {
             return String(ctx.input)
@@ -249,12 +249,12 @@ describe("Type Inference", () => {
         type FlowInputType = typeof myFlow extends Lite.Flow<unknown, infer TInput>
           ? TInput
           : never
-        expectTypeOf<FlowInputType>().toEqualTypeOf<unknown>()
+        expectTypeOf<FlowInputType>().toEqualTypeOf<void>()
 
         const scope = createScope()
         const ctx = scope.createContext()
-        const result = await ctx.exec({ flow: myFlow, input: "test" })
-        expect(result).toBe("test")
+        const result = await ctx.exec({ flow: myFlow })
+        expect(result).toBe("undefined")
         await ctx.close()
       })
 

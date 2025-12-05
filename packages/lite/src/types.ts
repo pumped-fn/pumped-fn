@@ -100,24 +100,25 @@ export namespace Lite {
     readonly data: DataStore
   }
 
-  export interface ExecutionContext<TInput = unknown> {
-    readonly input: TInput
+  export interface ExecutionContext {
+    readonly input: unknown
     readonly scope: Scope
-    exec<T>(options: ExecFlowOptions<T>): Promise<T>
-    exec<T, Args extends unknown[]>(options: ExecFnOptions<T, Args>): Promise<T>
+    exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
+    exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
     onClose(fn: () => MaybePromise<void>): void
     close(): Promise<void>
   }
 
-  export interface ExecFlowOptions<T> {
-    flow: Flow<T, unknown>
-    input: unknown
+  export type ExecFlowOptions<Output, Input> = {
+    flow: Flow<Output, Input>
     name?: string
     tags?: Tagged<unknown>[]
-  }
+  } & ([NoInfer<Input>] extends [void | undefined | null]
+    ? { input?: undefined | null }
+    : { input: NoInfer<Input> })
 
-  export interface ExecFnOptions<T, Args extends unknown[] = unknown[]> {
-    fn: (...args: Args) => MaybePromise<T>
+  export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
+    fn: (...args: Args) => MaybePromise<Output>
     params: Args
     tags?: Tagged<unknown>[]
   }
@@ -214,16 +215,16 @@ export namespace Lite {
   export interface Extension {
     readonly name: string
     init?(scope: Scope): MaybePromise<void>
-    wrapResolve?<T>(
-      next: () => Promise<T>,
-      atom: Atom<T>,
+    wrapResolve?(
+      next: () => Promise<unknown>,
+      atom: Atom<unknown>,
       scope: Scope
-    ): Promise<T>
-    wrapExec?<T>(
-      next: () => Promise<T>,
-      target: Flow<T, unknown> | ((...args: unknown[]) => MaybePromise<T>),
+    ): Promise<unknown>
+    wrapExec?(
+      next: () => Promise<unknown>,
+      target: Flow<unknown, unknown> | ((...args: unknown[]) => MaybePromise<unknown>),
       ctx: ExecutionContext
-    ): Promise<T>
+    ): Promise<unknown>
     dispose?(scope: Scope): MaybePromise<void>
   }
 
@@ -248,10 +249,10 @@ export namespace Lite {
       : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 
   export type FlowFactory<
-    TOutput,
-    TInput,
+    Output,
+    Input,
     D extends Record<string, Dependency>,
   > = keyof D extends never
-    ? (ctx: ExecutionContext<TInput>) => MaybePromise<TOutput>
-    : (ctx: ExecutionContext<TInput>, deps: InferDeps<D>) => MaybePromise<TOutput>
+    ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
+    : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 }

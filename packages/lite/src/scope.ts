@@ -678,7 +678,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this._input
   }
 
-  async exec<T>(options: Lite.ExecFlowOptions<T> | Lite.ExecFnOptions<T>): Promise<T> {
+  async exec(options: {
+    flow: Lite.Flow<unknown, unknown>
+    input?: unknown
+    name?: string
+    tags?: Lite.Tagged<unknown>[]
+  } | Lite.ExecFnOptions<unknown>): Promise<unknown> {
     if (this.closed) {
       throw new Error("ExecutionContext is closed")
     }
@@ -690,7 +695,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private async execFlow<T>(options: Lite.ExecFlowOptions<T>): Promise<T> {
+  private async execFlow(options: {
+    flow: Lite.Flow<unknown, unknown>
+    input?: unknown
+    name?: string
+    tags?: Lite.Tagged<unknown>[]
+  }): Promise<unknown> {
     const { flow, input, tags: execTags, name: execName } = options
 
     const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
@@ -720,9 +730,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
       deps?: Record<string, unknown>
-    ) => MaybePromise<T>
+    ) => MaybePromise<unknown>
 
-    const doExec = async (): Promise<T> => {
+    const doExec = async (): Promise<unknown> => {
       if (flow.deps && Object.keys(flow.deps).length > 0) {
         return factory(this, resolvedDeps)
       } else {
@@ -733,23 +743,23 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.applyExecExtensions(flow, doExec)
   }
 
-  private execFn<T>(options: Lite.ExecFnOptions<T>): Promise<T> {
+  private execFn(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
     const doExec = () => Promise.resolve(fn(...params))
     return this.applyExecExtensions(fn, doExec)
   }
 
-  private async applyExecExtensions<T>(
-    target: Lite.Flow<T, unknown> | ((...args: unknown[]) => MaybePromise<T>),
-    doExec: () => Promise<T>
-  ): Promise<T> {
+  private async applyExecExtensions(
+    target: Lite.Flow<unknown, unknown> | ((...args: unknown[]) => MaybePromise<unknown>),
+    doExec: () => Promise<unknown>
+  ): Promise<unknown> {
     let next = doExec
 
     for (let i = this.scope.extensions.length - 1; i >= 0; i--) {
       const ext = this.scope.extensions[i]
       if (ext?.wrapExec) {
         const currentNext = next
-        next = ext.wrapExec.bind(ext, currentNext, target, this) as () => Promise<T>
+        next = ext.wrapExec.bind(ext, currentNext, target, this) as () => Promise<unknown>
       }
     }
 
