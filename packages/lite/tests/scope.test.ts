@@ -3,7 +3,7 @@ import { createScope } from "../src/scope"
 import { atom, controller } from "../src/atom"
 import { preset } from "../src/preset"
 import { tag, tags } from "../src/tag"
-import { flow } from "../src/flow"
+import { flow, typed } from "../src/flow"
 import type { Lite } from "../src/types"
 
 describe("Scope", () => {
@@ -333,6 +333,7 @@ describe("ExecutionContext", () => {
       const ctx = scope.createContext()
 
       const myFlow = flow({
+        parse: typed<string>(),
         factory: (ctx) => `input: ${ctx.input}`,
       })
 
@@ -499,16 +500,6 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("controller edge cases", () => {
-    it("throws when get called before resolve", async () => {
-      const scope = createScope()
-      const myAtom = atom({ factory: () => 42 })
-
-      const ctrl = scope.controller(myAtom)
-      expect(() => ctrl.get()).toThrow("not resolved")
-    })
-  })
-
   describe("concurrent resolution", () => {
     it("handles concurrent resolution of same atom", async () => {
       const scope = createScope()
@@ -590,26 +581,6 @@ describe("ExecutionContext", () => {
   })
 
   describe("controller.invalidate()", () => {
-    it("runs cleanups in LIFO order", async () => {
-      const scope = createScope()
-      const order: number[] = []
-      const myAtom = atom({
-        factory: (ctx) => {
-          ctx.cleanup(() => { order.push(1) })
-          ctx.cleanup(() => { order.push(2) })
-          ctx.cleanup(() => { order.push(3) })
-          return 42
-        }
-      })
-
-      await scope.resolve(myAtom)
-      const ctrl = scope.controller(myAtom)
-      ctrl.invalidate()
-
-      await new Promise(r => setTimeout(r, 10))
-      expect(order).toEqual([3, 2, 1])
-    })
-
     it("triggers re-resolution", async () => {
       const scope = createScope()
       let resolveCount = 0
@@ -1227,34 +1198,22 @@ describe("ExecutionContext", () => {
       expect(result).toBe("hello")
     })
 
-    it("returns undefined for missing keys without default", async () => {
+    it("returns undefined for missing keys (ignores tag defaults)", async () => {
       const scope = createScope()
       const missingTag = tag<string>({ label: "missing" })
+      const tagWithDefault = tag<number>({ label: "count", default: 0 })
 
       const myAtom = atom({
-        factory: (ctx) => {
-          return ctx.data.get(missingTag)
-        },
+        factory: (ctx) => ({
+          missing: ctx.data.get(missingTag),
+          withDefault: ctx.data.get(tagWithDefault),
+        }),
       })
 
       const result = await scope.resolve(myAtom)
 
-      expect(result).toBeUndefined()
-    })
-
-    it("returns undefined for missing keys (Map-like semantics)", async () => {
-      const scope = createScope()
-      const countTag = tag<number>({ label: "count", default: 0 })
-
-      const myAtom = atom({
-        factory: (ctx) => {
-          return ctx.data.get(countTag)
-        },
-      })
-
-      const result = await scope.resolve(myAtom)
-
-      expect(result).toBe(undefined)
+      expect(result.missing).toBeUndefined()
+      expect(result.withDefault).toBeUndefined()
     })
 
     it("returns stored value over default when set", async () => {

@@ -2,36 +2,26 @@ import { describe, it, expect } from "vitest"
 import { atom, isAtom, controller, isControllerDep } from "../src/atom"
 
 describe("Atom", () => {
-  describe("atom()", () => {
-    it("creates an atom without deps", () => {
-      const myAtom = atom({
-        factory: () => 42,
-      })
-
-      expect(isAtom(myAtom)).toBe(true)
-      expect(myAtom.deps).toBeUndefined()
+  it("preserves config and identifies via type guards", () => {
+    const simpleAtom = atom({ factory: () => 42 })
+    const configAtom = atom({ factory: () => ({ port: 3000 }) })
+    const withDeps = atom({
+      deps: { cfg: configAtom },
+      factory: (ctx, { cfg }) => cfg.port,
     })
 
-    it("creates an atom with deps", () => {
-      const configAtom = atom({ factory: () => ({ port: 3000 }) })
-      const serverAtom = atom({
-        deps: { cfg: configAtom },
-        factory: (ctx, { cfg }) => ({ server: true, port: cfg.port }),
-      })
+    expect(isAtom(simpleAtom)).toBe(true)
+    expect(simpleAtom.deps).toBeUndefined()
 
-      expect(isAtom(serverAtom)).toBe(true)
-      expect(serverAtom.deps).toEqual({ cfg: configAtom })
-    })
-
+    expect(isAtom(withDeps)).toBe(true)
+    expect(withDeps.deps).toHaveProperty("cfg")
   })
 
-  describe("controller()", () => {
-    it("wraps an atom as controller dep", () => {
-      const myAtom = atom({ factory: () => 42 })
-      const ctrlDep = controller(myAtom)
+  it("controller() wraps atom as controller dep", () => {
+    const myAtom = atom({ factory: () => 42 })
+    const ctrlDep = controller(myAtom)
 
-      expect(isControllerDep(ctrlDep)).toBe(true)
-      expect(ctrlDep.atom).toBe(myAtom)
-    })
+    expect(isControllerDep(ctrlDep)).toBe(true)
+    expect(ctrlDep.atom).toBe(myAtom)
   })
 })

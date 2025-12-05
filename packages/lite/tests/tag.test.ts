@@ -5,22 +5,25 @@ import type { Lite } from "../src/types"
 
 describe("Tag", () => {
   describe("tag()", () => {
-    it("creates a tag with label", () => {
-      const myTag = tag<string>({ label: "myTag" })
+    it("preserves all config properties", () => {
+      const simpleTag = tag<string>({ label: "simple" })
+      const tagWithDefault = tag<number>({ label: "count", default: 0 })
+      const tagWithParse = tag({
+        label: "parsed",
+        parse: (raw: unknown) => Number(raw),
+      })
 
-      expect(isTag(myTag)).toBe(true)
-      expect(myTag.label).toBe("myTag")
-      expect(myTag.hasDefault).toBe(false)
+      expect(isTag(simpleTag)).toBe(true)
+      expect(simpleTag.label).toBe("simple")
+      expect(simpleTag.hasDefault).toBe(false)
+
+      expect(tagWithDefault.hasDefault).toBe(true)
+      expect(tagWithDefault.defaultValue).toBe(0)
+
+      expect(tagWithParse.parse).toBeDefined()
     })
 
-    it("creates a tag with default value", () => {
-      const myTag = tag<number>({ label: "count", default: 0 })
-
-      expect(myTag.hasDefault).toBe(true)
-      expect(myTag.defaultValue).toBe(0)
-    })
-
-    it("creates tagged value when called", () => {
+    it("creates tagged values when called", () => {
       const myTag = tag<string>({ label: "myTag" })
       const tagged = myTag("hello")
 
@@ -29,7 +32,7 @@ describe("Tag", () => {
       expect(tagged.key).toBe(myTag.key)
     })
 
-    it("creates a tag with parse function", () => {
+    it("parse validates values and throws ParseError on failure", () => {
       const numberTag = tag({
         label: "count",
         parse: (raw: unknown) => {
@@ -39,46 +42,8 @@ describe("Tag", () => {
         },
       })
 
-      expect(isTag(numberTag)).toBe(true)
-      expect(numberTag.parse).toBeDefined()
-    })
-
-    it("validates value through parse on creation", () => {
-      const numberTag = tag({
-        label: "count",
-        parse: (raw: unknown) => {
-          const n = Number(raw)
-          if (isNaN(n)) throw new Error("Must be a number")
-          return n
-        },
-      })
-
-      const tagged = numberTag(42)
-      expect(tagged.value).toBe(42)
-    })
-
-    it("throws ParseError when parse fails", () => {
-      const numberTag = tag({
-        label: "count",
-        parse: (raw: unknown) => {
-          const n = Number(raw)
-          if (isNaN(n)) throw new Error("Must be a number")
-          return n
-        },
-      })
-
-      expect(() => numberTag("not-a-number" as unknown as number)).toThrow()
-    })
-
-    it("ParseError has correct properties when parse fails", () => {
-      const numberTag = tag({
-        label: "count",
-        parse: (raw: unknown) => {
-          const n = Number(raw)
-          if (isNaN(n)) throw new Error("Must be a number")
-          return n
-        },
-      })
+      const valid = numberTag(42)
+      expect(valid.value).toBe(42)
 
       try {
         numberTag("not-a-number" as unknown as number)
@@ -96,12 +61,7 @@ describe("Tag", () => {
       let parseCalled = false
       const numberTag = tag({
         label: "count",
-        parse: (raw: unknown) => {
-          parseCalled = true
-          const n = Number(raw)
-          if (isNaN(n)) throw new Error("Must be a number")
-          return n
-        },
+        parse: () => { parseCalled = true; return 0 },
         default: 0,
       })
 
@@ -110,65 +70,27 @@ describe("Tag", () => {
     })
   })
 
-  describe("tag.get()", () => {
-    it("returns value from tagged array", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const source = [myTag("hello")]
-
-      expect(myTag.get(source)).toBe("hello")
-    })
-
-    it("throws when tag not found and no default", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const source: Lite.Tagged<unknown>[] = []
-
-      expect(() => myTag.get(source)).toThrow()
-    })
-
-    it("returns default when tag not found", () => {
-      const myTag = tag<number>({ label: "count", default: 42 })
-      const source: Lite.Tagged<unknown>[] = []
-
-      expect(myTag.get(source)).toBe(42)
-    })
-  })
-
-  describe("tag.find()", () => {
-    it("returns value from tagged array", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const source = [myTag("hello")]
-
-      expect(myTag.find(source)).toBe("hello")
-    })
-
-    it("returns undefined when tag not found", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const source: Lite.Tagged<unknown>[] = []
-
-      expect(myTag.find(source)).toBeUndefined()
-    })
-
-    it("returns default when tag not found and has default", () => {
-      const myTag = tag<number>({ label: "count", default: 42 })
-      const source: Lite.Tagged<unknown>[] = []
-
-      expect(myTag.find(source)).toBe(42)
-    })
-  })
-
-  describe("tag.collect()", () => {
-    it("returns all values for tag", () => {
+  describe("tag retrieval methods", () => {
+    it("get/find/collect retrieve values from tagged arrays", () => {
       const myTag = tag<string>({ label: "myTag" })
       const source = [myTag("a"), myTag("b"), myTag("c")]
 
+      expect(myTag.get(source)).toBe("a")
+      expect(myTag.find(source)).toBe("a")
       expect(myTag.collect(source)).toEqual(["a", "b", "c"])
     })
 
-    it("returns empty array when tag not found", () => {
-      const myTag = tag<string>({ label: "myTag" })
-      const source: Lite.Tagged<unknown>[] = []
+    it("handles missing tags appropriately per method", () => {
+      const noDefault = tag<string>({ label: "noDefault" })
+      const withDefault = tag<number>({ label: "withDefault", default: 42 })
+      const empty: Lite.Tagged<unknown>[] = []
 
-      expect(myTag.collect(source)).toEqual([])
+      expect(() => noDefault.get(empty)).toThrow()
+      expect(noDefault.find(empty)).toBeUndefined()
+      expect(noDefault.collect(empty)).toEqual([])
+
+      expect(withDefault.get(empty)).toBe(42)
+      expect(withDefault.find(empty)).toBe(42)
     })
   })
 

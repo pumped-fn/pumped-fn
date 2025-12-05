@@ -20,14 +20,14 @@ export function typed<T>(): Lite.Typed<T> {
 }
 
 export interface FlowConfig<
-  TOutput,
-  TInput,
+  Output,
+  Input,
   D extends Record<string, Lite.Dependency>,
 > {
   name?: string
-  parse?: ((raw: unknown) => MaybePromise<TInput>) | Lite.Typed<TInput>
+  parse?: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
   deps?: D
-  factory: Lite.FlowFactory<TOutput, TInput, D>
+  factory: Lite.FlowFactory<Output, Input, D>
   tags?: Lite.Tagged<unknown>[]
 }
 
@@ -53,13 +53,13 @@ export function flow<TOutput>(config: {
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
-}): Lite.Flow<TOutput, unknown>
+}): Lite.Flow<TOutput, void>
 
 export function flow<TOutput, TInput>(config: {
   name?: string
   parse: (raw: unknown) => MaybePromise<TInput>
   deps?: undefined
-  factory: (ctx: Lite.ExecutionContext<NoInfer<TInput>>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 
@@ -67,7 +67,7 @@ export function flow<TOutput, TInput>(config: {
   name?: string
   parse: Lite.Typed<TInput>
   deps?: undefined
-  factory: (ctx: Lite.ExecutionContext<NoInfer<TInput>>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 
@@ -80,7 +80,7 @@ export function flow<
   deps: D
   factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
-}): Lite.Flow<TOutput, unknown>
+}): Lite.Flow<TOutput, void>
 
 export function flow<
   TOutput,
@@ -90,7 +90,7 @@ export function flow<
   name?: string
   parse: (raw: unknown) => MaybePromise<TInput>
   deps: D
-  factory: (ctx: Lite.ExecutionContext<NoInfer<TInput>>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 
@@ -102,7 +102,7 @@ export function flow<
   name?: string
   parse: Lite.Typed<TInput>
   deps: D
-  factory: (ctx: Lite.ExecutionContext<NoInfer<TInput>>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Flow<TOutput, TInput>
 

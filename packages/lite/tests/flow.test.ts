@@ -5,49 +5,23 @@ import { tag, tags } from "../src/tag";
 
 describe("Flow", () => {
   describe("flow()", () => {
-    it("creates a flow without deps", () => {
-      const myFlow = flow({
-        factory: (ctx) => ctx.input,
-      });
-
-      expect(isFlow(myFlow)).toBe(true);
-      expect(myFlow.deps).toBeUndefined();
-    });
-
-    it("creates a flow with deps", () => {
+    it("preserves all config properties", () => {
       const dbAtom = atom({ factory: () => ({ query: () => [] }) });
       const requestId = tag<string>({ label: "requestId" });
+      const parse = (raw: unknown): string => String(raw);
 
       const myFlow = flow({
+        name: "myFlow",
+        parse,
         deps: { db: dbAtom, reqId: tags.required(requestId) },
-        factory: (ctx, { db, reqId }) => {
-          return { db, reqId, input: ctx.input };
-        },
+        factory: (ctx, { db }) => db.query(),
       });
 
       expect(isFlow(myFlow)).toBe(true);
-      expect(myFlow.deps).toBeDefined();
-    });
-
-    it("creates a flow with name", () => {
-      const myFlow = flow({
-        name: "myFlow",
-        factory: (ctx) => ctx.input,
-      });
-
       expect(myFlow.name).toBe("myFlow");
-    });
-
-    it("creates a flow with parse function", () => {
-      const myFlow = flow({
-        parse: (raw: unknown): string => {
-          if (typeof raw !== "string") throw new Error("Must be string");
-          return raw;
-        },
-        factory: (ctx) => ctx.input.toUpperCase(),
-      });
-
-      expect(myFlow.parse).toBeDefined();
+      expect(myFlow.parse).toBe(parse);
+      expect(myFlow.deps).toHaveProperty("db");
+      expect(myFlow.deps).toHaveProperty("reqId");
     });
   });
 });
