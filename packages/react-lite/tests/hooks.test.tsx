@@ -88,25 +88,31 @@ describe('useScope', () => {
 })
 
 describe('useAtom - state handling', () => {
-  it('throws error when atom is in idle state', async () => {
+  it('auto-resolves and suspends when atom is in idle state', async () => {
     const testAtom = atom({
-      factory: async () => 'value',
+      factory: async () => 'lazy resolved value',
     })
 
     const scope = createScope()
 
     function TestComponent() {
-      useAtom(testAtom)
-      return <div>test</div>
+      const value = useAtom(testAtom)
+      return <div>{value}</div>
     }
 
-    expect(() => {
-      render(
-        <ScopeProvider scope={scope}>
+    render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading...</div>}>
           <TestComponent />
-        </ScopeProvider>
-      )
-    }).toThrow('Atom not resolved. Call scope.resolve() before rendering.')
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('lazy resolved value')).toBeInTheDocument()
+    })
   })
 
   it('suspends when atom is in resolving state', async () => {
@@ -461,25 +467,31 @@ describe('useSelect - equality filtering', () => {
 })
 
 describe('useSelect - state handling', () => {
-  it('throws error when atom is in idle state', () => {
+  it('auto-resolves and suspends when atom is in idle state', async () => {
     const testAtom = atom({
-      factory: async () => 'value',
+      factory: async () => 'lazy selected value',
     })
 
     const scope = createScope()
 
     function TestComponent() {
-      useSelect(testAtom, (v) => v)
-      return <div>test</div>
+      const value = useSelect(testAtom, (v) => v)
+      return <div>{value}</div>
     }
 
-    expect(() => {
-      render(
-        <ScopeProvider scope={scope}>
+    render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading...</div>}>
           <TestComponent />
-        </ScopeProvider>
-      )
-    }).toThrow('Atom not resolved. Call scope.resolve() before rendering.')
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('lazy selected value')).toBeInTheDocument()
+    })
   })
 
   it('suspends when atom is in resolving state', async () => {

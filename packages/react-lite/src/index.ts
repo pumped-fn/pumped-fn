@@ -4,6 +4,7 @@
  */
 
 export type { Lite } from '@pumped-fn/lite'
+export { createScope, atom, flow, preset } from '@pumped-fn/lite'
 export { ScopeContext, ScopeProvider } from './context'
 export type { ScopeProviderProps } from './context'
 export { useScope, useController, useAtom, useSelect } from './hooks'

@@ -36,19 +36,20 @@ flowchart TD
     Hook[useAtom/useSelect]
     Hook --> State{ctrl.state?}
 
-    State -->|idle| Error[Throw Error]
-    State -->|resolving| Promise[Throw Promise]
+    State -->|idle| AutoResolve[Auto-resolve + Throw Promise]
+    State -->|resolving| Promise[Throw cached Promise]
     State -->|resolved| Value[Return value]
     State -->|failed| Stored[Throw stored error]
 
-    Promise --> Suspense[Suspense catches]
+    AutoResolve --> Suspense[Suspense catches]
+    Promise --> Suspense
     Stored --> ErrorBoundary[ErrorBoundary catches]
 ```
 
 | State | Hook Behavior |
 |-------|---------------|
-| `idle` | Throws error — atom must be resolved before render |
-| `resolving` | Throws promise — Suspense shows fallback |
+| `idle` | Auto-resolves and suspends — Suspense shows fallback |
+| `resolving` | Throws cached promise — Suspense shows fallback |
 | `resolved` | Returns value, subscribes to changes |
 | `failed` | Throws stored error — ErrorBoundary catches |
 

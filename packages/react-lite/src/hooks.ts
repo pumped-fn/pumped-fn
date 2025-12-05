@@ -2,6 +2,18 @@ import { useCallback, useContext, useMemo, useRef, useSyncExternalStore } from '
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
+const pendingPromises = new WeakMap<Lite.Atom<unknown>, Promise<unknown>>()
+
+function getOrCreatePendingPromise<T>(atom: Lite.Atom<T>, ctrl: Lite.Controller<T>): Promise<T> {
+  let pending = pendingPromises.get(atom) as Promise<T> | undefined
+  if (!pending) {
+    pending = ctrl.resolve()
+    pendingPromises.set(atom, pending)
+    pending.finally(() => pendingPromises.delete(atom))
+  }
+  return pending
+}
+
 /**
  * Access the current Lite.Scope from context.
  *
@@ -41,7 +53,7 @@ function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
 
 /**
  * Subscribe to atom value with Suspense/ErrorBoundary integration.
- * Throws Promise when resolving (Suspense), throws Error when failed (ErrorBoundary).
+ * Auto-resolves atoms lazily and throws cached Promise for Suspense.
  *
  * @param atom - The atom to read
  * @returns The current value of the atom
@@ -56,26 +68,22 @@ function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
  */
 function useAtom<T>(atom: Lite.Atom<T>): T {
   const ctrl = useController(atom)
+  const atomRef = useRef(atom)
+  atomRef.current = atom
 
   const getSnapshot = useCallback((): T => {
-    switch (ctrl.state) {
-      case 'idle':
-        throw new Error("Atom not resolved. Call scope.resolve() before rendering.")
-      case 'resolving':
-        throw ctrl.resolve()
-      case 'failed':
-        throw ctrl.get()
-      case 'resolved':
-        return ctrl.get()
-      default: {
-        const _exhaustive: never = ctrl.state
-        throw new Error(`Unhandled state: ${_exhaustive}`)
-      }
+    const state = ctrl.state
+    if (state === 'idle' || state === 'resolving') {
+      throw getOrCreatePendingPromise(atomRef.current, ctrl)
     }
+    if (state === 'failed') {
+      throw ctrl.get()
+    }
+    return ctrl.get()
   }, [ctrl])
 
   const subscribe = useCallback(
-    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
+    (onStoreChange: () => void) => ctrl.on('resolved', onStoreChange),
     [ctrl]
   )
 
@@ -104,6 +112,9 @@ function useSelect<T, S>(
   const scope = useScope()
   const ctrl = useController(atom)
 
+  const atomRef = useRef(atom)
+  atomRef.current = atom
+
   const selectorRef = useRef(selector)
   const eqRef = useRef(eq)
   selectorRef.current = selector
@@ -128,20 +139,14 @@ function useSelect<T, S>(
   }, [scope, atom])
 
   const getSnapshot = useCallback((): S => {
-    switch (ctrl.state) {
-      case 'idle':
-        throw new Error("Atom not resolved. Call scope.resolve() before rendering.")
-      case 'resolving':
-        throw ctrl.resolve()
-      case 'failed':
-        throw ctrl.get()
-      case 'resolved':
-        return getOrCreateHandle().get()
-      default: {
-        const _exhaustive: never = ctrl.state
-        throw new Error(`Unhandled state: ${_exhaustive}`)
-      }
+    const state = ctrl.state
+    if (state === 'idle' || state === 'resolving') {
+      throw getOrCreatePendingPromise(atomRef.current, ctrl)
     }
+    if (state === 'failed') {
+      throw ctrl.get()
+    }
+    return getOrCreateHandle().get()
   }, [ctrl, getOrCreateHandle])
 
   const subscribe = useCallback((onStoreChange: () => void) => {
