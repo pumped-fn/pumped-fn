@@ -1,8 +1,13 @@
-import { useCallback, useContext, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
 const pendingPromises = new WeakMap<Lite.Atom<unknown>, Promise<unknown>>()
+
+interface UseControllerOptions {
+  resolve?: boolean
+  cascade?: boolean
+}
 
 function getOrCreatePendingPromise<T>(atom: Lite.Atom<T>, ctrl: Lite.Controller<T>): Promise<T> {
   let pending = pendingPromises.get(atom) as Promise<T> | undefined
@@ -38,17 +43,46 @@ function useScope(): Lite.Scope {
  * Get a memoized controller for an atom.
  *
  * @param atom - The atom to create a controller for
+ * @param options - Optional configuration
+ * @param options.resolve - If true, auto-resolves the atom and suspends until ready
+ * @param options.cascade - If true, releases the atom ref when the component unmounts
  * @returns A memoized Lite.Controller instance
  *
  * @example
  * ```tsx
+ * // Basic usage
  * const ctrl = useController(counterAtom)
  * ctrl.set(ctrl.get() + 1)
+ *
+ * // Auto-resolved controller (suspends until ready)
+ * const ctrl = useController(userAtom, { resolve: true })
+ * const user = ctrl.get() // guaranteed to work
+ *
+ * // With cascade disposal on unmount
+ * const ctrl = useController(userAtom, { resolve: true, cascade: true })
  * ```
  */
-function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
+function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): Lite.Controller<T> {
   const scope = useScope()
-  return useMemo(() => scope.controller(atom), [scope, atom])
+  const ctrl = useMemo(() => scope.controller(atom), [scope, atom])
+
+  const resolveOption = options?.resolve
+  const cascadeOption = options?.cascade
+
+  if (resolveOption && ctrl.state !== 'resolved') {
+    throw getOrCreatePendingPromise(atom, ctrl)
+  }
+
+  useEffect(() => {
+    if (cascadeOption) {
+      scope.acquireRef(atom)
+      return () => {
+        scope.releaseRef(atom)
+      }
+    }
+  }, [scope, atom, cascadeOption])
+
+  return ctrl
 }
 
 /**
@@ -159,4 +193,4 @@ function useSelect<T, S>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export { useScope, useController, useAtom, useSelect }
+export { useScope, useController, useAtom, useSelect, type UseControllerOptions }

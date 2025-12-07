@@ -203,6 +203,126 @@ describe("Scope", () => {
       const result = await scope.resolve(outerAtom)
       expect(result).toBe(42)
     })
+
+    it("controller dep with resolve option auto-resolves atom", async () => {
+      const scope = createScope()
+      const innerAtom = atom({ factory: () => 42 })
+      const outerAtom = atom({
+        deps: { inner: controller(innerAtom, { resolve: true }) },
+        factory: (ctx, { inner }) => {
+          expect(inner.state).toBe('resolved')
+          return inner.get()
+        },
+      })
+
+      const result = await scope.resolve(outerAtom)
+      expect(result).toBe(42)
+    })
+
+    it("controller dep with resolve option works with async factory", async () => {
+      const scope = createScope()
+      const innerAtom = atom({
+        factory: async () => {
+          await new Promise(r => setTimeout(r, 10))
+          return "async value"
+        }
+      })
+      const outerAtom = atom({
+        deps: { inner: controller(innerAtom, { resolve: true }) },
+        factory: (ctx, { inner }) => {
+          expect(inner.state).toBe('resolved')
+          return inner.get()
+        },
+      })
+
+      const result = await scope.resolve(outerAtom)
+      expect(result).toBe("async value")
+    })
+
+    it("controller dep without resolve option remains idle", async () => {
+      const scope = createScope()
+      const innerAtom = atom({ factory: () => 42 })
+      const outerAtom = atom({
+        deps: { inner: controller(innerAtom) },
+        factory: (ctx, { inner }) => {
+          expect(inner.state).toBe('idle')
+          return "outer"
+        },
+      })
+
+      const result = await scope.resolve(outerAtom)
+      expect(result).toBe("outer")
+    })
+
+    it("mixed controller deps with and without resolve option", async () => {
+      const scope = createScope()
+      const resolvedAtom = atom({ factory: () => "resolved" })
+      const lazyAtom = atom({ factory: () => "lazy" })
+      const outerAtom = atom({
+        deps: {
+          resolved: controller(resolvedAtom, { resolve: true }),
+          lazy: controller(lazyAtom),
+        },
+        factory: (ctx, { resolved, lazy }) => {
+          expect(resolved.state).toBe('resolved')
+          expect(lazy.state).toBe('idle')
+          return resolved.get()
+        },
+      })
+
+      const result = await scope.resolve(outerAtom)
+      expect(result).toBe("resolved")
+    })
+  })
+
+  describe("ref counting", () => {
+    it("acquireRef increments ref count", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 42 })
+
+      await scope.resolve(myAtom)
+      scope.acquireRef(myAtom)
+      scope.acquireRef(myAtom)
+
+      await scope.releaseRef(myAtom)
+      const ctrl = scope.controller(myAtom)
+      expect(ctrl.state).toBe('resolved')
+
+      await scope.releaseRef(myAtom)
+      expect(ctrl.state).toBe('idle')
+    })
+
+    it("releaseRef releases atom when refs reach zero", async () => {
+      const scope = createScope()
+      let cleanupCalled = false
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.cleanup(() => { cleanupCalled = true })
+          return 42
+        }
+      })
+
+      await scope.resolve(myAtom)
+      scope.acquireRef(myAtom)
+
+      await scope.releaseRef(myAtom)
+      expect(cleanupCalled).toBe(true)
+    })
+
+    it("releaseRef without acquireRef still releases", async () => {
+      const scope = createScope()
+      let cleanupCalled = false
+      const myAtom = atom({
+        factory: (ctx) => {
+          ctx.cleanup(() => { cleanupCalled = true })
+          return 42
+        }
+      })
+
+      await scope.resolve(myAtom)
+      await scope.releaseRef(myAtom)
+      expect(cleanupCalled).toBe(true)
+    })
   })
 
   describe("tag deps", () => {

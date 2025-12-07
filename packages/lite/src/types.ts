@@ -29,6 +29,8 @@ export namespace Lite {
       selector: (value: T) => S,
       options?: SelectOptions<S>
     ): SelectHandle<S>
+    acquireRef<T>(atom: Atom<T>): void
+    releaseRef<T>(atom: Atom<T>): Promise<void>
   }
 
   export interface CreateContextOptions {
@@ -197,9 +199,14 @@ export namespace Lite {
     readonly mode: "required" | "optional" | "all"
   }
 
+  export interface ControllerDepOptions {
+    resolve?: boolean
+  }
+
   export interface ControllerDep<T> {
     readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
+    readonly options?: ControllerDepOptions
   }
 
   export interface Typed<T> {

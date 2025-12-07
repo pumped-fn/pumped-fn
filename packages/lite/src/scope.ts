@@ -172,6 +172,7 @@ class ScopeImpl implements Lite.Scope {
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private initialized = false
+  private refs = new Map<Lite.Atom<unknown>, number>()
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
   readonly ready: Promise<void>
@@ -497,7 +498,11 @@ class ScopeImpl implements Lite.Scope {
       if (isAtom(dep)) {
         result[key] = await this.resolve(dep)
       } else if (isControllerDep(dep)) {
-        result[key] = new ControllerImpl(dep.atom, this)
+        const ctrl = new ControllerImpl(dep.atom, this)
+        if (dep.options?.resolve) {
+          await ctrl.resolve()
+        }
+        result[key] = ctrl
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 
@@ -632,6 +637,21 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.cache.delete(atom)
+  }
+
+  acquireRef<T>(atom: Lite.Atom<T>): void {
+    const count = this.refs.get(atom) ?? 0
+    this.refs.set(atom, count + 1)
+  }
+
+  async releaseRef<T>(atom: Lite.Atom<T>): Promise<void> {
+    const count = this.refs.get(atom) ?? 0
+    if (count <= 1) {
+      this.refs.delete(atom)
+      await this.release(atom)
+    } else {
+      this.refs.set(atom, count - 1)
+    }
   }
 
   async dispose(): Promise<void> {
