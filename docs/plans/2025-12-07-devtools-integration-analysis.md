@@ -483,10 +483,238 @@ execution.onStatusChange((status, exec) => {
 - Browser environments
 - React Native (via custom transport)
 
+## OpenTUI Integration (Recommended for Phase 1)
+
+[OpenTUI](https://github.com/sst/opentui) is a TypeScript TUI library from SST that provides an excellent foundation for building a terminal-based devtools interface. It offers flexbox-based layouts, rich text styling, and interactive components.
+
+### Why OpenTUI?
+
+| Feature | Benefit for Devtools |
+|---------|---------------------|
+| TypeScript-first | Type-safe integration with pumped-fn |
+| Flexbox layout (Yoga) | Complex dashboard layouts |
+| React/Solid reconciler | Familiar component model |
+| High performance (Zig) | Efficient event streaming |
+| ScrollBox component | Timeline/log scrolling |
+| Select component | Interactive navigation |
+| Syntax highlighting | Code/value inspection |
+
+### Architecture with OpenTUI
+
+```mermaid
+graph TB
+    subgraph "pumped-fn Application"
+        SCOPE[Scope]
+        EXT[DevtoolsExtension]
+    end
+
+    subgraph "@pumped-fn/devtools-tui"
+        EMITTER[EventEmitter]
+        STORE[EventStore]
+    end
+
+    subgraph "OpenTUI Renderer"
+        CLI[CliRenderer]
+        ROOT[Root Container]
+    end
+
+    subgraph "UI Components"
+        HEADER[Header Box]
+        TIMELINE[Timeline ScrollBox]
+        DETAILS[Details Panel]
+        GRAPH[Dependency View]
+    end
+
+    SCOPE --> EXT
+    EXT --> EMITTER
+    EMITTER --> STORE
+    STORE --> CLI
+    CLI --> ROOT
+    ROOT --> HEADER
+    ROOT --> TIMELINE
+    ROOT --> DETAILS
+    ROOT --> GRAPH
+```
+
+### OpenTUI Components Mapping
+
+| Devtools Feature | OpenTUI Component | Usage |
+|-----------------|-------------------|-------|
+| Event timeline | `ScrollBoxRenderable` | Scrollable log of events |
+| Event details | `BoxRenderable` + `TextRenderable` | Selected event info |
+| Navigation | `SelectRenderable` | Filter/navigate events |
+| Value inspector | `CodeRenderable` | Syntax-highlighted JSON |
+| Status bar | `BoxRenderable` | Scope stats, timing |
+| Tabs | `TabSelectRenderable` | Switch views |
+
+### Implementation Plan
+
+```typescript
+import {
+  createCliRenderer,
+  BoxRenderable,
+  TextRenderable,
+  ScrollBoxRenderable,
+  SelectRenderable,
+  CodeRenderable,
+} from "@opentui/core"
+import { createDevtools, type DevtoolsEvent } from "@pumped-fn/devtools"
+
+interface TuiDevtoolsOptions {
+  targetFps?: number
+  theme?: 'dark' | 'light'
+}
+
+async function createTuiDevtools(options?: TuiDevtoolsOptions) {
+  const renderer = await createCliRenderer({
+    exitOnCtrlC: true,
+    targetFps: options?.targetFps ?? 30,
+  })
+
+  const events: DevtoolsEvent[] = []
+
+  const layout = new BoxRenderable(renderer, {
+    id: "root",
+    flexDirection: "column",
+    height: "100%",
+    width: "100%",
+  })
+
+  const header = new BoxRenderable(renderer, {
+    id: "header",
+    height: 3,
+    border: true,
+    borderStyle: "single",
+  })
+
+  const headerText = new TextRenderable(renderer, {
+    id: "header-text",
+    content: "pumped-fn devtools",
+    textColor: "#61AFEF",
+  })
+
+  const timeline = new ScrollBoxRenderable(renderer, {
+    id: "timeline",
+    flex: 1,
+    border: true,
+  })
+
+  const details = new BoxRenderable(renderer, {
+    id: "details",
+    height: 10,
+    border: true,
+  })
+
+  renderer.root.add(layout)
+  layout.add(header)
+  header.add(headerText)
+  layout.add(timeline)
+  layout.add(details)
+
+  function addEvent(event: DevtoolsEvent) {
+    events.push(event)
+    const eventText = new TextRenderable(renderer, {
+      id: `event-${event.id}`,
+      content: formatEvent(event),
+    })
+    timeline.add(eventText)
+  }
+
+  const extension = createDevtools({
+    onAtomResolve: (e) => addEvent({ type: 'atom:resolve', ...e }),
+    onAtomResolved: (e) => addEvent({ type: 'atom:resolved', ...e }),
+    onFlowExec: (e) => addEvent({ type: 'flow:exec', ...e }),
+    onFlowComplete: (e) => addEvent({ type: 'flow:complete', ...e }),
+    onError: (e) => addEvent({ type: 'error', ...e }),
+  })
+
+  return {
+    extension,
+    renderer,
+    destroy: () => renderer.destroy(),
+  }
+}
+
+function formatEvent(event: DevtoolsEvent): string {
+  const time = new Date(event.timestamp).toISOString().slice(11, 23)
+  const icon = {
+    'atom:resolve': '⚡',
+    'atom:resolved': '✓',
+    'flow:exec': '▶',
+    'flow:complete': '✓',
+    'error': '✗',
+  }[event.type]
+
+  const name = 'atomName' in event ? event.atomName : event.flowName
+  const duration = 'duration' in event ? ` (${event.duration.toFixed(1)}ms)` : ''
+
+  return `${time} ${icon} ${event.type.padEnd(14)} ${name}${duration}`
+}
+```
+
+### Example Output
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ pumped-fn devtools                          Atoms: 5    │
+├─────────────────────────────────────────────────────────┤
+│ 12:34:56.789 ⚡ atom:resolve    configAtom              │
+│ 12:34:56.790 ✓ atom:resolved   configAtom (1.2ms)      │
+│ 12:34:56.791 ⚡ atom:resolve    dbAtom                  │
+│ 12:34:56.795 ✓ atom:resolved   dbAtom (4.1ms)          │
+│ 12:34:56.800 ▶ flow:exec       fetchUserFlow           │
+│ 12:34:56.850 ✓ flow:complete   fetchUserFlow (50.3ms)  │
+│ 12:34:56.855 ⚡ atom:resolve    cacheAtom               │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ Selected: fetchUserFlow                                 │
+│ Input: { id: "user-123" }                               │
+│ Duration: 50.3ms | Dependencies: [dbAtom, cacheAtom]    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Package Structure
+
+```
+packages/
+├── devtools/                    # Core extension (platform-agnostic)
+│   ├── src/
+│   │   ├── extension.ts         # Lite.Extension implementation
+│   │   ├── events.ts            # Event types and formatters
+│   │   ├── store.ts             # In-memory event storage
+│   │   └── index.ts
+│   └── package.json
+│
+├── devtools-tui/                # OpenTUI-based terminal UI
+│   ├── src/
+│   │   ├── renderer.ts          # OpenTUI setup
+│   │   ├── components/
+│   │   │   ├── Timeline.ts      # Event timeline
+│   │   │   ├── Details.ts       # Event details panel
+│   │   │   ├── DependencyGraph.ts
+│   │   │   └── StatusBar.ts
+│   │   └── index.ts
+│   └── package.json
+│
+└── devtools-react/              # React panel (future)
+```
+
+### Requirements
+
+- **Zig compiler** required for OpenTUI build
+- Node.js 18+ / Bun recommended
+- Terminal with true color support for best experience
+
+### Caveats
+
+- OpenTUI is still in development (not production-ready per their docs)
+- Requires Zig toolchain for native bindings
+- Browser environments not supported (terminal only)
+
 ## Next Steps
 
 1. Create ADR for devtools architecture decision
-2. Implement Phase 1 core extension
-3. Add CLI logger for immediate utility
-4. Design React devtools panel UI
-5. Plan browser extension architecture
+2. Implement Phase 1 core extension (`@pumped-fn/devtools`)
+3. Build OpenTUI-based terminal devtools (`@pumped-fn/devtools-tui`)
+4. Design React devtools panel UI (Phase 2)
+5. Plan browser extension architecture (Phase 3)
