@@ -646,7 +646,10 @@ class ScopeImpl implements Lite.Scope {
 
   async releaseRef<T>(atom: Lite.Atom<T>): Promise<void> {
     const count = this.refs.get(atom) ?? 0
-    if (count <= 1) {
+    if (count === 0) {
+      return
+    }
+    if (count === 1) {
       this.refs.delete(atom)
       await this.release(atom)
     } else {
@@ -665,6 +668,7 @@ class ScopeImpl implements Lite.Scope {
     for (const atom of atoms) {
       await this.release(atom as Lite.Atom<unknown>)
     }
+    this.refs.clear()
   }
 
   async flush(): Promise<void> {

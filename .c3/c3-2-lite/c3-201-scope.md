@@ -498,12 +498,58 @@ const atom = atom({
 })
 ```
 
+## ScopeInternal (Framework Integration) {#c3-201-internal}
+
+The `ScopeInternal` interface extends `Scope` with reference counting methods for framework integrations (e.g., React hooks). This is an **internal API** not intended for general use.
+
+```typescript
+interface ScopeInternal extends Scope {
+  acquireRef<T>(atom: Atom<T>): void
+  releaseRef<T>(atom: Atom<T>): Promise<void>
+}
+```
+
+### Reference Counting
+
+**acquireRef**: Increments the reference count for an atom. The atom will not be released as long as references exist.
+
+**releaseRef**: Decrements the reference count. When the count reaches zero, the atom is automatically released (cleanup runs, cache cleared).
+
+### Usage Example (React Integration)
+
+```typescript
+function useController<T>(atom: Atom<T>, options?: { cascade?: boolean }) {
+  const scope = useScope()
+  const ctrl = useMemo(() => scope.controller(atom), [scope, atom])
+
+  useEffect(() => {
+    if (options?.cascade) {
+      const internal = scope as ScopeInternal
+      internal.acquireRef(atom)
+      return () => {
+        void internal.releaseRef(atom)
+      }
+    }
+  }, [scope, atom, options?.cascade])
+
+  return ctrl
+}
+```
+
+### Behavior
+
+- Multiple `acquireRef` calls increment the counter
+- Each `releaseRef` decrements it
+- When count reaches zero, `release()` is called automatically
+- Calling `releaseRef` when count is already zero is a no-op
+- References are cleared when `scope.dispose()` is called
+
 ## Source Files {#c3-201-source}
 
 | File | Contents |
 |------|----------|
-| `src/scope.ts` | `createScope()`, `ScopeImpl`, `ControllerImpl`, `ExecutionContextImpl` |
-| `src/types.ts` | `Scope`, `Controller`, `ExecutionContext`, `AtomState` interfaces |
+| `src/scope.ts` | `createScope()`, `ScopeImpl`, `ControllerImpl`, `ExecutionContextImpl`, ref counting |
+| `src/types.ts` | `Scope`, `ScopeInternal`, `Controller`, `ExecutionContext`, `AtomState` interfaces |
 | `src/symbols.ts` | `controllerSymbol` |
 
 ## Testing {#c3-201-testing}
@@ -513,9 +559,12 @@ Key test scenarios in `tests/scope.test.ts`:
 - Circular dependency detection
 - Extension wrapping order
 - Controller state transitions
+- Controller auto-resolution with resolve option
 - Invalidation cleanup sequence
 - Event emission timing
 - Concurrent resolution sharing
+- Reference counting (acquireRef/releaseRef)
+- Reference counting cleanup on zero refs
 
 ## Related {#c3-201-related}
 

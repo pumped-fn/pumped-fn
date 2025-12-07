@@ -69,8 +69,12 @@ function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): L
   const resolveOption = options?.resolve
   const cascadeOption = options?.cascade
 
-  if (resolveOption && ctrl.state !== 'resolved') {
+  if (resolveOption && ctrl.state !== 'resolved' && ctrl.state !== 'failed') {
     throw getOrCreatePendingPromise(atom, ctrl)
+  }
+
+  if (resolveOption && ctrl.state === 'failed') {
+    throw ctrl.get()
   }
 
   useEffect(() => {
@@ -78,7 +82,7 @@ function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): L
       const internal = scope as Lite.ScopeInternal
       internal.acquireRef(atom)
       return () => {
-        internal.releaseRef(atom)
+        void internal.releaseRef(atom)
       }
     }
   }, [scope, atom, cascadeOption])

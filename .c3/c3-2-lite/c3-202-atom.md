@@ -160,6 +160,41 @@ const myAtom = atom({
 import { controller } from '@pumped-fn/lite'
 
 const dep = controller(myAtom)
+
+const resolvedDep = controller(myAtom, { resolve: true })
+```
+
+### Controller Resolution Options
+
+Controller dependencies can be configured with optional resolution behavior:
+
+```typescript
+interface ControllerDepOptions {
+  resolve?: boolean
+}
+```
+
+**Lazy (default)**: Controller created in `idle` state, must be resolved manually:
+
+```typescript
+const dependentAtom = atom({
+  deps: { config: controller(configAtom) },
+  factory: async (ctx, { config }) => {
+    await config.resolve()
+    return config.get()
+  }
+})
+```
+
+**Eager (resolve: true)**: Controller auto-resolved before factory executes:
+
+```typescript
+const dependentAtom = atom({
+  deps: { config: controller(configAtom, { resolve: true }) },
+  factory: (ctx, { config }) => {
+    return config.get()
+  }
+})
 ```
 
 ### Usage Pattern
@@ -418,6 +453,7 @@ Key test scenarios in `tests/atom.test.ts`:
 - Atom creation with/without dependencies
 - Type inference for dependencies
 - Controller dependency creation
+- Controller dependency with resolve option
 - Type guards
 
 Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
