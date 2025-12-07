@@ -29,6 +29,14 @@ export namespace Lite {
       selector: (value: T) => S,
       options?: SelectOptions<S>
     ): SelectHandle<S>
+  }
+
+  /**
+   * @internal
+   * Internal interface for framework integrations (e.g., react-lite).
+   * Not part of the public API - may change without notice.
+   */
+  export interface ScopeInternal extends Scope {
     acquireRef<T>(atom: Atom<T>): void
     releaseRef<T>(atom: Atom<T>): Promise<void>
   }

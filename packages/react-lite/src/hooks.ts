@@ -75,9 +75,10 @@ function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): L
 
   useEffect(() => {
     if (cascadeOption) {
-      scope.acquireRef(atom)
+      const internal = scope as Lite.ScopeInternal
+      internal.acquireRef(atom)
       return () => {
-        scope.releaseRef(atom)
+        internal.releaseRef(atom)
       }
     }
   }, [scope, atom, cascadeOption])

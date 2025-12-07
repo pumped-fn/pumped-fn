@@ -275,9 +275,9 @@ describe("Scope", () => {
     })
   })
 
-  describe("ref counting", () => {
+  describe("ref counting (internal)", () => {
     it("acquireRef increments ref count", async () => {
-      const scope = createScope()
+      const scope = createScope() as Lite.ScopeInternal
       const myAtom = atom({ factory: () => 42 })
 
       await scope.resolve(myAtom)
@@ -293,7 +293,7 @@ describe("Scope", () => {
     })
 
     it("releaseRef releases atom when refs reach zero", async () => {
-      const scope = createScope()
+      const scope = createScope() as Lite.ScopeInternal
       let cleanupCalled = false
       const myAtom = atom({
         factory: (ctx) => {
@@ -310,7 +310,7 @@ describe("Scope", () => {
     })
 
     it("releaseRef without acquireRef still releases", async () => {
-      const scope = createScope()
+      const scope = createScope() as Lite.ScopeInternal
       let cleanupCalled = false
       const myAtom = atom({
         factory: (ctx) => {
