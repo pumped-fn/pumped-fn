@@ -547,110 +547,203 @@ graph TB
 | Status bar | `BoxRenderable` | Scope stats, timing |
 | Tabs | `TabSelectRenderable` | Switch views |
 
-### Implementation Plan
+### Implementation Plan (Using @opentui/react)
 
-```typescript
-import {
-  createCliRenderer,
-  BoxRenderable,
-  TextRenderable,
-  ScrollBoxRenderable,
-  SelectRenderable,
-  CodeRenderable,
-} from "@opentui/core"
+Using the React reconciler for a declarative, familiar development experience:
+
+```tsx
+// tsconfig.json requirement:
+// { "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "@opentui/react" } }
+
+import { createCliRenderer } from "@opentui/core"
+import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react"
+import { useState, useEffect, useCallback } from "react"
 import { createDevtools, type DevtoolsEvent } from "@pumped-fn/devtools"
 
-interface TuiDevtoolsOptions {
-  targetFps?: number
-  theme?: 'dark' | 'light'
+interface DevtoolsStore {
+  events: DevtoolsEvent[]
+  subscribe: (listener: () => void) => () => void
+  getSnapshot: () => DevtoolsEvent[]
 }
 
-async function createTuiDevtools(options?: TuiDevtoolsOptions) {
-  const renderer = await createCliRenderer({
-    exitOnCtrlC: true,
-    targetFps: options?.targetFps ?? 30,
-  })
-
+function createDevtoolsStore(): DevtoolsStore {
   const events: DevtoolsEvent[] = []
-
-  const layout = new BoxRenderable(renderer, {
-    id: "root",
-    flexDirection: "column",
-    height: "100%",
-    width: "100%",
-  })
-
-  const header = new BoxRenderable(renderer, {
-    id: "header",
-    height: 3,
-    border: true,
-    borderStyle: "single",
-  })
-
-  const headerText = new TextRenderable(renderer, {
-    id: "header-text",
-    content: "pumped-fn devtools",
-    textColor: "#61AFEF",
-  })
-
-  const timeline = new ScrollBoxRenderable(renderer, {
-    id: "timeline",
-    flex: 1,
-    border: true,
-  })
-
-  const details = new BoxRenderable(renderer, {
-    id: "details",
-    height: 10,
-    border: true,
-  })
-
-  renderer.root.add(layout)
-  layout.add(header)
-  header.add(headerText)
-  layout.add(timeline)
-  layout.add(details)
-
-  function addEvent(event: DevtoolsEvent) {
-    events.push(event)
-    const eventText = new TextRenderable(renderer, {
-      id: `event-${event.id}`,
-      content: formatEvent(event),
-    })
-    timeline.add(eventText)
-  }
-
-  const extension = createDevtools({
-    onAtomResolve: (e) => addEvent({ type: 'atom:resolve', ...e }),
-    onAtomResolved: (e) => addEvent({ type: 'atom:resolved', ...e }),
-    onFlowExec: (e) => addEvent({ type: 'flow:exec', ...e }),
-    onFlowComplete: (e) => addEvent({ type: 'flow:complete', ...e }),
-    onError: (e) => addEvent({ type: 'error', ...e }),
-  })
+  const listeners = new Set<() => void>()
 
   return {
-    extension,
-    renderer,
-    destroy: () => renderer.destroy(),
+    events,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    getSnapshot: () => events,
+    push: (event: DevtoolsEvent) => {
+      events.push(event)
+      listeners.forEach(l => l())
+    }
   }
 }
 
-function formatEvent(event: DevtoolsEvent): string {
+function useDevtoolsEvents(store: DevtoolsStore) {
+  const [events, setEvents] = useState(store.getSnapshot())
+  useEffect(() => store.subscribe(() => setEvents([...store.getSnapshot()])), [store])
+  return events
+}
+
+function Header({ atomCount }: { atomCount: number }) {
+  return (
+    <box height={3} border borderStyle="single">
+      <text style={{ color: "#61AFEF" }}>
+        pumped-fn devtools{" "}
+        <span style={{ color: "#98C379" }}>Atoms: {atomCount}</span>
+      </text>
+    </box>
+  )
+}
+
+function EventRow({ event }: { event: DevtoolsEvent }) {
   const time = new Date(event.timestamp).toISOString().slice(11, 23)
-  const icon = {
-    'atom:resolve': '⚡',
-    'atom:resolved': '✓',
-    'flow:exec': '▶',
-    'flow:complete': '✓',
-    'error': '✗',
-  }[event.type]
+  const icons: Record<string, string> = {
+    'atom:resolve': '⚡', 'atom:resolved': '✓',
+    'flow:exec': '▶', 'flow:complete': '✓', 'error': '✗',
+  }
+  const colors: Record<string, string> = {
+    'atom:resolve': '#E5C07B', 'atom:resolved': '#98C379',
+    'flow:exec': '#61AFEF', 'flow:complete': '#98C379', 'error': '#E06C75',
+  }
 
   const name = 'atomName' in event ? event.atomName : event.flowName
   const duration = 'duration' in event ? ` (${event.duration.toFixed(1)}ms)` : ''
 
-  return `${time} ${icon} ${event.type.padEnd(14)} ${name}${duration}`
+  return (
+    <text>
+      <span style={{ color: "#5C6370" }}>{time}</span>{" "}
+      <span style={{ color: colors[event.type] }}>{icons[event.type]}</span>{" "}
+      <span style={{ color: "#ABB2BF" }}>{event.type.padEnd(14)}</span>{" "}
+      <span style={{ color: "#C678DD" }}>{name}</span>
+      <span style={{ color: "#5C6370" }}>{duration}</span>
+    </text>
+  )
+}
+
+function Timeline({ events }: { events: DevtoolsEvent[] }) {
+  return (
+    <scrollbox flex={1} border borderStyle="single">
+      {events.map((event) => (
+        <EventRow key={event.id} event={event} />
+      ))}
+    </scrollbox>
+  )
+}
+
+function Details({ event }: { event: DevtoolsEvent | null }) {
+  if (!event) {
+    return (
+      <box height={8} border borderStyle="single">
+        <text style={{ color: "#5C6370" }}>Select an event to view details</text>
+      </box>
+    )
+  }
+
+  const name = 'atomName' in event ? event.atomName : event.flowName
+  const input = 'input' in event ? JSON.stringify(event.input, null, 2) : null
+
+  return (
+    <box height={8} border borderStyle="single" flexDirection="column">
+      <text>
+        <strong>Selected:</strong> <span style={{ color: "#C678DD" }}>{name}</span>
+      </text>
+      {input && (
+        <code language="json">{input}</code>
+      )}
+      {'duration' in event && (
+        <text>
+          <span style={{ color: "#5C6370" }}>Duration:</span>{" "}
+          <span style={{ color: "#98C379" }}>{event.duration.toFixed(1)}ms</span>
+        </text>
+      )}
+    </box>
+  )
+}
+
+function DevtoolsApp({ store }: { store: DevtoolsStore }) {
+  const events = useDevtoolsEvents(store)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const { height } = useTerminalDimensions()
+
+  useKeyboard((key) => {
+    if (key === 'j' || key === 'ArrowDown') {
+      setSelectedIndex(i => Math.min((i ?? -1) + 1, events.length - 1))
+    }
+    if (key === 'k' || key === 'ArrowUp') {
+      setSelectedIndex(i => Math.max((i ?? 0) - 1, 0))
+    }
+    if (key === 'q') {
+      process.exit(0)
+    }
+  })
+
+  const selectedEvent = selectedIndex !== null ? events[selectedIndex] : null
+  const atomCount = events.filter(e => e.type === 'atom:resolved').length
+
+  return (
+    <box flexDirection="column" height="100%" width="100%">
+      <Header atomCount={atomCount} />
+      <Timeline events={events} />
+      <Details event={selectedEvent} />
+      <box height={1}>
+        <text style={{ color: "#5C6370" }}>
+          j/k: navigate | q: quit | Events: {events.length}
+        </text>
+      </box>
+    </box>
+  )
+}
+
+export async function startDevtoolsTui() {
+  const renderer = await createCliRenderer({
+    exitOnCtrlC: true,
+    targetFps: 30,
+  })
+
+  const store = createDevtoolsStore()
+
+  const extension = createDevtools({
+    onAtomResolve: (e) => store.push({ type: 'atom:resolve', ...e }),
+    onAtomResolved: (e) => store.push({ type: 'atom:resolved', ...e }),
+    onFlowExec: (e) => store.push({ type: 'flow:exec', ...e }),
+    onFlowComplete: (e) => store.push({ type: 'flow:complete', ...e }),
+    onError: (e) => store.push({ type: 'error', ...e }),
+  })
+
+  createRoot(renderer).render(<DevtoolsApp store={store} />)
+
+  return {
+    extension,
+    destroy: () => renderer.destroy(),
+  }
 }
 ```
+
+### OpenTUI React Components
+
+| JSX Element | Purpose |
+|-------------|---------|
+| `<box>` | Flexbox container with border, padding |
+| `<text>` | Text display with inline styling |
+| `<scrollbox>` | Scrollable container for timeline |
+| `<code>` | Syntax-highlighted code block |
+| `<select>` | Interactive selection list |
+| `<span>`, `<strong>`, `<em>` | Inline text modifiers |
+
+### OpenTUI React Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `useKeyboard(handler)` | Handle keyboard input (j/k navigation) |
+| `useTerminalDimensions()` | Reactive terminal size |
+| `useRenderer()` | Access renderer for advanced ops |
+| `useOnResize(callback)` | Terminal resize events |
 
 ### Example Output
 
@@ -685,18 +778,36 @@ packages/
 │   │   └── index.ts
 │   └── package.json
 │
-├── devtools-tui/                # OpenTUI-based terminal UI
+├── devtools-tui/                # OpenTUI React-based terminal UI
 │   ├── src/
-│   │   ├── renderer.ts          # OpenTUI setup
+│   │   ├── main.tsx             # Entry point, renderer setup
+│   │   ├── App.tsx              # Root component
 │   │   ├── components/
-│   │   │   ├── Timeline.ts      # Event timeline
-│   │   │   ├── Details.ts       # Event details panel
-│   │   │   ├── DependencyGraph.ts
-│   │   │   └── StatusBar.ts
+│   │   │   ├── Header.tsx       # Title bar with stats
+│   │   │   ├── Timeline.tsx     # Scrollable event list
+│   │   │   ├── EventRow.tsx     # Individual event display
+│   │   │   ├── Details.tsx      # Selected event details
+│   │   │   └── StatusBar.tsx    # Keyboard hints, counts
+│   │   ├── hooks/
+│   │   │   └── useDevtoolsEvents.ts
 │   │   └── index.ts
+│   ├── tsconfig.json            # jsxImportSource: @opentui/react
 │   └── package.json
 │
-└── devtools-react/              # React panel (future)
+└── devtools-web/                # Browser React panel (future)
+```
+
+### Dependencies
+
+```json
+{
+  "dependencies": {
+    "@opentui/core": "^0.1.57",
+    "@opentui/react": "^0.1.57",
+    "@pumped-fn/devtools": "workspace:*",
+    "react": "^18.0.0"
+  }
+}
 ```
 
 ### Requirements
