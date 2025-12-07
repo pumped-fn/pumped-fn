@@ -304,97 +304,249 @@ graph LR
 
 ### Phase 1: Core Devtools Extension
 
-Create `@pumped-fn/devtools` package:
+Create `@pumped-fn/devtools` package with transport-based architecture:
+
+```mermaid
+graph TB
+    subgraph "Your App Process"
+        SCOPE[Scope + Extension]
+        CORE[Devtools Core]
+        Q[Event Queue]
+    end
+
+    subgraph "Transports (fire-and-forget)"
+        BC[BroadcastChannel<br/>Browser same-origin]
+        WS[WebSocket<br/>Node.js / Remote]
+        PM[postMessage<br/>iframe / extension]
+        MEM[Memory<br/>Same-page panel]
+        FILE[File/Stream<br/>Logging]
+    end
+
+    subgraph "Clients (separate process/context)"
+        TUI[TUI - Terminal 2]
+        WEB[Web Dashboard]
+        EXT[Browser Extension]
+        PANEL[In-page Panel]
+    end
+
+    SCOPE -->|sync| CORE
+    CORE -->|"queueMicrotask"| Q
+    Q -->|async, non-blocking| BC
+    Q -->|async, non-blocking| WS
+    Q -->|async, non-blocking| PM
+    Q -->|sync| MEM
+    Q -->|async| FILE
+
+    BC -.-> WEB
+    BC -.-> PANEL
+    WS -.-> TUI
+    PM -.-> EXT
+    MEM -.-> PANEL
+```
+
+#### Transport Strategy by Environment
+
+| Environment | Transport | Why |
+|-------------|-----------|-----|
+| Browser (same-origin) | `BroadcastChannel` | Zero setup, native API, no server |
+| Browser (extension) | `postMessage` | Cross-origin communication |
+| Browser (same-page) | `Memory` | Direct reference, zero overhead |
+| Node.js | `WebSocket` | Cross-process, TUI in separate terminal |
+| Node.js (logging) | `File/Stream` | Persistent debug logs |
+
+#### Core Design Principles
+
+1. **Fire-and-forget**: Never await transport, never block app
+2. **Permissive**: Silently drop if transport fails
+3. **Batched**: Queue events, flush on microtask
+4. **Serializable**: Events must be JSON-safe for cross-context
 
 ```typescript
+interface Transport {
+  readonly name: string
+  send(events: DevtoolsEvent[]): void  // fire-and-forget, no return
+  dispose?(): void
+}
+
 interface DevtoolsOptions {
-  onAtomResolve?: (event: AtomResolveEvent) => void
-  onAtomResolved?: (event: AtomResolvedEvent) => void
-  onFlowExec?: (event: FlowExecEvent) => void
-  onFlowComplete?: (event: FlowCompleteEvent) => void
-  onError?: (event: ErrorEvent) => void
+  transports?: Transport[]
+  batchMs?: number        // batch window, default 0 (microtask)
+  maxQueueSize?: number   // drop oldest if exceeded, default 1000
+  serialize?: (event: DevtoolsEvent) => unknown  // custom serializer
 }
 
-interface AtomResolveEvent {
+interface DevtoolsEvent {
   id: string
-  atom: Lite.Atom<unknown>
-  atomName: string
-  deps: string[]
-  tags: Lite.Tagged<unknown>[]
+  type: 'atom:resolve' | 'atom:resolved' | 'flow:exec' | 'flow:complete' | 'error'
   timestamp: number
-}
-
-interface AtomResolvedEvent extends AtomResolveEvent {
-  duration: number
-  value?: unknown // Optional, may be stripped
-}
-
-interface FlowExecEvent {
-  id: string
-  flow: Lite.Flow<unknown, unknown>
-  flowName: string
-  input: unknown
-  tags: Lite.Tagged<unknown>[]
-  timestamp: number
-}
-
-interface FlowCompleteEvent extends FlowExecEvent {
-  duration: number
+  name: string
+  duration?: number
+  deps?: string[]
+  input?: unknown
   output?: unknown
-  error?: Error
+  error?: { message: string, stack?: string }
+}
+```
+
+#### Built-in Transports
+
+```typescript
+// Browser: BroadcastChannel (recommended for web)
+function broadcastChannel(channel?: string): Transport {
+  const bc = new BroadcastChannel(channel ?? 'pumped-devtools')
+  return {
+    name: 'broadcast-channel',
+    send: (events) => {
+      try { bc.postMessage(events) } catch {}  // permissive
+    },
+    dispose: () => bc.close()
+  }
 }
 
+// Browser: postMessage (for extensions, iframes)
+function postMessage(target: Window, origin?: string): Transport {
+  return {
+    name: 'post-message',
+    send: (events) => {
+      try { target.postMessage({ type: 'pumped-devtools', events }, origin ?? '*') } catch {}
+    }
+  }
+}
+
+// Browser/Node: Memory (same-page panel, testing)
+function memory(): Transport & { subscribe: (cb: (events: DevtoolsEvent[]) => void) => () => void } {
+  const listeners = new Set<(events: DevtoolsEvent[]) => void>()
+  return {
+    name: 'memory',
+    send: (events) => listeners.forEach(cb => cb(events)),
+    subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb) }
+  }
+}
+
+// Node.js: WebSocket server (for TUI, remote dashboard)
+function websocketServer(opts: { port: number }): Transport {
+  const clients = new Set<WebSocket>()
+  const wss = new WebSocketServer({ port: opts.port })
+  wss.on('connection', (ws) => {
+    clients.add(ws)
+    ws.on('close', () => clients.delete(ws))
+  })
+  return {
+    name: 'websocket',
+    send: (events) => {
+      const data = JSON.stringify(events)
+      clients.forEach(ws => { try { ws.send(data) } catch {} })
+    },
+    dispose: () => wss.close()
+  }
+}
+
+// Node.js: File stream (debugging, CI)
+function fileStream(opts: { path: string }): Transport {
+  const stream = createWriteStream(opts.path, { flags: 'a' })
+  return {
+    name: 'file',
+    send: (events) => {
+      events.forEach(e => stream.write(JSON.stringify(e) + '\n'))
+    },
+    dispose: () => stream.end()
+  }
+}
+```
+
+#### Extension Implementation
+
+```typescript
 function createDevtools(options?: DevtoolsOptions): Lite.Extension {
+  const transports = options?.transports ?? []
+  const maxQueue = options?.maxQueueSize ?? 1000
+  let queue: DevtoolsEvent[] = []
+  let scheduled = false
+
+  function emit(event: DevtoolsEvent) {
+    queue.push(event)
+    if (queue.length > maxQueue) queue.shift()  // drop oldest
+
+    if (!scheduled) {
+      scheduled = true
+      queueMicrotask(() => {
+        const batch = queue
+        queue = []
+        scheduled = false
+        transports.forEach(t => t.send(batch))  // fire-and-forget
+      })
+    }
+  }
+
   return {
     name: 'devtools',
 
-    init: (scope) => {
-      // Track scope creation
-    },
-
     wrapResolve: async (next, atom, scope) => {
-      const event = createAtomResolveEvent(atom)
-      options?.onAtomResolve?.(event)
+      const id = crypto.randomUUID()
+      const name = atom.factory.name ?? '<anonymous>'
+      const deps = Object.keys(atom.deps ?? {})
+
+      emit({ id, type: 'atom:resolve', timestamp: Date.now(), name, deps })
 
       const start = performance.now()
       try {
         const result = await next()
-        options?.onAtomResolved?.({
-          ...event,
-          duration: performance.now() - start,
-          value: result
-        })
+        emit({ id, type: 'atom:resolved', timestamp: Date.now(), name, deps, duration: performance.now() - start })
         return result
-      } catch (error) {
-        options?.onError?.({ ...event, error })
-        throw error
+      } catch (err) {
+        emit({ id, type: 'error', timestamp: Date.now(), name, error: { message: String(err) } })
+        throw err
       }
     },
 
     wrapExec: async (next, target, ctx) => {
-      const event = createFlowExecEvent(target, ctx)
-      options?.onFlowExec?.(event)
+      const id = crypto.randomUUID()
+      const name = 'name' in target ? (target.name ?? '<anonymous>') : target.name ?? '<fn>'
+
+      emit({ id, type: 'flow:exec', timestamp: Date.now(), name, input: ctx.input })
 
       const start = performance.now()
       try {
         const result = await next()
-        options?.onFlowComplete?.({
-          ...event,
-          duration: performance.now() - start,
-          output: result
-        })
+        emit({ id, type: 'flow:complete', timestamp: Date.now(), name, duration: performance.now() - start })
         return result
-      } catch (error) {
-        options?.onError?.({ ...event, error })
-        throw error
+      } catch (err) {
+        emit({ id, type: 'error', timestamp: Date.now(), name, error: { message: String(err) } })
+        throw err
       }
     },
 
-    dispose: (scope) => {
-      // Cleanup, final stats
+    dispose: () => {
+      transports.forEach(t => t.dispose?.())
     }
   }
 }
+```
+
+#### Usage Examples
+
+```typescript
+// Browser app with in-page devtools panel
+const mem = memory()
+const scope = createScope({
+  extensions: [devtools({ transports: [mem, broadcastChannel()] })]
+})
+
+// React panel subscribes via memory transport
+mem.subscribe((events) => setEvents(prev => [...prev, ...events]))
+
+// Node.js app with TUI in separate terminal
+const scope = createScope({
+  extensions: [devtools({
+    transports: [
+      websocketServer({ port: 9229 }),
+      fileStream({ path: './debug.ndjson' })
+    ]
+  })]
+})
+
+// Then in another terminal:
+// npx @pumped-fn/devtools-tui --port 9229
 ```
 
 ### Phase 2: React Integration
