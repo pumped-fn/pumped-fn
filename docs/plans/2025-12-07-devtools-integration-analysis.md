@@ -557,272 +557,923 @@ The devtools itself is built using `@pumped-fn/lite` and `@pumped-fn/react-lite`
 - Uses atoms for reactive state
 - Keeps devtools scope isolated from app scope
 
+#### Architecture Overview
+
 ```mermaid
 graph TB
     subgraph "App Process"
         APP_SCOPE[App Scope]
         EXT[Devtools Extension]
+        TRANSPORT[Transport]
     end
 
-    subgraph "Devtools (separate scope)"
-        DT_SCOPE[Devtools Scope]
+    subgraph "Devtools Scope (Isolated)"
+        DT_SCOPE[createScope]
 
-        subgraph "Atoms"
-            EVENTS[eventsAtom]
+        subgraph "Source Atoms"
+            EVENTS[eventsAtom<br/>DevtoolsEvent[]]
+            INDEX[selectedIndexAtom<br/>number | null]
+            FILTER[filterAtom<br/>EventFilter]
+        end
+
+        subgraph "Derived Atoms"
+            FILTERED[filteredEventsAtom]
             SELECTED[selectedEventAtom]
-            FILTER[filterAtom]
             STATS[statsAtom]
+        end
+
+        subgraph "Flows"
+            ADD[addEventsFlow]
+            NAV[navigateFlow]
+            SET_FILTER[setFilterFlow]
         end
     end
 
     subgraph "UI Layer"
-        TUI[OpenTUI + react-lite]
-        WEB[Browser + react-lite]
+        TUI["@opentui/react<br/>+ @pumped-fn/react-lite"]
+        WEB["React DOM<br/>+ @pumped-fn/react-lite"]
     end
 
     APP_SCOPE --> EXT
-    EXT -->|"transport.send()"| DT_SCOPE
-    DT_SCOPE --> EVENTS
+    EXT -->|emit| TRANSPORT
+    TRANSPORT -->|"subscribe → addEventsFlow"| DT_SCOPE
+
+    EVENTS --> FILTERED
+    FILTER --> FILTERED
     EVENTS --> SELECTED
+    INDEX --> SELECTED
     EVENTS --> STATS
 
     DT_SCOPE --> TUI
     DT_SCOPE --> WEB
 ```
 
-#### Devtools Atoms
+#### Complete Data Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant App as App Scope
+    participant Ext as DevtoolsExtension
+    participant Q as Event Queue
+    participant T as Transport
+    participant DT as Devtools Scope
+    participant Ctrl as eventsAtom Controller
+    participant UI as React Component
+
+    Note over App,UI: 1. App resolves an atom
+    App->>Ext: wrapResolve(next, atom, scope)
+    Ext->>Ext: emit({ type: 'atom:resolve', ... })
+
+    Note over Ext,Q: 2. Event queued (non-blocking)
+    Ext->>Q: queue.push(event)
+    Ext->>Ext: queueMicrotask(flush)
+    Ext-->>App: return next()
+
+    Note over Q,T: 3. Microtask flushes batch
+    Q->>T: transport.send(batch)
+
+    Note over T,DT: 4. Transport delivers to devtools
+    T->>DT: subscribe callback
+    DT->>DT: createContext()
+    DT->>DT: ctx.exec({ flow: addEventsFlow, input: { events } })
+
+    Note over DT,Ctrl: 5. Flow updates atom via controller
+    DT->>Ctrl: scope.controller(eventsAtom)
+    Ctrl->>Ctrl: ctrl.update(prev => [...prev, ...events])
+
+    Note over Ctrl,UI: 6. Controller notifies subscribers
+    Ctrl->>Ctrl: state = resolving → resolved
+    Ctrl->>UI: 'resolved' listeners fire
+    UI->>UI: useSyncExternalStore re-renders
+```
+
+#### Atom Resolution in Devtools
+
+```mermaid
+sequenceDiagram
+    participant C as React Component
+    participant H as useAtom(statsAtom)
+    participant S as Devtools Scope
+    participant Stats as statsAtom
+    participant Events as eventsAtom
+
+    C->>H: render()
+    H->>S: scope.controller(statsAtom)
+    H->>H: check ctrl.state
+
+    alt state === 'idle'
+        H->>Stats: ctrl.resolve()
+        Note over Stats: statsAtom depends on eventsAtom
+        Stats->>S: resolve deps
+        S->>Events: scope.resolve(eventsAtom)
+        Events-->>S: []
+        S-->>Stats: { events: [] }
+        Stats->>Stats: factory(ctx, { events })
+        Stats-->>H: { total: 0, atoms: 0, ... }
+        H->>H: subscribe to 'resolved'
+        H-->>C: return stats
+    else state === 'resolved'
+        H->>Stats: ctrl.get()
+        Stats-->>H: cached value
+        H-->>C: return stats
+    else state === 'resolving'
+        H-->>C: throw Promise (Suspense)
+    end
+```
+
+#### Devtools Atoms (Correct API)
 
 ```typescript
-import { atom, flow, createScope, controller } from "@pumped-fn/lite"
+import { atom, flow, createScope, controller, typed } from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 
-const eventsAtom = atom<DevtoolsEvent[]>((ctx) => {
-  ctx.cleanup(() => {
-    // cleanup on scope dispose
-  })
-  return []
-})
+// ============================================
+// Types
+// ============================================
 
-const selectedIndexAtom = atom<number | null>(() => null)
+interface DevtoolsEvent {
+  id: string
+  type: 'atom:resolve' | 'atom:resolved' | 'flow:exec' | 'flow:complete' | 'error'
+  timestamp: number
+  name: string
+  duration?: number
+  deps?: string[]
+  input?: unknown
+  output?: unknown
+  error?: { message: string; stack?: string }
+}
 
-const selectedEventAtom = atom((ctx, { events, index }) => {
-  return index !== null ? events[index] : null
-}, {
-  deps: {
-    events: eventsAtom,
-    index: selectedIndexAtom
+interface EventFilter {
+  types: DevtoolsEvent['type'][]
+  search: string
+}
+
+interface Stats {
+  total: number
+  atoms: number
+  flows: number
+  errors: number
+}
+
+// ============================================
+// Source Atoms (mutable state)
+// ============================================
+
+const eventsAtom = atom<DevtoolsEvent[]>({
+  factory: (ctx) => {
+    ctx.cleanup(() => {
+      // Clear events on scope dispose
+    })
+    return []
   }
 })
 
-const filterAtom = atom<EventFilter>(() => ({
-  types: ['atom:resolved', 'flow:complete', 'error'],
-  search: ''
-}))
+const selectedIndexAtom = atom<number | null>({
+  factory: () => null
+})
 
-const filteredEventsAtom = atom((ctx, { events, filter }) => {
-  return events.filter(e =>
-    filter.types.includes(e.type) &&
-    (filter.search === '' || e.name.includes(filter.search))
-  )
-}, {
+const filterAtom = atom<EventFilter>({
+  factory: () => ({
+    types: ['atom:resolved', 'flow:complete', 'error'],
+    search: ''
+  })
+})
+
+// ============================================
+// Derived Atoms (computed from deps)
+// ============================================
+
+const filteredEventsAtom = atom<DevtoolsEvent[]>({
   deps: {
     events: eventsAtom,
     filter: filterAtom
+  },
+  factory: (ctx, { events, filter }) => {
+    return events.filter(e =>
+      filter.types.includes(e.type) &&
+      (filter.search === '' || e.name.toLowerCase().includes(filter.search.toLowerCase()))
+    )
   }
 })
 
-const statsAtom = atom((ctx, { events }) => ({
-  total: events.length,
-  atoms: events.filter(e => e.type === 'atom:resolved').length,
-  flows: events.filter(e => e.type === 'flow:complete').length,
-  errors: events.filter(e => e.type === 'error').length,
-}), {
-  deps: { events: eventsAtom }
+const selectedEventAtom = atom<DevtoolsEvent | null>({
+  deps: {
+    events: filteredEventsAtom,
+    index: selectedIndexAtom
+  },
+  factory: (ctx, { events, index }) => {
+    return index !== null && index < events.length ? events[index] : null
+  }
 })
 
-// Flow for adding events (called by transport)
-const addEventsFlow = flow((ctx, { events }) => {
-  const eventsCtrl = ctx.scope.controller(eventsAtom)
-  eventsCtrl.update(prev => [...prev, ...events])
-}, {
-  deps: {}
-})
-
-// Flow for navigation
-const navigateFlow = flow((ctx, { direction }) => {
-  const indexCtrl = ctx.scope.controller(selectedIndexAtom)
-  const events = await ctx.scope.resolve(eventsAtom)
-
-  indexCtrl.update(prev => {
-    if (direction === 'down') return Math.min((prev ?? -1) + 1, events.length - 1)
-    if (direction === 'up') return Math.max((prev ?? 0) - 1, 0)
-    return prev
+const statsAtom = atom<Stats>({
+  deps: {
+    events: eventsAtom
+  },
+  factory: (ctx, { events }) => ({
+    total: events.length,
+    atoms: events.filter(e => e.type === 'atom:resolved').length,
+    flows: events.filter(e => e.type === 'flow:complete').length,
+    errors: events.filter(e => e.type === 'error').length,
   })
+})
+
+// ============================================
+// Atoms with Controller Dependencies
+// ============================================
+
+// Example: Atom that watches another atom for changes
+const autoScrollAtom = atom<boolean>({
+  deps: {
+    eventsCtrl: controller(eventsAtom)  // Get controller, not value
+  },
+  factory: (ctx, { eventsCtrl }) => {
+    // Subscribe to events changes
+    const unsub = eventsCtrl.on('resolved', () => {
+      // Could trigger scroll behavior
+      ctx.invalidate()  // Re-run this atom when events change
+    })
+    ctx.cleanup(unsub)
+    return true  // Auto-scroll enabled by default
+  }
+})
+```
+
+#### Flows for Mutations
+
+```mermaid
+sequenceDiagram
+    participant T as Transport
+    participant Ctx as ExecutionContext
+    participant Flow as addEventsFlow
+    participant Ctrl as eventsAtom Controller
+    participant Atom as eventsAtom
+
+    T->>Ctx: scope.createContext()
+    T->>Ctx: ctx.exec({ flow: addEventsFlow, input: { events } })
+
+    Ctx->>Flow: parse input (typed<T>)
+    Ctx->>Flow: factory(ctx, deps)
+
+    Flow->>Ctrl: ctx.scope.controller(eventsAtom)
+    Flow->>Ctrl: ctrl.update(prev => [...prev, ...events])
+
+    Note over Ctrl,Atom: Controller schedules invalidation
+    Ctrl->>Atom: run cleanups (LIFO)
+    Ctrl->>Atom: state = resolving
+    Note over Atom: set() skips factory, applies value directly
+    Ctrl->>Atom: state = resolved
+    Ctrl->>Ctrl: notify 'resolved' listeners
+
+    Flow-->>Ctx: return void
+    T->>Ctx: ctx.close()
+    Ctx->>Ctx: run onClose cleanups
+```
+
+```typescript
+// ============================================
+// Flows (short-lived mutations)
+// ============================================
+
+// Flow to add events from transport
+const addEventsFlow = flow<void, { events: DevtoolsEvent[] }>({
+  name: 'addEvents',
+  parse: typed<{ events: DevtoolsEvent[] }>(),
+  factory: (ctx) => {
+    const eventsCtrl = ctx.scope.controller(eventsAtom)
+    eventsCtrl.update(prev => [...prev, ...ctx.input.events])
+  }
+})
+
+// Flow for keyboard navigation
+const navigateFlow = flow<void, { direction: 'up' | 'down' }>({
+  name: 'navigate',
+  parse: typed<{ direction: 'up' | 'down' }>(),
+  deps: {
+    events: filteredEventsAtom
+  },
+  factory: async (ctx, { events }) => {
+    const indexCtrl = ctx.scope.controller(selectedIndexAtom)
+
+    indexCtrl.update(prev => {
+      if (ctx.input.direction === 'down') {
+        return Math.min((prev ?? -1) + 1, events.length - 1)
+      }
+      if (ctx.input.direction === 'up') {
+        return Math.max((prev ?? 0) - 1, 0)
+      }
+      return prev
+    })
+  }
+})
+
+// Flow to update filter
+const setFilterFlow = flow<void, Partial<EventFilter>>({
+  name: 'setFilter',
+  parse: typed<Partial<EventFilter>>(),
+  factory: (ctx) => {
+    const filterCtrl = ctx.scope.controller(filterAtom)
+    filterCtrl.update(prev => ({ ...prev, ...ctx.input }))
+  }
+})
+
+// Flow to clear all events
+const clearEventsFlow = flow<void, void>({
+  name: 'clearEvents',
+  factory: (ctx) => {
+    const eventsCtrl = ctx.scope.controller(eventsAtom)
+    const indexCtrl = ctx.scope.controller(selectedIndexAtom)
+
+    eventsCtrl.set([])
+    indexCtrl.set(null)
+  }
 })
 ```
 
 #### Devtools Scope Setup
 
+```mermaid
+sequenceDiagram
+    participant Main as Entry Point
+    participant Scope as Devtools Scope
+    participant T as Transport
+    participant Ctx as ExecutionContext
+
+    Main->>Scope: createScope()
+    Scope-->>Main: scope
+
+    Main->>Scope: await scope.ready
+    Note over Scope: Extensions initialized (if any)
+
+    Main->>Scope: scope.resolve(eventsAtom)
+    Scope->>Scope: cache eventsAtom = []
+
+    Main->>Scope: scope.resolve(statsAtom)
+    Note over Scope: Resolves deps (eventsAtom already cached)
+    Scope->>Scope: cache statsAtom = { total: 0, ... }
+
+    Main->>T: transport.subscribe(callback)
+
+    Note over T,Ctx: When transport receives events:
+    T->>Scope: scope.createContext()
+    Scope-->>T: ctx
+    T->>Ctx: ctx.exec({ flow: addEventsFlow, input })
+    Ctx-->>T: void
+    T->>Ctx: ctx.close()
+```
+
 ```typescript
 import { createScope } from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 
-function createDevtoolsScope() {
+interface MemoryTransport {
+  send(events: DevtoolsEvent[]): void
+  subscribe(cb: (events: DevtoolsEvent[]) => void): () => void
+}
+
+async function createDevtoolsScope(): Promise<Lite.Scope> {
   const scope = createScope()
 
-  // Pre-resolve atoms for immediate access
-  scope.resolve(eventsAtom)
-  scope.resolve(statsAtom)
+  // Wait for any extensions to initialize
+  await scope.ready
+
+  // Pre-resolve atoms for immediate UI access
+  // This ensures atoms are in 'resolved' state before rendering
+  await scope.resolve(eventsAtom)
+  await scope.resolve(statsAtom)
+  await scope.resolve(filteredEventsAtom)
+  await scope.resolve(selectedEventAtom)
 
   return scope
 }
 
-// Transport receives events and pushes to devtools scope
-function connectTransport(transport: Transport, devtoolsScope: Scope) {
-  transport.subscribe(async (events) => {
+// Connect transport to devtools scope
+function connectTransport(
+  transport: MemoryTransport,
+  devtoolsScope: Lite.Scope
+): () => void {
+  return transport.subscribe(async (events) => {
     const ctx = devtoolsScope.createContext()
-    await ctx.exec({ flow: addEventsFlow, input: { events } })
-    await ctx.close()
+    try {
+      await ctx.exec({
+        flow: addEventsFlow,
+        input: { events }
+      })
+    } finally {
+      await ctx.close()
+    }
   })
 }
 ```
 
 #### TUI with react-lite + OpenTUI
 
+```mermaid
+sequenceDiagram
+    participant Main as startTui()
+    participant Scope as Devtools Scope
+    participant WS as WebSocket Client
+    participant Renderer as OpenTUI Renderer
+    participant React as React Tree
+    participant Hook as useAtom
+
+    Main->>Scope: createDevtoolsScope()
+    Scope-->>Main: scope (atoms pre-resolved)
+
+    Main->>WS: connectWebSocket(port)
+    Main->>WS: connectTransport(ws, scope)
+
+    Main->>Renderer: createCliRenderer()
+    Renderer-->>Main: renderer
+
+    Main->>React: createRoot(renderer).render(<ScopeProvider>)
+
+    Note over React,Hook: Component mounts
+    React->>Hook: useAtom(statsAtom)
+    Hook->>Scope: scope.controller(statsAtom)
+    Hook->>Hook: ctrl.state === 'resolved'
+    Hook->>Hook: ctrl.get() → stats
+    Hook->>Hook: ctrl.on('resolved', rerender)
+    Hook-->>React: stats value
+
+    Note over WS,Hook: Events arrive from app
+    WS->>Scope: ctx.exec(addEventsFlow)
+    Scope->>Scope: eventsAtom updated
+    Scope->>Scope: statsAtom invalidated (dep changed)
+    Scope->>Hook: 'resolved' listener fires
+    Hook->>React: trigger re-render
+    React->>Hook: useAtom(statsAtom)
+    Hook-->>React: new stats value
+```
+
 ```tsx
 import { createCliRenderer } from "@opentui/core"
-import { createRoot, useKeyboard } from "@opentui/react"
-import { ScopeProvider, useAtom, useController } from "@pumped-fn/react-lite"
+import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react"
+import { ScopeProvider, useScope, useAtom, useController } from "@pumped-fn/react-lite"
+import { Suspense } from "react"
 
-function DevtoolsApp() {
+// ============================================
+// Components
+// ============================================
+
+function Header() {
   const stats = useAtom(statsAtom)
-  const events = useAtom(filteredEventsAtom)
-  const selectedEvent = useAtom(selectedEventAtom)
-  const indexCtrl = useController(selectedIndexAtom)
-
-  useKeyboard((key) => {
-    if (key === 'j') indexCtrl.update(i => Math.min((i ?? -1) + 1, events.length - 1))
-    if (key === 'k') indexCtrl.update(i => Math.max((i ?? 0) - 1, 0))
-    if (key === 'q') process.exit(0)
-  })
 
   return (
-    <box flexDirection="column" height="100%">
-      <Header stats={stats} />
-      <Timeline events={events} />
-      <Details event={selectedEvent} />
-      <StatusBar />
-    </box>
-  )
-}
-
-function Header({ stats }: { stats: Stats }) {
-  return (
-    <box height={3} border>
-      <text>
-        pumped-fn devtools |
-        Atoms: {stats.atoms} |
-        Flows: {stats.flows} |
-        Errors: {stats.errors}
+    <box height={3} border borderStyle="single">
+      <text style={{ color: "#61AFEF" }}>
+        pumped-fn devtools |{" "}
+        <span style={{ color: "#98C379" }}>Atoms: {stats.atoms}</span> |{" "}
+        <span style={{ color: "#61AFEF" }}>Flows: {stats.flows}</span> |{" "}
+        <span style={{ color: "#E06C75" }}>Errors: {stats.errors}</span>
       </text>
     </box>
   )
 }
 
-function Timeline({ events }: { events: DevtoolsEvent[] }) {
+function EventRow({ event, selected }: { event: DevtoolsEvent; selected: boolean }) {
+  const time = new Date(event.timestamp).toISOString().slice(11, 23)
+  const icons: Record<string, string> = {
+    'atom:resolve': '⚡', 'atom:resolved': '✓',
+    'flow:exec': '▶', 'flow:complete': '✓', 'error': '✗',
+  }
+  const colors: Record<string, string> = {
+    'atom:resolve': '#E5C07B', 'atom:resolved': '#98C379',
+    'flow:exec': '#61AFEF', 'flow:complete': '#98C379', 'error': '#E06C75',
+  }
+  const duration = event.duration ? ` (${event.duration.toFixed(1)}ms)` : ''
+
   return (
-    <scrollbox flex={1} border>
-      {events.map(e => <EventRow key={e.id} event={e} />)}
+    <box backgroundColor={selected ? "#1E3A5F" : "transparent"}>
+      <text>
+        <span style={{ color: "#5C6370" }}>{time}</span>{" "}
+        <span style={{ color: colors[event.type] }}>{icons[event.type]}</span>{" "}
+        <span style={{ color: "#ABB2BF" }}>{event.type.padEnd(14)}</span>{" "}
+        <span style={{ color: "#C678DD" }}>{event.name}</span>
+        <span style={{ color: "#5C6370" }}>{duration}</span>
+      </text>
+    </box>
+  )
+}
+
+function Timeline() {
+  const events = useAtom(filteredEventsAtom)
+  const selectedIndex = useAtom(selectedIndexAtom)
+
+  return (
+    <scrollbox flex={1} border borderStyle="single">
+      {events.map((event, i) => (
+        <EventRow key={event.id} event={event} selected={i === selectedIndex} />
+      ))}
     </scrollbox>
   )
 }
 
-// Entry point
+function Details() {
+  const event = useAtom(selectedEventAtom)
+
+  if (!event) {
+    return (
+      <box height={8} border borderStyle="single">
+        <text style={{ color: "#5C6370" }}>Select an event (j/k to navigate)</text>
+      </box>
+    )
+  }
+
+  return (
+    <box height={8} border borderStyle="single" flexDirection="column">
+      <text>
+        <strong>Selected:</strong>{" "}
+        <span style={{ color: "#C678DD" }}>{event.name}</span>
+      </text>
+      {event.input !== undefined && (
+        <code language="json">{JSON.stringify(event.input, null, 2)}</code>
+      )}
+      {event.duration !== undefined && (
+        <text>
+          <span style={{ color: "#5C6370" }}>Duration:</span>{" "}
+          <span style={{ color: "#98C379" }}>{event.duration.toFixed(1)}ms</span>
+        </text>
+      )}
+      {event.error && (
+        <text style={{ color: "#E06C75" }}>Error: {event.error.message}</text>
+      )}
+    </box>
+  )
+}
+
+function StatusBar() {
+  const events = useAtom(filteredEventsAtom)
+
+  return (
+    <box height={1}>
+      <text style={{ color: "#5C6370" }}>
+        j/k: navigate | c: clear | f: filter | q: quit | Events: {events.length}
+      </text>
+    </box>
+  )
+}
+
+function DevtoolsApp() {
+  const scope = useScope()
+  const { height } = useTerminalDimensions()
+
+  useKeyboard(async (key) => {
+    const ctx = scope.createContext()
+    try {
+      if (key === 'j' || key === 'ArrowDown') {
+        await ctx.exec({ flow: navigateFlow, input: { direction: 'down' } })
+      }
+      if (key === 'k' || key === 'ArrowUp') {
+        await ctx.exec({ flow: navigateFlow, input: { direction: 'up' } })
+      }
+      if (key === 'c') {
+        await ctx.exec({ flow: clearEventsFlow })
+      }
+      if (key === 'q') {
+        process.exit(0)
+      }
+    } finally {
+      await ctx.close()
+    }
+  })
+
+  return (
+    <box flexDirection="column" height="100%" width="100%">
+      <Header />
+      <Timeline />
+      <Details />
+      <StatusBar />
+    </box>
+  )
+}
+
+// ============================================
+// Entry Point
+// ============================================
+
 export async function startTui(port: number) {
-  const devtoolsScope = createDevtoolsScope()
-  const transport = connectWebSocket(port)
-  connectTransport(transport, devtoolsScope)
+  // 1. Create isolated devtools scope
+  const devtoolsScope = await createDevtoolsScope()
 
-  const renderer = await createCliRenderer({ exitOnCtrlC: true })
+  // 2. Connect WebSocket transport
+  const ws = new WebSocket(`ws://localhost:${port}`)
+  const transport: MemoryTransport = {
+    send: () => {},  // TUI is receive-only
+    subscribe: (cb) => {
+      ws.onmessage = (e) => cb(JSON.parse(e.data))
+      return () => ws.close()
+    }
+  }
+  const disconnect = connectTransport(transport, devtoolsScope)
 
+  // 3. Create OpenTUI renderer
+  const renderer = await createCliRenderer({
+    exitOnCtrlC: true,
+    targetFps: 30,
+  })
+
+  // 4. Render React tree with ScopeProvider
   createRoot(renderer).render(
     <ScopeProvider scope={devtoolsScope}>
-      <DevtoolsApp />
+      <Suspense fallback={<text>Loading...</text>}>
+        <DevtoolsApp />
+      </Suspense>
     </ScopeProvider>
   )
+
+  return {
+    scope: devtoolsScope,
+    disconnect,
+    destroy: () => {
+      disconnect()
+      renderer.destroy()
+      devtoolsScope.dispose()
+    }
+  }
 }
 ```
 
 #### Web Panel with react-lite
 
+```mermaid
+sequenceDiagram
+    participant App as Browser App
+    participant Ext as DevtoolsExtension
+    participant BC as BroadcastChannel
+    participant Tab as Devtools Tab
+    participant Scope as Devtools Scope
+    participant React as React Components
+
+    Note over App,BC: App emits events via BroadcastChannel
+    App->>Ext: wrapResolve(next, atom, scope)
+    Ext->>BC: bc.postMessage(events)
+
+    Note over BC,Tab: Separate tab receives events
+    BC->>Tab: bc.onmessage
+    Tab->>Scope: ctx.exec(addEventsFlow)
+    Scope->>React: atom updated → re-render
+```
+
 ```tsx
-import { ScopeProvider, useAtom, useController } from "@pumped-fn/react-lite"
+import { useState, useEffect, Suspense } from "react"
+import { ScopeProvider, useScope, useAtom, useController, useSelect } from "@pumped-fn/react-lite"
+import type { Lite } from "@pumped-fn/lite"
+
+// ============================================
+// Web Components
+// ============================================
+
+function Stats() {
+  // Fine-grained selection - only re-renders when stats change
+  const total = useSelect(statsAtom, s => s.total)
+  const atoms = useSelect(statsAtom, s => s.atoms)
+  const flows = useSelect(statsAtom, s => s.flows)
+  const errors = useSelect(statsAtom, s => s.errors)
+
+  return (
+    <div className="stats">
+      <span>Total: {total}</span>
+      <span className="atoms">Atoms: {atoms}</span>
+      <span className="flows">Flows: {flows}</span>
+      <span className="errors">Errors: {errors}</span>
+    </div>
+  )
+}
+
+function FilterBar() {
+  const filter = useAtom(filterAtom)
+  const scope = useScope()
+
+  const updateFilter = async (updates: Partial<EventFilter>) => {
+    const ctx = scope.createContext()
+    await ctx.exec({ flow: setFilterFlow, input: updates })
+    await ctx.close()
+  }
+
+  return (
+    <div className="filter-bar">
+      <input
+        type="text"
+        placeholder="Search..."
+        value={filter.search}
+        onChange={(e) => updateFilter({ search: e.target.value })}
+      />
+      <div className="type-filters">
+        {(['atom:resolved', 'flow:complete', 'error'] as const).map(type => (
+          <label key={type}>
+            <input
+              type="checkbox"
+              checked={filter.types.includes(type)}
+              onChange={(e) => updateFilter({
+                types: e.target.checked
+                  ? [...filter.types, type]
+                  : filter.types.filter(t => t !== type)
+              })}
+            />
+            {type}
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Timeline() {
+  const events = useAtom(filteredEventsAtom)
+  const selectedIndex = useAtom(selectedIndexAtom)
+  const indexCtrl = useController(selectedIndexAtom)
+
+  return (
+    <div className="timeline">
+      {events.map((event, i) => (
+        <div
+          key={event.id}
+          className={`event ${i === selectedIndex ? 'selected' : ''}`}
+          onClick={() => indexCtrl.set(i)}
+        >
+          <span className="time">
+            {new Date(event.timestamp).toISOString().slice(11, 23)}
+          </span>
+          <span className={`type ${event.type}`}>{event.type}</span>
+          <span className="name">{event.name}</span>
+          {event.duration && (
+            <span className="duration">{event.duration.toFixed(1)}ms</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Details() {
+  const event = useAtom(selectedEventAtom)
+
+  if (!event) {
+    return <div className="details empty">Select an event</div>
+  }
+
+  return (
+    <div className="details">
+      <h3>{event.name}</h3>
+      <dl>
+        <dt>Type</dt><dd>{event.type}</dd>
+        <dt>Time</dt><dd>{new Date(event.timestamp).toISOString()}</dd>
+        {event.duration && <><dt>Duration</dt><dd>{event.duration.toFixed(2)}ms</dd></>}
+        {event.deps && <><dt>Dependencies</dt><dd>{event.deps.join(', ')}</dd></>}
+        {event.input !== undefined && (
+          <>
+            <dt>Input</dt>
+            <dd><pre>{JSON.stringify(event.input, null, 2)}</pre></dd>
+          </>
+        )}
+        {event.error && (
+          <>
+            <dt>Error</dt>
+            <dd className="error">{event.error.message}</dd>
+          </>
+        )}
+      </dl>
+    </div>
+  )
+}
 
 function DevtoolsWebPanel() {
-  const stats = useAtom(statsAtom)
-  const events = useAtom(filteredEventsAtom)
-  const selectedEvent = useAtom(selectedEventAtom)
-  const filterCtrl = useController(filterAtom)
-
   return (
     <div className="devtools-panel">
       <header>
         <h1>pumped-fn devtools</h1>
-        <Stats stats={stats} />
-        <FilterBar controller={filterCtrl} />
+        <Stats />
       </header>
+      <FilterBar />
       <main>
-        <Timeline events={events} />
-        <Details event={selectedEvent} />
+        <Timeline />
+        <Details />
       </main>
     </div>
   )
 }
 
+// ============================================
+// Integration Components
+// ============================================
+
 // For in-page panel (memory transport)
 export function InPageDevtools({ memoryTransport }: { memoryTransport: MemoryTransport }) {
-  const [scope] = useState(() => {
-    const s = createDevtoolsScope()
-    connectTransport(memoryTransport, s)
-    return s
-  })
+  const [scope, setScope] = useState<Lite.Scope | null>(null)
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+
+    createDevtoolsScope().then((s) => {
+      setScope(s)
+      cleanup = connectTransport(memoryTransport, s)
+    })
+
+    return () => {
+      cleanup?.()
+      scope?.dispose()
+    }
+  }, [memoryTransport])
+
+  if (!scope) return <div>Loading devtools...</div>
 
   return (
     <ScopeProvider scope={scope}>
-      <DevtoolsWebPanel />
+      <Suspense fallback={<div>Loading...</div>}>
+        <DevtoolsWebPanel />
+      </Suspense>
     </ScopeProvider>
   )
 }
 
 // For separate tab (BroadcastChannel)
-export function StandaloneDevtools({ channel }: { channel: string }) {
-  const [scope] = useState(() => {
-    const s = createDevtoolsScope()
-    const bc = new BroadcastChannel(channel)
-    bc.onmessage = (e) => {
-      const ctx = s.createContext()
-      ctx.exec({ flow: addEventsFlow, input: { events: e.data } })
-      ctx.close()
+export function StandaloneDevtools({ channel = 'pumped-devtools' }: { channel?: string }) {
+  const [scope, setScope] = useState<Lite.Scope | null>(null)
+
+  useEffect(() => {
+    let bc: BroadcastChannel | undefined
+    let cleanup: (() => void) | undefined
+
+    createDevtoolsScope().then((s) => {
+      setScope(s)
+
+      bc = new BroadcastChannel(channel)
+      const transport: MemoryTransport = {
+        send: () => {},
+        subscribe: (cb) => {
+          bc!.onmessage = (e) => cb(e.data)
+          return () => {}
+        }
+      }
+      cleanup = connectTransport(transport, s)
+    })
+
+    return () => {
+      cleanup?.()
+      bc?.close()
+      scope?.dispose()
     }
-    return s
-  })
+  }, [channel])
+
+  if (!scope) return <div>Connecting to app...</div>
 
   return (
     <ScopeProvider scope={scope}>
-      <DevtoolsWebPanel />
+      <Suspense fallback={<div>Loading...</div>}>
+        <DevtoolsWebPanel />
+      </Suspense>
     </ScopeProvider>
   )
 }
+```
+
+#### Controller Reactivity Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User Action
+    participant Ctrl as Controller
+    participant Atom as eventsAtom
+    participant Derived as statsAtom
+    participant UI as React useAtom
+
+    User->>Ctrl: ctrl.update(prev => [...prev, newEvent])
+
+    Note over Ctrl,Atom: Controller schedules update
+    Ctrl->>Atom: pendingSet = { fn }
+    Ctrl->>Atom: scheduleInvalidation()
+
+    Note over Atom: queueMicrotask processes
+    Atom->>Atom: run cleanups (LIFO)
+    Atom->>Atom: state = 'resolving'
+    Atom->>Atom: apply pendingSet.fn(prev)
+    Atom->>Atom: state = 'resolved'
+    Atom->>Ctrl: notify 'resolved' listeners
+
+    Note over Derived: Dependent atom invalidated
+    Derived->>Derived: deps changed → auto-invalidate
+    Derived->>Derived: re-run factory(ctx, { events })
+    Derived->>Derived: state = 'resolved'
+
+    Note over UI: React re-renders
+    UI->>UI: useSyncExternalStore callback
+    UI->>Ctrl: ctrl.get()
+    Ctrl-->>UI: new value
 ```
 
 #### Benefits of This Approach
 
 | Benefit | How |
 |---------|-----|
-| **Isolation** | Devtools scope is separate from app scope |
-| **Reactivity** | Controllers trigger UI updates automatically |
-| **Derived state** | `filteredEventsAtom`, `statsAtom` computed from `eventsAtom` |
-| **Testable** | Same atoms work in TUI, web, and tests |
-| **Consistent** | Same patterns as users would use |
-| **Proof** | Demonstrates library capabilities |
+| **Isolation** | Devtools scope is separate from app scope - no interference |
+| **Reactivity** | `ctrl.update()` → atom invalidates → derived atoms update → UI re-renders |
+| **Derived state** | `filteredEventsAtom`, `statsAtom` auto-recompute when `eventsAtom` changes |
+| **Fine-grained** | `useSelect(statsAtom, s => s.errors)` only re-renders on error count change |
+| **Suspense** | `useAtom` throws Promise for idle/resolving → Suspense fallback |
+| **Testable** | Same atoms work in TUI, web, and unit tests |
+| **Type-safe** | Full TypeScript inference for deps, input, output |
+| **Proof** | Demonstrates library capabilities at real scale |
 
 ### Phase 2: FlowExecution Integration
 
