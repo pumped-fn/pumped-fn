@@ -663,11 +663,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private closed = false
   private _input: unknown = undefined
   private readonly baseTags: Lite.Tagged<unknown>[]
+  private _data: Map<symbol, unknown> | undefined
+  readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
     readonly scope: ScopeImpl,
-    options?: Lite.CreateContextOptions
+    options?: Lite.CreateContextOptions & {
+      parent?: Lite.ExecutionContext
+      input?: unknown
+    }
   ) {
+    this.parent = options?.parent
+    this._input = options?.input
     const ctxTags = options?.tags
     this.baseTags = ctxTags?.length
       ? [...ctxTags, ...scope.tags]
@@ -676,6 +683,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get input(): unknown {
     return this._input
+  }
+
+  get data(): Map<symbol, unknown> {
+    if (!this._data) {
+      this._data = new Map()
+    }
+    return this._data
   }
 
   async exec(options: {
@@ -688,14 +702,23 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       throw new Error("ExecutionContext is closed")
     }
 
-    if ("flow" in options) {
-      return this.execFlow(options)
-    } else {
-      return this.execFn(options)
+    const childCtx = new ExecutionContextImpl(this.scope, {
+      parent: this,
+      tags: this.baseTags
+    })
+
+    try {
+      if ("flow" in options) {
+        return await childCtx.execFlowInternal(options)
+      } else {
+        return await childCtx.execFnInternal(options)
+      }
+    } finally {
+      await childCtx.close()
     }
   }
 
-  private async execFlow(options: {
+  private async execFlowInternal(options: {
     flow: Lite.Flow<unknown, unknown>
     input?: unknown
     name?: string
@@ -743,7 +766,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.applyExecExtensions(flow, doExec)
   }
 
-  private execFn(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
     const doExec = () => Promise.resolve(fn(...params))
     return this.applyExecExtensions(fn, doExec)
