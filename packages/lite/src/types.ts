@@ -8,6 +8,7 @@ import type {
   controllerSymbol,
   tagExecutorSymbol,
   typedSymbol,
+  serviceSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -255,4 +256,26 @@ export namespace Lite {
   > = keyof D extends never
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
+
+  export type ServiceMethod<TArgs extends unknown[], TReturn> = (
+    ctx: ExecutionContext,
+    ...args: TArgs
+  ) => MaybePromise<TReturn>
+
+  export type ServiceMethods = Record<
+    string,
+    (ctx: ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>
+  >
+
+  export interface Service<T extends ServiceMethods> {
+    readonly [serviceSymbol]: true
+    readonly factory: ServiceFactory<T, Record<string, Dependency>>
+    readonly deps?: Record<string, Dependency>
+    readonly tags?: Tagged<unknown>[]
+  }
+
+  export type ServiceFactory<T extends ServiceMethods, D extends Record<string, Dependency>> =
+    keyof D extends never
+      ? (ctx: ResolveContext) => MaybePromise<T>
+      : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 }
