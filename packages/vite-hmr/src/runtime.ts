@@ -18,11 +18,16 @@ function getRegistry(): AtomRegistry | null {
  * Registers an atom for HMR persistence.
  * Returns cached reference if key exists, otherwise stores and returns the atom.
  * In production (no import.meta.hot), returns atom unchanged.
+ *
+ * Registry intentionally persists across HMR reloads - this enables
+ * new code to reuse old atom references for Scope cache hits.
+ * Deleted atoms accumulate in registry (dev-only memory leak).
+ * Full page reload clears everything.
  */
-export function __hmr_register<T>(
+export function __hmr_register(
   key: string,
-  atom: Lite.Atom<T>
-): Lite.Atom<T> {
+  atom: Lite.Atom<unknown>
+): Lite.Atom<unknown> {
   const registry = getRegistry()
 
   if (!registry) {
@@ -30,7 +35,7 @@ export function __hmr_register<T>(
   }
 
   if (registry.has(key)) {
-    return registry.get(key) as Lite.Atom<T>
+    return registry.get(key)!
   }
 
   registry.set(key, atom)
