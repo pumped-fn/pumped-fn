@@ -46,6 +46,7 @@ graph TB
     subgraph "Public API"
         createScope["createScope()"]
         atom["atom()"]
+        service["service()"]
         flow["flow()"]
         tag["tag()"]
         preset["preset()"]
@@ -65,6 +66,7 @@ graph TB
 
     createScope --> Scope
     atom --> Scope
+    service --> Scope
     flow --> ExecutionContext
     tag --> Tags
     preset --> Scope
