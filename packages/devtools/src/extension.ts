@@ -19,9 +19,7 @@ function getAtomDeps(atom: Lite.Atom<unknown>): string[] {
   return Object.keys(atom.deps);
 }
 
-function getTargetName(
-  target: Lite.Flow<unknown, unknown> | ((...args: unknown[]) => unknown)
-): string {
+function getTargetName(target: { name?: string } | ((...args: never[]) => unknown)): string {
   if ("name" in target && typeof target.name === "string") {
     return target.name || "<anonymous>";
   }
