@@ -423,12 +423,12 @@ describe("ExecutionContext", () => {
   })
 
   describe("ctx.exec() with fn", () => {
-    it("executes plain function", async () => {
+    it("executes plain function with auto-injected ctx", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
-        fn: (a: number, b: number) => a + b,
+        fn: (_ctx: Lite.ExecutionContext, a: number, b: number) => a + b,
         params: [1, 2],
       })
 

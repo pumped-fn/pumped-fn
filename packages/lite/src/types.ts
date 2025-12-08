@@ -8,6 +8,7 @@ import type {
   controllerSymbol,
   tagExecutorSymbol,
   typedSymbol,
+  serviceSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -17,7 +18,7 @@ export type AtomState = 'idle' | 'resolving' | 'resolved' | 'failed'
 export namespace Lite {
   export interface Scope {
     readonly ready: Promise<void>
-    resolve<T>(atom: Atom<T>): Promise<T>
+    resolve<T>(atom: Atom<T> | Service<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
@@ -118,7 +119,7 @@ export namespace Lite {
     : { input: NoInfer<Input> })
 
   export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
-    fn: (...args: Args) => MaybePromise<Output>
+    fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
     params: Args
     tags?: Tagged<unknown>[]
   }
@@ -222,7 +223,7 @@ export namespace Lite {
     ): Promise<unknown>
     wrapExec?(
       next: () => Promise<unknown>,
-      target: Flow<unknown, unknown> | ((...args: unknown[]) => MaybePromise<unknown>),
+      target: Flow<unknown, unknown> | ((ctx: ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
       ctx: ExecutionContext
     ): Promise<unknown>
     dispose?(scope: Scope): MaybePromise<void>
@@ -255,4 +256,17 @@ export namespace Lite {
   > = keyof D extends never
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
+
+  export interface Service<T> {
+    readonly [atomSymbol]: true
+    readonly [serviceSymbol]: true
+    readonly factory: ServiceFactory<T, Record<string, Dependency>>
+    readonly deps?: Record<string, Dependency>
+    readonly tags?: Tagged<unknown>[]
+  }
+
+  export type ServiceFactory<T, D extends Record<string, Dependency>> =
+    keyof D extends never
+      ? (ctx: ResolveContext) => MaybePromise<T>
+      : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 }

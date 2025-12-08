@@ -36,6 +36,69 @@ Prior to finish, always use /c3-skill:audit to up date corresponding docs
   }
   ```
 
+# Library Typing Best Practices
+
+## When `as unknown as` is Required
+
+TypeScript cannot verify implementations of generic factory functions with conditional types.
+This is a [known TypeScript limitation](https://github.com/microsoft/TypeScript/issues/33912).
+
+**Use `as unknown as` for:**
+
+1. **Generic factory functions** - When implementation signature differs from overloaded call signatures
+2. **Conditional return types** - TypeScript can't narrow generic type parameters via control flow
+3. **Consistent patterns** - Match existing codebase patterns (see atom.ts, flow.ts, tag.ts)
+
+```typescript
+// CORRECT: Factory with conditional deps type
+export function atom<T, D extends Record<string, Dependency>>(
+  config: AtomConfig<T, D>
+): Atom<T> {
+  return {
+    [atomSymbol]: true,
+    factory: config.factory as unknown as AtomFactory<T, Record<string, Dependency>>,
+    deps: config.deps as unknown as Record<string, Dependency> | undefined,
+  }
+}
+```
+
+**Why not alternatives?**
+
+| Alternative | Problem |
+|-------------|---------|
+| `any` | Violates zero-tolerance policy, loses all type safety |
+| Single `as` | Fails - types not directly assignable |
+| Runtime validation | Overkill for internal factory patterns |
+
+## Type Safety Strategy
+
+Since `as unknown as` bypasses compiler checks, ensure safety through:
+
+1. **Function overloads** - Expose type-safe call signatures to consumers
+2. **Comprehensive tests** - Test all type variations (with deps, without deps, etc.)
+3. **Consistent patterns** - Follow established patterns in atom.ts/flow.ts/service.ts
+
+```typescript
+// Overload 1: No deps
+export function atom<T>(config: { factory: () => T }): Atom<T>
+
+// Overload 2: With deps
+export function atom<T, D extends Record<string, Dependency>>(
+  config: { deps: D; factory: (ctx, deps: InferDeps<D>) => T }
+): Atom<T>
+
+// Implementation: Uses as unknown as (type-safe via overloads + tests)
+export function atom<T, D>(config: AtomConfig<T, D>): Atom<T> { ... }
+```
+
+## DX vs Type Safety Tradeoff
+
+As library authors, prioritize consumer DX while maintaining internal discipline:
+
+- **External API**: Full type inference, no assertions required by users
+- **Internal implementation**: Use `as unknown as` where compiler can't help
+- **Verification**: Tests validate what compiler cannot
+
 # Coding Workflow
 
 - Always use pnpm

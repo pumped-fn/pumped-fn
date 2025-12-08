@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-04 09:14:38
+> Last generated: 2025-12-08 12:45:00
 
 ## Context Level
 
@@ -163,6 +163,25 @@ allowing factory bypassing or atom substitution at scope creation.
 - [Source Files](#c3-205-source)
 - [Testing](#c3-205-testing)
 - [Related](#c3-205-related)
+
+---
+
+#### [c3-206](./c3-2-lite/c3-206-service.md) - Service
+> Context-aware method containers for infrastructure patterns like databases,
+loggers, and HTTP clients where multiple methods share the same dependencies.
+
+**Sections**:
+- [Overview](#c3-206-overview) - Context-aware method containers
+- [Concepts](#c3-206-concepts)
+- [Creating Services](#c3-206-creating)
+- [Resolution](#c3-206-resolution)
+- [Invocation](#c3-206-invocation)
+- [Type Safety](#c3-206-types)
+- [Type Guard](#c3-206-guards)
+- [Common Patterns](#c3-206-patterns)
+- [Source Files](#c3-206-source)
+- [Testing](#c3-206-testing)
+- [Related](#c3-206-related)
 
 ---
 
@@ -453,5 +472,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 23
-**Contexts**: 1 | **Containers**: 2 | **Components**: 6 | **ADRs**: 14
+**Total Documents**: 24
+**Contexts**: 1 | **Containers**: 2 | **Components**: 7 | **ADRs**: 14
