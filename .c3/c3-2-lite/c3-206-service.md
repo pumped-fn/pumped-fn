@@ -43,7 +43,24 @@ type ServiceFactory<T, D extends Record<string, Dependency>> =
     : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 ```
 
-### Service vs Atom
+### Service IS-A Atom
+
+Services are atoms with additional constraints. Internally, a Service has **both** symbols:
+
+```typescript
+{
+  [atomSymbol]: true,      // Enables atom resolution machinery
+  [serviceSymbol]: true,   // Identifies as service for type guards
+  factory, deps, tags
+}
+```
+
+**Why dual symbols?**
+- `atomSymbol` → Reuses atom lifecycle (singleton, cleanup, invalidation)
+- `serviceSymbol` → Distinguishes from plain atoms for tooling/type guards
+
+This means `isAtom(service)` returns `true` (structural subtyping), while
+`isService(service)` provides specific identification.
 
 | Aspect | Atom | Service |
 |--------|------|---------|
@@ -51,7 +68,7 @@ type ServiceFactory<T, D extends Record<string, Dependency>> =
 | Methods | N/A | Take `(ctx, ...args)` |
 | Resolution | `scope.resolve()` | `scope.resolve()` |
 | Invocation | Direct use | `ctx.exec({ fn, params })` |
-| Symbol | `atomSymbol` | `serviceSymbol` |
+| Symbols | `atomSymbol` | `atomSymbol` + `serviceSymbol` |
 
 ## Creating Services {#c3-206-creating}
 
@@ -169,7 +186,11 @@ if (isService(value)) {
 
 ### Use Arrow Functions
 
-Service methods should use arrow functions (closures) rather than method syntax:
+Service methods should use arrow functions (closures) rather than method syntax.
+
+**Why?** When methods are passed to `ctx.exec({ fn: method })`, they lose their
+`this` binding. Arrow functions don't rely on `this` - they capture state via
+closures, so they work correctly when extracted and passed around.
 
 ```typescript
 const counterService = service({
