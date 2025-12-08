@@ -8,17 +8,19 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./runtime": {
+      "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js",
-      "require": "./dist/runtime.cjs",
-      "types": "./dist/runtime.d.ts"
+      "require": "./dist/runtime.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
@@ -35,10 +37,16 @@
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
+    "@types/estree": "^1.0.8",
+    "typescript": "^5.9.0",
     "vite": "^6.0.0",
-    "vitest": "^3.0.0",
-    "typescript": "^5.9.0"
+    "vitest": "^3.0.0"
   },
-  "keywords": ["vite", "hmr", "pumped-fn", "dependency-injection"],
+  "keywords": [
+    "vite",
+    "hmr",
+    "pumped-fn",
+    "dependency-injection"
+  ],
   "license": "MIT"
 }
