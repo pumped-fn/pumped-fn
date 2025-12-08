@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-08 12:45:00
+> Last generated: 2025-12-08 14:21:27
 
 ## Context Level
 
@@ -47,17 +47,27 @@ and controllers for TypeScript applications with zero external dependencies.
 integration via useSyncExternalStore for React 18+ applications.
 
 **Sections**:
-- [Overview](#c3-3-overview) - Thin React wrappers for lite
-- [Technology Stack](#c3-3-stack) - React 18+ integration
-- [Component Relationships](#c3-3-relationships) - Hook to lite connections
-- [State Handling](#c3-3-states) - Atom state to React pattern mapping
-- [Public API](#c3-3-api) - Hooks and context exports
-- [Source Organization](#c3-3-source) - File structure
-- [Components](#c3-3-components) - Component inventory
-- [Usage Patterns](#c3-3-patterns) - Common usage examples
-- [Testing](#c3-3-testing) - Testing strategy
-- [SSR Compatibility](#c3-3-ssr) - Server-side rendering notes
+- [Overview](#c3-3-overview)
+- [Technology Stack](#c3-3-stack)
+- [Component Relationships](#c3-3-relationships)
+- [State Handling](#c3-3-states)
+- [Public API](#c3-3-api)
+- [Source Organization](#c3-3-source)
+- [Components](#c3-3-components)
+- [Usage Patterns](#c3-3-patterns)
+- [Testing](#c3-3-testing)
+- [SSR Compatibility](#c3-3-ssr)
 - [Related](#c3-3-related)
+
+---
+
+### [c3-4](./c3-4-devtools/) - Devtools Library (@pumped-fn/devtools)
+> Observability extension with fire-and-forget transports.
+
+**Sections**:
+- [Overview](#c3-4-overview)
+- [API](#c3-4-api)
+- [Related](#c3-4-related)
 
 ---
 
@@ -77,6 +87,7 @@ Controller pattern for subscribing to atom state changes.
 - [Controller Usage](#c3-201-controller)
 - [Select Usage](#c3-201-select)
 - [Invalidation](#c3-201-invalidation)
+- [Direct Value Mutation](#c3-201-set-update)
 - [Event Listening](#c3-201-events)
 - [Cleanup & Disposal](#c3-201-cleanup)
 - [Source Files](#c3-201-source)
@@ -192,19 +203,28 @@ loggers, and HTTP clients where multiple methods share the same dependencies.
 and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 **Sections**:
-- [Overview](#c3-301-overview) - Hook overview and purpose
-- [Concepts](#c3-301-concepts) - Explicit lifecycle and state mapping
-- [useScope](#c3-301-use-scope) - Access scope from context
-- [useController](#c3-301-use-controller) - Get memoized controller
-- [useAtom](#c3-301-use-atom) - Subscribe to atom value
-- [useSelect](#c3-301-use-select) - Fine-grained selection
-- [Source Files](#c3-301-source) - Implementation files
-- [Testing](#c3-301-testing) - Test coverage
+- [Overview](#c3-301-overview)
+- [Concepts](#c3-301-concepts)
+- [useScope](#c3-301-use-scope)
+- [useController](#c3-301-use-controller)
+- [useAtom](#c3-301-use-atom)
+- [useSelect](#c3-301-use-select)
+- [Source Files](#c3-301-source)
+- [Testing](#c3-301-testing)
 - [Related](#c3-301-related)
 
 ---
 
 ## Architecture Decisions
+
+### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
+> 
+
+**Status**: Proposed
+
+**Sections**:
+
+---
 
 ### [adr-014](./adr/adr-014-datastore-map-semantics.md) - DataStore Map-like Semantics
 > Align DataStore with Map semantics - get() always returns T | undefined
@@ -472,5 +492,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 24
-**Contexts**: 1 | **Containers**: 2 | **Components**: 7 | **ADRs**: 14
+**Total Documents**: 25
+**Contexts**: 1 | **Containers**: 3 | **Components**: 7 | **ADRs**: 15

@@ -1,0 +1,47 @@
+{
+  "name": "@pumped-fn/devtools",
+  "version": "0.0.1",
+  "description": "Observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "tsx examples/demo.ts"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": "^1.0.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "tsdown": "^0.16.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.5"
+  },
+  "keywords": [
+    "pumped-fn",
+    "devtools",
+    "observability",
+    "extension",
+    "debugging"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AugustinMauworships/pumped-fn.git",
+    "directory": "packages/devtools"
+  }
+}
