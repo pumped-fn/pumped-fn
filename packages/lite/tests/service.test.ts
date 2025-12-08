@@ -33,7 +33,7 @@ describe("Service", () => {
 
     const db = await scope.resolve(dbService)
     const ctx = scope.createContext()
-    const result = await ctx.exec({ fn: db.query, params: [ctx, "SELECT 1"] })
+    const result = await ctx.exec({ fn: db.query, params: ["SELECT 1"] })
 
     expect(result).toBe("[DB] SELECT 1")
 
@@ -64,11 +64,11 @@ describe("Service", () => {
     const ctx = scope.createContext()
 
     const incrementFn = counter.increment
-    await ctx.exec({ fn: incrementFn, params: [ctx] })
-    await ctx.exec({ fn: counter.increment, params: [ctx] })
+    await ctx.exec({ fn: incrementFn, params: [] })
+    await ctx.exec({ fn: counter.increment, params: [] })
 
     const getCountFn = counter.getCount
-    const count = await ctx.exec({ fn: getCountFn, params: [ctx] })
+    const count = await ctx.exec({ fn: getCountFn, params: [] })
     expect(count).toBe(2)
 
     await ctx.close()
@@ -98,7 +98,7 @@ describe("Service", () => {
     const echo = await scope.resolve(echoService)
     const ctx = scope.createContext()
 
-    await ctx.exec({ fn: echo.echo, params: [ctx, "hello"] })
+    await ctx.exec({ fn: echo.echo, params: ["hello"] })
 
     expect(execCalls).toContain("fn")
 

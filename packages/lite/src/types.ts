@@ -119,7 +119,7 @@ export namespace Lite {
     : { input: NoInfer<Input> })
 
   export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
-    fn: (...args: Args) => MaybePromise<Output>
+    fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
     params: Args
     tags?: Tagged<unknown>[]
   }
@@ -223,7 +223,7 @@ export namespace Lite {
     ): Promise<unknown>
     wrapExec?(
       next: () => Promise<unknown>,
-      target: Flow<unknown, unknown> | ((...args: unknown[]) => MaybePromise<unknown>),
+      target: Flow<unknown, unknown> | ((ctx: ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
       ctx: ExecutionContext
     ): Promise<unknown>
     dispose?(scope: Scope): MaybePromise<void>
