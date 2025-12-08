@@ -157,54 +157,60 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       throw new Error("ExecutionContext is closed")
     }
 
-    // NEW: Create child context for this execution
-    const childCtx = new ExecutionContextImpl(this.scope, {
-      parent: this,
-      tags: this.baseTags
-    })
-
-    try {
-      if ("flow" in options) {
-        return await childCtx.execFlowInternal(options)
-      } else {
-        return await childCtx.execFnInternal(options)
+    if ("flow" in options) {
+      // Parse input BEFORE creating child (cleaner than Object.defineProperty)
+      const { flow, input, name: execName } = options
+      let parsedInput: unknown = input
+      if (flow.parse) {
+        const label = execName ?? flow.name ?? "anonymous"
+        try {
+          parsedInput = await flow.parse(input)
+        } catch (err) {
+          throw new ParseError(...)
+        }
       }
-    } finally {
-      // NEW: Auto-close child (runs child's cleanups)
-      await childCtx.close()
+
+      // Create child with parsed input - assigned in constructor
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        tags: this.baseTags,
+        input: parsedInput
+      })
+
+      try {
+        return await childCtx.execFlowInternal(options)
+      } finally {
+        await childCtx.close()
+      }
+    } else {
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        tags: this.baseTags
+      })
+
+      try {
+        return await childCtx.execFnInternal(options)
+      } finally {
+        await childCtx.close()
+      }
     }
   }
 
-  // RENAMED from execFlow - now internal, receives input via constructor
+  // RENAMED from execFlow - input already set via constructor
   private async execFlowInternal(options: {
     flow: Lite.Flow<unknown, unknown>
     input?: unknown
     name?: string
     tags?: Lite.Tagged<unknown>[]
   }): Promise<unknown> {
-    const { flow, input, tags: execTags, name: execName } = options
+    const { flow, tags: execTags } = options
 
-    // Merge tags for this execution
     const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
     const allTags = hasExtraTags
       ? [...(execTags ?? []), ...this.baseTags, ...(flow.tags ?? [])]
       : this.baseTags
 
     const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
-
-    // Parse input
-    let parsedInput: unknown = input
-    if (flow.parse) {
-      const label = execName ?? flow.name ?? "anonymous"
-      try {
-        parsedInput = await flow.parse(input)
-      } catch (err) {
-        throw new ParseError(...)
-      }
-    }
-
-    // Store input on THIS child context (not mutation!)
-    Object.defineProperty(this, '_input', { value: parsedInput })
 
     const factory = flow.factory as (
       ctx: Lite.ExecutionContext,
