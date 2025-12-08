@@ -44,9 +44,7 @@ export function transformAtoms(
           loc: { start: { line: number; column: number } }
         }
 
-        const { line, column } = initNode.loc.start
-        const key = `${filePath}:${line}:${column}`
-
+        const key = `${filePath}:${initNode.loc.start.line}:${initNode.loc.start.column}`
         needsImport = true
 
         s.prependLeft(initNode.start, `__hmr_register('${key}', `)
