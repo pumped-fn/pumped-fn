@@ -31,6 +31,20 @@ describe("pumpedHmr plugin", () => {
     expect(result).toBeNull()
   })
 
+  it("production build has zero HMR overhead", () => {
+    process.env.NODE_ENV = "production"
+    const plugin = pumpedHmr()
+    const transform = plugin.transform as Function
+
+    const originalCode = `import { atom } from '@pumped-fn/lite'
+const configAtom = atom({ factory: () => ({ key: 'value' }) })
+export { configAtom }`
+
+    const result = transform(originalCode, "src/atoms.ts")
+
+    expect(result).toBeNull()
+  })
+
   it("skips non-JS/TS files", () => {
     process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()

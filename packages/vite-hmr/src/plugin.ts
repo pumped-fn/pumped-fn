@@ -1,8 +1,13 @@
 import type { Plugin } from "vite"
 import { transformAtoms } from "./transform"
 
+/**
+ * Configuration options for the pumped-fn HMR plugin.
+ */
 export interface PumpedHmrOptions {
+  /** File pattern to include in transformation. Defaults to /\.[jt]sx?$/ */
   include?: RegExp
+  /** File pattern to exclude from transformation. Defaults to /node_modules/ */
   exclude?: RegExp
 }
 
