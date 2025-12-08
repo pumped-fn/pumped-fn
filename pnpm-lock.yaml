@@ -128,6 +128,9 @@ importers:
       '@pumped-fn/lite':
         specifier: workspace:*
         version: link:../lite
+      '@types/estree':
+        specifier: ^1.0.8
+        version: 1.0.8
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
