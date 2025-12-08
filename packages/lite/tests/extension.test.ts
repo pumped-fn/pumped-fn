@@ -139,7 +139,7 @@ describe("Extension", () => {
       await ctx.close()
     })
 
-    it("wraps plain function execution", async () => {
+    it("wraps plain function execution with auto-injected ctx", async () => {
       const calls: string[] = []
       const ext: Lite.Extension = {
         name: "test",
@@ -155,7 +155,7 @@ describe("Extension", () => {
       const ctx = scope.createContext()
 
       await ctx.exec({
-        fn: (a: number, b: number) => a + b,
+        fn: (_ctx: Lite.ExecutionContext, a: number, b: number) => a + b,
         params: [1, 2],
       })
       expect(calls).toEqual(["before", "after"])

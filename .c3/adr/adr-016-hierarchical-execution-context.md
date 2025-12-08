@@ -1,5 +1,5 @@
 ---
-id: ADR-015-hierarchical-execution-context
+id: ADR-016-hierarchical-execution-context
 title: Hierarchical ExecutionContext with Parent-Child Per Exec
 summary: >
   Create child ExecutionContext per exec() call with parent reference and
@@ -9,12 +9,12 @@ status: proposed
 date: 2025-12-08
 ---
 
-# [ADR-015] Hierarchical ExecutionContext with Parent-Child Per Exec
+# [ADR-016] Hierarchical ExecutionContext with Parent-Child Per Exec
 
-## Status {#adr-015-status}
+## Status {#adr-016-status}
 **Accepted** - 2025-12-08
 
-## Problem/Requirement {#adr-015-problem}
+## Problem/Requirement {#adr-016-problem}
 
 Extensions need to implement nested span tracing (OpenTelemetry-style) where:
 - Each `ctx.exec()` creates a span
@@ -46,7 +46,7 @@ This prevents extensions from:
 | Tag-only correlation | No automatic parent-child, just grouping |
 | AsyncLocalStorage | Node.js only, not portable |
 
-## Exploration Journey {#adr-015-exploration}
+## Exploration Journey {#adr-016-exploration}
 
 **Initial hypothesis:** Add `data` map to ExecutionContext (like ResolveContext per ADR-007).
 
@@ -79,7 +79,7 @@ This prevents extensions from:
 
 **Confirmed:** This aligns with ADR-001's design for core-next which already had child context tracking. We're bringing that pattern to lite in minimal form.
 
-## Solution {#adr-015-solution}
+## Solution {#adr-016-solution}
 
 Each `ctx.exec()` creates a child ExecutionContext with:
 1. `parent` reference to caller's context
@@ -112,7 +112,7 @@ interface ExecutionContext {
 
 Extensions need **private symbols** for encapsulation. User code uses Tags for type safety.
 
-### Implementation Detail {#adr-015-implementation}
+### Implementation Detail {#adr-016-implementation}
 
 #### ExecutionContextImpl Changes
 
@@ -258,7 +258,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 | `applyExecExtensions()` | Pass `this` (child) to extensions | ~5 |
 | **Total** | | **~57 lines** |
 
-### Execution Flow Sequence {#adr-015-sequence}
+### Execution Flow Sequence {#adr-016-sequence}
 
 ```mermaid
 sequenceDiagram
@@ -294,7 +294,7 @@ sequenceDiagram
     Root-->>App: result
 ```
 
-### Cleanup Lifecycle Sequence {#adr-015-cleanup-sequence}
+### Cleanup Lifecycle Sequence {#adr-016-cleanup-sequence}
 
 **Critical clarification:** Child auto-close runs immediately after exec completes.
 
@@ -322,7 +322,7 @@ sequenceDiagram
     Note over Root: Root cleanups run<br/>(child already cleaned)
 ```
 
-### Closure Capture Behavior {#adr-015-closure}
+### Closure Capture Behavior {#adr-016-closure}
 
 **Question from review:** If `ctx` is captured in setTimeout, does child remain valid?
 
@@ -374,7 +374,7 @@ const myFlow = flow({
 })
 ```
 
-### Root Context Behavior {#adr-015-root}
+### Root Context Behavior {#adr-016-root}
 
 **Question from review:** What is root `ctx.input` if it never exec'd directly?
 
@@ -394,7 +394,7 @@ await ctx.exec({ flow: f2, input: 'b' })
 // child.input === 'b'
 ```
 
-### Extension Usage for Tracing {#adr-015-tracing}
+### Extension Usage for Tracing {#adr-016-tracing}
 
 ```typescript
 const SPAN_KEY = Symbol('tracing.span')
@@ -422,7 +422,7 @@ const tracingExtension: Extension = {
 }
 ```
 
-### Concurrent Safety {#adr-015-concurrent}
+### Concurrent Safety {#adr-016-concurrent}
 
 ```typescript
 await Promise.all([
@@ -443,7 +443,7 @@ await childCtxB.exec({ flow: nested })
 
 No race conditions - each execution has isolated context and data.
 
-## Breaking Changes {#adr-015-breaking}
+## Breaking Changes {#adr-016-breaking}
 
 ### 1. `onClose()` Timing Change (BREAKING)
 
@@ -531,7 +531,7 @@ const myFlow = flow({
 
 **Migration:** Create dedicated context for deferred work (see "Closure Capture Behavior" section).
 
-## Complexity Estimate {#adr-015-complexity}
+## Complexity Estimate {#adr-016-complexity}
 
 ### Revised Implementation Size: ~60 lines
 
@@ -554,7 +554,7 @@ const myFlow = flow({
 - Child eligible for GC after auto-close completes
 - No memory leak for typical request/response patterns
 
-## Alternative Considered: Shared Context with Stack {#adr-015-alternative}
+## Alternative Considered: Shared Context with Stack {#adr-016-alternative}
 
 **Approach:** Keep shared context, add `withData(fn)` method for scoped data.
 
@@ -572,7 +572,7 @@ wrapExec: async (next, target, ctx) => {
 3. Doesn't fix `ctx.input` mutation footgun
 4. More code than child-per-exec approach
 
-## Changes Across Layers {#adr-015-changes}
+## Changes Across Layers {#adr-016-changes}
 
 ### Context Level
 No changes to c3-0.
@@ -606,7 +606,7 @@ No changes to c3-0.
 | `src/types.ts` | Add `parent: ExecutionContext \| undefined`, `data: Map<symbol, unknown>` |
 | `src/scope.ts` | ExecutionContextImpl: parent field, data field, child creation, auto-close |
 
-## Verification {#adr-015-verification}
+## Verification {#adr-016-verification}
 
 ### Core Behavior
 - [ ] Each `ctx.exec()` creates new child context
@@ -655,7 +655,7 @@ No changes to c3-0.
 - [ ] `ctx.scope` still accessible on child
 - [ ] Extensions receiving ctx can still call all methods
 
-## Migration Guide {#adr-015-migration}
+## Migration Guide {#adr-016-migration}
 
 ### From: Shared ctx.input
 
@@ -734,7 +734,7 @@ await ctx.exec({
 })
 ```
 
-## Related {#adr-015-related}
+## Related {#adr-016-related}
 
 - [ADR-001](./adr-001-execution-context-lifecycle.md) - ExecutionContext lifecycle (similar child tracking in core-next)
 - [ADR-007](./adr-007-resolve-context-data.md) - Per-atom data pattern (DataStore for atoms, Map for extensions)

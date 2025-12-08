@@ -768,12 +768,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
-    const doExec = () => Promise.resolve(fn(...params))
+    const doExec = () => Promise.resolve(fn(this, ...params))
     return this.applyExecExtensions(fn, doExec)
   }
 
   private async applyExecExtensions(
-    target: Lite.Flow<unknown, unknown> | ((...args: unknown[]) => MaybePromise<unknown>),
+    target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
     doExec: () => Promise<unknown>
   ): Promise<unknown> {
     let next = doExec

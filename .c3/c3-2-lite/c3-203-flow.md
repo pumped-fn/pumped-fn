@@ -476,7 +476,7 @@ const tracingExtension: Extension = {
 }
 ```
 
-### Breaking Changes from ADR-015
+### Breaking Changes from ADR-016
 
 #### 1. onClose() Timing
 

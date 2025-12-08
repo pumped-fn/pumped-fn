@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Vitest, pnpm
 
-**Reference:** `.c3/adr/adr-015-hierarchical-execution-context.md`
+**Reference:** `.c3/adr/adr-016-hierarchical-execution-context.md`
 
 ---
 
@@ -610,7 +610,7 @@ git commit -m "feat(lite): add hierarchical ExecutionContext with parent-child p
 BREAKING CHANGE: onClose() callbacks now run when exec completes (child auto-close),
 not when root context is manually closed.
 
-Refs: ADR-015"
+Refs: ADR-016"
 ```
 
 ---

@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-04 09:14:38
+> Last generated: 2025-12-08 14:21:27
 
 ## Context Level
 
@@ -47,17 +47,27 @@ and controllers for TypeScript applications with zero external dependencies.
 integration via useSyncExternalStore for React 18+ applications.
 
 **Sections**:
-- [Overview](#c3-3-overview) - Thin React wrappers for lite
-- [Technology Stack](#c3-3-stack) - React 18+ integration
-- [Component Relationships](#c3-3-relationships) - Hook to lite connections
-- [State Handling](#c3-3-states) - Atom state to React pattern mapping
-- [Public API](#c3-3-api) - Hooks and context exports
-- [Source Organization](#c3-3-source) - File structure
-- [Components](#c3-3-components) - Component inventory
-- [Usage Patterns](#c3-3-patterns) - Common usage examples
-- [Testing](#c3-3-testing) - Testing strategy
-- [SSR Compatibility](#c3-3-ssr) - Server-side rendering notes
+- [Overview](#c3-3-overview)
+- [Technology Stack](#c3-3-stack)
+- [Component Relationships](#c3-3-relationships)
+- [State Handling](#c3-3-states)
+- [Public API](#c3-3-api)
+- [Source Organization](#c3-3-source)
+- [Components](#c3-3-components)
+- [Usage Patterns](#c3-3-patterns)
+- [Testing](#c3-3-testing)
+- [SSR Compatibility](#c3-3-ssr)
 - [Related](#c3-3-related)
+
+---
+
+### [c3-4](./c3-4-devtools/) - Devtools Library (@pumped-fn/devtools)
+> Observability extension with fire-and-forget transports.
+
+**Sections**:
+- [Overview](#c3-4-overview)
+- [API](#c3-4-api)
+- [Related](#c3-4-related)
 
 ---
 
@@ -77,6 +87,7 @@ Controller pattern for subscribing to atom state changes.
 - [Controller Usage](#c3-201-controller)
 - [Select Usage](#c3-201-select)
 - [Invalidation](#c3-201-invalidation)
+- [Direct Value Mutation](#c3-201-set-update)
 - [Event Listening](#c3-201-events)
 - [Cleanup & Disposal](#c3-201-cleanup)
 - [Source Files](#c3-201-source)
@@ -166,6 +177,25 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ---
 
+#### [c3-206](./c3-2-lite/c3-206-service.md) - Service
+> Context-aware method containers for infrastructure patterns like databases,
+loggers, and HTTP clients where multiple methods share the same dependencies.
+
+**Sections**:
+- [Overview](#c3-206-overview) - Context-aware method containers
+- [Concepts](#c3-206-concepts)
+- [Creating Services](#c3-206-creating)
+- [Resolution](#c3-206-resolution)
+- [Invocation](#c3-206-invocation)
+- [Type Safety](#c3-206-types)
+- [Type Guard](#c3-206-guards)
+- [Common Patterns](#c3-206-patterns)
+- [Source Files](#c3-206-source)
+- [Testing](#c3-206-testing)
+- [Related](#c3-206-related)
+
+---
+
 ### React Lite Library (@pumped-fn/react-lite) Components
 
 #### [c3-301](./c3-3-react-lite/c3-301-hooks.md) - React Hooks
@@ -173,19 +203,28 @@ allowing factory bypassing or atom substitution at scope creation.
 and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 **Sections**:
-- [Overview](#c3-301-overview) - Hook overview and purpose
-- [Concepts](#c3-301-concepts) - Explicit lifecycle and state mapping
-- [useScope](#c3-301-use-scope) - Access scope from context
-- [useController](#c3-301-use-controller) - Get memoized controller
-- [useAtom](#c3-301-use-atom) - Subscribe to atom value
-- [useSelect](#c3-301-use-select) - Fine-grained selection
-- [Source Files](#c3-301-source) - Implementation files
-- [Testing](#c3-301-testing) - Test coverage
+- [Overview](#c3-301-overview)
+- [Concepts](#c3-301-concepts)
+- [useScope](#c3-301-use-scope)
+- [useController](#c3-301-use-controller)
+- [useAtom](#c3-301-use-atom)
+- [useSelect](#c3-301-use-select)
+- [Source Files](#c3-301-source)
+- [Testing](#c3-301-testing)
 - [Related](#c3-301-related)
 
 ---
 
 ## Architecture Decisions
+
+### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
+> 
+
+**Status**: Proposed
+
+**Sections**:
+
+---
 
 ### [adr-014](./adr/adr-014-datastore-map-semantics.md) - DataStore Map-like Semantics
 > Align DataStore with Map semantics - get() always returns T | undefined
@@ -205,7 +244,7 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 ---
 
-### [adr-015](./adr/adr-015-hierarchical-execution-context.md) - Hierarchical ExecutionContext with Parent-Child Per Exec
+### [adr-016](./adr/adr-016-hierarchical-execution-context.md) - Hierarchical ExecutionContext with Parent-Child Per Exec
 > Create child ExecutionContext per exec() call with parent reference and
 isolated data map, enabling nested span tracing without race conditions
 or AsyncLocalStorage dependency.
@@ -213,24 +252,24 @@ or AsyncLocalStorage dependency.
 **Status**: Accepted
 
 **Sections**:
-- [Status](#adr-015-status)
-- [Problem/Requirement](#adr-015-problem)
-- [Exploration Journey](#adr-015-exploration)
-- [Solution](#adr-015-solution)
-- [Implementation](#adr-015-implementation)
-- [Execution Flow Sequence](#adr-015-sequence)
-- [Cleanup Lifecycle Sequence](#adr-015-cleanup-sequence)
-- [Closure Capture Behavior](#adr-015-closure)
-- [Root Context Behavior](#adr-015-root)
-- [Extension Usage for Tracing](#adr-015-tracing)
-- [Concurrent Safety](#adr-015-concurrent)
-- [Breaking Changes](#adr-015-breaking)
-- [Complexity Estimate](#adr-015-complexity)
-- [Alternative Considered](#adr-015-alternative)
-- [Changes Across Layers](#adr-015-changes)
-- [Verification](#adr-015-verification)
-- [Migration Guide](#adr-015-migration)
-- [Related](#adr-015-related)
+- [Status](#adr-016-status)
+- [Problem/Requirement](#adr-016-problem)
+- [Exploration Journey](#adr-016-exploration)
+- [Solution](#adr-016-solution)
+- [Implementation](#adr-016-implementation)
+- [Execution Flow Sequence](#adr-016-sequence)
+- [Cleanup Lifecycle Sequence](#adr-016-cleanup-sequence)
+- [Closure Capture Behavior](#adr-016-closure)
+- [Root Context Behavior](#adr-016-root)
+- [Extension Usage for Tracing](#adr-016-tracing)
+- [Concurrent Safety](#adr-016-concurrent)
+- [Breaking Changes](#adr-016-breaking)
+- [Complexity Estimate](#adr-016-complexity)
+- [Alternative Considered](#adr-016-alternative)
+- [Changes Across Layers](#adr-016-changes)
+- [Verification](#adr-016-verification)
+- [Migration Guide](#adr-016-migration)
+- [Related](#adr-016-related)
 
 ---
 
@@ -482,5 +521,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 24
-**Contexts**: 1 | **Containers**: 2 | **Components**: 6 | **ADRs**: 15
+**Total Documents**: 26
+**Contexts**: 1 | **Containers**: 3 | **Components**: 7 | **ADRs**: 16
