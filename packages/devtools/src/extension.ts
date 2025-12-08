@@ -71,9 +71,7 @@ export function createDevtools(options?: Devtools.Options): Lite.Extension {
         for (const transport of transports) {
           try {
             transport.send(toSend as Devtools.Event[]);
-          } catch {
-            /* fire-and-forget: silently ignore transport errors */
-          }
+          } catch {}
         }
       });
     }
@@ -164,9 +162,7 @@ export function createDevtools(options?: Devtools.Options): Lite.Extension {
       for (const transport of transports) {
         try {
           transport.dispose?.();
-        } catch {
-          /* silently ignore dispose errors */
-        }
+        } catch {}
       }
     },
   };

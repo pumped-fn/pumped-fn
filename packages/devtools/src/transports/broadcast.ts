@@ -18,9 +18,7 @@ export function broadcastChannel(channel?: string): Devtools.Transport {
   if (typeof BroadcastChannel === "undefined") {
     return {
       name: "broadcast-channel",
-      send() {
-        /* BroadcastChannel not available */
-      },
+      send() {},
     };
   }
 
@@ -32,9 +30,7 @@ export function broadcastChannel(channel?: string): Devtools.Transport {
     send(events) {
       try {
         bc.postMessage(events);
-      } catch {
-        /* fire-and-forget: silently ignore errors */
-      }
+      } catch {}
     },
 
     dispose() {
@@ -68,9 +64,7 @@ export function receiveBroadcast(
   bc.onmessage = (event: MessageEvent<readonly Devtools.Event[]>) => {
     try {
       callback(event.data);
-    } catch {
-      /* silently ignore callback errors */
-    }
+    } catch {}
   };
 
   return () => {

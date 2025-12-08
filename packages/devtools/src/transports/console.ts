@@ -60,9 +60,7 @@ export function consoleTransport(options?: ConsoleOptions): Devtools.Transport {
               globalThis.console.log(formatPretty(event));
               break;
           }
-        } catch {
-          /* silently ignore console errors */
-        }
+        } catch {}
       }
     },
   };

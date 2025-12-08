@@ -27,9 +27,7 @@ export function memory(): Devtools.MemoryTransport {
       for (const listener of listeners) {
         try {
           listener(events);
-        } catch {
-          /* silently ignore listener errors */
-        }
+        } catch {}
       }
     },
 
