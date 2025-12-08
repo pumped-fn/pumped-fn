@@ -165,6 +165,51 @@ if (isService(value)) {
 }
 ```
 
+## Best Practices {#c3-206-best-practices}
+
+### Use Arrow Functions
+
+Service methods should use arrow functions (closures) rather than method syntax:
+
+```typescript
+const counterService = service({
+  factory: () => {
+    let count = 0
+    return {
+      increment: (ctx: Lite.ExecutionContext) => ++count,
+      getCount: (ctx: Lite.ExecutionContext) => count,
+    }
+  }
+})
+```
+
+Arrow functions capture closure state and work correctly when destructured:
+
+```typescript
+const counter = await scope.resolve(counterService)
+const { increment, getCount } = counter
+
+await ctx.exec({ fn: increment, params: [] })
+await ctx.exec({ fn: getCount, params: [] })
+```
+
+### Avoid Class-Based Factories
+
+If you need class instances, bind methods explicitly:
+
+```typescript
+const dbService = service({
+  deps: { pool: poolAtom },
+  factory: (ctx, { pool }) => {
+    const client = new DbClient(pool)
+    return {
+      query: client.query.bind(client),
+      transaction: (ctx, fn) => client.transaction(fn),
+    }
+  }
+})
+```
+
 ## Common Patterns {#c3-206-patterns}
 
 ### Database Service

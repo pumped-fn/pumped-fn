@@ -41,18 +41,13 @@ describe("Service", () => {
     await scope.dispose()
   })
 
-  it("binds methods to preserve closure state when destructured", async () => {
+  it("methods work when destructured (closure pattern)", async () => {
     const counterService = service({
       factory: () => {
         let count = 0
         return {
-          increment(_ctx: Lite.ExecutionContext) {
-            count++
-            return count
-          },
-          getCount(_ctx: Lite.ExecutionContext) {
-            return count
-          },
+          increment: (_ctx: Lite.ExecutionContext) => ++count,
+          getCount: (_ctx: Lite.ExecutionContext) => count,
         }
       },
     })

@@ -1,35 +1,6 @@
 import { atomSymbol, serviceSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
-type AnyFunction = (...args: unknown[]) => unknown
-type PropertyKey = string | symbol
-
-function bindMethods<T extends Record<PropertyKey, unknown>>(obj: T): T {
-  const bound = Object.create(Object.getPrototypeOf(obj)) as T
-  const keys: PropertyKey[] = [
-    ...Object.getOwnPropertyNames(obj),
-    ...Object.getOwnPropertySymbols(obj),
-  ]
-
-  for (const key of keys) {
-    const descriptor = Object.getOwnPropertyDescriptor(obj, key)
-    if (!descriptor) continue
-
-    if (descriptor.get || descriptor.set) {
-      Object.defineProperty(bound, key, descriptor)
-    } else if (typeof descriptor.value === "function") {
-      const fn = descriptor.value as AnyFunction
-      Object.defineProperty(bound, key, {
-        ...descriptor,
-        value: fn.bind(obj),
-      })
-    } else {
-      Object.defineProperty(bound, key, descriptor)
-    }
-  }
-  return bound
-}
-
 export interface ServiceConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
   factory: Lite.ServiceFactory<T, D>
@@ -72,34 +43,10 @@ export function service<
 export function service<T, D extends Record<string, Lite.Dependency>>(
   config: ServiceConfig<T, D>
 ): Lite.Service<T> {
-  const originalFactory = config.factory as (
-    ctx: Lite.ResolveContext,
-    deps?: Lite.InferDeps<D>
-  ) => MaybePromise<T>
-
-  const wrappedFactory = (
-    ctx: Lite.ResolveContext,
-    deps?: Lite.InferDeps<D>
-  ): MaybePromise<T> => {
-    const result = originalFactory(ctx, deps)
-    if (result instanceof Promise) {
-      return result.then((resolved) => {
-        if (typeof resolved === "object" && resolved !== null) {
-          return bindMethods(resolved as Record<string, unknown>) as T
-        }
-        return resolved
-      })
-    }
-    if (typeof result === "object" && result !== null) {
-      return bindMethods(result as Record<string, unknown>) as T
-    }
-    return result
-  }
-
   return {
     [atomSymbol]: true,
     [serviceSymbol]: true,
-    factory: wrappedFactory as unknown as Lite.ServiceFactory<T, Record<string, Lite.Dependency>>,
+    factory: config.factory as unknown as Lite.ServiceFactory<T, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
