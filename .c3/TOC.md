@@ -244,6 +244,35 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 ---
 
+### [adr-016](./adr/adr-016-hierarchical-execution-context.md) - Hierarchical ExecutionContext with Parent-Child Per Exec
+> Create child ExecutionContext per exec() call with parent reference and
+isolated data map, enabling nested span tracing without race conditions
+or AsyncLocalStorage dependency.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-016-status)
+- [Problem/Requirement](#adr-016-problem)
+- [Exploration Journey](#adr-016-exploration)
+- [Solution](#adr-016-solution)
+- [Implementation](#adr-016-implementation)
+- [Execution Flow Sequence](#adr-016-sequence)
+- [Cleanup Lifecycle Sequence](#adr-016-cleanup-sequence)
+- [Closure Capture Behavior](#adr-016-closure)
+- [Root Context Behavior](#adr-016-root)
+- [Extension Usage for Tracing](#adr-016-tracing)
+- [Concurrent Safety](#adr-016-concurrent)
+- [Breaking Changes](#adr-016-breaking)
+- [Complexity Estimate](#adr-016-complexity)
+- [Alternative Considered](#adr-016-alternative)
+- [Changes Across Layers](#adr-016-changes)
+- [Verification](#adr-016-verification)
+- [Migration Guide](#adr-016-migration)
+- [Related](#adr-016-related)
+
+---
+
 ### [adr-013](./adr/adr-013-controller-set-update.md) - Controller.set() and Controller.update() for Direct Value Mutation
 > Add set() and update() methods to Controller for pushing values directly
 without re-running the factory, enabling external data sources (WebSocket,
@@ -492,5 +521,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 25
-**Contexts**: 1 | **Containers**: 3 | **Components**: 7 | **ADRs**: 15
+**Total Documents**: 26
+**Contexts**: 1 | **Containers**: 3 | **Components**: 7 | **ADRs**: 16
