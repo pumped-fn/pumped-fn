@@ -661,7 +661,7 @@ class ScopeImpl implements Lite.Scope {
 class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: (() => MaybePromise<void>)[] = []
   private closed = false
-  private _input: unknown = undefined
+  private readonly _input: unknown = undefined
   private readonly baseTags: Lite.Tagged<unknown>[]
   private _data: Map<symbol, unknown> | undefined
   readonly parent: Lite.ExecutionContext | undefined
@@ -670,11 +670,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     readonly scope: ScopeImpl,
     options?: Lite.CreateContextOptions & {
       parent?: Lite.ExecutionContext
-      input?: unknown
     }
   ) {
     this.parent = options?.parent
-    this._input = options?.input
     const ctxTags = options?.tags
     this.baseTags = ctxTags?.length
       ? [...ctxTags, ...scope.tags]
@@ -748,7 +746,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
     }
 
-    this._input = parsedInput
+    Object.defineProperty(this, "_input", {
+      value: parsedInput,
+      writable: false,
+      configurable: false
+    })
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
