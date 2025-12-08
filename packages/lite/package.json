@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "Lightweight dependency injection with minimal reactivity",
   "type": "module",
   "main": "./dist/index.cjs",
