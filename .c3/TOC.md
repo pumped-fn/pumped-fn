@@ -71,6 +71,19 @@ integration via useSyncExternalStore for React 18+ applications.
 
 ---
 
+### [c3-5](./c3-5-vite-hmr/) - Vite HMR Plugin (@pumped-fn/vite-hmr)
+> Build-time Vite plugin preserving atom state across hot module reloads.
+
+**Sections**:
+- [Overview](#c3-5-overview)
+- [Architecture](#c3-5-architecture)
+- [API](#c3-5-api)
+- [Transform Rules](#c3-5-transforms)
+- [Production Safety](#c3-5-production)
+- [Related](#c3-5-related)
+
+---
+
 ## Component Level
 
 ### Lite Library (@pumped-fn/lite) Components
@@ -521,5 +534,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 26
-**Contexts**: 1 | **Containers**: 3 | **Components**: 7 | **ADRs**: 16
+**Total Documents**: 27
+**Contexts**: 1 | **Containers**: 4 | **Components**: 7 | **ADRs**: 16

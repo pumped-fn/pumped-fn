@@ -35,6 +35,7 @@ graph TB
         Lite["@pumped-fn/lite<br/>(Core Library)"]
         ReactLite["@pumped-fn/react-lite<br/>(React Bindings)"]
         Devtools["@pumped-fn/devtools<br/>(Observability)"]
+        ViteHMR["@pumped-fn/vite-hmr<br/>(HMR Plugin)"]
     end
 
     subgraph "Framework Integrations"
@@ -50,7 +51,9 @@ graph TB
 
     ReactLite -->|depends on| Lite
     Devtools -->|depends on| Lite
+    ViteHMR -->|transforms| Lite
 
+    AppDev -->|uses| ViteHMR
     Hono -.->|integrates| Lite
     NextJS -.->|integrates| Lite
     TanStack -.->|integrates| Lite
@@ -72,6 +75,7 @@ graph TB
 | @pumped-fn/lite | Library | Lightweight DI with minimal reactivity - atoms, flows, tags, controllers | [c3-2-lite](./c3-2-lite/) |
 | @pumped-fn/react-lite | Library | Minimal React bindings with Suspense and useSyncExternalStore | [c3-3-react-lite](./c3-3-react-lite/) |
 | @pumped-fn/devtools | Library | Observability extension with transport-based event streaming | [c3-4-devtools](./c3-4-devtools/) |
+| @pumped-fn/vite-hmr | Vite Plugin | Build-time transform preserving atom state across HMR reloads | [c3-5-vite-hmr](./c3-5-vite-hmr/) |
 | docs | Static Site | VitePress documentation site | (out of scope) |
 
 ## Protocols {#c3-0-protocols}
@@ -83,6 +87,7 @@ graph TB
 | @pumped-fn/react-lite | @pumped-fn/lite | npm dependency | React hooks wrap lite Scope and Controller APIs |
 | @pumped-fn/devtools | @pumped-fn/lite | Extension interface | Devtools uses Extension hooks for instrumentation |
 | @pumped-fn/devtools | External UI | Transport (fire-and-forget) | Events streamed via BroadcastChannel, WebSocket, or Memory |
+| @pumped-fn/vite-hmr | User code | AST transform | Plugin transforms atom() calls at build time |
 
 Containers are npm packages with no runtime protocol - communication is through TypeScript types and function imports. Devtools uses fire-and-forget transports for zero-overhead event streaming.
 
