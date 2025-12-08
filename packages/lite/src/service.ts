@@ -2,16 +2,29 @@ import { atomSymbol, serviceSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
 type AnyFunction = (...args: unknown[]) => unknown
+type PropertyKey = string | symbol
 
-function bindMethods<T extends Record<string, unknown>>(obj: T): T {
-  const bound = {} as T
-  for (const key of Object.keys(obj)) {
-    const value = obj[key]
-    if (typeof value === "function") {
-      const fn = value as AnyFunction
-      bound[key as keyof T] = fn.bind(obj) as T[keyof T]
+function bindMethods<T extends Record<PropertyKey, unknown>>(obj: T): T {
+  const bound = Object.create(Object.getPrototypeOf(obj)) as T
+  const keys: PropertyKey[] = [
+    ...Object.getOwnPropertyNames(obj),
+    ...Object.getOwnPropertySymbols(obj),
+  ]
+
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key)
+    if (!descriptor) continue
+
+    if (descriptor.get || descriptor.set) {
+      Object.defineProperty(bound, key, descriptor)
+    } else if (typeof descriptor.value === "function") {
+      const fn = descriptor.value as AnyFunction
+      Object.defineProperty(bound, key, {
+        ...descriptor,
+        value: fn.bind(obj),
+      })
     } else {
-      bound[key as keyof T] = value as T[keyof T]
+      Object.defineProperty(bound, key, descriptor)
     }
   }
   return bound
@@ -49,7 +62,7 @@ export function service<T>(config: {
 
 export function service<
   T,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<unknown>>,
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
