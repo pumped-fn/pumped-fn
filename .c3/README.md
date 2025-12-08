@@ -33,6 +33,8 @@ graph TB
 
     subgraph "pumped-fn"
         Lite["@pumped-fn/lite<br/>(Core Library)"]
+        ReactLite["@pumped-fn/react-lite<br/>(React Bindings)"]
+        Devtools["@pumped-fn/devtools<br/>(Observability)"]
     end
 
     subgraph "Framework Integrations"
@@ -42,7 +44,12 @@ graph TB
     end
 
     AppDev -->|uses| Lite
+    AppDev -->|uses| ReactLite
+    AppDev -->|uses| Devtools
     LibAuthor -->|extends| Lite
+
+    ReactLite -->|depends on| Lite
+    Devtools -->|depends on| Lite
 
     Hono -.->|integrates| Lite
     NextJS -.->|integrates| Lite
@@ -63,6 +70,8 @@ graph TB
 | Container | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
 | @pumped-fn/lite | Library | Lightweight DI with minimal reactivity - atoms, flows, tags, controllers | [c3-2-lite](./c3-2-lite/) |
+| @pumped-fn/react-lite | Library | Minimal React bindings with Suspense and useSyncExternalStore | [c3-3-react-lite](./c3-3-react-lite/) |
+| @pumped-fn/devtools | Library | Observability extension with transport-based event streaming | [c3-4-devtools](./c3-4-devtools/) |
 | docs | Static Site | VitePress documentation site | (out of scope) |
 
 ## Protocols {#c3-0-protocols}
@@ -71,8 +80,11 @@ graph TB
 | From | To | Protocol | Description |
 |------|-----|----------|-------------|
 | Framework integrations | @pumped-fn/lite | npm dependency | Frameworks use lite for DI and flow handling |
+| @pumped-fn/react-lite | @pumped-fn/lite | npm dependency | React hooks wrap lite Scope and Controller APIs |
+| @pumped-fn/devtools | @pumped-fn/lite | Extension interface | Devtools uses Extension hooks for instrumentation |
+| @pumped-fn/devtools | External UI | Transport (fire-and-forget) | Events streamed via BroadcastChannel, WebSocket, or Memory |
 
-Containers are npm packages with no runtime protocol - communication is through TypeScript types and function imports.
+Containers are npm packages with no runtime protocol - communication is through TypeScript types and function imports. Devtools uses fire-and-forget transports for zero-overhead event streaming.
 
 ## Cross-Cutting Concerns {#c3-0-cross-cutting}
 <!-- Decisions that affect multiple containers -->
@@ -91,6 +103,11 @@ Implemented in: [c3-204-tag](./c3-2-lite/c3-204-tag.md)
 Reactive state observation through the Controller pattern. Atoms can self-invalidate and listeners can subscribe to state changes with event filtering (`resolved`, `resolving`, `*`).
 
 Implemented in: [c3-201-scope](./c3-2-lite/c3-201-scope.md)
+
+### Observability (Devtools)
+Developer observability via Extension-based instrumentation. Events (atom resolution, flow execution, errors) are streamed through fire-and-forget transports to external UIs without blocking application code.
+
+Implemented in: [c3-4-devtools](./c3-4-devtools/)
 
 ## Deployment {#c3-0-deployment}
 <!-- How this system is distributed -->
