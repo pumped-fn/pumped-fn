@@ -18,7 +18,7 @@ export type AtomState = 'idle' | 'resolving' | 'resolved' | 'failed'
 export namespace Lite {
   export interface Scope {
     readonly ready: Promise<void>
-    resolve<T>(atom: Atom<T>): Promise<T>
+    resolve<T>(atom: Atom<T> | Service<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
@@ -258,6 +258,7 @@ export namespace Lite {
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 
   export interface Service<T> {
+    readonly [atomSymbol]: true
     readonly [serviceSymbol]: true
     readonly factory: ServiceFactory<T, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>

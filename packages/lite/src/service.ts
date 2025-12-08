@@ -1,5 +1,18 @@
-import { serviceSymbol } from "./symbols"
+import { atomSymbol, serviceSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
+
+function bindMethods<T extends object>(obj: T): T {
+  const bound = {} as T
+  for (const key of Object.keys(obj) as (keyof T)[]) {
+    const value = obj[key]
+    if (typeof value === "function") {
+      bound[key] = (value as Function).bind(obj) as T[keyof T]
+    } else {
+      bound[key] = value
+    }
+  }
+  return bound
+}
 
 export interface ServiceConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
@@ -43,9 +56,26 @@ export function service<
 export function service<T, D extends Record<string, Lite.Dependency>>(
   config: ServiceConfig<T, D>
 ): Lite.Service<T> {
+  const originalFactory = config.factory as (
+    ctx: Lite.ResolveContext,
+    deps?: Lite.InferDeps<D>
+  ) => MaybePromise<T>
+
+  const wrappedFactory = async (
+    ctx: Lite.ResolveContext,
+    deps?: Lite.InferDeps<D>
+  ): Promise<T> => {
+    const result = await originalFactory(ctx, deps)
+    if (typeof result === "object" && result !== null) {
+      return bindMethods(result as object) as T
+    }
+    return result
+  }
+
   return {
+    [atomSymbol]: true,
     [serviceSymbol]: true,
-    factory: config.factory as unknown as Lite.ServiceFactory<T, Record<string, Lite.Dependency>>,
+    factory: wrappedFactory as unknown as Lite.ServiceFactory<T, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
