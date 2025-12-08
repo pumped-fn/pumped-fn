@@ -41,13 +41,20 @@ Created by `scope.createContext()`, used for flow execution:
 
 ```typescript
 interface ExecutionContext {
-  readonly input: unknown              // Current flow input
-  readonly scope: Scope                // Parent scope
-  exec(options): Promise<T>            // Execute flow or function
-  onClose(fn: () => MaybePromise<void>): void  // Register cleanup
-  close(): Promise<void>               // Run cleanups
+  readonly input: unknown                        // Current execution's input
+  readonly scope: Scope                          // Parent scope
+  readonly parent: ExecutionContext | undefined  // Parent context (undefined for root)
+  readonly data: Map<symbol, unknown>            // Per-execution storage for extensions
+  exec(options): Promise<T>                      // Execute flow or function (creates child)
+  onClose(fn: () => MaybePromise<void>): void    // Register cleanup
+  close(): Promise<void>                         // Run cleanups
 }
 ```
+
+**Key properties:**
+- `parent`: References the calling context. Root contexts (from `createContext()`) have `undefined`.
+- `data`: Lazy-initialized Map for extension private storage. Use symbols as keys for encapsulation.
+- `exec()`: Creates a child context with `parent` set to current context, auto-closes after execution.
 
 ## Creating Flows {#c3-203-creating}
 
@@ -198,18 +205,26 @@ const ctx = scope.createContext({
 
 ### Registering Cleanup
 
+Cleanups registered via `onClose()` run on **child context auto-close**, not root close:
+
 ```typescript
-await ctx.exec({
-  flow: flow({
-    factory: (ctx) => {
-      const resource = acquireResource()
-      ctx.onClose(() => resource.release())
-      return resource
-    }
-  }),
-  input: null
+const resourceFlow = flow({
+  factory: (ctx) => {
+    // ctx is a CHILD context created by exec()
+    const resource = acquireResource()
+
+    // Cleanup runs when THIS exec() completes
+    ctx.onClose(() => resource.release())
+
+    return resource
+  }
 })
+
+await rootCtx.exec({ flow: resourceFlow })
+// resource.release() called HERE (child auto-closes)
 ```
+
+**Note:** If you need cleanup on root close instead of exec completion, traverse to root via `ctx.parent` chain (see "Hierarchical Execution" section).
 
 ### Closing Context
 
@@ -220,17 +235,26 @@ await ctx.close()
 
 ### Context Reuse
 
-A single context can execute multiple flows:
+A single **root** context can execute multiple flows. Each exec creates a **child** context:
 
 ```typescript
-const ctx = scope.createContext()
+const rootCtx = scope.createContext()
 
-await ctx.exec({ flow: authFlow, input: credentials })
-await ctx.exec({ flow: loadDataFlow, input: query })
-await ctx.exec({ flow: saveResultFlow, input: data })
+// Each exec creates a child with isolated input and data
+await rootCtx.exec({ flow: authFlow, input: credentials })
+// childA.input = credentials, childA auto-closes after authFlow returns
 
-await ctx.close()
+await rootCtx.exec({ flow: loadDataFlow, input: query })
+// childB.input = query, childB auto-closes after loadDataFlow returns
+
+await rootCtx.exec({ flow: saveResultFlow, input: data })
+// childC.input = data, childC auto-closes after saveResultFlow returns
+
+await rootCtx.close()
+// Only root cleanups run (children already closed)
 ```
+
+**Key insight:** Root context's `input` remains `undefined`. Children get their own `input` from exec options.
 
 ### Closed Context Error
 
@@ -246,16 +270,34 @@ await ctx.exec({ flow: someFlow, input: null })
 
 ### Executing Flows from Flows
 
+Each nested `ctx.exec()` creates a **grandchild** context:
+
 ```typescript
 const parentFlow = flow({
   factory: async (ctx) => {
+    // ctx is child of root
+    console.log(ctx.parent !== undefined) // true (parent is root)
+
     const childResult = await ctx.exec({
       flow: childFlow,
       input: ctx.input
     })
+    // grandchild created (parent = ctx), auto-closed after childFlow returns
+
     return processResult(childResult)
   }
 })
+
+const rootCtx = scope.createContext()
+await rootCtx.exec({ flow: parentFlow })
+// Creates child (parentFlow's ctx), which creates grandchild (childFlow's ctx)
+```
+
+**Context tree:**
+```
+rootCtx (parent: undefined)
+└─> childCtx (parent: rootCtx) - parentFlow's ctx
+    └─> grandchildCtx (parent: childCtx) - childFlow's ctx
 ```
 
 ### Executing Functions
@@ -287,6 +329,237 @@ const tracingExtension: Extension = {
   }
 }
 ```
+
+## Hierarchical Execution {#c3-203-hierarchical}
+
+### Child Context Per Exec
+
+Each `ctx.exec()` call creates a **child context** with:
+- `parent` reference to the calling context
+- Own `data` Map (isolated from siblings)
+- Own `input` (no mutation of parent)
+- Auto-closes when execution completes
+
+```typescript
+const rootCtx = scope.createContext()
+// rootCtx.parent === undefined
+// rootCtx.input === undefined
+
+await rootCtx.exec({ flow: myFlow, input: 'data' })
+// Inside myFlow factory:
+//   childCtx.parent === rootCtx
+//   childCtx.input === 'data'
+//   childCtx.data === new Map()
+// After exec returns: childCtx is closed
+```
+
+### Parent Chain Navigation
+
+```typescript
+const parentFlow = flow({
+  factory: async (ctx) => {
+    console.log('Parent context')
+
+    await ctx.exec({
+      flow: flow({
+        factory: async (childCtx) => {
+          console.log('Child context')
+          console.log(childCtx.parent === ctx) // true
+
+          await childCtx.exec({
+            flow: flow({
+              factory: (grandchildCtx) => {
+                console.log('Grandchild context')
+                console.log(grandchildCtx.parent === childCtx) // true
+                console.log(grandchildCtx.parent?.parent === ctx) // true
+              }
+            })
+          })
+        }
+      })
+    })
+  }
+})
+```
+
+### Isolated Data Maps
+
+Each execution has its own data map, preventing concurrent access races:
+
+```typescript
+// Concurrent siblings have isolated data
+await Promise.all([
+  ctx.exec({ flow: flowA }),  // childA.data (separate Map)
+  ctx.exec({ flow: flowB })   // childB.data (separate Map)
+])
+
+// No race conditions - each child has independent storage
+```
+
+### Auto-Close Lifecycle
+
+Child contexts automatically close when `exec()` completes:
+
+```typescript
+const myFlow = flow({
+  factory: async (ctx) => {
+    // ctx is a CHILD context (not root)
+    ctx.onClose(() => console.log('Child cleanup'))
+
+    return 'result'
+  }
+})
+
+await rootCtx.exec({ flow: myFlow })
+// Logs "Child cleanup" HERE (after factory returns, before exec() returns)
+
+await rootCtx.close()
+// No additional cleanup - child already closed
+```
+
+**Critical:** Cleanups registered via `ctx.onClose()` run when the **child context** auto-closes (after factory returns), not when root context manually closes.
+
+### Deferred Execution Pattern
+
+Captured child context is closed after exec returns. For deferred work, create a dedicated context:
+
+```typescript
+const myFlow = flow({
+  factory: async (ctx) => {
+    // WRONG: setTimeout with captured ctx
+    // setTimeout(() => ctx.exec({ flow: later }), 100)
+    // ^ Throws "ExecutionContext is closed"
+
+    // CORRECT: Create dedicated context
+    const scope = ctx.scope
+    setTimeout(async () => {
+      const deferredCtx = scope.createContext()
+      try {
+        await deferredCtx.exec({ flow: later })
+      } finally {
+        await deferredCtx.close()
+      }
+    }, 100)
+
+    return 'immediate result'
+  }
+})
+```
+
+### Extension Usage: Tracing with Parent Chain
+
+Extensions receive child context and can access parent data:
+
+```typescript
+const SPAN_KEY = Symbol('tracing.span')
+
+const tracingExtension: Extension = {
+  name: 'tracing',
+  wrapExec: async (next, target, ctx) => {
+    // Read parent span from parent's data
+    const parentSpan = ctx.parent?.data.get(SPAN_KEY) as Span | undefined
+
+    const span = tracer.startSpan({
+      name: isFlow(target) ? (target.name ?? 'anonymous') : 'fn',
+      parent: parentSpan  // Automatic parent-child relationship!
+    })
+
+    // Store in THIS context's data
+    ctx.data.set(SPAN_KEY, span)
+
+    try {
+      return await next()
+    } finally {
+      span.end()
+    }
+  }
+}
+```
+
+### Breaking Changes from ADR-015
+
+#### 1. onClose() Timing
+
+**Before:** Cleanup ran on manual `ctx.close()`.
+
+**After:** Cleanup runs when exec completes (child auto-close).
+
+```typescript
+// BEFORE: Shared context, cleanup on manual close
+const ctx = scope.createContext()
+await ctx.exec({
+  flow: flow({
+    factory: (ctx) => {
+      ctx.onClose(() => console.log('cleanup'))
+    }
+  })
+})
+// Cleanup NOT run yet
+await ctx.close()  // Cleanup runs HERE
+
+// AFTER: Child context, cleanup on exec completion
+await ctx.exec({
+  flow: flow({
+    factory: (ctx) => {  // ctx is CHILD
+      ctx.onClose(() => console.log('cleanup'))
+    }
+  })
+})
+// Cleanup runs HERE (child auto-closed)
+await ctx.close()  // Nothing additional runs
+```
+
+**Migration:** If cleanup must run on root close, traverse to root:
+
+```typescript
+const myFlow = flow({
+  factory: (ctx) => {
+    // Find root context
+    let root = ctx
+    while (root.parent) root = root.parent
+
+    // Register on root, not child
+    root.onClose(() => console.log('cleanup on root'))
+  }
+})
+```
+
+#### 2. ctx.input Isolation
+
+**Before:** `ctx.input` mutated on each exec (footgun).
+
+**After:** Each child has immutable `input`.
+
+```typescript
+// BEFORE: Mutation footgun
+await ctx.exec({ flow: f1, input: 'a' })  // ctx.input = 'a'
+await ctx.exec({ flow: f2, input: 'b' })  // ctx.input = 'b' (overwrites!)
+
+// AFTER: Isolated per child
+await ctx.exec({ flow: f1, input: 'a' })  // childA.input = 'a'
+await ctx.exec({ flow: f2, input: 'b' })  // childB.input = 'b'
+// ctx.input unchanged (undefined for root)
+```
+
+#### 3. Closed Context After Exec
+
+**Before:** Same context reused across execs.
+
+**After:** Child context closed after exec returns.
+
+```typescript
+const myFlow = flow({
+  factory: async (ctx) => {
+    setTimeout(() => {
+      // BEFORE: Would work
+      // AFTER: Throws "ExecutionContext is closed"
+      ctx.exec({ flow: later })
+    }, 100)
+  }
+})
+```
+
+**Migration:** Use dedicated context pattern (see "Deferred Execution Pattern" above).
 
 ## Type Safety {#c3-203-types}
 
@@ -383,6 +656,18 @@ await ctx.exec({ flow: protectedFlow, input: request })
 Key test scenarios in `tests/flow.test.ts`:
 - Flow creation with/without dependencies
 - Type inference for dependencies
+
+Key test scenarios in `tests/hierarchical-context.test.ts` (15 tests):
+- Root context has undefined parent
+- Child context has parent reference
+- Grandchild has correct parent chain
+- Each execution has isolated data Map
+- Concurrent siblings don't share data
+- Child context auto-closes after exec
+- onClose callbacks run on child auto-close
+- Captured child context throws after close
+- Extensions receive child context with parent access
+- Tracing pattern with parent span propagation
 
 Key test scenarios in `tests/scope.test.ts`:
 - Context creation and execution

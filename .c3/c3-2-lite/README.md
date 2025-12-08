@@ -245,13 +245,78 @@ const loggingExtension: Lite.Extension = {
 const scope = createScope({ extensions: [loggingExtension] })
 ```
 
+**Example tracing extension with hierarchical context:**
+
+```typescript
+const SPAN_KEY = Symbol('tracing.span')
+
+interface Span {
+  name: string
+  parent?: Span
+  end(): void
+}
+
+const tracingExtension: Lite.Extension = {
+  name: 'tracing',
+  wrapExec: async (next, target, ctx) => {
+    // Extensions receive CHILD context (created by exec)
+    // Access parent span from parent context's data
+    const parentSpan = ctx.parent?.data.get(SPAN_KEY) as Span | undefined
+
+    const span: Span = {
+      name: isFlow(target) ? (target.name ?? 'anonymous') : 'fn',
+      parent: parentSpan,  // Automatic parent-child relationship!
+      end: () => console.log(`Span ended: ${span.name}`)
+    }
+
+    // Store span in THIS context's data (isolated per execution)
+    ctx.data.set(SPAN_KEY, span)
+
+    try {
+      const result = await next()
+      return result
+    } finally {
+      span.end()
+    }
+  }
+}
+
+const scope = createScope({ extensions: [tracingExtension] })
+const ctx = scope.createContext()
+
+await ctx.exec({
+  flow: flow({
+    name: 'parent',
+    factory: async (ctx) => {
+      // parentSpan stored in ctx.data
+
+      await ctx.exec({
+        flow: flow({
+          name: 'child',
+          factory: async (ctx) => {
+            // childSpan.parent = parentSpan (automatic!)
+          }
+        })
+      })
+    }
+  })
+})
+// Hierarchical span tree created without AsyncLocalStorage!
+```
+
+**Key pattern:**
+- Each `ctx.exec()` creates child context with isolated `data` Map
+- Extensions read `ctx.parent?.data` for parent info
+- Extensions write to `ctx.data` for current execution
+- Enables nested tracing without global state or AsyncLocalStorage
+
 ## Testing {#c3-2-testing}
 <!-- Testing strategy -->
 
 **Test organization:**
 - Unit tests per source file
 - Type tests using `expectTypeOf` from Vitest
-- 102 tests covering all components
+- 145 tests covering all components (including 15 hierarchical context tests)
 
 **Running tests:**
 ```bash

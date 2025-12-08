@@ -84,25 +84,6 @@ describe("Hierarchical ExecutionContext", () => {
       await ctx.close()
     })
 
-    it("data map is lazy", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-
-      let accessed = false
-      const originalGet = Map.prototype.get
-
-      await ctx.exec({
-        flow: flow({
-          factory: () => {
-            accessed = true
-          }
-        }),
-        input: null
-      })
-
-      await ctx.close()
-    })
-
     it("concurrent execs have isolated data", async () => {
       const scope = createScope()
       const ctx = scope.createContext()

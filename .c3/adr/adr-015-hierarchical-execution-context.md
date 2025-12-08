@@ -12,7 +12,7 @@ date: 2025-12-08
 # [ADR-015] Hierarchical ExecutionContext with Parent-Child Per Exec
 
 ## Status {#adr-015-status}
-**Proposed** - 2025-12-08
+**Accepted** - 2025-12-08
 
 ## Problem/Requirement {#adr-015-problem}
 
