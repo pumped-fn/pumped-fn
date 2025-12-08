@@ -661,13 +661,20 @@ class ScopeImpl implements Lite.Scope {
 class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: (() => MaybePromise<void>)[] = []
   private closed = false
-  private _input: unknown = undefined
+  private readonly _input: unknown
   private readonly baseTags: Lite.Tagged<unknown>[]
+  private _data: Map<symbol, unknown> | undefined
+  readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
     readonly scope: ScopeImpl,
-    options?: Lite.CreateContextOptions
+    options?: Lite.CreateContextOptions & {
+      parent?: Lite.ExecutionContext
+      input?: unknown
+    }
   ) {
+    this.parent = options?.parent
+    this._input = options?.input
     const ctxTags = options?.tags
     this.baseTags = ctxTags?.length
       ? [...ctxTags, ...scope.tags]
@@ -676,6 +683,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get input(): unknown {
     return this._input
+  }
+
+  get data(): Map<symbol, unknown> {
+    if (!this._data) {
+      this._data = new Map()
+    }
+    return this._data
   }
 
   async exec(options: {
@@ -689,19 +703,54 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
 
     if ("flow" in options) {
-      return this.execFlow(options)
+      const { flow, input, name: execName } = options
+      let parsedInput: unknown = input
+      if (flow.parse) {
+        const label = execName ?? flow.name ?? "anonymous"
+        try {
+          parsedInput = await flow.parse(input)
+        } catch (err) {
+          throw new ParseError(
+            `Failed to parse flow input "${label}"`,
+            "flow-input",
+            label,
+            err
+          )
+        }
+      }
+
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        tags: this.baseTags,
+        input: parsedInput
+      })
+
+      try {
+        return await childCtx.execFlowInternal(options)
+      } finally {
+        await childCtx.close()
+      }
     } else {
-      return this.execFn(options)
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        tags: this.baseTags
+      })
+
+      try {
+        return await childCtx.execFnInternal(options)
+      } finally {
+        await childCtx.close()
+      }
     }
   }
 
-  private async execFlow(options: {
+  private async execFlowInternal(options: {
     flow: Lite.Flow<unknown, unknown>
     input?: unknown
     name?: string
     tags?: Lite.Tagged<unknown>[]
   }): Promise<unknown> {
-    const { flow, input, tags: execTags, name: execName } = options
+    const { flow, tags: execTags } = options
 
     const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
     const allTags = hasExtraTags
@@ -709,23 +758,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       : this.baseTags
 
     const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
-
-    let parsedInput: unknown = input
-    if (flow.parse) {
-      const label = execName ?? flow.name ?? "anonymous"
-      try {
-        parsedInput = await flow.parse(input)
-      } catch (err) {
-        throw new ParseError(
-          `Failed to parse flow input "${label}"`,
-          "flow-input",
-          label,
-          err
-        )
-      }
-    }
-
-    this._input = parsedInput
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
@@ -743,7 +775,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.applyExecExtensions(flow, doExec)
   }
 
-  private execFn(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
     const doExec = () => Promise.resolve(fn(this, ...params))
     return this.applyExecExtensions(fn, doExec)

@@ -1,0 +1,333 @@
+import { describe, it, expect } from "vitest"
+import { createScope } from "../src/scope"
+import { flow } from "../src/flow"
+import { type Lite } from "../src/types"
+
+describe("Hierarchical ExecutionContext", () => {
+  describe("parent chain", () => {
+    it("root context has undefined parent", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(ctx.parent).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("child context has parent reference", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let childParent: unknown
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childParent = childCtx.parent
+          }
+        }),
+        input: null
+      })
+
+      expect(childParent).toBe(ctx)
+      await ctx.close()
+    })
+
+    it("grandchild has correct parent chain", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      const parents: unknown[] = []
+
+      const innerFlow = flow({
+        factory: (grandchildCtx) => {
+          parents.push(grandchildCtx.parent?.parent)
+        }
+      })
+
+      const outerFlow = flow({
+        factory: async (childCtx) => {
+          parents.push(childCtx.parent)
+          await childCtx.exec({ flow: innerFlow, input: null })
+        }
+      })
+
+      await ctx.exec({ flow: outerFlow, input: null })
+
+      expect(parents[0]).toBe(ctx)
+      expect(parents[1]).toBe(ctx)
+      await ctx.close()
+    })
+  })
+
+  describe("data isolation", () => {
+    it("each context has own data map", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      ctx.data.set(KEY, "root")
+
+      let childData: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childData = childCtx.data.get(KEY) as string | undefined
+            childCtx.data.set(KEY, "child")
+          }
+        }),
+        input: null
+      })
+
+      expect(ctx.data.get(KEY)).toBe("root")
+      expect(childData).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("concurrent execs have isolated data", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      const results: string[] = []
+
+      const testFlow = flow<void, string>({
+        parse: (raw) => raw as string,
+        factory: async (childCtx) => {
+          const id = childCtx.input
+          childCtx.data.set(KEY, id)
+          await new Promise(r => setTimeout(r, 10))
+          results.push(childCtx.data.get(KEY) as string)
+        }
+      })
+
+      await Promise.all([
+        ctx.exec({ flow: testFlow, input: "A" }),
+        ctx.exec({ flow: testFlow, input: "B" })
+      ])
+
+      expect(results).toContain("A")
+      expect(results).toContain("B")
+      await ctx.close()
+    })
+  })
+
+  describe("input isolation", () => {
+    it("root context has undefined input", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(ctx.input).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("each exec has isolated input", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const inputs: unknown[] = []
+
+      const captureFlow = flow<void, string>({
+        parse: (raw) => raw as string,
+        factory: (childCtx) => {
+          inputs.push(childCtx.input)
+        }
+      })
+
+      await ctx.exec({ flow: captureFlow, input: "first" })
+      await ctx.exec({ flow: captureFlow, input: "second" })
+
+      expect(inputs).toEqual(["first", "second"])
+      expect(ctx.input).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("concurrent execs have correct input", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const inputs: string[] = []
+
+      const captureFlow = flow<void, string>({
+        parse: (raw) => raw as string,
+        factory: async (childCtx) => {
+          await new Promise(r => setTimeout(r, 10))
+          inputs.push(childCtx.input)
+        }
+      })
+
+      await Promise.all([
+        ctx.exec({ flow: captureFlow, input: "A" }),
+        ctx.exec({ flow: captureFlow, input: "B" })
+      ])
+
+      expect(inputs.sort()).toEqual(["A", "B"])
+      await ctx.close()
+    })
+  })
+
+  describe("cleanup lifecycle", () => {
+    it("child cleanup runs on exec completion", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const events: string[] = []
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childCtx.onClose(() => {
+              events.push("child-cleanup")
+            })
+          }
+        }),
+        input: null
+      })
+
+      events.push("after-exec")
+      await ctx.close()
+      events.push("after-root-close")
+
+      expect(events).toEqual(["child-cleanup", "after-exec", "after-root-close"])
+    })
+
+    it("nested cleanups run in correct order", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const events: string[] = []
+
+      const innerFlow = flow({
+        factory: (grandchildCtx) => {
+          grandchildCtx.onClose(() => {
+            events.push("grandchild")
+          })
+        }
+      })
+
+      const outerFlow = flow({
+        factory: async (childCtx) => {
+          childCtx.onClose(() => {
+            events.push("child")
+          })
+          await childCtx.exec({ flow: innerFlow, input: null })
+          events.push("after-inner-exec")
+        }
+      })
+
+      await ctx.exec({ flow: outerFlow, input: null })
+      events.push("after-outer-exec")
+
+      expect(events).toEqual([
+        "grandchild",
+        "after-inner-exec",
+        "child",
+        "after-outer-exec"
+      ])
+      await ctx.close()
+    })
+
+    it("double close is no-op", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      let cleanupCount = 0
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childCtx.onClose(() => {
+              cleanupCount++
+            })
+          }
+        }),
+        input: null
+      })
+
+      expect(cleanupCount).toBe(1)
+      await ctx.close()
+    })
+  })
+
+  describe("closed context", () => {
+    it("exec on closed child throws", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedCtx: Lite.ExecutionContext | undefined
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            capturedCtx = childCtx
+          }
+        }),
+        input: null
+      })
+
+      await expect(
+        capturedCtx!.exec({ flow: flow({ factory: () => {} }), input: null })
+      ).rejects.toThrow("ExecutionContext is closed")
+
+      await ctx.close()
+    })
+
+    it("data and parent accessible on closed context", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      let capturedCtx: Lite.ExecutionContext | undefined
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childCtx.data.set(KEY, "value")
+            capturedCtx = childCtx
+          }
+        }),
+        input: null
+      })
+
+      expect(capturedCtx!.data.get(KEY)).toBe("value")
+      expect(capturedCtx!.parent).toBe(ctx)
+      await ctx.close()
+    })
+  })
+
+  describe("extension integration", () => {
+    it("wrapExec receives child context", async () => {
+      const SPAN_KEY = Symbol("span")
+      const contexts: Lite.ExecutionContext[] = []
+
+      const tracingExtension: Lite.Extension = {
+        name: "tracing",
+        wrapExec: async (next, target, ctx) => {
+          contexts.push(ctx)
+          const parentSpan = ctx.parent?.data.get(SPAN_KEY)
+          ctx.data.set(SPAN_KEY, { parent: parentSpan, id: contexts.length })
+          return next()
+        }
+      }
+
+      const scope = createScope({ extensions: [tracingExtension] })
+      const ctx = scope.createContext()
+
+      const innerFlow = flow({ factory: () => {} })
+      const outerFlow = flow({
+        factory: async (childCtx) => {
+          await childCtx.exec({ flow: innerFlow, input: null })
+        }
+      })
+
+      await ctx.exec({ flow: outerFlow, input: null })
+
+      expect(contexts).toHaveLength(2)
+      expect(contexts[0]!.parent).toBe(ctx)
+      expect(contexts[1]!.parent).toBe(contexts[0])
+
+      const span1 = contexts[0]!.data.get(SPAN_KEY) as { parent: unknown; id: number }
+      const span2 = contexts[1]!.data.get(SPAN_KEY) as { parent: unknown; id: number }
+
+      expect(span1.parent).toBeUndefined()
+      expect(span2.parent).toEqual(span1)
+
+      await ctx.close()
+    })
+  })
+})
