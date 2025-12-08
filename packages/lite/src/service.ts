@@ -1,14 +1,17 @@
 import { atomSymbol, serviceSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
-function bindMethods<T extends object>(obj: T): T {
+type AnyFunction = (...args: unknown[]) => unknown
+
+function bindMethods<T extends Record<string, unknown>>(obj: T): T {
   const bound = {} as T
-  for (const key of Object.keys(obj) as (keyof T)[]) {
+  for (const key of Object.keys(obj)) {
     const value = obj[key]
     if (typeof value === "function") {
-      bound[key] = (value as Function).bind(obj) as T[keyof T]
+      const fn = value as AnyFunction
+      bound[key as keyof T] = fn.bind(obj) as T[keyof T]
     } else {
-      bound[key] = value
+      bound[key as keyof T] = value as T[keyof T]
     }
   }
   return bound
@@ -61,13 +64,21 @@ export function service<T, D extends Record<string, Lite.Dependency>>(
     deps?: Lite.InferDeps<D>
   ) => MaybePromise<T>
 
-  const wrappedFactory = async (
+  const wrappedFactory = (
     ctx: Lite.ResolveContext,
     deps?: Lite.InferDeps<D>
-  ): Promise<T> => {
-    const result = await originalFactory(ctx, deps)
+  ): MaybePromise<T> => {
+    const result = originalFactory(ctx, deps)
+    if (result instanceof Promise) {
+      return result.then((resolved) => {
+        if (typeof resolved === "object" && resolved !== null) {
+          return bindMethods(resolved as Record<string, unknown>) as T
+        }
+        return resolved
+      })
+    }
     if (typeof result === "object" && result !== null) {
-      return bindMethods(result as object) as T
+      return bindMethods(result as Record<string, unknown>) as T
     }
     return result
   }
