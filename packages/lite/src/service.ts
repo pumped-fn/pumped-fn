@@ -1,7 +1,7 @@
 import { serviceSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
-export interface ServiceConfig<T extends Lite.ServiceMethods, D extends Record<string, Lite.Dependency>> {
+export interface ServiceConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
   factory: Lite.ServiceFactory<T, D>
   tags?: Lite.Tagged<unknown>[]
@@ -25,14 +25,14 @@ export interface ServiceConfig<T extends Lite.ServiceMethods, D extends Record<s
  * })
  * ```
  */
-export function service<T extends Lite.ServiceMethods>(config: {
+export function service<T>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Service<T>
 
 export function service<
-  T extends Lite.ServiceMethods,
+  T,
   const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
 >(config: {
   deps: D
@@ -40,7 +40,7 @@ export function service<
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Service<T>
 
-export function service<T extends Lite.ServiceMethods, D extends Record<string, Lite.Dependency>>(
+export function service<T, D extends Record<string, Lite.Dependency>>(
   config: ServiceConfig<T, D>
 ): Lite.Service<T> {
   return {
@@ -64,7 +64,7 @@ export function service<T extends Lite.ServiceMethods, D extends Record<string, 
  * }
  * ```
  */
-export function isService(value: unknown): value is Lite.Service<Lite.ServiceMethods> {
+export function isService(value: unknown): value is Lite.Service<unknown> {
   return (
     typeof value === "object" &&
     value !== null &&

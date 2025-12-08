@@ -8,7 +8,7 @@ describe("Service", () => {
   it("creates service and identifies via type guard", () => {
     const dbService = service({
       factory: () => ({
-        query: (ctx, sql: string) => `result: ${sql}`,
+        query: (_ctx: Lite.ExecutionContext, sql: string) => `result: ${sql}`,
       }),
     })
 
@@ -21,8 +21,8 @@ describe("Service", () => {
 
     const dbService = service({
       deps: { config: configAtom },
-      factory: (ctx, { config }) => ({
-        query: (ctx, sql: string) => `[${config.prefix}] ${sql}`,
+      factory: (_ctx, { config }) => ({
+        query: (_execCtx: Lite.ExecutionContext, sql: string) => `[${config.prefix}] ${sql}`,
       }),
     })
 
