@@ -7,6 +7,7 @@ import {
   tags,
   controller,
   createScope,
+  service,
   type Lite,
 } from "../src/index"
 
@@ -283,6 +284,22 @@ describe("Type Inference", () => {
         expect(result).toBe("1: test")
         await ctx.close()
       })
+    })
+  })
+
+  describe("service type constraints", () => {
+    it("service methods must match ctx.exec signature", () => {
+      const dbService = service({
+        factory: () => ({
+          query: (ctx: Lite.ExecutionContext, sql: string) => [] as unknown[],
+        }),
+      })
+
+      type DbServiceType = typeof dbService extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<DbServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
+
+      // @ts-expect-error - badMethod lacks ExecutionContext as first param
+      service({ factory: () => ({ badMethod: (name: string) => name }) })
     })
   })
 })
