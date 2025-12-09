@@ -258,15 +258,7 @@ export namespace Lite {
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 
-  /**
-   * Service method signature - matches ExecFnOptions.fn constraint.
-   * ctx.exec always injects ExecutionContext as first parameter.
-   */
   export type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
 
-  /**
-   * Record of methods compatible with ctx.exec({ fn, params }).
-   * Use with service() to get compile-time enforcement.
-   */
   export type ServiceMethods = Record<string, ServiceMethod>
 }

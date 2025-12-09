@@ -1,11 +1,7 @@
 import { atomSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 
-/**
- * Creates a service - a narrowed Atom returning methods for ctx.exec().
- * Resolution is identical to atom(). The constraint ensures methods
- * match the (ctx: ExecutionContext, ...args) => result signature.
- */
+/** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */
 export function service<T extends Lite.ServiceMethods>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
@@ -26,7 +22,6 @@ export function service<T extends Lite.ServiceMethods, D extends Record<string, 
   factory: Lite.AtomFactory<T, D>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Atom<T> {
-  // Same implementation as atom() - cast needed due to type erasure in Atom<T>
   return {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,

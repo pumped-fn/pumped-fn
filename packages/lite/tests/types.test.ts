@@ -289,7 +289,6 @@ describe("Type Inference", () => {
 
   describe("service type constraints", () => {
     it("service methods must match ctx.exec signature", () => {
-      // service() returns Atom<T> where T extends ServiceMethods
       const dbService = service({
         factory: () => ({
           query: (ctx: Lite.ExecutionContext, sql: string) => [] as unknown[],
@@ -299,7 +298,7 @@ describe("Type Inference", () => {
       type DbServiceType = typeof dbService extends Lite.Atom<infer T> ? T : never
       expectTypeOf<DbServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
 
-      // @ts-expect-error - methods without ExecutionContext rejected
+      // @ts-expect-error
       service({
         factory: () => ({
           badMethod: (name: string) => name,
