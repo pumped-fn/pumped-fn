@@ -26,10 +26,11 @@ export function service<T extends Lite.ServiceMethods, D extends Record<string, 
   factory: Lite.AtomFactory<T, D>
   tags?: Lite.Tagged<unknown>[]
 }): Lite.Atom<T> {
+  // Same implementation as atom() - cast needed due to type erasure in Atom<T>
   return {
     [atomSymbol]: true,
-    factory: config.factory as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
-    deps: config.deps as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
+    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
 }

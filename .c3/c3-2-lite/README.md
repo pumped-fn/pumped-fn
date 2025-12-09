@@ -193,7 +193,6 @@ packages/lite/
 │   ├── flow.test.ts
 │   ├── tag.test.ts
 │   ├── preset.test.ts
-│   ├── service.test.ts
 │   ├── scope.test.ts
 │   ├── extension.test.ts
 │   └── types.test.ts
