@@ -202,6 +202,11 @@ export namespace Lite {
   export interface ControllerDep<T> {
     readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
+    readonly resolve?: boolean
+  }
+
+  export interface ControllerOptions {
+    resolve?: boolean
   }
 
   export interface Typed<T> {

@@ -497,7 +497,11 @@ class ScopeImpl implements Lite.Scope {
       if (isAtom(dep)) {
         result[key] = await this.resolve(dep)
       } else if (isControllerDep(dep)) {
-        result[key] = new ControllerImpl(dep.atom, this)
+        const ctrl = new ControllerImpl(dep.atom, this)
+        if (dep.resolve) {
+          await ctrl.resolve()
+        }
+        result[key] = ctrl
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 
