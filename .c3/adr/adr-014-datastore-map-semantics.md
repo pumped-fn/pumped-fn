@@ -2,38 +2,33 @@
 id: adr-014
 title: DataStore Map-like Semantics
 summary: >
-  Align DataStore with Map semantics - get() always returns T | undefined
+  Documents that DataStore has Map semantics - get() always returns T | undefined
   (pure lookup), defaults only used by getOrSet() not get().
-status: proposed
+status: implemented
 date: 2025-12-03
+verified: 2025-12-09
 ---
 
 # [ADR-014] DataStore Map-like Semantics
 
 ## Status {#adr-014-status}
-**Proposed** - 2025-12-03
+**Implemented** - Verified 2025-12-09
+
+> **Note:** Verification on 2025-12-09 confirmed the implementation ALREADY has Map-like
+> semantics. This ADR documents existing behavior, not a change.
 
 ## Problem/Requirement {#adr-014-problem}
 
-The current DataStore API (ADR-010, ADR-012) has subtle semantics that differ from JavaScript's `Map`:
+This ADR clarifies the DataStore API semantics and ensures they are explicitly documented in specs.
 
-**Issue: `get()` returns default for tags with defaults**
-
-```typescript
-const countTag = tag<number>({ label: 'count', default: 0 })
-
-ctx.data.get(countTag)  // Returns 0 (default) - but not stored!
-ctx.data.has(countTag)  // Returns false - confusing!
-```
-
-This creates confusion:
-- `get()` returns a value, but `has()` returns false
-- Different behavior based on tag configuration
-- Not Map-like: `Map.get()` returns undefined if key not present
-
-**The mental model should be:**
-- `get()` = pure lookup (like `Map.get()`)
+**The mental model is:**
+- `get()` = pure lookup (like `Map.get()`) - returns `T | undefined`, never uses defaults
 - `getOrSet()` = initialize if missing, return value (like React's `useState` initial value)
+
+**Why document this:**
+- Makes behavior explicit in specs
+- Ensures `get()` and `has()` are consistent (both return "not present" for unset tags)
+- Confirms Map-like semantics are intentional, not accidental
 
 ## Exploration Journey {#adr-014-exploration}
 
