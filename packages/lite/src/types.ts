@@ -258,7 +258,7 @@ export namespace Lite {
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 
-  export type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
+  export type ServiceMethod = (ctx: ExecutionContext, ...args: never[]) => unknown
 
   export type ServiceMethods = Record<string, ServiceMethod>
 }

@@ -298,12 +298,8 @@ describe("Type Inference", () => {
       type DbServiceType = typeof dbService extends Lite.Atom<infer T> ? T : never
       expectTypeOf<DbServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
 
-      // @ts-expect-error
-      service({
-        factory: () => ({
-          badMethod: (name: string) => name,
-        }),
-      })
+      // @ts-expect-error - badMethod lacks ExecutionContext as first param
+      service({ factory: () => ({ badMethod: (name: string) => name }) })
     })
   })
 })
