@@ -353,5 +353,18 @@ describe("Type Inference", () => {
       await ctx.close()
       await scope.dispose()
     })
+
+    it("rejects methods without ExecutionContext as first parameter", () => {
+      // @ts-expect-error - methods must have ExecutionContext as first param
+      const invalidService = service({
+        factory: () => ({
+          // Missing ExecutionContext parameter
+          badMethod: (name: string) => `Hello, ${name}`,
+        }),
+      })
+
+      // This test exists to verify the type constraint at compile time
+      expect(invalidService).toBeDefined()
+    })
   })
 })

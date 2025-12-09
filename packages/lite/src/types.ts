@@ -19,7 +19,6 @@ export namespace Lite {
   export interface Scope {
     readonly ready: Promise<void>
     resolve<T>(atom: Atom<T>): Promise<T>
-    resolve<T extends ServiceMethods>(atom: Service<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
@@ -264,7 +263,8 @@ export namespace Lite {
    * Constraint for service method signatures.
    * Each method must accept ExecutionContext as first parameter.
    */
-  export type ServiceMethod = (ctx: ExecutionContext, ...args: never[]) => unknown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
 
   /**
    * Record of service methods where each method receives ExecutionContext.

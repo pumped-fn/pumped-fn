@@ -30,18 +30,26 @@ Primary use cases:
 ### Service Interface
 
 ```typescript
-interface Service<T> {
+// Type constraint: service methods must accept ExecutionContext as first param
+type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
+type ServiceMethods = Record<string, ServiceMethod>
+
+interface Service<T extends ServiceMethods> {
   readonly [serviceSymbol]: true
   readonly factory: ServiceFactory<T, Record<string, Dependency>>
   readonly deps?: Record<string, Dependency>
   readonly tags?: Tagged<unknown>[]
 }
 
-type ServiceFactory<T, D extends Record<string, Dependency>> =
+type ServiceFactory<T extends ServiceMethods, D extends Record<string, Dependency>> =
   keyof D extends never
     ? (ctx: ResolveContext) => MaybePromise<T>
     : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 ```
+
+**Type Constraint:** Unlike atoms which can return any value, services are constrained
+to return `Record<string, (ctx: ExecutionContext, ...args) => unknown>`. This ensures
+all service methods receive execution context for extension wrapping via `ctx.exec()`.
 
 ### Service IS-A Atom
 
@@ -322,6 +330,11 @@ Key test scenarios in `tests/service.test.ts`:
 - Service creation and type guard identification
 - Service resolution with dependencies
 - Method invocation via `ctx.exec()`
+
+Type constraint tests in `tests/types.test.ts`:
+- Service methods must have ExecutionContext as first parameter
+- Service type inference with dependencies
+- Negative test: methods without ExecutionContext are rejected
 
 ## Related {#c3-206-related}
 
