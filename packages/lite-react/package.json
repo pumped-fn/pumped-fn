@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/react-lite",
+  "name": "@pumped-fn/lite-react",
   "version": "0.3.0",
   "description": "React integration for @pumped-fn/lite",
   "type": "module",
@@ -54,7 +54,7 @@
   },
   "repository": {
     "type": "git",
-    "directory": "packages/react-lite",
+    "directory": "packages/lite-react",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   },
   "keywords": [
@@ -63,6 +63,7 @@
     "dependency-injection",
     "di",
     "lite",
+    "lite-react",
     "reactivity",
     "typescript"
   ],

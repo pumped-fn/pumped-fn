@@ -1,7 +1,7 @@
 export const devtoolsEventSymbol: unique symbol = Symbol.for(
-  "@pumped-fn/devtools/event"
+  "@pumped-fn/lite-devtools/event"
 );
 
 export const memoryTransportSymbol: unique symbol = Symbol.for(
-  "@pumped-fn/devtools/memory-transport"
+  "@pumped-fn/lite-devtools/memory-transport"
 );

@@ -1,4 +1,4 @@
-# @pumped-fn/react-lite
+# @pumped-fn/lite-react
 
 ## 0.3.0
 
@@ -19,7 +19,7 @@
 
 ### Minor Changes
 
-- 1587c37: feat(react-lite): initial release of React integration for @pumped-fn/lite
+- 1587c37: feat(lite-react): initial release of React integration for @pumped-fn/lite
 
   Adds minimal React bindings with Suspense and ErrorBoundary integration:
 

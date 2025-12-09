@@ -1,10 +1,10 @@
-# @pumped-fn/vite-hmr
+# @pumped-fn/lite-hmr
 
 ## 0.1.0
 
 ### Minor Changes
 
-- 954d9d9: Add @pumped-fn/vite-hmr package for HMR compatibility
+- 954d9d9: Add @pumped-fn/lite-hmr package for HMR compatibility
 
   - Vite plugin that preserves atom state across hot module reloads
   - Build-time AST transform wraps atom declarations with registry helper

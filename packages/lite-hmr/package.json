@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/vite-hmr",
+  "name": "@pumped-fn/lite-hmr",
   "version": "0.1.0",
   "description": "Vite HMR plugin for @pumped-fn/lite atoms",
   "type": "module",
@@ -46,6 +46,7 @@
     "vite",
     "hmr",
     "pumped-fn",
+    "lite-hmr",
     "dependency-injection"
   ],
   "license": "MIT"

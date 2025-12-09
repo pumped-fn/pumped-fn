@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/devtools",
+  "name": "@pumped-fn/lite-devtools",
   "version": "0.1.2",
   "description": "Observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming",
   "type": "module",
@@ -39,6 +39,7 @@
   },
   "keywords": [
     "pumped-fn",
+    "lite-devtools",
     "devtools",
     "observability",
     "extension",
@@ -47,7 +48,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "directory": "packages/devtools",
+    "directory": "packages/lite-devtools",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }

@@ -12,7 +12,7 @@ date: 2025-12-08
 
 ## Decision
 
-Create `@pumped-fn/devtools` using the existing Extension system with fire-and-forget transports.
+Create `@pumped-fn/lite-devtools` using the existing Extension system with fire-and-forget transports.
 
 **Key constraints:**
 1. Never block app code (fire-and-forget, no await)
@@ -34,5 +34,5 @@ const scope = createScope({
 ## Changes
 
 - **c3-0:** Add devtools to Containers table
-- **c3-4-devtools:** New container at `packages/devtools/`
+- **c3-4-lite-devtools:** New container at `packages/lite-devtools/`
 - **c3-2-lite:** No changes (Extension system sufficient)

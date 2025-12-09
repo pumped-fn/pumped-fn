@@ -1,4 +1,4 @@
-# @pumped-fn/devtools
+# @pumped-fn/lite-devtools
 
 ## 0.1.2
 
@@ -21,4 +21,4 @@
 
 ### Minor Changes
 
-- 5a7fd67: Add @pumped-fn/devtools package - observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming
+- 5a7fd67: Add @pumped-fn/lite-devtools package - observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming

@@ -1,12 +1,12 @@
 ---
 id: c3-4
 c3-version: 3
-title: Devtools Library (@pumped-fn/devtools)
+title: Lite Devtools Library (@pumped-fn/lite-devtools)
 summary: >
   Observability extension with fire-and-forget transports.
 ---
 
-# Devtools Library (@pumped-fn/devtools)
+# Lite Devtools Library (@pumped-fn/lite-devtools)
 
 ## Overview {#c3-4-overview}
 
@@ -15,7 +15,7 @@ Extension-based observability for pumped-fn. Fire-and-forget, never blocks app.
 ## API {#c3-4-api}
 
 ```typescript
-import { createDevtools, memory, broadcastChannel, consoleTransport } from '@pumped-fn/devtools'
+import { createDevtools, memory, broadcastChannel, consoleTransport } from '@pumped-fn/lite-devtools'
 
 const mem = memory()
 const scope = createScope({

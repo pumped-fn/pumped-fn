@@ -57,7 +57,7 @@ export function transformAtoms(
     return null
   }
 
-  s.prepend(`import { __hmr_register } from '@pumped-fn/vite-hmr/runtime';\n`)
+  s.prepend(`import { __hmr_register } from '@pumped-fn/lite-hmr/runtime';\n`)
 
   return {
     code: s.toString(),

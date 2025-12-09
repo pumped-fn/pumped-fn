@@ -6,7 +6,7 @@ This document describes how to release pumped-fn packages and skills.
 
 Two independent release workflows:
 
-1. **NPM Packages** - Automated via Changesets (core-next, react, devtools)
+1. **NPM Packages** - Automated via Changesets (lite, lite-react, lite-devtools)
 2. **Claude Skills** - Automated via GitHub Releases (pumped-fn skill zips)
 
 ## NPM Package Releases

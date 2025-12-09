@@ -31,7 +31,7 @@ function getTargetName(target: { name?: string } | ((...args: never[]) => unknow
  *
  * @example
  * ```typescript
- * import { createDevtools, memory } from '@pumped-fn/devtools'
+ * import { createDevtools, memory } from '@pumped-fn/lite-devtools'
  * import { createScope } from '@pumped-fn/lite'
  *
  * const mem = memory()
