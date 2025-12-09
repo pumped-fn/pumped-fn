@@ -376,6 +376,26 @@ Use a separate atom instead when:
 - State needs its own invalidation lifecycle
 - State should be externally accessible/controllable
 
+## Service Helper {#c3-202-service}
+
+The `service()` function is a convenience wrapper that returns an `Atom<T>` with the constraint that `T` must be methods compatible with `ctx.exec()`:
+
+```typescript
+type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
+type ServiceMethods = Record<string, ServiceMethod>
+
+// service() returns Atom<T> where T extends ServiceMethods
+const dbService = service({
+  deps: { pool: poolAtom },
+  factory: (ctx, { pool }) => ({
+    query: (ctx: ExecutionContext, sql: string) => pool.query(sql),
+    insert: (ctx: ExecutionContext, table: string, data: object) => pool.insert(table, data),
+  })
+})
+```
+
+This is purely a compile-time constraint - `ctx.exec({ fn, params })` always injects `ExecutionContext` as the first argument, so service methods must match that signature.
+
 ## Type Guard {#c3-202-guards}
 
 ### isAtom
@@ -409,7 +429,8 @@ function processDep(dep: Dependency) {
 | File | Contents |
 |------|----------|
 | `src/atom.ts` | `atom()`, `controller()`, `isAtom()`, `isControllerDep()` |
-| `src/types.ts` | `Atom`, `ControllerDep`, `ResolveContext`, `AtomFactory` |
+| `src/service.ts` | `service()` |
+| `src/types.ts` | `Atom`, `ControllerDep`, `ResolveContext`, `AtomFactory`, `ServiceMethod`, `ServiceMethods` |
 | `src/symbols.ts` | `atomSymbol`, `controllerDepSymbol` |
 
 ## Testing {#c3-202-testing}

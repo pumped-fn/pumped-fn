@@ -186,7 +186,7 @@ packages/lite/
 │   ├── flow.ts       # flow(), isFlow()
 │   ├── tag.ts        # tag(), tags, tag type guards
 │   ├── preset.ts     # preset(), isPreset()
-│   ├── service.ts    # service(), isService()
+│   ├── service.ts    # service()
 │   └── scope.ts      # createScope(), Scope, Controller, ExecutionContext
 ├── tests/
 │   ├── atom.test.ts
@@ -208,11 +208,10 @@ packages/lite/
 | ID | Component | Description |
 |----|-----------|-------------|
 | [c3-201](./c3-201-scope.md) | Scope & Controller | DI container, resolution, lifecycle states, reactivity |
-| [c3-202](./c3-202-atom.md) | Atom | Long-lived dependency definition |
+| [c3-202](./c3-202-atom.md) | Atom | Long-lived dependency definition (includes `service()` helper) |
 | [c3-203](./c3-203-flow.md) | Flow & ExecutionContext | Request/response execution pattern |
 | [c3-204](./c3-204-tag.md) | Tag System | Metadata attachment and extraction |
 | [c3-205](./c3-205-preset.md) | Preset | Value injection and atom redirection |
-| [c3-206](./c3-206-service.md) | Service | Context-aware method containers |
 
 ## Extension System {#c3-2-extension}
 <!-- Cross-cutting concern hooks -->
