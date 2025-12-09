@@ -119,7 +119,7 @@ importers:
         specifier: ^4.7.0
         version: 4.10.8
       react:
-        specifier: ^19.2.1
+        specifier: ^19.0.0
         version: 19.2.1
     devDependencies:
       '@pumped-fn/lite-devtools':
@@ -129,7 +129,7 @@ importers:
         specifier: ^20.19.22
         version: 20.19.22
       '@types/react':
-        specifier: ^19.2.7
+        specifier: ^19.0.0
         version: 19.2.7
       tsdown:
         specifier: ^0.16.5
