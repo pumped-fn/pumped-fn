@@ -7,6 +7,7 @@ import {
   tags,
   controller,
   createScope,
+  service,
   type Lite,
 } from "../src/index"
 
@@ -283,6 +284,74 @@ describe("Type Inference", () => {
         expect(result).toBe("1: test")
         await ctx.close()
       })
+    })
+  })
+
+  describe("service type constraints", () => {
+    it("should enforce methods have ExecutionContext as first parameter", () => {
+      const validService = service({
+        factory: () => ({
+          greet: (ctx: Lite.ExecutionContext, name: string) => `Hello, ${name}`,
+          count: (ctx: Lite.ExecutionContext) => 42,
+        }),
+      })
+
+      type ServiceType = typeof validService extends Lite.Service<infer T> ? T : never
+      expectTypeOf<ServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
+    })
+
+    it("should infer service method types correctly", () => {
+      const dbService = service({
+        factory: () => ({
+          query: (ctx: Lite.ExecutionContext, sql: string) => [] as unknown[],
+          insert: (ctx: Lite.ExecutionContext, table: string, data: object) => 1,
+        }),
+      })
+
+      type DbServiceType = typeof dbService extends Lite.Service<infer T> ? T : never
+
+      expectTypeOf<DbServiceType["query"]>().toMatchTypeOf<(ctx: Lite.ExecutionContext, sql: string) => unknown[]>()
+      expectTypeOf<DbServiceType["insert"]>().toMatchTypeOf<(ctx: Lite.ExecutionContext, table: string, data: object) => number>()
+    })
+
+    it("should work with dependencies", () => {
+      const configAtom = atom({ factory: () => ({ prefix: "DB" }) })
+
+      const serviceWithDeps = service({
+        deps: { config: configAtom },
+        factory: (ctx, { config }) => ({
+          format: (execCtx: Lite.ExecutionContext, msg: string) => `[${config.prefix}] ${msg}`,
+        }),
+      })
+
+      type ServiceType = typeof serviceWithDeps extends Lite.Service<infer T> ? T : never
+      expectTypeOf<ServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
+    })
+
+    it("resolves service and invokes methods correctly", async () => {
+      const counterService = service({
+        factory: () => {
+          let count = 0
+          return {
+            increment: (ctx: Lite.ExecutionContext) => ++count,
+            getCount: (ctx: Lite.ExecutionContext) => count,
+          }
+        },
+      })
+
+      const scope = createScope()
+      await scope.ready
+
+      const counter = await scope.resolve(counterService)
+      const ctx = scope.createContext()
+
+      await ctx.exec({ fn: counter.increment, params: [] })
+      const result = await ctx.exec({ fn: counter.getCount, params: [] })
+
+      expect(result).toBe(1)
+
+      await ctx.close()
+      await scope.dispose()
     })
   })
 })

@@ -18,7 +18,8 @@ export type AtomState = 'idle' | 'resolving' | 'resolved' | 'failed'
 export namespace Lite {
   export interface Scope {
     readonly ready: Promise<void>
-    resolve<T>(atom: Atom<T> | Service<T>): Promise<T>
+    resolve<T>(atom: Atom<T>): Promise<T>
+    resolve<T extends ServiceMethods>(atom: Service<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
@@ -259,7 +260,18 @@ export namespace Lite {
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 
-  export interface Service<T> {
+  /**
+   * Constraint for service method signatures.
+   * Each method must accept ExecutionContext as first parameter.
+   */
+  export type ServiceMethod = (ctx: ExecutionContext, ...args: never[]) => unknown
+
+  /**
+   * Record of service methods where each method receives ExecutionContext.
+   */
+  export type ServiceMethods = Record<string, ServiceMethod>
+
+  export interface Service<T extends ServiceMethods> {
     readonly [atomSymbol]: true
     readonly [serviceSymbol]: true
     readonly factory: ServiceFactory<T, Record<string, Dependency>>
@@ -267,7 +279,7 @@ export namespace Lite {
     readonly tags?: Tagged<unknown>[]
   }
 
-  export type ServiceFactory<T, D extends Record<string, Dependency>> =
+  export type ServiceFactory<T extends ServiceMethods, D extends Record<string, Dependency>> =
     keyof D extends never
       ? (ctx: ResolveContext) => MaybePromise<T>
       : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
