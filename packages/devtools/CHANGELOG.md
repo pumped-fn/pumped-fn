@@ -1,5 +1,14 @@
 # @pumped-fn/devtools
 
+## 0.1.2
+
+### Patch Changes
+
+- 54db29b: fix: correct package exports for TypeScript type resolution
+
+  - Add `types` conditions to exports map for ESM and CJS
+  - Correct file extensions from `.js`/`.d.ts` to `.mjs`/`.d.mts` and `.cjs`/`.d.cts`
+
 ## 0.1.1
 
 ### Patch Changes
