@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/devtools",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming",
   "type": "module",
   "exports": {
