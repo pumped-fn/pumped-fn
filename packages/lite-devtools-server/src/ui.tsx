@@ -30,18 +30,23 @@ function StatusBar({ port }: { port: number }) {
   return <text fg="cyan">Port: {port} | Events: {events.length}</text>;
 }
 
-export function App({ port }: { port: number }) {
+function Content({ port }: { port: number }) {
   return (
-    <ScopeProvider scope={scope}>
-      <box flexDirection="column" padding={1}>
-        <text attributes={TextAttributes.BOLD} fg="green">Lite Devtools Server</text>
-        <box marginTop={1} flexDirection="column" flexGrow={1}>
-          <EventList />
-        </box>
-        <box marginTop={1}>
-          <StatusBar port={port} />
-        </box>
+    <box flexDirection="column" padding={1}>
+      <text attributes={TextAttributes.BOLD} fg="green">Lite Devtools Server</text>
+      <box marginTop={1} flexDirection="column" flexGrow={1}>
+        <EventList />
       </box>
-    </ScopeProvider>
+      <box marginTop={1}>
+        <StatusBar port={port} />
+      </box>
+    </box>
+  );
+}
+
+export function App({ port }: { port: number }) {
+  // Type cast needed due to React 18/19 type incompatibility between workspace packages
+  return (
+    <ScopeProvider scope={scope} children={<Content port={port} /> as any} />
   );
 }
