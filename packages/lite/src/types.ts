@@ -263,8 +263,7 @@ export namespace Lite {
    * Constraint for service method signatures.
    * Each method must accept ExecutionContext as first parameter.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
+  export type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
 
   /**
    * Record of service methods where each method receives ExecutionContext.

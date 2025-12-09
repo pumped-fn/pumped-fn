@@ -31,7 +31,7 @@ Primary use cases:
 
 ```typescript
 // Type constraint: service methods must accept ExecutionContext as first param
-type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
+type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
 type ServiceMethods = Record<string, ServiceMethod>
 
 interface Service<T extends ServiceMethods> {
