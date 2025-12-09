@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-09 16:08:28
+> Last generated: 2025-12-09 17:36:47
 
 ## Context Level
 
@@ -256,7 +256,7 @@ or AsyncLocalStorage dependency.
 ### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
 > 
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 
