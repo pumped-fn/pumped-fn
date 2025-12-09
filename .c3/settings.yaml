@@ -12,13 +12,7 @@ handoff: |
   - up quality level by defining a very high standard of review for each task
   - but instead of writing to file, we'll use beads to create epics and task. Epic should be the ADR
   - the plan should also include running, cleaning up  /c3-skill:c3-audit, marking ADR completed
-  - the package will have README.md, that contains diagram explaining how the library and main operation works, focus on that to reflect if changes are need to be added/updated
-  - open PR, PR must have docs, c3-audited, slops cleaned up
-    - Excessive comments
-    - Unnecessary type annotations
-    - Verbose error handling
-    - Redundant documentation
-
+  
 # Diagram tools (optional)
 diagrams: |
   always use mermaid charts, never use ascii art
