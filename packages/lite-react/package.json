@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-react",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "React integration for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
