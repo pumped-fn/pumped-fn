@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/lite": major
+"@pumped-fn/lite": minor
 ---
 
 Add hierarchical ExecutionContext with parent-child relationship per exec() call
