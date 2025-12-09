@@ -185,6 +185,27 @@ const dependentAtom = atom({
 })
 ```
 
+### Auto-Resolution Option
+
+Use `{ resolve: true }` to ensure the controller is resolved before your factory runs:
+
+```typescript
+const dependentAtom = atom({
+  deps: { config: controller(configAtom, { resolve: true }) },
+  factory: (ctx, { config }) => {
+    // config.get() is safe - already resolved
+    const unsub = config.on('resolved', () => ctx.invalidate())
+    ctx.cleanup(unsub)
+    return createServer(config.get().port)
+  }
+})
+```
+
+| Option | Behavior |
+|--------|----------|
+| `controller(atom)` | Controller in `idle` state, must call `resolve()` |
+| `controller(atom, { resolve: true })` | Controller in `resolved` state, `get()` safe |
+
 ### Type Guard
 
 ```typescript

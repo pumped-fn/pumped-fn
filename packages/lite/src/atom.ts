@@ -72,25 +72,31 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  * The Controller provides full lifecycle control: get, resolve, release, invalidate, and subscribe.
  *
  * @param atom - The Atom to wrap
+ * @param options - Optional configuration. Use { resolve: true } to auto-resolve before factory runs.
  * @returns A ControllerDep that resolves to a Controller for the Atom
  *
  * @example
  * ```typescript
  * const configAtom = atom({ factory: () => fetchConfig() })
  * const serverAtom = atom({
- *   deps: { config: controller(configAtom) },
+ *   deps: { config: controller(configAtom, { resolve: true }) },
  *   factory: (ctx, { config }) => {
- *     const unsub = config.on(() => ctx.invalidate())
+ *     // config.get() is safe - already resolved
+ *     const unsub = config.on('resolved', () => ctx.invalidate())
  *     ctx.cleanup(unsub)
  *     return createServer(config.get().port)
  *   }
  * })
  * ```
  */
-export function controller<T>(atom: Lite.Atom<T>): Lite.ControllerDep<T> {
+export function controller<T>(
+  atom: Lite.Atom<T>,
+  options?: Lite.ControllerOptions
+): Lite.ControllerDep<T> {
   return {
     [controllerDepSymbol]: true,
     atom,
+    resolve: options?.resolve,
   }
 }
 

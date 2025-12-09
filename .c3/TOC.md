@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-08 14:21:27
+> Last generated: 2025-12-09 16:08:28
 
 ## Context Level
 
@@ -122,6 +122,7 @@ and controller dependency helper for reactive patterns.
 - [Cleanup Registration](#c3-202-cleanup)
 - [Self-Invalidation](#c3-202-invalidation)
 - [Per-Atom Private Storage](#c3-202-data)
+- [Service Helper](#c3-202-service)
 - [Type Guard](#c3-202-guards)
 - [Source Files](#c3-202-source)
 - [Testing](#c3-202-testing)
@@ -140,6 +141,7 @@ context lifecycle, and dependency resolution.
 - [Executing Flows](#c3-203-executing)
 - [ExecutionContext Lifecycle](#c3-203-lifecycle)
 - [Nested Execution](#c3-203-nested)
+- [Hierarchical Execution](#c3-203-hierarchical)
 - [Type Safety](#c3-203-types)
 - [Type Guard](#c3-203-guards)
 - [Common Patterns](#c3-203-patterns)
@@ -190,25 +192,6 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ---
 
-#### [c3-206](./c3-2-lite/c3-206-service.md) - Service
-> Context-aware method containers for infrastructure patterns like databases,
-loggers, and HTTP clients where multiple methods share the same dependencies.
-
-**Sections**:
-- [Overview](#c3-206-overview) - Context-aware method containers
-- [Concepts](#c3-206-concepts)
-- [Creating Services](#c3-206-creating)
-- [Resolution](#c3-206-resolution)
-- [Invocation](#c3-206-invocation)
-- [Type Safety](#c3-206-types)
-- [Type Guard](#c3-206-guards)
-- [Common Patterns](#c3-206-patterns)
-- [Source Files](#c3-206-source)
-- [Testing](#c3-206-testing)
-- [Related](#c3-206-related)
-
----
-
 ### React Lite Library (@pumped-fn/react-lite) Components
 
 #### [c3-301](./c3-3-react-lite/c3-301-hooks.md) - React Hooks
@@ -230,6 +213,46 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 ## Architecture Decisions
 
+### [adr-017](./adr/adr-017-controller-auto-resolution.md) - Controller Auto-Resolution Option
+> Add optional { resolve: true } flag to controller() helper that auto-resolves
+the atom before passing the controller to the factory, eliminating the need
+for redundant atom+controller deps or manual resolve() calls.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-017-status)
+- [Problem/Requirement](#adr-017-problem)
+- [Exploration Journey](#adr-017-exploration)
+- [Solution](#adr-017-solution)
+- [Changes Across Layers](#adr-017-changes)
+- [Verification](#adr-017-verification)
+- [Related](#adr-017-related)
+
+---
+
+### [ADR-016-hierarchical-execution-context](./adr/adr-016-hierarchical-execution-context.md) - Hierarchical ExecutionContext with Parent-Child Per Exec
+> Create child ExecutionContext per exec() call with parent reference and
+isolated data map, enabling nested span tracing without race conditions
+or AsyncLocalStorage dependency.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-016-status)
+- [Problem/Requirement](#adr-016-problem)
+- [Exploration Journey](#adr-016-exploration)
+- [Solution](#adr-016-solution)
+- [Breaking Changes](#adr-016-breaking)
+- [Complexity Estimate](#adr-016-complexity)
+- [Alternative Considered: Shared Context with Stack](#adr-016-alternative)
+- [Changes Across Layers](#adr-016-changes)
+- [Verification](#adr-016-verification)
+- [Migration Guide](#adr-016-migration)
+- [Related](#adr-016-related)
+
+---
+
 ### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
 > 
 
@@ -240,10 +263,10 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ### [adr-014](./adr/adr-014-datastore-map-semantics.md) - DataStore Map-like Semantics
-> Align DataStore with Map semantics - get() always returns T | undefined
+> Documents that DataStore has Map semantics - get() always returns T | undefined
 (pure lookup), defaults only used by getOrSet() not get().
 
-**Status**: Proposed
+**Status**: Implemented
 
 **Sections**:
 - [Status](#adr-014-status)
@@ -254,35 +277,6 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 - [Verification](#adr-014-verification)
 - [Migration Guide](#adr-014-migration)
 - [Related](#adr-014-related)
-
----
-
-### [adr-016](./adr/adr-016-hierarchical-execution-context.md) - Hierarchical ExecutionContext with Parent-Child Per Exec
-> Create child ExecutionContext per exec() call with parent reference and
-isolated data map, enabling nested span tracing without race conditions
-or AsyncLocalStorage dependency.
-
-**Status**: Accepted
-
-**Sections**:
-- [Status](#adr-016-status)
-- [Problem/Requirement](#adr-016-problem)
-- [Exploration Journey](#adr-016-exploration)
-- [Solution](#adr-016-solution)
-- [Implementation](#adr-016-implementation)
-- [Execution Flow Sequence](#adr-016-sequence)
-- [Cleanup Lifecycle Sequence](#adr-016-cleanup-sequence)
-- [Closure Capture Behavior](#adr-016-closure)
-- [Root Context Behavior](#adr-016-root)
-- [Extension Usage for Tracing](#adr-016-tracing)
-- [Concurrent Safety](#adr-016-concurrent)
-- [Breaking Changes](#adr-016-breaking)
-- [Complexity Estimate](#adr-016-complexity)
-- [Alternative Considered](#adr-016-alternative)
-- [Changes Across Layers](#adr-016-changes)
-- [Verification](#adr-016-verification)
-- [Migration Guide](#adr-016-migration)
-- [Related](#adr-016-related)
 
 ---
 
@@ -534,5 +528,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 27
-**Contexts**: 1 | **Containers**: 4 | **Components**: 7 | **ADRs**: 16
+**Total Documents**: 28
+**Contexts**: 1 | **Containers**: 4 | **Components**: 6 | **ADRs**: 17

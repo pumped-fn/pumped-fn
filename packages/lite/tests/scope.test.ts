@@ -203,6 +203,82 @@ describe("Scope", () => {
       const result = await scope.resolve(outerAtom)
       expect(result).toBe(42)
     })
+
+    it("auto-resolves controller when { resolve: true }", async () => {
+      const scope = createScope()
+      const configAtom = atom({ factory: () => ({ port: 3000 }) })
+
+      const dependentAtom = atom({
+        deps: { config: controller(configAtom, { resolve: true }) },
+        factory: (ctx, { config }) => {
+          expect(config.state).toBe('resolved')
+          return config.get().port
+        }
+      })
+
+      const result = await scope.resolve(dependentAtom)
+      expect(result).toBe(3000)
+    })
+
+    it("controller without options remains idle", async () => {
+      const scope = createScope()
+      const configAtom = atom({ factory: () => ({ port: 3000 }) })
+
+      const dependentAtom = atom({
+        deps: { config: controller(configAtom) },
+        factory: async (ctx, { config }) => {
+          expect(config.state).toBe('idle')
+          await config.resolve()
+          return config.get().port
+        }
+      })
+
+      const result = await scope.resolve(dependentAtom)
+      expect(result).toBe(3000)
+    })
+
+    it("resolved controller supports on(), invalidate(), set()", async () => {
+      const scope = createScope()
+      let factoryCallCount = 0
+      const configAtom = atom({
+        factory: () => {
+          factoryCallCount++
+          return { port: 3000 }
+        }
+      })
+
+      let listenerCalls = 0
+      const dependentAtom = atom({
+        deps: { config: controller(configAtom, { resolve: true }) },
+        factory: (ctx, { config }) => {
+          config.on('resolved', () => listenerCalls++)
+          return config.get().port
+        }
+      })
+
+      await scope.resolve(dependentAtom)
+      expect(factoryCallCount).toBe(1)
+
+      const ctrl = scope.controller(configAtom)
+      ctrl.set({ port: 8080 })
+      await scope.flush()
+      expect(listenerCalls).toBe(1)
+      expect(ctrl.get().port).toBe(8080)
+    })
+
+    it("propagates errors from auto-resolved controller", async () => {
+      const scope = createScope()
+      const failingAtom = atom({
+        factory: () => { throw new Error("config failed") }
+      })
+
+      const dependentAtom = atom({
+        deps: { config: controller(failingAtom, { resolve: true }) },
+        factory: (ctx, { config }) => config.get()
+      })
+
+      await expect(scope.resolve(dependentAtom)).rejects.toThrow("config failed")
+    })
   })
 
   describe("tag deps", () => {

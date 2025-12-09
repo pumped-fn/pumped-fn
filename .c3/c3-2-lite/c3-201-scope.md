@@ -204,6 +204,24 @@ ctrl.invalidate()
 unsub() // Stop listening
 ```
 
+### Pre-Resolved Controller Dependency
+
+When using `controller(atom, { resolve: true })` as a dependency, the controller
+is already in `resolved` state when the factory runs:
+
+```typescript
+const myAtom = atom({
+  deps: { config: controller(configAtom, { resolve: true }) },
+  factory: (ctx, { config }) => {
+    console.log(config.state)  // 'resolved'
+    console.log(config.get())  // { port: 3000 } - safe, no throw
+
+    config.on('resolved', () => ctx.invalidate())
+    return config.get().port
+  }
+})
+```
+
 ### Controller.get() Behavior
 
 | State | Behavior |
