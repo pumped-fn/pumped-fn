@@ -8,7 +8,6 @@ import type {
   controllerSymbol,
   tagExecutorSymbol,
   typedSymbol,
-  serviceSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -260,26 +259,14 @@ export namespace Lite {
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
 
   /**
-   * Constraint for service method signatures.
-   * Each method must accept ExecutionContext as first parameter.
+   * Service method signature - matches ExecFnOptions.fn constraint.
+   * ctx.exec always injects ExecutionContext as first parameter.
    */
   export type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
 
   /**
-   * Record of service methods where each method receives ExecutionContext.
+   * Record of methods compatible with ctx.exec({ fn, params }).
+   * Use with service() to get compile-time enforcement.
    */
   export type ServiceMethods = Record<string, ServiceMethod>
-
-  export interface Service<T extends ServiceMethods> {
-    readonly [atomSymbol]: true
-    readonly [serviceSymbol]: true
-    readonly factory: ServiceFactory<T, Record<string, Dependency>>
-    readonly deps?: Record<string, Dependency>
-    readonly tags?: Tagged<unknown>[]
-  }
-
-  export type ServiceFactory<T extends ServiceMethods, D extends Record<string, Dependency>> =
-    keyof D extends never
-      ? (ctx: ResolveContext) => MaybePromise<T>
-      : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
 }

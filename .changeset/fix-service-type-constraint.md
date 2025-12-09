@@ -2,11 +2,17 @@
 "@pumped-fn/lite": patch
 ---
 
-fix: enforce ServiceMethods type constraint on service return type
+fix: simplify service to be narrowed atom with type constraint
 
-The `service()` function now properly enforces that the return type `T` must be a record of methods where each method receives `ExecutionContext` as its first parameter.
+**BREAKING**: Removed `Service<T>` interface, `isService()`, and `serviceSymbol`
 
-Before: `Service<T>` allowed any type `T`
-After: `Service<T extends ServiceMethods>` requires `T` to be `Record<string, (ctx: ExecutionContext, ...args) => unknown>`
+- `service()` now returns `Atom<T extends ServiceMethods>` directly
+- Use `isAtom()` instead of `isService()` for type guards
+- Removed `ServiceFactory` type - uses `AtomFactory` instead
 
-This is a type-level fix that improves type safety without changing runtime behavior.
+The `ServiceMethods` constraint ensures methods match the `(ctx: ExecutionContext, ...args) => result`
+signature that `ctx.exec({ fn, params })` expects. This is enforced at compile time.
+
+Migration:
+- Replace `Lite.Service<T>` with `Lite.Atom<T>` where `T extends Lite.ServiceMethods`
+- Replace `isService(value)` with `isAtom(value)`

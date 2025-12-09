@@ -139,7 +139,7 @@ sequenceDiagram
 | `tag(config)` | Define metadata tag | `Tag<T>` |
 | `preset(atom, value)` | Create preset injection | `Preset<T>` |
 | `controller(atom)` | Create controller dependency | `ControllerDep<T>` |
-| `service(config)` | Define context-aware method container | `Service<T>` |
+| `service(config)` | Define context-aware method container | `Atom<T extends ServiceMethods>` |
 | `scope.select(atom, selector, options?)` | Create fine-grained subscription | `SelectHandle<S>` |
 
 ### Type Guards
@@ -153,7 +153,6 @@ sequenceDiagram
 | `isPreset(value)` | Check if value is Preset |
 | `isControllerDep(value)` | Check if value is ControllerDep |
 | `isTagExecutor(value)` | Check if value is TagExecutor |
-| `isService(value)` | Check if value is Service |
 
 ### Interfaces
 

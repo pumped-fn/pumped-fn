@@ -27,56 +27,22 @@ Primary use cases:
 
 ## Concepts {#c3-206-concepts}
 
-### Service Interface
+### Service = Narrowed Atom
 
 ```typescript
-// Type constraint: service methods must accept ExecutionContext as first param
+// Service method must match ctx.exec({ fn, params }) signature
 type ServiceMethod = (ctx: ExecutionContext, ...args: unknown[]) => unknown
 type ServiceMethods = Record<string, ServiceMethod>
 
-interface Service<T extends ServiceMethods> {
-  readonly [serviceSymbol]: true
-  readonly factory: ServiceFactory<T, Record<string, Dependency>>
-  readonly deps?: Record<string, Dependency>
-  readonly tags?: Tagged<unknown>[]
-}
-
-type ServiceFactory<T extends ServiceMethods, D extends Record<string, Dependency>> =
-  keyof D extends never
-    ? (ctx: ResolveContext) => MaybePromise<T>
-    : (ctx: ResolveContext, deps: InferDeps<D>) => MaybePromise<T>
+// service() returns Atom<T> where T extends ServiceMethods
+function service<T extends ServiceMethods>(config): Atom<T>
 ```
 
-**Type Constraint:** Unlike atoms which can return any value, services are constrained
-to return `Record<string, (ctx: ExecutionContext, ...args) => unknown>`. This ensures
-all service methods receive execution context for extension wrapping via `ctx.exec()`.
+**Key insight:** `ctx.exec({ fn, params })` always injects `ExecutionContext` as the first
+argument. The `service()` function enforces this at compile time via `T extends ServiceMethods`.
 
-### Service IS-A Atom
-
-Services are atoms with additional constraints. Internally, a Service has **both** symbols:
-
-```typescript
-{
-  [atomSymbol]: true,      // Enables atom resolution machinery
-  [serviceSymbol]: true,   // Identifies as service for type guards
-  factory, deps, tags
-}
-```
-
-**Why dual symbols?**
-- `atomSymbol` → Reuses atom lifecycle (singleton, cleanup, invalidation)
-- `serviceSymbol` → Distinguishes from plain atoms for tooling/type guards
-
-This means `isAtom(service)` returns `true` (structural subtyping), while
-`isService(service)` provides specific identification.
-
-| Aspect | Atom | Service |
-|--------|------|---------|
-| Returns | Any value | Object with methods |
-| Methods | N/A | Take `(ctx, ...args)` |
-| Resolution | `scope.resolve()` | `scope.resolve()` |
-| Invocation | Direct use | `ctx.exec({ fn, params })` |
-| Symbols | `atomSymbol` | `atomSymbol` + `serviceSymbol` |
+There is no separate `Service` type - `service()` just returns an `Atom<T>` with the constraint
+that `T` must be methods compatible with `ctx.exec`.
 
 ## Creating Services {#c3-206-creating}
 
@@ -178,15 +144,13 @@ await ctx.exec({ fn: db.query, params: [123] }) // Type error
 
 ## Type Guard {#c3-206-guards}
 
-### isService
+Services are atoms, so use `isAtom()`:
 
 ```typescript
-import { isService } from '@pumped-fn/lite'
+import { isAtom } from '@pumped-fn/lite'
 
-if (isService(value)) {
-  // value is Service<unknown>
-  console.log('Factory:', value.factory)
-  console.log('Deps:', value.deps)
+if (isAtom(value)) {
+  const methods = await scope.resolve(value)
 }
 ```
 
@@ -319,22 +283,18 @@ const loggerService = service({
 
 | File | Contents |
 |------|----------|
-| `src/service.ts` | `service()`, `isService()`, `ServiceConfig` |
-| `src/types.ts` | `Service`, `ServiceFactory` in Lite namespace |
-| `src/symbols.ts` | `serviceSymbol` |
-| `src/index.ts` | Public exports |
+| `src/service.ts` | `service()` |
+| `src/types.ts` | `ServiceMethod`, `ServiceMethods` |
 
 ## Testing {#c3-206-testing}
 
-Key test scenarios in `tests/service.test.ts`:
-- Service creation and type guard identification
-- Service resolution with dependencies
+Runtime tests in `tests/service.test.ts`:
+- Service is atom (`isAtom()` returns true)
+- Resolution with dependencies
 - Method invocation via `ctx.exec()`
 
-Type constraint tests in `tests/types.test.ts`:
-- Service methods must have ExecutionContext as first parameter
-- Service type inference with dependencies
-- Negative test: methods without ExecutionContext are rejected
+Type tests in `tests/types.test.ts`:
+- Service methods must match `ctx.exec` signature `(ctx, ...args) => result`
 
 ## Related {#c3-206-related}
 
