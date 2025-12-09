@@ -1,17 +1,17 @@
 ---
 id: c3-3
 c3-version: 3
-title: React Lite Library (@pumped-fn/react-lite)
+title: Lite React Library (@pumped-fn/lite-react)
 summary: >
   Minimal React bindings for @pumped-fn/lite with Suspense and ErrorBoundary
   integration via useSyncExternalStore for React 18+ applications.
 ---
 
-# React Lite Library (@pumped-fn/react-lite)
+# Lite React Library (@pumped-fn/lite-react)
 
 ## Overview {#c3-3-overview}
 
-`@pumped-fn/react-lite` provides thin React wrappers around `@pumped-fn/lite` primitives:
+`@pumped-fn/lite-react` provides thin React wrappers around `@pumped-fn/lite` primitives:
 - **ScopeProvider** - React Context provider for scope injection
 - **useAtom** - Subscribe to atom values with Suspense/ErrorBoundary integration
 - **useSelect** - Fine-grained selection with custom equality
@@ -47,7 +47,7 @@ graph TB
         Components["User Components"]
     end
 
-    subgraph "@pumped-fn/react-lite"
+    subgraph "@pumped-fn/lite-react"
         useScope["useScope()"]
         useAtom["useAtom()"]
         useSelect["useSelect()"]
@@ -127,7 +127,7 @@ Types are re-exported from `@pumped-fn/lite` via the `Lite` namespace.
 ## Source Organization {#c3-3-source}
 
 ```
-packages/react-lite/
+packages/lite-react/
 ├── src/
 │   ├── index.ts          # Public exports
 │   ├── context.tsx       # ScopeContext, ScopeProvider
@@ -154,7 +154,7 @@ packages/react-lite/
 
 ```tsx
 import { createScope, atom } from '@pumped-fn/lite'
-import { ScopeProvider, useAtom } from '@pumped-fn/react-lite'
+import { ScopeProvider, useAtom } from '@pumped-fn/lite-react'
 
 const userAtom = atom({
   factory: async () => fetch('/api/user').then(r => r.json())
@@ -219,15 +219,15 @@ function TodoCount() {
 
 **Running tests:**
 ```bash
-pnpm -F @pumped-fn/react-lite test        # Run all tests
-pnpm -F @pumped-fn/react-lite typecheck   # Type check src
-pnpm -F @pumped-fn/react-lite typecheck:full  # Type check src + tests
+pnpm -F @pumped-fn/lite-react test        # Run all tests
+pnpm -F @pumped-fn/lite-react typecheck   # Type check src
+pnpm -F @pumped-fn/lite-react typecheck:full  # Type check src + tests
 ```
 
 **Testing with presets:**
 ```tsx
 import { createScope, preset } from '@pumped-fn/lite'
-import { ScopeProvider } from '@pumped-fn/react-lite'
+import { ScopeProvider } from '@pumped-fn/lite-react'
 
 test('renders user name', async () => {
   const scope = createScope({

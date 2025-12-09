@@ -1,11 +1,11 @@
-# @pumped-fn/vite-hmr
+# @pumped-fn/lite-hmr
 
 Vite HMR plugin for `@pumped-fn/lite` that preserves atom state across hot module reloads.
 
 ## Installation
 
 ```bash
-pnpm add -D @pumped-fn/vite-hmr
+pnpm add -D @pumped-fn/lite-hmr
 ```
 
 ## Usage
@@ -14,7 +14,7 @@ pnpm add -D @pumped-fn/vite-hmr
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { pumpedHmr } from '@pumped-fn/vite-hmr'
+import { pumpedHmr } from '@pumped-fn/lite-hmr'
 
 export default defineConfig({
   plugins: [

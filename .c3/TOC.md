@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-09 16:08:28
+> Last generated: 2025-12-09 17:36:47
 
 ## Context Level
 
@@ -42,7 +42,7 @@ and controllers for TypeScript applications with zero external dependencies.
 
 ---
 
-### [c3-3](./c3-3-react-lite/) - React Lite Library (@pumped-fn/react-lite)
+### [c3-3](./c3-3-lite-react/) - Lite React Library (@pumped-fn/lite-react)
 > Minimal React bindings for @pumped-fn/lite with Suspense and ErrorBoundary
 integration via useSyncExternalStore for React 18+ applications.
 
@@ -61,7 +61,7 @@ integration via useSyncExternalStore for React 18+ applications.
 
 ---
 
-### [c3-4](./c3-4-devtools/) - Devtools Library (@pumped-fn/devtools)
+### [c3-4](./c3-4-lite-devtools/) - Lite Devtools Library (@pumped-fn/lite-devtools)
 > Observability extension with fire-and-forget transports.
 
 **Sections**:
@@ -71,7 +71,7 @@ integration via useSyncExternalStore for React 18+ applications.
 
 ---
 
-### [c3-5](./c3-5-vite-hmr/) - Vite HMR Plugin (@pumped-fn/vite-hmr)
+### [c3-5](./c3-5-lite-hmr/) - Lite HMR Plugin (@pumped-fn/lite-hmr)
 > Build-time Vite plugin preserving atom state across hot module reloads.
 
 **Sections**:
@@ -192,9 +192,9 @@ allowing factory bypassing or atom substitution at scope creation.
 
 ---
 
-### React Lite Library (@pumped-fn/react-lite) Components
+### Lite React Library (@pumped-fn/lite-react) Components
 
-#### [c3-301](./c3-3-react-lite/c3-301-hooks.md) - React Hooks
+#### [c3-301](./c3-3-lite-react/c3-301-hooks.md) - React Hooks
 > React hooks for @pumped-fn/lite integration - useScope, useAtom, useSelect,
 and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
@@ -256,7 +256,7 @@ or AsyncLocalStorage dependency.
 ### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
 > 
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 

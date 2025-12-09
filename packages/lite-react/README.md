@@ -1,4 +1,4 @@
-# @pumped-fn/react-lite
+# @pumped-fn/lite-react
 
 React bindings for `@pumped-fn/lite` with Suspense and ErrorBoundary integration.
 
@@ -61,7 +61,7 @@ Provides scope to component tree.
 
 ```tsx
 import { createScope } from '@pumped-fn/lite'
-import { ScopeProvider } from '@pumped-fn/react-lite'
+import { ScopeProvider } from '@pumped-fn/lite-react'
 
 const scope = createScope()
 await scope.resolve(userAtom)
@@ -147,7 +147,7 @@ Use presets for test isolation:
 
 ```tsx
 import { createScope, preset } from '@pumped-fn/lite'
-import { ScopeProvider } from '@pumped-fn/react-lite'
+import { ScopeProvider } from '@pumped-fn/lite-react'
 
 const scope = createScope({
   presets: [preset(userAtom, { name: 'Test User' })]

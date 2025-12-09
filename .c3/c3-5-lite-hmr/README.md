@@ -1,12 +1,12 @@
 ---
 id: c3-5
 c3-version: 3
-title: Vite HMR Plugin (@pumped-fn/vite-hmr)
+title: Lite HMR Plugin (@pumped-fn/lite-hmr)
 summary: >
   Build-time Vite plugin preserving atom state across hot module reloads.
 ---
 
-# Vite HMR Plugin (@pumped-fn/vite-hmr)
+# Lite HMR Plugin (@pumped-fn/lite-hmr)
 
 ## Overview {#c3-5-overview}
 
@@ -44,7 +44,7 @@ Vite plugin that transforms atom declarations at build time to preserve state ac
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import { pumpedHmr } from '@pumped-fn/vite-hmr'
+import { pumpedHmr } from '@pumped-fn/lite-hmr'
 
 export default defineConfig({
   plugins: [pumpedHmr()]

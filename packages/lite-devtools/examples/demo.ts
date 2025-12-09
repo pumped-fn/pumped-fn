@@ -26,7 +26,7 @@ const fetchUserFlow = flow({
 });
 
 async function main() {
-  console.log("\n--- @pumped-fn/devtools demo ---\n");
+  console.log("\n--- @pumped-fn/lite-devtools demo ---\n");
 
   const scope = createScope({
     extensions: [createDevtools({ transports: [consoleTransport()] })],
