@@ -441,11 +441,6 @@ Key test scenarios in `tests/atom.test.ts`:
 - Controller dependency creation
 - Type guards
 
-Key test scenarios for `service()` in `tests/types.test.ts`:
-- Type constraint enforced (methods must match `(ctx: ExecutionContext, ...args) => result`)
-- Negative test: invalid signature rejected at compile time (`@ts-expect-error`)
-- Runtime behavior identical to `atom()` (covered by `scope.test.ts`)
-
 Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
 - Tag-based get/set with type safety
 - Default value handling for tags with defaults
