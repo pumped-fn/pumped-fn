@@ -1,7 +1,13 @@
+import { type ReactNode } from "react";
 import { ScopeProvider, useAtom } from "@pumped-fn/lite-react";
 import type { Devtools } from "@pumped-fn/lite-devtools";
 import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
+
+// Bridge React 18/19 type boundary: lite-react uses React 18 types, this package uses React 19
+function Provider({ children }: { children: ReactNode }) {
+  return <ScopeProvider scope={scope} children={children as React.ReactNode} />;
+}
 
 const ICONS: Record<Devtools.EventType, string> = {
   "atom:resolve": "⚡", "atom:resolved": "✓", "flow:exec": "▶", "flow:complete": "✓", error: "✗",
@@ -46,8 +52,8 @@ function Content({ port }: { port: number }) {
 
 export function App({ port }: { port: number }) {
   return (
-    <ScopeProvider scope={scope}>
+    <Provider>
       <Content port={port} />
-    </ScopeProvider>
+    </Provider>
   );
 }
