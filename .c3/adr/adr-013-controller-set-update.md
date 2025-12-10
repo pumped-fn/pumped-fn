@@ -5,14 +5,14 @@ summary: >
   Add set() and update() methods to Controller for pushing values directly
   without re-running the factory, enabling external data sources (WebSocket,
   etc.) to update atom values reactively while preserving the invalidation queue.
-status: proposed
+status: implemented
 date: 2025-12-03
 ---
 
 # [ADR-013] Controller.set() and Controller.update() for Direct Value Mutation
 
 ## Status {#adr-013-status}
-**Proposed** - 2025-12-03
+**Implemented** - 2025-12-10
 
 ## Problem/Requirement {#adr-013-problem}
 

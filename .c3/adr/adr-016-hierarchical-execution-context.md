@@ -5,7 +5,7 @@ summary: >
   Create child ExecutionContext per exec() call with parent reference and
   isolated data map, enabling nested span tracing without race conditions
   or AsyncLocalStorage dependency.
-status: proposed
+status: accepted
 date: 2025-12-08
 ---
 

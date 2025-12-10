@@ -31,6 +31,7 @@ mem.subscribe((events) => console.log(events))
 | `memory()` | Same-process (panels, testing) |
 | `broadcastChannel()` | Browser tabs |
 | `consoleTransport()` | Debug logging |
+| `httpTransport()` | Cross-process (standalone server) |
 
 **Event types:** `atom:resolve`, `atom:resolved`, `flow:exec`, `flow:complete`, `error`
 

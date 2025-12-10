@@ -5,5 +5,6 @@ export {
   broadcastChannel,
   receiveBroadcast,
   consoleTransport,
+  httpTransport,
 } from "./transports";
 export type { Devtools } from "./types";
