@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-09 17:36:47
+> Last generated: 2025-12-10 17:24:58
 
 ## Context Level
 
@@ -81,6 +81,19 @@ integration via useSyncExternalStore for React 18+ applications.
 - [Transform Rules](#c3-5-transforms)
 - [Production Safety](#c3-5-production)
 - [Related](#c3-5-related)
+
+---
+
+### [c3-6](./c3-6-lite-devtools-server/) - Lite Devtools Server (@pumped-fn/lite-devtools-server)
+> Standalone TUI server receiving devtools events via HTTP from application processes.
+
+**Sections**:
+- [Overview](#c3-6-overview)
+- [Architecture](#c3-6-architecture)
+- [Technology Stack](#c3-6-stack)
+- [API](#c3-6-api)
+- [Source Organization](#c3-6-source)
+- [Related](#c3-6-related)
 
 ---
 
@@ -236,7 +249,7 @@ for redundant atom+controller deps or manual resolve() calls.
 isolated data map, enabling nested span tracing without race conditions
 or AsyncLocalStorage dependency.
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 - [Status](#adr-016-status)
@@ -285,7 +298,7 @@ or AsyncLocalStorage dependency.
 without re-running the factory, enabling external data sources (WebSocket,
 etc.) to update atom values reactively while preserving the invalidation queue.
 
-**Status**: Proposed
+**Status**: Implemented
 
 **Sections**:
 - [Status](#adr-013-status)
@@ -528,5 +541,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 28
-**Contexts**: 1 | **Containers**: 4 | **Components**: 6 | **ADRs**: 17
+**Total Documents**: 29
+**Contexts**: 1 | **Containers**: 5 | **Components**: 6 | **ADRs**: 17
