@@ -6,6 +6,7 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
+import { SpanStatusCode } from "@opentelemetry/api";
 
 describe("OTel tracing", () => {
   let exporter: InMemorySpanExporter;
@@ -192,5 +193,46 @@ describe("OTel tracing", () => {
     const spans = exporter.getFinishedSpans();
     expect(spans.length).toBe(1);
     expect(spans[0]?.name).toBe("tracedFlow");
+  });
+
+  it("records exception on span when flow fails", async () => {
+    const failingFlow = flow({
+      name: "failingFlow",
+      factory: () => {
+        throw new Error("test error");
+      },
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    const ctx = scope.createContext();
+    await expect(ctx.exec({ flow: failingFlow })).rejects.toThrow("test error");
+    await ctx.close();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(spans[0]?.events.some((e) => e.name === "exception")).toBe(true);
+  });
+
+  it("records exception on span when atom fails", async () => {
+    const failingAtom = atom({
+      factory: async function failingAtom(): Promise<never> {
+        throw new Error("atom error");
+      },
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    await expect(scope.resolve(failingAtom)).rejects.toThrow("atom error");
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(spans[0]?.events.some((e) => e.name === "exception")).toBe(true);
   });
 });
