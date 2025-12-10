@@ -6,7 +6,7 @@ import { scope, eventsAtom } from "./state";
 
 // Bridge React 18/19 type boundary: lite-react uses React 18 types, this package uses React 19
 function Provider({ children }: { children: ReactNode }) {
-  return <ScopeProvider scope={scope} children={children as React.ReactNode} />;
+  return <ScopeProvider scope={scope} children={children as unknown as React.ReactNode} />;
 }
 
 const ICONS: Record<Devtools.EventType, string> = {
