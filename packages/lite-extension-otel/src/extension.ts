@@ -8,6 +8,7 @@ import {
 import { isFlow, type Lite } from "@pumped-fn/lite";
 import type { OtelExtension } from "./types";
 import { SPAN_KEY, getSpanFromContext, setSpanInContext } from "./span";
+import { createMetrics, type OtelMetrics } from "./metrics";
 
 function getTargetName(
   target: Lite.Flow<unknown, unknown> | Function,
@@ -36,7 +37,12 @@ function getAtomName(
 }
 
 export function createOtel(options: OtelExtension.Options): Lite.Extension {
-  const { tracer, flowFilter, atomFilter } = options;
+  const { tracer, meter, flowFilter, atomFilter } = options;
+
+  let metrics: OtelMetrics | undefined;
+  if (meter) {
+    metrics = createMetrics(meter);
+  }
 
   return {
     name: "otel",
@@ -47,6 +53,7 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
       }
 
       const span = tracer.startSpan(getAtomName(atom, options));
+      const start = performance.now();
 
       try {
         const result = await context.with(
@@ -54,6 +61,9 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
           next
         );
         span.setStatus({ code: SpanStatusCode.OK });
+        metrics?.atomResolutionHistogram.record(performance.now() - start, {
+          "atom.name": getAtomName(atom, options),
+        });
         return result;
       } catch (err) {
         span.setStatus({
@@ -63,6 +73,10 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
         if (err instanceof Error) {
           span.recordException(err);
         }
+        metrics?.errorCounter.add(1, {
+          "atom.name": getAtomName(atom, options),
+          "error.type": err instanceof Error ? err.constructor.name : "unknown",
+        });
         throw err;
       } finally {
         span.end();
@@ -82,8 +96,10 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
         ? trace.setSpan(context.active(), parentSpan)
         : context.active();
 
-      const span = tracer.startSpan(getTargetName(target, options), {}, parentContext);
+      const spanName = getTargetName(target, options);
+      const span = tracer.startSpan(spanName, {}, parentContext);
       setSpanInContext(ctx.data, span);
+      const start = performance.now();
 
       try {
         const result = await context.with(
@@ -91,6 +107,9 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
           next
         );
         span.setStatus({ code: SpanStatusCode.OK });
+        metrics?.flowExecutionHistogram.record(performance.now() - start, {
+          "flow.name": spanName,
+        });
         return result;
       } catch (err) {
         span.setStatus({
@@ -100,6 +119,10 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
         if (err instanceof Error) {
           span.recordException(err);
         }
+        metrics?.errorCounter.add(1, {
+          "flow.name": spanName,
+          "error.type": err instanceof Error ? err.constructor.name : "unknown",
+        });
         throw err;
       } finally {
         span.end();
