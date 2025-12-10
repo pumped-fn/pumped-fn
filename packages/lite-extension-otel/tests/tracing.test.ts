@@ -18,9 +18,9 @@ describe("OTel tracing", () => {
     provider.register();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     exporter.reset();
-    provider.shutdown();
+    await provider.shutdown();
   });
 
   it("creates span for flow execution", async () => {
@@ -132,5 +132,65 @@ describe("OTel tracing", () => {
     const spans = exporter.getFinishedSpans();
     expect(spans.length).toBe(1);
     expect(spans[0]?.name).toBe("configAtom");
+  });
+
+  it("atomFilter skips filtered atoms", async () => {
+    const tracedAtom = atom({
+      factory: async function tracedAtom() {
+        return "traced";
+      },
+    });
+
+    const skippedAtom = atom({
+      factory: async function skippedAtom() {
+        return "skipped";
+      },
+    });
+
+    const scope = createScope({
+      extensions: [
+        createOtel({
+          tracer: provider.getTracer("test"),
+          atomFilter: (atom) => !atom.factory.name.startsWith("skippedAtom"),
+        }),
+      ],
+    });
+
+    await scope.resolve(tracedAtom);
+    await scope.resolve(skippedAtom);
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toContain("tracedAtom");
+  });
+
+  it("flowFilter skips filtered flows", async () => {
+    const tracedFlow = flow({
+      name: "tracedFlow",
+      factory: () => "traced",
+    });
+
+    const skippedFlow = flow({
+      name: "skippedFlow",
+      factory: () => "skipped",
+    });
+
+    const scope = createScope({
+      extensions: [
+        createOtel({
+          tracer: provider.getTracer("test"),
+          flowFilter: (flow) => flow.name !== "skippedFlow",
+        }),
+      ],
+    });
+
+    const ctx = scope.createContext();
+    await ctx.exec({ flow: tracedFlow });
+    await ctx.exec({ flow: skippedFlow });
+    await ctx.close();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toBe("tracedFlow");
   });
 });
