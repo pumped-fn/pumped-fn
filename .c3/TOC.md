@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-10 17:24:58
+> Last generated: 2025-12-10 18:21:50
 
 ## Context Level
 
@@ -94,6 +94,23 @@ integration via useSyncExternalStore for React 18+ applications.
 - [API](#c3-6-api)
 - [Source Organization](#c3-6-source)
 - [Related](#c3-6-related)
+
+---
+
+### [c3-7](./c3-7-lite-extension-otel/) - Lite Extension OTel (@pumped-fn/lite-extension-otel)
+> OpenTelemetry integration extension providing distributed tracing, metrics,
+and W3C context propagation for pumped-fn applications.
+
+**Sections**:
+- [Overview](#c3-7-overview)
+- [Technology Stack](#c3-7-stack)
+- [Architecture](#c3-7-architecture)
+- [Span Hierarchy Flow](#c3-7-hierarchy)
+- [API](#c3-7-api)
+- [Metrics](#c3-7-metrics)
+- [Source Organization](#c3-7-source)
+- [Testing](#c3-7-testing)
+- [Related](#c3-7-related)
 
 ---
 
@@ -225,6 +242,24 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [adr-018](./adr/adr-018-otel-extension.md) - OpenTelemetry Extension for Lite Package
+> Create @pumped-fn/lite-extension-otel package providing OpenTelemetry integration
+with tracing, metrics, and context propagation using the Extension system and
+hierarchical ExecutionContext from ADR-016.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-018-status)
+- [Problem/Requirement](#adr-018-problem)
+- [Exploration Journey](#adr-018-exploration)
+- [Solution](#adr-018-solution)
+- [Changes Across Layers](#adr-018-changes)
+- [Verification](#adr-018-verification)
+- [Related](#adr-018-related)
+
+---
 
 ### [adr-017](./adr/adr-017-controller-auto-resolution.md) - Controller Auto-Resolution Option
 > Add optional { resolve: true } flag to controller() helper that auto-resolves
@@ -541,5 +576,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 29
-**Contexts**: 1 | **Containers**: 5 | **Components**: 6 | **ADRs**: 17
+**Total Documents**: 31
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 18

@@ -37,6 +37,7 @@ graph TB
         Devtools["@pumped-fn/lite-devtools<br/>(Observability)"]
         DevtoolsServer["@pumped-fn/lite-devtools-server<br/>(TUI Server)"]
         LiteHMR["@pumped-fn/lite-hmr<br/>(HMR Plugin)"]
+        OTel["@pumped-fn/lite-extension-otel<br/>(OpenTelemetry)"]
     end
 
     subgraph "Framework Integrations"
@@ -58,6 +59,7 @@ graph TB
     LiteHMR -->|transforms| Lite
 
     AppDev -->|uses| LiteHMR
+    OTel -->|depends on| Lite
     Hono -.->|integrates| Lite
     NextJS -.->|integrates| Lite
     TanStack -.->|integrates| Lite
@@ -81,6 +83,7 @@ graph TB
 | @pumped-fn/lite-devtools | Library | Observability extension with transport-based event streaming | [c3-4-lite-devtools](./c3-4-lite-devtools/) |
 | @pumped-fn/lite-hmr | Vite Plugin | Build-time transform preserving atom state across HMR reloads | [c3-5-lite-hmr](./c3-5-lite-hmr/) |
 | @pumped-fn/lite-devtools-server | CLI Tool | Standalone TUI server receiving devtools events via HTTP | [c3-6-lite-devtools-server](./c3-6-lite-devtools-server/) |
+| @pumped-fn/lite-extension-otel | Library | OpenTelemetry integration with tracing, metrics, and context propagation | [c3-7-lite-extension-otel](./c3-7-lite-extension-otel/) |
 | docs | Static Site | VitePress documentation site | (out of scope) |
 
 ## Protocols {#c3-0-protocols}
