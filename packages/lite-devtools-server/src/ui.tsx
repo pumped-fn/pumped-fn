@@ -5,7 +5,7 @@ import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
 function ReactTypeBridge({ children }: { children: ReactNode }) {
-  // @ts-expect-error React 18/19 ReactNode type boundary
+  // @ts-expect-error React version type mismatch
   return <ScopeProvider scope={scope} children={children} />;
 }
 

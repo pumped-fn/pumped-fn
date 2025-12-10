@@ -39,13 +39,16 @@
     "hono": "^4.7.0",
     "react": "^19.0.0"
   },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "devDependencies": {
     "@pumped-fn/lite-devtools": "workspace:*",
     "@types/node": "^20.19.22",
     "@types/react": "^19.0.0",
-    "tsdown": "^0.16.5",
+    "tsdown": "catalog:",
     "tsx": "^4.19.4",
-    "typescript": "^5.9.3"
+    "typescript": "catalog:"
   },
   "license": "MIT"
 }

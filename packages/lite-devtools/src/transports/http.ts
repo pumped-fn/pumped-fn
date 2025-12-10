@@ -13,7 +13,7 @@ export function httpTransport(options: HttpTransportOptions): Devtools.Transport
   return {
     name: "http",
     send(events) {
-      void fetch(options.url, {
+      fetch(options.url, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...options.headers },
         body: JSON.stringify(events),
