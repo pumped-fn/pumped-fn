@@ -78,7 +78,7 @@ serve({ fetch: app.fetch, port: 3001 })
 ```
 packages/lite-devtools-server/
 ├── src/
-│   ├── bin.ts      # CLI entry point
+│   ├── bin.tsx     # CLI entry point
 │   ├── server.ts   # Hono HTTP server
 │   ├── state.ts    # Reactive state (eventsAtom)
 │   ├── ui.tsx      # OpenTUI React dashboard
