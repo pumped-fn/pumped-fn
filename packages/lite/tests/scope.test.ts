@@ -1257,15 +1257,15 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("ctx.data (tag-based DataStore)", () => {
+  describe("ctx.data (ContextData with Tag support)", () => {
     it("stores and retrieves typed values using tags", async () => {
       const scope = createScope()
       const valueTag = tag<string>({ label: "value" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(valueTag, "hello")
-          return ctx.data.get(valueTag)
+          ctx.data.setTag(valueTag, "hello")
+          return ctx.data.getTag(valueTag)
         },
       })
 
@@ -1281,8 +1281,8 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => ({
-          missing: ctx.data.get(missingTag),
-          withDefault: ctx.data.get(tagWithDefault),
+          missing: ctx.data.getTag(missingTag),
+          withDefault: ctx.data.getTag(tagWithDefault),
         }),
       })
 
@@ -1298,8 +1298,8 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(countTag, 42)
-          return ctx.data.get(countTag)
+          ctx.data.setTag(countTag, 42)
+          return ctx.data.getTag(countTag)
         },
       })
 
@@ -1316,9 +1316,9 @@ describe("ExecutionContext", () => {
       const myAtom = atom({
         factory: (ctx) => {
           resolveCount++
-          const prev = ctx.data.getOrSet(countTag)
-          ctx.data.set(countTag, prev + 1)
-          return ctx.data.get(countTag)
+          const prev = ctx.data.getOrSetTag(countTag)
+          ctx.data.setTag(countTag, prev + 1)
+          return ctx.data.getTag(countTag)
         },
       })
 
@@ -1342,9 +1342,9 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => {
-          const prev = ctx.data.getOrSet(countTag)
-          ctx.data.set(countTag, prev + 1)
-          return ctx.data.get(countTag)
+          const prev = ctx.data.getOrSetTag(countTag)
+          ctx.data.setTag(countTag, prev + 1)
+          return ctx.data.getTag(countTag)
         },
       })
 
@@ -1357,7 +1357,7 @@ describe("ExecutionContext", () => {
       expect(second).toBe(1)
     })
 
-    it("creates DataStore lazily on first access", async () => {
+    it("creates ContextData lazily on first access", async () => {
       const scope = createScope()
       const keyTag = tag<string>({ label: "key" })
       let dataAccessed = false
@@ -1371,7 +1371,7 @@ describe("ExecutionContext", () => {
       const withDataAtom = atom({
         factory: (ctx) => {
           dataAccessed = true
-          ctx.data.set(keyTag, "value")
+          ctx.data.setTag(keyTag, "value")
           return "data accessed"
         },
       })
@@ -1388,15 +1388,15 @@ describe("ExecutionContext", () => {
 
       const atomA = atom({
         factory: (ctx) => {
-          ctx.data.set(nameTag, "A")
-          return ctx.data.get(nameTag)
+          ctx.data.setTag(nameTag, "A")
+          return ctx.data.getTag(nameTag)
         },
       })
 
       const atomB = atom({
         factory: (ctx) => {
-          ctx.data.set(nameTag, "B")
-          return ctx.data.get(nameTag)
+          ctx.data.setTag(nameTag, "B")
+          return ctx.data.getTag(nameTag)
         },
       })
 
@@ -1407,17 +1407,17 @@ describe("ExecutionContext", () => {
       expect(resultB).toBe("B")
     })
 
-    it("supports has() to check if key exists", async () => {
+    it("supports hasTag() to check if key exists", async () => {
       const scope = createScope()
       const existsTag = tag<string>({ label: "exists" })
       const missingTag = tag<string>({ label: "missing" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(existsTag, "value")
+          ctx.data.setTag(existsTag, "value")
           return {
-            hasExists: ctx.data.has(existsTag),
-            hasMissing: ctx.data.has(missingTag),
+            hasExists: ctx.data.hasTag(existsTag),
+            hasMissing: ctx.data.hasTag(missingTag),
           }
         },
       })
@@ -1428,16 +1428,16 @@ describe("ExecutionContext", () => {
       expect(result.hasMissing).toBe(false)
     })
 
-    it("supports delete() to remove key", async () => {
+    it("supports deleteTag() to remove key", async () => {
       const scope = createScope()
       const valueTag = tag<string>({ label: "value" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(valueTag, "hello")
-          const before = ctx.data.get(valueTag)
-          const deleted = ctx.data.delete(valueTag)
-          const after = ctx.data.get(valueTag)
+          ctx.data.setTag(valueTag, "hello")
+          const before = ctx.data.getTag(valueTag)
+          const deleted = ctx.data.deleteTag(valueTag)
+          const after = ctx.data.getTag(valueTag)
           return { before, deleted, after }
         },
       })
@@ -1449,16 +1449,16 @@ describe("ExecutionContext", () => {
       expect(result.after).toBeUndefined()
     })
 
-    it("delete() returns undefined after deletion (Map-like semantics)", async () => {
+    it("deleteTag() returns undefined after deletion (Map-like semantics)", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 0 })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(countTag, 5)
-          const before = ctx.data.get(countTag)
-          ctx.data.delete(countTag)
-          const after = ctx.data.get(countTag)
+          ctx.data.setTag(countTag, 5)
+          const before = ctx.data.getTag(countTag)
+          ctx.data.deleteTag(countTag)
+          const after = ctx.data.getTag(countTag)
           return { before, after }
         },
       })
@@ -1476,12 +1476,12 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(aTag, "hello")
-          ctx.data.set(bTag, 42)
+          ctx.data.setTag(aTag, "hello")
+          ctx.data.setTag(bTag, 42)
           ctx.data.clear()
           return {
-            a: ctx.data.get(aTag),
-            b: ctx.data.get(bTag),
+            a: ctx.data.getTag(aTag),
+            b: ctx.data.getTag(bTag),
           }
         },
       })
@@ -1498,10 +1498,10 @@ describe("ExecutionContext", () => {
 
       const myAtom = atom({
         factory: (ctx) => {
-          let cache = ctx.data.get(cacheTag)
+          let cache = ctx.data.getTag(cacheTag)
           if (!cache) {
             cache = new Map()
-            ctx.data.set(cacheTag, cache)
+            ctx.data.setTag(cacheTag, cache)
           }
           cache.set("key", 123)
           return cache
@@ -1514,14 +1514,14 @@ describe("ExecutionContext", () => {
       expect(result.get("key")).toBe(123)
     })
 
-    it("getOrSet returns existing value when present", async () => {
+    it("getOrSetTag returns existing value when present", async () => {
       const scope = createScope()
       const valueTag = tag<string>({ label: "value" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(valueTag, "existing")
-          return ctx.data.getOrSet(valueTag, "default")
+          ctx.data.setTag(valueTag, "existing")
+          return ctx.data.getOrSetTag(valueTag, "default")
         },
       })
 
@@ -1530,14 +1530,14 @@ describe("ExecutionContext", () => {
       expect(result).toBe("existing")
     })
 
-    it("getOrSet stores and returns default when missing (tag without default)", async () => {
+    it("getOrSetTag stores and returns default when missing (tag without default)", async () => {
       const scope = createScope()
       const valueTag = tag<string>({ label: "value" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          const value = ctx.data.getOrSet(valueTag, "default")
-          const hasIt = ctx.data.has(valueTag)
+          const value = ctx.data.getOrSetTag(valueTag, "default")
+          const hasIt = ctx.data.hasTag(valueTag)
           return { value, hasIt }
         },
       })
@@ -1548,14 +1548,14 @@ describe("ExecutionContext", () => {
       expect(result.hasIt).toBe(true)
     })
 
-    it("getOrSet uses tag default when available (no second arg needed)", async () => {
+    it("getOrSetTag uses tag default when available (no second arg needed)", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 42 })
 
       const myAtom = atom({
         factory: (ctx) => {
-          const value = ctx.data.getOrSet(countTag)
-          const hasIt = ctx.data.has(countTag)
+          const value = ctx.data.getOrSetTag(countTag)
+          const hasIt = ctx.data.hasTag(countTag)
           return { value, hasIt }
         },
       })
@@ -1566,15 +1566,15 @@ describe("ExecutionContext", () => {
       expect(result.hasIt).toBe(true)
     })
 
-    it("getOrSet materializes value so has() returns true", async () => {
+    it("getOrSetTag materializes value so hasTag() returns true", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 0 })
 
       const myAtom = atom({
         factory: (ctx) => {
-          const beforeHas = ctx.data.has(countTag)
-          ctx.data.getOrSet(countTag)
-          const afterHas = ctx.data.has(countTag)
+          const beforeHas = ctx.data.hasTag(countTag)
+          ctx.data.getOrSetTag(countTag)
+          const afterHas = ctx.data.hasTag(countTag)
           return { beforeHas, afterHas }
         },
       })
@@ -1585,16 +1585,16 @@ describe("ExecutionContext", () => {
       expect(result.afterHas).toBe(true)
     })
 
-    it("delete then getOrSet re-initializes value", async () => {
+    it("deleteTag then getOrSetTag re-initializes value", async () => {
       const scope = createScope()
       const countTag = tag<number>({ label: "count", default: 0 })
 
       const myAtom = atom({
         factory: (ctx) => {
-          ctx.data.set(countTag, 99)
-          const before = ctx.data.get(countTag)
-          ctx.data.delete(countTag)
-          const afterDelete = ctx.data.getOrSet(countTag)
+          ctx.data.setTag(countTag, 99)
+          const before = ctx.data.getTag(countTag)
+          ctx.data.deleteTag(countTag)
+          const afterDelete = ctx.data.getOrSetTag(countTag)
           return { before, afterDelete }
         },
       })
@@ -1605,13 +1605,13 @@ describe("ExecutionContext", () => {
       expect(result.afterDelete).toBe(0)
     })
 
-    it("getOrSet with complex types replaces boilerplate pattern", async () => {
+    it("getOrSetTag with complex types replaces boilerplate pattern", async () => {
       const scope = createScope()
       const cacheTag = tag<Map<string, number>>({ label: "cache" })
 
       const myAtom = atom({
         factory: (ctx) => {
-          const cache = ctx.data.getOrSet(cacheTag, new Map())
+          const cache = ctx.data.getOrSetTag(cacheTag, new Map())
           cache.set("key", 456)
           return cache
         },

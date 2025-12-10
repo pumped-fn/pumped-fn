@@ -138,7 +138,7 @@ Long-lived cached dependency with lifecycle.
 - `ctx.cleanup(fn)` — runs on invalidate and release (LIFO order)
 - `ctx.invalidate()` — schedule re-resolution
 - `ctx.data` — storage that survives invalidation (cleared on release)
-- `ctx.data.getOrSet(tag, defaultValue)` — initialize and retrieve in one call
+- `ctx.data.getOrSetTag(tag, defaultValue)` — initialize and retrieve in one call
 
 ### Flow
 
@@ -214,16 +214,16 @@ import type { Lite } from '@pumped-fn/lite'
 
 Both run cleanups before applying the new value.
 
-### DataStore.get()
+### ContextData.getTag()
 
-`ctx.data.get(tag)` always returns `T | undefined` (Map-like semantics). Use `getOrSet(tag)` when you need the tag's default value.
+`ctx.data.getTag(tag)` always returns `T | undefined` (Map-like semantics). Use `getOrSetTag(tag)` when you need the tag's default value.
 
 ```typescript
 const countTag = tag<number>({ label: 'count', default: 0 })
 
-ctx.data.get(countTag)       // undefined (not stored)
-ctx.data.getOrSet(countTag)  // 0 (uses default, now stored)
-ctx.data.get(countTag)       // 0 (now stored)
+ctx.data.getTag(countTag)       // undefined (not stored)
+ctx.data.getOrSetTag(countTag)  // 0 (uses default, now stored)
+ctx.data.getTag(countTag)       // 0 (now stored)
 ```
 
 ## License

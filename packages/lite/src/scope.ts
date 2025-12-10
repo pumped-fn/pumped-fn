@@ -5,33 +5,51 @@ import { ParseError } from "./errors"
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
-class DataStoreImpl implements Lite.DataStore {
-  private readonly map = new Map<symbol, unknown>()
+class ContextDataImpl implements Lite.ContextData {
+  private readonly map = new Map<string | symbol, unknown>()
 
-  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
-    return this.map.get(tag.key) as T | undefined
+  // Raw Map operations
+  get(key: string | symbol): unknown {
+    return this.map.get(key)
   }
 
-  set<T>(tag: Lite.Tag<T, boolean>, value: T): void {
-    this.map.set(tag.key, value)
+  set(key: string | symbol, value: unknown): void {
+    this.map.set(key, value)
   }
 
-  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
-    return this.map.has(tag.key)
+  has(key: string | symbol): boolean {
+    return this.map.has(key)
   }
 
-  delete<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
-    return this.map.delete(tag.key)
+  delete(key: string | symbol): boolean {
+    return this.map.delete(key)
   }
 
   clear(): void {
     this.map.clear()
   }
 
-  getOrSet<T>(tag: Lite.Tag<T, true>): T
-  getOrSet<T>(tag: Lite.Tag<T, true>, value: T): T
-  getOrSet<T>(tag: Lite.Tag<T, false>, value: T): T
-  getOrSet<T>(tag: Lite.Tag<T, boolean>, value?: T): T {
+  // Tag-based operations
+  getTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.map.get(tag.key) as T | undefined
+  }
+
+  setTag<T>(tag: Lite.Tag<T, boolean>, value: T): void {
+    this.map.set(tag.key, value)
+  }
+
+  hasTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.map.has(tag.key)
+  }
+
+  deleteTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.map.delete(tag.key)
+  }
+
+  getOrSetTag<T>(tag: Lite.Tag<T, true>): T
+  getOrSetTag<T>(tag: Lite.Tag<T, true>, value: T): T
+  getOrSetTag<T>(tag: Lite.Tag<T, false>, value: T): T
+  getOrSetTag<T>(tag: Lite.Tag<T, boolean>, value?: T): T {
     if (this.map.has(tag.key)) {
       return this.map.get(tag.key) as T
     }
@@ -50,7 +68,7 @@ interface AtomEntry<T> {
   listeners: Map<ListenerEvent, Set<() => void>>
   pendingInvalidate: boolean
   pendingSet?: { value: T } | { fn: (prev: T) => T }
-  data?: Lite.DataStore
+  data?: ContextDataImpl
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -411,7 +429,7 @@ class ScopeImpl implements Lite.Scope {
       scope: this,
       get data() {
         if (!entry.data) {
-          entry.data = new DataStoreImpl()
+          entry.data = new ContextDataImpl()
         }
         return entry.data
       },
@@ -667,7 +685,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private closed = false
   private readonly _input: unknown
   private readonly baseTags: Lite.Tagged<unknown>[]
-  private _data: Map<string | symbol, unknown> | undefined
+  private _data: ContextDataImpl | undefined
   readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
@@ -689,9 +707,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this._input
   }
 
-  get data(): Map<string | symbol, unknown> {
+  get data(): Lite.ContextData {
     if (!this._data) {
-      this._data = new Map()
+      this._data = new ContextDataImpl()
     }
     return this._data
   }
