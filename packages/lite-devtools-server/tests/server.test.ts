@@ -1,13 +1,20 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { app } from "../src/server";
+import type { Hono } from "hono";
+import { createApp } from "../src/server";
 import { scope, eventsAtom } from "../src/state";
+import type { Lite } from "@pumped-fn/lite";
+import type { Devtools } from "@pumped-fn/lite-devtools";
 
 describe("devtools server", () => {
+  let app: Hono;
+  let ctrl: Lite.Controller<Devtools.Event[]>;
+
   beforeEach(async () => {
     await scope.ready;
     await scope.resolve(eventsAtom);
-    const ctrl = scope.controller(eventsAtom);
+    ctrl = scope.controller(eventsAtom);
     ctrl.set([]);
+    app = createApp(ctrl);
   });
 
   it("GET /health returns ok", async () => {

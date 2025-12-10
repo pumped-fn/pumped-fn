@@ -67,9 +67,13 @@ PORT=4000 npx @pumped-fn/lite-devtools-server
 ### Programmatic
 
 ```typescript
-import { app } from '@pumped-fn/lite-devtools-server'
+import { createApp, scope, eventsAtom } from '@pumped-fn/lite-devtools-server'
 import { serve } from '@hono/node-server'
 
+await scope.ready
+await scope.resolve(eventsAtom)
+const ctrl = scope.controller(eventsAtom)
+const app = createApp(ctrl)
 serve({ fetch: app.fetch, port: 3001 })
 ```
 
