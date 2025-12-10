@@ -5,7 +5,7 @@ import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
 function ReactTypeBridge({ children }: { children: ReactNode }) {
-  // @ts-expect-error React version type mismatch
+  // @ts-expect-error lite-react uses React 18 types, OpenTUI requires React 19
   return <ScopeProvider scope={scope} children={children} />;
 }
 
