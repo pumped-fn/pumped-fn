@@ -40,9 +40,6 @@
     "hono": "catalog:",
     "react": "catalog:"
   },
-  "peerDependencies": {
-    "react": "^19.0.0"
-  },
   "devDependencies": {
     "@pumped-fn/lite-devtools": "workspace:*",
     "@types/node": "catalog:",

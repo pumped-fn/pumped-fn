@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Devtools } from "@pumped-fn/lite-devtools";
+import type { Lite } from "@pumped-fn/lite";
 import { scope, eventsAtom } from "./state";
 
 const MAX_EVENTS = 100;
@@ -8,12 +9,16 @@ const MAX_EVENTS = 100;
 export const app = new Hono();
 app.use("*", cors());
 
-const ctrl = scope.controller(eventsAtom);
+let ctrl: Lite.Controller<Devtools.Event[]> | undefined;
+function getController() {
+  if (!ctrl) ctrl = scope.controller(eventsAtom);
+  return ctrl;
+}
 
 app.post("/events", async (c) => {
   try {
     const newEvents = (await c.req.json()) as Devtools.Event[];
-    ctrl.update((prev) => {
+    getController().update((prev) => {
       const next = prev.concat(newEvents);
       return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
     });
@@ -25,4 +30,4 @@ app.post("/events", async (c) => {
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-app.get("/events", (c) => c.json(ctrl.get()));
+app.get("/events", (c) => c.json(getController().get()));
