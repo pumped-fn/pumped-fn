@@ -1,5 +1,9 @@
 # Pumped-fn Project Instructions
 
+# Dependencies
+
+When adding new dependencies to any package, use `catalog:` version specifier instead of hardcoded versions. Catalog versions are defined in `pnpm-workspace.yaml`. If a package is not in the catalog, add it there first.
+
 # Prerequisites
 
 This repo requires `c3-skill` and `superpowers` skill sets. If you encounter tool not found or skill not found related to c3 or superpowers, please have a look at ./troubleshooting.md

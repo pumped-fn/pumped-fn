@@ -42,9 +42,9 @@
     "@types/react": "^18.3.27",
     "jsdom": "^27.3.0",
     "react": "^18.3.1",
-    "tsdown": "^0.16.8",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"

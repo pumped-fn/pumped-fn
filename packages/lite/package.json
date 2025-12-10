@@ -32,9 +32,9 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "tsdown": "^0.16.8",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"

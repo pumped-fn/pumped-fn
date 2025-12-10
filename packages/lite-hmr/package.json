@@ -38,9 +38,10 @@
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@types/estree": "^1.0.8",
-    "typescript": "^5.9.3",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
     "vite": "^6.4.1",
-    "vitest": "^3.2.4"
+    "vitest": "catalog:"
   },
   "keywords": [
     "vite",
