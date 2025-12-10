@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createOtel } from "../src";
-import { createScope, flow } from "@pumped-fn/lite";
+import { createScope, flow, atom } from "@pumped-fn/lite";
 import {
   BasicTracerProvider,
   InMemorySpanExporter,
@@ -114,5 +114,23 @@ describe("OTel tracing", () => {
     // Both have no parent (root context has no span)
     expect(slowSpan?.parentSpanId).toBeUndefined();
     expect(fastSpan?.parentSpanId).toBeUndefined();
+  });
+
+  it("creates span for atom resolution", async () => {
+    const testAtom = atom({
+      factory: async function configAtom() {
+        return { key: "value" };
+      },
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    await scope.resolve(testAtom);
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toBe("configAtom");
   });
 });

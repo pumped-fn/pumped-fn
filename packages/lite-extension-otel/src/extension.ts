@@ -25,11 +25,49 @@ function getTargetName(
   return "fn";
 }
 
+function getAtomName(
+  atom: Lite.Atom<unknown>,
+  options?: OtelExtension.Options
+): string {
+  if (options?.spanName) {
+    return options.spanName(atom);
+  }
+  return atom.factory.name ?? "atom";
+}
+
 export function createOtel(options: OtelExtension.Options): Lite.Extension {
-  const { tracer, flowFilter } = options;
+  const { tracer, flowFilter, atomFilter } = options;
 
   return {
     name: "otel",
+
+    wrapResolve: async (next, atom, _scope) => {
+      if (atomFilter && !atomFilter(atom)) {
+        return next();
+      }
+
+      const span = tracer.startSpan(getAtomName(atom, options));
+
+      try {
+        const result = await context.with(
+          trace.setSpan(context.active(), span),
+          next
+        );
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (err) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        if (err instanceof Error) {
+          span.recordException(err);
+        }
+        throw err;
+      } finally {
+        span.end();
+      }
+    },
 
     wrapExec: async (next, target, ctx) => {
       if (flowFilter && isFlow(target) && !flowFilter(target)) {
