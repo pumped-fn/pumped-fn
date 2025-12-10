@@ -45,8 +45,9 @@ function Content({ port }: { port: number }) {
 }
 
 export function App({ port }: { port: number }) {
-  // Type cast needed due to React 18/19 type incompatibility between workspace packages
   return (
-    <ScopeProvider scope={scope} children={<Content port={port} /> as any} />
+    <ScopeProvider scope={scope}>
+      <Content port={port} />
+    </ScopeProvider>
   );
 }

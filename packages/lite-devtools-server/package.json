@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/bin.ts",
+    "dev": "tsx src/bin.tsx",
     "demo": "tsx examples/demo.ts"
   },
   "dependencies": {

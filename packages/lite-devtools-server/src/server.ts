@@ -8,12 +8,13 @@ const MAX_EVENTS = 100;
 export const app = new Hono();
 app.use("*", cors());
 
+// Module-level controller is safe: atom is resolved at startup in bin.tsx.
+// Concurrent update() calls may race, but event loss is acceptable for devtools.
 const ctrl = scope.controller(eventsAtom);
 
 app.post("/events", async (c) => {
   try {
     const newEvents = (await c.req.json()) as Devtools.Event[];
-    await ctrl.resolve();
     ctrl.update((prev) => {
       const next = prev.concat(newEvents);
       return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
@@ -26,7 +27,4 @@ app.post("/events", async (c) => {
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-app.get("/events", async (c) => {
-  await ctrl.resolve();
-  return c.json(ctrl.get());
-});
+app.get("/events", (c) => c.json(ctrl.get()));
