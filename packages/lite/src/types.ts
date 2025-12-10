@@ -104,7 +104,7 @@ export namespace Lite {
     readonly input: unknown
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
-    readonly data: Map<symbol, unknown>
+    readonly data: Map<string | symbol, unknown>
     exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
     onClose(fn: () => MaybePromise<void>): void

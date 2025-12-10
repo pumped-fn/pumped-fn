@@ -667,7 +667,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private closed = false
   private readonly _input: unknown
   private readonly baseTags: Lite.Tagged<unknown>[]
-  private _data: Map<symbol, unknown> | undefined
+  private _data: Map<string | symbol, unknown> | undefined
   readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
@@ -689,7 +689,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this._input
   }
 
-  get data(): Map<symbol, unknown> {
+  get data(): Map<string | symbol, unknown> {
     if (!this._data) {
       this._data = new Map()
     }
