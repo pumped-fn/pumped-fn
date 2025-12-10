@@ -2,7 +2,9 @@
 
 # Dependencies
 
-When adding new dependencies to any package, use `catalog:` version specifier instead of hardcoded versions. Catalog versions are defined in `pnpm-workspace.yaml`. If a package is not in the catalog, add it there first.
+When adding new dependencies to any package:
+- **dependencies** and **devDependencies**: Use `catalog:` version specifier. Catalog versions are defined in `pnpm-workspace.yaml`. If a package is not in the catalog, add it there first.
+- **peerDependencies**: Use explicit version ranges (e.g., `^19.0.0`). Peer dependencies are NOT managed by catalog since they define compatibility contracts with consumers.
 
 # Prerequisites
 
