@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-10 18:21:50
+> Last generated: 2025-12-10 18:59:52
 
 ## Context Level
 
@@ -248,7 +248,7 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 with tracing, metrics, and context propagation using the Extension system and
 hierarchical ExecutionContext from ADR-016.
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 - [Status](#adr-018-status)

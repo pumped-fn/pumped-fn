@@ -5,14 +5,14 @@ summary: >
   Create @pumped-fn/lite-extension-otel package providing OpenTelemetry integration
   with tracing, metrics, and context propagation using the Extension system and
   hierarchical ExecutionContext from ADR-016.
-status: proposed
+status: accepted
 date: 2025-12-10
 ---
 
 # [ADR-018] OpenTelemetry Extension for Lite Package
 
 ## Status {#adr-018-status}
-**Proposed** - 2025-12-10
+**Accepted** - 2025-12-10
 
 ## Problem/Requirement {#adr-018-problem}
 
