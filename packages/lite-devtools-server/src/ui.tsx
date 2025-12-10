@@ -5,8 +5,9 @@ import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
 // Bridge React 18/19 type boundary: lite-react uses React 18 types, this package uses React 19
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function Provider({ children }: { children: ReactNode }) {
-  return <ScopeProvider scope={scope} children={children as unknown as React.ReactNode} />;
+  return <ScopeProvider scope={scope} children={children as any} />;
 }
 
 const ICONS: Record<Devtools.EventType, string> = {
