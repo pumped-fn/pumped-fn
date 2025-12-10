@@ -41,4 +41,78 @@ describe("OTel tracing", () => {
     expect(spans.length).toBe(1);
     expect(spans[0]?.name).toBe("testFlow");
   });
+
+  it("creates parent-child span hierarchy for nested flows", async () => {
+    const childFlow = flow({
+      name: "childFlow",
+      factory: () => "child",
+    });
+
+    const parentFlow = flow({
+      name: "parentFlow",
+      factory: async (ctx) => {
+        const result = await ctx.exec({ flow: childFlow });
+        return `parent-${result}`;
+      },
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    const ctx = scope.createContext();
+    const result = await ctx.exec({ flow: parentFlow });
+    await ctx.close();
+
+    expect(result).toBe("parent-child");
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(2);
+
+    const childSpan = spans.find((s) => s.name === "childFlow");
+    const parentSpan = spans.find((s) => s.name === "parentFlow");
+
+    expect(childSpan).toBeDefined();
+    expect(parentSpan).toBeDefined();
+    expect(childSpan?.parentSpanId).toBe(parentSpan?.spanContext().spanId);
+  });
+
+  it("concurrent siblings have isolated spans", async () => {
+    const slowFlow = flow({
+      name: "slowFlow",
+      factory: async () => {
+        await new Promise((r) => setTimeout(r, 10));
+        return "slow";
+      },
+    });
+
+    const fastFlow = flow({
+      name: "fastFlow",
+      factory: () => "fast",
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    const ctx = scope.createContext();
+    const [slow, fast] = await Promise.all([
+      ctx.exec({ flow: slowFlow }),
+      ctx.exec({ flow: fastFlow }),
+    ]);
+    await ctx.close();
+
+    expect(slow).toBe("slow");
+    expect(fast).toBe("fast");
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(2);
+
+    const slowSpan = spans.find((s) => s.name === "slowFlow");
+    const fastSpan = spans.find((s) => s.name === "fastFlow");
+
+    // Both have no parent (root context has no span)
+    expect(slowSpan?.parentSpanId).toBeUndefined();
+    expect(fastSpan?.parentSpanId).toBeUndefined();
+  });
 });
