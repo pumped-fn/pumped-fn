@@ -16,8 +16,8 @@ async function main() {
   try {
     const renderer = await createCliRenderer();
     createRoot(renderer).render(<App port={PORT} />);
-  } catch (err) {
-    console.error("TUI initialization failed:", err);
+  } catch {
+    console.log("TUI unavailable, running headless");
   }
 }
 
