@@ -35,6 +35,7 @@ graph TB
         Lite["@pumped-fn/lite<br/>(Core Library)"]
         ReactLite["@pumped-fn/lite-react<br/>(React Bindings)"]
         Devtools["@pumped-fn/lite-devtools<br/>(Observability)"]
+        DevtoolsServer["@pumped-fn/lite-devtools-server<br/>(TUI Server)"]
         LiteHMR["@pumped-fn/lite-hmr<br/>(HMR Plugin)"]
     end
 
@@ -51,6 +52,9 @@ graph TB
 
     ReactLite -->|depends on| Lite
     Devtools -->|depends on| Lite
+    DevtoolsServer -->|depends on| Lite
+    DevtoolsServer -->|depends on| ReactLite
+    Devtools -.->|HTTP events| DevtoolsServer
     LiteHMR -->|transforms| Lite
 
     AppDev -->|uses| LiteHMR
@@ -76,6 +80,7 @@ graph TB
 | @pumped-fn/lite-react | Library | Minimal React bindings with Suspense and useSyncExternalStore | [c3-3-lite-react](./c3-3-lite-react/) |
 | @pumped-fn/lite-devtools | Library | Observability extension with transport-based event streaming | [c3-4-lite-devtools](./c3-4-lite-devtools/) |
 | @pumped-fn/lite-hmr | Vite Plugin | Build-time transform preserving atom state across HMR reloads | [c3-5-lite-hmr](./c3-5-lite-hmr/) |
+| @pumped-fn/lite-devtools-server | CLI Tool | Standalone TUI server receiving devtools events via HTTP | [c3-6-lite-devtools-server](./c3-6-lite-devtools-server/) |
 | docs | Static Site | VitePress documentation site | (out of scope) |
 
 ## Protocols {#c3-0-protocols}

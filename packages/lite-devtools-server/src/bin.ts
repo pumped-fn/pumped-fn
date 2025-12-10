@@ -1,7 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import type { ReactNode } from "react";
 import { createElement } from "react";
 import { app } from "./server";
 import { App } from "./ui";
@@ -17,9 +16,11 @@ async function main() {
   });
   try {
     const renderer = await createCliRenderer();
-    createRoot(renderer).render(createElement(App, { port: PORT }) as any);
-  } catch {
-    console.log("TUI not available, running headless");
+    // Type cast needed: OpenTUI uses React 19 types, lite-react uses React 18 types
+    createRoot(renderer).render(createElement(App, { port: PORT }) as React.ReactNode);
+  } catch (err) {
+    console.error("TUI initialization failed:", err);
+    console.log("Running in headless mode");
   }
 }
 
