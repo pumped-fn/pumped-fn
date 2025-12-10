@@ -4,10 +4,9 @@ import type { Devtools } from "@pumped-fn/lite-devtools";
 import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
-// Bridge React 18/19 type boundary: lite-react uses React 18 types, this package uses React 19
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function Provider({ children }: { children: ReactNode }) {
-  return <ScopeProvider scope={scope} children={children as any} />;
+function ReactTypeBridge({ children }: { children: ReactNode }) {
+  // @ts-expect-error React 18/19 ReactNode type boundary
+  return <ScopeProvider scope={scope} children={children} />;
 }
 
 const ICONS: Record<Devtools.EventType, string> = {
@@ -53,8 +52,8 @@ function Content({ port }: { port: number }) {
 
 export function App({ port }: { port: number }) {
   return (
-    <Provider>
+    <ReactTypeBridge>
       <Content port={port} />
-    </Provider>
+    </ReactTypeBridge>
   );
 }
