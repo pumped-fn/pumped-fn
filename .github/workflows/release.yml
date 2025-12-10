@@ -44,6 +44,9 @@ jobs:
         id: release_title
         run: echo "title=$(bash scripts/get-release-title.sh)" >> $GITHUB_OUTPUT
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
@@ -55,8 +58,8 @@ jobs:
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish notification
         if: steps.changesets.outputs.published == 'true'

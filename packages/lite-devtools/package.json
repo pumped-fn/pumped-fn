@@ -33,9 +33,9 @@
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
-    "tsdown": "^0.16.5",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.5"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "keywords": [
     "pumped-fn",

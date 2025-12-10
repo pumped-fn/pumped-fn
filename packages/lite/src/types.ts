@@ -58,53 +58,59 @@ export namespace Lite {
   }
 
   /**
-   * Per-atom private storage using Tags as keys. Data survives invalidation
-   * but is cleared on release.
+   * Unified context data storage with both raw Map operations and Tag-based DX.
    */
-  export interface DataStore {
-    /**
-     * Pure lookup - returns stored value or undefined.
-     * Does NOT use tag defaults (Map-like semantics).
-     * Use `getOrSet()` when you need defaults.
-     */
-    get<T>(tag: Tag<T, boolean>): T | undefined
-    /** Store value for tag */
-    set<T>(tag: Tag<T, boolean>, value: T): void
-    /** Check if tag has stored value */
-    has<T, H extends boolean>(tag: Tag<T, H>): boolean
-    /** Remove stored value, returns true if existed */
-    delete<T, H extends boolean>(tag: Tag<T, H>): boolean
+  export interface ContextData {
+    // Raw Map operations (string | symbol keys)
+    /** Get value by key */
+    get(key: string | symbol): unknown
+    /** Set value by key */
+    set(key: string | symbol, value: unknown): void
+    /** Check if key exists */
+    has(key: string | symbol): boolean
+    /** Delete value by key, returns true if existed */
+    delete(key: string | symbol): boolean
     /** Remove all stored values */
     clear(): void
+
+    // Tag-based operations (type-safe DX)
+    /** Get value by tag, returns undefined if not stored */
+    getTag<T>(tag: Tag<T, boolean>): T | undefined
+    /** Set value by tag */
+    setTag<T>(tag: Tag<T, boolean>, value: T): void
+    /** Check if tag has stored value */
+    hasTag<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /** Delete value by tag, returns true if existed */
+    deleteTag<T, H extends boolean>(tag: Tag<T, H>): boolean
     /**
      * Get existing value or initialize with tag's default.
-     * Stores and returns the value (materializes it).
+     * Stores and returns the value.
      */
-    getOrSet<T>(tag: Tag<T, true>): T
+    getOrSetTag<T>(tag: Tag<T, true>): T
     /**
      * Get existing value or initialize with provided value.
-     * Stores and returns the value (materializes it).
+     * Stores and returns the value.
      */
-    getOrSet<T>(tag: Tag<T, true>, value: T): T
+    getOrSetTag<T>(tag: Tag<T, true>, value: T): T
     /**
      * Get existing value or initialize with provided value.
      * Required for tags without defaults.
      */
-    getOrSet<T>(tag: Tag<T, false>, value: T): T
+    getOrSetTag<T>(tag: Tag<T, false>, value: T): T
   }
 
   export interface ResolveContext {
     cleanup(fn: () => MaybePromise<void>): void
     invalidate(): void
     readonly scope: Scope
-    readonly data: DataStore
+    readonly data: ContextData
   }
 
   export interface ExecutionContext {
     readonly input: unknown
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
-    readonly data: Map<symbol, unknown>
+    readonly data: ContextData
     exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
     onClose(fn: () => MaybePromise<void>): void

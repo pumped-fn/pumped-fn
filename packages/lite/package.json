@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Lightweight dependency injection with minimal reactivity",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -32,9 +32,9 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "tsdown": "^0.16.5",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.5"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"
