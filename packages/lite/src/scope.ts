@@ -740,7 +740,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get data(): Lite.ContextData {
     if (!this._data) {
-      this._data = new ContextDataImpl()
+      this._data = new ContextDataImpl(this.parent?.data)
     }
     return this._data
   }
