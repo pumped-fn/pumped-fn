@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-otel",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "OpenTelemetry extension for @pumped-fn/lite with tracing, metrics, and context propagation",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -18,7 +18,9 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
@@ -39,7 +41,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "keywords": ["pumped-fn", "opentelemetry", "otel", "tracing", "metrics", "observability"],
+  "keywords": [
+    "pumped-fn",
+    "opentelemetry",
+    "otel",
+    "tracing",
+    "metrics",
+    "observability"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
