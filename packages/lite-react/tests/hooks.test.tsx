@@ -203,6 +203,69 @@ describe('useAtom - state handling', () => {
     errorCaught = screen.getByText('Error caught') !== null
     expect(errorCaught).toBe(true)
   })
+
+  it('throws error when atom is idle and resolve: false', () => {
+    const testAtom = atom({
+      factory: async () => 'value',
+    })
+
+    const scope = createScope()
+    // Note: NOT resolving the atom
+
+    function TestComponent() {
+      useAtom(testAtom, { resolve: false })
+      return <div>test</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <ErrorBoundary fallback={<div>Error caught</div>}>
+          <TestComponent />
+        </ErrorBoundary>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('Error caught')).toBeInTheDocument()
+  })
+
+  it('suspends when resolving with resolve: false (already started)', async () => {
+    let resolveFactory: (value: string) => void
+    const promise = new Promise<string>((resolve) => {
+      resolveFactory = resolve
+    })
+
+    const testAtom = atom({
+      factory: async () => promise,
+    })
+
+    const scope = createScope()
+    scope.resolve(testAtom) // Start resolution externally
+
+    function TestComponent() {
+      const value = useAtom(testAtom, { resolve: false })
+      return <div>{value}</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <TestComponent />
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    // Should suspend because it's resolving
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveFactory!('resolved value')
+      await promise
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('resolved value')).toBeInTheDocument()
+    })
+  })
 })
 
 describe('useAtom - invalidation', () => {
@@ -679,6 +742,221 @@ describe('preset injection pattern', () => {
   })
 })
 
+describe('useAtom - non-Suspense mode', () => {
+  it('returns state object with suspense: false', async () => {
+    const testAtom = atom({
+      factory: async () => 'resolved value',
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    function TestComponent() {
+      const { data, loading, error, controller } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <span data-testid="error">{error?.message ?? 'none'}</span>
+          <span data-testid="has-controller">{controller ? 'yes' : 'no'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('resolved value')
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+    expect(screen.getByTestId('has-controller')).toHaveTextContent('yes')
+  })
+
+  it('returns idle state for unresolved atom', () => {
+    const testAtom = atom({
+      factory: async () => 'value',
+    })
+
+    const scope = createScope()
+
+    function TestComponent() {
+      const { data, loading, error } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data ?? 'undefined'}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <span data-testid="error">{error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('undefined')
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+  })
+
+  it('shows loading state during resolution', async () => {
+    let resolveFactory: (value: string) => void
+    const promise = new Promise<string>((resolve) => {
+      resolveFactory = resolve
+    })
+
+    const testAtom = atom({
+      factory: async () => promise,
+    })
+
+    const scope = createScope()
+    scope.resolve(testAtom) // Start resolution
+
+    function TestComponent() {
+      const { data, loading, error } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data ?? 'undefined'}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <span data-testid="error">{error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('loading')).toHaveTextContent('true')
+
+    await act(async () => {
+      resolveFactory!('resolved')
+      await promise
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('data')).toHaveTextContent('resolved')
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+  })
+
+  it('shows error state for failed atom', async () => {
+    const testError = new Error('Test failure')
+    const testAtom = atom({
+      factory: async () => {
+        throw testError
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom).catch(() => {})
+
+    function TestComponent() {
+      const { data, loading, error } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data ?? 'undefined'}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <span data-testid="error">{error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('undefined')
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    expect(screen.getByTestId('error')).toHaveTextContent('Test failure')
+  })
+
+  it('auto-resolves with resolve: true', async () => {
+    const testAtom = atom({
+      factory: async () => 'auto resolved',
+    })
+
+    const scope = createScope()
+
+    function TestComponent() {
+      const { data, loading } = useAtom(testAtom, { suspense: false, resolve: true })
+      return (
+        <div>
+          <span data-testid="data">{data ?? 'undefined'}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    // Initially loading
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('true')
+    })
+
+    // Eventually resolved
+    await waitFor(() => {
+      expect(screen.getByTestId('data')).toHaveTextContent('auto resolved')
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+  })
+
+  it('updates when controller.invalidate() is called', async () => {
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        return `value-${callCount}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    function TestComponent() {
+      const { data, loading, controller } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <button onClick={() => controller.invalidate()}>Refresh</button>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('value-1')
+
+    await act(async () => {
+      screen.getByText('Refresh').click()
+      await scope.flush()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('data')).toHaveTextContent('value-2')
+    })
+  })
+})
+
 describe('useController', () => {
   it('returns memoized controller', async () => {
     const testAtom = atom({
@@ -710,6 +988,60 @@ describe('useController', () => {
 
     expect(controllers.length).toBe(2)
     expect(controllers[0]).toBe(controllers[1])
+  })
+
+  it('triggers Suspense with resolve: true when atom not resolved', async () => {
+    const testAtom = atom({
+      factory: async () => 'resolved value',
+    })
+
+    const scope = createScope()
+
+    function TestComponent() {
+      const ctrl = useController(testAtom, { resolve: true })
+      return <div>{ctrl.get()}</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <TestComponent />
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('resolved value')).toBeInTheDocument()
+    })
+  })
+
+  it('returns controller immediately with resolve: true when already resolved', async () => {
+    const testAtom = atom({
+      factory: async () => 'value',
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    let capturedCtrl: Lite.Controller<string> | null = null
+
+    function TestComponent() {
+      const ctrl = useController(testAtom, { resolve: true })
+      capturedCtrl = ctrl
+      return <div>{ctrl.get()}</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('value')).toBeInTheDocument()
+    expect(capturedCtrl).not.toBeNull()
+    expect(capturedCtrl!.state).toBe('resolved')
   })
 
   it.skip('allows direct value manipulation with set()', async () => {
