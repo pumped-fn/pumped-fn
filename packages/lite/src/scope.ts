@@ -540,8 +540,15 @@ class ScopeImpl implements Lite.Scope {
     return result
   }
 
-  controller<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
-    return new ControllerImpl(atom, this)
+  controller<T>(atom: Lite.Atom<T>): Lite.Controller<T>
+  controller<T>(atom: Lite.Atom<T>, options: { resolve: true }): Promise<Lite.Controller<T>>
+  controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>>
+  controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>> {
+    const ctrl = new ControllerImpl(atom, this)
+    if (options?.resolve) {
+      return ctrl.resolve().then(() => ctrl)
+    }
+    return ctrl
   }
 
   select<T, S>(
@@ -717,6 +724,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   async exec(options: {
     flow: Lite.Flow<unknown, unknown>
     input?: unknown
+    rawInput?: unknown
     name?: string
     tags?: Lite.Tagged<unknown>[]
   } | Lite.ExecFnOptions<unknown>): Promise<unknown> {
@@ -725,12 +733,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
 
     if ("flow" in options) {
-      const { flow, input, name: execName } = options
-      let parsedInput: unknown = input
+      const { flow, input, rawInput, name: execName } = options
+      // Use rawInput if provided, otherwise input
+      const rawValue = rawInput !== undefined ? rawInput : input
+      let parsedInput: unknown = rawValue
       if (flow.parse) {
         const label = execName ?? flow.name ?? "anonymous"
         try {
-          parsedInput = await flow.parse(input)
+          parsedInput = await flow.parse(rawValue)
         } catch (err) {
           throw new ParseError(
             `Failed to parse flow input "${label}"`,
