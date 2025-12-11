@@ -121,9 +121,12 @@ export namespace Lite {
     flow: Flow<Output, Input>
     name?: string
     tags?: Tagged<unknown>[]
-  } & ([NoInfer<Input>] extends [void | undefined | null]
-    ? { input?: undefined | null }
-    : { input: NoInfer<Input> })
+  } & (
+    | ([NoInfer<Input>] extends [void | undefined | null]
+        ? { input?: undefined | null; rawInput?: never }
+        : { input: NoInfer<Input>; rawInput?: never })
+    | { rawInput: unknown; input?: never }
+  )
 
   export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
     fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
