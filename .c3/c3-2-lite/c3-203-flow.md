@@ -172,6 +172,26 @@ const result = await ctx.exec({
 await ctx.close()
 ```
 
+### Raw Input Execution
+
+When the caller has unknown/untyped data and the flow has a `parse` function:
+
+```typescript
+const createUser = flow({
+  parse: (raw) => userSchema.parse(raw),
+  factory: (ctx) => db.create(ctx.input)
+})
+
+// Typed execution - caller provides correct type
+await ctx.exec({ flow: createUser, input: { name: 'Alice', email: 'a@b.com' } })
+
+// Raw execution - flow's parse validates unknown data
+const body: unknown = JSON.parse(request.body)
+await ctx.exec({ flow: createUser, rawInput: body })
+```
+
+`input` and `rawInput` are mutually exclusive - TypeScript prevents using both.
+
 ### Execution with Tags
 
 ```typescript
@@ -574,6 +594,19 @@ const typedFlow = flow({
     return `${input.name} is ${input.age} years old`
   }
 })
+```
+
+### ExecFlowOptions
+
+```typescript
+type ExecFlowOptions<Output, Input> = {
+  flow: Flow<Output, Input>
+  name?: string
+  tags?: Tagged<unknown>[]
+} & (
+  | { input: Input; rawInput?: never }   // Typed execution
+  | { rawInput: unknown; input?: never } // Raw execution
+)
 ```
 
 ### FlowFactory Type
