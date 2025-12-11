@@ -74,6 +74,16 @@ export namespace Lite {
     delete(key: string | symbol): boolean
     /** Remove all stored values */
     clear(): void
+    /**
+     * Look up value by key, traversing parent chain if not found locally.
+     * Returns first match or undefined.
+     */
+    seek(key: string | symbol): unknown
+    /**
+     * Look up tag value, traversing parent chain if not found locally.
+     * Returns first match or undefined (ignores tag defaults).
+     */
+    seekTag<T>(tag: Tag<T, boolean>): T | undefined
 
     // Tag-based operations (type-safe DX)
     /** Get value by tag, returns undefined if not stored */
