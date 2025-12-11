@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
 import { type Lite } from "../src/types"
+import { tag } from "../src/tag"
 
 describe("Hierarchical ExecutionContext", () => {
   describe("parent chain", () => {
@@ -108,6 +109,182 @@ describe("Hierarchical ExecutionContext", () => {
 
       expect(results).toContain("A")
       expect(results).toContain("B")
+      await ctx.close()
+    })
+  })
+
+  describe("seek() hierarchical lookup", () => {
+    it("seek() returns local value if exists", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      ctx.data.set(KEY, "local-value")
+      expect(ctx.data.seek(KEY)).toBe("local-value")
+
+      await ctx.close()
+    })
+
+    it("seek() returns parent value if not local", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      ctx.data.set(KEY, "parent-value")
+
+      let childSeekResult: unknown
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childSeekResult = childCtx.data.seek(KEY)
+          }
+        }),
+        input: null
+      })
+
+      expect(childSeekResult).toBe("parent-value")
+      await ctx.close()
+    })
+
+    it("seek() traverses full parent chain", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      ctx.data.set(KEY, "root-value")
+
+      let grandchildSeekResult: unknown
+
+      const innerFlow = flow({
+        factory: (grandchildCtx) => {
+          grandchildSeekResult = grandchildCtx.data.seek(KEY)
+        }
+      })
+
+      const outerFlow = flow({
+        factory: async (childCtx) => {
+          await childCtx.exec({ flow: innerFlow, input: null })
+        }
+      })
+
+      await ctx.exec({ flow: outerFlow, input: null })
+
+      expect(grandchildSeekResult).toBe("root-value")
+      await ctx.close()
+    })
+
+    it("seek() returns undefined if not in any context", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("missing")
+
+      let childSeekResult: unknown = "not-undefined"
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childSeekResult = childCtx.data.seek(KEY)
+          }
+        }),
+        input: null
+      })
+
+      expect(childSeekResult).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("seek() prefers local over parent", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const KEY = Symbol("test")
+
+      ctx.data.set(KEY, "parent-value")
+
+      let childSeekResult: unknown
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childCtx.data.set(KEY, "child-value")
+            childSeekResult = childCtx.data.seek(KEY)
+          }
+        }),
+        input: null
+      })
+
+      expect(childSeekResult).toBe("child-value")
+      await ctx.close()
+    })
+  })
+
+  describe("seekTag() hierarchical lookup", () => {
+    it("seekTag() returns parent tag value", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const testTag = tag<string>({ label: "test" })
+
+      ctx.data.setTag(testTag, "parent-tag-value")
+
+      let childSeekResult: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childSeekResult = childCtx.data.seekTag(testTag)
+          }
+        }),
+        input: null
+      })
+
+      expect(childSeekResult).toBe("parent-tag-value")
+      await ctx.close()
+    })
+
+    it("seekTag() does NOT use tag default", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const tagWithDefault = tag<number>({ label: "count", default: 42 })
+
+      let childSeekResult: number | undefined = 999
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            childSeekResult = childCtx.data.seekTag(tagWithDefault)
+          }
+        }),
+        input: null
+      })
+
+      expect(childSeekResult).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("seekTag() traverses grandparent chain", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const userTag = tag<{ id: string }>({ label: "user" })
+
+      ctx.data.setTag(userTag, { id: "root-user" })
+
+      let grandchildResult: { id: string } | undefined
+
+      const innerFlow = flow({
+        factory: (grandchildCtx) => {
+          grandchildResult = grandchildCtx.data.seekTag(userTag)
+        }
+      })
+
+      const outerFlow = flow({
+        factory: async (childCtx) => {
+          await childCtx.exec({ flow: innerFlow, input: null })
+        }
+      })
+
+      await ctx.exec({ flow: outerFlow, input: null })
+
+      expect(grandchildResult).toEqual({ id: "root-user" })
       await ctx.close()
     })
   })

@@ -8,6 +8,10 @@ type ListenerEvent = 'resolving' | 'resolved' | '*'
 class ContextDataImpl implements Lite.ContextData {
   private readonly map = new Map<string | symbol, unknown>()
 
+  constructor(
+    private readonly parentData?: Lite.ContextData
+  ) {}
+
   // Raw Map operations
   get(key: string | symbol): unknown {
     return this.map.get(key)
@@ -29,6 +33,13 @@ class ContextDataImpl implements Lite.ContextData {
     this.map.clear()
   }
 
+  seek(key: string | symbol): unknown {
+    if (this.map.has(key)) {
+      return this.map.get(key)
+    }
+    return this.parentData?.seek(key)
+  }
+
   // Tag-based operations
   getTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
     return this.map.get(tag.key) as T | undefined
@@ -44,6 +55,13 @@ class ContextDataImpl implements Lite.ContextData {
 
   deleteTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
     return this.map.delete(tag.key)
+  }
+
+  seekTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    if (this.map.has(tag.key)) {
+      return this.map.get(tag.key) as T
+    }
+    return this.parentData?.seekTag(tag)
   }
 
   getOrSetTag<T>(tag: Lite.Tag<T, true>): T
@@ -722,7 +740,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get data(): Lite.ContextData {
     if (!this._data) {
-      this._data = new ContextDataImpl()
+      this._data = new ContextDataImpl(this.parent?.data)
     }
     return this._data
   }

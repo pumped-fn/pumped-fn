@@ -416,6 +416,39 @@ await Promise.all([
 // No race conditions - each child has independent storage
 ```
 
+### Hierarchical Data Lookup with seek()
+
+While each context has isolated data (`get()`/`getTag()` only read local), you can traverse the parent chain using `seek()`:
+
+```typescript
+const requestIdTag = tag<string>({ label: "requestId" })
+
+const middleware = flow({
+  factory: async (ctx) => {
+    ctx.data.setTag(requestIdTag, generateRequestId())
+    return ctx.exec({ flow: handler })
+  }
+})
+
+const handler = flow({
+  factory: (ctx) => {
+    // seekTag() finds value from parent middleware context
+    const reqId = ctx.data.seekTag(requestIdTag)
+    logger.info(`Request: ${reqId}`)
+  }
+})
+```
+
+**Behavior comparison:**
+
+| Method | Scope | Use Case |
+|--------|-------|----------|
+| `getTag(tag)` | Local only | Per-exec isolated data |
+| `seekTag(tag)` | Local → parent → ... → root | Cross-cutting concerns |
+| `setTag(tag, v)` | Local only | Always writes to current context |
+
+**Note:** `seekTag()` does NOT use tag defaults - it's a pure lookup. Returns `undefined` if not found in any context.
+
 ### Auto-Close Lifecycle
 
 Child contexts automatically close when `exec()` completes:

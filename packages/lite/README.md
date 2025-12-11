@@ -229,6 +229,34 @@ ctx.data.getOrSetTag(countTag)  // 0 (uses default, now stored)
 ctx.data.getTag(countTag)       // 0 (now stored)
 ```
 
+### Hierarchical Data Lookup with seek()
+
+Each execution context has isolated data, but `seekTag()` traverses the parent chain:
+
+```typescript
+const requestIdTag = tag<string>({ label: 'requestId' })
+
+const middleware = flow({
+  factory: async (ctx) => {
+    ctx.data.setTag(requestIdTag, 'req-123')
+    return ctx.exec({ flow: handler })
+  }
+})
+
+const handler = flow({
+  factory: (ctx) => {
+    // seekTag() finds value from parent context
+    const reqId = ctx.data.seekTag(requestIdTag)  // 'req-123'
+  }
+})
+```
+
+| Method | Scope | Use Case |
+|--------|-------|----------|
+| `getTag(tag)` | Local only | Per-exec isolated data |
+| `seekTag(tag)` | Local → parent → root | Cross-cutting concerns |
+| `setTag(tag, v)` | Local only | Always writes to current context |
+
 ## License
 
 MIT

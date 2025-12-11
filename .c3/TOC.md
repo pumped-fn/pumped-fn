@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-11 09:56:28
+> Last generated: 2025-12-11 14:09:15
 
 ## Context Level
 
@@ -244,6 +244,24 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [ADR-021-hierarchical-data-seek](./adr/adr-021-hierarchical-data-seek.md) - Hierarchical Data Lookup via seek() Method
+> Add seek() method to ContextData for looking up tag values across the
+ExecutionContext parent chain, enabling shared data patterns without
+breaking existing isolated data semantics.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-021-status)
+- [Problem/Requirement](#adr-021-problem)
+- [Exploration Journey](#adr-021-exploration)
+- [Solution](#adr-021-solution)
+- [Changes Across Layers](#adr-021-changes)
+- [Verification](#adr-021-verification)
+- [Related](#adr-021-related)
+
+---
 
 ### [adr-020](./adr/adr-020-raw-input-execution.md) - Raw Input Execution for Flows with Parse
 > Add rawInput option to ctx.exec() allowing unknown input when flow has parse,
@@ -613,5 +631,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 33
-**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 20
+**Total Documents**: 34
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 21
