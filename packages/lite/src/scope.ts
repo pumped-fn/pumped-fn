@@ -740,7 +740,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     if ("flow" in options) {
       const { flow, input, rawInput, name: execName } = options
-      // Use rawInput if provided, otherwise input
       const rawValue = rawInput !== undefined ? rawInput : input
       let parsedInput: unknown = rawValue
       if (flow.parse) {

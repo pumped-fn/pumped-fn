@@ -278,7 +278,7 @@ packages/lite-extension-otel/
 - [x] Works with @opentelemetry/sdk-trace-node
 - [x] Works with @opentelemetry/sdk-metrics
 - [x] No dependencies on AsyncLocalStorage
-- [ ] Disposed properly on scope.dispose()
+- [x] Disposal: Extension is stateless wrapper - OTel SDK lifecycle (TracerProvider, MeterProvider shutdown) is user's responsibility
 
 ## Related {#adr-018-related}
 
