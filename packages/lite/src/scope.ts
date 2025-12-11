@@ -190,6 +190,7 @@ class ScopeImpl implements Lite.Scope {
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private initialized = false
+  private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
   readonly ready: Promise<void>
@@ -544,7 +545,11 @@ class ScopeImpl implements Lite.Scope {
   controller<T>(atom: Lite.Atom<T>, options: { resolve: true }): Promise<Lite.Controller<T>>
   controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>>
   controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>> {
-    const ctrl = new ControllerImpl(atom, this)
+    let ctrl = this.controllers.get(atom) as ControllerImpl<T> | undefined
+    if (!ctrl) {
+      ctrl = new ControllerImpl(atom, this)
+      this.controllers.set(atom, ctrl as ControllerImpl<unknown>)
+    }
     if (options?.resolve) {
       return ctrl.resolve().then(() => ctrl)
     }
@@ -661,6 +666,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.cache.delete(atom)
+    this.controllers.delete(atom)
   }
 
   async dispose(): Promise<void> {
