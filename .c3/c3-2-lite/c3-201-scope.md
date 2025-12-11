@@ -99,6 +99,7 @@ interface Scope {
   readonly ready: Promise<void>  // Resolves when extensions initialized
   resolve<T>(atom: Atom<T>): Promise<T>
   controller<T>(atom: Atom<T>): Controller<T>
+  controller<T>(atom: Atom<T>, options: { resolve: true }): Promise<Controller<T>>
   release<T>(atom: Atom<T>): Promise<void>
   dispose(): Promise<void>
   createContext(options?: CreateContextOptions): ExecutionContext
@@ -171,6 +172,24 @@ await ctrl.resolve()
 console.log(ctrl.state)  // 'resolved'
 console.log(ctrl.get())  // { port: 3000 }
 ```
+
+### Pre-Resolved Controller via Scope
+
+When you need a controller that's already resolved outside of atom dependencies:
+
+```typescript
+// Returns Promise<Controller<T>> - controller is resolved when promise settles
+const ctrl = await scope.controller(configAtom, { resolve: true })
+console.log(ctrl.state)  // 'resolved'
+console.log(ctrl.get())  // { port: 3000 } - safe, no throw
+```
+
+| Call | Return Type | Controller State |
+|------|-------------|------------------|
+| `scope.controller(atom)` | `Controller<T>` | `idle` |
+| `scope.controller(atom, { resolve: true })` | `Promise<Controller<T>>` | `resolved` after await |
+
+**Note:** Unlike the `controller()` dependency helper which is consumed during async dep resolution, `scope.controller()` must return a `Promise` when `{ resolve: true }` is specified because resolution is inherently async.
 
 ### Subscribing to Changes
 
