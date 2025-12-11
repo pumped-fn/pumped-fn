@@ -21,6 +21,8 @@
   "files": [
     "dist",
     "README.md",
+    "PATTERNS.md",
+    "MIGRATION.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
