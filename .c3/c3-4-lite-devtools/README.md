@@ -35,6 +35,26 @@ mem.subscribe((events) => console.log(events))
 
 **Event types:** `atom:resolve`, `atom:resolved`, `flow:exec`, `flow:complete`, `error`
 
+## Source Organization {#c3-4-source}
+
+```
+packages/lite-devtools/
+├── src/
+│   ├── index.ts        # Public exports
+│   ├── extension.ts    # createDevtools() implementation
+│   ├── types.ts        # Devtools namespace, event types
+│   ├── symbols.ts      # Internal symbols
+│   └── transports/
+│       ├── index.ts    # Transport exports
+│       ├── memory.ts   # In-memory transport with subscribe()
+│       ├── broadcast.ts # BroadcastChannel transport
+│       ├── console.ts  # Console/debug transport
+│       └── http.ts     # HTTP POST transport
+├── tests/
+├── package.json
+└── tsdown.config.ts
+```
+
 ## Related {#c3-4-related}
 
 - [ADR-015](../adr/adr-015-devtools-integration.md)

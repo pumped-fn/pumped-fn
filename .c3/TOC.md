@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-11 09:41:01
+> Last generated: 2025-12-11 09:56:28
 
 ## Context Level
 
@@ -67,6 +67,7 @@ integration via useSyncExternalStore for React 18+ applications.
 **Sections**:
 - [Overview](#c3-4-overview)
 - [API](#c3-4-api)
+- [Source Organization](#c3-4-source)
 - [Related](#c3-4-related)
 
 ---
@@ -80,6 +81,7 @@ integration via useSyncExternalStore for React 18+ applications.
 - [API](#c3-5-api)
 - [Transform Rules](#c3-5-transforms)
 - [Production Safety](#c3-5-production)
+- [Source Organization](#c3-5-source)
 - [Related](#c3-5-related)
 
 ---

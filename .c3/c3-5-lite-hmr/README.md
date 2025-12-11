@@ -73,6 +73,21 @@ export default defineConfig({
 - Runtime returns atom as-is when `import.meta.hot` undefined
 - Zero overhead in production builds
 
+## Source Organization {#c3-5-source}
+
+```
+packages/lite-hmr/
+├── src/
+│   ├── index.ts      # Plugin export
+│   ├── plugin.ts     # Vite plugin implementation
+│   ├── runtime.ts    # __hmr_register() helper
+│   ├── transform.ts  # AST transform logic
+│   └── types.ts      # PumpedHmrOptions
+├── tests/
+├── package.json
+└── tsdown.config.ts
+```
+
 ## Related {#c3-5-related}
 
 - [c3-2 Scope](../c3-2-lite/c3-201-scope.md) - Cache behavior
