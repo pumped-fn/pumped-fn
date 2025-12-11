@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 1.8.0
+
+### Minor Changes
+
+- 36105b0: Add `seek()` and `seekTag()` methods to `ContextData` for hierarchical data lookup across ExecutionContext parent chain. Also add PATTERNS.md architectural documentation and include MIGRATION.md in package.
+
 ## 1.7.0
 
 ### Minor Changes
