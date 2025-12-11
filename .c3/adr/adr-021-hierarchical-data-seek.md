@@ -261,28 +261,28 @@ No changes to c3-0.
 ## Verification {#adr-021-verification}
 
 ### Core Behavior
-- [ ] `seek(key)` returns local value if exists
-- [ ] `seek(key)` returns parent value if not local
-- [ ] `seek(key)` traverses full parent chain
-- [ ] `seek(key)` returns undefined if not found in any context
-- [ ] `seekTag(tag)` same traversal behavior
-- [ ] `seekTag(tag)` does NOT use tag's default value (pure lookup)
+- [x] `seek(key)` returns local value if exists
+- [x] `seek(key)` returns parent value if not local
+- [x] `seek(key)` traverses full parent chain
+- [x] `seek(key)` returns undefined if not found in any context
+- [x] `seekTag(tag)` same traversal behavior
+- [x] `seekTag(tag)` does NOT use tag's default value (pure lookup)
 
 ### Isolation Preserved
-- [ ] `getTag()` still returns only local values
-- [ ] `setTag()` still writes only to local context
-- [ ] Concurrent execs still have isolated data
-- [ ] OTel extension span tracking unchanged
+- [x] `getTag()` still returns only local values
+- [x] `setTag()` still writes only to local context
+- [x] Concurrent execs still have isolated data
+- [x] OTel extension span tracking unchanged
 
 ### Parent Chain
-- [ ] Root context seek returns only local (no parent)
-- [ ] Child context seek checks local then parent
-- [ ] Grandchild context seek checks local → parent → grandparent
+- [x] Root context seek returns only local (no parent)
+- [x] Child context seek checks local then parent
+- [x] Grandchild context seek checks local → parent → grandparent
 
 ### Edge Cases
-- [ ] seek on closed context still works (data accessible)
-- [ ] seek with undefined parent returns undefined
-- [ ] seek finds value set before child context created
+- [x] seek on closed context still works (data accessible)
+- [x] seek with undefined parent returns undefined
+- [x] seek finds value set before child context created
 
 ## Related {#adr-021-related}
 
