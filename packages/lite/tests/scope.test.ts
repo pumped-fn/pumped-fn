@@ -1350,6 +1350,54 @@ describe("ExecutionContext", () => {
       expect(parseOrder).toEqual(["parse", "factory"]);
       await ctx.close();
     });
+
+    it("rawInput works without parse (passes through as-is)", async () => {
+      const scope = createScope();
+      const ctx = scope.createContext();
+
+      const myFlow = flow({
+        factory: (ctx) => ctx.input,
+      });
+
+      const body: unknown = { data: 123 };
+      const result = await ctx.exec({
+        flow: myFlow as unknown as Lite.Flow<unknown, unknown>,
+        rawInput: body,
+      });
+
+      expect(result).toEqual({ data: 123 });
+      await ctx.close();
+    });
+
+    it("throws ParseError when rawInput fails parse", async () => {
+      const scope = createScope();
+      const ctx = scope.createContext();
+      const { ParseError } = await import("../src/errors");
+
+      const myFlow = flow({
+        name: "strictFlow",
+        parse: (raw: unknown): string => {
+          if (typeof raw !== "string") throw new Error("Must be string");
+          return raw;
+        },
+        factory: (ctx) => ctx.input,
+      });
+
+      try {
+        await ctx.exec({
+          flow: myFlow as unknown as Lite.Flow<string, unknown>,
+          rawInput: 123,
+        });
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError);
+        const parseErr = err as InstanceType<typeof ParseError>;
+        expect(parseErr.phase).toBe("flow-input");
+        expect(parseErr.label).toBe("strictFlow");
+      }
+
+      await ctx.close();
+    });
   })
 
   describe("ctx.data (ContextData with Tag support)", () => {
