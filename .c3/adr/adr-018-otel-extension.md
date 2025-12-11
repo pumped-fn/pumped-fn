@@ -250,34 +250,34 @@ packages/lite-extension-otel/
 ## Verification {#adr-018-verification}
 
 ### Tracing
-- [ ] Spans created for atom resolution with correct name
-- [ ] Spans created for flow execution with correct name
-- [ ] Nested flows have parent-child span relationship via ctx.parent
-- [ ] Concurrent siblings have isolated spans (no race conditions)
-- [ ] Span status set to OK on success, ERROR on exception
-- [ ] Exception recorded on span before re-throwing
-- [ ] Span ends in finally block (even on error)
+- [x] Spans created for atom resolution with correct name
+- [x] Spans created for flow execution with correct name
+- [x] Nested flows have parent-child span relationship via ctx.parent
+- [x] Concurrent siblings have isolated spans (no race conditions)
+- [x] Span status set to OK on success, ERROR on exception
+- [x] Exception recorded on span before re-throwing
+- [x] Span ends in finally block (even on error)
 
 ### Metrics
-- [ ] Resolution time histogram recorded for atoms
-- [ ] Execution time histogram recorded for flows
-- [ ] Error counter incremented on exceptions
-- [ ] Attributes include atom/flow name
+- [x] Resolution time histogram recorded for atoms
+- [x] Execution time histogram recorded for flows
+- [x] Error counter incremented on exceptions
+- [x] Attributes include atom/flow name
 
 ### Context Propagation
-- [ ] extractContext() parses W3C Trace Context headers
-- [ ] injectContext() writes W3C headers for outgoing calls
-- [ ] getCurrentSpan() returns span from ExecutionContext
+- [x] extractContext() parses W3C Trace Context headers
+- [x] injectContext() writes W3C headers for outgoing calls
+- [x] getCurrentSpan() returns span from ExecutionContext
 
 ### Filters
-- [ ] atomFilter skips tracing for filtered atoms
-- [ ] flowFilter skips tracing for filtered flows
-- [ ] Skipped items still execute normally
+- [x] atomFilter skips tracing for filtered atoms
+- [x] flowFilter skips tracing for filtered flows
+- [x] Skipped items still execute normally
 
 ### Integration
-- [ ] Works with @opentelemetry/sdk-trace-node
-- [ ] Works with @opentelemetry/sdk-metrics
-- [ ] No dependencies on AsyncLocalStorage
+- [x] Works with @opentelemetry/sdk-trace-node
+- [x] Works with @opentelemetry/sdk-metrics
+- [x] No dependencies on AsyncLocalStorage
 - [ ] Disposed properly on scope.dispose()
 
 ## Related {#adr-018-related}

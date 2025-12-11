@@ -44,6 +44,6 @@
   "repository": {
     "type": "git",
     "directory": "packages/lite-extension-otel",
-    "url": "git+https://github.com/pumpd-fn/pumped-fn.git"
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }
