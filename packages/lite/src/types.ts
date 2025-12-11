@@ -19,6 +19,8 @@ export namespace Lite {
     readonly ready: Promise<void>
     resolve<T>(atom: Atom<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
+    controller<T>(atom: Atom<T>, options: { resolve: true }): Promise<Controller<T>>
+    controller<T>(atom: Atom<T>, options?: ControllerOptions): Controller<T> | Promise<Controller<T>>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     flush(): Promise<void>
