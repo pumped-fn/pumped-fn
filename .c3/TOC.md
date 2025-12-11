@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-10 18:59:52
+> Last generated: 2025-12-11 09:40:31
 
 ## Context Level
 
@@ -242,6 +242,41 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [adr-020](./adr/adr-020-raw-input-execution.md) - Raw Input Execution for Flows with Parse
+> Add rawInput option to ctx.exec() allowing unknown input when flow has parse,
+enabling callers to delegate validation to the flow instead of pre-typing input.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-020-status)
+- [Problem/Requirement](#adr-020-problem)
+- [Exploration Journey](#adr-020-exploration)
+- [Solution](#adr-020-solution)
+- [Changes Across Layers](#adr-020-changes)
+- [Verification](#adr-020-verification)
+- [Related](#adr-020-related)
+
+---
+
+### [adr-019](./adr/adr-019-scope-controller-options.md) - Scope.controller() Options for API Consistency
+> Add optional { resolve: true } flag to scope.controller() to match the
+controller() dependency helper, eliminating API inconsistency and enabling
+the same convenience pattern outside of atom dependencies.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-019-status)
+- [Problem/Requirement](#adr-019-problem)
+- [Exploration Journey](#adr-019-exploration)
+- [Solution](#adr-019-solution)
+- [Changes Across Layers](#adr-019-changes)
+- [Verification](#adr-019-verification)
+- [Related](#adr-019-related)
+
+---
 
 ### [adr-018](./adr/adr-018-otel-extension.md) - OpenTelemetry Extension for Lite Package
 > Create @pumped-fn/lite-extension-otel package providing OpenTelemetry integration
@@ -576,5 +611,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 31
-**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 18
+**Total Documents**: 33
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 20
