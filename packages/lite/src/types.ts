@@ -19,6 +19,8 @@ export namespace Lite {
     readonly ready: Promise<void>
     resolve<T>(atom: Atom<T>): Promise<T>
     controller<T>(atom: Atom<T>): Controller<T>
+    controller<T>(atom: Atom<T>, options: { resolve: true }): Promise<Controller<T>>
+    controller<T>(atom: Atom<T>, options?: ControllerOptions): Controller<T> | Promise<Controller<T>>
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     flush(): Promise<void>
@@ -121,9 +123,12 @@ export namespace Lite {
     flow: Flow<Output, Input>
     name?: string
     tags?: Tagged<unknown>[]
-  } & ([NoInfer<Input>] extends [void | undefined | null]
-    ? { input?: undefined | null }
-    : { input: NoInfer<Input> })
+  } & (
+    | ([NoInfer<Input>] extends [void | undefined | null]
+        ? { input?: undefined | null; rawInput?: never }
+        : { input: NoInfer<Input>; rawInput?: never })
+    | { rawInput: unknown; input?: never }
+  )
 
   export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
     fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>

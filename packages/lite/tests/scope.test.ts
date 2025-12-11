@@ -166,6 +166,71 @@ describe("Scope", () => {
       expect(ctrl.state).toBe('resolved')
       expect(ctrl.get()).toBe(2)
     })
+
+    it("returns promise with { resolve: true } option", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 42 })
+
+      const result = scope.controller(myAtom, { resolve: true })
+      expect(result).toBeInstanceOf(Promise)
+
+      const ctrl = await result
+      expect(ctrl.state).toBe('resolved')
+      expect(ctrl.get()).toBe(42)
+    })
+
+    it("controller from { resolve: true } is same instance as regular controller", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 42 })
+
+      const ctrl1 = scope.controller(myAtom)
+      const ctrl2 = await scope.controller(myAtom, { resolve: true })
+
+      // Verify they are the SAME instance
+      expect(ctrl1).toBe(ctrl2)
+      expect(ctrl1.get()).toBe(42)
+      expect(ctrl2.get()).toBe(42)
+    })
+
+    it("{ resolve: true } works with async factory", async () => {
+      const scope = createScope()
+      const myAtom = atom({
+        factory: async () => {
+          await new Promise(r => setTimeout(r, 10))
+          return "async-value"
+        }
+      })
+
+      const ctrl = await scope.controller(myAtom, { resolve: true })
+      expect(ctrl.state).toBe('resolved')
+      expect(ctrl.get()).toBe("async-value")
+    })
+
+    it("{ resolve: true } propagates factory errors", async () => {
+      const scope = createScope()
+      const myAtom = atom({
+        factory: () => {
+          throw new Error("factory error")
+        }
+      })
+
+      await expect(scope.controller(myAtom, { resolve: true }))
+        .rejects.toThrow("factory error")
+    })
+
+    it("{ resolve: true } returns already-resolved controller immediately", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 42 })
+
+      // Resolve first
+      await scope.resolve(myAtom)
+
+      // Then get controller with resolve: true
+      const ctrl = await scope.controller(myAtom, { resolve: true })
+
+      expect(ctrl.state).toBe('resolved')
+      expect(ctrl.get()).toBe(42)
+    })
   })
 
   describe("controller deps", () => {
@@ -1255,6 +1320,84 @@ describe("ExecutionContext", () => {
       expect(result).toBe("HELLO")
       await ctx.close()
     })
+
+    it("accepts rawInput and passes to parse", async () => {
+      const scope = createScope();
+      const ctx = scope.createContext();
+      const parseOrder: string[] = [];
+
+      const myFlow = flow({
+        name: "parseFlow",
+        parse: (raw: unknown): { name: string } => {
+          parseOrder.push("parse");
+          const obj = raw as Record<string, unknown>;
+          if (typeof obj.name !== "string") throw new Error("name required");
+          return { name: obj.name };
+        },
+        factory: (ctx) => {
+          parseOrder.push("factory");
+          return ctx.input.name.toUpperCase();
+        },
+      });
+
+      const body: unknown = { name: "alice" };
+      const result = await ctx.exec({
+        flow: myFlow as unknown as Lite.Flow<string, unknown>,
+        rawInput: body,
+      });
+
+      expect(result).toBe("ALICE");
+      expect(parseOrder).toEqual(["parse", "factory"]);
+      await ctx.close();
+    });
+
+    it("rawInput works without parse (passes through as-is)", async () => {
+      const scope = createScope();
+      const ctx = scope.createContext();
+
+      const myFlow = flow({
+        factory: (ctx) => ctx.input,
+      });
+
+      const body: unknown = { data: 123 };
+      const result = await ctx.exec({
+        flow: myFlow as unknown as Lite.Flow<unknown, unknown>,
+        rawInput: body,
+      });
+
+      expect(result).toEqual({ data: 123 });
+      await ctx.close();
+    });
+
+    it("throws ParseError when rawInput fails parse", async () => {
+      const scope = createScope();
+      const ctx = scope.createContext();
+      const { ParseError } = await import("../src/errors");
+
+      const myFlow = flow({
+        name: "strictFlow",
+        parse: (raw: unknown): string => {
+          if (typeof raw !== "string") throw new Error("Must be string");
+          return raw;
+        },
+        factory: (ctx) => ctx.input,
+      });
+
+      try {
+        await ctx.exec({
+          flow: myFlow as unknown as Lite.Flow<string, unknown>,
+          rawInput: 123,
+        });
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ParseError);
+        const parseErr = err as InstanceType<typeof ParseError>;
+        expect(parseErr.phase).toBe("flow-input");
+        expect(parseErr.label).toBe("strictFlow");
+      }
+
+      await ctx.close();
+    });
   })
 
   describe("ctx.data (ContextData with Tag support)", () => {

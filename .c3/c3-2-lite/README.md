@@ -187,7 +187,8 @@ packages/lite/
 │   ├── tag.ts        # tag(), tags, tag type guards
 │   ├── preset.ts     # preset(), isPreset()
 │   ├── service.ts    # service()
-│   └── scope.ts      # createScope(), Scope, Controller, ExecutionContext
+│   ├── scope.ts      # createScope(), Scope, Controller, ExecutionContext
+│   └── errors.ts     # ParseError class
 ├── tests/
 │   ├── atom.test.ts
 │   ├── flow.test.ts

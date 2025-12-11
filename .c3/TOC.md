@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-10 17:24:58
+> Last generated: 2025-12-11 09:56:28
 
 ## Context Level
 
@@ -67,6 +67,7 @@ integration via useSyncExternalStore for React 18+ applications.
 **Sections**:
 - [Overview](#c3-4-overview)
 - [API](#c3-4-api)
+- [Source Organization](#c3-4-source)
 - [Related](#c3-4-related)
 
 ---
@@ -80,6 +81,7 @@ integration via useSyncExternalStore for React 18+ applications.
 - [API](#c3-5-api)
 - [Transform Rules](#c3-5-transforms)
 - [Production Safety](#c3-5-production)
+- [Source Organization](#c3-5-source)
 - [Related](#c3-5-related)
 
 ---
@@ -94,6 +96,23 @@ integration via useSyncExternalStore for React 18+ applications.
 - [API](#c3-6-api)
 - [Source Organization](#c3-6-source)
 - [Related](#c3-6-related)
+
+---
+
+### [c3-7](./c3-7-lite-extension-otel/) - Lite Extension OTel (@pumped-fn/lite-extension-otel)
+> OpenTelemetry integration extension providing distributed tracing, metrics,
+and W3C context propagation for pumped-fn applications.
+
+**Sections**:
+- [Overview](#c3-7-overview)
+- [Technology Stack](#c3-7-stack)
+- [Architecture](#c3-7-architecture)
+- [Span Hierarchy Flow](#c3-7-hierarchy)
+- [API](#c3-7-api)
+- [Metrics](#c3-7-metrics)
+- [Source Organization](#c3-7-source)
+- [Testing](#c3-7-testing)
+- [Related](#c3-7-related)
 
 ---
 
@@ -225,6 +244,59 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [adr-020](./adr/adr-020-raw-input-execution.md) - Raw Input Execution for Flows with Parse
+> Add rawInput option to ctx.exec() allowing unknown input when flow has parse,
+enabling callers to delegate validation to the flow instead of pre-typing input.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-020-status)
+- [Problem/Requirement](#adr-020-problem)
+- [Exploration Journey](#adr-020-exploration)
+- [Solution](#adr-020-solution)
+- [Changes Across Layers](#adr-020-changes)
+- [Verification](#adr-020-verification)
+- [Related](#adr-020-related)
+
+---
+
+### [adr-019](./adr/adr-019-scope-controller-options.md) - Scope.controller() Options for API Consistency
+> Add optional { resolve: true } flag to scope.controller() to match the
+controller() dependency helper, eliminating API inconsistency and enabling
+the same convenience pattern outside of atom dependencies.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-019-status)
+- [Problem/Requirement](#adr-019-problem)
+- [Exploration Journey](#adr-019-exploration)
+- [Solution](#adr-019-solution)
+- [Changes Across Layers](#adr-019-changes)
+- [Verification](#adr-019-verification)
+- [Related](#adr-019-related)
+
+---
+
+### [adr-018](./adr/adr-018-otel-extension.md) - OpenTelemetry Extension for Lite Package
+> Create @pumped-fn/lite-extension-otel package providing OpenTelemetry integration
+with tracing, metrics, and context propagation using the Extension system and
+hierarchical ExecutionContext from ADR-016.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-018-status)
+- [Problem/Requirement](#adr-018-problem)
+- [Exploration Journey](#adr-018-exploration)
+- [Solution](#adr-018-solution)
+- [Changes Across Layers](#adr-018-changes)
+- [Verification](#adr-018-verification)
+- [Related](#adr-018-related)
+
+---
 
 ### [adr-017](./adr/adr-017-controller-auto-resolution.md) - Controller Auto-Resolution Option
 > Add optional { resolve: true } flag to controller() helper that auto-resolves
@@ -541,5 +613,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 29
-**Contexts**: 1 | **Containers**: 5 | **Components**: 6 | **ADRs**: 17
+**Total Documents**: 33
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 20
