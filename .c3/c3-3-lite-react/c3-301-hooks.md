@@ -24,7 +24,9 @@ Four hooks provide React integration with @pumped-fn/lite's scope and atom syste
 
 ### Explicit Lifecycle
 
-Hooks **observe**, they don't **trigger**. Atoms must be resolved before rendering:
+Hooks **observe**, they don't **trigger**. Atoms must be resolved before rendering.
+
+**Exception:** `useAtom(atom, { suspense: false, resolve: true })` triggers resolution via `useEffect`. This is an opt-in escape hatch for users who need imperative auto-resolution without Suspense. See [ADR-022](../adr/adr-022-non-suspense-mode.md).
 
 ```tsx
 const scope = createScope()
