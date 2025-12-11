@@ -149,6 +149,7 @@ Short-lived operation with input/output.
 - Dependencies on atoms via `deps`
 - `ctx.input` — typed input access
 - `ctx.onClose(fn)` — cleanup when context closes
+- `ctx.exec({ flow, rawInput })` — pass unknown input when flow has `parse`
 
 ### Tag
 
@@ -172,6 +173,8 @@ Reactive handle for observing and controlling atom state.
 - `ctrl.update(fn)` — transform value: `fn(currentValue) → newValue` (skips factory)
 - `ctrl.on(event, listener)` — subscribe to `'resolved' | 'resolving' | '*'`
 - Use `controller(atom)` in deps for reactive dependency (unresolved, you control timing)
+- Use `controller(atom, { resolve: true })` to auto-resolve before passing to factory
+- Use `scope.controller(atom, { resolve: true })` for same behavior outside deps
 
 ### Preset
 

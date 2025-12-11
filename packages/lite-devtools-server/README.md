@@ -2,6 +2,8 @@
 
 Standalone TUI server for receiving devtools events from `@pumped-fn/lite-devtools` via HTTP.
 
+**CLI tool** · **Terminal dashboard** · **HTTP receiver**
+
 ## Architecture
 
 ```mermaid
@@ -64,3 +66,11 @@ const scope = createScope({
 2. Events POSTed to `/events` are buffered (max 100 events)
 3. TUI dashboard displays last 20 events in real-time
 4. Uses `@pumped-fn/lite` atoms for reactive state management
+
+## Full API
+
+See [`dist/index.d.mts`](./dist/index.d.mts) for complete type definitions.
+
+## License
+
+MIT

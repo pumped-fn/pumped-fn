@@ -2,7 +2,7 @@
 
 OpenTelemetry extension for @pumped-fn/lite with automatic tracing, metrics, and context propagation.
 
-> **API Reference:** See generated `.d.mts` / `.d.cts` files for full TypeScript API.
+**Zero runtime dependencies** · **ADR-016 compliant** · **W3C Trace Context**
 
 ## Architecture Overview
 

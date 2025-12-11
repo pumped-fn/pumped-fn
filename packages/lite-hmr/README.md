@@ -2,10 +2,37 @@
 
 Vite HMR plugin for `@pumped-fn/lite` that preserves atom state across hot module reloads.
 
-## Installation
+**Dev only** · **Zero overhead in production** · **Vite plugin**
 
-```bash
-pnpm add -D @pumped-fn/lite-hmr
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Vite
+    participant Plugin as pumpedHmr()
+    participant HMR as import.meta.hot.data
+    participant Scope
+
+    Note over Vite,Plugin: Build Time Transform
+
+    Dev->>Vite: Save file with atom()
+    Vite->>Plugin: transform(code)
+    Plugin->>Plugin: AST detect: const foo = atom({...})
+    Plugin-->>Vite: const foo = __hmr_register('key', atom({...}))
+
+    Note over HMR,Scope: Runtime (HMR Reload)
+
+    Vite->>HMR: Module reload
+    HMR->>HMR: Check registry for 'key'
+    alt First load
+        HMR->>HMR: Store new atom reference
+        HMR-->>Scope: New atom
+    else Reload
+        HMR-->>Scope: Cached atom (same reference)
+    end
+
+    Note over Scope: Cache hit - state preserved!
 ```
 
 ## Usage
@@ -24,7 +51,7 @@ export default defineConfig({
 })
 ```
 
-## How It Works
+## Transform Example
 
 The plugin transforms named atom declarations at build time:
 
