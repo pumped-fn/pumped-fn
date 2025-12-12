@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/lite-extension-otel",
   "version": "0.2.0",
-  "description": "OpenTelemetry extension for @pumped-fn/lite with tracing, metrics, and context propagation",
+  "description": "OpenTelemetry extension for @pumped-fn/lite with tracing and context propagation",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -27,16 +27,18 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:"
+  },
   "peerDependencies": {
-    "@pumped-fn/lite": "^1.0.0",
-    "@opentelemetry/api": "^1.0.0"
+    "@pumped-fn/lite": "^1.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/core": "^1.30.1",
-    "@opentelemetry/sdk-trace-base": "^1.30.1",
-    "@opentelemetry/sdk-metrics": "^1.30.1",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -46,7 +48,6 @@
     "opentelemetry",
     "otel",
     "tracing",
-    "metrics",
     "observability"
   ],
   "license": "MIT",
