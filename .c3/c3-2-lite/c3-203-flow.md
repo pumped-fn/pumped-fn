@@ -204,13 +204,35 @@ const result = await ctx.exec({
 })
 ```
 
-### Tag Merge Order
+### Tag Auto-Population and Lookup (ADR-023)
 
-When resolving tag dependencies, tags are merged in this order (later wins):
-1. Flow's attached tags (`flow.tags`)
-2. Scope's tags (`createScope({ tags: [...] })`)
-3. Context's tags (`createContext({ tags: [...] })`)
-4. Execution tags (`exec({ tags: [...] })`)
+Tags from various sources are **auto-populated into `ctx.data`** and resolved via `seekTag()`:
+
+**Auto-population order (into ctx.data):**
+1. `createScope({ tags })` → populated into root ctx.data via createContext
+2. `createContext({ tags })` → populated into root ctx.data
+3. `exec({ tags })` → populated into child ctx.data
+4. `flow.tags` → populated into child ctx.data
+
+**Lookup via seekTag() (nearest wins):**
+- `tags.required()` uses `ctx.data.seekTag()` to traverse the parent chain
+- Child context values override parent context values
+- Tags propagate automatically to all descendants (grandchildren, etc.)
+
+**Middleware pattern:**
+```typescript
+const authMiddleware = flow({
+  factory: async (ctx) => {
+    ctx.data.setTag(userTag, await authenticate(ctx.input))
+    return ctx.exec({ flow: handler })
+  }
+})
+
+const handler = flow({
+  deps: { user: tags.required(userTag) },  // Found via seekTag from parent
+  factory: (ctx, { user }) => { ... }
+})
+```
 
 ## ExecutionContext Lifecycle {#c3-203-lifecycle}
 
@@ -433,9 +455,8 @@ const middleware = flow({
 })
 
 const handler = flow({
-  factory: (ctx) => {
-    // seekTag() finds value from parent middleware context
-    const reqId = ctx.data.seekTag(requestIdTag)
+  deps: { reqId: tags.required(requestIdTag) },  // ADR-023: uses seekTag() internally
+  factory: (ctx, { reqId }) => {
     logger.info(`Request: ${reqId}`)
   }
 })
@@ -448,8 +469,9 @@ const handler = flow({
 | `getTag(tag)` | Local only | Per-exec isolated data |
 | `seekTag(tag)` | Local → parent → ... → root | Cross-cutting concerns |
 | `setTag(tag, v)` | Local only | Always writes to current context |
+| `tags.required(tag)` | Uses seekTag() | Tag dependencies (ADR-023) |
 
-**Note:** `seekTag()` does NOT use tag defaults - it's a pure lookup. Returns `undefined` if not found in any context.
+**Note:** `seekTag()` does NOT use tag defaults - it's a pure lookup. Returns `undefined` if not found in any context. For tag dependencies with defaults, use `tags.optional(tag)` which falls back to the tag's default value.
 
 ### Auto-Close Lifecycle
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
 import { type Lite } from "../src/types"
-import { tag } from "../src/tag"
+import { tag, tags } from "../src/tag"
 
 describe("Hierarchical ExecutionContext", () => {
   describe("parent chain", () => {
@@ -571,6 +571,172 @@ describe("Hierarchical ExecutionContext", () => {
       const ctx = scope.createContext()
 
       expect(ctx.name).toBeUndefined()
+    })
+  })
+
+  describe("tag dependency resolution with seekTag (ADR-023)", () => {
+    it("tags.required() finds ctx.data.setTag() value from parent", async () => {
+      const userTag = tag<string>({ label: "user" })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedUser: string | undefined
+
+      const handler = flow({
+        deps: { user: tags.required(userTag) },
+        factory: (_, { user }) => {
+          capturedUser = user
+        }
+      })
+
+      const middleware = flow({
+        factory: async (parentCtx) => {
+          parentCtx.data.setTag(userTag, "alice")
+          return parentCtx.exec({ flow: handler })
+        }
+      })
+
+      await ctx.exec({ flow: middleware })
+      expect(capturedUser).toBe("alice")
+      await ctx.close()
+    })
+
+    it("exec tags propagate to grandchildren via seekTag", async () => {
+      const requestIdTag = tag<string>({ label: "requestId" })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedRequestId: string | undefined
+
+      const grandchild = flow({
+        deps: { reqId: tags.required(requestIdTag) },
+        factory: (_, { reqId }) => {
+          capturedRequestId = reqId
+        }
+      })
+
+      const child = flow({
+        factory: async (childCtx) => {
+          return childCtx.exec({ flow: grandchild })
+        }
+      })
+
+      await ctx.exec({
+        flow: child,
+        tags: [requestIdTag("req-123")]
+      })
+
+      expect(capturedRequestId).toBe("req-123")
+      await ctx.close()
+    })
+
+    it("tags.all() collects from hierarchy (one per level)", async () => {
+      const roleTag = tag<string>({ label: "role" })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      ctx.data.setTag(roleTag, "admin")
+
+      let collectedRoles: string[] = []
+
+      const grandchild = flow({
+        deps: { roles: tags.all(roleTag) },
+        factory: (_, { roles }) => {
+          collectedRoles = roles
+        }
+      })
+
+      const child = flow({
+        factory: async (childCtx) => {
+          childCtx.data.setTag(roleTag, "editor")
+          return childCtx.exec({ flow: grandchild })
+        }
+      })
+
+      const parent = flow({
+        factory: async (parentCtx) => {
+          parentCtx.data.setTag(roleTag, "viewer")
+          return parentCtx.exec({ flow: child })
+        }
+      })
+
+      await ctx.exec({ flow: parent })
+
+      expect(collectedRoles).toEqual(["editor", "viewer", "admin"])
+      await ctx.close()
+    })
+
+    it("child ctx.data.setTag() overrides parent value", async () => {
+      const tenantTag = tag<string>({ label: "tenant" })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedTenant: string | undefined
+
+      const child = flow({
+        deps: { tenant: tags.required(tenantTag) },
+        factory: (_, { tenant }) => {
+          capturedTenant = tenant
+        }
+      })
+
+      const parent = flow({
+        factory: async (parentCtx) => {
+          parentCtx.data.setTag(tenantTag, "tenant-A")
+          return parentCtx.exec({
+            flow: flow({
+              factory: async (childCtx) => {
+                childCtx.data.setTag(tenantTag, "tenant-B")
+                return childCtx.exec({ flow: child })
+              }
+            })
+          })
+        }
+      })
+
+      await ctx.exec({ flow: parent })
+      expect(capturedTenant).toBe("tenant-B")
+      await ctx.close()
+    })
+
+    it("scope tags available in root context via createContext auto-population", async () => {
+      const tenantTag = tag<string>({ label: "tenant" })
+      const scope = createScope({ tags: [tenantTag("scope-tenant")] })
+      const ctx = scope.createContext()
+
+      let capturedTenant: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          deps: { tenant: tags.required(tenantTag) },
+          factory: (_, { tenant }) => {
+            capturedTenant = tenant
+          }
+        })
+      })
+
+      expect(capturedTenant).toBe("scope-tenant")
+      await ctx.close()
+    })
+
+    it("context tags override scope tags", async () => {
+      const tenantTag = tag<string>({ label: "tenant" })
+      const scope = createScope({ tags: [tenantTag("scope-tenant")] })
+      const ctx = scope.createContext({ tags: [tenantTag("context-tenant")] })
+
+      let capturedTenant: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          deps: { tenant: tags.required(tenantTag) },
+          factory: (_, { tenant }) => {
+            capturedTenant = tenant
+          }
+        })
+      })
+
+      expect(capturedTenant).toBe("context-tenant")
+      await ctx.close()
     })
   })
 })
