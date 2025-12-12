@@ -42,6 +42,7 @@ Created by `scope.createContext()`, used for flow execution:
 ```typescript
 interface ExecutionContext {
   readonly input: unknown                        // Current execution's input
+  readonly name: string | undefined              // Resolved: execName > flowName > undefined
   readonly scope: Scope                          // Parent scope
   readonly parent: ExecutionContext | undefined  // Parent context (undefined for root)
   readonly data: Map<symbol, unknown>            // Per-execution storage for extensions
@@ -52,6 +53,7 @@ interface ExecutionContext {
 ```
 
 **Key properties:**
+- `name`: Resolved from exec options or flow definition. Priority: `execName > flowName > undefined`.
 - `parent`: References the calling context. Root contexts (from `createContext()`) have `undefined`.
 - `data`: Lazy-initialized Map for extension private storage. Use symbols as keys for encapsulation.
 - `exec()`: Creates a child context with `parent` set to current context, auto-closes after execution.
@@ -512,9 +514,10 @@ const tracingExtension: Extension = {
     // Read parent span from parent's data
     const parentSpan = ctx.parent?.data.get(SPAN_KEY) as Span | undefined
 
+    // Use ctx.name for span naming (resolved: execName > flowName > undefined)
     const span = tracer.startSpan({
-      name: isFlow(target) ? (target.name ?? 'anonymous') : 'fn',
-      parent: parentSpan  // Automatic parent-child relationship!
+      name: ctx.name ?? 'anonymous',
+      parent: parentSpan
     })
 
     // Store in THIS context's data

@@ -717,7 +717,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private readonly _input: unknown
   private readonly baseTags: Lite.Tagged<unknown>[]
   private _data: ContextDataImpl | undefined
-  private _name: string | undefined | null = null
   private readonly _execName: string | undefined
   private readonly _flowName: string | undefined
   readonly parent: Lite.ExecutionContext | undefined
@@ -746,10 +745,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   get name(): string | undefined {
-    if (this._name === null) {
-      this._name = this._execName ?? this._flowName
-    }
-    return this._name
+    return this._execName ?? this._flowName
   }
 
   get data(): Lite.ContextData {

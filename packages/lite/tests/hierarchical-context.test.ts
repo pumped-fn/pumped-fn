@@ -507,4 +507,104 @@ describe("Hierarchical ExecutionContext", () => {
       await ctx.close()
     })
   })
+
+  describe("ctx.name resolution", () => {
+    it("returns exec name when provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedName: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          name: "flowName",
+          factory: (childCtx) => {
+            capturedName = childCtx.name
+          }
+        }),
+        name: "execName"
+      })
+
+      expect(capturedName).toBe("execName")
+      await ctx.close()
+    })
+
+    it("returns flow name when exec name not provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedName: string | undefined
+
+      await ctx.exec({
+        flow: flow({
+          name: "flowName",
+          factory: (childCtx) => {
+            capturedName = childCtx.name
+          }
+        })
+      })
+
+      expect(capturedName).toBe("flowName")
+      await ctx.close()
+    })
+
+    it("returns undefined when neither provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedName: string | undefined | null = null
+
+      await ctx.exec({
+        flow: flow({
+          factory: (childCtx) => {
+            capturedName = childCtx.name
+          }
+        })
+      })
+
+      expect(capturedName).toBeUndefined()
+      await ctx.close()
+    })
+
+    it("uses function name for fn exec", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedName: string | undefined
+
+      await ctx.exec({
+        fn: function namedFunction(childCtx) {
+          capturedName = childCtx.name
+        },
+        params: []
+      })
+
+      expect(capturedName).toBe("namedFunction")
+      await ctx.close()
+    })
+
+    it("infers fn name from property assignment", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      let capturedName: string | undefined
+
+      await ctx.exec({
+        fn: (childCtx) => {
+          capturedName = childCtx.name
+        },
+        params: []
+      })
+
+      expect(capturedName).toBe("fn")
+      await ctx.close()
+    })
+
+    it("root context has undefined name", () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(ctx.name).toBeUndefined()
+    })
+  })
 })
