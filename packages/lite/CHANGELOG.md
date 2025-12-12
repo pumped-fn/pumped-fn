@@ -1,5 +1,15 @@
 # @pumped-fn/lite
 
+## 1.9.0
+
+### Minor Changes
+
+- 9e1f827: Add `name` property to ExecutionContext for extension visibility
+
+  - ExecutionContext now exposes `name: string | undefined` (lazy-computed)
+  - Name resolution: exec name > flow name > undefined
+  - OTEL extension uses `ctx.name` with configurable `defaultFlowName` fallback
+
 ## 1.8.0
 
 ### Minor Changes
