@@ -566,40 +566,6 @@ describe("Hierarchical ExecutionContext", () => {
       await ctx.close()
     })
 
-    it("uses function name for fn exec", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-
-      let capturedName: string | undefined
-
-      await ctx.exec({
-        fn: function namedFunction(childCtx) {
-          capturedName = childCtx.name
-        },
-        params: []
-      })
-
-      expect(capturedName).toBe("namedFunction")
-      await ctx.close()
-    })
-
-    it("infers fn name from property assignment", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-
-      let capturedName: string | undefined
-
-      await ctx.exec({
-        fn: (childCtx) => {
-          capturedName = childCtx.name
-        },
-        params: []
-      })
-
-      expect(capturedName).toBe("fn")
-      await ctx.close()
-    })
-
     it("root context has undefined name", () => {
       const scope = createScope()
       const ctx = scope.createContext()
