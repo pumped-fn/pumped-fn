@@ -10,20 +10,15 @@ import type { OtelExtension } from "./types";
 import { SPAN_KEY, getSpanFromContext, setSpanInContext } from "./span";
 import { createMetrics, type OtelMetrics } from "./metrics";
 
-function getTargetName(
+function getExecName(
+  ctx: Lite.ExecutionContext,
   target: Lite.Flow<unknown, unknown> | Function,
   options?: OtelExtension.Options
 ): string {
   if (options?.spanName) {
     return options.spanName(target as Lite.Flow<unknown, unknown>);
   }
-  if (isFlow(target)) {
-    return target.name ?? "flow";
-  }
-  if (typeof target === "function" && target.name) {
-    return target.name;
-  }
-  return "fn";
+  return ctx.name ?? options?.defaultFlowName ?? "flow";
 }
 
 function getAtomName(
@@ -96,7 +91,7 @@ export function createOtel(options: OtelExtension.Options): Lite.Extension {
         ? trace.setSpan(context.active(), parentSpan)
         : context.active();
 
-      const spanName = getTargetName(target, options);
+      const spanName = getExecName(ctx, target, options);
       const span = tracer.startSpan(spanName, {}, parentContext);
       setSpanInContext(ctx.data, span);
       const start = performance.now();
