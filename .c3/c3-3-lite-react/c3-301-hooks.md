@@ -24,7 +24,9 @@ Four hooks provide React integration with @pumped-fn/lite's scope and atom syste
 
 ### Explicit Lifecycle
 
-Hooks **observe**, they don't **trigger**. Atoms must be resolved before rendering:
+Hooks **observe**, they don't **trigger**. Atoms must be resolved before rendering.
+
+**Exception:** `useAtom(atom, { suspense: false, resolve: true })` triggers resolution via `useEffect`. This is an opt-in escape hatch for users who need imperative auto-resolution without Suspense. See [ADR-022](../adr/adr-022-non-suspense-mode.md).
 
 ```tsx
 const scope = createScope()
@@ -79,13 +81,11 @@ function MyComponent() {
 Get a memoized Controller instance for an atom.
 
 ```typescript
-function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
-  const scope = useScope()
-  return useMemo(() => scope.controller(atom), [scope, atom])
-}
+function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
+function useController<T>(atom: Lite.Atom<T>, options: { resolve: true }): Lite.Controller<T>
 ```
 
-**Usage:**
+**Basic usage:**
 ```tsx
 function Counter() {
   const ctrl = useController(countAtom)
@@ -98,63 +98,106 @@ function Counter() {
 }
 ```
 
-## useAtom {#c3-301-use-atom}
+**With resolve option:**
 
-Subscribe to an atom's value with full Suspense/ErrorBoundary integration.
+When `{ resolve: true }` is passed, the hook throws a Promise (triggering Suspense) if the atom is not resolved:
 
-```typescript
-function useAtom<T>(atom: Lite.Atom<T>): T {
-  const ctrl = useController(atom)
-
-  const getSnapshot = useCallback((): T => {
-    switch (ctrl.state) {
-      case 'idle':
-        throw new Error("Atom not resolved...")
-      case 'resolving':
-        throw ctrl.resolve()
-      case 'failed':
-        throw ctrl.get()
-      case 'resolved':
-        return ctrl.get()
-      default: {
-        const exhaustiveCheck: never = ctrl.state
-        throw new Error(`Unhandled atom state: ${exhaustiveCheck}`)
-      }
-    }
-  }, [ctrl])
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
-    [ctrl]
-  )
-
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+```tsx
+function ConfigDisplay() {
+  // Suspense ensures controller is resolved
+  const ctrl = useController(configAtom, { resolve: true })
+  return <div>{ctrl.get().apiUrl}</div> // safe - guaranteed resolved
 }
 ```
 
-**Usage:**
+| Option | Behavior |
+|--------|----------|
+| (none) | Returns controller immediately, any state |
+| `{ resolve: true }` | Throws Promise for Suspense if not resolved |
+
+## useAtom {#c3-301-use-atom}
+
+Subscribe to an atom's value with Suspense/ErrorBoundary integration or manual state handling.
+
+```typescript
+// Suspense mode (default)
+function useAtom<T>(atom: Lite.Atom<T>): T
+
+// Non-Suspense mode
+function useAtom<T>(atom: Lite.Atom<T>, options: { suspense: false; resolve?: boolean }): UseAtomState<T>
+
+interface UseAtomState<T> {
+  data: T | undefined
+  loading: boolean
+  error: Error | undefined
+  controller: Lite.Controller<T>
+}
+```
+
+### Suspense Mode (Default)
+
 ```tsx
 function UserProfile() {
   const user = useAtom(userAtom)
   return <div>{user.name}</div>
 }
-```
 
-**With Suspense:**
-```tsx
-<Suspense fallback={<Loading />}>
-  <UserProfile />
-</Suspense>
-```
-
-**With ErrorBoundary:**
-```tsx
+// Wrap with Suspense + ErrorBoundary
 <ErrorBoundary fallback={<Error />}>
   <Suspense fallback={<Loading />}>
     <UserProfile />
   </Suspense>
 </ErrorBoundary>
 ```
+
+### Non-Suspense Mode
+
+For manual loading/error state handling:
+
+```tsx
+function UserProfile() {
+  const { data, loading, error, controller } = useAtom(userAtom, { suspense: false })
+
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+  if (!data) return <div>Not loaded</div>
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <button onClick={() => controller.invalidate()}>Refresh</button>
+    </div>
+  )
+}
+```
+
+### Options
+
+| Option | Return | Behavior |
+|--------|--------|----------|
+| (none) | `T` | Suspense mode, auto-resolves and throws Promise |
+| `{ suspense: false }` | `UseAtomState<T>` | Manual state, no auto-resolve |
+| `{ suspense: false, resolve: true }` | `UseAtomState<T>` | Manual state, auto-resolves on mount |
+
+### State Mapping
+
+**Suspense mode:**
+
+| Atom State | Behavior |
+|------------|----------|
+| `idle` | Auto-resolve, throw Promise |
+| `resolving` | Throw Promise (Suspense catches) |
+| `resolved` | Return value, subscribe |
+| `failed` | Throw error (ErrorBoundary catches) |
+
+**Non-Suspense mode:**
+
+| Atom State | `data` | `loading` | `error` |
+|------------|--------|-----------|---------|
+| `idle` | `undefined` | `false` | `undefined` |
+| `resolving` | `undefined` | `true` | `undefined` |
+| `resolved` | value | `false` | `undefined` |
+| `failed` | `undefined` | `false` | Error |
 
 ## useSelect {#c3-301-use-select}
 

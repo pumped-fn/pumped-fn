@@ -91,6 +91,14 @@ ctrl.update(n => n + 1)
 ctrl.invalidate()
 ```
 
+With `{ resolve: true }` option, triggers Suspense if atom not resolved:
+
+```tsx
+// Suspense ensures controller is resolved before render
+const ctrl = useController(configAtom, { resolve: true })
+ctrl.get() // safe - Suspense guarantees resolved state
+```
+
 ### useAtom
 
 Subscribe to atom value with Suspense integration.
@@ -108,6 +116,39 @@ function UserProfile() {
   </Suspense>
 </ErrorBoundary>
 ```
+
+#### Non-Suspense Mode
+
+For manual loading/error state handling without Suspense:
+
+```tsx
+function UserProfile() {
+  const { data, loading, error, controller } = useAtom(userAtom, { suspense: false })
+
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+  if (!data) return <div>Not loaded</div>
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <button onClick={() => controller.invalidate()}>Refresh</button>
+    </div>
+  )
+}
+```
+
+With `{ resolve: true }`, auto-resolves on mount:
+
+```tsx
+// Starts resolution automatically when component mounts
+const { data, loading, error } = useAtom(userAtom, { suspense: false, resolve: true })
+```
+
+| Option | Effect |
+|--------|--------|
+| `{ suspense: false }` | Returns state object, no auto-resolve |
+| `{ suspense: false, resolve: true }` | Returns state object, auto-resolves on mount |
 
 ### useSelect
 

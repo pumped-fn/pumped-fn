@@ -116,13 +116,19 @@ flowchart TD
 | Hook | Description | Returns |
 |------|-------------|---------|
 | `useScope()` | Get scope from context | `Lite.Scope` |
-| `useController(atom)` | Get memoized controller | `Lite.Controller<T>` |
-| `useAtom(atom)` | Subscribe to atom value | `T` |
+| `useController(atom, options?)` | Get memoized controller | `Lite.Controller<T>` |
+| `useAtom(atom)` | Subscribe to atom value (Suspense) | `T` |
+| `useAtom(atom, { suspense: false })` | Manual state handling | `UseAtomState<T>` |
 | `useSelect(atom, selector, eq?)` | Fine-grained selection | `S` |
 
 ### Type Exports
 
-Types are re-exported from `@pumped-fn/lite` via the `Lite` namespace.
+| Type | Description |
+|------|-------------|
+| `UseAtomOptions` | Options for useAtom hook |
+| `UseAtomState<T>` | Return type for non-Suspense mode |
+| `UseControllerOptions` | Options for useController hook |
+| `Lite` | Re-exported namespace from `@pumped-fn/lite` |
 
 ## Source Organization {#c3-3-source}
 
