@@ -264,6 +264,27 @@ const handler = flow({
 | `setTag(tag, v)` | Local only | Always writes to current context |
 | `tags.required(tag)` | Uses `seekTag()` | Dependency injection |
 
+### Resolution Timing
+
+Tag dependencies resolve **once** at factory start. Direct `seekTag()` calls reflect runtime changes:
+
+```typescript
+const handler = flow({
+  deps: { userId: tags.required(userIdTag) },
+  factory: (ctx, { userId }) => {
+    ctx.data.setTag(userIdTag, 'changed')
+
+    console.log(userId)                      // Original (stable)
+    console.log(ctx.data.seekTag(userIdTag)) // 'changed' (dynamic)
+  }
+})
+```
+
+| Access | Resolution | Runtime Changes |
+|--------|------------|-----------------|
+| `deps: { x: tags.required(tag) }` | Once at start | Stable snapshot |
+| `ctx.data.seekTag(tag)` | Each call | Sees changes |
+
 ## License
 
 MIT
