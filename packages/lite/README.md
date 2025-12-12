@@ -74,20 +74,26 @@ sequenceDiagram
     Context->>Context: run onClose cleanups (LIFO)
 ```
 
-## Tag Inheritance
+## Tag Inheritance (ADR-023)
+
+Tags are auto-populated into `ctx.data` and resolved via `seekTag()`:
 
 ```mermaid
 flowchart TD
-    subgraph Scope["Scope: tags=[tenantId('t1')]"]
-        subgraph Context["Context: tags=[requestId('r1')]"]
-            subgraph Flow["Flow deps:"]
-                T1["tags.required(tenantId) → 't1'"]
-                T2["tags.required(requestId) → 'r1'"]
+    subgraph Root["Root Context (ctx.data)"]
+        S["scope.tags → auto-populated"]
+        C["context.tags → auto-populated"]
+        subgraph Child["Child Context (exec)"]
+            E["exec.tags → auto-populated"]
+            F["flow.tags → auto-populated"]
+            D["ctx.data.setTag() → runtime"]
+            subgraph Deps["tags.required(tag)"]
+                R["seekTag() traverses: Child → Root"]
             end
         end
     end
 
-    Note["Inner inherits from outer. Override by passing same tag at inner level."]
+    Note["Nearest value wins. Propagates to all descendants."]
 ```
 
 ## Controller Reactivity
@@ -153,13 +159,13 @@ Short-lived operation with input/output.
 
 ### Tag
 
-Contextual value passed through execution without explicit wiring.
+Contextual value passed through execution without explicit wiring. Uses `seekTag()` for hierarchical lookup (ADR-023).
 
 - `tag({ label, default?, parse? })` — define with optional default and validation
-- `tags.required(tag)` — dependency that throws if missing
-- `tags.optional(tag)` — dependency that returns undefined if missing
-- `tags.all(tag)` — collects all values from inheritance chain
-- Tags inherit: Scope → Context → exec call
+- `tags.required(tag)` — dependency using `seekTag()`, throws if missing
+- `tags.optional(tag)` — dependency using `seekTag()`, returns undefined if missing
+- `tags.all(tag)` — collects one value per hierarchy level (child → root)
+- Tags auto-populate into `ctx.data`: scope → context → exec → flow
 
 ### Controller
 
@@ -229,9 +235,9 @@ ctx.data.getOrSetTag(countTag)  // 0 (uses default, now stored)
 ctx.data.getTag(countTag)       // 0 (now stored)
 ```
 
-### Hierarchical Data Lookup with seek()
+### Hierarchical Data Lookup with seekTag() (ADR-023)
 
-Each execution context has isolated data, but `seekTag()` traverses the parent chain:
+Tag dependencies (`tags.required()`, `tags.optional()`, `tags.all()`) use `seekTag()` internally to traverse the ExecutionContext parent chain. Tags from all sources are auto-populated into `ctx.data`:
 
 ```typescript
 const requestIdTag = tag<string>({ label: 'requestId' })
@@ -244,9 +250,9 @@ const middleware = flow({
 })
 
 const handler = flow({
-  factory: (ctx) => {
-    // seekTag() finds value from parent context
-    const reqId = ctx.data.seekTag(requestIdTag)  // 'req-123'
+  deps: { reqId: tags.required(requestIdTag) },
+  factory: (ctx, { reqId }) => {
+    // reqId === 'req-123' (found via seekTag from parent)
   }
 })
 ```
@@ -256,6 +262,28 @@ const handler = flow({
 | `getTag(tag)` | Local only | Per-exec isolated data |
 | `seekTag(tag)` | Local → parent → root | Cross-cutting concerns |
 | `setTag(tag, v)` | Local only | Always writes to current context |
+| `tags.required(tag)` | Uses `seekTag()` | Dependency injection |
+
+### Resolution Timing
+
+Tag dependencies resolve **once** at factory start. Direct `seekTag()` calls reflect runtime changes:
+
+```typescript
+const handler = flow({
+  deps: { userId: tags.required(userIdTag) },
+  factory: (ctx, { userId }) => {
+    ctx.data.setTag(userIdTag, 'changed')
+
+    console.log(userId)                      // Original (stable)
+    console.log(ctx.data.seekTag(userIdTag)) // 'changed' (dynamic)
+  }
+})
+```
+
+| Access | Resolution | Runtime Changes |
+|--------|------------|-----------------|
+| `deps: { x: tags.required(tag) }` | Once at start | Stable snapshot |
+| `ctx.data.seekTag(tag)` | Each call | Sees changes |
 
 ## License
 
