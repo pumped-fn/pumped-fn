@@ -68,7 +68,8 @@ Refactor to self-contained extension with:
 2. **AsyncLocalStorage context** - Replace ContextData Symbol with ALS
 3. **Lifecycle management** - `init()` creates provider, `dispose()` shuts down
 4. **Result capture** - Optional input/output capture with redaction support
-5. **Remove metrics** - Separate concern (can be separate extension)
+5. **Hierarchical redaction** - Uses `seekTag()` to traverse parent chain, enabling a parent to redact all child spans
+6. **Remove metrics** - Separate concern (can be separate extension)
 
 ### New API Design
 
@@ -181,7 +182,8 @@ export function otel(): Lite.Extension {
 
     wrapExec(next, _target, ctx) {
       const spanName = ctx.name ?? 'unknown-flow'
-      const shouldRedact = ctx.data.getTag(otelConfig.redact) ?? false
+      // seekTag traverses parent chain - enables hierarchical redaction
+      const shouldRedact = ctx.data.seekTag(otelConfig.redact) ?? false
       const parentContext = otelContextStorage.getStore() || ROOT_CONTEXT
       const span = tracer.startSpan(spanName, undefined, parentContext)
       const newContext = trace.setSpan(parentContext, span)

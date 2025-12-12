@@ -40,8 +40,6 @@ const otelConfigAtom = atom({
   factory: (_ctx, deps) => deps,
 })
 
-const otelContextStorage = new AsyncLocalStorage<Context>()
-
 const activeProviders = new Set<BasicTracerProvider>()
 
 /**
@@ -54,6 +52,10 @@ export async function shutdownAllProviders(): Promise<void> {
   activeProviders.clear()
 }
 
+/**
+ * Safely serializes user data for span attributes.
+ * JSON.stringify can throw on circular references or BigInt values from user code.
+ */
 const safeStringify = (value: unknown): string => {
   try {
     return JSON.stringify(value)
@@ -91,6 +93,7 @@ function createExporter(
  * ```
  */
 export function otel(options?: OtelOptions): Lite.Extension {
+  const contextStorage = new AsyncLocalStorage<Context>()
   let exporter: SpanExporter
   let spanProcessor: SpanProcessor
   let tracer: Tracer
@@ -126,12 +129,12 @@ export function otel(options?: OtelOptions): Lite.Extension {
     ): Promise<unknown> {
       const spanName = ctx.name ?? "unknown-flow"
       const shouldRedact = ctx.data.seekTag(otelConfig.redact) ?? false
-      const parentOtelContext = otelContextStorage.getStore() || ROOT_CONTEXT
+      const parentOtelContext = contextStorage.getStore() || ROOT_CONTEXT
       const currentSpan = tracer.startSpan(spanName, undefined, parentOtelContext)
 
       const newOtelContext = trace.setSpan(parentOtelContext, currentSpan)
 
-      return otelContextStorage.run(newOtelContext, () => next())
+      return contextStorage.run(newOtelContext, () => next())
         .then((result) => {
           currentSpan.setStatus({ code: SpanStatusCode.OK })
           if (!shouldRedact && captureResults) {
