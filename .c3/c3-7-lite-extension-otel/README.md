@@ -3,8 +3,8 @@ id: c3-7
 c3-version: 3
 title: Lite Extension OTel (@pumped-fn/lite-extension-otel)
 summary: >
-  OpenTelemetry integration extension providing distributed tracing, metrics,
-  and W3C context propagation for pumped-fn applications.
+  Self-contained OpenTelemetry tracing extension with tag-based configuration,
+  AsyncLocalStorage context propagation, and automatic provider lifecycle management.
 ---
 
 # Lite Extension OTel (@pumped-fn/lite-extension-otel)

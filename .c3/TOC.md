@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-12 15:24:13
+> Last generated: 2025-12-12 15:25:06
 
 ## Context Level
 
@@ -100,8 +100,8 @@ integration via useSyncExternalStore for React 18+ applications.
 ---
 
 ### [c3-7](./c3-7-lite-extension-otel/) - Lite Extension OTel (@pumped-fn/lite-extension-otel)
-> OpenTelemetry integration extension providing distributed tracing, metrics,
-and W3C context propagation for pumped-fn applications.
+> Self-contained OpenTelemetry tracing extension with tag-based configuration,
+AsyncLocalStorage context propagation, and automatic provider lifecycle management.
 
 **Sections**:
 - [Overview](#c3-7-overview)
