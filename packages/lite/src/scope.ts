@@ -801,6 +801,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
         tags: this.baseTags,
+        execName: options.name,
         flowName: options.fn.name || undefined,
         input: options.params
       })

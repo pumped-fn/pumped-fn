@@ -336,6 +336,16 @@ const myFlow = flow({
 })
 ```
 
+**With explicit name for tracing/debugging:**
+
+```typescript
+const result = await ctx.exec({
+  fn: async (ctx, a: number, b: number) => a + b,
+  params: [1, 2],
+  name: "addNumbers"
+})
+```
+
 **Note:** For function execution, `ctx.input` is the `params` array, enabling extensions to access function arguments.
 
 ### Extension Wrapping
@@ -648,6 +658,17 @@ type ExecFlowOptions<Output, Input> = {
   | { input: Input; rawInput?: never }   // Typed execution
   | { rawInput: unknown; input?: never } // Raw execution
 )
+```
+
+### ExecFnOptions
+
+```typescript
+interface ExecFnOptions<Output, Args extends unknown[]> {
+  fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
+  params: Args
+  name?: string
+  tags?: Tagged<unknown>[]
+}
 ```
 
 ### FlowFactory Type
