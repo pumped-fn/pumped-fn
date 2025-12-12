@@ -235,4 +235,64 @@ describe("OTel tracing", () => {
     expect(spans[0]?.status.code).toBe(SpanStatusCode.ERROR);
     expect(spans[0]?.events.some((e) => e.name === "exception")).toBe(true);
   });
+
+  it("uses exec name override for span naming", async () => {
+    const testFlow = flow({
+      name: "flowName",
+      factory: () => 42,
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    const ctx = scope.createContext();
+    await ctx.exec({ flow: testFlow, name: "execOverride" });
+    await ctx.close();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toBe("execOverride");
+  });
+
+  it("uses defaultFlowName when ctx.name is undefined", async () => {
+    const testFlow = flow({
+      factory: () => 42,
+    });
+
+    const scope = createScope({
+      extensions: [
+        createOtel({
+          tracer: provider.getTracer("test"),
+          defaultFlowName: "customDefault",
+        }),
+      ],
+    });
+
+    const ctx = scope.createContext();
+    await ctx.exec({ flow: testFlow });
+    await ctx.close();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toBe("customDefault");
+  });
+
+  it("falls back to 'flow' when no name and no defaultFlowName", async () => {
+    const testFlow = flow({
+      factory: () => 42,
+    });
+
+    const scope = createScope({
+      extensions: [createOtel({ tracer: provider.getTracer("test") })],
+    });
+
+    const ctx = scope.createContext();
+    await ctx.exec({ flow: testFlow });
+    await ctx.close();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBe(1);
+    expect(spans[0]?.name).toBe("flow");
+  });
 });

@@ -120,6 +120,7 @@ export namespace Lite {
 
   export interface ExecutionContext {
     readonly input: unknown
+    readonly name: string | undefined
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
     readonly data: ContextData

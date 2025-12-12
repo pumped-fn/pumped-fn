@@ -717,6 +717,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private readonly _input: unknown
   private readonly baseTags: Lite.Tagged<unknown>[]
   private _data: ContextDataImpl | undefined
+  private readonly _execName: string | undefined
+  private readonly _flowName: string | undefined
   readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
@@ -724,10 +726,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     options?: Lite.CreateContextOptions & {
       parent?: Lite.ExecutionContext
       input?: unknown
+      execName?: string
+      flowName?: string
     }
   ) {
     this.parent = options?.parent
     this._input = options?.input
+    this._execName = options?.execName
+    this._flowName = options?.flowName
     const ctxTags = options?.tags
     this.baseTags = ctxTags?.length
       ? [...ctxTags, ...scope.tags]
@@ -736,6 +742,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get input(): unknown {
     return this._input
+  }
+
+  get name(): string | undefined {
+    return this._execName ?? this._flowName
   }
 
   get data(): Lite.ContextData {
@@ -777,7 +787,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
         tags: this.baseTags,
-        input: parsedInput
+        input: parsedInput,
+        execName,
+        flowName: flow.name
       })
 
       try {
@@ -788,7 +800,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     } else {
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
-        tags: this.baseTags
+        tags: this.baseTags,
+        flowName: options.fn.name || undefined
       })
 
       try {
