@@ -1,5 +1,26 @@
 # @pumped-fn/lite
 
+## 1.9.1
+
+### Patch Changes
+
+- e774247: Expose function params as `ctx.input` for extensions
+
+  When executing functions via `ctx.exec({ fn, params })`, the `params` array is now available on `ctx.input`. This enables extensions to access function arguments consistently with flow input.
+
+  - Flows: `ctx.input` = parsed input value
+  - Functions: `ctx.input` = params array
+
+## 1.9.0
+
+### Minor Changes
+
+- 9e1f827: Add `name` property to ExecutionContext for extension visibility
+
+  - ExecutionContext now exposes `name: string | undefined` (lazy-computed)
+  - Name resolution: exec name > flow name > undefined
+  - OTEL extension uses `ctx.name` with configurable `defaultFlowName` fallback
+
 ## 1.8.0
 
 ### Minor Changes

@@ -144,6 +144,7 @@ export namespace Lite {
   export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
     fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
     params: Args
+    name?: string
     tags?: Tagged<unknown>[]
   }
 

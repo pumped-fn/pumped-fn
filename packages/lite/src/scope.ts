@@ -847,7 +847,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     } else {
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
-        flowName: options.fn.name || undefined
+        execName: options.name,
+        flowName: options.fn.name || undefined,
+        input: options.params
       })
 
       try {

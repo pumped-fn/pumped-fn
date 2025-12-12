@@ -572,6 +572,60 @@ describe("Hierarchical ExecutionContext", () => {
 
       expect(ctx.name).toBeUndefined()
     })
+
+    it("returns exec name for function execution when provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      let capturedName: string | undefined
+
+      await ctx.exec({
+        fn: (innerCtx) => {
+          capturedName = innerCtx.name
+          return 42
+        },
+        params: [],
+        name: "explicitFnName"
+      })
+
+      expect(capturedName).toBe("explicitFnName")
+    })
+
+    it("exec name takes priority over fn.name for function execution", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      let capturedName: string | undefined
+
+      async function namedFunction(innerCtx: Lite.ExecutionContext) {
+        capturedName = innerCtx.name
+        return 42
+      }
+
+      await ctx.exec({
+        fn: namedFunction,
+        params: [],
+        name: "overrideName"
+      })
+
+      expect(capturedName).toBe("overrideName")
+    })
+
+    it("falls back to fn.name when exec name not provided", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      let capturedName: string | undefined
+
+      async function namedFunction(innerCtx: Lite.ExecutionContext) {
+        capturedName = innerCtx.name
+        return 42
+      }
+
+      await ctx.exec({
+        fn: namedFunction,
+        params: []
+      })
+
+      expect(capturedName).toBe("namedFunction")
+    })
   })
 
   describe("tag dependency resolution with seekTag (ADR-023)", () => {

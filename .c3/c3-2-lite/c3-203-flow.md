@@ -41,7 +41,7 @@ Created by `scope.createContext()`, used for flow execution:
 
 ```typescript
 interface ExecutionContext {
-  readonly input: unknown                        // Current execution's input
+  readonly input: unknown                        // Flow: parsed input, Function: params array
   readonly name: string | undefined              // Resolved: execName > flowName > undefined
   readonly scope: Scope                          // Parent scope
   readonly parent: ExecutionContext | undefined  // Parent context (undefined for root)
@@ -350,13 +350,25 @@ rootCtx (parent: undefined)
 const myFlow = flow({
   factory: async (ctx) => {
     const result = await ctx.exec({
-      fn: async (a: number, b: number) => a + b,
+      fn: async (ctx, a: number, b: number) => a + b,
       params: [1, 2]
     })
     return result // 3
   }
 })
 ```
+
+**With explicit name for tracing/debugging:**
+
+```typescript
+const result = await ctx.exec({
+  fn: async (ctx, a: number, b: number) => a + b,
+  params: [1, 2],
+  name: "addNumbers"
+})
+```
+
+**Note:** For function execution, `ctx.input` is the `params` array, enabling extensions to access function arguments.
 
 ### Extension Wrapping
 
@@ -367,6 +379,9 @@ const tracingExtension: Extension = {
   name: 'tracing',
   wrapExec: async (next, target, ctx) => {
     console.log('Executing:', isFlow(target) ? 'flow' : 'function')
+    // ctx.input available for both:
+    // - Flows: parsed input value
+    // - Functions: params array
     const result = await next()
     console.log('Result:', result)
     return result
@@ -665,6 +680,17 @@ type ExecFlowOptions<Output, Input> = {
   | { input: Input; rawInput?: never }   // Typed execution
   | { rawInput: unknown; input?: never } // Raw execution
 )
+```
+
+### ExecFnOptions
+
+```typescript
+interface ExecFnOptions<Output, Args extends unknown[]> {
+  fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
+  params: Args
+  name?: string
+  tags?: Tagged<unknown>[]
+}
 ```
 
 ### FlowFactory Type
