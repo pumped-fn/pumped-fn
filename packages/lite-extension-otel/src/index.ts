@@ -66,6 +66,16 @@ export interface OtelOptions {
   exporter?: SpanExporter
 }
 
+function createExporter(
+  type: "http" | "grpc" | "console",
+  url: string,
+  override?: SpanExporter
+): SpanExporter {
+  if (override) return override
+  if (type === "console") return new ConsoleSpanExporter()
+  return new OTLPTraceExporter({ url })
+}
+
 /**
  * Creates an OpenTelemetry extension for pumped-fn that instruments function executions with distributed tracing.
  *
@@ -94,11 +104,7 @@ export function otel(options?: OtelOptions): Lite.Extension {
       const config = await scope.resolve(otelConfigAtom)
       captureResults = config.captureResults
 
-      exporter = options?.exporter
-        ? options.exporter
-        : config.type === "console"
-        ? new ConsoleSpanExporter()
-        : new OTLPTraceExporter({ url: config.url })
+      exporter = createExporter(config.type, config.url, options?.exporter)
 
       spanProcessor = new SimpleSpanProcessor(exporter)
 
@@ -118,9 +124,6 @@ export function otel(options?: OtelOptions): Lite.Extension {
       _target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown),
       ctx: Lite.ExecutionContext
     ): Promise<unknown> {
-      if (!tracer) {
-        return next()
-      }
       const spanName = ctx.name ?? "unknown-flow"
       const shouldRedact = ctx.data.seekTag(otelConfig.redact) ?? false
       const parentOtelContext = otelContextStorage.getStore() || ROOT_CONTEXT
