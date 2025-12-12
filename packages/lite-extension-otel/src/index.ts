@@ -64,7 +64,14 @@ const safeStringify = (value: unknown): string => {
   }
 }
 
+/**
+ * Options for the otel extension.
+ */
 export interface OtelOptions {
+  /**
+   * Custom span exporter, primarily for testing with InMemorySpanExporter.
+   * For production, use otelConfig.type tag to select console/http exporter.
+   */
   exporter?: SpanExporter
 }
 
