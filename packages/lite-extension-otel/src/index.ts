@@ -13,15 +13,6 @@ import {
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
 import { AsyncLocalStorage } from "node:async_hooks"
 
-/**
- * Configuration tags for OpenTelemetry integration.
- *
- * @property name - Service name for tracing (default: "default-app")
- * @property url - OTLP exporter endpoint URL (default: "http://localhost:4318/v1/traces")
- * @property type - Exporter type: "http" | "grpc" | "console" (default: "console")
- * @property captureResults - Whether to capture operation results in spans (default: true)
- * @property redact - Whether to redact sensitive data from spans (default: false)
- */
 export const otelConfig = {
   name: tag<string>({ label: "otel.name", default: "default-app" }),
   url: tag<string>({ label: "otel.url", default: "http://localhost:4318/v1/traces" }),
@@ -160,10 +151,8 @@ export function otel(options?: OtelOptions): Lite.Extension {
     },
 
     async dispose() {
-      if (provider) {
-        await provider.shutdown()
-        activeProviders.delete(provider)
-      }
+      await provider.shutdown()
+      activeProviders.delete(provider)
     }
   }
 }

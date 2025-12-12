@@ -49,7 +49,6 @@ describe("otel extension (simplified)", () => {
       await ctx.exec({ flow: testFlow })
       await ctx.close()
       await scope.flush()
-      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
@@ -81,7 +80,6 @@ describe("otel extension (simplified)", () => {
       const ctx = scope.createContext()
       const result = await ctx.exec({ flow: parentFlow })
       await ctx.close()
-      await scope.flush()
       await scope.flush()
 
       expect(result).toBe("parent-child")
@@ -147,7 +145,6 @@ describe("otel extension (simplified)", () => {
       await ctx.exec({ flow: testFlow, name: "customName" })
       await ctx.close()
       await scope.flush()
-      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
@@ -170,7 +167,6 @@ describe("otel extension (simplified)", () => {
       const ctx = scope.createContext()
       await ctx.exec({ flow: testFlow })
       await ctx.close()
-      await scope.flush()
       await scope.flush()
 
       const spans = exporter.getFinishedSpans()
@@ -201,7 +197,6 @@ describe("otel extension (simplified)", () => {
       await ctx.exec({ flow: testFlow })
       await ctx.close()
       await scope.flush()
-      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
@@ -230,7 +225,6 @@ describe("otel extension (simplified)", () => {
       ctx.data.setTag(otelConfig.redact, true)
       await ctx.exec({ flow: sensitiveFlow })
       await ctx.close()
-      await scope.flush()
       await scope.flush()
 
       const spans = exporter.getFinishedSpans()
