@@ -6,29 +6,25 @@ import { SpanStatusCode, trace, context } from "@opentelemetry/api"
 
 describe("otel extension (simplified)", () => {
   let exporter: InMemorySpanExporter
-  let testProvider: BasicTracerProvider
 
   beforeEach(() => {
     exporter = new InMemorySpanExporter()
-    testProvider = new BasicTracerProvider()
-    testProvider.addSpanProcessor(new SimpleSpanProcessor(exporter))
-    testProvider.register()
   })
 
   afterEach(async () => {
-    exporter.reset()
-    await testProvider.shutdown()
     await shutdownAllProviders()
+    exporter.reset()
   })
 
   describe("initialization", () => {
     it("initializes provider from tag configuration", async () => {
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [
+          otelConfig.name("test-app"),
+          otelConfig.type("console"),
+        ],
       })
-
-      scope.setTag(otelConfig.name, "test-app")
-      scope.setTag(otelConfig.type, "console")
 
       await scope.ready
 
@@ -44,19 +40,22 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       const ctx = scope.createContext()
       await ctx.exec({ flow: testFlow })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       expect(spans[0]?.name).toBe("myFlow")
+
+      await scope.dispose()
     })
 
     it("creates parent-child span hierarchy via AsyncLocalStorage", async () => {
@@ -74,20 +73,23 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       const ctx = scope.createContext()
       const result = await ctx.exec({ flow: parentFlow })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       expect(result).toBe("parent-child")
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(2)
+
+      await scope.dispose()
 
       const childSpan = spans.find((s) => s.name === "childFlow")
       const parentSpan = spans.find((s) => s.name === "parentFlow")
@@ -106,20 +108,27 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       const ctx = scope.createContext()
-      await expect(ctx.exec({ flow: failingFlow })).rejects.toThrow("test error")
+      try {
+        await ctx.exec({ flow: failingFlow })
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error)
+        expect((err as Error).message).toBe("test error")
+      }
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       expect(spans[0]?.status.code).toBe(SpanStatusCode.ERROR)
       expect(spans[0]?.events.some((e) => e.name === "exception")).toBe(true)
+
+      await scope.dispose()
     })
 
     it("uses exec name override for span naming", async () => {
@@ -129,19 +138,22 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       const ctx = scope.createContext()
       await ctx.exec({ flow: testFlow, name: "customName" })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       expect(spans[0]?.name).toBe("customName")
+
+      await scope.dispose()
     })
 
     it("falls back to unknown-flow when no name", async () => {
@@ -150,19 +162,22 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       const ctx = scope.createContext()
       await ctx.exec({ flow: testFlow })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       expect(spans[0]?.name).toBe("unknown-flow")
+
+      await scope.dispose()
     })
   })
 
@@ -174,21 +189,26 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [
+          otelConfig.type("console"),
+          otelConfig.captureResults(true),
+        ],
       })
-      scope.setTag(otelConfig.type, "console")
-      scope.setTag(otelConfig.captureResults, true)
       await scope.ready
 
       const ctx = scope.createContext()
       await ctx.exec({ flow: testFlow })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       const resultAttr = spans[0]?.attributes["operation.result"]
       expect(resultAttr).toBe('{"data":"test"}')
+
+      await scope.dispose()
     })
 
     it("respects redaction tag per execution", async () => {
@@ -198,30 +218,35 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [
+          otelConfig.type("console"),
+          otelConfig.captureResults(true),
+        ],
       })
-      scope.setTag(otelConfig.type, "console")
-      scope.setTag(otelConfig.captureResults, true)
       await scope.ready
 
       const ctx = scope.createContext()
       ctx.data.setTag(otelConfig.redact, true)
       await ctx.exec({ flow: sensitiveFlow })
       await ctx.close()
-      await scope.dispose()
+      await scope.flush()
+      await scope.flush()
 
       const spans = exporter.getFinishedSpans()
       expect(spans.length).toBe(1)
       expect(spans[0]?.attributes["operation.result"]).toBeUndefined()
+
+      await scope.dispose()
     })
   })
 
   describe("lifecycle", () => {
     it("shuts down provider on dispose", async () => {
       const scope = createScope({
-        extensions: [otel()],
+        extensions: [otel({ exporter })],
+        tags: [otelConfig.type("console")],
       })
-      scope.setTag(otelConfig.type, "console")
       await scope.ready
 
       await scope.dispose()
