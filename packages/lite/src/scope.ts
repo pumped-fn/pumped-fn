@@ -523,12 +523,11 @@ class ScopeImpl implements Lite.Scope {
 
   async resolveDeps(
     deps: Record<string, Lite.Dependency> | undefined,
-    tagSource?: Lite.Tagged<unknown>[]
+    ctx?: Lite.ExecutionContext
   ): Promise<Record<string, unknown>> {
     if (!deps) return {}
 
     const result: Record<string, unknown> = {}
-    const tags = tagSource ?? this.tags
 
     for (const [key, dep] of Object.entries(deps)) {
       if (isAtom(dep)) {
@@ -543,20 +542,52 @@ class ScopeImpl implements Lite.Scope {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 
         switch (tagExecutor.mode) {
-          case "required":
-            result[key] = tagExecutor.tag.get(tags)
+          case "required": {
+            const value = ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
+              : tagExecutor.tag.find(this.tags)
+            if (value !== undefined) {
+              result[key] = value
+            } else if (tagExecutor.tag.hasDefault) {
+              result[key] = tagExecutor.tag.defaultValue
+            } else {
+              throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
+            }
             break
-          case "optional":
-            result[key] = tagExecutor.tag.find(tags)
+          }
+          case "optional": {
+            const value = ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
+              : tagExecutor.tag.find(this.tags)
+            result[key] = value ?? tagExecutor.tag.defaultValue
             break
-          case "all":
-            result[key] = tagExecutor.tag.collect(tags)
+          }
+          case "all": {
+            result[key] = ctx
+              ? this.collectFromHierarchy(ctx, tagExecutor.tag)
+              : tagExecutor.tag.collect(this.tags)
             break
+          }
         }
       }
     }
 
     return result
+  }
+
+  private collectFromHierarchy<T>(ctx: Lite.ExecutionContext, tag: Lite.Tag<T, boolean>): T[] {
+    const results: T[] = []
+    let current: Lite.ExecutionContext | undefined = ctx
+
+    while (current) {
+      const value = current.data.getTag(tag)
+      if (value !== undefined) {
+        results.push(value)
+      }
+      current = current.parent
+    }
+
+    return results
   }
 
   controller<T>(atom: Lite.Atom<T>): Lite.Controller<T>
@@ -707,7 +738,19 @@ class ScopeImpl implements Lite.Scope {
   }
 
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
-    return new ExecutionContextImpl(this, options)
+    const ctx = new ExecutionContextImpl(this, options)
+
+    for (const tagged of options?.tags ?? []) {
+      ctx.data.set(tagged.key, tagged.value)
+    }
+
+    for (const tagged of this.tags) {
+      if (!ctx.data.has(tagged.key)) {
+        ctx.data.set(tagged.key, tagged.value)
+      }
+    }
+
+    return ctx
   }
 }
 
@@ -715,7 +758,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: (() => MaybePromise<void>)[] = []
   private closed = false
   private readonly _input: unknown
-  private readonly baseTags: Lite.Tagged<unknown>[]
   private _data: ContextDataImpl | undefined
   private readonly _execName: string | undefined
   private readonly _flowName: string | undefined
@@ -734,10 +776,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this._input = options?.input
     this._execName = options?.execName
     this._flowName = options?.flowName
-    const ctxTags = options?.tags
-    this.baseTags = ctxTags?.length
-      ? [...ctxTags, ...scope.tags]
-      : scope.tags
   }
 
   get input(): unknown {
@@ -767,7 +805,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
 
     if ("flow" in options) {
-      const { flow, input, rawInput, name: execName } = options
+      const { flow, input, rawInput, name: execName, tags: execTags } = options
       const rawValue = rawInput !== undefined ? rawInput : input
       let parsedInput: unknown = rawValue
       if (flow.parse) {
@@ -786,21 +824,29 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
-        tags: this.baseTags,
         input: parsedInput,
         execName,
         flowName: flow.name
       })
 
+      for (const tagged of execTags ?? []) {
+        childCtx.data.set(tagged.key, tagged.value)
+      }
+
+      for (const tagged of flow.tags ?? []) {
+        if (!childCtx.data.has(tagged.key)) {
+          childCtx.data.set(tagged.key, tagged.value)
+        }
+      }
+
       try {
-        return await childCtx.execFlowInternal(options)
+        return await childCtx.execFlowInternal(flow)
       } finally {
         await childCtx.close()
       }
     } else {
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
-        tags: this.baseTags,
         execName: options.name,
         flowName: options.fn.name || undefined,
         input: options.params
@@ -814,20 +860,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private async execFlowInternal(options: {
-    flow: Lite.Flow<unknown, unknown>
-    input?: unknown
-    name?: string
-    tags?: Lite.Tagged<unknown>[]
-  }): Promise<unknown> {
-    const { flow, tags: execTags } = options
-
-    const hasExtraTags = (execTags?.length ?? 0) > 0 || (flow.tags?.length ?? 0) > 0
-    const allTags = hasExtraTags
-      ? [...(execTags ?? []), ...this.baseTags, ...(flow.tags ?? [])]
-      : this.baseTags
-
-    const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags)
+  private async execFlowInternal(flow: Lite.Flow<unknown, unknown>): Promise<unknown> {
+    const resolvedDeps = await this.scope.resolveDeps(flow.deps, this)
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,

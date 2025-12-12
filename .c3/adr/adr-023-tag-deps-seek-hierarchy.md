@@ -1,118 +1,160 @@
 ---
 id: ADR-023-tag-deps-seek-hierarchy
-title: Tag Dependencies Use seekTag for Hierarchical Lookup
+title: Unify Tag System Under ctx.data with seekTag
 summary: >
-  Change tags.required(), tags.optional(), and tags.all() to look up values
-  via seekTag() across the ExecutionContext parent chain, enabling flows to
-  access tag values set via ctx.data.setTag() in parent contexts.
+  Auto-populate Tagged[] arrays into ctx.data and use seekTag() for all tag
+  dependency resolution, creating a single unified system where tags naturally
+  propagate through the ExecutionContext parent chain.
 status: proposed
 date: 2025-12-12
 ---
 
-# [ADR-023] Tag Dependencies Use seekTag for Hierarchical Lookup
+# [ADR-023] Unify Tag System Under ctx.data with seekTag
 
 ## Status {#adr-023-status}
 **Proposed** - 2025-12-12
 
 ## Problem/Requirement {#adr-023-problem}
 
-Users expect `tags.required(someTag)` in a child flow to find values set via `ctx.data.setTag(someTag, value)` in a parent context:
+The current tag system has two separate mechanisms that cause confusion:
+
+**1. Tagged[] arrays** - passed via `exec({ tags })`, `createContext({ tags })`, `createScope({ tags })`
+- Looked up via `tag.get(taggedArray)`
+- Does NOT propagate to grandchildren (exec tags only visible to immediate child)
+
+**2. ctx.data** - runtime storage with hierarchical lookup
+- Set via `ctx.data.setTag(tag, value)`
+- Looked up via `ctx.data.seekTag(tag)` which traverses parent chain
+- NOT visible to `tags.required()` dependencies
 
 ```typescript
-const requestIdTag = tag<string>({ label: "requestId" })
-
 const middleware = flow({
   factory: async (ctx) => {
-    ctx.data.setTag(requestIdTag, generateRequestId())
+    ctx.data.setTag(userTag, user)
     return ctx.exec({ flow: handler })
   }
 })
 
 const handler = flow({
-  deps: { reqId: tags.required(requestIdTag) },  // User expects this to work
-  factory: (ctx, { reqId }) => {
-    logger.info(`Handling request ${reqId}`)
+  deps: { user: tags.required(userTag) },
+  factory: (ctx, { user }) => {
+    // FAILS! tags.required() doesn't see ctx.data values
   }
 })
 ```
 
-**Current behavior:** `tags.required()` only looks at the merged `Tagged[]` array from:
-1. Flow's attached tags
-2. Scope's tags
-3. Context's tags (at createContext time)
-4. Execution tags (passed to exec)
-
-It does **not** look at `ctx.data` - values set via `ctx.data.setTag()` are invisible to tag dependencies.
-
-**User need:** Tag dependencies should search the ExecutionContext parent chain using `seekTag()` semantics (added in ADR-021), enabling middleware patterns where parent contexts set values that child flows consume as dependencies.
-
-## Exploration Journey {#adr-023-exploration}
-
-**Initial hypothesis:** The issue is in `resolveDeps` which calls `tag.get(tags)` on a flat array instead of using `seekTag()`.
-
-**Explored isolated (scope.ts:524-560):**
+**Additional bug:** Exec tags don't propagate to grandchildren:
 
 ```typescript
-async resolveDeps(deps, tagSource?) {
-  const tags = tagSource ?? this.tags  // Flat Tagged[] array
+ctx.exec({ flow: f1, tags: [userTag('alice')] })
 
-  for (const [key, dep] of Object.entries(deps)) {
-    if (tagExecutorSymbol in dep) {
-      switch (tagExecutor.mode) {
-        case "required":
-          result[key] = tagExecutor.tag.get(tags)  // Only searches flat array
-        case "optional":
-          result[key] = tagExecutor.tag.find(tags)
-        case "all":
-          result[key] = tagExecutor.tag.collect(tags)
-      }
-    }
+const f1 = flow({
+  factory: (ctx) => ctx.exec({ flow: f2 })
+})
+
+const f2 = flow({
+  deps: { user: tags.required(userTag) },
+  factory: (ctx, { user }) => {
+    // FAILS! userTag not visible to grandchild
   }
-}
+})
 ```
 
-**Discovered problem:** `resolveDeps` has no access to `ExecutionContext` - it only receives the flat `Tagged[]` array. To use `seekTag()`, we need to pass the context.
-
-**Explored upstream (ADR-021):** The `seekTag()` method exists on `ContextData` and traverses the parent chain:
-
-```typescript
-seekTag<T>(tag: Tag<T>): T | undefined {
-  if (this.map.has(tag.key)) {
-    return this.map.get(tag.key) as T
-  }
-  return this.parentData?.seekTag(tag)
-}
-```
-
-**Explored adjacent (c3-203, c3-204):** Two separate tag mechanisms exist:
-1. `Tagged[]` arrays - compile-time known values
-2. `ctx.data.setTag()` - runtime dynamic values
-
-**User clarification confirmed:** The request is to unify these - tag dependencies should look at both sources.
-
-**Design consideration:** Order of precedence matters. The closest context should win:
-1. **`ctx.data.seekTag()` traversal (highest priority)** - runtime values from nearest parent
-2. Execution tags
-3. Context tags
-4. Scope tags
-5. Flow tags (lowest priority)
-
-This ensures runtime values set via `ctx.data.setTag()` in parent contexts take precedence over static `Tagged[]` values, matching the intuition that "closer" data wins.
+The README implies a unified system, but code has two separate systems.
 
 ## Solution {#adr-023-solution}
 
-Modify `resolveDeps` to accept optional `ExecutionContext` and check `ctx.data.seekTag()` **first** (highest priority):
+Unify under ctx.data: auto-populate Tagged[] into ctx.data, use seekTag() for resolution.
+
+```mermaid
+flowchart TD
+    subgraph Before["BEFORE: Two Systems"]
+        A1["exec({ tags: [userTag] })"] --> B1["Tagged[] array"]
+        B1 --> C1["tag.get(array)"]
+
+        A2["ctx.data.setTag(userTag)"] --> B2["ctx.data Map"]
+        B2 --> C2["seekTag()"]
+
+        C1 -.- X["No connection"]
+        C2 -.- X
+    end
+
+    subgraph After["AFTER: Unified"]
+        A3["exec({ tags: [userTag] })"] --> B3["Auto-populate ctx.data"]
+        A4["ctx.data.setTag(userTag)"] --> B3
+        B3 --> C3["seekTag() traverses parent chain"]
+        C3 --> D3["tags.required() finds value"]
+    end
+```
+
+### Auto-Population Rules
+
+| Source | When | Populates Into |
+|--------|------|----------------|
+| `exec({ tags: [...] })` | Child context created | `childCtx.data` |
+| `flow.tags` | Flow executes | `childCtx.data` |
+| `createContext({ tags: [...] })` | Context created | `rootCtx.data` |
+| `createScope({ tags: [...] })` | Context created | `rootCtx.data` (via createContext) |
+
+### Implementation Details
+
+**1. Auto-populate in exec():**
+
+```typescript
+async exec(options) {
+  const childCtx = new ExecutionContextImpl(this.scope, {
+    parent: this,
+    input: parsedInput,
+  })
+
+  if ("flow" in options) {
+    const { flow, tags: execTags } = options
+
+    for (const tagged of execTags ?? []) {
+      childCtx.data.set(tagged.key, tagged.value)
+    }
+
+    for (const tagged of flow.tags ?? []) {
+      if (!childCtx.data.has(tagged.key)) {
+        childCtx.data.set(tagged.key, tagged.value)
+      }
+    }
+  }
+
+  return childCtx.execFlowInternal(options)
+}
+```
+
+**2. Auto-populate in createContext():**
+
+```typescript
+createContext(options?: CreateContextOptions): ExecutionContext {
+  const ctx = new ExecutionContextImpl(this, options)
+
+  for (const tagged of options?.tags ?? []) {
+    ctx.data.set(tagged.key, tagged.value)
+  }
+
+  for (const tagged of this.tags) {
+    if (!ctx.data.has(tagged.key)) {
+      ctx.data.set(tagged.key, tagged.value)
+    }
+  }
+
+  return ctx
+}
+```
+
+**3. Change resolveDeps to use seekTag():**
 
 ```typescript
 async resolveDeps(
   deps: Record<string, Dependency> | undefined,
-  tagSource?: Tagged<unknown>[],
-  ctx?: ExecutionContext  // NEW parameter
+  ctx?: ExecutionContext
 ): Promise<Record<string, unknown>> {
   if (!deps) return {}
 
   const result: Record<string, unknown> = {}
-  const tags = tagSource ?? this.tags
 
   for (const [key, dep] of Object.entries(deps)) {
     if (tagExecutorSymbol in dep) {
@@ -120,58 +162,42 @@ async resolveDeps(
 
       switch (tagExecutor.mode) {
         case "required": {
-          // First try ctx.data hierarchy (highest priority)
-          if (ctx) {
-            const fromData = ctx.data.seekTag(tagExecutor.tag)
-            if (fromData !== undefined) {
-              result[key] = fromData
-              break
-            }
+          const value = ctx?.data.seekTag(tagExecutor.tag)
+          if (value !== undefined) {
+            result[key] = value
+          } else if (tagExecutor.tag.hasDefault) {
+            result[key] = tagExecutor.tag.defaultValue
+          } else {
+            throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
           }
-          // Fall back to Tagged[] array
-          result[key] = tagExecutor.tag.get(tags)
           break
         }
         case "optional": {
-          // First try ctx.data hierarchy (highest priority)
-          if (ctx) {
-            const fromData = ctx.data.seekTag(tagExecutor.tag)
-            if (fromData !== undefined) {
-              result[key] = fromData
-              break
-            }
-          }
-          // Fall back to Tagged[] array
-          result[key] = tagExecutor.tag.find(tags)
+          const value = ctx?.data.seekTag(tagExecutor.tag)
+          result[key] = value ?? tagExecutor.tag.defaultValue
           break
         }
         case "all": {
-          // Collect from ctx.data hierarchy first (higher priority)
-          const fromData = ctx ? collectFromDataHierarchy(ctx, tagExecutor.tag) : []
-          // Then collect from Tagged[] array
-          const fromTags = tagExecutor.tag.collect(tags)
-          result[key] = [...fromData, ...fromTags]
+          result[key] = ctx ? collectFromHierarchy(ctx, tagExecutor.tag) : []
           break
         }
       }
     }
   }
+
   return result
 }
 ```
 
-### Helper for `tags.all()` Hierarchy Collection
+**4. Helper for tags.all():**
 
 ```typescript
-function collectFromDataHierarchy<T>(
-  ctx: ExecutionContext,
-  tag: Tag<T>
-): T[] {
+function collectFromHierarchy<T>(ctx: ExecutionContext, tag: Tag<T>): T[] {
   const results: T[] = []
   let current: ExecutionContext | undefined = ctx
 
   while (current) {
-    const value = current.data.getTag(tag)  // Local only, no seek
+    const value = current.data.getTag(tag)
     if (value !== undefined) {
       results.push(value)
     }
@@ -182,130 +208,139 @@ function collectFromDataHierarchy<T>(
 }
 ```
 
-### Call Site Changes
-
-In `ExecutionContextImpl.execFlowInternal()`:
-
-```typescript
-private async execFlowInternal(options) {
-  const { flow, tags: execTags } = options
-
-  const allTags = [...(execTags ?? []), ...this.baseTags, ...(flow.tags ?? [])]
-
-  // Pass `this` (ExecutionContext) to enable seekTag fallback
-  const resolvedDeps = await this.scope.resolveDeps(flow.deps, allTags, this)
-  // ...
-}
-```
-
 ### Lookup Precedence
 
 ```mermaid
 flowchart TD
-    Start["tags.required(someTag)"] --> SeekData["ctx.data.seekTag() hierarchy"]
-    SeekData -->|Found| ReturnData["Return value"]
-    SeekData -->|Not found| CheckExec["Check execution tags"]
-    CheckExec -->|Found| ReturnExec["Return value"]
-    CheckExec -->|Not found| CheckCtx["Check context tags"]
-    CheckCtx -->|Found| ReturnCtx["Return value"]
-    CheckCtx -->|Not found| CheckScope["Check scope tags"]
-    CheckScope -->|Found| ReturnScope["Return value"]
-    CheckScope -->|Not found| CheckFlow["Check flow tags"]
-    CheckFlow -->|Found| ReturnFlow["Return value"]
-    CheckFlow -->|Not found| CheckDefault["Has default?"]
+    Start["tags.required(someTag)"] --> SeekTag["ctx.data.seekTag()"]
+    SeekTag --> CheckLocal["Check local ctx.data"]
+    CheckLocal -->|Found| Return["Return value"]
+    CheckLocal -->|Not found| CheckParent["Check parent.data"]
+    CheckParent -->|Found| Return
+    CheckParent -->|Not found| Continue["Continue up chain..."]
+    Continue -->|Found| Return
+    Continue -->|Root reached| CheckDefault["Has default?"]
     CheckDefault -->|Yes| ReturnDefault["Return default"]
     CheckDefault -->|No| Throw["Throw error"]
 ```
 
+Priority within ctx.data (highest to lowest):
+1. Current context (exec tags, ctx.data.setTag, flow.tags)
+2. Parent context
+3. Grandparent context
+4. ... up to root (context tags, scope tags)
+5. Tag's default value
+
 ### Usage Example
 
 ```typescript
-const requestIdTag = tag<string>({ label: "requestId" })
-const userTag = tag<User>({ label: "user" })
+const userTag = tag<User>({ label: 'user' })
+const requestIdTag = tag<string>({ label: 'requestId' })
 
 const authMiddleware = flow({
   factory: async (ctx) => {
     const user = await authenticate(ctx.input)
     ctx.data.setTag(userTag, user)
-    ctx.data.setTag(requestIdTag, generateId())
-
-    return ctx.exec({ flow: businessLogic })
+    return ctx.exec({ flow: handler })
   }
 })
 
-const businessLogic = flow({
+await ctx.exec({
+  flow: handler,
+  tags: [requestIdTag('req-123')]
+})
+
+const handler = flow({
   deps: {
-    user: tags.required(userTag),      // Found via seekTag from parent
-    reqId: tags.optional(requestIdTag) // Found via seekTag from parent
+    user: tags.required(userTag),
+    reqId: tags.optional(requestIdTag)
   },
   factory: (ctx, { user, reqId }) => {
-    logger.info(`Processing for ${user.name}, request ${reqId}`)
-    return process(ctx.input, user)
+    // Works! Both found through unified seekTag
+  }
+})
+
+const deepHandler = flow({
+  deps: { user: tags.required(userTag) },
+  factory: (ctx, { user }) => {
+    // Also works! Grandchild finds via parent chain
   }
 })
 ```
 
 ## Changes Across Layers {#adr-023-changes}
 
-### Context Level
-No changes to c3-0.
-
 ### Container Level
 
 **c3-2 (Lite Library):**
-- Update Public API section to document `resolveDeps` context parameter
-- Add note about tag resolution order in Extension System section
+- Remove `baseTags` from ExecutionContextImpl
+- Remove `tagSource` parameter from `resolveDeps`
+- Add `ctx` parameter to `resolveDeps`
+- Add auto-population logic to `exec()` and `createContext()`
 
 ### Component Level
 
-**c3-204 (Tag System):**
-1. Update "Tag Extraction Modes" section to document hierarchical lookup behavior
-2. Add "Lookup Precedence" subsection explaining Tagged[] → ctx.data.seekTag() fallback
-3. Update "Tag Sources" to include ctx.data as a source
-
 **c3-203 (Flow & ExecutionContext):**
-1. Update "Flow with Tag Dependencies" example to show ctx.data.setTag() pattern
-2. Add cross-reference to c3-204 for hierarchical tag lookup
+- Remove "Tag Merge Order" section
+- Document auto-population behavior
+- Update examples to show unified system
+
+**c3-204 (Tag System):**
+- Update "Tag Extraction Modes" to document seekTag usage
+- Update "Tag Sources" to explain auto-population
+- Change `tags.all()` documentation (hierarchy collection)
 
 **Source files:**
 
 | File | Changes |
 |------|---------|
-| `src/scope.ts` | Add `ctx` parameter to `resolveDeps`, implement seekTag fallback |
-| `src/types.ts` | Update `Scope.resolveDeps` signature |
+| `src/scope.ts` | Remove baseTags, add auto-population, change resolveDeps |
+| `src/types.ts` | Update Scope interface (remove resolveDeps tagSource param) |
 
 ## Verification {#adr-023-verification}
 
 ### Core Behavior
-- [ ] `tags.required(tag)` checks ctx.data.seekTag() first (highest priority)
-- [ ] `tags.required(tag)` falls back to Tagged[] array if not in ctx.data
-- [ ] `tags.required(tag)` traverses full parent chain via seekTag
-- [ ] `tags.required(tag)` throws if not found anywhere and no default
-- [ ] `tags.optional(tag)` returns undefined if not found anywhere
-- [ ] `tags.all(tag)` collects from ctx.data hierarchy first, then Tagged[] array
+- [ ] `exec({ tags })` auto-populates into childCtx.data
+- [ ] `flow.tags` auto-populates into childCtx.data
+- [ ] `createContext({ tags })` auto-populates into ctx.data
+- [ ] `createScope({ tags })` auto-populates via createContext
+- [ ] `tags.required()` uses seekTag() to find values
+- [ ] `tags.optional()` uses seekTag() to find values
+- [ ] `tags.all()` collects from hierarchy (one per level)
 
-### Precedence
-- [ ] ctx.data.seekTag() values override Tagged[] array values
-- [ ] Closest parent's ctx.data value wins (seekTag semantics)
-- [ ] Tagged[] array used as fallback when not in ctx.data
-- [ ] Within Tagged[] array: exec > context > scope > flow tags
+### Propagation
+- [ ] Exec tags visible to grandchildren via seekTag
+- [ ] ctx.data.setTag() in parent visible to tags.required() in child
+- [ ] Deeper nesting still finds values
 
-### Parent Chain
-- [ ] Child flow finds parent's ctx.data.setTag value
-- [ ] Grandchild flow finds grandparent's ctx.data.setTag value
-- [ ] Root context (no parent) only searches Tagged[] array
+### Priority
+- [ ] exec tags override flow.tags (same tag in same context)
+- [ ] Child ctx.data overrides parent ctx.data (seekTag behavior)
+- [ ] ctx.data.setTag() can override auto-populated values
 
-### Atom Resolution
-- [ ] Atom deps still work (no ExecutionContext available)
-- [ ] Atom deps only search scope.tags (no ctx.data)
+### Atoms
+- [ ] Atom deps work without ExecutionContext
+- [ ] Atom tag deps use scope.tags (fallback behavior)
 
 ### Backwards Compatibility
-- [ ] Existing code passing tags via Tagged[] still works (as fallback)
-- [ ] ctx.data.seekTag() now takes precedence over Tagged[] array (breaking change)
-- [ ] Code not using ctx.data.setTag() is unaffected
+- [ ] Existing exec({ tags }) works (auto-populated)
+- [ ] Existing createContext({ tags }) works
+- [ ] `tags.all()` semantic change: hierarchy levels, not array duplicates
+
+## Migration {#adr-023-migration}
+
+**For most users:** No changes required. Existing code works, plus new capabilities.
+
+**If using `tags.all()` with duplicate tags at same level:**
+
+```typescript
+const rolesTag = tag<string[]>({ label: 'roles' })
+exec({ tags: [rolesTag(['admin', 'editor'])] })
+tags.required(rolesTag)
+```
 
 ## Related {#adr-023-related}
 
 - [ADR-021](./adr-021-hierarchical-data-seek.md) - Introduced seekTag() method
-- [c3-204](../c3-2-lite/c3-204-tag.md) - Tag System (primary change)
-- [c3-203](../c3-2-lite/c3-203-flow.md) - Flow & ExecutionContext (usage patterns)
+- [c3-203](../c3-2-lite/c3-203-flow.md) - Flow & ExecutionContext
+- [c3-204](../c3-2-lite/c3-204-tag.md) - Tag System

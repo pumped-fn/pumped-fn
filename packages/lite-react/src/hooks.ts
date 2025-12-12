@@ -1,6 +1,31 @@
-import { useCallback, useContext, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
+
+interface UseAtomSuspenseOptions {
+  suspense?: true
+  /** @default true */
+  resolve?: boolean
+}
+
+interface UseAtomManualOptions {
+  suspense: false
+  /** @default false */
+  resolve?: boolean
+}
+
+type UseAtomOptions = UseAtomSuspenseOptions | UseAtomManualOptions
+
+interface UseAtomState<T> {
+  data: T | undefined
+  loading: boolean
+  error: Error | undefined
+  controller: Lite.Controller<T>
+}
+
+interface UseControllerOptions {
+  resolve?: boolean
+}
 
 const pendingPromises = new WeakMap<Lite.Atom<unknown>, Promise<unknown>>()
 
@@ -37,53 +62,131 @@ function useScope(): Lite.Scope {
 /**
  * Get a memoized controller for an atom.
  *
- * @param atom - The atom to create a controller for
- * @returns A memoized Lite.Controller instance
- *
  * @example
  * ```tsx
  * const ctrl = useController(counterAtom)
  * ctrl.set(ctrl.get() + 1)
  * ```
  */
-function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T> {
+function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
+function useController<T>(atom: Lite.Atom<T>, options: UseControllerOptions): Lite.Controller<T>
+function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): Lite.Controller<T> {
   const scope = useScope()
-  return useMemo(() => scope.controller(atom), [scope, atom])
+  const ctrl = useMemo(() => scope.controller(atom), [scope, atom])
+
+  if (options?.resolve) {
+    if (ctrl.state === 'idle' || ctrl.state === 'resolving') {
+      throw getOrCreatePendingPromise(atom, ctrl)
+    }
+    if (ctrl.state === 'failed') {
+      throw ctrl.get()
+    }
+  }
+
+  return ctrl
 }
 
 /**
  * Subscribe to atom value with Suspense/ErrorBoundary integration.
- * Auto-resolves atoms lazily and throws cached Promise for Suspense.
- *
- * @param atom - The atom to read
- * @returns The current value of the atom
  *
  * @example
  * ```tsx
- * function UserProfile() {
- *   const user = useAtom(userAtom)
- *   return <div>{user.name}</div>
- * }
+ * const user = useAtom(userAtom)
+ * const { data, loading, error } = useAtom(userAtom, { suspense: false })
  * ```
  */
-function useAtom<T>(atom: Lite.Atom<T>): T {
+function useAtom<T>(atom: Lite.Atom<T>): T
+function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomSuspenseOptions): T
+function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomManualOptions): UseAtomState<T>
+function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomState<T> {
   const ctrl = useController(atom)
   const atomRef = useRef(atom)
   atomRef.current = atom
 
+  if (options?.suspense === false) {
+    return useAtomState(atom, ctrl, options.resolve ?? false)
+  }
+
+  const autoResolve = options?.resolve !== false
+
   const getSnapshot = useCallback((): T => {
-    const state = ctrl.state
-    if (state === 'idle' || state === 'resolving') {
+    if (ctrl.state === 'idle') {
+      if (autoResolve) {
+        throw getOrCreatePendingPromise(atomRef.current, ctrl)
+      }
+      throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
+    }
+    if (ctrl.state === 'resolving') {
       throw getOrCreatePendingPromise(atomRef.current, ctrl)
     }
-    if (state === 'failed') {
+    if (ctrl.state === 'failed') {
       throw ctrl.get()
     }
     return ctrl.get()
-  }, [ctrl])
+  }, [ctrl, autoResolve])
 
   const subscribe = useCallback(
     (onStoreChange: () => void) => ctrl.on('resolved', onStoreChange),
+    [ctrl]
+  )
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+function useAtomState<T>(
+  atom: Lite.Atom<T>,
+  ctrl: Lite.Controller<T>,
+  autoResolve: boolean
+): UseAtomState<T> {
+  const stateCache = useRef<{
+    ctrlState: Lite.Controller<T>['state']
+    data: T | undefined
+    error: Error | undefined
+    result: UseAtomState<T>
+  } | null>(null)
+
+  useEffect(() => {
+    if (autoResolve && (ctrl.state === 'idle' || ctrl.state === 'resolving')) {
+      getOrCreatePendingPromise(atom, ctrl)
+    }
+  }, [atom, ctrl, autoResolve])
+
+  const getSnapshot = useCallback((): UseAtomState<T> => {
+    let data: T | undefined
+    let error: Error | undefined
+
+    if (ctrl.state === 'resolved') {
+      data = ctrl.get()
+    } else if (ctrl.state === 'failed') {
+      try {
+        ctrl.get()
+      } catch (e) {
+        error = e instanceof Error ? e : new Error(String(e))
+      }
+    }
+
+    if (
+      stateCache.current &&
+      stateCache.current.ctrlState === ctrl.state &&
+      stateCache.current.data === data &&
+      stateCache.current.error === error
+    ) {
+      return stateCache.current.result
+    }
+
+    const result: UseAtomState<T> = {
+      data,
+      loading: ctrl.state === 'resolving',
+      error,
+      controller: ctrl,
+    }
+
+    stateCache.current = { ctrlState: ctrl.state, data, error, result }
+    return result
+  }, [ctrl])
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
     [ctrl]
   )
 
@@ -160,3 +263,4 @@ function useSelect<T, S>(
 }
 
 export { useScope, useController, useAtom, useSelect }
+export type { UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions }
