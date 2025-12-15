@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-11 14:09:15
+> Last generated: 2025-12-12 15:25:06
 
 ## Context Level
 
@@ -100,8 +100,8 @@ integration via useSyncExternalStore for React 18+ applications.
 ---
 
 ### [c3-7](./c3-7-lite-extension-otel/) - Lite Extension OTel (@pumped-fn/lite-extension-otel)
-> OpenTelemetry integration extension providing distributed tracing, metrics,
-and W3C context propagation for pumped-fn applications.
+> Self-contained OpenTelemetry tracing extension with tag-based configuration,
+AsyncLocalStorage context propagation, and automatic provider lifecycle management.
 
 **Sections**:
 - [Overview](#c3-7-overview)
@@ -109,7 +109,7 @@ and W3C context propagation for pumped-fn applications.
 - [Architecture](#c3-7-architecture)
 - [Span Hierarchy Flow](#c3-7-hierarchy)
 - [API](#c3-7-api)
-- [Metrics](#c3-7-metrics)
+- [Lifecycle Management](#c3-7-lifecycle)
 - [Source Organization](#c3-7-source)
 - [Testing](#c3-7-testing)
 - [Related](#c3-7-related)
@@ -244,6 +244,76 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [adr-025](./adr/adr-025-otel-simplification.md) - Simplify OTEL Extension with Self-Contained Provider Management
+> Refactor @pumped-fn/lite-extension-otel to be self-contained with tag-based
+configuration, AsyncLocalStorage context propagation, and automatic provider
+lifecycle management, reducing complexity by ~60%.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-025-status)
+- [Problem/Requirement](#adr-025-problem)
+- [Exploration Journey](#adr-025-exploration)
+- [Solution](#adr-025-solution)
+- [Changes Across Layers](#adr-025-changes)
+- [Verification](#adr-025-verification)
+- [Related](#adr-025-related)
+
+---
+
+### [adr-024](./adr/adr-024-exec-fn-name-option.md) - Add name Option to ExecFnOptions for API Consistency
+> Add optional name property to ExecFnOptions to match ExecFlowOptions,
+allowing callers to provide explicit names for function executions.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-024-status)
+- [Problem/Requirement](#adr-024-problem)
+- [Exploration Journey](#adr-024-exploration)
+- [Solution](#adr-024-solution)
+- [Changes Across Layers](#adr-024-changes)
+- [Verification](#adr-024-verification)
+- [Related](#adr-024-related)
+
+---
+
+### [ADR-023-tag-deps-seek-hierarchy](./adr/adr-023-tag-deps-seek-hierarchy.md) - Tag Dependencies Use seekTag for Hierarchical Lookup
+> Change tags.required(), tags.optional(), and tags.all() to look up values
+via seekTag() across the ExecutionContext parent chain, enabling flows to
+access tag values set via ctx.data.setTag() in parent contexts.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-023-status)
+- [Problem/Requirement](#adr-023-problem)
+- [Exploration Journey](#adr-023-exploration)
+- [Solution](#adr-023-solution)
+- [Changes Across Layers](#adr-023-changes)
+- [Verification](#adr-023-verification)
+- [Related](#adr-023-related)
+
+---
+
+### [ADR-022-execution-context-name](./adr/adr-022-execution-context-name.md) - ExecutionContext Name Property for Extension Visibility
+> Add name property to ExecutionContext so extensions can access the resolved
+flow/exec name without inspecting the target object directly.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-022-status)
+- [Problem/Requirement](#adr-022-problem)
+- [Exploration Journey](#adr-022-exploration)
+- [Solution](#adr-022-solution)
+- [Changes Across Layers](#adr-022-changes)
+- [Verification](#adr-022-verification)
+- [Related](#adr-022-related)
+
+---
 
 ### [ADR-021-hierarchical-data-seek](./adr/adr-021-hierarchical-data-seek.md) - Hierarchical Data Lookup via seek() Method
 > Add seek() method to ContextData for looking up tag values across the
@@ -631,5 +701,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 34
-**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 21
+**Total Documents**: 38
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 25
