@@ -30,18 +30,6 @@ const otelConfigAtom = atom({
   factory: (_ctx, deps) => deps,
 })
 
-const activeProviders = new Set<BasicTracerProvider>()
-
-/**
- * Shuts down all active OpenTelemetry providers and clears the registry.
- * Call this during application shutdown to ensure all spans are flushed.
- */
-export async function shutdownAllProviders(): Promise<void> {
-  const shutdowns = Array.from(activeProviders).map((p) => p.shutdown())
-  await Promise.all(shutdowns)
-  activeProviders.clear()
-}
-
 const safeStringify = (value: unknown): string => {
   try {
     return JSON.stringify(value)
@@ -103,7 +91,6 @@ export function otel(options?: OtelOptions): Lite.Extension {
           [ATTR_SERVICE_NAME]: config.name,
         }))
       })
-      activeProviders.add(provider)
 
       tracer = provider.getTracer(config.name)
     },
@@ -140,7 +127,6 @@ export function otel(options?: OtelOptions): Lite.Extension {
 
     async dispose() {
       await provider.shutdown()
-      activeProviders.delete(provider)
     }
   }
 }

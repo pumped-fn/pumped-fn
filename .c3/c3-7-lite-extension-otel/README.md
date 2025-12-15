@@ -202,19 +202,6 @@ The extension manages the complete OpenTelemetry provider lifecycle:
 2. **wrapExec(next, target, ctx)** - Wraps executions with spans
 3. **dispose()** - Shuts down provider and flushes spans
 
-### Shutdown Utility
-
-For applications managing multiple scopes:
-
-```typescript
-import { shutdownAllProviders } from '@pumped-fn/lite-extension-otel'
-
-// During application shutdown
-await shutdownAllProviders()
-```
-
-This ensures all spans are flushed before process exit.
-
 ## Source Organization {#c3-7-source}
 
 ```
@@ -226,7 +213,6 @@ packages/lite-extension-otel/
 │                          # - Provider management
 │                          # - AsyncLocalStorage context
 │                          # - Span creation/completion
-│                          # - shutdownAllProviders()
 ├── tests/
 │   └── otel.test.ts       # Comprehensive test suite
 ├── package.json
@@ -241,7 +227,7 @@ packages/lite-extension-otel/
 - **Context Propagation** - AsyncLocalStorage stores OpenTelemetry context across async boundaries
 - **Span Lifecycle** - Created in wrapExec, ended in finally block
 - **Result Capture** - Configurable via captureResults tag, respects redact flag
-- **Shutdown** - Provider cleanup in dispose(), global shutdown utility
+- **Shutdown** - Provider cleanup in dispose()
 
 ## Testing {#c3-7-testing}
 
@@ -251,7 +237,7 @@ packages/lite-extension-otel/
 - Parent-child span hierarchy via AsyncLocalStorage
 - Error recording and span status codes
 - Result capture configuration (captureResults, redact tags)
-- Provider lifecycle (init, dispose, shutdownAllProviders)
+- Provider lifecycle (init, dispose)
 
 **Test infrastructure:**
 - InMemorySpanExporter for span inspection

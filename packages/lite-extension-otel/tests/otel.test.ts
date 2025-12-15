@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { otel, otelConfig, shutdownAllProviders } from "../src"
+import { otel, otelConfig } from "../src"
 import { createScope, flow } from "@pumped-fn/lite"
 import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
 import { SpanStatusCode, trace, context } from "@opentelemetry/api"
@@ -11,8 +11,7 @@ describe("otel extension (simplified)", () => {
     exporter = new InMemorySpanExporter()
   })
 
-  afterEach(async () => {
-    await shutdownAllProviders()
+  afterEach(() => {
     exporter.reset()
   })
 
