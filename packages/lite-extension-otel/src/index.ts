@@ -18,6 +18,7 @@ export const otelConfig = {
   type: tag<"http" | "grpc" | "console">({ label: "otel.type", default: "console" }),
   captureResults: tag<boolean>({ label: "otel.captureResults", default: true }),
   redact: tag<boolean>({ label: "otel.redact", default: false }),
+  exporter: tag<SpanExporter | undefined>({ label: "otel.exporter" }),
 }
 
 const otelConfigAtom = atom({
@@ -26,6 +27,7 @@ const otelConfigAtom = atom({
     url: tags.required(otelConfig.url),
     type: tags.required(otelConfig.type),
     captureResults: tags.required(otelConfig.captureResults),
+    exporter: tags.optional(otelConfig.exporter),
   },
   factory: (_ctx, deps) => deps,
 })
@@ -36,17 +38,6 @@ const safeStringify = (value: unknown): string => {
   } catch {
     return "<non-serializable>"
   }
-}
-
-/**
- * Options for the otel extension.
- */
-export interface OtelOptions {
-  /**
-   * Custom span exporter, primarily for testing with InMemorySpanExporter.
-   * For production, use otelConfig.type tag to select console/http exporter.
-   */
-  exporter?: SpanExporter
 }
 
 function createExporter(
@@ -70,7 +61,7 @@ function createExporter(
  * })
  * ```
  */
-export function otel(options?: OtelOptions): Lite.Extension {
+export function otel(): Lite.Extension {
   const contextStorage = new AsyncLocalStorage<Context>()
   let tracer: Tracer
   let provider: BasicTracerProvider
@@ -83,7 +74,7 @@ export function otel(options?: OtelOptions): Lite.Extension {
       const config = await scope.resolve(otelConfigAtom)
       captureResults = config.captureResults
 
-      const exporter = createExporter(config.type, config.url, options?.exporter)
+      const exporter = createExporter(config.type, config.url, config.exporter)
 
       provider = new BasicTracerProvider({
         spanProcessors: [new SimpleSpanProcessor(exporter)],

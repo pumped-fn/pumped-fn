@@ -155,6 +155,7 @@ export const otelConfig = {
   type: tag<"http" | "grpc" | "console">({ label: "otel.type", default: "console" }),
   captureResults: tag<boolean>({ label: "otel.captureResults", default: true }),
   redact: tag<boolean>({ label: "otel.redact", default: false }),
+  exporter: tag<SpanExporter | undefined>({ label: "otel.exporter" }),
 }
 ```
 

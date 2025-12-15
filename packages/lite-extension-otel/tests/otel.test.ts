@@ -18,10 +18,11 @@ describe("otel extension (simplified)", () => {
   describe("initialization", () => {
     it("initializes provider from tag configuration", async () => {
       const scope = createScope({
-        extensions: [otel({ exporter })],
+        extensions: [otel()],
         tags: [
           otelConfig.name("test-app"),
           otelConfig.type("console"),
+          otelConfig.exporter(exporter),
         ],
       })
 
@@ -39,8 +40,8 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
@@ -71,8 +72,8 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
@@ -105,8 +106,8 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
@@ -135,8 +136,8 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
@@ -158,8 +159,8 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
@@ -184,10 +185,11 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
+        extensions: [otel()],
         tags: [
           otelConfig.type("console"),
           otelConfig.captureResults(true),
+          otelConfig.exporter(exporter),
         ],
       })
       await scope.ready
@@ -212,10 +214,11 @@ describe("otel extension (simplified)", () => {
       })
 
       const scope = createScope({
-        extensions: [otel({ exporter })],
+        extensions: [otel()],
         tags: [
           otelConfig.type("console"),
           otelConfig.captureResults(true),
+          otelConfig.exporter(exporter),
         ],
       })
       await scope.ready
@@ -237,8 +240,8 @@ describe("otel extension (simplified)", () => {
   describe("lifecycle", () => {
     it("shuts down provider on dispose", async () => {
       const scope = createScope({
-        extensions: [otel({ exporter })],
-        tags: [otelConfig.type("console")],
+        extensions: [otel()],
+        tags: [otelConfig.type("console"), otelConfig.exporter(exporter)],
       })
       await scope.ready
 
