@@ -206,12 +206,14 @@ export namespace Lite {
     get(source: TagSource): HasDefault extends true ? T : T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
     collect(source: TagSource): T[]
+    atoms(): Atom<unknown>[]
   }
 
   export interface Tagged<T> {
     readonly [taggedSymbol]: true
     readonly key: symbol
     readonly value: T
+    readonly tag: Tag<T, boolean>
   }
 
   export type TagSource = Tagged<unknown>[] | { tags?: Tagged<unknown>[] }

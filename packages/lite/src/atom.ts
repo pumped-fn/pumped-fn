@@ -1,4 +1,5 @@
 import { atomSymbol, controllerDepSymbol } from "./symbols"
+import { registerAtomToTags } from "./tag"
 import type { Lite, MaybePromise } from "./types"
 
 export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
@@ -38,12 +39,18 @@ export function atom<
 export function atom<T, D extends Record<string, Lite.Dependency>>(
   config: AtomConfig<T, D>
 ): Lite.Atom<T> {
-  return {
+  const atomInstance: Lite.Atom<T> = {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
+
+  if (config.tags?.length) {
+    registerAtomToTags(atomInstance, config.tags)
+  }
+
+  return atomInstance
 }
 
 /**
