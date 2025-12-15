@@ -1,5 +1,18 @@
 # @pumped-fn/lite-react
 
+## 1.1.0
+
+### Minor Changes
+
+- 1624845: feat(lite-react): add non-Suspense mode and resolve options for useAtom/useController
+
+  - Add `{ suspense: false }` option to `useAtom` returning `UseAtomState<T>` with `data`, `loading`, `error`, `controller`
+  - Add `{ resolve: boolean }` option to control auto-resolution behavior
+    - Suspense mode: `resolve` defaults to `true` (auto-resolves idle atoms)
+    - Non-Suspense mode: `resolve` defaults to `false` (no auto-resolve)
+  - Add `{ resolve: true }` option to `useController` for Suspense integration
+  - Export new types: `UseAtomSuspenseOptions`, `UseAtomManualOptions`, `UseAtomOptions`, `UseAtomState`, `UseControllerOptions`
+
 ## 1.0.0
 
 ### Major Changes
