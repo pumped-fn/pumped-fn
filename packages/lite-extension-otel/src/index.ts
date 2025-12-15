@@ -42,10 +42,6 @@ export async function shutdownAllProviders(): Promise<void> {
   activeProviders.clear()
 }
 
-/**
- * Safely serializes user data for span attributes.
- * JSON.stringify can throw on circular references or BigInt values from user code.
- */
 const safeStringify = (value: unknown): string => {
   try {
     return JSON.stringify(value)
@@ -76,17 +72,14 @@ function createExporter(
 }
 
 /**
- * Creates an OpenTelemetry extension for pumped-fn that instruments function executions with distributed tracing.
- *
- * @param options - Optional configuration for custom span exporter
- * @returns A Lite.Extension that wraps executions with OpenTelemetry spans
+ * Creates an OpenTelemetry extension for pumped-fn that instruments flow executions with distributed tracing.
  *
  * @example
  * ```typescript
- * const app = lite()
- *   .use(otel())
- *   .value(otelConfig.name, "my-service")
- *   .value(otelConfig.type, "http")
+ * const scope = createScope({
+ *   extensions: [otel()],
+ *   tags: [otelConfig.name("my-service"), otelConfig.type("http")],
+ * })
  * ```
  */
 export function otel(options?: OtelOptions): Lite.Extension {
