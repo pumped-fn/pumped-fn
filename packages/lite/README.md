@@ -159,13 +159,31 @@ Short-lived operation with input/output.
 
 ### Tag
 
-Contextual value passed through execution without explicit wiring. Uses `seekTag()` for hierarchical lookup (ADR-023).
+Contextual value passed through execution without explicit wiring.
 
-- `tag({ label, default?, parse? })` — define with optional default and validation
-- `tags.required(tag)` — dependency using `seekTag()`, throws if missing
-- `tags.optional(tag)` — dependency using `seekTag()`, returns undefined if missing
-- `tags.all(tag)` — collects one value per hierarchy level (child → root)
-- Tags auto-populate into `ctx.data`: scope → context → exec → flow
+- Hierarchical lookup via `seekTag()` (ADR-023)
+- Auto-populates into `ctx.data`: scope → context → exec → flow
+- Registry tracks atom↔tag relationships (ADR-026)
+
+```mermaid
+flowchart TD
+    subgraph "Tag Registry (ADR-026)"
+        direction LR
+        A["atom({ tags: [...] })"] -->|auto-register| R["WeakMap⟨Tag, WeakRef⟨Atom⟩[]⟩"]
+        R -->|"tag.atoms()"| Q["query atoms by tag"]
+        R -->|"getAllTags()"| T["query all tags"]
+    end
+
+    subgraph "Tag Inheritance (ADR-023)"
+        S[scope.tags] --> D[ctx.data]
+        C[context.tags] --> D
+        E[exec.tags] --> D
+        F[flow.tags] --> D
+        D -->|"seekTag()"| V["nearest value wins"]
+    end
+```
+
+Memory: `WeakRef` allows GC of unused atoms/tags. Cleanup on query.
 
 ### Controller
 
@@ -199,6 +217,42 @@ AOP-style middleware for cross-cutting concerns.
 - `wrapExec(next, target, ctx)` — intercept flow execution
 - `dispose(scope)` — cleanup when scope disposed
 - Pass via `createScope({ extensions: [...] })`
+
+## Patterns
+
+### Eager Resolution via Tag Registry
+
+Use tags to mark atoms for eager resolution without hardcoding atom references:
+
+```mermaid
+flowchart LR
+    subgraph "Define"
+        T[eagerTag] --> A1[atomA]
+        T --> A2[atomB]
+        T --> A3[atomC]
+    end
+
+    subgraph "Extension init()"
+        E["eagerTag.atoms()"] --> R["resolve all marked atoms"]
+    end
+
+    A1 & A2 & A3 -.->|"auto-tracked"| E
+```
+
+### Extension Discovery via getAllTags()
+
+Extensions can discover and process all tags at runtime:
+
+```mermaid
+flowchart LR
+    subgraph "Runtime"
+        G["getAllTags()"] --> F{"filter by criteria"}
+        F --> P["process matching tags"]
+        P --> A["tag.atoms() for each"]
+    end
+```
+
+Use cases: metrics collection, debugging, documentation generation.
 
 ## Full API
 

@@ -8,6 +8,85 @@ export interface TagOptions<T, HasDefault extends boolean> {
   parse?: (raw: unknown) => T
 }
 
+const registry = new WeakMap<Lite.Tag<unknown, boolean>, WeakRef<Lite.Atom<unknown>>[]>()
+const tagRegistry: WeakRef<Lite.Tag<unknown, boolean>>[] = []
+
+/**
+ * Returns all tags that have been created.
+ *
+ * Uses WeakRef internally so tags can be garbage collected when no longer referenced.
+ * Stale references are cleaned up lazily on each call (not between calls).
+ *
+ * @returns Array of all live Tag instances. Returns `Tag<unknown, boolean>[]` because
+ * the registry cannot preserve individual tag type parameters at runtime.
+ *
+ * Performance: O(n) where n = total tags created. For typical usage (< 100 tags),
+ * this is negligible. Cleanup happens during query, not continuously.
+ *
+ * @example
+ * ```typescript
+ * const allTags = getAllTags()
+ * for (const t of allTags) {
+ *   console.log(t.label, t.atoms().length)
+ * }
+ * ```
+ */
+export function getAllTags(): Lite.Tag<unknown, boolean>[] {
+  const live: Lite.Tag<unknown, boolean>[] = []
+  const liveRefs: WeakRef<Lite.Tag<unknown, boolean>>[] = []
+
+  for (const ref of tagRegistry) {
+    const tag = ref.deref()
+    if (tag) {
+      live.push(tag)
+      liveRefs.push(ref)
+    }
+  }
+
+  tagRegistry.length = 0
+  tagRegistry.push(...liveRefs)
+
+  return live
+}
+
+export function registerAtomToTags(
+  atom: Lite.Atom<unknown>,
+  tags: Lite.Tagged<unknown>[]
+): void {
+  for (const tagged of tags) {
+    let refs = registry.get(tagged.tag)
+    if (!refs) {
+      refs = []
+      registry.set(tagged.tag, refs)
+    }
+    refs.push(new WeakRef(atom))
+  }
+}
+
+function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
+  const refs = registry.get(tag)
+  if (!refs) return []
+
+  const live: Lite.Atom<unknown>[] = []
+  const liveRefs: WeakRef<Lite.Atom<unknown>>[] = []
+
+  for (const ref of refs) {
+    const atom = ref.deref()
+    if (atom) {
+      live.push(atom)
+      liveRefs.push(ref)
+    }
+  }
+
+  if (liveRefs.length > 0) {
+    registry.set(tag, liveRefs)
+  } else {
+    registry.delete(tag)
+  }
+
+  return live
+}
+
 /**
  * Creates a metadata tag for attaching and retrieving typed values from Atoms and Flows.
  *
@@ -43,6 +122,8 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   const defaultValue = hasDefault ? options.default : undefined
   const parse = options.parse
 
+  let tagInstance: Lite.Tag<T, boolean>
+
   function createTagged(value: T): Lite.Tagged<T> {
     let validatedValue = value
     if (parse) {
@@ -61,6 +142,7 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
       [taggedSymbol]: true,
       key,
       value: validatedValue,
+      tag: tagInstance,
     }
   }
 
@@ -91,7 +173,23 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     return result
   }
 
-  return Object.assign(createTagged, {
+  /**
+   * Returns all atoms that have been created with this tag.
+   *
+   * Uses WeakRef internally so atoms can be garbage collected when no longer referenced.
+   * Stale references are cleaned up lazily on each call.
+   *
+   * @returns Array of atoms using this tag. Returns `Atom<unknown>[]` because multiple
+   * atom types with different return types can use the same tag - TypeScript cannot
+   * track this runtime relationship.
+   *
+   * Performance: O(n) where n = atoms using this tag. Cleanup happens during query.
+   */
+  function atoms(): Lite.Atom<unknown>[] {
+    return getAtomsForTag(tagInstance as Lite.Tag<unknown, boolean>)
+  }
+
+  tagInstance = Object.assign(createTagged, {
     [tagSymbol]: true as const,
     key,
     label: options.label,
@@ -101,7 +199,12 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     get,
     find,
     collect,
+    atoms,
   }) as unknown as Lite.Tag<T, boolean>
+
+  tagRegistry.push(new WeakRef(tagInstance as Lite.Tag<unknown, boolean>))
+
+  return tagInstance
 }
 
 /**
