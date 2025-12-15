@@ -1,5 +1,5 @@
 ---
-id: adr-022
+id: adr-027
 title: Non-Suspense Mode for useAtom
 summary: >
   Add { suspense: false } option to useAtom returning UseAtomState<T> for
@@ -8,12 +8,12 @@ status: accepted
 date: 2025-12-11
 ---
 
-# [ADR-022] Non-Suspense Mode for useAtom
+# [ADR-027] Non-Suspense Mode for useAtom
 
-## Status {#adr-022-status}
+## Status {#adr-027-status}
 **Accepted** - 2025-12-11
 
-## Problem/Requirement {#adr-022-problem}
+## Problem/Requirement {#adr-027-problem}
 
 `useAtom` requires Suspense and ErrorBoundary wrappers for loading/error states. Some use cases need imperative control:
 
@@ -22,7 +22,7 @@ date: 2025-12-11
 - Gradual migration from other state libraries
 - Components where Suspense boundaries are impractical
 
-## Exploration Journey {#adr-022-exploration}
+## Exploration Journey {#adr-027-exploration}
 
 **Initial hypothesis:** Add a mode flag that returns state object instead of throwing.
 
@@ -37,7 +37,7 @@ date: 2025-12-11
 
 **Resolution:** This is an opt-in escape hatch. Users choosing `{ suspense: false, resolve: true }` explicitly request imperative behavior. Document the exception.
 
-## Solution {#adr-022-solution}
+## Solution {#adr-027-solution}
 
 Add `{ suspense: false }` option to `useAtom`:
 
@@ -71,7 +71,7 @@ function useAtom<T>(atom: Atom<T>, options: { suspense: false, resolve: true }):
 
 **Why different defaults:** Suspense mode defaults `resolve: true` (declarative). Non-Suspense mode defaults `resolve: false` (imperative control expected).
 
-## Implementation {#adr-022-implementation}
+## Implementation {#adr-027-implementation}
 
 `useAtomState` helper handles non-Suspense rendering:
 
@@ -81,7 +81,7 @@ function useAtom<T>(atom: Atom<T>, options: { suspense: false, resolve: true }):
 
 3. **Subscribe to all events** - Uses `ctrl.on('*')` since any state change is relevant.
 
-## Changes Across Layers {#adr-022-changes}
+## Changes Across Layers {#adr-027-changes}
 
 ### Component Level
 
@@ -97,7 +97,7 @@ function useAtom<T>(atom: Atom<T>, options: { suspense: false, resolve: true }):
 |------|--------|
 | `packages/lite-react/src/hooks.ts` | Add `useAtomState`, option types, overloads |
 
-## Verification {#adr-022-verification}
+## Verification {#adr-027-verification}
 
 - [x] `useAtom(atom)` returns `T` (backward compatible)
 - [x] `useAtom(atom, { suspense: false })` returns `UseAtomState<T>`
@@ -106,7 +106,7 @@ function useAtom<T>(atom: Atom<T>, options: { suspense: false, resolve: true }):
 - [x] Re-renders on any state change
 - [x] Referential stability via cache
 
-## Related {#adr-022-related}
+## Related {#adr-027-related}
 
 - [c3-301](../c3-3-lite-react/c3-301-hooks.md) - React hooks documentation
 - [ADR-019](./adr-019-scope-controller-options.md) - Controller resolve options

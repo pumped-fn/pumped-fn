@@ -1,14 +1,14 @@
 ---
 id: adr-015
 title: Devtools via Extension + Fire-and-Forget Transports
-status: accepted
+status: abandoned
 date: 2025-12-08
 ---
 
 # [ADR-015] Devtools via Extension + Fire-and-Forget Transports
 
 ## Status
-**Accepted** - 2025-12-09
+**Abandoned** - 2025-12-15 (Original decision superseded by implementation in c3-4-lite-devtools)
 
 ## Decision
 

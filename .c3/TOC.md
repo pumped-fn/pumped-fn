@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-12 15:25:06
+> Last generated: 2025-12-15 16:02:48
 
 ## Context Level
 
@@ -197,6 +197,7 @@ for cross-cutting data propagation.
 - [Type Inference](#c3-204-types)
 - [Type Guards](#c3-204-guards)
 - [Common Patterns](#c3-204-patterns)
+- [Tag Registry](#c3-204-registry)
 - [Performance Note](#c3-204-performance)
 - [Source Files](#c3-204-source)
 - [Testing](#c3-204-testing)
@@ -245,6 +246,42 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 
 ## Architecture Decisions
 
+### [adr-027](./adr/adr-027-non-suspense-mode.md) - Non-Suspense Mode for useAtom
+> Add { suspense: false } option to useAtom returning UseAtomState<T> for
+imperative loading/error handling without Suspense boundaries.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-027-status)
+- [Problem/Requirement](#adr-027-problem)
+- [Exploration Journey](#adr-027-exploration)
+- [Solution](#adr-027-solution)
+- [Implementation](#adr-027-implementation)
+- [Changes Across Layers](#adr-027-changes)
+- [Verification](#adr-027-verification)
+- [Related](#adr-027-related)
+
+---
+
+### [ADR-026-tag-atom-registry](./adr/adr-026-tag-atom-registry.md) - Tag Atom Registry for Automatic Tracking
+> Add internal registry that automatically tracks which atoms use each tag,
+enabling queries like tag.atoms() for patterns like eager resolution
+without polluting core with specialized logic.
+
+**Status**: Accepted
+
+**Sections**:
+- [Status](#adr-026-status)
+- [Problem/Requirement](#adr-026-problem)
+- [Exploration Journey](#adr-026-exploration)
+- [Solution](#adr-026-solution)
+- [Changes Across Layers](#adr-026-changes)
+- [Verification](#adr-026-verification)
+- [Related](#adr-026-related)
+
+---
+
 ### [adr-025](./adr/adr-025-otel-simplification.md) - Simplify OTEL Extension with Self-Contained Provider Management
 > Refactor @pumped-fn/lite-extension-otel to be self-contained with tag-based
 configuration, AsyncLocalStorage context propagation, and automatic provider
@@ -259,6 +296,7 @@ lifecycle management, reducing complexity by ~60%.
 - [Solution](#adr-025-solution)
 - [Changes Across Layers](#adr-025-changes)
 - [Verification](#adr-025-verification)
+- [Migration](#adr-025-migration)
 - [Related](#adr-025-related)
 
 ---
@@ -280,20 +318,20 @@ allowing callers to provide explicit names for function executions.
 
 ---
 
-### [ADR-023-tag-deps-seek-hierarchy](./adr/adr-023-tag-deps-seek-hierarchy.md) - Tag Dependencies Use seekTag for Hierarchical Lookup
-> Change tags.required(), tags.optional(), and tags.all() to look up values
-via seekTag() across the ExecutionContext parent chain, enabling flows to
-access tag values set via ctx.data.setTag() in parent contexts.
+### [ADR-023-tag-deps-seek-hierarchy](./adr/adr-023-tag-deps-seek-hierarchy.md) - Unify Tag System Under ctx.data with seekTag
+> Auto-populate Tagged[] arrays into ctx.data and use seekTag() for all tag
+dependency resolution, creating a single unified system where tags naturally
+propagate through the ExecutionContext parent chain.
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Sections**:
 - [Status](#adr-023-status)
 - [Problem/Requirement](#adr-023-problem)
-- [Exploration Journey](#adr-023-exploration)
 - [Solution](#adr-023-solution)
 - [Changes Across Layers](#adr-023-changes)
 - [Verification](#adr-023-verification)
+- [Migration](#adr-023-migration)
 - [Related](#adr-023-related)
 
 ---
@@ -429,7 +467,7 @@ or AsyncLocalStorage dependency.
 ### [adr-015](./adr/adr-015-devtools-integration.md) - Devtools via Extension + Fire-and-Forget Transports
 > 
 
-**Status**: Accepted
+**Status**: Abandoned
 
 **Sections**:
 
@@ -701,5 +739,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 38
-**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 25
+**Total Documents**: 40
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 27
