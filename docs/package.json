@@ -12,7 +12,7 @@
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
-    "@types/node": "^20.19.26",
+    "@types/node": "^20.19.27",
     "typedoc": "^0.28.15",
     "typedoc-github-theme": "^0.3.1",
     "typescript": "^5.9.3",
@@ -22,7 +22,7 @@
   "type": "module",
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.1",
-    "@shikijs/vitepress-twoslash": "^3.19.0",
+    "@shikijs/vitepress-twoslash": "^3.20.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
     "dayjs": "^1.11.19",
