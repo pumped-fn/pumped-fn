@@ -5,14 +5,14 @@ summary: >
   Auto-populate Tagged[] arrays into ctx.data and use seekTag() for all tag
   dependency resolution, creating a single unified system where tags naturally
   propagate through the ExecutionContext parent chain.
-status: proposed
+status: accepted
 date: 2025-12-12
 ---
 
 # [ADR-023] Unify Tag System Under ctx.data with seekTag
 
 ## Status {#adr-023-status}
-**Proposed** - 2025-12-12
+**Accepted** - 2025-12-12
 
 ## Problem/Requirement {#adr-023-problem}
 

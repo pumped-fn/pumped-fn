@@ -8,7 +8,6 @@ import {
   ConsoleSpanExporter,
   SimpleSpanProcessor,
   type SpanExporter,
-  type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base"
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
 import { AsyncLocalStorage } from "node:async_hooks"
@@ -92,8 +91,6 @@ function createExporter(
  */
 export function otel(options?: OtelOptions): Lite.Extension {
   const contextStorage = new AsyncLocalStorage<Context>()
-  let exporter: SpanExporter
-  let spanProcessor: SpanProcessor
   let tracer: Tracer
   let provider: BasicTracerProvider
   let captureResults = false
@@ -105,12 +102,10 @@ export function otel(options?: OtelOptions): Lite.Extension {
       const config = await scope.resolve(otelConfigAtom)
       captureResults = config.captureResults
 
-      exporter = createExporter(config.type, config.url, options?.exporter)
-
-      spanProcessor = new SimpleSpanProcessor(exporter)
+      const exporter = createExporter(config.type, config.url, options?.exporter)
 
       provider = new BasicTracerProvider({
-        spanProcessors: [spanProcessor],
+        spanProcessors: [new SimpleSpanProcessor(exporter)],
         resource: Resource.default().merge(new Resource({
           [ATTR_SERVICE_NAME]: config.name,
         }))

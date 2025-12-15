@@ -288,6 +288,25 @@ Note: OTel packages move from peer to direct dependencies since extension manage
 - [x] Tests pass with in-memory exporter
 - [ ] No memory leaks from AsyncLocalStorage (manual profiling needed)
 
+## Migration {#adr-025-migration}
+
+### Removed: Atom Tracing
+
+ADR-018 included `wrapResolve` for tracing atom resolutions. This is removed because:
+
+1. **Noise vs signal**: Atoms resolve frequently during dependency injection. Tracing every resolution creates span floods that obscure meaningful operation traces.
+2. **Performance**: Each atom resolve would create a span, adding ~10-20ns overhead per resolution. For complex dependency graphs, this compounds.
+3. **Scope**: The extension now focuses on flow executions - the meaningful business operations users want to trace.
+
+**For users who need atom-level visibility**: Use the lite-devtools extension which provides execution tree inspection without span overhead.
+
+### Removed: Trace Filters
+
+ADR-018 had filter configuration to exclude certain flows from tracing. This is removed because:
+
+1. **Complexity vs utility**: Filter configuration added API surface for an edge case.
+2. **Alternative**: Use `otelConfig.redact` tag per-execution to control what gets captured, or wrap flows you don't want traced outside the otel scope.
+
 ## Related {#adr-025-related}
 
 - [ADR-018](./adr-018-otel-extension.md) - Original design being simplified
