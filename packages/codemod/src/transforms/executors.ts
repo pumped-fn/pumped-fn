@@ -28,8 +28,20 @@ export function transformProvide(
           j(factoryArg)
             .find(j.Identifier, { name: oldName })
             .forEach((identPath) => {
-              if (identPath.parent.value.type !== "ArrowFunctionExpression" &&
-                  identPath.parent.value.type !== "FunctionExpression") {
+              let currentPath = identPath.parent
+              let isShadowed = false
+
+              while (currentPath && currentPath.value !== factoryArg) {
+                const node = currentPath.value
+                if ((node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") &&
+                    node.params.some(p => p.type === "Identifier" && p.name === oldName)) {
+                  isShadowed = true
+                  break
+                }
+                currentPath = currentPath.parent
+              }
+
+              if (!isShadowed) {
                 identPath.node.name = "ctx"
               }
             })

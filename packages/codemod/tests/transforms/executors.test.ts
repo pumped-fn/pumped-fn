@@ -65,4 +65,38 @@ describe("transformProvide", () => {
 
     expect(code.trim()).toBe(input.trim())
   })
+
+  it("preserves shadowed parameter names in nested functions", () => {
+    const input = `const a = provide((ctl) => {
+  const inner = (ctl) => ctl + 1;
+  return ctl.resolve(dep);
+})`
+    const expected = `const a = atom({
+  factory: (ctx) => {
+    const inner = (ctl) => ctl + 1;
+    return ctx.resolve(dep);
+  }
+})`
+
+    const code = transform(input)
+
+    expect(code.trim()).toBe(expected.trim())
+  })
+
+  it("preserves shadowed parameter in nested arrow functions", () => {
+    const input = `const a = provide((controller) => {
+  const callback = (controller) => controller.getData();
+  return controller.resolve(dep);
+})`
+    const expected = `const a = atom({
+  factory: (ctx) => {
+    const callback = (controller) => controller.getData();
+    return ctx.resolve(dep);
+  }
+})`
+
+    const code = transform(input)
+
+    expect(code.trim()).toBe(expected.trim())
+  })
 })
