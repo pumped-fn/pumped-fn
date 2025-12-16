@@ -1,4 +1,4 @@
-import { provide, tag } from "@pumped-fn/core-next"
+import { atom, tag } from "@pumped-fn/lite"
 
 const nameTag = tag<string>("name")
 const versionTag = tag<string>("version")

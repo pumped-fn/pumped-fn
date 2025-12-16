@@ -1,7 +1,13 @@
-import { provide, tag } from "@pumped-fn/core-next"
+import { atom, tag } from "@pumped-fn/lite"
 
 const nameTag = tag<string>("name")
 const versionTag = tag<string>("version")
 
-const dbAtom = provide((ctl) => createDatabase(), nameTag("db"), versionTag("1.0"))
-const singleTagAtom = provide((controller) => getValue(), nameTag("single"))
+const dbAtom = atom({
+  factory: (ctx) => createDatabase(),
+  tags: [nameTag("db"), versionTag("1.0")]
+})
+const singleTagAtom = atom({
+  factory: (ctx) => getValue(),
+  tags: [nameTag("single")]
+})

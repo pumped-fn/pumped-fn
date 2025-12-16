@@ -1,7 +1,13 @@
-import { derive } from "@pumped-fn/core-next"
+import { atom } from "@pumped-fn/lite"
 
 const dbAtom = atom({ factory: (ctx) => new Database() })
 const cacheAtom = atom({ factory: (ctx) => new Cache() })
 
-const serviceAtom = derive({ db: dbAtom, cache: cacheAtom }, ({ db, cache }, ctl) => new Service(db, cache))
-const queryAtom = derive({ db: dbAtom }, ({ db }, controller) => db.query())
+const serviceAtom = atom({
+  deps: { db: dbAtom, cache: cacheAtom },
+  factory: (ctx, { db, cache }) => new Service(db, cache)
+})
+const queryAtom = atom({
+  deps: { db: dbAtom },
+  factory: (ctx, { db }) => db.query()
+})

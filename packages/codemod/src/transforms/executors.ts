@@ -15,7 +15,7 @@ export function transformProvide(
       if (args.length === 0) return
 
       const factoryArg = args[0]
-      if (factoryArg.type !== "ArrowFunctionExpression" && factoryArg.type !== "FunctionExpression") {
+      if (!factoryArg || (factoryArg.type !== "ArrowFunctionExpression" && factoryArg.type !== "FunctionExpression")) {
         return
       }
 
@@ -34,7 +34,7 @@ export function transformProvide(
               while (currentPath && currentPath.value !== factoryArg) {
                 const node = currentPath.value
                 if ((node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") &&
-                    node.params.some(p => p.type === "Identifier" && p.name === oldName)) {
+                    node.params.some((p: any) => p.type === "Identifier" && p.name === oldName)) {
                   isShadowed = true
                   break
                 }
@@ -95,9 +95,11 @@ export function transformDerive(
       const depsArg = args[0]
       const factoryArg = args[1]
 
-      if (factoryArg.type !== "ArrowFunctionExpression" && factoryArg.type !== "FunctionExpression") {
+      if (!factoryArg || (factoryArg.type !== "ArrowFunctionExpression" && factoryArg.type !== "FunctionExpression")) {
         return
       }
+
+      if (!depsArg) return
 
       let depsObject: ReturnType<typeof j.objectExpression> | null = null
 
@@ -117,10 +119,12 @@ export function transformDerive(
 
         const depsProperties = depsArg.elements.map((depExpr, idx) => {
           if (!depExpr) return null
+          const key = depKeys[idx]
+          if (!key) return null
           return j.property(
             "init",
-            j.identifier(depKeys[idx]),
-            depExpr
+            j.identifier(key),
+            depExpr as any
           )
         }).filter((p): p is ReturnType<typeof j.property> => p !== null)
 
@@ -146,7 +150,7 @@ export function transformDerive(
               while (currentPath && currentPath.value !== factoryArg) {
                 const node = currentPath.value
                 if ((node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") &&
-                    node.params.some(p => p.type === "Identifier" && p.name === oldName)) {
+                    node.params.some((p: any) => p.type === "Identifier" && p.name === oldName)) {
                   isShadowed = true
                   break
                 }
@@ -161,6 +165,8 @@ export function transformDerive(
       }
 
       const firstParam = factoryArg.params[0]
+      if (!firstParam) return
+
       let newDepsParam: ReturnType<typeof j.objectPattern>
 
       if (firstParam.type === "ArrayPattern") {

@@ -1,2 +1,2 @@
-import { provide, derive, tag, tags } from "@pumped-fn/core-next";
-import type { Core, Tag } from "@pumped-fn/core-next";
+import { atom, tag, tags } from "@pumped-fn/lite";
+import type { Lite } from "@pumped-fn/lite";

@@ -1,4 +1,4 @@
-import { provide } from "@pumped-fn/core-next"
+import { atom } from "@pumped-fn/lite"
 
 const simpleAtom = atom({
   factory: (ctx) => 42

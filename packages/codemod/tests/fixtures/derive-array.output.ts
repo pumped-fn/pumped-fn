@@ -1,4 +1,4 @@
-import { derive } from "@pumped-fn/core-next"
+import { atom } from "@pumped-fn/lite"
 
 const dbAtom = atom({ factory: (ctx) => new Database() })
 const configAtom = atom({ factory: (ctx) => ({ host: "localhost" }) })

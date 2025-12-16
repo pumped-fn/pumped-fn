@@ -4,8 +4,9 @@ export function transformControllerMethods(
   j: JSCodeshift,
   root: Collection
 ): void {
-  function processFunction(path: ASTPath) {
+  function processFunction(path: ASTPath<any>) {
     const fn = path.node
+    if (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression") return
     const param = fn.params[0]
 
     if (!param || param.type !== "Identifier" || param.name !== "ctx") {

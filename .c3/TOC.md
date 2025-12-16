@@ -2,7 +2,7 @@
 
 > **AUTO-GENERATED** - Do not edit manually. Regenerate with: `.c3/scripts/build-toc.sh`
 >
-> Last generated: 2025-12-15 16:02:48
+> Last generated: 2025-12-16 11:22:58
 
 ## Context Level
 
@@ -245,6 +245,25 @@ and useController with Suspense/ErrorBoundary support via useSyncExternalStore.
 ---
 
 ## Architecture Decisions
+
+### [ADR-028-codemod-core-next-to-lite](./adr/adr-028-codemod-core-next-to-lite.md) - Codemod Package for core-next to lite Migration
+> Create @pumped-fn/codemod package using jscodeshift to automate one-time
+migration from @pumped-fn/core-next to @pumped-fn/lite, transforming API
+patterns, type references, and import statements.
+
+**Status**: Proposed
+
+**Sections**:
+- [Status](#adr-028-status)
+- [Problem/Requirement](#adr-028-problem)
+- [Exploration Journey](#adr-028-exploration)
+- [Solution](#adr-028-solution)
+- [Changes Across Layers](#adr-028-changes)
+- [Verification](#adr-028-verification)
+- [Migration](#adr-028-migration)
+- [Related](#adr-028-related)
+
+---
 
 ### [adr-027](./adr/adr-027-non-suspense-mode.md) - Non-Suspense Mode for useAtom
 > Add { suspense: false } option to useAtom returning UseAtomState<T> for
@@ -739,5 +758,5 @@ to child contexts.
 
 ## Quick Reference
 
-**Total Documents**: 40
-**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 27
+**Total Documents**: 41
+**Contexts**: 1 | **Containers**: 6 | **Components**: 6 | **ADRs**: 28

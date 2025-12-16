@@ -1,2 +1,2 @@
-import { createScope, preset } from "@pumped-fn/core-next";
-import type { Core } from "@pumped-fn/core-next";
+import { createScope, preset } from "@pumped-fn/lite";
+import type { Lite } from "@pumped-fn/lite";

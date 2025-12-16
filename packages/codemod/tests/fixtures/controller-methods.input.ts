@@ -1,32 +1,42 @@
-import { provide } from "@pumped-fn/core-next"
+import { atom } from "@pumped-fn/lite"
 
-const cleanupAtom = provide((ctx) => {
-  ctx.cleanup(() => console.log('cleanup'))
-  return 42
-})
-
-const releaseAtom = provide((ctx) => {
-  ctx.release()
-  return 'value'
-})
-
-const reloadAtom = provide((ctx) => {
-  ctx.reload()
-  return {}
-})
-
-const multipleAtom = provide((ctx) => {
-  ctx.cleanup(() => {})
-  ctx.release()
-  ctx.reload()
-  const scoped = ctx.scope.resolve(otherAtom)
-  return scoped
-})
-
-const nestedAtom = provide((ctx) => {
-  const inner = () => {
-    ctx.release()
+const cleanupAtom = atom({
+  factory: (ctx) => {
+    ctx.cleanup(() => console.log('cleanup'))
+    return 42
   }
-  ctx.reload()
-  return inner
+})
+
+const releaseAtom = atom({
+  factory: (ctx) => {
+    ctx.invalidate()
+    return 'value'
+  }
+})
+
+const reloadAtom = atom({
+  factory: (ctx) => {
+    ctx.invalidate()
+    return {}
+  }
+})
+
+const multipleAtom = atom({
+  factory: (ctx) => {
+    ctx.cleanup(() => {})
+    ctx.invalidate()
+    ctx.invalidate()
+    const scoped = ctx.scope.resolve(otherAtom)
+    return scoped
+  }
+})
+
+const nestedAtom = atom({
+  factory: (ctx) => {
+    const inner = () => {
+      ctx.invalidate()
+    }
+    ctx.invalidate()
+    return inner
+  }
 })

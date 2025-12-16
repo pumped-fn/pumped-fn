@@ -35,10 +35,10 @@ export function transformImports(
           const importedName =
             specifier.imported.type === "Identifier"
               ? specifier.imported.name
-              : specifier.imported.value
+              : (specifier.imported as any).value
 
           const isTypeImport =
-            specifier.importKind === "type" || importDecl.importKind === "type"
+            (specifier as any).importKind === "type" || importDecl.importKind === "type"
           const mappedName = isTypeImport
             ? TYPE_MAPPINGS[importedName]
             : VALUE_MAPPINGS[importedName]
@@ -47,7 +47,7 @@ export function transformImports(
             transformedSpecifiers.add(mappedName)
             const newSpec = j.importSpecifier(j.identifier(mappedName))
             if (isTypeImport && importDecl.importKind !== "type") {
-              newSpec.importKind = "type"
+              (newSpec as any).importKind = "type"
             }
             newSpecifiers.push(newSpec)
           }

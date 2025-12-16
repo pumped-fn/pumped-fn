@@ -1,1 +1,1 @@
-import { extension, tag } from "@pumped-fn/core-next";
+import { extension, tag } from "@pumped-fn/lite";

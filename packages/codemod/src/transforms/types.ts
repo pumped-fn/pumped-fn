@@ -41,6 +41,7 @@ export function transformTypes(
       const right = qualifiedName.right
 
       if (left.type !== "Identifier") return
+      if (right.type !== "Identifier") return
 
       const leftName = left.name
       const rightName = right.name
@@ -80,7 +81,9 @@ export function transformTypes(
         return
       }
 
-      left.name = mapping.newLeft
+      if (left.type === "Identifier") {
+        left.name = mapping.newLeft
+      }
       right.name = mapping.newRight
 
       const typeRef = path.parent.value
