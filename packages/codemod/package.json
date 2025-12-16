@@ -1,0 +1,63 @@
+{
+  "name": "@pumped-fn/codemod",
+  "version": "0.1.0",
+  "description": "Codemods for @pumped-fn packages",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "bin": {
+    "pumped-codemod": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "jscodeshift": "^17.1.2"
+  },
+  "devDependencies": {
+    "@types/jscodeshift": "^0.12.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "packages/codemod",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
+  "keywords": [
+    "codemod",
+    "jscodeshift",
+    "migration",
+    "typescript"
+  ],
+  "license": "MIT"
+}
