@@ -263,7 +263,7 @@ export namespace Lite {
     ): Promise<unknown>
     wrapExec?(
       next: () => Promise<unknown>,
-      target: Flow<unknown, unknown> | ((ctx: ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
+      target: ExecTarget,
       ctx: ExecutionContext
     ): Promise<unknown>
     dispose?(scope: Scope): MaybePromise<void>
@@ -300,4 +300,107 @@ export namespace Lite {
   export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
 
   export type ServiceMethods = Record<string, ServiceMethod>
+
+  /**
+   * Any atom regardless of value type.
+   * Useful for APIs that don't need the value type.
+   */
+  export type AnyAtom = Atom<any>
+
+  /**
+   * Any flow regardless of input/output types.
+   * Useful for APIs that don't need the type parameters.
+   */
+  export type AnyFlow = Flow<any, any>
+
+  /**
+   * Any controller regardless of value type.
+   */
+  export type AnyController = Controller<any>
+
+  /**
+   * Target type for wrapExec extension hook.
+   * Either a Flow or an inline function.
+   */
+  export type ExecTarget = Flow<unknown, unknown> | ExecTargetFn
+
+  /**
+   * Inline function that can be executed via ctx.exec.
+   */
+  export type ExecTargetFn = (ctx: ExecutionContext, ...args: any[]) => MaybePromise<unknown>
+
+  /**
+   * Utility types for type extraction and manipulation.
+   * @example
+   * type Config = Lite.Utils.AtomValue<typeof configAtom>
+   * type Result = Lite.Utils.FlowOutput<typeof processFlow>
+   */
+  export namespace Utils {
+    /**
+     * Extract value type from an Atom.
+     * @example
+     * type Config = Lite.Utils.AtomValue<typeof configAtom> // string
+     */
+    export type AtomValue<A> = A extends Atom<infer T> ? T : never
+
+    /**
+     * Extract output type from a Flow.
+     * @example
+     * type Result = Lite.Utils.FlowOutput<typeof processFlow> // ProcessResult
+     */
+    export type FlowOutput<F> = F extends Flow<infer O, unknown> ? O : never
+
+    /**
+     * Extract input type from a Flow.
+     * @example
+     * type Input = Lite.Utils.FlowInput<typeof processFlow> // ProcessRequest
+     */
+    export type FlowInput<F> = F extends Flow<unknown, infer I> ? I : never
+
+    /**
+     * Extract value type from a Tag.
+     * @example
+     * type UserId = Lite.Utils.TagValue<typeof userIdTag> // string
+     */
+    export type TagValue<T> = T extends Tag<infer V, boolean> ? V : never
+
+    /**
+     * Extract dependencies record from an Atom or Flow.
+     * @example
+     * type Deps = Lite.Utils.DepsOf<typeof myAtom> // { db: DbAtom, cache: CacheAtom }
+     */
+    export type DepsOf<T> = T extends Atom<unknown>
+      ? T['deps']
+      : T extends Flow<unknown, unknown>
+        ? T['deps']
+        : never
+
+    /**
+     * Flatten complex intersection types for better IDE display.
+     */
+    export type Simplify<T> = { [K in keyof T]: T[K] } & {}
+
+    /**
+     * Create an atom type with inferred value.
+     * Useful for declaring atom types without defining the atom.
+     */
+    export type AtomType<T, D extends Record<string, Dependency> = Record<string, never>> = Atom<T> & {
+      readonly deps: D
+    }
+
+    /**
+     * Create a flow type with inferred input/output.
+     * Useful for declaring flow types without defining the flow.
+     */
+    export type FlowType<O, I = void, D extends Record<string, Dependency> = Record<string, never>> = Flow<O, I> & {
+      readonly deps: D
+    }
+
+    /**
+     * Extract value type from a Controller.
+     * @example
+     * type Value = Lite.Utils.ControllerValue<typeof ctrl> // string
+     */
+    export type ControllerValue<C> = C extends Controller<infer T> ? T : never
+  }
 }

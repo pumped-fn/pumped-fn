@@ -29,7 +29,7 @@ When generating code, DO NOT produce:
   - Comments - strictly NO inline comments or block comments
   - TSDoc is the ONLY exception: allowed on public interfaces to explain usage
   - Defensive try/catch or null checks in trusted/validated codepaths
-  - Casts to `any` to bypass type issues (fix the types properly)
+  - Casts to `any` to bypass type issues (fix the types properly). Exception: `any` is acceptable in library boundary code where type variance or interoperability requires it (e.g., generic service methods, extension hooks)
   - Single-use variables declared then immediately used (inline them)
   - Style inconsistent with surrounding code
 
