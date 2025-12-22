@@ -541,6 +541,65 @@ describe('GC Options', () => {
   })
 })
 
+describe('Automatic GC - Scheduling', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('schedules GC when last subscriber unsubscribes', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    expect(ctrl.state).toBe('resolved')
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    expect(ctrl.state).toBe('resolved')
+    
+    await delay(150)
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('cancels scheduled GC when resubscribed during grace period', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub1 = ctrl.on('resolved', () => {})
+    unsub1()
+    
+    await delay(50)
+    
+    const unsub2 = ctrl.on('resolved', () => {})
+    
+    await delay(100)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub2()
+  })
+
+  it('does not schedule GC when still has other subscribers', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub1 = ctrl.on('resolved', () => {})
+    const unsub2 = ctrl.on('resolved', () => {})
+    
+    unsub1()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub2()
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {

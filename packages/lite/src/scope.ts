@@ -314,12 +314,65 @@ class ScopeImpl implements Lite.Scope {
   }
 
   addListener<T>(atom: Lite.Atom<T>, event: ListenerEvent, listener: () => void): () => void {
+    this.cancelScheduledGC(atom)
+    
     const entry = this.getOrCreateEntry(atom)
     const listeners = entry.listeners.get(event)!
     listeners.add(listener)
     return () => {
       listeners.delete(listener)
+      this.maybeScheduleGC(atom)
     }
+  }
+
+  private getSubscriberCount<T>(atom: Lite.Atom<T>): number {
+    const entry = this.cache.get(atom)
+    if (!entry) return 0
+    let count = 0
+    for (const listeners of entry.listeners.values()) {
+      count += listeners.size
+    }
+    return count
+  }
+
+  private maybeScheduleGC<T>(atom: Lite.Atom<T>): void {
+    if (!this.gcOptions.enabled) return
+    if (atom.keepAlive) return
+    
+    const entry = this.cache.get(atom)
+    if (!entry) return
+    if (entry.state === 'idle') return
+    
+    const subscriberCount = this.getSubscriberCount(atom)
+    if (subscriberCount > 0) return
+    if (entry.dependents.size > 0) return
+    
+    if (entry.gcScheduled) return
+    
+    entry.gcScheduled = setTimeout(() => {
+      this.executeGC(atom)
+    }, this.gcOptions.graceMs)
+  }
+
+  private cancelScheduledGC<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (entry?.gcScheduled) {
+      clearTimeout(entry.gcScheduled)
+      entry.gcScheduled = null
+    }
+  }
+
+  private async executeGC<T>(atom: Lite.Atom<T>): Promise<void> {
+    const entry = this.cache.get(atom)
+    if (!entry) return
+    
+    entry.gcScheduled = null
+    
+    if (this.getSubscriberCount(atom) > 0) return
+    if (entry.dependents.size > 0) return
+    if (atom.keepAlive) return
+    
+    await this.release(atom)
   }
 
   private notifyListeners<T>(atom: Lite.Atom<T>, event: 'resolving' | 'resolved'): void {
