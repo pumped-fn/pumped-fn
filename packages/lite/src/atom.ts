@@ -6,6 +6,7 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
   factory: Lite.AtomFactory<T, D>
   tags?: Lite.Tagged<unknown>[]
+  keepAlive?: boolean
 }
 
 /**
@@ -25,6 +26,7 @@ export function atom<T>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
   tags?: Lite.Tagged<unknown>[]
+  keepAlive?: boolean
 }): Lite.Atom<T>
 
 export function atom<
@@ -34,6 +36,7 @@ export function atom<
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
   tags?: Lite.Tagged<unknown>[]
+  keepAlive?: boolean
 }): Lite.Atom<T>
 
 export function atom<T, D extends Record<string, Lite.Dependency>>(
@@ -44,6 +47,7 @@ export function atom<T, D extends Record<string, Lite.Dependency>>(
     factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
+    keepAlive: config.keepAlive,
   }
 
   if (config.tags?.length) {
