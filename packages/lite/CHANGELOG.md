@@ -1,5 +1,39 @@
 # @pumped-fn/lite
 
+## 1.11.0
+
+### Minor Changes
+
+- 60604a2: Add automatic garbage collection for atoms
+
+  - Atoms are automatically released when they have no subscribers after a configurable grace period (default 3000ms)
+  - Cascading GC: dependencies are protected while dependents are mounted
+  - New `keepAlive: true` option on atoms to prevent auto-release
+  - New `gc: { enabled, graceMs }` option on `createScope()` to configure or disable GC
+  - React Strict Mode compatible via grace period (handles double-mount/unmount)
+  - Disable with `createScope({ gc: { enabled: false } })` to preserve pre-1.11 behavior
+
+- 06d527f: Add utility types for better DX and boundary types for extensions
+
+  - Add `Lite.Utils` namespace with type extraction utilities:
+    - `AtomValue<A>`, `FlowOutput<F>`, `FlowInput<F>`, `TagValue<T>`, `ControllerValue<C>`
+    - `DepsOf<T>`, `Simplify<T>`, `AtomType<T, D>`, `FlowType<O, I, D>`
+  - Add boundary types for passthrough extension code:
+    - `AnyAtom`, `AnyFlow`, `AnyController`
+  - Add `ExecTarget` and `ExecTargetFn` type aliases for cleaner extension signatures
+
+### Patch Changes
+
+- a017021: docs: add Flow Deps & Execution pattern and improve documentation
+
+  - Add "Flow Deps & Execution" section to PATTERNS.md covering:
+    - Deps resolution (atoms from Scope vs tags from context hierarchy)
+    - Service invocation via ctx.exec (observable by extensions)
+    - Cleanup pattern with ctx.onClose (pessimistic cleanup)
+  - Remove redundant patterns (Command, Interceptor) covered by composite patterns
+  - Remove verbose Error Boundary diagram, replaced with bullet point
+  - Add Documentation section to README linking PATTERNS.md and API reference
+
 ## 1.10.0
 
 ### Minor Changes
