@@ -706,6 +706,24 @@ describe('Automatic GC - Cascading', () => {
   })
 })
 
+describe('Automatic GC - Disabled', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC when gc.enabled is false', async () => {
+    const scope = createScope({ gc: { enabled: false, graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {
