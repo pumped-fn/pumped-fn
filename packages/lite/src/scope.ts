@@ -372,7 +372,26 @@ class ScopeImpl implements Lite.Scope {
     if (entry.dependents.size > 0) return
     if (atom.keepAlive) return
     
+    const dependencies: Lite.Atom<unknown>[] = []
+    if (atom.deps) {
+      for (const dep of Object.values(atom.deps)) {
+        if (isAtom(dep)) {
+          dependencies.push(dep)
+        } else if (isControllerDep(dep)) {
+          dependencies.push(dep.atom)
+        }
+      }
+    }
+    
     await this.release(atom)
+    
+    for (const dep of dependencies) {
+      const depEntry = this.cache.get(dep)
+      if (depEntry) {
+        depEntry.dependents.delete(atom)
+        this.maybeScheduleGC(dep as Lite.Atom<unknown>)
+      }
+    }
   }
 
   private notifyListeners<T>(atom: Lite.Atom<T>, event: 'resolving' | 'resolved'): void {

@@ -614,7 +614,7 @@ describe('Automatic GC - keepAlive', () => {
     unsub()
     
     await delay(150)
-    expect(ctrl.state).toBe('resolved')  // Still alive due to keepAlive
+    expect(ctrl.state).toBe('resolved')
   })
 
   it('GCs atoms with keepAlive: false (explicit)', async () => {
@@ -628,7 +628,81 @@ describe('Automatic GC - keepAlive', () => {
     unsub()
     
     await delay(150)
-    expect(ctrl.state).toBe('idle')  // GC'd
+    expect(ctrl.state).toBe('idle')
+  })
+})
+
+describe('Automatic GC - Cascading', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC dependency while dependent is mounted', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    const depCtrl = scope.controller(depAtom)
+    const mainCtrl = scope.controller(mainAtom)
+    
+    await mainCtrl.resolve()
+    
+    const mainUnsub = mainCtrl.on('resolved', () => {})
+    
+    await delay(150)
+    expect(depCtrl.state).toBe('resolved')
+    
+    mainUnsub()
+  })
+
+  it('cascades GC to dependencies after dependent is released', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    const depCtrl = scope.controller(depAtom)
+    const mainCtrl = scope.controller(mainAtom)
+    
+    await mainCtrl.resolve()
+    
+    const unsub = mainCtrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(mainCtrl.state).toBe('idle')
+    
+    await delay(150)
+    expect(depCtrl.state).toBe('idle')
+  })
+
+  it('does not cascade to keepAlive dependencies', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const configAtom = atom({ factory: () => 'config', keepAlive: true })
+    const serviceAtom = atom({
+      deps: { config: configAtom },
+      factory: (ctx, { config }) => `service-${config}`
+    })
+    
+    const configCtrl = scope.controller(configAtom)
+    const serviceCtrl = scope.controller(serviceAtom)
+    
+    await serviceCtrl.resolve()
+    
+    const unsub = serviceCtrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(serviceCtrl.state).toBe('idle')
+    
+    await delay(150)
+    expect(configCtrl.state).toBe('resolved')
   })
 })
 
