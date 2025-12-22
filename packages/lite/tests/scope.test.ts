@@ -600,6 +600,38 @@ describe('Automatic GC - Scheduling', () => {
   })
 })
 
+describe('Automatic GC - keepAlive', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC atoms with keepAlive: true', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'persistent', keepAlive: true })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')  // Still alive due to keepAlive
+  })
+
+  it('GCs atoms with keepAlive: false (explicit)', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'temporary', keepAlive: false })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('idle')  // GC'd
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {
