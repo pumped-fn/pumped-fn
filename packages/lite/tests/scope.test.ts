@@ -724,6 +724,86 @@ describe('Automatic GC - Disabled', () => {
   })
 })
 
+describe('Automatic GC - Edge Cases', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('manual release still works', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    await scope.release(myAtom)
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('dispose releases all atoms ignoring GC', async () => {
+    const scope = createScope({ gc: { graceMs: 5000 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    await scope.dispose()
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('invalidation does not trigger GC (same subscribers)', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    let callCount = 0
+    const myAtom = atom({ factory: () => ++callCount })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    expect(ctrl.get()).toBe(1)
+    
+    const unsub = ctrl.on('resolved', () => {})
+    
+    ctrl.invalidate()
+    await scope.flush()
+    
+    expect(ctrl.state).toBe('resolved')
+    expect(ctrl.get()).toBe(2)
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub()
+  })
+
+  it('clears pending GC timer on manual release', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await scope.release(myAtom)
+    expect(ctrl.state).toBe('idle')
+    
+    await delay(150)
+  })
+
+  it('clears GC timers on dispose', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await scope.dispose()
+    
+    await delay(150)
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {

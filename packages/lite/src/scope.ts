@@ -804,6 +804,11 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.cache.get(atom)
     if (!entry) return
 
+    if (entry.gcScheduled) {
+      clearTimeout(entry.gcScheduled)
+      entry.gcScheduled = null
+    }
+
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
@@ -817,6 +822,13 @@ class ScopeImpl implements Lite.Scope {
     for (const ext of this.extensions) {
       if (ext.dispose) {
         await ext.dispose(this)
+      }
+    }
+
+    for (const entry of this.cache.values()) {
+      if (entry.gcScheduled) {
+        clearTimeout(entry.gcScheduled)
+        entry.gcScheduled = null
       }
     }
 
