@@ -519,6 +519,28 @@ describe('Dependents Tracking', () => {
   })
 })
 
+describe('GC Options', () => {
+  it('defaults gc.enabled to true', () => {
+    const scope = createScope() as any
+    expect(scope.gcOptions.enabled).toBe(true)
+  })
+
+  it('defaults gc.graceMs to 3000', () => {
+    const scope = createScope() as any
+    expect(scope.gcOptions.graceMs).toBe(3000)
+  })
+
+  it('respects gc.enabled: false', () => {
+    const scope = createScope({ gc: { enabled: false } }) as any
+    expect(scope.gcOptions.enabled).toBe(false)
+  })
+
+  it('respects custom gc.graceMs', () => {
+    const scope = createScope({ gc: { graceMs: 5000 } }) as any
+    expect(scope.gcOptions.graceMs).toBe(5000)
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {

@@ -211,6 +211,7 @@ class ScopeImpl implements Lite.Scope {
   private chainPromise: Promise<void> | null = null
   private initialized = false
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
+  private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
   readonly ready: Promise<void>
@@ -268,6 +269,11 @@ class ScopeImpl implements Lite.Scope {
 
     for (const p of options?.presets ?? []) {
       this.presets.set(p.atom, p.value)
+    }
+
+    this.gcOptions = {
+      enabled: options?.gc?.enabled ?? true,
+      graceMs: options?.gc?.graceMs ?? 3000,
     }
 
     this.ready = this.init()
