@@ -44,7 +44,7 @@ sequenceDiagram
     Scope-->>Context: deps (cached in scope)
     Context->>Flow1: factory(childCtx, deps)
     Note over Flow1: childCtx.parent = ctx
-    Flow1->>Flow1: tags.required(userId) from merged tags
+    Flow1->>Flow1: tags.required(userIdTag) from merged tags
     Flow1-->>Context: validated
 
     App->>Context: ctx.exec({ flow: processFlow, input: validated })
@@ -70,46 +70,103 @@ sequenceDiagram
 - Each `exec()` creates child context with isolated `data` Map
 - `seekTag()` traverses parent chain for shared data (e.g., transaction)
 - `ctx.close()` runs all `onClose` cleanups (LIFO order)
+- On error: child context auto-closes, cleanups still run
 
-**Error Boundary (natural extension):**
+**Primitives:** `createScope()`, `scope.createContext()`, `ctx.exec()`, `ctx.data.setTag/seekTag()`, `ctx.onClose()`, `ctx.close()`
+
+---
+
+### Flow Deps & Execution
+
+**Combines:** Command + Composite + Resource Management
+
+| Concern | Primitive |
+|---------|-----------|
+| Dependency injection | `deps` (atoms from Scope, tags from context hierarchy) |
+| Service invocation | `ctx.exec({ fn, params })` (observable by extensions) |
+| Resource cleanup | `ctx.onClose()` (LIFO, runs on success or failure) |
+
+**Deps Resolution:**
 
 ```mermaid
-sequenceDiagram
-    participant App
-    participant Scope
-    participant Context as ExecutionContext
-    participant Flow
+flowchart TB
+    subgraph Flow["flow({ deps, factory })"]
+        Deps["deps: { db: dbAtom, userId: tags.required(userIdTag) }"]
+    end
 
-    App->>Scope: createContext({ tags: [requestId] })
-    Scope-->>App: ctx
-    App->>Context: ctx.onClose(() => releaseResources())
+    subgraph Resolution
+        Deps --> AtomPath["Atom deps"]
+        Deps --> TagPath["Tag deps (TagExecutor)"]
 
-    alt Success path
-        App->>Context: ctx.exec({ flow, input })
-        Context->>Scope: resolve flow deps
-        Scope-->>Context: deps (cached)
-        Context->>Flow: factory(childCtx, deps)
-        Flow-->>Context: result
-        Note over Context: childCtx auto-closes
-        Context-->>App: result
-        App->>Context: ctx.close()
-        Context->>Context: run onClose cleanups
-    else Error path
-        App->>Context: ctx.exec({ flow, input })
-        Context->>Scope: resolve flow deps
-        Scope-->>Context: deps (cached)
-        Context->>Flow: factory(childCtx, deps)
-        Flow-->>Flow: throws Error
-        Note over Context: childCtx auto-closes
-        Context-->>App: throws Error
-        App->>App: catch(error)
-        App->>Context: ctx.close()
-        Context->>Context: run onClose cleanups
-        App-->>App: return error response
+        AtomPath --> Scope["Scope.resolve()"]
+        Scope --> |"cached in scope"| ResolvedAtom["db instance"]
+
+        TagPath --> CtxHierarchy["ctx.data.seekTag()"]
+        CtxHierarchy --> |"traverses parent chain"| ResolvedTag["userId value"]
+    end
+
+    subgraph Factory["factory(ctx, { db, userId })"]
+        ResolvedAtom --> DepsObj["deps object"]
+        ResolvedTag --> DepsObj
     end
 ```
 
-**Primitives:** `createScope()`, `scope.createContext()`, `ctx.exec()`, `ctx.data.setTag/seekTag()`, `ctx.onClose()`, `ctx.close()`
+**Service Invocation:**
+
+```mermaid
+sequenceDiagram
+    participant Flow
+    participant Ctx as ExecutionContext
+    participant Ext as Extension.wrapExec
+    participant Fn as service.method
+
+    Note over Flow: ❌ Direct call
+    Flow->>Fn: service.method(ctx, data)
+    Note over Fn: Extensions cannot observe
+
+    Note over Flow: ✅ Via ctx.exec
+    Flow->>Ctx: ctx.exec({ fn: service.method, params: [data] })
+    Ctx->>Ctx: create childCtx (parent = ctx)
+    Ctx->>Ext: wrapExec(next, fn, childCtx)
+    Ext->>Fn: next()
+    Fn-->>Ext: result
+    Ext-->>Ctx: result
+    Ctx->>Ctx: childCtx.close()
+    Ctx-->>Flow: result
+```
+
+**Cleanup Pattern:**
+
+```mermaid
+sequenceDiagram
+    participant Flow
+    participant Ctx as ExecutionContext
+    participant Tx as Transaction
+
+    Flow->>Tx: beginTransaction()
+    Tx-->>Flow: tx
+    Flow->>Ctx: ctx.onClose(() => tx.rollback())
+
+    alt Success
+        Flow->>Flow: do work
+        Flow->>Tx: tx.commit()
+        Flow->>Ctx: return result
+        Ctx->>Ctx: close() → rollback() is no-op
+    else Error
+        Flow->>Flow: do work (throws)
+        Ctx->>Ctx: close() → rollback() executes
+        Ctx->>Tx: tx.rollback()
+    end
+```
+
+**Characteristics:**
+- Atoms resolve via `Scope.resolve()` (cached, long-lived)
+- Tag deps resolve via `ctx.data.seekTag()` (traverses parent → grandparent → scope tags)
+- `ctx.exec({ fn, params })` creates child context with isolated `data` Map
+- Extensions intercept via `wrapExec(next, target, ctx)`
+- Register pessimistic cleanup via `ctx.onClose(fn)`, neutralize on success
+
+**Primitives:** `flow({ deps })`, `tags.required()`, `tags.optional()`, `tags.all()`, `ctx.exec()`, `ctx.onClose()`
 
 ---
 
@@ -269,45 +326,6 @@ stateDiagram-v2
 **Primitives:** `controller()`, `ctrl.on('resolved' | 'resolving' | '*')`, `ctrl.invalidate()`
 
 **Characteristics:** State-filtered subscriptions, LIFO cleanup before re-resolution, sequential invalidation chains with loop detection.
-
----
-
-### Command
-
-**GoF:** Command Pattern
-
-```mermaid
-graph LR
-    Client -->|exec| Context[ExecutionContext]
-    Context -->|invoke| Flow
-    Flow -->|input| Factory
-    Factory -->|output| Context
-    Context -->|result| Client
-```
-
-**Primitives:** `flow()`, `ctx.exec()`, `ctx.input`, `parse`
-
-**Characteristics:** Encapsulated request/response, input validation via `parse`, nestable execution, auto-closing child contexts.
-
----
-
-### Interceptor
-
-**GoF:** Interceptor / Chain of Responsibility
-
-```mermaid
-graph LR
-    Request --> Ext1[Extension 1]
-    Ext1 -->|next| Ext2[Extension 2]
-    Ext2 -->|next| Target[Atom/Flow]
-    Target --> Ext2
-    Ext2 --> Ext1
-    Ext1 --> Response
-```
-
-**Primitives:** `Extension`, `wrapResolve()`, `wrapExec()`, `init()`, `dispose()`
-
-**Characteristics:** Wraps both atom resolution and flow execution, registration order determines nesting, access to scope and context.
 
 ---
 

@@ -4,6 +4,13 @@ A lightweight effect system for TypeScript with managed lifecycles and minimal r
 
 **Zero dependencies** · **<17KB bundle** · **Full TypeScript support**
 
+## Documentation
+
+| Resource | Purpose |
+|----------|---------|
+| [PATTERNS.md](./PATTERNS.md) | Architecture patterns, flow design, deps resolution, cleanup strategies |
+| [dist/index.d.mts](./dist/index.d.mts) | API reference with TSDoc |
+
 ## How It Works
 
 ```mermaid
@@ -254,9 +261,7 @@ flowchart LR
 
 Use cases: metrics collection, debugging, documentation generation.
 
-## Full API
-
-See [`dist/index.d.mts`](./dist/index.d.mts) for complete type definitions.
+## Types
 
 All types available under the `Lite` namespace:
 
