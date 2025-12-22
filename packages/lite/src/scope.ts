@@ -87,6 +87,8 @@ interface AtomEntry<T> {
   pendingInvalidate: boolean
   pendingSet?: { value: T } | { fn: (prev: T) => T }
   data?: ContextDataImpl
+  dependents: Set<Lite.Atom<unknown>>
+  gcScheduled: ReturnType<typeof setTimeout> | null
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -297,6 +299,8 @@ class ScopeImpl implements Lite.Scope {
           ['*', new Set()],
         ]),
         pendingInvalidate: false,
+        dependents: new Set(),
+        gcScheduled: null,
       }
       this.cache.set(atom, entry as AtomEntry<unknown>)
     }
@@ -438,7 +442,7 @@ class ScopeImpl implements Lite.Scope {
       this.notifyListeners(atom, 'resolving')
     }
 
-    const resolvedDeps = await this.resolveDeps(atom.deps)
+    const resolvedDeps = await this.resolveDeps(atom.deps, undefined, atom)
 
     const ctx: Lite.ResolveContext = {
       cleanup: (fn) => entry.cleanups.push(fn),
@@ -523,7 +527,8 @@ class ScopeImpl implements Lite.Scope {
 
   async resolveDeps(
     deps: Record<string, Lite.Dependency> | undefined,
-    ctx?: Lite.ExecutionContext
+    ctx?: Lite.ExecutionContext,
+    dependentAtom?: Lite.Atom<unknown>
   ): Promise<Record<string, unknown>> {
     if (!deps) return {}
 
@@ -532,12 +537,24 @@ class ScopeImpl implements Lite.Scope {
     for (const [key, dep] of Object.entries(deps)) {
       if (isAtom(dep)) {
         result[key] = await this.resolve(dep)
+        if (dependentAtom) {
+          const depEntry = this.getEntry(dep)
+          if (depEntry) {
+            depEntry.dependents.add(dependentAtom)
+          }
+        }
       } else if (isControllerDep(dep)) {
         const ctrl = new ControllerImpl(dep.atom, this)
         if (dep.resolve) {
           await ctrl.resolve()
         }
         result[key] = ctrl
+        if (dependentAtom) {
+          const depEntry = this.getEntry(dep.atom)
+          if (depEntry) {
+            depEntry.dependents.add(dependentAtom)
+          }
+        }
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 

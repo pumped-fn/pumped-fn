@@ -455,6 +455,70 @@ describe("Scope", () => {
   })
 })
 
+describe('Dependents Tracking', () => {
+  it('tracks dependents when atom depends on another', async () => {
+    const scope = createScope() as any
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    await scope.resolve(mainAtom)
+    
+    const depEntry = scope.getEntry(depAtom)
+    expect(depEntry.dependents.has(mainAtom)).toBe(true)
+  })
+
+  it('does not track dependents for atoms without deps', async () => {
+    const scope = createScope() as any
+    
+    const standaloneAtom = atom({ factory: () => 'standalone' })
+    await scope.resolve(standaloneAtom)
+    
+    const entry = scope.getEntry(standaloneAtom)
+    expect(entry.dependents.size).toBe(0)
+  })
+
+  it('tracks multiple dependents for shared dependency', async () => {
+    const scope = createScope() as any
+    
+    const sharedAtom = atom({ factory: () => 'shared' })
+    const consumer1 = atom({
+      deps: { shared: sharedAtom },
+      factory: (ctx, { shared }) => `1-${shared}`
+    })
+    const consumer2 = atom({
+      deps: { shared: sharedAtom },
+      factory: (ctx, { shared }) => `2-${shared}`
+    })
+    
+    await scope.resolve(consumer1)
+    await scope.resolve(consumer2)
+    
+    const sharedEntry = scope.getEntry(sharedAtom)
+    expect(sharedEntry.dependents.size).toBe(2)
+    expect(sharedEntry.dependents.has(consumer1)).toBe(true)
+    expect(sharedEntry.dependents.has(consumer2)).toBe(true)
+  })
+
+  it('tracks dependents through controller deps', async () => {
+    const scope = createScope() as any
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: controller(depAtom, { resolve: true }) },
+      factory: (ctx, { dep }) => `main-${dep.get()}`
+    })
+    
+    await scope.resolve(mainAtom)
+    
+    const depEntry = scope.getEntry(depAtom)
+    expect(depEntry.dependents.has(mainAtom)).toBe(true)
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {
