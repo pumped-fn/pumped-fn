@@ -5,14 +5,14 @@ summary: >
   Add subscription-based garbage collection with cascading dependency tracking,
   configurable grace period for React Strict Mode compatibility, and explicit
   keepAlive opt-out for persistent atoms.
-status: proposed
+status: accepted
 date: 2025-12-22
 ---
 
 # [ADR-029] Automatic Garbage Collection for Atoms
 
 ## Status {#adr-029-status}
-**Proposed** - 2025-12-22
+**Accepted** - 2025-12-22
 
 ## Problem/Requirement {#adr-029-problem}
 
