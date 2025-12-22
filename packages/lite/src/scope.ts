@@ -87,6 +87,8 @@ interface AtomEntry<T> {
   pendingInvalidate: boolean
   pendingSet?: { value: T } | { fn: (prev: T) => T }
   data?: ContextDataImpl
+  dependents: Set<Lite.Atom<unknown>>
+  gcScheduled: ReturnType<typeof setTimeout> | null
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -209,6 +211,7 @@ class ScopeImpl implements Lite.Scope {
   private chainPromise: Promise<void> | null = null
   private initialized = false
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
+  private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<unknown>[]
   readonly ready: Promise<void>
@@ -268,6 +271,11 @@ class ScopeImpl implements Lite.Scope {
       this.presets.set(p.atom, p.value)
     }
 
+    this.gcOptions = {
+      enabled: options?.gc?.enabled ?? true,
+      graceMs: options?.gc?.graceMs ?? 3000,
+    }
+
     this.ready = this.init()
   }
 
@@ -297,6 +305,8 @@ class ScopeImpl implements Lite.Scope {
           ['*', new Set()],
         ]),
         pendingInvalidate: false,
+        dependents: new Set(),
+        gcScheduled: null,
       }
       this.cache.set(atom, entry as AtomEntry<unknown>)
     }
@@ -304,11 +314,77 @@ class ScopeImpl implements Lite.Scope {
   }
 
   addListener<T>(atom: Lite.Atom<T>, event: ListenerEvent, listener: () => void): () => void {
+    this.cancelScheduledGC(atom)
+    
     const entry = this.getOrCreateEntry(atom)
     const listeners = entry.listeners.get(event)!
     listeners.add(listener)
     return () => {
       listeners.delete(listener)
+      this.maybeScheduleGC(atom)
+    }
+  }
+
+  private getSubscriberCount<T>(atom: Lite.Atom<T>): number {
+    const entry = this.cache.get(atom)
+    if (!entry) return 0
+    let count = 0
+    for (const listeners of entry.listeners.values()) {
+      count += listeners.size
+    }
+    return count
+  }
+
+  private maybeScheduleGC<T>(atom: Lite.Atom<T>): void {
+    if (!this.gcOptions.enabled) return
+    if (atom.keepAlive) return
+    
+    const entry = this.cache.get(atom)
+    if (!entry) return
+    if (entry.state === 'idle') return
+    
+    const subscriberCount = this.getSubscriberCount(atom)
+    if (subscriberCount > 0) return
+    if (entry.dependents.size > 0) return
+    
+    if (entry.gcScheduled) return
+    
+    entry.gcScheduled = setTimeout(() => {
+      this.executeGC(atom)
+    }, this.gcOptions.graceMs)
+  }
+
+  private cancelScheduledGC<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (entry?.gcScheduled) {
+      clearTimeout(entry.gcScheduled)
+      entry.gcScheduled = null
+    }
+  }
+
+  private async executeGC<T>(atom: Lite.Atom<T>): Promise<void> {
+    const entry = this.cache.get(atom)
+    if (!entry) return
+    
+    entry.gcScheduled = null
+    
+    if (this.getSubscriberCount(atom) > 0) return
+    if (entry.dependents.size > 0) return
+    if (atom.keepAlive) return
+    
+    await this.release(atom)
+    
+    if (atom.deps) {
+      for (const dep of Object.values(atom.deps)) {
+        const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
+        if (!depAtom) continue
+        
+        const depEntry = this.cache.get(depAtom)
+        if (depEntry) {
+          depEntry.dependents.delete(atom)
+          this.maybeScheduleGC(depAtom)
+        }
+      }
     }
   }
 
@@ -438,7 +514,7 @@ class ScopeImpl implements Lite.Scope {
       this.notifyListeners(atom, 'resolving')
     }
 
-    const resolvedDeps = await this.resolveDeps(atom.deps)
+    const resolvedDeps = await this.resolveDeps(atom.deps, undefined, atom)
 
     const ctx: Lite.ResolveContext = {
       cleanup: (fn) => entry.cleanups.push(fn),
@@ -523,7 +599,8 @@ class ScopeImpl implements Lite.Scope {
 
   async resolveDeps(
     deps: Record<string, Lite.Dependency> | undefined,
-    ctx?: Lite.ExecutionContext
+    ctx?: Lite.ExecutionContext,
+    dependentAtom?: Lite.Atom<unknown>
   ): Promise<Record<string, unknown>> {
     if (!deps) return {}
 
@@ -532,12 +609,24 @@ class ScopeImpl implements Lite.Scope {
     for (const [key, dep] of Object.entries(deps)) {
       if (isAtom(dep)) {
         result[key] = await this.resolve(dep)
+        if (dependentAtom) {
+          const depEntry = this.getEntry(dep)
+          if (depEntry) {
+            depEntry.dependents.add(dependentAtom)
+          }
+        }
       } else if (isControllerDep(dep)) {
         const ctrl = new ControllerImpl(dep.atom, this)
         if (dep.resolve) {
           await ctrl.resolve()
         }
         result[key] = ctrl
+        if (dependentAtom) {
+          const depEntry = this.getEntry(dep.atom)
+          if (depEntry) {
+            depEntry.dependents.add(dependentAtom)
+          }
+        }
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
 
@@ -709,6 +798,11 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.cache.get(atom)
     if (!entry) return
 
+    if (entry.gcScheduled) {
+      clearTimeout(entry.gcScheduled)
+      entry.gcScheduled = null
+    }
+
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
@@ -722,6 +816,13 @@ class ScopeImpl implements Lite.Scope {
     for (const ext of this.extensions) {
       if (ext.dispose) {
         await ext.dispose(this)
+      }
+    }
+
+    for (const entry of this.cache.values()) {
+      if (entry.gcScheduled) {
+        clearTimeout(entry.gcScheduled)
+        entry.gcScheduled = null
       }
     }
 

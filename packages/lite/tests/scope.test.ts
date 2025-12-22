@@ -455,6 +455,355 @@ describe("Scope", () => {
   })
 })
 
+describe('Dependents Tracking', () => {
+  it('tracks dependents when atom depends on another', async () => {
+    const scope = createScope() as any
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    await scope.resolve(mainAtom)
+    
+    const depEntry = scope.getEntry(depAtom)
+    expect(depEntry.dependents.has(mainAtom)).toBe(true)
+  })
+
+  it('does not track dependents for atoms without deps', async () => {
+    const scope = createScope() as any
+    
+    const standaloneAtom = atom({ factory: () => 'standalone' })
+    await scope.resolve(standaloneAtom)
+    
+    const entry = scope.getEntry(standaloneAtom)
+    expect(entry.dependents.size).toBe(0)
+  })
+
+  it('tracks multiple dependents for shared dependency', async () => {
+    const scope = createScope() as any
+    
+    const sharedAtom = atom({ factory: () => 'shared' })
+    const consumer1 = atom({
+      deps: { shared: sharedAtom },
+      factory: (ctx, { shared }) => `1-${shared}`
+    })
+    const consumer2 = atom({
+      deps: { shared: sharedAtom },
+      factory: (ctx, { shared }) => `2-${shared}`
+    })
+    
+    await scope.resolve(consumer1)
+    await scope.resolve(consumer2)
+    
+    const sharedEntry = scope.getEntry(sharedAtom)
+    expect(sharedEntry.dependents.size).toBe(2)
+    expect(sharedEntry.dependents.has(consumer1)).toBe(true)
+    expect(sharedEntry.dependents.has(consumer2)).toBe(true)
+  })
+
+  it('tracks dependents through controller deps', async () => {
+    const scope = createScope() as any
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: controller(depAtom, { resolve: true }) },
+      factory: (ctx, { dep }) => `main-${dep.get()}`
+    })
+    
+    await scope.resolve(mainAtom)
+    
+    const depEntry = scope.getEntry(depAtom)
+    expect(depEntry.dependents.has(mainAtom)).toBe(true)
+  })
+})
+
+describe('GC Options', () => {
+  it('defaults gc.enabled to true', () => {
+    const scope = createScope() as any
+    expect(scope.gcOptions.enabled).toBe(true)
+  })
+
+  it('defaults gc.graceMs to 3000', () => {
+    const scope = createScope() as any
+    expect(scope.gcOptions.graceMs).toBe(3000)
+  })
+
+  it('respects gc.enabled: false', () => {
+    const scope = createScope({ gc: { enabled: false } }) as any
+    expect(scope.gcOptions.enabled).toBe(false)
+  })
+
+  it('respects custom gc.graceMs', () => {
+    const scope = createScope({ gc: { graceMs: 5000 } }) as any
+    expect(scope.gcOptions.graceMs).toBe(5000)
+  })
+})
+
+describe('Automatic GC - Scheduling', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('schedules GC when last subscriber unsubscribes', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    expect(ctrl.state).toBe('resolved')
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    expect(ctrl.state).toBe('resolved')
+    
+    await delay(150)
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('cancels scheduled GC when resubscribed during grace period', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub1 = ctrl.on('resolved', () => {})
+    unsub1()
+    
+    await delay(50)
+    
+    const unsub2 = ctrl.on('resolved', () => {})
+    
+    await delay(100)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub2()
+  })
+
+  it('does not schedule GC when still has other subscribers', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub1 = ctrl.on('resolved', () => {})
+    const unsub2 = ctrl.on('resolved', () => {})
+    
+    unsub1()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub2()
+  })
+})
+
+describe('Automatic GC - keepAlive', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC atoms with keepAlive: true', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'persistent', keepAlive: true })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+  })
+
+  it('GCs atoms with keepAlive: false (explicit)', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'temporary', keepAlive: false })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('idle')
+  })
+})
+
+describe('Automatic GC - Cascading', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC dependency while dependent is mounted', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    const depCtrl = scope.controller(depAtom)
+    const mainCtrl = scope.controller(mainAtom)
+    
+    await mainCtrl.resolve()
+    
+    const mainUnsub = mainCtrl.on('resolved', () => {})
+    
+    await delay(150)
+    expect(depCtrl.state).toBe('resolved')
+    
+    mainUnsub()
+  })
+
+  it('cascades GC to dependencies after dependent is released', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const depAtom = atom({ factory: () => 'dep' })
+    const mainAtom = atom({
+      deps: { dep: depAtom },
+      factory: (ctx, { dep }) => `main-${dep}`
+    })
+    
+    const depCtrl = scope.controller(depAtom)
+    const mainCtrl = scope.controller(mainAtom)
+    
+    await mainCtrl.resolve()
+    
+    const unsub = mainCtrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(mainCtrl.state).toBe('idle')
+    
+    await delay(150)
+    expect(depCtrl.state).toBe('idle')
+  })
+
+  it('does not cascade to keepAlive dependencies', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    
+    const configAtom = atom({ factory: () => 'config', keepAlive: true })
+    const serviceAtom = atom({
+      deps: { config: configAtom },
+      factory: (ctx, { config }) => `service-${config}`
+    })
+    
+    const configCtrl = scope.controller(configAtom)
+    const serviceCtrl = scope.controller(serviceAtom)
+    
+    await serviceCtrl.resolve()
+    
+    const unsub = serviceCtrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(serviceCtrl.state).toBe('idle')
+    
+    await delay(150)
+    expect(configCtrl.state).toBe('resolved')
+  })
+})
+
+describe('Automatic GC - Disabled', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('does not GC when gc.enabled is false', async () => {
+    const scope = createScope({ gc: { enabled: false, graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+  })
+})
+
+describe('Automatic GC - Edge Cases', () => {
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  it('manual release still works', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    await scope.release(myAtom)
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('dispose releases all atoms ignoring GC', async () => {
+    const scope = createScope({ gc: { graceMs: 5000 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    await scope.dispose()
+    expect(ctrl.state).toBe('idle')
+  })
+
+  it('invalidation does not trigger GC (same subscribers)', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    let callCount = 0
+    const myAtom = atom({ factory: () => ++callCount })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    expect(ctrl.get()).toBe(1)
+    
+    const unsub = ctrl.on('resolved', () => {})
+    
+    ctrl.invalidate()
+    await scope.flush()
+    
+    expect(ctrl.state).toBe('resolved')
+    expect(ctrl.get()).toBe(2)
+    
+    await delay(150)
+    expect(ctrl.state).toBe('resolved')
+    
+    unsub()
+  })
+
+  it('clears pending GC timer on manual release', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await scope.release(myAtom)
+    expect(ctrl.state).toBe('idle')
+    
+    await delay(150)
+  })
+
+  it('clears GC timers on dispose', async () => {
+    const scope = createScope({ gc: { graceMs: 100 } })
+    const myAtom = atom({ factory: () => 'value' })
+    
+    const ctrl = scope.controller(myAtom)
+    await ctrl.resolve()
+    
+    const unsub = ctrl.on('resolved', () => {})
+    unsub()
+    
+    await scope.dispose()
+    
+    await delay(150)
+  })
+})
+
 describe("ExecutionContext", () => {
   describe("createContext()", () => {
     it("creates execution context", async () => {

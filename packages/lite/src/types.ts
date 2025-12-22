@@ -41,6 +41,14 @@ export namespace Lite {
     extensions?: Extension[]
     tags?: Tagged<unknown>[]
     presets?: Preset<unknown>[]
+    gc?: GCOptions
+  }
+
+  export interface GCOptions {
+    /** Enable automatic garbage collection. Default: true */
+    enabled?: boolean
+    /** Grace period before releasing (ms). Default: 3000 */
+    graceMs?: number
   }
 
   export interface Atom<T> {
@@ -48,6 +56,7 @@ export namespace Lite {
     readonly factory: AtomFactory<T, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>
     readonly tags?: Tagged<unknown>[]
+    readonly keepAlive?: boolean
   }
 
   export interface Flow<TOutput, TInput = unknown> {

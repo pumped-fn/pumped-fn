@@ -339,6 +339,100 @@ const handler = flow({
 | `deps: { x: tags.required(tag) }` | Once at start | Stable snapshot |
 | `ctx.data.seekTag(tag)` | Each call | Sees changes |
 
+## Automatic Garbage Collection
+
+Atoms are automatically released when they have no subscribers, preventing memory leaks in long-running applications.
+
+### How It Works
+
+```mermaid
+sequenceDiagram
+    participant Component
+    participant Controller
+    participant Scope
+    participant Timer
+
+    Component->>Controller: ctrl.on('resolved', callback)
+    Note over Controller: subscriberCount = 1
+    
+    Component->>Controller: unsubscribe()
+    Note over Controller: subscriberCount = 0
+    Controller->>Timer: schedule GC (3000ms)
+    
+    alt Resubscribe before timeout
+        Component->>Controller: ctrl.on('resolved', callback)
+        Controller->>Timer: cancel GC
+        Note over Controller: Atom stays alive
+    else Timeout fires
+        Timer->>Scope: release(atom)
+        Note over Scope: Cleanups run, cache cleared
+        Scope->>Scope: Check dependencies for cascading GC
+    end
+```
+
+### Configuration
+
+```typescript
+// Default: GC enabled with 3000ms grace period
+const scope = createScope()
+
+// Custom grace period (useful for tests)
+const scope = createScope({
+  gc: { graceMs: 100 }
+})
+
+// Disable GC entirely (preserves pre-1.11 behavior)
+const scope = createScope({
+  gc: { enabled: false }
+})
+```
+
+### Opt-Out with keepAlive
+
+Mark atoms that should never be automatically released:
+
+```typescript
+const configAtom = atom({
+  factory: () => loadConfig(),
+  keepAlive: true  // Never auto-released
+})
+```
+
+### Cascading Dependency Protection
+
+Dependencies are protected while dependents are mounted:
+
+```
+configAtom (keepAlive: true)
+    ↑
+dbAtom ←── userServiceAtom ←── [Component subscribes]
+```
+
+- `dbAtom` won't be GC'd while `userServiceAtom` is mounted
+- When component unmounts, `userServiceAtom` is GC'd after grace period
+- Then `dbAtom` becomes eligible for GC (no dependents)
+- `configAtom` stays alive due to `keepAlive: true`
+
+### React Strict Mode Compatibility
+
+The 3000ms default grace period handles React's double-mount behavior:
+
+```
+Mount (render 1):     subscribe    → count=1
+Unmount (cleanup 1):  unsubscribe  → count=0 → schedule GC
+Mount (render 2):     subscribe    → count=1 → CANCEL GC
+```
+
+The second mount always happens before the GC timer fires.
+
+### API Summary
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `gc.enabled` | `true` | Enable/disable automatic GC |
+| `gc.graceMs` | `3000` | Delay before releasing (ms) |
+| `atom.keepAlive` | `false` | Prevent auto-release for specific atoms |
+
 ## License
 
 MIT
