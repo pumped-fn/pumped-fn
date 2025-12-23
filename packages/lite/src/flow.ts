@@ -28,7 +28,7 @@ export interface FlowConfig<
   parse?: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
   deps?: D
   factory: Lite.FlowFactory<Output, Input, D>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }
 
 /**
@@ -52,7 +52,7 @@ export function flow<TOutput>(config: {
   parse?: undefined
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, void>
 
 export function flow<TOutput, TInput>(config: {
@@ -60,7 +60,7 @@ export function flow<TOutput, TInput>(config: {
   parse: (raw: unknown) => MaybePromise<TInput>
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<TOutput, TInput>(config: {
@@ -68,7 +68,7 @@ export function flow<TOutput, TInput>(config: {
   parse: Lite.Typed<TInput>
   deps?: undefined
   factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<
@@ -79,7 +79,7 @@ export function flow<
   parse?: undefined
   deps: D
   factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, void>
 
 export function flow<
@@ -91,7 +91,7 @@ export function flow<
   parse: (raw: unknown) => MaybePromise<TInput>
   deps: D
   factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<
@@ -103,7 +103,7 @@ export function flow<
   parse: Lite.Typed<TInput>
   deps: D
   factory: (ctx: Lite.ExecutionContext & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<

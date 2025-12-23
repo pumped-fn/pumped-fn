@@ -213,7 +213,7 @@ class ScopeImpl implements Lite.Scope {
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
-  readonly tags: Lite.Tagged<unknown>[]
+  readonly tags: Lite.Tagged<any>[]
   readonly ready: Promise<void>
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
@@ -899,7 +899,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     input?: unknown
     rawInput?: unknown
     name?: string
-    tags?: Lite.Tagged<unknown>[]
+    tags?: Lite.Tagged<any>[]
   } | Lite.ExecFnOptions<unknown>): Promise<unknown> {
     if (this.closed) {
       throw new Error("ExecutionContext is closed")

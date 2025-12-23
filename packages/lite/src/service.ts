@@ -5,7 +5,7 @@ import type { Lite, MaybePromise } from "./types"
 export function service<T extends Lite.ServiceMethods>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Atom<T>
 
 export function service<
@@ -14,13 +14,13 @@ export function service<
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Atom<T>
 
 export function service<T extends Lite.ServiceMethods, D extends Record<string, Lite.Dependency>>(config: {
   deps?: D
   factory: Lite.AtomFactory<T, D>
-  tags?: Lite.Tagged<unknown>[]
+  tags?: Lite.Tagged<any>[]
 }): Lite.Atom<T> {
   return {
     [atomSymbol]: true,
