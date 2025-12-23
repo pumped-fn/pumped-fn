@@ -34,12 +34,12 @@ export namespace Lite {
   }
 
   export interface CreateContextOptions {
-    tags?: Tagged<unknown>[]
+    tags?: Tagged<any>[]
   }
 
   export interface ScopeOptions {
     extensions?: Extension[]
-    tags?: Tagged<unknown>[]
+    tags?: Tagged<any>[]
     presets?: Preset<unknown>[]
     gc?: GCOptions
   }
@@ -55,7 +55,7 @@ export namespace Lite {
     readonly [atomSymbol]: true
     readonly factory: AtomFactory<T, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>
-    readonly tags?: Tagged<unknown>[]
+    readonly tags?: Tagged<any>[]
     readonly keepAlive?: boolean
   }
 
@@ -65,7 +65,7 @@ export namespace Lite {
     readonly parse?: (raw: unknown) => MaybePromise<TInput>
     readonly factory: FlowFactory<TOutput, TInput, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>
-    readonly tags?: Tagged<unknown>[]
+    readonly tags?: Tagged<any>[]
   }
 
   /**
@@ -142,7 +142,7 @@ export namespace Lite {
   export type ExecFlowOptions<Output, Input> = {
     flow: Flow<Output, Input>
     name?: string
-    tags?: Tagged<unknown>[]
+    tags?: Tagged<any>[]
   } & (
     | ([NoInfer<Input>] extends [void | undefined | null]
         ? { input?: undefined | null; rawInput?: never }
@@ -154,7 +154,7 @@ export namespace Lite {
     fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
     params: Args
     name?: string
-    tags?: Tagged<unknown>[]
+    tags?: Tagged<any>[]
   }
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'
@@ -212,7 +212,7 @@ export namespace Lite {
     readonly hasDefault: HasDefault
     readonly parse?: (raw: unknown) => T
     (value: T): Tagged<T>
-    get(source: TagSource): HasDefault extends true ? T : T
+    get(source: TagSource): T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
     collect(source: TagSource): T[]
     atoms(): Atom<unknown>[]
@@ -225,7 +225,7 @@ export namespace Lite {
     readonly tag: Tag<T, boolean>
   }
 
-  export type TagSource = Tagged<unknown>[] | { tags?: Tagged<unknown>[] }
+  export type TagSource = Tagged<any>[] | { tags?: Tagged<any>[] }
 
   export interface TagExecutor<TOutput, TTag = TOutput> {
     readonly [tagExecutorSymbol]: true

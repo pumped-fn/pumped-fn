@@ -51,7 +51,7 @@ export function getAllTags(): Lite.Tag<unknown, boolean>[] {
 
 export function registerAtomToTags(
   atom: Lite.Atom<unknown>,
-  tags: Lite.Tagged<unknown>[]
+  tags: Lite.Tagged<any>[]
 ): void {
   for (const tagged of tags) {
     let refs = registry.get(tagged.tag)
