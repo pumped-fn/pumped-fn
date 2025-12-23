@@ -1,5 +1,15 @@
 # @pumped-fn/lite
 
+## 1.11.1
+
+### Patch Changes
+
+- 6af3cd0: Improve type ergonomics for tags and Tag.get()
+
+  - Change `Tagged<unknown>[]` to `Tagged<any>[]` at input boundaries to eliminate user casting
+  - Simplify `Tag.get()` return type from redundant `HasDefault extends true ? T : T` to plain `T`
+  - Applies to: `atom()`, `flow()`, `service()`, `createScope()`, `TagSource`
+
 ## 1.11.0
 
 ### Minor Changes
