@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { createScope } from "../src/scope"
 import { flow } from "../src/flow"
+import { service } from "../src/service"
 import { type Lite } from "../src/types"
 import { tag, tags } from "../src/tag"
 
@@ -790,6 +791,31 @@ describe("Hierarchical ExecutionContext", () => {
       })
 
       expect(capturedTenant).toBe("context-tenant")
+      await ctx.close()
+    })
+  })
+
+  describe("service with tag deps", () => {
+    it("service can use tags.required and resolve at runtime", async () => {
+      const tenantTag = tag<string>({ label: "tenant" })
+
+      const tenantService = service({
+        deps: { tenantId: tags.required(tenantTag) },
+        factory: (_ctx, { tenantId }) => ({
+          getTenant: (_ctx) => tenantId,
+          formatTenant: (_ctx, prefix: string) => `${prefix}-${tenantId}`,
+        }),
+      })
+
+      const scope = createScope({ tags: [tenantTag("acme-corp")] })
+      const svc = await scope.resolve(tenantService)
+      const ctx = scope.createContext()
+
+      const tenant = await ctx.exec({ fn: svc.getTenant, params: [] })
+      const formatted = await ctx.exec({ fn: svc.formatTenant, params: ["org"] })
+
+      expect(tenant).toBe("acme-corp")
+      expect(formatted).toBe("org-acme-corp")
       await ctx.close()
     })
   })

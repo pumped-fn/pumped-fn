@@ -10,7 +10,7 @@ export function service<T extends Lite.ServiceMethods>(config: {
 
 export function service<
   T extends Lite.ServiceMethods,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<unknown>>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<any>>,
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>

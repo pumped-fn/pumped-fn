@@ -272,7 +272,7 @@ export namespace Lite {
   export type Dependency =
     | Atom<unknown>
     | ControllerDep<unknown>
-    | TagExecutor<unknown>
+    | TagExecutor<any>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T

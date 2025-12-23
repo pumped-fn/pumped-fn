@@ -301,5 +301,22 @@ describe("Type Inference", () => {
       // @ts-expect-error - badMethod lacks ExecutionContext as first param
       service({ factory: () => ({ badMethod: (name: string) => name }) })
     })
+
+    it("service can use tags.required in deps", () => {
+      const tenantTag = tag<string>({ label: "tenant" })
+
+      const tenantService = service({
+        deps: { tenantId: tags.required(tenantTag) },
+        factory: (_ctx, { tenantId }) => {
+          expectTypeOf(tenantId).toEqualTypeOf<string>()
+          return {
+            getTenant: (_ctx) => tenantId,
+          }
+        },
+      })
+
+      type TenantServiceType = typeof tenantService extends Lite.Atom<infer T> ? T : never
+      expectTypeOf<TenantServiceType>().toMatchTypeOf<Lite.ServiceMethods>()
+    })
   })
 })
