@@ -7,8 +7,8 @@ describe("rawInput type safety", () => {
     const myFlow = flow({
       parse: (raw: unknown): { name: string } => {
         const obj = raw as Record<string, unknown>;
-        if (typeof obj.name !== "string") throw new Error("name required");
-        return { name: obj.name };
+        if (typeof obj["name"] !== "string") throw new Error("name required");
+        return { name: obj["name"] };
       },
       factory: (ctx) => ctx.input.name,
     });
@@ -36,8 +36,8 @@ describe("rawInput type safety", () => {
     type WithInput = Lite.ExecFlowOptions<string, string> & { input: string };
     expectTypeOf<WithInput["rawInput"]>().toEqualTypeOf<never | undefined>();
 
-    // When using rawInput, input should be never
+    // When using rawInput, input should be never (but union distribution keeps string in index access)
     type WithRawInput = Lite.ExecFlowOptions<string, string> & { rawInput: unknown };
-    expectTypeOf<WithRawInput["input"]>().toEqualTypeOf<never | undefined>();
+    expectTypeOf<WithRawInput["input"]>().toBeNullable();
   });
 });

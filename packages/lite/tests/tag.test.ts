@@ -192,7 +192,7 @@ describe("Tag", () => {
       const defaultTag = tag({ label: "getAllTags-default", default: 42 })
       const parseTag = tag({
         label: "getAllTags-parse",
-        parse: (raw) => String(raw),
+        parse: (raw: unknown) => String(raw),
       })
 
       const allTags = getAllTags()

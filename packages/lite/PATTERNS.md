@@ -1,380 +1,263 @@
-# Architectural Patterns
+# Patterns
 
-Design patterns implemented by `@pumped-fn/lite` and how to compose them for application architecture.
+Usage patterns as sequences. For API details, see `packages/lite/dist/index.d.mts`.
 
-## Composite Patterns
+## A. Fundamental Usage
 
 ### Request Lifecycle
 
-**Combines:** IoC Container + Command + Composite
-
-| GoF Pattern | Primitive |
-|-------------|-----------|
-| IoC Container | `Scope` (long-lived, caches atoms) |
-| Command | `Flow` (operations within request) |
-| Composite | `ExecutionContext` (parent-child with isolated data) |
-
-**Key Insight:**
-- `Scope` = application container (atoms cached here)
-- `ExecutionContext` = request boundary (data lives here, closed at request end)
-- `Flow` / `ctx.exec` = operations within the request (share context via `seekTag`)
+Model a request boundary with cleanup and shared context.
 
 ```mermaid
 sequenceDiagram
     participant App
     participant Scope
-    participant Context as ExecutionContext
-    participant ServiceAtom as Service Atom
-    participant Flow1 as Flow (validate)
-    participant Flow2 as Flow (process)
+    participant Ctx as ExecutionContext
+    participant Flow
 
-    Note over Scope: Long-lived (app lifetime)
-    App->>Scope: resolve(serviceAtom)
-    Scope-->>App: service (cached)
-
-    Note over Context: Per-request boundary
-    App->>Scope: createContext({ tags: [requestId, userId] })
+    App->>Scope: createScope()
+    App->>Scope: scope.createContext({ tags })
     Scope-->>App: ctx
 
-    App->>Context: ctx.data.setTag(TX_TAG, beginTransaction())
-    App->>Context: ctx.onClose(() => tx.rollback())
-
-    App->>Context: ctx.exec({ flow: validateFlow, input })
-    Context->>Scope: resolve flow deps (atoms)
-    Scope-->>Context: deps (cached in scope)
-    Context->>Flow1: factory(childCtx, deps)
-    Note over Flow1: childCtx.parent = ctx
-    Flow1->>Flow1: tags.required(userIdTag) from merged tags
-    Flow1-->>Context: validated
-
-    App->>Context: ctx.exec({ flow: processFlow, input: validated })
-    Context->>Scope: resolve flow deps (atoms)
-    Scope-->>Context: deps (from cache)
-    Context->>Flow2: factory(childCtx, deps)
-    Flow2->>Flow2: childCtx.exec({ fn: service.save, params: [data] })
-    Note over Flow2: Creates grandchildCtx
-    Flow2->>ServiceAtom: service.save(grandchildCtx, data)
-    ServiceAtom->>ServiceAtom: grandchildCtx.data.seekTag(TX_TAG)
-    Note over ServiceAtom: seekTag traverses parent chain
-    ServiceAtom-->>Flow2: saved
-    Flow2-->>Context: result
-
-    App->>Context: ctx.data.getTag(TX_TAG).commit()
-    App->>Context: ctx.close()
-    Context->>Context: onClose cleanups run (rollback skipped)
-```
-
-**Characteristics:**
-- Scope caches atoms across requests (resolve once, use many)
-- ExecutionContext bounds request lifecycle (`onClose` for cleanup)
-- Each `exec()` creates child context with isolated `data` Map
-- `seekTag()` traverses parent chain for shared data (e.g., transaction)
-- `ctx.close()` runs all `onClose` cleanups (LIFO order)
-- On error: child context auto-closes, cleanups still run
-
-**Primitives:** `createScope()`, `scope.createContext()`, `ctx.exec()`, `ctx.data.setTag/seekTag()`, `ctx.onClose()`, `ctx.close()`
-
----
-
-### Flow Deps & Execution
-
-**Combines:** Command + Composite + Resource Management
-
-| Concern | Primitive |
-|---------|-----------|
-| Dependency injection | `deps` (atoms from Scope, tags from context hierarchy) |
-| Service invocation | `ctx.exec({ fn, params })` (observable by extensions) |
-| Resource cleanup | `ctx.onClose()` (LIFO, runs on success or failure) |
-
-**Deps Resolution:**
-
-```mermaid
-flowchart TB
-    subgraph Flow["flow({ deps, factory })"]
-        Deps["deps: { db: dbAtom, userId: tags.required(userIdTag) }"]
-    end
-
-    subgraph Resolution
-        Deps --> AtomPath["Atom deps"]
-        Deps --> TagPath["Tag deps (TagExecutor)"]
-
-        AtomPath --> Scope["Scope.resolve()"]
-        Scope --> |"cached in scope"| ResolvedAtom["db instance"]
-
-        TagPath --> CtxHierarchy["ctx.data.seekTag()"]
-        CtxHierarchy --> |"traverses parent chain"| ResolvedTag["userId value"]
-    end
-
-    subgraph Factory["factory(ctx, { db, userId })"]
-        ResolvedAtom --> DepsObj["deps object"]
-        ResolvedTag --> DepsObj
-    end
-```
-
-**Service Invocation:**
-
-```mermaid
-sequenceDiagram
-    participant Flow
-    participant Ctx as ExecutionContext
-    participant Ext as Extension.wrapExec
-    participant Fn as service.method
-
-    Note over Flow: ❌ Direct call
-    Flow->>Fn: service.method(ctx, data)
-    Note over Fn: Extensions cannot observe
-
-    Note over Flow: ✅ Via ctx.exec
-    Flow->>Ctx: ctx.exec({ fn: service.method, params: [data] })
-    Ctx->>Ctx: create childCtx (parent = ctx)
-    Ctx->>Ext: wrapExec(next, fn, childCtx)
-    Ext->>Fn: next()
-    Fn-->>Ext: result
-    Ext-->>Ctx: result
+    App->>Ctx: ctx.exec({ flow, input, tags })
+    Ctx->>Flow: factory(childCtx, deps)
+    Flow-->>Ctx: output
     Ctx->>Ctx: childCtx.close()
-    Ctx-->>Flow: result
+    Ctx-->>App: output
+
+    App->>Ctx: ctx.onClose(cleanup)
+    App->>Ctx: ctx.close()
+    Ctx->>Ctx: run cleanups (LIFO)
 ```
 
-**Cleanup Pattern:**
+### Extensions Pipeline
 
-```mermaid
-sequenceDiagram
-    participant Flow
-    participant Ctx as ExecutionContext
-    participant Tx as Transaction
-
-    Flow->>Tx: beginTransaction()
-    Tx-->>Flow: tx
-    Flow->>Ctx: ctx.onClose(() => tx.rollback())
-
-    alt Success
-        Flow->>Flow: do work
-        Flow->>Tx: tx.commit()
-        Flow->>Ctx: return result
-        Ctx->>Ctx: close() → rollback() is no-op
-    else Error
-        Flow->>Flow: do work (throws)
-        Ctx->>Ctx: close() → rollback() executes
-        Ctx->>Tx: tx.rollback()
-    end
-```
-
-**Characteristics:**
-- Atoms resolve via `Scope.resolve()` (cached, long-lived)
-- Tag deps resolve via `ctx.data.seekTag()` (traverses parent → grandparent → scope tags)
-- `ctx.exec({ fn, params })` creates child context with isolated `data` Map
-- Extensions intercept via `wrapExec(next, target, ctx)`
-- Register pessimistic cleanup via `ctx.onClose(fn)`, neutralize on success
-
-**Primitives:** `flow({ deps })`, `tags.required()`, `tags.optional()`, `tags.all()`, `ctx.exec()`, `ctx.onClose()`
-
----
-
-### Request Pipeline
-
-**Combines:** Command + Interceptor + Context Object
-
-| GoF Pattern | Primitive |
-|-------------|-----------|
-| Command | `Flow` (encapsulates request with input/output) |
-| Interceptor | `Extension.wrapExec()` (wraps execution) |
-| Context Object | `Tag` (propagates metadata without explicit passing) |
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Scope
-    participant Extension1 as Extension (Auth)
-    participant Extension2 as Extension (Tracing)
-    participant Flow
-    participant Context as ExecutionContext
-
-    Client->>Scope: createContext({ tags: [requestId] })
-    Scope-->>Client: ctx
-    Client->>Context: exec({ flow, input, tags: [userId] })
-
-    Context->>Context: merge tags (flow → scope → context → exec)
-    Context->>Context: create child context
-
-    Context->>Extension1: wrapExec(next, flow, childCtx)
-    Extension1->>Extension1: extract userId tag, validate
-    Extension1->>Extension2: next()
-    Extension2->>Extension2: read parent span from ctx.parent?.data
-    Extension2->>Extension2: create child span, store in ctx.data
-    Extension2->>Flow: next()
-    Flow->>Flow: factory(ctx, deps) with tags.required(userId)
-    Flow-->>Extension2: result
-    Extension2->>Extension2: end span
-    Extension2-->>Extension1: result
-    Extension1-->>Context: result
-    Context->>Context: auto-close child (run onClose cleanups)
-    Context-->>Client: result
-```
-
-**Characteristics:**
-- Extensions wrap in registration order (outer → inner)
-- Each `exec()` creates isolated child context with own `data` Map
-- Tags merge with later sources winning (exec tags override flow tags)
-- Parent chain enables span correlation without AsyncLocalStorage
-
-**Primitives:** `flow()`, `Extension.wrapExec`, `tag()`, `ctx.exec()`, `ctx.parent`, `ctx.data`
-
----
-
-### Scoped Isolation
-
-**Combines:** IoC Container + Strategy + Composite
-
-| GoF Pattern | Primitive |
-|-------------|-----------|
-| IoC Container | `Scope` (manages atom lifecycles and resolution) |
-| Strategy | `Preset` (swap implementations at scope creation) |
-| Composite | `ExecutionContext` (parent-child isolation) |
+Observe and wrap timing for atoms/flows (logging, auth, tracing).
 
 ```mermaid
 sequenceDiagram
     participant App
-    participant TenantScope as Scope (Tenant A)
-    participant TestScope as Scope (Test)
-    participant DbAtom as dbAtom
-    participant MockDb as mockDbAtom
+    participant Scope
+    participant Ext as Extension
+    participant Atom
+    participant Flow
 
-    Note over App: Production - Tenant A
-    App->>TenantScope: createScope({ tags: [tenantId('A')] })
-    App->>TenantScope: resolve(dbAtom)
-    TenantScope->>DbAtom: factory(ctx, deps)
-    DbAtom->>DbAtom: tags.required(tenantId) → 'A'
-    DbAtom-->>TenantScope: TenantA DB connection
+    App->>Scope: createScope({ extensions: [ext] })
+    Scope->>Ext: ext.init(scope)
+    App->>Scope: await scope.ready
 
-    Note over App: Test - Mocked DB
-    App->>TestScope: createScope({ presets: [preset(dbAtom, mockDbAtom)] })
-    App->>TestScope: resolve(dbAtom)
-    TestScope->>TestScope: check presets → found
-    TestScope->>MockDb: resolve mockDbAtom instead
-    MockDb-->>TestScope: Mock DB instance
+    App->>Scope: resolve(atom)
+    Scope->>Ext: wrapResolve(next, atom, scope)
+    Ext->>Ext: before logic
+    Ext->>Atom: next()
+    Atom-->>Ext: value
+    Ext->>Ext: after logic
+    Ext-->>Scope: value
 
-    Note over App: Parallel tenant contexts
-    par Tenant A request
-        TenantScope->>TenantScope: createContext({ tags: [requestId('r1')] })
-    and Tenant B request
-        TenantScope->>TenantScope: createContext({ tags: [requestId('r2')] })
-    end
-    Note over TenantScope: Each context isolated, same scope
+    App->>Scope: ctx.exec({ flow })
+    Scope->>Ext: wrapExec(next, flow, ctx)
+    Ext->>Flow: next()
+    Flow-->>Ext: output
+    Ext-->>Scope: output
+
+    App->>Scope: dispose()
+    Scope->>Ext: ext.dispose(scope)
 ```
 
-**Characteristics:**
-- Each Scope is an isolated DI container with own cache
-- Presets swap atom implementations without changing definitions
-- Tags at scope level apply to all resolutions
-- Multiple ExecutionContexts share scope but isolate request data
-- Child contexts inherit parent tags, can override
+### Scoped Isolation + Testing
 
-**Use Cases:**
-- Multi-tenancy: scope-level tenant tag, context-level request isolation
-- Testing: preset mocks without touching production atom definitions
-- Feature flags: preset alternative implementations per environment
-
-**Primitives:** `createScope()`, `preset()`, `tag()`, `createContext()`, scope `tags` option
-
----
-
-## Foundational Patterns
-
-### IoC Container
-
-**GoF:** Inversion of Control / Dependency Injection Container
+Swap implementations and isolate tenants/tests.
 
 ```mermaid
-graph TB
-    Scope["Scope (Container)"]
-    AtomA["Atom A"]
-    AtomB["Atom B"]
-    AtomC["Atom C"]
-    Cache["Resolution Cache"]
+sequenceDiagram
+    participant Test
+    participant Scope
+    participant Atom
 
-    Scope -->|resolve| AtomA
-    Scope -->|resolve| AtomB
-    AtomB -->|deps| AtomA
-    AtomC -->|deps| AtomA
-    AtomC -->|deps| AtomB
-    Scope --- Cache
+    Test->>Scope: createScope({ presets: [preset(dbAtom, mockDb)], tags: [tenantTag(id)] })
+    Test->>Scope: resolve(dbAtom)
+    Scope-->>Test: mockDb (not real db)
+
+    Test->>Scope: createContext()
+    Scope-->>Test: ctx with tenantTag
 ```
 
-**Primitives:** `createScope()`, `atom()`, `deps`, `scope.resolve()`
+## B. Advanced Client/State Usage
 
-**Characteristics:** Lazy resolution, automatic caching, dependency graph traversal, circular dependency detection.
+### Controller Reactivity
 
----
-
-### Observer
-
-**GoF:** Observer Pattern with State Machine
+Client-side state with lifecycle hooks and invalidation.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> idle
-    idle --> resolving: resolve()
-    resolving --> resolved: success
-    resolving --> failed: error
-    resolved --> resolving: invalidate()
-    failed --> resolving: invalidate()
+sequenceDiagram
+    participant App
+    participant Scope
+    participant Ctrl as Controller
+    participant Atom
 
-    note right of resolving: listeners notified
-    note right of resolved: listeners notified
+    App->>Scope: controller(atom)
+    Scope-->>App: ctrl
+
+    App->>Ctrl: ctrl.on('resolving' | 'resolved' | '*', listener)
+    Ctrl-->>App: unsubscribe
+
+    App->>Ctrl: ctrl.get()
+    Ctrl-->>App: current value
+
+    App->>Ctrl: ctrl.set(newValue)
+    Ctrl->>Ctrl: notify listeners
+
+    App->>Ctrl: ctrl.update(v => v + 1)
+    Ctrl->>Ctrl: notify listeners
+
+    App->>Ctrl: ctrl.invalidate()
+    Ctrl->>Atom: re-run factory
+    Ctrl->>Ctrl: notify listeners
 ```
 
-**Primitives:** `controller()`, `ctrl.on('resolved' | 'resolving' | '*')`, `ctrl.invalidate()`
+### Ambient Context (Tags)
 
-**Characteristics:** State-filtered subscriptions, LIFO cleanup before re-resolution, sequential invalidation chains with loop detection.
-
----
-
-### Context Object
-
-**GoF:** Context Object / Ambient Context
+Propagate state without wiring parameters (app shell, user, locale).
 
 ```mermaid
-graph TB
-    subgraph Sources
-        FlowTags[Flow tags]
-        ScopeTags[Scope tags]
-        CtxTags[Context tags]
-        ExecTags[Exec tags]
-    end
+sequenceDiagram
+    participant App
+    participant Ctx as ExecutionContext
+    participant ChildCtx
+    participant Data as ctx.data
 
-    subgraph Merge[Tag Merge - later wins]
-        FlowTags --> Merged
-        ScopeTags --> Merged
-        CtxTags --> Merged
-        ExecTags --> Merged
-    end
+    App->>Data: ctx.data.setTag(userTag, user)
+    App->>Ctx: ctx.exec({ flow, tags: [localeTag('en')] })
+    Ctx->>ChildCtx: create with merged tags
 
-    subgraph Extract
-        Merged --> Required[tags.required]
-        Merged --> Optional[tags.optional]
-        Merged --> All[tags.all]
-    end
+    ChildCtx->>Data: ctx.data.seekTag(userTag)
+    Data-->>ChildCtx: user (from parent)
+
+    ChildCtx->>Data: ctx.data.getTag(localeTag)
+    Data-->>ChildCtx: 'en'
 ```
 
-**Primitives:** `tag()`, `tags.required()`, `tags.optional()`, `tags.all()`, `Tagged`
+### Derived State (Select)
 
-**Characteristics:** Implicit propagation through execution layers, type-safe extraction, merge precedence (exec > context > scope > flow).
-
----
-
-### Strategy
-
-**GoF:** Strategy Pattern
+Subscribe to a slice of atom state with custom equality.
 
 ```mermaid
-graph TB
-    Scope -->|resolve| Atom
-    Atom -->|check| Presets{Preset?}
-    Presets -->|value| Direct[Return value]
-    Presets -->|atom| Redirect[Resolve other atom]
-    Presets -->|none| Factory[Run factory]
+sequenceDiagram
+    participant App
+    participant Scope
+    participant Handle as SelectHandle
+    participant Atom
+
+    App->>Scope: select(atom, v => v.count, { eq: shallowEqual })
+    Scope-->>App: handle
+
+    App->>Handle: handle.get()
+    Handle-->>App: selected value
+
+    App->>Handle: handle.subscribe(listener)
+    Handle-->>App: unsubscribe
+
+    Note over Atom,Handle: atom changes
+    Handle->>Handle: eq(prev, next)?
+    Handle->>App: notify if changed
 ```
 
-**Primitives:** `preset()`, `createScope({ presets })`, `isPreset()`
+### Service Pattern
 
-**Characteristics:** Swap implementations at scope creation, value injection bypasses factory, atom redirection for mock substitution.
+Constrain atom methods to ExecutionContext-first signature for tracing/auth.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Scope
+    participant Ctx as ExecutionContext
+    participant Svc as Service Atom
+
+    App->>Scope: resolve(userService)
+    Scope-->>App: { getUser, updateUser }
+
+    App->>Ctx: svc.getUser(ctx, userId)
+    Ctx->>Svc: traced execution
+    Svc-->>Ctx: user
+    Ctx-->>App: user
+```
+
+### Typed Flow Input
+
+Type flow input without runtime parsing overhead.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Flow
+    participant Ctx
+
+    Note over Flow: flow({ parse: typed<T>(), factory })
+    App->>Flow: ctx.exec({ flow, input: typedInput })
+    Flow->>Flow: skip parse (type-only)
+    Flow->>Ctx: factory(ctx) with ctx.input: T
+    Ctx-->>App: output
+```
+
+### Controller as Dependency
+
+Receive reactive handle instead of resolved value in atom/flow deps.
+
+```mermaid
+sequenceDiagram
+    participant Scope
+    participant AtomA as serverAtom
+    participant Ctrl as Controller
+    participant AtomB as configAtom
+
+    Scope->>AtomA: resolve(serverAtom)
+    Note over AtomA: deps: { cfg: controller(configAtom, { resolve: true }) }
+    AtomA->>Scope: resolve configAtom first
+    Scope-->>Ctrl: ctrl (already resolved)
+    AtomA->>AtomA: factory(ctx, { cfg: ctrl })
+    AtomA->>Ctrl: ctrl.on('resolved', () => ctx.invalidate())
+    Note over AtomA: react to config changes
+```
+
+### Inline Function Execution
+
+Execute ad-hoc logic within context without defining a flow.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Ctx as ExecutionContext
+
+    App->>Ctx: ctx.exec({ fn: (ctx, a, b) => a + b, params: [1, 2], tags })
+    Ctx->>Ctx: create childCtx with tags
+    Ctx->>Ctx: fn(childCtx, 1, 2)
+    Ctx->>Ctx: childCtx.close()
+    Ctx-->>App: 3
+```
+
+### Atom Retention (GC)
+
+Control when atoms are garbage collected or kept alive indefinitely.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Scope
+    participant Atom
+
+    App->>Scope: createScope({ gc: { enabled: true, graceMs: 3000 } })
+
+    App->>Scope: resolve(atom)
+    Scope-->>App: value
+    Note over Scope: no refs → start grace timer
+
+    alt keepAlive: true
+        Note over Atom: never GC'd
+    else graceMs expires
+        Scope->>Atom: release()
+        Atom->>Atom: run cleanups
+    end
+
+    App->>Scope: flush()
+    Note over Scope: wait all pending
+```

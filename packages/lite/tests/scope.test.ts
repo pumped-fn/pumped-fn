@@ -1680,8 +1680,8 @@ describe("ExecutionContext", () => {
         parse: (raw: unknown): { name: string } => {
           parseOrder.push("parse");
           const obj = raw as Record<string, unknown>;
-          if (typeof obj.name !== "string") throw new Error("name required");
-          return { name: obj.name };
+          if (typeof obj["name"] !== "string") throw new Error("name required");
+          return { name: obj["name"] };
         },
         factory: (ctx) => {
           parseOrder.push("factory");
