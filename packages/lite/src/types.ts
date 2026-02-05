@@ -40,7 +40,7 @@ export namespace Lite {
   export interface ScopeOptions {
     extensions?: Extension[]
     tags?: Tagged<any>[]
-    presets?: Preset<unknown>[]
+    presets?: Preset<any, any>[]
     gc?: GCOptions
   }
 
@@ -247,10 +247,18 @@ export namespace Lite {
     readonly [typedSymbol]: true
   }
 
-  export interface Preset<T> {
+  export type PresetTarget<T, I = unknown> = Atom<T> | Flow<T, I>
+
+  export type PresetValue<T, I = unknown> =
+    | T
+    | Atom<T>
+    | Flow<T, I>
+    | ((ctx: ExecutionContext & { readonly input: I }) => MaybePromise<T>)
+
+  export interface Preset<T, I = unknown> {
     readonly [presetSymbol]: true
-    readonly atom: Atom<T>
-    readonly value: T | Atom<T>
+    readonly target: PresetTarget<T, I>
+    readonly value: PresetValue<T, I>
   }
 
   export interface Extension {

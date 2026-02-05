@@ -1,6 +1,7 @@
 import { controllerSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise, AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
+import { isFlow } from "./flow"
 import { ParseError } from "./errors"
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
@@ -201,7 +202,7 @@ class ControllerImpl<T> implements Lite.Controller<T> {
 
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
-  private presets = new Map<Lite.Atom<unknown>, unknown | Lite.Atom<unknown>>()
+  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown>, unknown>()
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
@@ -268,7 +269,7 @@ class ScopeImpl implements Lite.Scope {
     this.tags = options?.tags ?? []
 
     for (const p of options?.presets ?? []) {
-      this.presets.set(p.atom, p.value)
+      this.presets.set(p.target, p.value)
     }
 
     this.gcOptions = {
@@ -704,6 +705,10 @@ class ScopeImpl implements Lite.Scope {
     return new SelectHandleImpl(ctrl, selector, eq)
   }
 
+  getFlowPreset<O, I>(flow: Lite.Flow<O, I>): Lite.PresetValue<O, I> | undefined {
+    return this.presets.get(flow as Lite.Flow<unknown, unknown>) as Lite.PresetValue<O, I> | undefined
+  }
+
   invalidate<T>(atom: Lite.Atom<T>): void {
     const entry = this.cache.get(atom)
     if (!entry) return
@@ -907,6 +912,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     if ("flow" in options) {
       const { flow, input, rawInput, name: execName, tags: execTags } = options
+
+      const presetValue = this.scope.getFlowPreset(flow)
+      if (presetValue !== undefined && isFlow(presetValue)) {
+        return this.exec({ ...options, flow: presetValue })
+      }
+
       const rawValue = rawInput !== undefined ? rawInput : input
       let parsedInput: unknown = rawValue
       if (flow.parse) {
@@ -941,6 +952,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
 
       try {
+        if (presetValue !== undefined && typeof presetValue === 'function') {
+          return await childCtx.execPresetFn(flow, presetValue as (ctx: Lite.ExecutionContext) => unknown)
+        }
         return await childCtx.execFlowInternal(flow)
       } finally {
         await childCtx.close()
@@ -984,6 +998,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const { fn, params } = options
     const doExec = () => Promise.resolve(fn(this, ...params))
     return this.applyExecExtensions(fn, doExec)
+  }
+
+  async execPresetFn(
+    flow: Lite.Flow<unknown, unknown>,
+    fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>
+  ): Promise<unknown> {
+    const doExec = () => Promise.resolve(fn(this))
+    return this.applyExecExtensions(flow, doExec)
   }
 
   private async applyExecExtensions(
