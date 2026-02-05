@@ -1,29 +1,29 @@
 # Implementation Workflow
 
-Pick up beads tickets and implement them using subagent-driven-development with code review between tasks.
+Pick up tasks and implement them using subagent-driven-development with code review between tasks.
 
 ## Arguments
 
-- `$ARGUMENTS` - Optional: specific bead ID(s) to implement, or epic ID to work on
+- `$ARGUMENTS` - Optional: specific task ID(s) to implement, or plan file to work on
 
 ## Process
 
 Execute following steps sequentially:
 
 1. **Find available work**
-   - If specific bead ID provided → use that
-   - If epic ID provided → list tickets in that epic with `bd list`
-   - Otherwise → run `bd ready` to find unblocked tickets
-   - Show available tickets and let user confirm which to work on
+   - If specific task provided → use that
+   - If plan file provided → read tasks from `.plans/<feature-slug>.md`
+   - Otherwise → check TaskList for pending tasks
+   - Show available tasks and let user confirm which to work on
 
-2. **Review ticket context**
-   - Run `bd show <id>` for selected ticket
+2. **Review task context**
+   - Read task description and acceptance criteria
    - Read referenced C3 documents (if any)
    - Understand acceptance criteria and dependencies
    - Identify exact files to modify
 
 3. **Claim the work**
-   - Run `bd update <id> --status=in_progress`
+   - Mark task as in_progress using TaskUpdate
 
 4. **Implement using subagent-driven-development**
    - Use `subagent-driven-development` skill for implementation
@@ -36,31 +36,28 @@ Execute following steps sequentially:
    - Run tests: `pnpm -r test`
    - Ensure all acceptance criteria met
 
-6. **Close completed ticket**
-   - Run `bd close <id>`
-   - If multiple tickets completed → `bd close <id1> <id2> ...`
+6. **Close completed task**
+   - Mark task as completed using TaskUpdate
 
-7. **Sync and continue**
-   - Run `bd sync` to push changes
-   - Check `bd ready` for next available ticket
-   - Ask user: "Continue with next ticket? (yes/no)"
+7. **Continue**
+   - Check TaskList for next available task
+   - Ask user: "Continue with next task? (yes/no)"
 
 ## Success criteria
 
-- Ticket claimed before work starts
+- Task claimed before work starts
 - TDD workflow followed (test-first)
 - Code review performed between tasks
 - Typecheck and tests passing
 - All acceptance criteria met
-- Ticket closed upon completion
-- Changes synced to remote
+- Task closed upon completion
 
 ## Error handling
 
 If implementation fails:
-- Do NOT close the ticket
+- Do NOT close the task
 - Report what went wrong
-- Keep ticket in `in_progress` status
+- Keep task in `in_progress` status
 - Ask for guidance before proceeding
 
 If tests fail:
@@ -70,7 +67,6 @@ If tests fail:
 
 ## Notes
 
-- Use `bd blocked` to check if current work is blocking others
 - Prioritize unblocking work when possible
-- Each ticket should be completable in one session
-- If ticket is too large, discuss breaking it down
+- Each task should be completable in one session
+- If task is too large, discuss breaking it down

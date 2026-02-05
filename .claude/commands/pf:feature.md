@@ -42,17 +42,16 @@ Execute following steps sequentially:
    - Focus on concrete, testable implementation steps
    - Plan file created at: `.plans/<feature-slug>.md`
 
-7. **Convert plan to beads tickets**
+7. **Create tasks from plan**
    - Read the generated plan file
-   - For each task, create bead with `bd create`:
-     - `--title`: Clear, action-oriented title
-     - `--type`: task, bug, or feature as appropriate
-   - Append to each ticket:
+   - For each task, create task with TaskCreate:
+     - Clear, action-oriented title
+     - Task type as appropriate (task, bug, or feature)
+   - Include in each task:
      - Related C3 document references (if applicable)
      - Exact file paths to modify
      - Acceptance criteria
-     - Dependencies on other tickets
-   - Use `bd dep add` to establish dependencies between related tickets
+     - Dependencies on other tasks
 
 ## Success criteria
 
@@ -61,7 +60,7 @@ Execute following steps sequentially:
 - Mermaid diagram generated for review
 - Explicit approval received before planning
 - Implementation plan created without superficial details
-- All tasks converted to beads tickets with:
+- All tasks created with:
   - C3 document references
   - Clear acceptance criteria
   - Proper dependency chains
@@ -76,6 +75,5 @@ If any step fails:
 
 ## Notes
 
-- Each beads ticket should be implementable by an average developer without additional context
-- Use `bd ready` to verify tickets are properly configured
-- Tickets should be independent where possible, with explicit dependencies where not
+- Each task should be implementable by an average developer without additional context
+- Tasks should be independent where possible, with explicit dependencies where not

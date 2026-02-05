@@ -21,7 +21,7 @@ Diagrams mean a thousand words, mermaid chart is worth even more, because they a
 ## As the more details exposed, if it's more of adding new things, or ammeding current functionalities
 
 - use /c3-skill:c3 to craft ADR and follow the process
-- use subagent-driven-development to work on tasks on beads (bd ready)
+- use subagent-driven-development to work on tasks
 
 # Code Style (No Slop)
 

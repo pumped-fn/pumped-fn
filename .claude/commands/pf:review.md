@@ -4,16 +4,15 @@ Review implementation against ADR, clean up slop, and create pull request.
 
 ## Arguments
 
-- `$ARGUMENTS` - Optional: epic ID or feature name to review
+- `$ARGUMENTS` - Optional: feature name to review
 
 ## Process
 
 Execute following steps sequentially:
 
 1. **Verify all work complete**
-   - Run `bd list --status=in_progress` to check for incomplete work
-   - If tickets remain open → warn user and ask to continue or abort
-   - Run `bd list --status=open` for the epic to confirm all done
+   - Check TaskList for incomplete tasks (status: in_progress)
+   - If tasks remain open → warn user and ask to continue or abort
 
 2. **Review against ADR**
    - Locate relevant ADR in `.c3/` directory
@@ -54,7 +53,6 @@ Execute following steps sequentially:
    - Run `git status` to review changes
    - Stage relevant files: `git add <files>`
    - Commit with descriptive message
-   - Run `bd sync` to sync beads state
 
 9. **Finish development branch**
    - Use `finishing-a-development-branch` skill
@@ -86,7 +84,7 @@ Remove these patterns during noslop cleanup:
 
 ## Success criteria
 
-- All beads tickets for feature closed
+- All tasks for feature completed
 - Implementation matches ADR decisions
 - Typecheck and tests passing
 - Noslop cleanup complete

@@ -3,14 +3,13 @@
 
 # Audit handoff preference
 audit:
-  handoff: use /write-plan to create tasks, use beads instead of file to store tasks
+  handoff: use /write-plan to create tasks
 
 handoff: |
   once the ADR is created, we'll do
   - use /superpowers:write-plan to create a plan
   - review the plan and refine with removing all of superficial details, focusing on making plan happen in parallel
   - up quality level by defining a very high standard of review for each task
-  - but instead of writing to file, we'll use beads to create epics and task. Epic should be the ADR
   - the plan should also include running, cleaning up  /c3-skill:c3-audit, marking ADR completed
   
 # Diagram tools (optional)
