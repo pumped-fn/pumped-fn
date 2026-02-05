@@ -1,5 +1,16 @@
 # @pumped-fn/lite
 
+## 1.11.3
+
+### Patch Changes
+
+- eda1154: Extend preset() to support Flow in addition to Atom
+
+  - `preset(flow, fn)` - replacement function bypasses deps resolution (mock scenario)
+  - `preset(flow, otherFlow)` - delegates parse/deps/factory entirely to replacement
+  - Self-preset throws at creation time
+  - Extensions wrap both preset variants
+
 ## 1.11.2
 
 ### Patch Changes

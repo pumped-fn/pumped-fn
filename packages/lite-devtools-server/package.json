@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-devtools-server",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Standalone TUI devtools server for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
