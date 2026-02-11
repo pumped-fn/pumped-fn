@@ -12,17 +12,17 @@
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
-    "@types/node": "^20.19.26",
-    "typedoc": "^0.28.15",
+    "@types/node": "^20.19.33",
+    "typedoc": "^0.28.16",
     "typedoc-github-theme": "^0.3.1",
     "typescript": "^5.9.3",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.25"
+    "vue": "^3.5.28"
   },
   "type": "module",
   "dependencies": {
-    "@braintree/sanitize-url": "^7.1.1",
-    "@shikijs/vitepress-twoslash": "^3.19.0",
+    "@braintree/sanitize-url": "^7.1.2",
+    "@shikijs/vitepress-twoslash": "^3.22.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
     "dayjs": "^1.11.19",
