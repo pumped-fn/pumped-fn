@@ -6,6 +6,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
+  "bin": {
+    "pumped-lite": "./dist/cli.mjs"
+  },
   "exports": {
     ".": {
       "import": {
@@ -34,6 +37,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

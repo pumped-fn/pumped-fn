@@ -127,6 +127,8 @@ export namespace Lite {
     readonly data: ContextData
   }
 
+  export type CloseResult = { ok: true } | { ok: false; error: unknown }
+
   export interface ExecutionContext {
     readonly input: unknown
     readonly name: string | undefined
@@ -135,8 +137,8 @@ export namespace Lite {
     readonly data: ContextData
     exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
-    onClose(fn: () => MaybePromise<void>): void
-    close(): Promise<void>
+    onClose(fn: (result: CloseResult) => MaybePromise<void>): void
+    close(result?: CloseResult): Promise<void>
   }
 
   export type ExecFlowOptions<Output, Input> = {

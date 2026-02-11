@@ -22,17 +22,17 @@ sequenceDiagram
     App->>Ctx: ctx.exec({ flow, input, tags })
     Ctx->>Flow: factory(childCtx, deps)
     Flow-->>Ctx: output
-    Ctx->>Ctx: childCtx.close()
+    Ctx->>Ctx: childCtx.close(result)
     Ctx-->>App: output
 
-    App->>Ctx: ctx.onClose(cleanup)
-    App->>Ctx: ctx.close()
-    Ctx->>Ctx: run cleanups (LIFO)
+    App->>Ctx: ctx.onClose(result => cleanup)
+    App->>Ctx: ctx.close(result?)
+    Ctx->>Ctx: run onClose(CloseResult) LIFO
 ```
 
 ### Extensions Pipeline
 
-Observe and wrap timing for atoms/flows (logging, auth, tracing).
+Observe and wrap atoms/flows — logging, auth, tracing, transaction boundaries. Extensions register `onClose(CloseResult)` to finalize based on success or failure.
 
 ```mermaid
 sequenceDiagram
@@ -40,6 +40,7 @@ sequenceDiagram
     participant Scope
     participant Ext as Extension
     participant Atom
+    participant Ctx as ExecutionContext
     participant Flow
 
     App->>Scope: createScope({ extensions: [ext] })
@@ -54,11 +55,12 @@ sequenceDiagram
     Ext->>Ext: after logic
     Ext-->>Scope: value
 
-    App->>Scope: ctx.exec({ flow })
-    Scope->>Ext: wrapExec(next, flow, ctx)
+    App->>Ctx: ctx.exec({ flow })
+    Ctx->>Ext: wrapExec(next, flow, childCtx)
+    Ext->>Ext: ctx.onClose(result => result.ok ? commit : rollback)
     Ext->>Flow: next()
     Flow-->>Ext: output
-    Ext-->>Scope: output
+    Ext-->>Ctx: output
 
     App->>Scope: dispose()
     Scope->>Ext: ext.dispose(scope)
@@ -117,21 +119,30 @@ sequenceDiagram
 
 ### Ambient Context (Tags)
 
-Propagate state without wiring parameters (app shell, user, locale).
+Propagate values without wiring parameters. Tags serve two roles: scope-level config (consumed by atoms via `tags.required()`) and per-context ambient data (requestId, locale). Use `tags.required()` in deps to declare that an atom or flow needs an ambient value (e.g., a transacted connection) — extensions or context setup provide the value, the consumer just depends on it.
 
 ```mermaid
 sequenceDiagram
     participant App
+    participant Scope
+    participant Atom
     participant Ctx as ExecutionContext
     participant ChildCtx
     participant Data as ctx.data
 
-    App->>Data: ctx.data.setTag(userTag, user)
+    App->>Scope: createScope({ tags: [configTag(cfg)] })
+    App->>Scope: resolve(dbAtom)
+    Note right of Atom: deps: { config: tags.required(configTag) }
+    Scope->>Atom: factory(ctx, { config: cfg })
+
+    App->>Scope: scope.createContext({ tags: [requestIdTag(rid)] })
+    Scope-->>App: ctx
+
     App->>Ctx: ctx.exec({ flow, tags: [localeTag('en')] })
     Ctx->>ChildCtx: create with merged tags
 
-    ChildCtx->>Data: ctx.data.seekTag(userTag)
-    Data-->>ChildCtx: user (from parent)
+    ChildCtx->>Data: ctx.data.seekTag(requestIdTag)
+    Data-->>ChildCtx: rid (from parent)
 
     ChildCtx->>Data: ctx.data.getTag(localeTag)
     Data-->>ChildCtx: 'en'
@@ -164,22 +175,25 @@ sequenceDiagram
 
 ### Service Pattern
 
-Constrain atom methods to ExecutionContext-first signature for tracing/auth.
+Constrain atom methods to ExecutionContext-first signature. Always invoke via `ctx.exec` so a child context is created — extensions can observe the call, and cleanup is scoped.
 
 ```mermaid
 sequenceDiagram
     participant App
     participant Scope
     participant Ctx as ExecutionContext
+    participant Child as ChildContext
     participant Svc as Service Atom
 
     App->>Scope: resolve(userService)
     Scope-->>App: { getUser, updateUser }
 
-    App->>Ctx: svc.getUser(ctx, userId)
-    Ctx->>Svc: traced execution
-    Svc-->>Ctx: user
-    Ctx-->>App: user
+    App->>Ctx: ctx.exec({ fn: svc.getUser, params: [userId] })
+    Ctx->>Child: create child context
+    Child->>Svc: getUser(childCtx, userId)
+    Svc-->>Child: user
+    Child->>Child: close(result)
+    Child-->>App: user
 ```
 
 ### Typed Flow Input
@@ -189,14 +203,17 @@ Type flow input without runtime parsing overhead.
 ```mermaid
 sequenceDiagram
     participant App
+    participant Ctx as ExecutionContext
+    participant Child as ChildContext
     participant Flow
-    participant Ctx
 
     Note over Flow: flow({ parse: typed<T>(), factory })
-    App->>Flow: ctx.exec({ flow, input: typedInput })
-    Flow->>Flow: skip parse (type-only)
-    Flow->>Ctx: factory(ctx) with ctx.input: T
-    Ctx-->>App: output
+    App->>Ctx: ctx.exec({ flow, input: typedInput })
+    Ctx->>Child: create child (input passed through, no parse)
+    Child->>Flow: factory(childCtx, deps) with ctx.input: T
+    Flow-->>Child: output
+    Child->>Child: close(result)
+    Child-->>App: output
 ```
 
 ### Controller as Dependency
@@ -228,11 +245,12 @@ sequenceDiagram
     participant App
     participant Ctx as ExecutionContext
 
-    App->>Ctx: ctx.exec({ fn: (ctx, a, b) => a + b, params: [1, 2], tags })
-    Ctx->>Ctx: create childCtx with tags
-    Ctx->>Ctx: fn(childCtx, 1, 2)
-    Ctx->>Ctx: childCtx.close()
-    Ctx-->>App: 3
+    App->>Ctx: ctx.exec({ name, fn, params, tags })
+    Ctx->>Ctx: create childCtx (name + tags)
+    Ctx->>Ctx: fn(childCtx, ...params)
+    Ctx->>Ctx: childCtx.close(result)
+    Ctx-->>App: output
+    Note right of Ctx: name makes sub-executions observable by extensions
 ```
 
 ### Atom Retention (GC)

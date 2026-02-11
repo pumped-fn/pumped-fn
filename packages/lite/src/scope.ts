@@ -861,7 +861,7 @@ class ScopeImpl implements Lite.Scope {
 }
 
 class ExecutionContextImpl implements Lite.ExecutionContext {
-  private cleanups: (() => MaybePromise<void>)[] = []
+  private cleanups: ((result: Lite.CloseResult) => MaybePromise<void>)[] = []
   private closed = false
   private readonly _input: unknown
   private _data: ContextDataImpl | undefined
@@ -952,12 +952,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
 
       try {
-        if (presetValue !== undefined && typeof presetValue === 'function') {
-          return await childCtx.execPresetFn(flow, presetValue as (ctx: Lite.ExecutionContext) => unknown)
-        }
-        return await childCtx.execFlowInternal(flow)
-      } finally {
-        await childCtx.close()
+        const result = presetValue !== undefined && typeof presetValue === 'function'
+          ? await childCtx.execPresetFn(flow, presetValue as (ctx: Lite.ExecutionContext) => unknown)
+          : await childCtx.execFlowInternal(flow)
+        await childCtx.close({ ok: true })
+        return result
+      } catch (error) {
+        await childCtx.close({ ok: false, error })
+        throw error
       }
     } else {
       const childCtx = new ExecutionContextImpl(this.scope, {
@@ -968,9 +970,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       })
 
       try {
-        return await childCtx.execFnInternal(options)
-      } finally {
-        await childCtx.close()
+        const result = await childCtx.execFnInternal(options)
+        await childCtx.close({ ok: true })
+        return result
+      } catch (error) {
+        await childCtx.close({ ok: false, error })
+        throw error
       }
     }
   }
@@ -1025,18 +1030,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return next()
   }
 
-  onClose(fn: () => MaybePromise<void>): void {
+  onClose(fn: (result: Lite.CloseResult) => MaybePromise<void>): void {
     this.cleanups.push(fn)
   }
 
-  async close(): Promise<void> {
+  async close(result: Lite.CloseResult = { ok: true }): Promise<void> {
     if (this.closed) return
 
     this.closed = true
 
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
       const cleanup = this.cleanups[i]
-      if (cleanup) await cleanup()
+      if (cleanup) await cleanup(result)
     }
   }
 }
