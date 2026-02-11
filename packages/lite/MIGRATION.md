@@ -236,8 +236,8 @@ const loggingExt = extension({
 // AFTER (lite) - Simplified 4-hook interface
 const loggingExt: Lite.Extension = {
   name: 'logging',
-  wrapResolve: async (next, atom, scope) => {
-    console.log('Resolving atom...')
+  wrapResolve: async (next, event) => {
+    console.log('Resolving:', event.kind, event.target)
     const result = await next()
     console.log('Resolved:', result)
     return result

@@ -48,7 +48,7 @@ sequenceDiagram
     App->>Scope: await scope.ready
 
     App->>Scope: resolve(atom)
-    Scope->>Ext: wrapResolve(next, atom, scope)
+    Scope->>Ext: wrapResolve(next, { kind: "atom", target, scope })
     Ext->>Ext: before logic
     Ext->>Atom: next()
     Atom-->>Ext: value

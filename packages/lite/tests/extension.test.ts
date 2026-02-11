@@ -25,7 +25,7 @@ describe("Extension", () => {
       const calls: string[] = []
       const ext: Lite.Extension = {
         name: "test",
-        wrapResolve: async (next, atom, scope) => {
+        wrapResolve: async (next, event) => {
           calls.push("before")
           const result = await next()
           calls.push("after")

@@ -2,7 +2,23 @@ import { controllerSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise, AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { isFlow } from "./flow"
+import { isResource } from "./resource"
 import { ParseError } from "./errors"
+
+const resourceKeys = new WeakMap<Lite.Resource<unknown>, symbol>()
+let resourceKeyCounter = 0
+
+function getResourceKey(resource: Lite.Resource<unknown>): symbol {
+  let key = resourceKeys.get(resource)
+  if (!key) {
+    key = Symbol(`resource:${resource.name ?? resourceKeyCounter++}`)
+    resourceKeys.set(resource, key)
+  }
+  return key
+}
+
+const inflightResources = new WeakMap<Lite.ContextData, Map<symbol, Promise<unknown>>>()
+const resolvingResources = new Set<symbol>()
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
@@ -545,7 +561,8 @@ class ScopeImpl implements Lite.Scope {
     }
 
     try {
-      const value = await this.applyResolveExtensions(atom, doResolve)
+      const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
+      const value = await this.applyResolveExtensions(event, doResolve)
       entry.state = 'resolved'
       entry.value = value
       entry.hasValue = true
@@ -582,7 +599,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async applyResolveExtensions<T>(
-    atom: Lite.Atom<T>,
+    event: Lite.ResolveEvent,
     doResolve: () => Promise<T>
   ): Promise<T> {
     let next = doResolve
@@ -591,7 +608,7 @@ class ScopeImpl implements Lite.Scope {
       const ext = this.extensions[i]
       if (ext?.wrapResolve) {
         const currentNext = next
-        next = ext.wrapResolve.bind(ext, currentNext, atom, this) as () => Promise<T>
+        next = ext.wrapResolve.bind(ext, currentNext, event) as () => Promise<T>
       }
     }
 
@@ -658,6 +675,80 @@ class ScopeImpl implements Lite.Scope {
               : tagExecutor.tag.collect(this.tags)
             break
           }
+        }
+      } else if (isResource(dep)) {
+        if (!ctx) {
+          throw new Error("Resource deps require an ExecutionContext")
+        }
+
+        const resource = dep as Lite.Resource<unknown>
+        const resourceKey = getResourceKey(resource)
+        const storeCtx = ctx.parent ?? ctx
+
+        if (storeCtx.data.has(resourceKey)) {
+          result[key] = storeCtx.data.get(resourceKey)
+          continue
+        }
+
+        const existingSeek = ctx.data.seek(resourceKey)
+        if (existingSeek !== undefined || ctx.data.has(resourceKey)) {
+          result[key] = existingSeek
+          continue
+        }
+
+        if (resolvingResources.has(resourceKey)) {
+          throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
+        }
+
+        let flights = inflightResources.get(storeCtx.data)
+        if (!flights) {
+          flights = new Map()
+          inflightResources.set(storeCtx.data, flights)
+        }
+
+        const inflight = flights.get(resourceKey)
+        if (inflight) {
+          result[key] = await inflight
+          continue
+        }
+
+        const resolve = async () => {
+          resolvingResources.add(resourceKey)
+          try {
+            const resourceDeps = await this.resolveDeps(resource.deps, ctx)
+
+            const event: Lite.ResolveEvent = {
+              kind: "resource",
+              target: resource,
+              ctx: storeCtx,
+            }
+
+            const doResolve = async () => {
+              const factory = resource.factory as (
+                ctx: Lite.ExecutionContext,
+                deps?: Record<string, unknown>
+              ) => MaybePromise<unknown>
+              if (resource.deps && Object.keys(resource.deps).length > 0) {
+                return factory(storeCtx, resourceDeps)
+              }
+              return factory(storeCtx)
+            }
+
+            const value = await this.applyResolveExtensions(event, doResolve)
+            storeCtx.data.set(resourceKey, value)
+            return value
+          } finally {
+            resolvingResources.delete(resourceKey)
+          }
+        }
+
+        const promise = resolve()
+        flights.set(resourceKey, promise)
+
+        try {
+          result[key] = await promise
+        } finally {
+          flights.delete(resourceKey)
         }
       }
     }

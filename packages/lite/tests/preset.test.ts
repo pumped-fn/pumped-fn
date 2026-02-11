@@ -28,6 +28,10 @@ describe("Preset", () => {
     expect(() => preset(myFlow, myFlow)).toThrow("preset cannot reference itself")
   })
 
+  it("throws when target is neither Atom nor Flow", () => {
+    expect(() => preset({} as any, "value")).toThrow("preset target must be Atom or Flow")
+  })
+
   describe("Flow presets", () => {
     it("flow preset with function bypasses deps", async () => {
       const depAtom = atom({

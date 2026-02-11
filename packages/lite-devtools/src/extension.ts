@@ -78,44 +78,48 @@ export function createDevtools(options?: Devtools.Options): Lite.Extension {
   return {
     name: "devtools",
 
-    wrapResolve: async (next, atom, _scope) => {
-      const id = generateId();
-      const name = getAtomName(atom);
-      const deps = getAtomDeps(atom);
+    wrapResolve: async (next, event) => {
+      if (event.kind === "atom") {
+        const id = generateId();
+        const name = getAtomName(event.target);
+        const deps = getAtomDeps(event.target);
 
-      emit({
-        id,
-        type: "atom:resolve",
-        timestamp: Date.now(),
-        name,
-        deps,
-      });
-
-      const start = performance.now();
-      try {
-        const result = await next();
         emit({
           id,
-          type: "atom:resolved",
+          type: "atom:resolve",
           timestamp: Date.now(),
           name,
           deps,
-          duration: performance.now() - start,
         });
-        return result;
-      } catch (err) {
-        emit({
-          id,
-          type: "error",
-          timestamp: Date.now(),
-          name,
-          error: {
-            message: String(err),
-            stack: err instanceof Error ? err.stack : undefined,
-          },
-        });
-        throw err;
+
+        const start = performance.now();
+        try {
+          const result = await next();
+          emit({
+            id,
+            type: "atom:resolved",
+            timestamp: Date.now(),
+            name,
+            deps,
+            duration: performance.now() - start,
+          });
+          return result;
+        } catch (err) {
+          emit({
+            id,
+            type: "error",
+            timestamp: Date.now(),
+            name,
+            error: {
+              message: String(err),
+              stack: err instanceof Error ? err.stack : undefined,
+            },
+          });
+          throw err;
+        }
       }
+
+      return next();
     },
 
     wrapExec: async (next, target, ctx) => {

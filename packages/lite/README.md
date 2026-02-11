@@ -1,5 +1,7 @@
 # @pumped-fn/lite
 
+![Coverage: 97%+ statements](https://img.shields.io/badge/coverage-97%25%2B_statements-brightgreen) ![Coverage: 100% functions](https://img.shields.io/badge/coverage-100%25_functions-brightgreen) ![Tests: 263 passed](https://img.shields.io/badge/tests-263_passed-brightgreen)
+
 **Scoped Ambient State** for TypeScript — a scope-local atom graph with explicit dependencies and opt-in reactivity.
 
 State lives in the scope, not in the component tree. Handlers and components observe — they don't own or construct dependencies. The same graph works across React, server handlers, background jobs, and tests.
@@ -58,7 +60,7 @@ sequenceDiagram
     end
     Scope->>Scope: state → resolving
     Scope->>Scope: ⚡ emit 'resolving' → scope.on listeners
-    Scope->>Ext: wrapResolve(next, atom, scope)
+    Scope->>Ext: wrapResolve(next, { kind: "atom", target, scope })
     Ext->>Atom: next() → factory(ctx, deps)
     Note right of Atom: ctx.cleanup(fn) → stored per atom
     Note right of Atom: cleanups run LIFO on release/invalidate
@@ -99,6 +101,26 @@ sequenceDiagram
     Ctx->>Child: [A] close(result) → run onClose(CloseResult) LIFO
     Child-->>Ctx: output
     Ctx-->>App: output
+
+    %% ── Resource (execution‑scoped) ──
+    rect rgb(245, 240, 255)
+        Note over App,Ctrl: Resource (per‑execution middleware)
+        Note right of Scope: reusable factory resolved fresh per execution chain — logger, transaction, trace span
+
+        App->>App: resource({ deps, factory })
+        App-->>App: Resource definition (inert)
+
+        Note right of Child: during dep resolution in ctx.exec():
+        Note right of Child: seek hierarchy for existing instance
+        alt cache hit (seek‑up)
+            Child->>Child: reuse instance from parent ✓
+        else cache miss
+            Child->>Ext: wrapResolve(next, { kind: "resource", target, ctx })
+            Ext->>Child: next() → factory(parentCtx, deps)
+            Note right of Child: parentCtx.onClose(result) → cleanup registered
+            Child-->>Ext: instance stored on parent context
+        end
+    end
 
     %% ── Reactivity (opt‑in) ──
     rect rgb(240, 248, 255)

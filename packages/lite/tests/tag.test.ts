@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { tag, tags, isTag, isTagged, getAllTags } from "../src/tag"
+import { tag, tags, isTag, isTagged, getAllTags, isTagExecutor } from "../src/tag"
 import { atom } from "../src/atom"
 import { ParseError } from "../src/errors"
 import type { Lite } from "../src/types"
@@ -93,6 +93,24 @@ describe("Tag", () => {
       expect(withDefault.get(empty)).toBe(42)
       expect(withDefault.find(empty)).toBe(42)
     })
+
+    it("retrieves from object source with tags property", () => {
+      const myTag = tag<string>({ label: "objSource" })
+      const source = { tags: [myTag("found")] }
+
+      expect(myTag.get(source)).toBe("found")
+      expect(myTag.find(source)).toBe("found")
+      expect(myTag.collect(source)).toEqual(["found"])
+    })
+
+    it("handles object source without tags property", () => {
+      const noDefault = tag<string>({ label: "noTagsProp" })
+      const source = {}
+
+      expect(() => noDefault.get(source as any)).toThrow()
+      expect(noDefault.find(source as any)).toBeUndefined()
+      expect(noDefault.collect(source as any)).toEqual([])
+    })
   })
 
   describe("tags helpers", () => {
@@ -171,6 +189,18 @@ describe("Tag", () => {
       })
 
       expect(someTag.atoms()).toHaveLength(initialCount + 1)
+    })
+  })
+
+  describe("isTagExecutor()", () => {
+    it("identifies tag executors", () => {
+      const myTag = tag<string>({ label: "executor-test" })
+      expect(isTagExecutor(tags.required(myTag))).toBe(true)
+      expect(isTagExecutor(tags.optional(myTag))).toBe(true)
+      expect(isTagExecutor(tags.all(myTag))).toBe(true)
+      expect(isTagExecutor({})).toBe(false)
+      expect(isTagExecutor(null)).toBe(false)
+      expect(isTagExecutor("string")).toBe(false)
     })
   })
 

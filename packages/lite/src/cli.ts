@@ -188,7 +188,7 @@ Introspection:
 interface Extension {
   init?(scope): void | Promise<void>
   dispose?(scope): void
-  wrapResolve?(next, atom, scope): Promise<value>
+  wrapResolve?(next, event: ResolveEvent): Promise<value>
   wrapExec?(next, flow, ctx): Promise<output>
 }
 
@@ -197,19 +197,20 @@ createScope({ extensions: [ext1, ext2] })
 Lifecycle:
   1. scope creation  → ext.init(scope) called for each extension
   2. await scope.ready  → all init() resolved
-  3. resolve(atom)  → ext.wrapResolve(next, atom, scope)
+  3. resolve(atom)  → ext.wrapResolve(next, { kind: "atom", target, scope })
+     resolve(resource) → ext.wrapResolve(next, { kind: "resource", target, ctx })
      - call next() to proceed to actual resolution
-     - add before/after logic around next()
+     - dispatch on event.kind for atom vs resource
   4. ctx.exec(flow)  → ext.wrapExec(next, flow, ctx)
      - call next() to proceed to actual execution
   5. scope.dispose()  → ext.dispose(scope) called for each extension
 
 Example:
   const timingExt: Extension = {
-    wrapResolve: async (next, atom, scope) => {
+    wrapResolve: async (next, event) => {
       const start = Date.now()
       const value = await next()
-      console.log(atom, Date.now() - start, "ms")
+      console.log(event.target, Date.now() - start, "ms")
       return value
     },
   }`,

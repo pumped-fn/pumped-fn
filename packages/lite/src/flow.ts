@@ -73,7 +73,7 @@ export function flow<TOutput, TInput>(config: {
 
 export function flow<
   TOutput,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.Resource<unknown, Record<string, Lite.Dependency>> | { mode: string }>,
 >(config: {
   name?: string
   parse?: undefined
@@ -85,7 +85,7 @@ export function flow<
 export function flow<
   TOutput,
   TInput,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.Resource<unknown, Record<string, Lite.Dependency>> | { mode: string }>,
 >(config: {
   name?: string
   parse: (raw: unknown) => MaybePromise<TInput>
@@ -97,7 +97,7 @@ export function flow<
 export function flow<
   TOutput,
   TInput,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.Resource<unknown, Record<string, Lite.Dependency>> | { mode: string }>,
 >(config: {
   name?: string
   parse: Lite.Typed<TInput>

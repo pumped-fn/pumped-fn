@@ -8,6 +8,7 @@ import type {
   controllerSymbol,
   tagExecutorSymbol,
   typedSymbol,
+  resourceSymbol,
 } from "./symbols"
 
 export type MaybePromise<T> = T | Promise<T>
@@ -66,6 +67,13 @@ export namespace Lite {
     readonly factory: FlowFactory<TOutput, TInput, Record<string, Dependency>>
     readonly deps?: Record<string, Dependency>
     readonly tags?: Tagged<any>[]
+  }
+
+  export interface Resource<T, D extends Record<string, Dependency> = Record<string, Dependency>> {
+    readonly [resourceSymbol]: true
+    readonly name?: string
+    readonly deps?: D
+    readonly factory: ResourceFactory<T, D>
   }
 
   /**
@@ -263,13 +271,38 @@ export namespace Lite {
     readonly value: PresetValue<T, I>
   }
 
+  /**
+   * Discriminated context for `wrapResolve`.
+   *
+   * - `"atom"` — scope-level singleton. Cached after first resolve.
+   * - `"resource"` — execution-level. Fresh factory per first encounter,
+   *   seek-up on nested execs within the same chain.
+   */
+  export type ResolveEvent =
+    | {
+        readonly kind: "atom"
+        readonly target: Atom<unknown>
+        readonly scope: Scope
+      }
+    | {
+        readonly kind: "resource"
+        readonly target: Resource<unknown>
+        readonly ctx: ExecutionContext
+      }
+
   export interface Extension {
     readonly name: string
     init?(scope: Scope): MaybePromise<void>
+    /**
+     * Wraps dependency resolution. Dispatch by `event.kind`:
+     *
+     * - `"atom"` — `event.scope`, `event.target: Atom`. Cached in scope.
+     * - `"resource"` — `event.ctx`, `event.target: Resource`. Seek-up in
+     *   execution hierarchy, factory(ctx, deps) on miss.
+     */
     wrapResolve?(
       next: () => Promise<unknown>,
-      atom: Atom<unknown>,
-      scope: Scope
+      event: ResolveEvent
     ): Promise<unknown>
     wrapExec?(
       next: () => Promise<unknown>,
@@ -283,6 +316,7 @@ export namespace Lite {
     | Atom<unknown>
     | ControllerDep<unknown>
     | TagExecutor<any>
+    | Resource<unknown>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
@@ -290,7 +324,9 @@ export namespace Lite {
       ? Controller<T>
       : D extends TagExecutor<infer TOutput, infer _TTag>
         ? TOutput
-        : never
+        : D extends Resource<infer T>
+          ? T
+          : never
 
   export type InferDeps<D> = { [K in keyof D]: InferDep<D[K]> }
 
@@ -306,6 +342,11 @@ export namespace Lite {
   > = keyof D extends never
     ? (ctx: ExecutionContext & { readonly input: Input }) => MaybePromise<Output>
     : (ctx: ExecutionContext & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
+
+  export type ResourceFactory<T, D extends Record<string, Dependency>> =
+    keyof D extends never
+      ? (ctx: ExecutionContext) => MaybePromise<T>
+      : (ctx: ExecutionContext, deps: InferDeps<D>) => MaybePromise<T>
 
   export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
 
@@ -327,6 +368,11 @@ export namespace Lite {
    * Any controller regardless of value type.
    */
   export type AnyController = Controller<any>
+
+  /**
+   * Any resource regardless of value type.
+   */
+  export type AnyResource = Resource<any>
 
   /**
    * Target type for wrapExec extension hook.

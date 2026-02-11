@@ -29,7 +29,7 @@
     "demo": "tsx examples/demo.ts"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^1.0.0"
+    "@pumped-fn/lite": "^2.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
