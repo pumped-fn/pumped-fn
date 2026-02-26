@@ -2414,3 +2414,269 @@ describe("Coverage gaps", () => {
     })
   })
 })
+
+describe("controller dep with watch: true", () => {
+  it("re-runs parent when dep value changes", async () => {
+    let factoryCount = 0
+
+    const sourceAtom = atom({ factory: () => 1 })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        factoryCount++
+        return source.get() * 10
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(1)
+
+    scope.controller(sourceAtom).set(2)
+    await scope.flush()
+
+    expect(factoryCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe(20)
+
+    await scope.dispose()
+  })
+
+  it("skips parent when dep resolves to same value", async () => {
+    let sourceFactoryCount = 0
+    let derivedFactoryCount = 0
+
+    const sourceAtom = atom({
+      factory: () => {
+        sourceFactoryCount++
+        return "hello"
+      },
+    })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        derivedFactoryCount++
+        return `derived:${source.get()}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(sourceFactoryCount).toBe(1)
+    expect(derivedFactoryCount).toBe(1)
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(sourceFactoryCount).toBe(2)
+    expect(derivedFactoryCount).toBe(1)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:hello")
+
+    await scope.dispose()
+  })
+
+  it("custom eq function — skips on same id", async () => {
+    let factoryCount = 0
+
+    const sourceAtom = atom({ factory: () => ({ id: 1, name: "alice" }) })
+
+    const derivedAtom = atom({
+      deps: {
+        source: controller(sourceAtom, {
+          resolve: true,
+          watch: true,
+          eq: (a: { id: number; name: string }, b: { id: number; name: string }) => a.id === b.id,
+        }),
+      },
+      factory: (_ctx: any, { source }: any) => {
+        factoryCount++
+        return `user:${source.get().name}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(1)
+
+    scope.controller(sourceAtom).set({ id: 1, name: "bob" })
+    await scope.flush()
+
+    expect(factoryCount).toBe(1)
+
+    scope.controller(sourceAtom).set({ id: 2, name: "carol" })
+    await scope.flush()
+
+    expect(factoryCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("user:carol")
+
+    await scope.dispose()
+  })
+
+  it("cascade stops when intermediate value unchanged", async () => {
+    let bCount = 0
+    let cCount = 0
+
+    const aAtom = atom({ factory: () => 1 })
+
+    const bAtom = atom({
+      deps: { a: controller(aAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { a }: any) => {
+        bCount++
+        return a.get() > 5 ? "high" : "low"
+      },
+    })
+
+    const cAtom = atom({
+      deps: { b: controller(bAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { b }: any) => {
+        cCount++
+        return `level:${b.get()}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(cAtom)
+    expect(bCount).toBe(1)
+    expect(cCount).toBe(1)
+    expect(scope.controller(cAtom).get()).toBe("level:low")
+
+    scope.controller(aAtom).set(2)
+    await scope.flush()
+
+    expect(bCount).toBe(2)
+    expect(cCount).toBe(1)
+
+    scope.controller(aAtom).set(10)
+    await scope.flush()
+
+    expect(bCount).toBe(3)
+    expect(cCount).toBe(2)
+    expect(scope.controller(cAtom).get()).toBe("level:high")
+
+    await scope.dispose()
+  })
+
+  it("watch dep auto-subscribes without manual ctx.cleanup wiring", async () => {
+    let factoryCount = 0
+
+    const sourceAtom = atom({ factory: () => "initial" })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        factoryCount++
+        return `echo:${source.get()}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(1)
+
+    scope.controller(sourceAtom).set("updated")
+    await scope.flush()
+
+    expect(factoryCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("echo:updated")
+
+    scope.controller(sourceAtom).set("again")
+    await scope.flush()
+
+    expect(factoryCount).toBe(3)
+    expect(scope.controller(derivedAtom).get()).toBe("echo:again")
+
+    await scope.dispose()
+  })
+
+  it("throws when watch: true without resolve: true", async () => {
+    const sourceAtom = atom({ factory: () => 1 })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { watch: true }) },
+      factory: (_ctx: any, { source }: any) => source.get(),
+    })
+
+    const scope = createScope()
+    await expect(scope.resolve(derivedAtom)).rejects.toThrow("requires resolve: true")
+    await scope.dispose()
+  })
+
+  it("controller instance from watch dep is same as scope.controller()", async () => {
+    let capturedCtrl: any
+
+    const sourceAtom = atom({ factory: () => 42 })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        capturedCtrl = source
+        return source.get()
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+
+    expect(capturedCtrl).toBe(scope.controller(sourceAtom))
+
+    await scope.dispose()
+  })
+
+  it("no invalidations after dispose", async () => {
+    let factoryCount = 0
+
+    const sourceAtom = atom({ factory: () => 1 })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        factoryCount++
+        return source.get()
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(1)
+
+    scope.controller(sourceAtom).set(99)
+    await scope.flush()
+    expect(factoryCount).toBe(2)
+
+    await scope.dispose()
+
+    expect(factoryCount).toBe(2)
+  })
+
+  it("no listener accumulation across failed-resolve retries", async () => {
+    let factoryCount = 0
+    let shouldFail = true
+
+    const sourceAtom = atom({ factory: () => 1 })
+
+    const derivedAtom = atom({
+      deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { source }: any) => {
+        factoryCount++
+        if (shouldFail) throw new Error("intentional failure")
+        return source.get()
+      },
+    })
+
+    const scope = createScope()
+    await expect(scope.resolve(derivedAtom)).rejects.toThrow("intentional failure")
+    expect(factoryCount).toBe(1)
+
+    shouldFail = false
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(2)
+
+    scope.controller(sourceAtom).set(2)
+    await scope.flush()
+
+    expect(factoryCount).toBe(3)
+
+    await scope.dispose()
+  })
+})

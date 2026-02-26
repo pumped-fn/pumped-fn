@@ -1,6 +1,6 @@
 # @pumped-fn/lite
 
-![Coverage: 97%+ statements](https://img.shields.io/badge/coverage-97%25%2B_statements-brightgreen) ![Coverage: 100% functions](https://img.shields.io/badge/coverage-100%25_functions-brightgreen) ![Tests: 263 passed](https://img.shields.io/badge/tests-263_passed-brightgreen)
+![Coverage: 97%+ statements](https://img.shields.io/badge/coverage-97%25%2B_statements-brightgreen) ![Coverage: 100% functions](https://img.shields.io/badge/coverage-100%25_functions-brightgreen) ![Tests: 300 passed](https://img.shields.io/badge/tests-300_passed-brightgreen)
 
 **Scoped Ambient State** for TypeScript — a scope-local atom graph with explicit dependencies and opt-in reactivity.
 
@@ -151,6 +151,13 @@ sequenceDiagram
 
         App->>Scope: select(atom, selector, { eq })
         Scope-->>App: handle { get, subscribe }
+
+        Note over App,Ctrl: Dependency reactivity — atom deps only
+        Note right of Scope: watch:true replaces manual ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))
+        App->>Scope: resolve(derivedAtom)
+        Note right of Scope: deps: { src: controller(srcAtom, { resolve: true, watch: true, eq? }) }
+        Scope->>Scope: on dep 'resolved': eq(prev, next) → scheduleInvalidation if changed
+        Note right of Scope: watch listener auto-cleaned on re-resolve / release / dispose
     end
 
     %% ── Cleanup & Teardown ──

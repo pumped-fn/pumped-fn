@@ -218,22 +218,23 @@ sequenceDiagram
 
 ### Controller as Dependency
 
-Receive reactive handle instead of resolved value in atom/flow deps.
+Receive a reactive handle instead of the resolved value in atom deps. Use `resolve: true` to pre-resolve before the factory runs. Add `watch: true` (atom deps only) to auto-invalidate the parent when the dep value changes — replaces manual `ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))`.
 
 ```mermaid
 sequenceDiagram
     participant Scope
-    participant AtomA as serverAtom
+    participant Parent as derivedAtom
+    participant Dep as configAtom
     participant Ctrl as Controller
-    participant AtomB as configAtom
 
-    Scope->>AtomA: resolve(serverAtom)
-    Note over AtomA: deps: { cfg: controller(configAtom, { resolve: true }) }
-    AtomA->>Scope: resolve configAtom first
-    Scope-->>Ctrl: ctrl (already resolved)
-    AtomA->>AtomA: factory(ctx, { cfg: ctrl })
-    AtomA->>Ctrl: ctrl.on('resolved', () => ctx.invalidate())
-    Note over AtomA: react to config changes
+    Scope->>Parent: resolve(derivedAtom)
+    Note over Parent: deps: { cfg: controller(configAtom, { resolve: true, watch: true, eq? }) }
+    Parent->>Scope: resolve configAtom first
+    Scope-->>Ctrl: ctrl (resolved)
+    Parent->>Parent: factory(_, { cfg: ctrl })
+    Note over Scope: on dep 'resolved': compare prev/next via eq ?? Object.is
+    Scope->>Parent: scheduleInvalidation if changed
+    Note over Parent: watch listener auto-cleaned on re-resolve / release / dispose
 ```
 
 ### Inline Function Execution

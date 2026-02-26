@@ -247,10 +247,18 @@ export namespace Lite {
     readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
     readonly resolve?: boolean
+    readonly watch?: boolean
+    readonly eq?: (a: any, b: any) => boolean
   }
 
   export interface ControllerOptions {
     resolve?: boolean
+  }
+
+  export interface ControllerDepOptions<T> {
+    resolve?: boolean
+    watch?: boolean
+    eq?: (a: T, b: T) => boolean
   }
 
   export interface Typed<T> {

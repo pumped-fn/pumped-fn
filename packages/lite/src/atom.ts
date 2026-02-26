@@ -83,31 +83,46 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  * The Controller provides full lifecycle control: get, resolve, release, invalidate, and subscribe.
  *
  * @param atom - The Atom to wrap
- * @param options - Optional configuration. Use { resolve: true } to auto-resolve before factory runs.
+ * @param options - Optional configuration:
+ *   - `resolve: true` — auto-resolves the dep before the parent factory runs; `config.get()` is safe.
+ *   - `watch: true` — atom deps only; requires `resolve: true`; automatically re-runs the parent factory
+ *     when the dep resolves to a new value (value-equality gated via `Object.is` by default). Replaces
+ *     manual `ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))` wiring. Watch
+ *     listeners are auto-cleaned on re-resolve, release, and dispose.
+ *   - `eq` — custom equality function `(a: T, b: T) => boolean`; only used with `watch: true`.
  * @returns A ControllerDep that resolves to a Controller for the Atom
  *
  * @example
  * ```typescript
- * const configAtom = atom({ factory: () => fetchConfig() })
+ * // resolve only
  * const serverAtom = atom({
  *   deps: { config: controller(configAtom, { resolve: true }) },
- *   factory: (ctx, { config }) => {
- *     // config.get() is safe - already resolved
- *     const unsub = config.on('resolved', () => ctx.invalidate())
- *     ctx.cleanup(unsub)
- *     return createServer(config.get().port)
- *   }
+ *   factory: (_, { config }) => createServer(config.get().port),
+ * })
+ *
+ * // watch: re-runs parent when dep value changes
+ * const profileAtom = atom({
+ *   deps: { token: controller(tokenAtom, { resolve: true, watch: true }) },
+ *   factory: (_, { token }) => ({ id: `user-${token.get().jwt}` }),
+ * })
+ *
+ * // watch with custom equality
+ * const derivedAtom = atom({
+ *   deps: { src: controller(srcAtom, { resolve: true, watch: true, eq: (a, b) => a.id === b.id }) },
+ *   factory: (_, { src }) => src.get().name,
  * })
  * ```
  */
 export function controller<T>(
   atom: Lite.Atom<T>,
-  options?: Lite.ControllerOptions
+  options?: Lite.ControllerDepOptions<T>
 ): Lite.ControllerDep<T> {
   return {
     [controllerDepSymbol]: true,
     atom,
     resolve: options?.resolve,
+    watch: options?.watch,
+    eq: options?.eq,
   }
 }
 

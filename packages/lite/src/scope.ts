@@ -526,6 +526,10 @@ class ScopeImpl implements Lite.Scope {
 
     const wasResolving = entry.state === 'resolving'
     if (!wasResolving) {
+      for (let i = entry.cleanups.length - 1; i >= 0; i--) {
+        await entry.cleanups[i]?.()
+      }
+      entry.cleanups = []
       entry.state = 'resolving'
       this.emitStateChange('resolving', atom)
       this.notifyListeners(atom, 'resolving')
@@ -634,7 +638,11 @@ class ScopeImpl implements Lite.Scope {
           }
         }
       } else if (isControllerDep(dep)) {
-        const ctrl = new ControllerImpl(dep.atom, this)
+        if (dep.watch) {
+          if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
+          if (!dep.resolve) throw new Error("controller({ watch: true }) requires resolve: true")
+        }
+        const ctrl = this.controller(dep.atom)
         if (dep.resolve) {
           await ctrl.resolve()
         }
@@ -644,6 +652,20 @@ class ScopeImpl implements Lite.Scope {
           if (depEntry) {
             depEntry.dependents.add(dependentAtom)
           }
+        }
+        if (dep.watch) {
+          const eq = dep.eq ?? Object.is
+          let prev = ctrl.get() as unknown
+          const unsub = this.on("resolved", dep.atom, () => {
+            const next = ctrl.get() as unknown
+            if (!eq(prev, next)) {
+              prev = next
+              this.scheduleInvalidation(dependentAtom!)
+            }
+          })
+          const depEntry = this.getEntry(dependentAtom!)
+          if (depEntry) depEntry.cleanups.push(unsub)
+          else unsub()
         }
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
