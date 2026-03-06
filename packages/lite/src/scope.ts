@@ -18,7 +18,6 @@ function getResourceKey(resource: Lite.Resource<unknown>): symbol {
 }
 
 const inflightResources = new WeakMap<Lite.ContextData, Map<symbol, Promise<unknown>>>()
-const resolvingResources = new Set<symbol>()
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
@@ -55,6 +54,14 @@ class ContextDataImpl implements Lite.ContextData {
       return this.map.get(key)
     }
     return this.parentData?.seek(key)
+  }
+
+  seekHas(key: string | symbol): boolean {
+    if (this.map.has(key)) return true
+    if (this.parentData && this.parentData instanceof ContextDataImpl) {
+      return this.parentData.seekHas(key)
+    }
+    return false
   }
 
   // Tag-based operations
@@ -227,7 +234,9 @@ class ScopeImpl implements Lite.Scope {
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private initialized = false
+  private disposed = false
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
+  private resolvingResources = new Set<symbol>()
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<any>[]
@@ -257,7 +266,7 @@ class ScopeImpl implements Lite.Scope {
 
   private async processInvalidationChain(): Promise<void> {
     try {
-      while (this.invalidationQueue.size > 0) {
+      while (this.invalidationQueue.size > 0 && !this.disposed) {
         const atom = this.invalidationQueue.values().next().value as Lite.Atom<unknown>
         this.invalidationQueue.delete(atom)
 
@@ -410,15 +419,15 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
 
     const eventListeners = entry.listeners.get(event)
-    if (eventListeners) {
-      for (const listener of eventListeners) {
+    if (eventListeners?.size) {
+      for (const listener of Array.from(eventListeners)) {
         listener()
       }
     }
 
     const allListeners = entry.listeners.get('*')
-    if (allListeners) {
-      for (const listener of allListeners) {
+    if (allListeners?.size) {
+      for (const listener of Array.from(allListeners)) {
         listener()
       }
     }
@@ -429,8 +438,8 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
 
     const allListeners = entry.listeners.get('*')
-    if (allListeners) {
-      for (const listener of allListeners) {
+    if (allListeners?.size) {
+      for (const listener of Array.from(allListeners)) {
         listener()
       }
     }
@@ -440,8 +449,8 @@ class ScopeImpl implements Lite.Scope {
     const stateMap = this.stateListeners.get(state)
     if (stateMap) {
       const listeners = stateMap.get(atom)
-      if (listeners) {
-        for (const listener of listeners) {
+      if (listeners?.size) {
+        for (const listener of Array.from(listeners)) {
           listener()
         }
       }
@@ -712,13 +721,13 @@ class ScopeImpl implements Lite.Scope {
           continue
         }
 
-        const existingSeek = ctx.data.seek(resourceKey)
-        if (existingSeek !== undefined || ctx.data.has(resourceKey)) {
-          result[key] = existingSeek
+        const ctxData = ctx.data as ContextDataImpl
+        if (ctxData.seekHas(resourceKey)) {
+          result[key] = ctxData.seek(resourceKey)
           continue
         }
 
-        if (resolvingResources.has(resourceKey)) {
+        if (this.resolvingResources.has(resourceKey)) {
           throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
         }
 
@@ -735,7 +744,7 @@ class ScopeImpl implements Lite.Scope {
         }
 
         const resolve = async () => {
-          resolvingResources.add(resourceKey)
+          this.resolvingResources.add(resourceKey)
           try {
             const resourceDeps = await this.resolveDeps(resource.deps, ctx)
 
@@ -760,7 +769,7 @@ class ScopeImpl implements Lite.Scope {
             storeCtx.data.set(resourceKey, value)
             return value
           } finally {
-            resolvingResources.delete(resourceKey)
+            this.resolvingResources.delete(resourceKey)
           }
         }
 
@@ -881,6 +890,28 @@ class ScopeImpl implements Lite.Scope {
     const pendingSet = entry.pendingSet
     entry.pendingSet = undefined
 
+    if (pendingSet) {
+      entry.state = "resolving"
+      entry.value = previousValue
+      entry.error = undefined
+      entry.pendingInvalidate = false
+      this.pending.delete(atom)
+      this.resolving.delete(atom)
+      this.emitStateChange("resolving", atom)
+      this.notifyListeners(atom, "resolving")
+
+      if ('value' in pendingSet) {
+        entry.value = pendingSet.value
+      } else {
+        entry.value = pendingSet.fn(previousValue as T)
+      }
+      entry.state = 'resolved'
+      entry.hasValue = true
+      this.emitStateChange('resolved', atom)
+      this.notifyListeners(atom, 'resolved')
+      return
+    }
+
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       const cleanup = entry.cleanups[i]
       if (cleanup) await cleanup()
@@ -895,19 +926,6 @@ class ScopeImpl implements Lite.Scope {
     this.resolving.delete(atom)
     this.emitStateChange("resolving", atom)
     this.notifyListeners(atom, "resolving")
-
-    if (pendingSet) {
-      if ('value' in pendingSet) {
-        entry.value = pendingSet.value
-      } else {
-        entry.value = pendingSet.fn(previousValue as T)
-      }
-      entry.state = 'resolved'
-      entry.hasValue = true
-      this.emitStateChange('resolved', atom)
-      this.notifyListeners(atom, 'resolved')
-      return
-    }
 
     await this.resolve(atom)
   }
@@ -928,9 +946,19 @@ class ScopeImpl implements Lite.Scope {
 
     this.cache.delete(atom)
     this.controllers.delete(atom)
+
+    for (const [state, stateMap] of this.stateListeners) {
+      stateMap.delete(atom)
+      if (stateMap.size === 0) this.stateListeners.delete(state)
+    }
   }
 
   async dispose(): Promise<void> {
+    this.disposed = true
+    this.invalidationQueue.clear()
+    this.invalidationChain = null
+    this.chainPromise = null
+
     for (const ext of this.extensions) {
       if (ext.dispose) {
         await ext.dispose(this)
