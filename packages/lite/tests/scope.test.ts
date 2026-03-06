@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { createScope } from "../src/scope"
 import { atom, controller } from "../src/atom"
+import { service } from "../src/service"
 import { preset } from "../src/preset"
 import { tag, tags } from "../src/tag"
 import { flow, typed } from "../src/flow"
@@ -1203,7 +1204,7 @@ describe("ExecutionContext", () => {
       expect(notifications).toEqual(["resolved"])
     })
 
-    it("runs cleanups before setting", async () => {
+    it("does not run cleanups on set (factory does not re-run)", async () => {
       const scope = createScope()
       const cleanups: string[] = []
       const myAtom = atom({
@@ -1219,7 +1220,8 @@ describe("ExecutionContext", () => {
       ctrl.set({ name: "Alice" })
       await scope.flush()
 
-      expect(cleanups).toEqual(["cleanup"])
+      expect(cleanups).toEqual([])
+      expect(ctrl.get()).toEqual({ name: "Alice" })
     })
 
     it("throws when atom not resolved", () => {
@@ -2677,6 +2679,192 @@ describe("controller dep with watch: true", () => {
 
     expect(factoryCount).toBe(3)
 
+    await scope.dispose()
+  })
+})
+
+describe("Triage regression tests", () => {
+  it("Fix 1: watch survives set() and subsequent changes", async () => {
+    let derivedCount = 0
+
+    const sourceAtom = atom({ factory: () => "initial" })
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { src }: any) => {
+        derivedCount++
+        return `derived:${src.get()}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+
+    scope.controller(sourceAtom).set("after-set-1")
+    await scope.flush()
+    expect(derivedCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:after-set-1")
+
+    scope.controller(sourceAtom).set("after-set-2")
+    await scope.flush()
+    expect(derivedCount).toBe(3)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:after-set-2")
+
+    scope.controller(sourceAtom).set("after-set-3")
+    await scope.flush()
+    expect(derivedCount).toBe(4)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:after-set-3")
+
+    await scope.dispose()
+  })
+
+  it("Fix 2: two scopes resolving same resource concurrently — no false circular", async () => {
+    let callCount = 0
+    const sharedResource = resource({
+      factory: async () => {
+        callCount++
+        await new Promise(r => setTimeout(r, 10))
+        return "shared-value"
+      },
+    })
+
+    const myFlow = flow({
+      deps: { res: sharedResource },
+      factory: (_ctx: any, { res }: any) => res,
+    })
+
+    const scope1 = createScope()
+    const scope2 = createScope()
+    const ctx1 = scope1.createContext()
+    const ctx2 = scope2.createContext()
+
+    const [r1, r2] = await Promise.all([
+      ctx1.exec({ flow: myFlow }),
+      ctx2.exec({ flow: myFlow }),
+    ])
+
+    expect(r1).toBe("shared-value")
+    expect(r2).toBe("shared-value")
+    expect(callCount).toBe(2)
+
+    await ctx1.close()
+    await ctx2.close()
+    await scope1.dispose()
+    await scope2.dispose()
+  })
+
+  it("Fix 3: listener that unsubscribes during notification — sibling fires", async () => {
+    const scope = createScope()
+    const myAtom = atom({ factory: () => 1 })
+    await scope.resolve(myAtom)
+
+    const ctrl = scope.controller(myAtom)
+    const events: string[] = []
+
+    let unsub1: (() => void) | undefined
+    unsub1 = ctrl.on("resolved", () => {
+      events.push("first")
+      unsub1!()
+    })
+
+    ctrl.on("resolved", () => {
+      events.push("second")
+    })
+
+    ctrl.set(2)
+    await scope.flush()
+
+    expect(events).toContain("first")
+    expect(events).toContain("second")
+
+    await scope.dispose()
+  })
+
+  it("Fix 4: release cleans stateListeners", async () => {
+    const scope = createScope()
+    const myAtom = atom({ factory: () => 42 })
+    await scope.resolve(myAtom)
+
+    const events: string[] = []
+    const unsub = scope.on("resolved", myAtom, () => events.push("resolved"))
+
+    ctrl_set_and_flush: {
+      scope.controller(myAtom).set(99)
+      await scope.flush()
+      expect(events).toEqual(["resolved"])
+    }
+
+    await scope.release(myAtom)
+
+    await scope.resolve(myAtom)
+    expect(events).toEqual(["resolved"])
+
+    unsub()
+    await scope.dispose()
+  })
+
+  it("Fix 5: dispose during active invalidation chain — no errors", async () => {
+    let factoryCount = 0
+
+    const slowAtom = atom({
+      factory: async () => {
+        factoryCount++
+        await new Promise(r => setTimeout(r, 50))
+        return factoryCount
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(slowAtom)
+    expect(factoryCount).toBe(1)
+
+    scope.controller(slowAtom).invalidate()
+
+    await scope.dispose()
+
+    expect(factoryCount).toBeLessThanOrEqual(2)
+  })
+
+  it("Fix 6: service with tags — tag.atoms() returns the service atom", () => {
+    const myTag = tag<string>({ label: "svc-tag" })
+    const svcAtom = service({
+      tags: [myTag("svc-value")],
+      factory: () => ({
+        greet: async (_ctx: Lite.ExecutionContext, name: string) => `hello ${name}`,
+      }),
+    })
+
+    const atoms = myTag.atoms()
+    expect(atoms).toContain(svcAtom)
+  })
+
+  it("Fix 7: resource returning undefined — grandparent seek finds it", async () => {
+    const undefinedResource = resource({
+      name: "undef-resource",
+      factory: () => undefined,
+    })
+
+    const innerFlow = flow({
+      deps: { val: undefinedResource },
+      factory: (_ctx: any, { val }: any) => ({ found: true, value: val }),
+    })
+
+    const outerFlow = flow({
+      deps: { val: undefinedResource },
+      factory: async (ctx) => {
+        const inner = await ctx.exec({ flow: innerFlow })
+        return inner
+      },
+    })
+
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const result = await ctx.exec({ flow: outerFlow }) as any
+
+    expect(result.found).toBe(true)
+    expect(result.value).toBeUndefined()
+
+    await ctx.close()
     await scope.dispose()
   })
 })

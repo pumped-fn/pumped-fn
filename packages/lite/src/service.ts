@@ -1,4 +1,5 @@
 import { atomSymbol } from "./symbols"
+import { registerAtomToTags } from "./tag"
 import type { Lite, MaybePromise } from "./types"
 
 /** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */
@@ -22,10 +23,16 @@ export function service<T extends Lite.ServiceMethods, D extends Record<string, 
   factory: Lite.AtomFactory<T, D>
   tags?: Lite.Tagged<any>[]
 }): Lite.Atom<T> {
-  return {
+  const atomInstance: Lite.Atom<T> = {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
   }
+
+  if (config.tags?.length) {
+    registerAtomToTags(atomInstance, config.tags)
+  }
+
+  return atomInstance
 }
