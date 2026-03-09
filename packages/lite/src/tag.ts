@@ -117,7 +117,7 @@ export function tag<T>(options: {
   default: T
 }): Lite.Tag<T, true>
 export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
-  const key = Symbol.for(`@pumped-fn/lite/tag/${options.label}`)
+  const key = Symbol(`@pumped-fn/lite/tag/${options.label}`)
   const hasDefault = "default" in options
   const defaultValue = hasDefault ? options.default : undefined
   const parse = options.parse
