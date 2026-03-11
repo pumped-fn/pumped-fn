@@ -260,11 +260,11 @@ export namespace Lite {
     resolve?: boolean
   }
 
-  export interface ControllerDepOptions<T> {
-    resolve?: boolean
-    watch?: boolean
-    eq?: (a: T, b: T) => boolean
-  }
+  export type ControllerDepOptions<T> =
+    | { resolve: true; watch: true; eq: (a: T, b: T) => boolean }
+    | { resolve: true; watch: true; eq?: never }
+    | { resolve: true; watch?: never; eq?: never }
+    | { resolve?: never; watch?: never; eq?: never }
 
   export interface Typed<T> {
     readonly [typedSymbol]: true

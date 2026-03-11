@@ -32,7 +32,16 @@ const pendingPromises = new WeakMap<Lite.Atom<unknown>, Promise<unknown>>()
 function getOrCreatePendingPromise<T>(atom: Lite.Atom<T>, ctrl: Lite.Controller<T>): Promise<T> {
   let pending = pendingPromises.get(atom) as Promise<T> | undefined
   if (!pending) {
-    pending = ctrl.resolve()
+    if (ctrl.state === 'resolving') {
+      pending = new Promise<T>((resolve) => {
+        const unsub = ctrl.on('resolved', () => {
+          unsub()
+          resolve(ctrl.get())
+        })
+      })
+    } else {
+      pending = ctrl.resolve()
+    }
     pendingPromises.set(atom, pending)
     pending.finally(() => pendingPromises.delete(atom))
   }
@@ -116,17 +125,18 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
       }
       throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
     }
-    if (ctrl.state === 'resolving') {
-      throw getOrCreatePendingPromise(atomRef.current, ctrl)
-    }
     if (ctrl.state === 'failed') {
       throw ctrl.get()
     }
-    return ctrl.get()
+    try {
+      return ctrl.get()
+    } catch {
+      throw getOrCreatePendingPromise(atomRef.current, ctrl)
+    }
   }, [ctrl, autoResolve])
 
   const subscribe = useCallback(
-    (onStoreChange: () => void) => ctrl.on('resolved', onStoreChange),
+    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
     [ctrl]
   )
 
@@ -223,6 +233,9 @@ function useSelect<T, S>(
   selectorRef.current = selector
   eqRef.current = eq
 
+  const stableSelector = useCallback((value: T): S => selectorRef.current(value), [])
+  const stableEq = useCallback((a: S, b: S): boolean => (eqRef.current ?? Object.is)(a, b), [])
+
   const handleRef = useRef<{
     scope: Lite.Scope
     atom: Lite.Atom<T>
@@ -235,11 +248,11 @@ function useSelect<T, S>(
       handleRef.current.scope !== scope ||
       handleRef.current.atom !== atom
     ) {
-      const handle = scope.select(atom, selectorRef.current, { eq: eqRef.current })
+      const handle = scope.select(atom, stableSelector, { eq: stableEq })
       handleRef.current = { scope, atom, handle }
     }
     return handleRef.current.handle
-  }, [scope, atom])
+  }, [scope, atom, stableSelector, stableEq])
 
   const getSnapshot = useCallback((): S => {
     const state = ctrl.state
@@ -249,7 +262,8 @@ function useSelect<T, S>(
     if (state === 'failed') {
       throw ctrl.get()
     }
-    return getOrCreateHandle().get()
+    getOrCreateHandle()
+    return selectorRef.current(ctrl.get())
   }, [ctrl, getOrCreateHandle])
 
   const subscribe = useCallback((onStoreChange: () => void) => {

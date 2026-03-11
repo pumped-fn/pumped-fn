@@ -2595,7 +2595,7 @@ describe("controller dep with watch: true", () => {
     const sourceAtom = atom({ factory: () => 1 })
 
     const derivedAtom = atom({
-      deps: { source: controller(sourceAtom, { watch: true }) },
+      deps: { source: controller(sourceAtom, { watch: true } as any) },
       factory: (_ctx: any, { source }: any) => source.get(),
     })
 
@@ -2865,6 +2865,154 @@ describe("Triage regression tests", () => {
     expect(result.value).toBeUndefined()
 
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("H1: watch cascades when source factory returns new object literal (Object.is)", async () => {
+    let derivedCount = 0
+
+    const sourceAtom = atom({
+      factory: () => ({ key: "value", num: 42 }),
+    })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { src }: any) => {
+        derivedCount++
+        return `derived:${src.get().key}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(2)
+
+    await scope.dispose()
+  })
+
+  it("H1: watch with custom eq prevents false cascades on object literals", async () => {
+    let derivedCount = 0
+
+    const sourceAtom = atom({
+      factory: () => ({ key: "value", num: 42 }),
+    })
+
+    const derivedAtom = atom({
+      deps: {
+        src: controller(sourceAtom, {
+          resolve: true,
+          watch: true,
+          eq: (a: { key: string; num: number }, b: { key: string; num: number }) =>
+            a.key === b.key && a.num === b.num,
+        }),
+      },
+      factory: (_ctx: any, { src }: any) => {
+        derivedCount++
+        return `derived:${src.get().key}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(1)
+
+    await scope.dispose()
+  })
+
+  it("M4: watch handles sequential source changes — derived re-resolves for each", async () => {
+    let factoryCount = 0
+
+    const sourceAtom = atom({ factory: () => "initial" })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: async (_ctx: any, { src }: any) => {
+        factoryCount++
+        const val = src.get()
+        await new Promise<void>((r) => setTimeout(r, 5))
+        return `derived:${val}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(factoryCount).toBe(1)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:initial")
+
+    scope.controller(sourceAtom).set("v2")
+    await scope.flush()
+
+    expect(factoryCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:v2")
+
+    scope.controller(sourceAtom).set("v3")
+    await scope.flush()
+
+    expect(factoryCount).toBe(3)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:v3")
+
+    await scope.dispose()
+  })
+
+  it("M5: diamond dependency — D depends on B and C which both watch A — D resolves once per change", async () => {
+    let bCount = 0
+    let cCount = 0
+    let dCount = 0
+
+    const aAtom = atom({ factory: () => 1 })
+
+    const bAtom = atom({
+      deps: { a: controller(aAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { a }: any) => {
+        bCount++
+        return a.get() * 2
+      },
+    })
+
+    const cAtom = atom({
+      deps: { a: controller(aAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { a }: any) => {
+        cCount++
+        return a.get() * 3
+      },
+    })
+
+    const dAtom = atom({
+      deps: {
+        b: controller(bAtom, { resolve: true, watch: true }),
+        c: controller(cAtom, { resolve: true, watch: true }),
+      },
+      factory: (_ctx: any, { b, c }: any) => {
+        dCount++
+        return b.get() + c.get()
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(dAtom)
+    expect(bCount).toBe(1)
+    expect(cCount).toBe(1)
+    expect(dCount).toBe(1)
+    expect(scope.controller(dAtom).get()).toBe(5)
+
+    scope.controller(aAtom).set(10)
+    await scope.flush()
+
+    expect(bCount).toBe(2)
+    expect(cCount).toBe(2)
+    expect(dCount).toBe(2)
+    expect(scope.controller(dAtom).get()).toBe(50)
+
     await scope.dispose()
   })
 })

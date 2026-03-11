@@ -163,7 +163,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   }
 
   private notifyListeners(): void {
-    for (const listener of this.listeners) {
+    for (const listener of [...this.listeners]) {
       listener()
     }
   }
@@ -866,7 +866,7 @@ class ScopeImpl implements Lite.Scope {
     options?: Lite.SelectOptions<S>
   ): Lite.SelectHandle<S> {
     const ctrl = this.controller(atom)
-    const eq = options?.eq ?? ((a, b) => a === b)
+    const eq = options?.eq ?? Object.is
     return new SelectHandleImpl(ctrl, selector, eq)
   }
 

@@ -269,7 +269,7 @@ describe('useAtom - state handling', () => {
 })
 
 describe('useAtom - invalidation', () => {
-  it.skip('suspends during invalidation and re-resolution', async () => {
+  it('returns stale value during re-resolution without Suspense flash', async () => {
     let callCount = 0
     const testAtom = atom({
       factory: async () => {
@@ -304,9 +304,7 @@ describe('useAtom - invalidation', () => {
 
     await act(async () => {
       screen.getByText('Invalidate').click()
-      await waitFor(() => {
-        expect(screen.getByText('Loading...')).toBeInTheDocument()
-      })
+      await scope.flush()
     })
 
     await waitFor(() => {
@@ -314,7 +312,7 @@ describe('useAtom - invalidation', () => {
     })
   })
 
-  it.skip('re-renders when atom value changes', async () => {
+  it('re-renders when atom value changes', async () => {
     const testAtom = atom({
       factory: () => 0,
     })
@@ -1044,7 +1042,7 @@ describe('useController', () => {
     expect(capturedCtrl!.state).toBe('resolved')
   })
 
-  it.skip('allows direct value manipulation with set()', async () => {
+  it('allows direct value manipulation with set()', async () => {
     const counterAtom = atom({
       factory: () => 0,
     })
@@ -1082,7 +1080,7 @@ describe('useController', () => {
     })
   })
 
-  it.skip('allows updating with update() function', async () => {
+  it('allows updating with update() function', async () => {
     const counterAtom = atom({
       factory: () => 5,
     })
