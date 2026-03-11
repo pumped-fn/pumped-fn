@@ -18,6 +18,7 @@ function getResourceKey(resource: Lite.Resource<unknown>): symbol {
 }
 
 const inflightResources = new WeakMap<Lite.ContextData, Map<symbol, Promise<unknown>>>()
+const resolvingResourcesMap = new WeakMap<Lite.ContextData, Set<symbol>>()
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
@@ -58,10 +59,7 @@ class ContextDataImpl implements Lite.ContextData {
 
   seekHas(key: string | symbol): boolean {
     if (this.map.has(key)) return true
-    if (this.parentData && this.parentData instanceof ContextDataImpl) {
-      return this.parentData.seekHas(key)
-    }
-    return false
+    return this.parentData?.seekHas(key) ?? false
   }
 
   // Tag-based operations
@@ -130,7 +128,6 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
     }
 
     this.currentValue = selector(ctrl.get())
-
     this.ctrlUnsub = ctrl.on('resolved', () => {
       const nextValue = this.selector(this.ctrl.get())
       if (!this.eq(this.currentValue, nextValue)) {
@@ -145,7 +142,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   }
 
   subscribe(listener: () => void): () => void {
-    if (this.listeners.size === 0 && !this.ctrlUnsub) {
+    if (!this.ctrlUnsub) {
       this.currentValue = this.selector(this.ctrl.get())
       this.ctrlUnsub = this.ctrl.on('resolved', () => {
         const nextValue = this.selector(this.ctrl.get())
@@ -169,6 +166,11 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
     for (const listener of this.listeners) {
       listener()
     }
+  }
+
+  dispose(): void {
+    this.listeners.clear()
+    this.cleanup()
   }
 
   private cleanup(): void {
@@ -245,7 +247,6 @@ class ScopeImpl implements Lite.Scope {
   private initialized = false
   private disposed = false
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
-  private resolvingResources = new Set<symbol>()
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<any>[]
@@ -433,14 +434,14 @@ class ScopeImpl implements Lite.Scope {
 
     const eventListeners = entry.listeners.get(event)
     if (eventListeners?.size) {
-      for (const listener of eventListeners) {
+      for (const listener of [...eventListeners]) {
         listener()
       }
     }
 
     const allListeners = entry.listeners.get('*')
     if (allListeners?.size) {
-      for (const listener of allListeners) {
+      for (const listener of [...allListeners]) {
         listener()
       }
     }
@@ -452,7 +453,7 @@ class ScopeImpl implements Lite.Scope {
 
     const allListeners = entry.listeners.get('*')
     if (allListeners?.size) {
-      for (const listener of allListeners) {
+      for (const listener of [...allListeners]) {
         listener()
       }
     }
@@ -463,7 +464,7 @@ class ScopeImpl implements Lite.Scope {
     if (stateMap) {
       const listeners = stateMap.get(atom)
       if (listeners?.size) {
-        for (const listener of listeners) {
+        for (const listener of [...listeners]) {
           listener()
         }
       }
@@ -498,6 +499,8 @@ class ScopeImpl implements Lite.Scope {
   }
 
   async resolve<T>(atom: Lite.Atom<T>): Promise<T> {
+    if (this.disposed) throw new Error("Scope is disposed")
+
     if (!this.initialized) {
       await this.ready
     }
@@ -516,8 +519,8 @@ class ScopeImpl implements Lite.Scope {
       throw new Error("Circular dependency detected")
     }
 
-    const presetValue = this.presets.get(atom)
-    if (presetValue !== undefined) {
+    if (this.presets.has(atom)) {
+      const presetValue = this.presets.get(atom)
       if (isAtom(presetValue)) {
         return this.resolve(presetValue as Lite.Atom<T>)
       }
@@ -618,6 +621,11 @@ class ScopeImpl implements Lite.Scope {
         entry.pendingInvalidate = false
         this.invalidationChain?.delete(atom)
         this.scheduleInvalidation(atom)
+      } else if (entry.pendingSet && 'value' in entry.pendingSet) {
+        this.invalidationChain?.delete(atom)
+        this.scheduleInvalidation(atom)
+      } else {
+        entry.pendingSet = undefined
       }
 
       throw entry.error
@@ -751,14 +759,9 @@ class ScopeImpl implements Lite.Scope {
         continue
       }
 
-      const ctxData = ctx.data as ContextDataImpl
-      if (ctxData.seekHas(resourceKey)) {
-        result[key] = ctxData.seek(resourceKey)
+      if (ctx.data.seekHas(resourceKey)) {
+        result[key] = ctx.data.seek(resourceKey)
         continue
-      }
-
-      if (this.resolvingResources.has(resourceKey)) {
-        throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
       }
 
       let flights = inflightResources.get(storeCtx.data)
@@ -773,8 +776,18 @@ class ScopeImpl implements Lite.Scope {
         continue
       }
 
+      let localResolvingResources = resolvingResourcesMap.get(storeCtx.data)
+      if (!localResolvingResources) {
+        localResolvingResources = new Set()
+        resolvingResourcesMap.set(storeCtx.data, localResolvingResources)
+      }
+
+      if (localResolvingResources.has(resourceKey)) {
+        throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
+      }
+
       const resolve = async () => {
-        this.resolvingResources.add(resourceKey)
+        localResolvingResources.add(resourceKey)
         try {
           const resourceDeps = await this.resolveDeps(resource.deps, ctx)
 
@@ -799,7 +812,7 @@ class ScopeImpl implements Lite.Scope {
           storeCtx.data.set(resourceKey, value)
           return value
         } finally {
-          this.resolvingResources.delete(resourceKey)
+          localResolvingResources.delete(resourceKey)
         }
       }
 
@@ -835,6 +848,7 @@ class ScopeImpl implements Lite.Scope {
   controller<T>(atom: Lite.Atom<T>, options: { resolve: true }): Promise<Lite.Controller<T>>
   controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>>
   controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>> {
+    if (this.disposed) throw new Error("Scope is disposed")
     let ctrl = this.controllers.get(atom) as ControllerImpl<T> | undefined
     if (!ctrl) {
       ctrl = new ControllerImpl(atom, this)
@@ -938,6 +952,7 @@ class ScopeImpl implements Lite.Scope {
       entry.hasValue = true
       this.emitStateChange('resolved', atom)
       this.notifyListeners(atom, 'resolved')
+      this.invalidationChain?.delete(atom)
       return
     }
 
@@ -955,7 +970,11 @@ class ScopeImpl implements Lite.Scope {
     this.emitStateChange("resolving", atom)
     this.notifyListeners(atom, "resolving")
 
-    await this.resolve(atom)
+    try {
+      await this.resolve(atom)
+    } catch (e) {
+      if (!entry.pendingSet && !entry.pendingInvalidate) throw e
+    }
   }
 
   async release<T>(atom: Lite.Atom<T>): Promise<void> {
@@ -971,6 +990,18 @@ class ScopeImpl implements Lite.Scope {
       try { await entry.cleanups[i]?.() } catch {}
     }
 
+    if (atom.deps) {
+      for (const dep of Object.values(atom.deps)) {
+        const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
+        if (!depAtom) continue
+        const depEntry = this.cache.get(depAtom)
+        if (depEntry) {
+          depEntry.dependents.delete(atom)
+          this.maybeScheduleGC(depAtom)
+        }
+      }
+    }
+
     this.cache.delete(atom)
     this.controllers.delete(atom)
 
@@ -981,7 +1012,12 @@ class ScopeImpl implements Lite.Scope {
   }
 
   async dispose(): Promise<void> {
+    if (this.chainPromise) {
+      try { await this.chainPromise } catch {}
+    }
+
     this.disposed = true
+
     this.invalidationQueue.clear()
     this.invalidationChain = null
     this.chainPromise = null
@@ -1012,6 +1048,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
+    if (this.disposed) throw new Error("Scope is disposed")
     const ctx = new ExecutionContextImpl(this, options)
 
     for (const tagged of options?.tags ?? []) {

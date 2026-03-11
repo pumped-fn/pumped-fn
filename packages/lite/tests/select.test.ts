@@ -307,4 +307,67 @@ describe("scope.select()", () => {
       expect(handle2.get()?.text).toBe("Build MORE")
     })
   })
+
+  describe("SelectHandle tracks changes without subscribers", () => {
+    it("get() returns fresh value even without active subscribers", async () => {
+      let value = 1
+      const myAtom = atom({ factory: () => value })
+      const scope = createScope()
+      await scope.resolve(myAtom)
+
+      const handle = scope.select(myAtom, (n) => n * 10)
+      expect(handle.get()).toBe(10)
+
+      value = 2
+      scope.controller(myAtom).invalidate()
+      await scope.flush()
+
+      expect(handle.get()).toBe(20)
+    })
+
+    it("refreshes value on re-subscribe after auto-cleanup", async () => {
+      let value = 1
+      const myAtom = atom({ factory: () => value })
+      const scope = createScope()
+      await scope.resolve(myAtom)
+
+      const handle = scope.select(myAtom, (n) => n * 10)
+      const unsub = handle.subscribe(() => {})
+      unsub()
+
+      value = 2
+      scope.controller(myAtom).invalidate()
+      await scope.flush()
+
+      const unsub2 = handle.subscribe(() => {})
+      expect(handle.get()).toBe(20)
+      unsub2()
+    })
+  })
+
+  describe("SelectHandle dispose", () => {
+    it("exposes a dispose method", async () => {
+      const scope = createScope()
+      const myAtom = atom({ factory: () => 42 })
+      await scope.resolve(myAtom)
+
+      const handle = scope.select(myAtom, (n) => n)
+      expect(handle.dispose).toBeTypeOf("function")
+    })
+
+    it("dispose() cleans up internal subscription", async () => {
+      let factoryCalls = 0
+      const myAtom = atom({ factory: () => ++factoryCalls })
+      const scope = createScope({ gc: { enabled: true, graceMs: 10 } })
+      await scope.resolve(myAtom)
+
+      const handle = scope.select(myAtom, (n) => n)
+      handle.dispose()
+
+      scope.controller(myAtom).invalidate()
+      await scope.flush()
+
+      expect(handle.get()).toBe(1)
+    })
+  })
 })

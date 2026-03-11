@@ -1204,7 +1204,7 @@ describe("ExecutionContext", () => {
       expect(notifications).toEqual(["resolved"])
     })
 
-    it("does not run cleanups on set (factory does not re-run)", async () => {
+    it("does not run cleanups on set (value replacement bypasses factory)", async () => {
       const scope = createScope()
       const cleanups: string[] = []
       const myAtom = atom({
@@ -2866,5 +2866,143 @@ describe("Triage regression tests", () => {
 
     await ctx.close()
     await scope.dispose()
+  })
+})
+
+describe("release() cleanup", () => {
+  it("removes atom from dependency dependents sets on release", async () => {
+    let factoryCalls = 0
+    const depAtom = atom({ factory: () => { factoryCalls++; return "dep" } })
+    const parentAtom = atom({
+      deps: { dep: depAtom },
+      factory: (_ctx, { dep }) => `parent-${dep}`,
+    })
+
+    const scope = createScope({ gc: { enabled: true, graceMs: 10 } })
+    await scope.resolve(parentAtom)
+    expect(factoryCalls).toBe(1)
+
+    await scope.release(parentAtom)
+
+    await new Promise(r => setTimeout(r, 50))
+
+    await scope.resolve(depAtom)
+    expect(factoryCalls).toBe(2)
+    await scope.dispose()
+  })
+
+  it("controller operations throw after release", async () => {
+    const myAtom = atom({ factory: () => 42 })
+    const scope = createScope()
+    await scope.resolve(myAtom)
+
+    const ctrl = scope.controller(myAtom)
+    await scope.release(myAtom)
+
+    expect(() => ctrl.get()).toThrow()
+  })
+})
+
+describe("pendingSet on failure path", () => {
+  it("applies pendingSet even if factory throws during resolve", async () => {
+    let callCount = 0
+    const myAtom = atom({
+      factory: () => {
+        callCount++
+        if (callCount === 2) throw new Error("factory fail")
+        return callCount
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(myAtom)
+
+    const ctrl = scope.controller(myAtom)
+
+    ctrl.invalidate()
+    ctrl.on("resolving", () => {
+      ctrl.set(999)
+    })
+
+    await scope.flush()
+
+    expect(ctrl.get()).toBe(999)
+    expect(ctrl.state).toBe("resolved")
+  })
+})
+
+describe("listener notification", () => {
+  it("adding a listener during notification does not fire it in the same cycle", async () => {
+    const myAtom = atom({ factory: () => 42 })
+    const scope = createScope()
+    await scope.resolve(myAtom)
+
+    const ctrl = scope.controller(myAtom)
+    let innerFired = false
+
+    ctrl.on("resolved", () => {
+      ctrl.on("resolved", () => {
+        innerFired = true
+      })
+    })
+
+    ctrl.invalidate()
+    await scope.flush()
+
+    expect(innerFired).toBe(false)
+  })
+})
+
+describe("dispose() behavior", () => {
+  it("awaits in-flight invalidation chain before releasing", async () => {
+    let factoryRuns = 0
+    const myAtom = atom({
+      factory: async () => {
+        factoryRuns++
+        await new Promise(r => setTimeout(r, 10))
+        return factoryRuns
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(myAtom)
+
+    scope.controller(myAtom).invalidate()
+    await scope.dispose()
+
+    expect(factoryRuns).toBeGreaterThanOrEqual(1)
+  })
+
+  it("drains pending invalidation chain before marking disposed", async () => {
+    let resolveCount = 0
+    const myAtom = atom({
+      factory: () => ++resolveCount,
+    })
+
+    const scope = createScope()
+    await scope.resolve(myAtom)
+    expect(resolveCount).toBe(1)
+
+    scope.controller(myAtom).invalidate()
+
+    await scope.dispose()
+
+    expect(resolveCount).toBe(2)
+  })
+
+  it("throws on resolve() after dispose()", async () => {
+    const myAtom = atom({ factory: () => 42 })
+    const scope = createScope()
+    await scope.resolve(myAtom)
+    await scope.dispose()
+
+    await expect(scope.resolve(myAtom)).rejects.toThrow()
+  })
+
+  it("throws on createContext() after dispose()", async () => {
+    const scope = createScope()
+    await scope.dispose()
+
+    expect(() => scope.createContext()).toThrow()
   })
 })

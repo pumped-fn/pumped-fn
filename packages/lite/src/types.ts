@@ -101,6 +101,10 @@ export namespace Lite {
      * Returns first match or undefined (ignores tag defaults).
      */
     seekTag<T>(tag: Tag<T, boolean>): T | undefined
+    /**
+     * Check if key exists locally or in parent chain.
+     */
+    seekHas(key: string | symbol): boolean
 
     // Tag-based operations (type-safe DX)
     /** Get value by tag, returns undefined if not stored */
@@ -212,6 +216,7 @@ export namespace Lite {
   export interface SelectHandle<S> {
     get(): S
     subscribe(listener: () => void): () => void
+    dispose(): void
   }
 
   export interface Tag<T, HasDefault extends boolean = false> {

@@ -100,3 +100,47 @@ describe("invalidation chain", () => {
     expect(count).toBe(1)
   })
 })
+
+describe("pendingSet in invalidation chain", () => {
+  it("does not run cleanups when set() replaces value (bypasses factory)", async () => {
+    let cleanupCalled = false
+    const myAtom = atom({
+      factory: (ctx) => {
+        ctx.cleanup(() => { cleanupCalled = true })
+        return "initial"
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(myAtom)
+
+    const ctrl = scope.controller(myAtom)
+    ctrl.set("replaced")
+    await scope.flush()
+
+    expect(cleanupCalled).toBe(false)
+  })
+
+  it("does not false-positive infinite loop on pendingSet + re-invalidation", async () => {
+    const atomA = atom({ factory: () => "a" })
+    const atomB = atom({
+      deps: { a: controller(atomA, { resolve: true }) },
+      factory: (_ctx, { a }) => `b-${a.get()}`,
+    })
+
+    const scope = createScope()
+    await scope.resolve(atomA)
+    await scope.resolve(atomB)
+
+    const ctrlA = scope.controller(atomA)
+    const ctrlB = scope.controller(atomB)
+
+    ctrlA.on("resolved", () => ctrlB.invalidate())
+
+    ctrlA.set("a2")
+
+    await scope.flush()
+
+    expect(ctrlA.get()).toBe("a2")
+  })
+})

@@ -396,4 +396,81 @@ describe("resource", () => {
       await scope.dispose()
     })
   })
+
+  describe("concurrent resource resolution", () => {
+    it("two concurrent contexts can resolve the same resource", async () => {
+      let callCount = 0
+      const sharedResource = resource({
+        name: "shared",
+        factory: async () => {
+          callCount++
+          await new Promise(r => setTimeout(r, 20))
+          return { id: callCount }
+        },
+      })
+
+      const testFlow = flow({
+        deps: { r: sharedResource },
+        factory: (_ctx, { r }) => r,
+      })
+
+      const scope = createScope()
+      await scope.ready
+
+      const ctx1 = scope.createContext()
+      const ctx2 = scope.createContext()
+
+      const [result1, result2] = await Promise.all([
+        ctx1.exec({ flow: testFlow }),
+        ctx2.exec({ flow: testFlow }),
+      ])
+
+      expect(result1).toBeDefined()
+      expect(result2).toBeDefined()
+      expect(callCount).toBe(2)
+
+      await ctx1.close()
+      await ctx2.close()
+      await scope.dispose()
+    })
+
+    it("sibling exec calls under one parent do not false-positive circular dependency", async () => {
+      let callCount = 0
+      const sharedResource = resource({
+        name: "sibling-shared",
+        factory: async () => {
+          callCount++
+          await new Promise(r => setTimeout(r, 10))
+          return `val-${callCount}`
+        },
+      })
+
+      const childFlow = flow({
+        deps: { r: sharedResource },
+        factory: (_ctx, { r }) => r,
+      })
+
+      const parentFlow = flow({
+        factory: async (ctx) => {
+          const [a, b] = await Promise.all([
+            ctx.exec({ flow: childFlow }),
+            ctx.exec({ flow: childFlow }),
+          ])
+          return [a, b]
+        },
+      })
+
+      const scope = createScope()
+      await scope.ready
+      const ctx = scope.createContext()
+
+      const results = await ctx.exec({ flow: parentFlow })
+      expect(results).toHaveLength(2)
+      expect(results[0]).toBeDefined()
+      expect(results[1]).toBeDefined()
+
+      await ctx.close()
+      await scope.dispose()
+    })
+  })
 })

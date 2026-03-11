@@ -32,6 +32,21 @@ describe("Preset", () => {
     expect(() => preset({} as any, "value")).toThrow("preset target must be Atom or Flow")
   })
 
+  describe("preset with undefined value", () => {
+    it("preset(atom, undefined) applies undefined as the value", async () => {
+      const myAtom = atom({
+        factory: () => "factory-value" as string | undefined,
+      })
+
+      const scope = createScope({
+        presets: [preset(myAtom, undefined)],
+      })
+
+      const result = await scope.resolve(myAtom)
+      expect(result).toBeUndefined()
+    })
+  })
+
   describe("Flow presets", () => {
     it("flow preset with function bypasses deps", async () => {
       const depAtom = atom({
