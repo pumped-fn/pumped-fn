@@ -12,7 +12,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-  
+    allow:
+      - dependency-type: "direct"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
