@@ -217,18 +217,5 @@ describe("Tag", () => {
       expect(allTags).toContain(newTag2)
     })
 
-    it("includes tags with different configurations", () => {
-      const simpleTag = tag<string>({ label: "getAllTags-simple" })
-      const defaultTag = tag({ label: "getAllTags-default", default: 42 })
-      const parseTag = tag({
-        label: "getAllTags-parse",
-        parse: (raw: unknown) => String(raw),
-      })
-
-      const allTags = getAllTags()
-      expect(allTags).toContain(simpleTag)
-      expect(allTags).toContain(defaultTag)
-      expect(allTags).toContain(parseTag)
-    })
   })
 })

@@ -29,22 +29,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Component
-    participant SelectHandle
+    participant useSelect
     participant Atom
 
     Note over Atom: value.email changes
-    Atom->>SelectHandle: notify
-    SelectHandle->>SelectHandle: selector(value) → same result
+    Atom->>useSelect: notify
+    useSelect->>useSelect: selector(value) → same result
     Note over Component: NO re-render
 
     Note over Atom: value.name changes
-    Atom->>SelectHandle: notify
-    SelectHandle->>SelectHandle: selector(value) → different
-    SelectHandle->>Component: re-render
+    Atom->>useSelect: notify
+    useSelect->>useSelect: selector(value) → different
+    useSelect->>Component: re-render
 ```
 
-- Default equality: `===` (reference)
+- Default equality: `Object.is`
 - Custom equality for complex comparisons
+- Selector logic is reevaluated when the store changes or you pass a new selector function, so prop-driven selectors stay in sync without waiting for another atom update
 
 ---
 

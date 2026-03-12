@@ -2,19 +2,15 @@ import { describe, it, expect } from "vitest"
 import { atom, isAtom, controller, isControllerDep } from "../src/atom"
 
 describe("keepAlive", () => {
-  it("atom without keepAlive has keepAlive undefined", () => {
-    const myAtom = atom({ factory: () => "value" })
-    expect(myAtom.keepAlive).toBeUndefined()
-  })
+  it("preserves keepAlive property for all variants", () => {
+    const noKeepAlive = atom({ factory: () => "value" })
+    expect(noKeepAlive.keepAlive).toBeUndefined()
 
-  it("atom with keepAlive: true has keepAlive true", () => {
-    const myAtom = atom({ factory: () => "value", keepAlive: true })
-    expect(myAtom.keepAlive).toBe(true)
-  })
+    const withKeepAlive = atom({ factory: () => "value", keepAlive: true })
+    expect(withKeepAlive.keepAlive).toBe(true)
 
-  it("atom with keepAlive: false has keepAlive false", () => {
-    const myAtom = atom({ factory: () => "value", keepAlive: false })
-    expect(myAtom.keepAlive).toBe(false)
+    const explicitFalse = atom({ factory: () => "value", keepAlive: false })
+    expect(explicitFalse.keepAlive).toBe(false)
   })
 })
 

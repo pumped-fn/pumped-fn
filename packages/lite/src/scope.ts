@@ -244,6 +244,7 @@ class ScopeImpl implements Lite.Scope {
   private invalidationScheduled = false
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
+  private chainError: unknown = null
   private initialized = false
   private disposed = false
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
@@ -268,11 +269,21 @@ class ScopeImpl implements Lite.Scope {
     if (!this.chainPromise) {
       this.invalidationChain = new Set()
       this.invalidationScheduled = true
-      this.chainPromise = new Promise<void>((resolve, reject) => {
-        queueMicrotask(() => {
-          this.processInvalidationChain().then(resolve).catch(reject)
+      this.chainError = null
+      const chainPromise = (async () => {
+        await new Promise<void>((resolve) => {
+          queueMicrotask(resolve)
         })
-      })
+
+        try {
+          await this.processInvalidationChain()
+        } catch (error) {
+          if (this.chainError === null) {
+            this.chainError = error
+          }
+        }
+      })()
+      this.chainPromise = chainPromise
     }
   }
 
@@ -1044,6 +1055,11 @@ class ScopeImpl implements Lite.Scope {
   async flush(): Promise<void> {
     if (this.chainPromise) {
       await this.chainPromise
+    }
+    if (this.chainError !== null) {
+      const error = this.chainError
+      this.chainError = null
+      throw error
     }
   }
 

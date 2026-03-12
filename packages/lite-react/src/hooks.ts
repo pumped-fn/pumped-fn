@@ -27,23 +27,32 @@ interface UseControllerOptions {
   resolve?: boolean
 }
 
-const pendingPromises = new WeakMap<Lite.Atom<unknown>, Promise<unknown>>()
+const pendingPromises = new WeakMap<Lite.Controller<unknown>, Promise<unknown>>()
 
-function getOrCreatePendingPromise<T>(atom: Lite.Atom<T>, ctrl: Lite.Controller<T>): Promise<T> {
-  let pending = pendingPromises.get(atom) as Promise<T> | undefined
+function getOrCreatePendingPromise<T>(ctrl: Lite.Controller<T>): Promise<T> {
+  let pending = pendingPromises.get(ctrl) as Promise<T> | undefined
   if (!pending) {
     if (ctrl.state === 'resolving') {
-      pending = new Promise<T>((resolve) => {
-        const unsub = ctrl.on('resolved', () => {
-          unsub()
-          resolve(ctrl.get())
+      pending = new Promise<T>((resolve, reject) => {
+        const unsub = ctrl.on('*', () => {
+          if (ctrl.state === 'resolved') {
+            unsub()
+            resolve(ctrl.get())
+          } else if (ctrl.state === 'failed') {
+            unsub()
+            try { ctrl.get() } catch (e) { reject(e) }
+          }
         })
       })
     } else {
       pending = ctrl.resolve()
     }
-    pendingPromises.set(atom, pending)
-    pending.finally(() => pendingPromises.delete(atom))
+    pendingPromises.set(ctrl, pending)
+    void pending.catch(() => {})
+    pending.then(
+      () => pendingPromises.delete(ctrl),
+      () => pendingPromises.delete(ctrl)
+    )
   }
   return pending
 }
@@ -56,8 +65,10 @@ function getOrCreatePendingPromise<T>(atom: Lite.Atom<T>, ctrl: Lite.Controller<
  *
  * @example
  * ```tsx
- * const scope = useScope()
- * await scope.resolve(myAtom)
+ * function MyComponent() {
+ *   const scope = useScope()
+ *   const handleClick = () => scope.resolve(myAtom)
+ * }
  * ```
  */
 function useScope(): Lite.Scope {
@@ -85,7 +96,7 @@ function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): L
 
   if (options?.resolve) {
     if (ctrl.state === 'idle' || ctrl.state === 'resolving') {
-      throw getOrCreatePendingPromise(atom, ctrl)
+      throw getOrCreatePendingPromise(ctrl)
     }
     if (ctrl.state === 'failed') {
       throw ctrl.get()
@@ -109,64 +120,51 @@ function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomSuspenseOptions): T
 function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomManualOptions): UseAtomState<T>
 function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomState<T> {
   const ctrl = useController(atom)
-  const atomRef = useRef(atom)
-  atomRef.current = atom
+  const ctrlState = ctrl.state
 
-  if (options?.suspense === false) {
-    return useAtomState(atom, ctrl, options.resolve ?? false)
-  }
+  const isSuspense = options?.suspense !== false
+  const autoResolve = isSuspense ? options?.resolve !== false : !!options?.resolve
 
-  const autoResolve = options?.resolve !== false
-
-  const getSnapshot = useCallback((): T => {
-    if (ctrl.state === 'idle') {
-      if (autoResolve) {
-        throw getOrCreatePendingPromise(atomRef.current, ctrl)
-      }
-      throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
-    }
-    if (ctrl.state === 'failed') {
-      throw ctrl.get()
-    }
-    try {
-      return ctrl.get()
-    } catch {
-      throw getOrCreatePendingPromise(atomRef.current, ctrl)
-    }
-  }, [ctrl, autoResolve])
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
-    [ctrl]
-  )
-
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-}
-
-function useAtomState<T>(
-  atom: Lite.Atom<T>,
-  ctrl: Lite.Controller<T>,
-  autoResolve: boolean
-): UseAtomState<T> {
   const stateCache = useRef<{
+    ctrl: Lite.Controller<T>
     ctrlState: Lite.Controller<T>['state']
     data: T | undefined
     error: Error | undefined
+    loading: boolean
     result: UseAtomState<T>
   } | null>(null)
 
   useEffect(() => {
-    if (autoResolve && (ctrl.state === 'idle' || ctrl.state === 'resolving')) {
-      getOrCreatePendingPromise(atom, ctrl)
+    if (!isSuspense && (ctrlState === 'resolving' || (autoResolve && ctrlState === 'idle'))) {
+      void getOrCreatePendingPromise(ctrl).catch(() => {})
     }
-  }, [atom, ctrl, autoResolve])
+  }, [ctrl, ctrlState, autoResolve, isSuspense])
 
-  const getSnapshot = useCallback((): UseAtomState<T> => {
+  const getSnapshot = useCallback((): T | UseAtomState<T> => {
+    if (isSuspense) {
+      if (ctrl.state === 'idle') {
+        if (autoResolve) {
+          throw getOrCreatePendingPromise(ctrl)
+        }
+        throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
+      }
+      if (ctrl.state === 'failed') {
+        throw ctrl.get()
+      }
+      try {
+        return ctrl.get()
+      } catch {
+        throw getOrCreatePendingPromise(ctrl)
+      }
+    }
+
     let data: T | undefined
     let error: Error | undefined
 
-    if (ctrl.state === 'resolved') {
-      data = ctrl.get()
+    if (ctrl.state === 'resolved' || ctrl.state === 'resolving') {
+      try {
+        data = ctrl.get()
+      } catch {}
     } else if (ctrl.state === 'failed') {
       try {
         ctrl.get()
@@ -175,30 +173,38 @@ function useAtomState<T>(
       }
     }
 
+    const loading = ctrl.state === 'resolving' || (autoResolve && ctrl.state === 'idle')
+
     if (
       stateCache.current &&
+      stateCache.current.ctrl === ctrl &&
       stateCache.current.ctrlState === ctrl.state &&
       stateCache.current.data === data &&
-      stateCache.current.error === error
+      stateCache.current.error === error &&
+      stateCache.current.loading === loading
     ) {
       return stateCache.current.result
     }
 
     const result: UseAtomState<T> = {
       data,
-      loading: ctrl.state === 'resolving',
+      loading,
       error,
       controller: ctrl,
     }
 
-    stateCache.current = { ctrlState: ctrl.state, data, error, result }
+    stateCache.current = { ctrl, ctrlState: ctrl.state, data, error, loading, result }
     return result
-  }, [ctrl])
+  }, [ctrl, autoResolve, isSuspense])
 
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => ctrl.on('*', onStoreChange),
-    [ctrl]
-  )
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    return ctrl.on('*', () => {
+      if (!isSuspense && ctrl.state === 'resolving') {
+        void getOrCreatePendingPromise(ctrl).catch(() => {})
+      }
+      onStoreChange()
+    })
+  }, [ctrl, isSuspense])
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
@@ -222,56 +228,74 @@ function useSelect<T, S>(
   selector: (value: T) => S,
   eq?: (a: S, b: S) => boolean
 ): S {
-  const scope = useScope()
   const ctrl = useController(atom)
-
-  const atomRef = useRef(atom)
-  atomRef.current = atom
 
   const selectorRef = useRef(selector)
   const eqRef = useRef(eq)
   selectorRef.current = selector
   eqRef.current = eq
 
-  const stableSelector = useCallback((value: T): S => selectorRef.current(value), [])
-  const stableEq = useCallback((a: S, b: S): boolean => (eqRef.current ?? Object.is)(a, b), [])
-
-  const handleRef = useRef<{
-    scope: Lite.Scope
-    atom: Lite.Atom<T>
-    handle: Lite.SelectHandle<S>
+  const selectionCache = useRef<{
+    ctrl: Lite.Controller<T>
+    ctrlState: Lite.Controller<T>['state']
+    source: T
+    selector: (value: T) => S
+    eq: ((a: S, b: S) => boolean) | undefined
+    value: S
   } | null>(null)
-
-  const getOrCreateHandle = useCallback(() => {
-    if (
-      !handleRef.current ||
-      handleRef.current.scope !== scope ||
-      handleRef.current.atom !== atom
-    ) {
-      const handle = scope.select(atom, stableSelector, { eq: stableEq })
-      handleRef.current = { scope, atom, handle }
-    }
-    return handleRef.current.handle
-  }, [scope, atom, stableSelector, stableEq])
 
   const getSnapshot = useCallback((): S => {
     const state = ctrl.state
-    if (state === 'idle' || state === 'resolving') {
-      throw getOrCreatePendingPromise(atomRef.current, ctrl)
+    if (state === 'idle') {
+      throw getOrCreatePendingPromise(ctrl)
     }
     if (state === 'failed') {
       throw ctrl.get()
     }
-    getOrCreateHandle()
-    return selectorRef.current(ctrl.get())
-  }, [ctrl, getOrCreateHandle])
+    let value: T
+    try {
+      value = ctrl.get()
+    } catch {
+      throw getOrCreatePendingPromise(ctrl)
+    }
+
+    const nextSelector = selectorRef.current
+    const nextEq = eqRef.current
+    const current = selectionCache.current
+    if (
+      current &&
+      current.ctrl === ctrl &&
+      current.ctrlState === state &&
+      Object.is(current.source, value) &&
+      current.selector === nextSelector &&
+      current.eq === nextEq
+    ) {
+      return current.value
+    }
+
+    const nextValue = nextSelector(value)
+    const selectedValue = current &&
+      current.ctrl === ctrl &&
+      current.selector === nextSelector &&
+      (nextEq ?? Object.is)(current.value, nextValue)
+      ? current.value
+      : nextValue
+
+    selectionCache.current = {
+      ctrl,
+      ctrlState: state,
+      source: value,
+      selector: nextSelector,
+      eq: nextEq,
+      value: selectedValue,
+    }
+
+    return selectedValue
+  }, [ctrl])
 
   const subscribe = useCallback((onStoreChange: () => void) => {
-    if (ctrl.state !== 'resolved') {
-      return () => {}
-    }
-    return getOrCreateHandle().subscribe(onStoreChange)
-  }, [ctrl, getOrCreateHandle])
+    return ctrl.on('*', onStoreChange)
+  }, [ctrl])
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

@@ -525,6 +525,113 @@ describe('useSelect - equality filtering', () => {
 
     expect(screen.getByTestId('name')).toHaveTextContent('Alice')
   })
+
+  it('caches derived object snapshots when the store has not changed', async () => {
+    type User = { name: string }
+    const userAtom = atom<User>({
+      factory: async () => ({ name: 'Alice' }),
+    })
+
+    const scope = createScope()
+    await scope.resolve(userAtom)
+
+    const seen: Array<{ name: string }> = []
+    const selectName = (user: User) => ({ name: user.name })
+
+    function TestComponent({ label }: { label: string }) {
+      const value = useSelect(userAtom, selectName)
+      seen.push(value)
+      return <div data-testid="value">{label}:{value.name}</div>
+    }
+
+    const { rerender } = render(
+      <ScopeProvider scope={scope}>
+        <TestComponent label="first" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('first:Alice')
+
+    rerender(
+      <ScopeProvider scope={scope}>
+        <TestComponent label="second" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('second:Alice')
+    expect(seen).toHaveLength(2)
+    expect(seen[0]).toBe(seen[1])
+  })
+
+  it('recomputes when selector semantics change without an atom update', async () => {
+    type User = { name: string; email: string }
+    const userAtom = atom<User>({
+      factory: async () => ({ name: 'Alice', email: 'alice@example.com' }),
+    })
+
+    const scope = createScope()
+    await scope.resolve(userAtom)
+
+    function TestComponent({ field }: { field: 'name' | 'email' }) {
+      const value = useSelect(userAtom, (user) => user[field])
+      return <div data-testid="value">{value}</div>
+    }
+
+    const { rerender } = render(
+      <ScopeProvider scope={scope}>
+        <TestComponent field="name" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('Alice')
+
+    rerender(
+      <ScopeProvider scope={scope}>
+        <TestComponent field="email" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('alice@example.com')
+  })
+
+  it('recomputes when selector semantics change under a custom equality function', async () => {
+    type Value = { id: string; label: string }
+    type State = { a: Value; b: Value }
+    const stateAtom = atom<State>({
+      factory: async () => ({
+        a: { id: '1', label: 'A' },
+        b: { id: '1', label: 'B' },
+      }),
+    })
+
+    const scope = createScope()
+    await scope.resolve(stateAtom)
+
+    function TestComponent({ field }: { field: keyof State }) {
+      const value = useSelect(
+        stateAtom,
+        (state) => state[field],
+        (left, right) => left.id === right.id
+      )
+      return <div data-testid="value">{value.label}</div>
+    }
+
+    const { rerender } = render(
+      <ScopeProvider scope={scope}>
+        <TestComponent field="a" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('A')
+
+    rerender(
+      <ScopeProvider scope={scope}>
+        <TestComponent field="b" />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('B')
+  })
 })
 
 describe('useSelect - state handling', () => {
@@ -618,6 +725,106 @@ describe('useSelect - state handling', () => {
     )
 
     expect(screen.getByText('Error caught')).toBeInTheDocument()
+  })
+
+  it('surfaces refresh failures after a previously resolved value', async () => {
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        if (callCount === 1) {
+          return 'ok'
+        }
+        throw new Error('Refresh failed')
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    function TestComponent() {
+      const value = useSelect(testAtom, (v) => v)
+      const ctrl = useController(testAtom)
+
+      return (
+        <div>
+          <span data-testid="value">{value}</span>
+          <button onClick={() => ctrl.invalidate()}>Refresh</button>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <ErrorBoundary fallback={<div>Error caught</div>}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <TestComponent />
+          </Suspense>
+        </ErrorBoundary>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('value')).toHaveTextContent('ok')
+
+    await act(async () => {
+      screen.getByText('Refresh').click()
+      await scope.flush().catch(() => {})
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Error caught')).toBeInTheDocument()
+    })
+  })
+
+  it('returns stale selection for a fresh subscriber while re-resolving', async () => {
+    let resolveNext: ((value: string) => void) | null = null
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        if (callCount === 1) {
+          return 'value-1'
+        }
+        return new Promise<string>((resolve) => {
+          resolveNext = resolve
+        })
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+    const ctrl = scope.controller(testAtom)
+    ctrl.invalidate()
+
+    await waitFor(() => {
+      expect(ctrl.state).toBe('resolving')
+      expect(resolveNext).not.toBeNull()
+    })
+
+    function TestComponent() {
+      const value = useSelect(testAtom, (v) => v)
+      return <div data-testid="value">{value}</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <TestComponent />
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    expect(screen.getByTestId('value')).toHaveTextContent('value-1')
+
+    await act(async () => {
+      resolveNext?.('value-2')
+      await scope.flush()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('value')).toHaveTextContent('value-2')
+    })
   })
 })
 
@@ -913,6 +1120,117 @@ describe('useAtom - non-Suspense mode', () => {
     })
   })
 
+  it('does not emit unhandledRejection when auto-resolve fails', async () => {
+    const testAtom = atom({
+      factory: async () => {
+        throw new Error('auto resolve failed')
+      },
+    })
+
+    const scope = createScope()
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason)
+    }
+
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      function TestComponent() {
+        const { error, loading } = useAtom(testAtom, { suspense: false, resolve: true })
+        return (
+          <div>
+            <span data-testid="loading">{loading.toString()}</span>
+            <span data-testid="error">{error?.message ?? 'none'}</span>
+          </div>
+        )
+      }
+
+      render(
+        <ScopeProvider scope={scope}>
+          <TestComponent />
+        </ScopeProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('false')
+        expect(screen.getByTestId('error')).toHaveTextContent('auto resolve failed')
+      })
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(unhandled).toHaveLength(0)
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled)
+    }
+  })
+
+  it('does not emit unhandledRejection when a manual refresh fails', async () => {
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        if (callCount === 1) {
+          return 'value-1'
+        }
+        throw new Error('refresh failed')
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason)
+    }
+
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      function TestComponent() {
+        const { data, error, loading, controller } = useAtom(testAtom, { suspense: false, resolve: true })
+        return (
+          <div>
+            <span data-testid="data">{data ?? 'undefined'}</span>
+            <span data-testid="loading">{loading.toString()}</span>
+            <span data-testid="error">{error?.message ?? 'none'}</span>
+            <button onClick={() => controller.invalidate()}>Refresh</button>
+          </div>
+        )
+      }
+
+      render(
+        <ScopeProvider scope={scope}>
+          <TestComponent />
+        </ScopeProvider>
+      )
+
+      expect(screen.getByTestId('data')).toHaveTextContent('value-1')
+      expect(screen.getByTestId('error')).toHaveTextContent('none')
+
+      await act(async () => {
+        screen.getByText('Refresh').click()
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('data')).toHaveTextContent('undefined')
+        expect(screen.getByTestId('loading')).toHaveTextContent('false')
+        expect(screen.getByTestId('error')).toHaveTextContent('refresh failed')
+      })
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(unhandled).toHaveLength(0)
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled)
+    }
+  })
+
   it('updates when controller.invalidate() is called', async () => {
     let callCount = 0
     const testAtom = atom({
@@ -952,6 +1270,98 @@ describe('useAtom - non-Suspense mode', () => {
     await waitFor(() => {
       expect(screen.getByTestId('data')).toHaveTextContent('value-2')
     })
+  })
+
+  it('keeps stale data visible while refresh is in flight', async () => {
+    let resolveNext: ((value: string) => void) | null = null
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        if (callCount === 1) {
+          return 'value-1'
+        }
+        return new Promise<string>((resolve) => {
+          resolveNext = resolve
+        })
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    function TestComponent() {
+      const { data, loading, controller } = useAtom(testAtom, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{data ?? 'undefined'}</span>
+          <span data-testid="loading">{loading.toString()}</span>
+          <button onClick={() => controller.invalidate()}>Refresh</button>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('value-1')
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+
+    await act(async () => {
+      screen.getByText('Refresh').click()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('data')).toHaveTextContent('value-1')
+    expect(screen.getByTestId('loading')).toHaveTextContent('true')
+
+    await act(async () => {
+      resolveNext?.('value-2')
+      await scope.flush()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('data')).toHaveTextContent('value-2')
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+  })
+
+  it('returns the current scope controller when the provider changes with identical data', async () => {
+    const testAtom = atom({
+      factory: async () => 'shared value',
+    })
+
+    const scopeA = createScope()
+    const scopeB = createScope()
+    await scopeA.resolve(testAtom)
+    await scopeB.resolve(testAtom)
+
+    const seen: Lite.Controller<string>[] = []
+
+    function TestComponent() {
+      const { controller } = useAtom(testAtom, { suspense: false })
+      seen.push(controller)
+      return <div>test</div>
+    }
+
+    const { rerender } = render(
+      <ScopeProvider scope={scopeA}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    rerender(
+      <ScopeProvider scope={scopeB}>
+        <TestComponent />
+      </ScopeProvider>
+    )
+
+    expect(seen).toHaveLength(2)
+    expect(seen[0]).toBe(scopeA.controller(testAtom))
+    expect(seen[1]).toBe(scopeB.controller(testAtom))
   })
 })
 

@@ -134,7 +134,7 @@ describe("B4: controller.get() throughput", () => {
       sum += ctrl.get()
     }
     await scope.dispose()
-    return sum
+    void sum
   })
 })
 

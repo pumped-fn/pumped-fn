@@ -1,6 +1,6 @@
 # @pumped-fn/lite-react
 
-React bindings for `@pumped-fn/lite` with Suspense and ErrorBoundary integration.
+React bindings for `@pumped-fn/lite` with Suspense, ErrorBoundary integration, and stale-while-revalidate refreshes.
 
 **Zero dependencies** · **<2KB bundle** · **React 18+**
 
@@ -20,12 +20,14 @@ sequenceDiagram
     alt resolved
         Controller-->>useAtom: value
         useAtom->>Controller: subscribe to changes
-    else resolving
+    else resolving with stale value
+        Controller-->>useAtom: stale value
+    else resolving without value
         useAtom-->>App: throw Promise (Suspense)
     else failed
         useAtom-->>App: throw Error (ErrorBoundary)
     else idle
-        useAtom-->>App: throw Error (not resolved)
+        useAtom-->>App: throw Promise (Suspense)
     end
 ```
 
@@ -37,19 +39,21 @@ flowchart TD
     Hook --> State{ctrl.state?}
 
     State -->|idle| AutoResolve[Auto-resolve + Throw Promise]
-    State -->|resolving| Promise[Throw cached Promise]
+    State -->|resolving + stale value| Stale[Return stale value]
+    State -->|resolving + no value| Promise[Throw cached Promise]
     State -->|resolved| Value[Return value]
     State -->|failed| Stored[Throw stored error]
 
     AutoResolve --> Suspense[Suspense catches]
     Promise --> Suspense
+    Stale --> Render[Keep current UI]
     Stored --> ErrorBoundary[ErrorBoundary catches]
 ```
 
 | State | Hook Behavior |
 |-------|---------------|
 | `idle` | Auto-resolves and suspends — Suspense shows fallback |
-| `resolving` | Throws cached promise — Suspense shows fallback |
+| `resolving` | Returns stale value if available, otherwise throws cached promise |
 | `resolved` | Returns value, subscribes to changes |
 | `failed` | Throws stored error — ErrorBoundary catches |
 
@@ -99,6 +103,8 @@ const ctrl = useController(configAtom, { resolve: true })
 ctrl.get() // safe - Suspense guarantees resolved state
 ```
 
+While a controller is re-resolving, `{ resolve: true }` keeps suspending until the controller settles.
+
 ### useAtom
 
 Subscribe to atom value with Suspense integration.
@@ -125,6 +131,7 @@ For manual loading/error state handling without Suspense:
 function UserProfile() {
   const { data, loading, error, controller } = useAtom(userAtom, { suspense: false })
 
+  if (loading && data) return <div>Refreshing {data.name}...</div>
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error.message}</div>
   if (!data) return <div>Not loaded</div>
@@ -150,6 +157,8 @@ const { data, loading, error } = useAtom(userAtom, { suspense: false, resolve: t
 | `{ suspense: false }` | Returns state object, no auto-resolve |
 | `{ suspense: false, resolve: true }` | Returns state object, auto-resolves on mount |
 
+While `loading` is `true`, `data` may still contain the last resolved value during a refresh.
+
 ### useSelect
 
 Fine-grained selection — only re-renders when selected value changes.
@@ -161,7 +170,7 @@ const count = useSelect(todosAtom, todos => todos.length, (a, b) => a === b)
 
 ## Invalidation
 
-When an atom is invalidated, hooks automatically suspend during re-resolution:
+When an atom is invalidated, `useAtom` and `useSelect` keep rendering the last value while re-resolving:
 
 ```mermaid
 sequenceDiagram
@@ -174,13 +183,15 @@ sequenceDiagram
 
     Note over Controller: ctrl.invalidate()
     Controller->>Controller: state = resolving
-    useAtom-->>Component: throw Promise
-    Note over Component: Suspense fallback
+    useAtom-->>Component: stale value
+    Note over Component: current UI stays visible
 
     Controller->>Controller: factory runs
     Controller->>Controller: state = resolved
     useAtom->>Component: re-render (new value)
 ```
+
+`useController(atom, { resolve: true })` is different: it suspends until the controller settles again.
 
 ## Testing
 
@@ -204,10 +215,9 @@ render(
 
 ## SSR
 
-SSR-compatible by design:
+SSR-compatible when request-scoped atoms are resolved before rendering:
 
 - No side effects on import
-- Uses `useSyncExternalStore` with server snapshot
 - Scope passed as prop (no global state)
 
 ```tsx
