@@ -1,5 +1,12 @@
 # @pumped-fn/lite
 
+## 2.1.2
+
+### Patch Changes
+
+- 8ed17e7: - Fix watch and invalidation edge cases in `@pumped-fn/lite` by aligning `select()` with `Object.is`, snapshotting select listeners during notification, making watch option typing match the runtime contract, and surfacing invalidation-chain failures from `flush()` instead of leaking them as background rejections.
+  - Fix `@pumped-fn/lite-react` hook refresh behavior by keeping stale values visible during re-resolution, recomputing `useSelect` snapshots when selector or equality semantics change, tracking pending promises per controller, and suppressing non-Suspense `unhandledRejection` leaks on failed refreshes.
+
 ## 2.1.1
 
 ### Patch Changes
