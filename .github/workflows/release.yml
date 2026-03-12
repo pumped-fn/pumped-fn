@@ -33,10 +33,12 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - name: Configure npm for OIDC
+      - name: Setup npm for OIDC trusted publishing
         run: |
+          npm install -g npm@^11.5.1
           npm config set registry https://registry.npmjs.org/
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          echo "npm version: $(npm --version)"
           npm config list
 
       - name: Install dependencies
