@@ -32,7 +32,12 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+
+      - name: Configure npm for OIDC
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          npm config list
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
