@@ -49,5 +49,13 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "packages/lite-devtools-server",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
   "license": "MIT"
 }
