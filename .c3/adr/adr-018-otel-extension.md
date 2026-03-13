@@ -11,6 +11,10 @@ date: 2025-12-10
 
 # [ADR-018] OpenTelemetry Extension for Lite Package
 
+## Goal
+
+Add a first-class OpenTelemetry integration path for lite applications that need production-grade observability.
+
 ## Status {#adr-018-status}
 **Accepted** - 2025-12-10
 

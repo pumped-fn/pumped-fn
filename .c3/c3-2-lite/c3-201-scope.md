@@ -1,13 +1,21 @@
 ---
 id: c3-201
-c3-version: 3
+c3-version: 4
 title: Scope & Controller
+type: component
+category: foundation
+parent: c3-2
+goal: Own scope lifecycle, controller state transitions, invalidation sequencing, and selection handles for the lite container.
 summary: >
   Core DI container with resolution caching, lifecycle states, and reactive
   Controller pattern for subscribing to atom state changes.
 ---
 
 # Scope & Controller
+
+## Goal
+
+Own the long-lived scope cache, controller contract, invalidation queue, and selection helpers that make the lite runtime observable and reusable.
 
 ## Overview {#c3-201-overview}
 <!-- Foundation of the DI system -->
@@ -18,6 +26,19 @@ The Scope is the central DI container that:
 - Provides Controllers for reactive access to atoms
 - Creates ExecutionContexts for flow execution
 - Emits state change events for observability
+
+## Container Connection
+
+This component is the core runtime surface for the lite container. Without it, the runtime would lose cache ownership, lifecycle transitions, controller-based observation, and the invalidation semantics that every higher-level integration depends on.
+
+## Dependencies
+
+| Direction | What | From/To |
+|-----------|------|---------|
+| IN (uses) | Atom/controller dependency shapes | c3-202 |
+| IN (uses) | Execution context semantics | c3-203 |
+| OUT (provides) | Scope, controller, invalidation, and select behavior | c3-2 |
+| OUT (provides) | React-facing controller semantics | c3-301 |
 
 ## Concepts {#c3-201-concepts}
 
@@ -68,10 +89,13 @@ Created from Scope for flow execution:
 ```typescript
 interface ExecutionContext {
   readonly input: unknown      // Current flow input
+  readonly name: string | undefined
   readonly scope: Scope        // Parent scope
+  readonly parent: ExecutionContext | undefined
+  readonly data: ContextData
   exec(options): Promise<T>    // Execute flow or function
-  onClose(fn): void            // Register cleanup
-  close(): Promise<void>       // Run cleanups
+  onClose(fn): void            // Register cleanup with close result
+  close(result?): Promise<void> // Run cleanups
 }
 ```
 
@@ -100,10 +124,12 @@ interface Scope {
   resolve<T>(atom: Atom<T>): Promise<T>
   controller<T>(atom: Atom<T>): Controller<T>
   controller<T>(atom: Atom<T>, options: { resolve: true }): Promise<Controller<T>>
+  flush(): Promise<void>
   release<T>(atom: Atom<T>): Promise<void>
   dispose(): Promise<void>
   createContext(options?: CreateContextOptions): ExecutionContext
   on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+  select<T, S>(atom: Atom<T>, selector: (value: T) => S, options?): SelectHandle<S>
 }
 ```
 
@@ -420,18 +446,18 @@ ctrl.update(user => ({ ...user, lastSeen: Date.now() }))
 
 ### Behavior
 
-Both methods follow the same flow as `invalidate()`:
-1. Queue via same invalidation mechanism
-2. Run cleanups (LIFO)
-3. State: `resolved → resolving → resolved`
-4. Replace value (from argument, not factory)
-5. Notify listeners
+Both methods use the same invalidation scheduler and listener flow as `invalidate()`, but the current fast path is not identical to a full re-resolution:
+1. Queue through the same microtask invalidation mechanism
+2. Transition `resolved → resolving → resolved`
+3. Replace value from the argument or updater, not from the factory
+4. Notify listeners for `resolving` and `resolved`
+5. Skip previously registered cleanups on the direct-value fast path
 
 ### Comparison with invalidate()
 
 | | `invalidate()` | `set(value)` / `update(fn)` |
 |---|---|---|
-| Runs cleanups | Yes | Yes |
+| Runs cleanups | Yes | No (current fast path) |
 | State transition | resolving → resolved | resolving → resolved |
 | Gets value from | Factory (async) | Argument (sync) |
 | Triggers listeners | Yes | Yes |
@@ -471,9 +497,11 @@ const wsAtom = atom({
 | State | `set()` / `update()` Behavior |
 |-------|-------------------------------|
 | `idle` | Throws "Atom not resolved" |
-| `resolving` | Queues, executes after resolution |
+| `resolving` | Queues a pending direct write for the current cycle |
 | `resolved` | Queues normally |
 | `failed` | Throws the stored error |
+
+`set(value)` and `update(fn)` also diverge on failure paths. A queued `set(value)` survives a failed re-resolution because the value is already materialized, while a queued `update(fn)` can be discarded if the preceding resolve never produces a usable base value.
 
 ## Event Listening {#c3-201-events}
 
@@ -535,13 +563,17 @@ const atom = atom({
 })
 ```
 
-## Source Files {#c3-201-source}
+## Code References {#c3-201-source}
 
 | File | Contents |
 |------|----------|
 | `src/scope.ts` | `createScope()`, `ScopeImpl`, `ControllerImpl`, `ExecutionContextImpl` |
 | `src/types.ts` | `Scope`, `Controller`, `ExecutionContext`, `AtomState` interfaces |
 | `src/symbols.ts` | `controllerSymbol` |
+
+## Related Refs
+
+No component-specific `ref-*` documents are wired yet for this runtime surface.
 
 ## Testing {#c3-201-testing}
 
@@ -556,8 +588,8 @@ Key test scenarios in `tests/scope.test.ts`:
 
 ## Related {#c3-201-related}
 
-- [c3-202](./c3-202-atom.md) - Atom definition
-- [c3-203](./c3-203-flow.md) - ExecutionContext usage in flows
+- [c3-202-atom](./c3-202-atom.md) - Atom definition
+- [c3-203-flow](./c3-203-flow.md) - ExecutionContext usage in flows
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller design decisions
 - [ADR-008](../adr/adr-008-sync-create-scope.md) - Synchronous createScope with ready promise
 - [ADR-009](../adr/adr-009-fix-duplicate-listener-notifications.md) - Controller.on() state filtering

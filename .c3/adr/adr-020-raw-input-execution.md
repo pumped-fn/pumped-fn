@@ -10,6 +10,10 @@ date: 2025-12-11
 
 # [ADR-020] Raw Input Execution for Flows with Parse
 
+## Goal
+
+Allow callers to pass untyped raw input into parsed flows and let the flow own validation.
+
 ## Status {#adr-020-status}
 **Accepted** - 2025-12-11
 

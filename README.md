@@ -17,6 +17,28 @@ An effect system manages **how** and **when** computations run:
 npm install @pumped-fn/lite
 ```
 
+## Goal
+
+Describe application state, execution-scoped work, and cross-cutting behavior as explicit dataflow instead of ad hoc globals or framework-owned stores.
+
+## Containers
+
+| Package | Role |
+|---------|------|
+| `@pumped-fn/lite` | Core runtime: atoms, flows, resources, tags, presets, controllers |
+| `@pumped-fn/lite-react` | React bindings over Lite controllers and subscriptions |
+| `@pumped-fn/lite-devtools` | Observability extension and transports |
+| `@pumped-fn/lite-devtools-server` | Terminal dashboard for remote devtools events |
+| `@pumped-fn/lite-hmr` | HMR helpers for atom state preservation |
+| `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
+
+## Abstract Constraints
+
+- Lifecycle and cache ownership stay in Lite scopes and controllers.
+- Cross-cutting behavior goes through extensions and tags rather than hidden globals.
+- Framework integrations should stay thin and adapt to the host rendering model instead of redefining Lite semantics.
+- Long-lived state belongs in atoms; execution/request-local work belongs in `ExecutionContext` and `resource()`.
+
 ## Core Concepts
 
 ```

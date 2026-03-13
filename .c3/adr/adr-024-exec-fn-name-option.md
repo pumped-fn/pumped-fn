@@ -10,6 +10,10 @@ date: 2025-12-12
 
 # [ADR-024] Add name Option to ExecFnOptions for API Consistency
 
+## Goal
+
+Make function execution naming consistent with flow execution naming across the `ctx.exec()` API.
+
 ## Status {#adr-024-status}
 **Accepted** - 2025-12-12
 

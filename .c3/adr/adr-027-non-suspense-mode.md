@@ -10,6 +10,10 @@ date: 2025-12-11
 
 # [ADR-027] Non-Suspense Mode for useAtom
 
+## Goal
+
+Let React consumers use lite state without Suspense boundaries when imperative loading and error rendering are a better fit.
+
 ## Status {#adr-027-status}
 **Accepted** - 2025-12-11
 

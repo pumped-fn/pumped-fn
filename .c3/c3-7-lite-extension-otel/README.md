@@ -1,13 +1,21 @@
 ---
 id: c3-7
-c3-version: 3
+c3-version: 4
 title: Lite Extension OTel (@pumped-fn/lite-extension-otel)
+type: container
+boundary: library
+parent: c3-0
+goal: Attach OpenTelemetry tracing to lite execution with package-managed provider lifecycle.
 summary: >
   Self-contained OpenTelemetry tracing extension with tag-based configuration,
   AsyncLocalStorage context propagation, and automatic provider lifecycle management.
 ---
 
 # Lite Extension OTel (@pumped-fn/lite-extension-otel)
+
+## Goal
+
+Integrate OpenTelemetry with lite execution so applications can emit traces without manually wiring provider lifecycle or context propagation.
 
 ## Overview {#c3-7-overview}
 
@@ -24,6 +32,18 @@ Self-contained OpenTelemetry integration for `@pumped-fn/lite` with tag-based co
 2. Tag-based configuration - no code coupling to OTel APIs
 3. AsyncLocalStorage for context propagation - reliable parent-child spans
 4. Focused on tracing - metrics removed as separate concern
+
+## Responsibilities
+
+- Translate lite resolve/exec lifecycles into tracing spans
+- Manage OTel provider lifecycle inside the extension boundary
+- Propagate execution context through AsyncLocalStorage and tags
+
+## Components
+
+| ID | Name | Category | Status | Goal Contribution |
+|----|------|----------|--------|-------------------|
+| c3-701 | OTel Extension | foundation | active | Configures tracing from lite tags and wraps flow execution with provider-managed spans. |
 
 ## Technology Stack {#c3-7-stack}
 

@@ -1,13 +1,21 @@
 ---
 id: c3-202
-c3-version: 3
+c3-version: 4
 title: Atom
+type: component
+category: foundation
+parent: c3-2
+goal: Define long-lived atoms and the service helper that turn factories into scope-managed dependencies.
 summary: >
   Long-lived dependency definition with factory function, optional dependencies,
   and controller dependency helper for reactive patterns.
 ---
 
 # Atom
+
+## Goal
+
+Define the long-lived dependency primitive that lite scopes resolve, cache, watch, and expose through controllers.
 
 ## Overview {#c3-202-overview}
 <!-- Long-lived dependency definition -->
@@ -17,6 +25,19 @@ An Atom represents a long-lived dependency that:
 - Can declare dependencies on other atoms, controllers, or tags
 - Is resolved once per scope and cached
 - Supports lifecycle cleanup via ResolveContext
+
+## Container Connection
+
+Atoms are the primary unit of long-lived state and dependency composition inside the lite container. They give the runtime something stable to resolve, cache, invalidate, and wire into controllers.
+
+## Dependencies
+
+| Direction | What | From/To |
+|-----------|------|---------|
+| IN (uses) | Tag executors in dependency declarations | c3-204 |
+| OUT (provides) | Atom definitions consumed by scope/controller runtime | c3-201 |
+| OUT (provides) | Long-lived dependency building blocks for flow execution | c3-203 |
+| OUT (provides) | Override targets for presets | c3-205 |
 
 ## Concepts {#c3-202-concepts}
 
@@ -445,7 +466,7 @@ function processDep(dep: Dependency) {
 }
 ```
 
-## Source Files {#c3-202-source}
+## Code References {#c3-202-source}
 
 | File | Contents |
 |------|----------|
@@ -453,6 +474,10 @@ function processDep(dep: Dependency) {
 | `src/service.ts` | `service()` |
 | `src/types.ts` | `Atom`, `ControllerDep`, `ResolveContext`, `AtomFactory`, `ServiceMethod`, `ServiceMethods` |
 | `src/symbols.ts` | `atomSymbol`, `controllerDepSymbol` |
+
+## Related Refs
+
+No component-specific `ref-*` documents are wired yet for atom definitions.
 
 ## Testing {#c3-202-testing}
 
@@ -478,9 +503,9 @@ Key test scenarios for `ctx.data` in `tests/scope.test.ts`:
 
 ## Related {#c3-202-related}
 
-- [c3-201](./c3-201-scope.md) - Scope resolution and Controller
-- [c3-204](./c3-204-tag.md) - Tag dependencies (tags also used as DataStore keys)
-- [c3-205](./c3-205-preset.md) - Atom value presets
+- [c3-201-scope](./c3-201-scope.md) - Scope resolution and Controller
+- [c3-204-tag](./c3-204-tag.md) - Tag dependencies (tags also used as DataStore keys)
+- [c3-205-preset](./c3-205-preset.md) - Atom value presets
 - [ADR-007](../adr/adr-007-resolve-context-data.md) - Original per-atom private storage design
 - [ADR-010](../adr/adr-010-typed-data-store.md) - Tag-based typed DataStore API
 - [ADR-012](../adr/adr-012-datastore-api-improvements.md) - DataStore API improvements (getOrSet, relaxed signatures)

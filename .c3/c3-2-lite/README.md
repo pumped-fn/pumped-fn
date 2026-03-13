@@ -1,7 +1,11 @@
 ---
 id: c3-2
-c3-version: 3
+c3-version: 4
 title: Lite Library (@pumped-fn/lite)
+type: container
+boundary: library
+parent: c3-0
+goal: Provide the core scope/runtime primitives for atoms, flows, resources, tags, presets, and controllers.
 summary: >
   Lightweight dependency injection with minimal reactivity - atoms, flows, tags,
   and controllers for TypeScript applications with zero external dependencies.
@@ -9,12 +13,17 @@ summary: >
 
 # Lite Library (@pumped-fn/lite)
 
+## Goal
+
+Provide the framework-agnostic runtime that owns lifecycle, dependency resolution, execution scoping, and controller semantics for the rest of pumped-fn.
+
 ## Overview {#c3-2-overview}
 <!-- Lightweight DI with minimal reactivity -->
 
 `@pumped-fn/lite` is a minimal dependency injection library for TypeScript that provides:
 - **Atoms** - Long-lived dependencies with lifecycle management
 - **Flows** - Short-lived request/response execution patterns
+- **Resources** - Execution-scoped dependencies shared across a nested `ctx.exec()` chain
 - **Tags** - Metadata attachment and extraction
 - **Controllers** - Deferred resolution with reactivity support
 
@@ -26,6 +35,12 @@ summary: >
 **Bundle size:** <17KB (ESM), <17KB (CJS)
 
 **Dependencies:** Zero external dependencies
+
+## Responsibilities
+
+- Resolve and cache long-lived atoms inside a scope boundary
+- Run flows and execution-scoped resources inside explicit execution contexts
+- Expose controller, tag, preset, and extension surfaces used by downstream containers
 
 ## Technology Stack {#c3-2-stack}
 <!-- Runtime and build tooling -->
@@ -135,6 +150,7 @@ sequenceDiagram
 |----------|-------------|---------|
 | `createScope(options?)` | Create DI container (sync, with `ready` promise) | `Scope` |
 | `atom(config)` | Define long-lived dependency | `Atom<T>` |
+| `resource(config)` | Define execution-scoped dependency | `Resource<T>` |
 | `flow(config)` | Define request handler | `Flow<T, I>` |
 | `tag(config)` | Define metadata tag | `Tag<T>` |
 | `preset(atom, value)` | Create preset injection | `Preset<T>` |
@@ -151,6 +167,7 @@ sequenceDiagram
 | `isTag(value)` | Check if value is Tag |
 | `isTagged(value)` | Check if value is Tagged |
 | `isPreset(value)` | Check if value is Preset |
+| `isResource(value)` | Check if value is Resource |
 | `isControllerDep(value)` | Check if value is ControllerDep |
 | `isTagExecutor(value)` | Check if value is TagExecutor |
 
@@ -161,6 +178,7 @@ sequenceDiagram
 | `Scope` | DI container with resolution, controller, and event APIs |
 | `Controller<T>` | Deferred accessor with state, get, invalidate, and subscription |
 | `ExecutionContext` | Flow execution context with input, exec, and lifecycle |
+| `Resource<T>` | Execution-scoped dependency resolved per exec chain |
 | `Extension` | Cross-cutting hooks for resolve and exec |
 
 ### Namespace Export
@@ -202,16 +220,16 @@ packages/lite/
 └── tsdown.config.ts
 ```
 
-## Components {#c3-2-components}
+## Components
 <!-- Component inventory -->
 
 | ID | Component | Description |
 |----|-----------|-------------|
-| [c3-201](./c3-201-scope.md) | Scope & Controller | DI container, resolution, lifecycle states, reactivity |
-| [c3-202](./c3-202-atom.md) | Atom | Long-lived dependency definition (includes `service()` helper) |
-| [c3-203](./c3-203-flow.md) | Flow & ExecutionContext | Request/response execution pattern |
-| [c3-204](./c3-204-tag.md) | Tag System | Metadata attachment and extraction |
-| [c3-205](./c3-205-preset.md) | Preset | Value injection and atom redirection |
+| c3-201 | Scope & Controller | DI container, resolution, lifecycle states, reactivity |
+| c3-202 | Atom | Long-lived dependency definition (includes `service()` helper) |
+| c3-203 | Flow, ExecutionContext & Resource | Request/response execution with execution-scoped dependencies |
+| c3-204 | Tag System | Metadata attachment and extraction |
+| c3-205 | Preset | Value injection and atom redirection |
 
 ## Extension System {#c3-2-extension}
 <!-- Cross-cutting concern hooks -->
@@ -222,15 +240,15 @@ Extensions provide AOP-style hooks for cross-cutting concerns:
 interface Extension {
   readonly name: string
   init?(scope: Scope): MaybePromise<void>
-  wrapResolve?<T>(next: () => Promise<T>, atom: Atom<T>, scope: Scope): Promise<T>
-  wrapExec?<T>(next: () => Promise<T>, target: Flow | Function, ctx: ExecutionContext): Promise<T>
+  wrapResolve?(next: () => Promise<unknown>, event: ResolveEvent): Promise<unknown>
+  wrapExec?(next: () => Promise<unknown>, target: ExecTarget, ctx: ExecutionContext): Promise<unknown>
   dispose?(scope: Scope): MaybePromise<void>
 }
 ```
 
 **Lifecycle:**
 1. `init()` - Called when scope is created (after `createScope()`)
-2. `wrapResolve()` - Wraps atom resolution (innermost extension runs first)
+2. `wrapResolve()` - Wraps atom and resource resolution via `event.kind`
 3. `wrapExec()` - Wraps flow/function execution
 4. `dispose()` - Called when scope is disposed
 
@@ -239,10 +257,13 @@ interface Extension {
 ```typescript
 const loggingExtension: Lite.Extension = {
   name: 'logging',
-  wrapResolve: async (next, atom, scope) => {
-    console.log('Resolving atom...')
+  wrapResolve: async (next, event) => {
+    const label = event.kind === 'atom'
+      ? event.target.factory.name ?? 'atom'
+      : event.target.name ?? 'resource'
+    console.log(`Resolving ${event.kind}: ${label}`)
     const result = await next()
-    console.log('Resolved:', result)
+    console.log(`Resolved ${event.kind}: ${label}`)
     return result
   }
 }
@@ -321,7 +342,7 @@ await ctx.exec({
 **Test organization:**
 - Unit tests per source file
 - Type tests using `expectTypeOf` from Vitest
-- 145 tests covering all components (including 15 hierarchical context tests)
+- Focused behavior coverage for atoms, flows, resources, tags, presets, selection, extensions, and invalidation chains
 
 **Running tests:**
 ```bash

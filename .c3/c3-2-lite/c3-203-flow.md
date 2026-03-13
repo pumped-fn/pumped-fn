@@ -1,13 +1,21 @@
 ---
 id: c3-203
-c3-version: 3
+c3-version: 4
 title: Flow & ExecutionContext
+type: component
+category: foundation
+parent: c3-2
+goal: Define short-lived flow execution, execution contexts, and execution-scoped resources for request/response work.
 summary: >
   Short-lived request/response execution pattern with input handling,
   context lifecycle, and dependency resolution.
 ---
 
 # Flow & ExecutionContext
+
+## Goal
+
+Provide the short-lived execution layer in the lite container, including parsed flow input, nested execution contexts, and execution-scoped resources.
 
 ## Overview {#c3-203-overview}
 <!-- Request handling pattern -->
@@ -17,6 +25,18 @@ A Flow represents a short-lived execution that:
 - Has access to resolved dependencies
 - Runs within an ExecutionContext
 - Supports nested flow execution
+
+## Container Connection
+
+This component turns the lite container from a static dependency graph into an execution model. It owns request/response orchestration, nested execution, and execution-scoped dependencies that should not escape a single exec chain.
+
+## Dependencies
+
+| Direction | What | From/To |
+|-----------|------|---------|
+| IN (uses) | Scope cache and controller runtime | c3-201 |
+| IN (uses) | Tag extraction inside executions | c3-204 |
+| OUT (provides) | Flow, exec, and resource semantics | c3-2 |
 
 Flows are the primary pattern for handling requests, commands, or any operation with input.
 
@@ -759,7 +779,7 @@ const ctx = scope.createContext()
 await ctx.exec({ flow: protectedFlow, input: request })
 ```
 
-## Source Files {#c3-203-source}
+## Code References {#c3-203-source}
 
 | File | Contents |
 |------|----------|
@@ -767,6 +787,10 @@ await ctx.exec({ flow: protectedFlow, input: request })
 | `src/scope.ts` | `ExecutionContextImpl` |
 | `src/types.ts` | `Flow`, `ExecutionContext`, `ExecFlowOptions`, `ExecFnOptions` |
 | `src/symbols.ts` | `flowSymbol` |
+
+## Related Refs
+
+No component-specific `ref-*` documents are wired yet for flow execution.
 
 ## Testing {#c3-203-testing}
 
@@ -795,6 +819,6 @@ Key test scenarios in `tests/scope.test.ts`:
 
 ## Related {#c3-203-related}
 
-- [c3-201](./c3-201-scope.md) - Scope and context creation
-- [c3-204](./c3-204-tag.md) - Tag dependencies in flows
-- [c3-2](./README.md#c3-2-extension) - Extension wrapping
+- [c3-201-scope](./c3-201-scope.md) - Scope and context creation
+- [c3-204-tag](./c3-204-tag.md) - Tag dependencies in flows
+- [c3-2-lite](./README.md#c3-2-extension) - Extension wrapping

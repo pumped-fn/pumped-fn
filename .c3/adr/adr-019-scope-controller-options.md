@@ -11,6 +11,10 @@ date: 2025-12-11
 
 # [ADR-019] Scope.controller() Options for API Consistency
 
+## Goal
+
+Align `scope.controller()` with the dependency helper so controller auto-resolution works consistently inside and outside atom deps.
+
 ## Status {#adr-019-status}
 **Accepted** - 2025-12-11
 

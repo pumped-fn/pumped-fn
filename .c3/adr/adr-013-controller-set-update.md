@@ -11,6 +11,10 @@ date: 2025-12-03
 
 # [ADR-013] Controller.set() and Controller.update() for Direct Value Mutation
 
+## Goal
+
+Let external data sources push direct value changes into the atom graph without bypassing controller-driven reactivity.
+
 ## Status {#adr-013-status}
 **Implemented** - 2025-12-10
 

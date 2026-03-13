@@ -1,0 +1,109 @@
+# C3 code-map: maps component and ref IDs to source file glob patterns.
+# Edit patterns, then verify with: c3x coverage
+
+_exclude:
+  - ".actrc"
+  - ".changeset/**"
+  - ".claude-plugin/**"
+  - ".c3/**"
+  - ".github/**"
+  - ".gitattributes"
+  - ".gitignore"
+  - ".npmrc"
+  - ".vscode/**"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "CONTRIBUTING.md"
+  - "LICENSE"
+  - "README-plugin.md"
+  - "context7.json"
+  - "docs/**"
+  - "patches/**"
+  - "plans/**"
+  - "scripts/**"
+  - "tasks/**"
+  - "**/CHANGELOG.md"
+  - "**/README.md"
+  - "**/tests/**"
+  - "**/dist/**"
+  - "package.json"
+  - "packages/*/examples/**"
+  - "packages/*/package.json"
+  - "packages/*/tsconfig*.json"
+  - "packages/*/tsdown.config.ts"
+  - "packages/*/vitest.config.ts"
+  - "packages/**/MIGRATION.md"
+  - "packages/**/PATTERNS.md"
+  - "packages/lite/src/index.ts"
+  - "packages/lite/src/cli.ts"
+  - "packages/lite/src/errors.ts"
+  - "packages/lite/src/symbols.ts"
+  - "pnpm-lock.yaml"
+  - "pnpm-workspace.yaml"
+  - "troubleshooting.md"
+  - "tsconfig.json"
+  - "ultracite.config.js"
+
+c3-201:
+  - "packages/lite/src/scope.ts"
+  - "packages/lite/src/types.ts"
+  - "packages/lite/src/equality.ts"
+
+c3-202:
+  - "packages/lite/src/atom.ts"
+  - "packages/lite/src/service.ts"
+
+c3-203:
+  - "packages/lite/src/flow.ts"
+  - "packages/lite/src/resource.ts"
+
+c3-204:
+  - "packages/lite/src/tag.ts"
+
+c3-205:
+  - "packages/lite/src/preset.ts"
+
+c3-301:
+  - "packages/lite-react/src/index.ts"
+  - "packages/lite-react/src/context.tsx"
+  - "packages/lite-react/src/hooks.ts"
+
+c3-401:
+  - "packages/lite-devtools/src/index.ts"
+  - "packages/lite-devtools/src/extension.ts"
+  - "packages/lite-devtools/src/types.ts"
+  - "packages/lite-devtools/src/symbols.ts"
+
+c3-402:
+  - "packages/lite-devtools/src/transports/**"
+
+c3-501:
+  - "packages/lite-hmr/src/index.ts"
+  - "packages/lite-hmr/src/plugin.ts"
+  - "packages/lite-hmr/src/transform.ts"
+
+c3-502:
+  - "packages/lite-hmr/src/runtime.ts"
+  - "packages/lite-hmr/src/types.ts"
+
+c3-601:
+  - "packages/lite-devtools-server/src/index.ts"
+  - "packages/lite-devtools-server/src/server.ts"
+  - "packages/lite-devtools-server/src/state.ts"
+
+c3-602:
+  - "packages/lite-devtools-server/src/bin.tsx"
+  - "packages/lite-devtools-server/src/ui.tsx"
+
+c3-701:
+  - "packages/lite-extension-otel/src/index.ts"
+
+c3-801:
+  - "packages/codemod/src/cli.ts"
+  - "packages/codemod/src/index.ts"
+
+c3-802:
+  - "packages/codemod/src/transforms/**"
+
+c3-803:
+  - "packages/codemod/src/report/**"

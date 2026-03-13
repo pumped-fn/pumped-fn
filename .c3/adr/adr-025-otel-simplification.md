@@ -11,6 +11,10 @@ date: 2025-12-12
 
 # [ADR-025] Simplify OTEL Extension with Self-Contained Provider Management
 
+## Goal
+
+Reduce OTel integration complexity by moving provider lifecycle and context propagation inside the extension boundary.
+
 ## Status {#adr-025-status}
 **Accepted** - 2025-12-12
 

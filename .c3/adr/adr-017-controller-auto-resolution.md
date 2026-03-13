@@ -11,6 +11,10 @@ date: 2025-12-09
 
 # [ADR-017] Controller Auto-Resolution Option
 
+## Goal
+
+Reduce boilerplate when atom factories need controller semantics and a resolved value from the same dependency.
+
 ## Status {#adr-017-status}
 **Accepted** - 2025-12-09
 

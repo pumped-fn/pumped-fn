@@ -1,13 +1,21 @@
 ---
 id: c3-3
-c3-version: 3
+c3-version: 4
 title: Lite React Library (@pumped-fn/lite-react)
+type: container
+boundary: library
+parent: c3-0
+goal: Provide React bindings that let React observe and drive lite controller state without owning a separate store.
 summary: >
   Minimal React bindings for @pumped-fn/lite with Suspense and ErrorBoundary
   integration via useSyncExternalStore for React 18+ applications.
 ---
 
 # Lite React Library (@pumped-fn/lite-react)
+
+## Goal
+
+Adapt lite scopes and controllers to React's rendering model with minimal wrapper code and no additional client-side cache layer.
 
 ## Overview {#c3-3-overview}
 
@@ -19,12 +27,18 @@ summary: >
 
 **Design principles:**
 1. Thin wrappers - no hidden magic, explicit lifecycle
-2. Hooks observe, don't trigger - atoms must be pre-resolved
-3. SSR-compatible - no side effects on import, no global state
+2. Suspense-first value hooks - `useAtom` and `useSelect` auto-resolve by default and reuse controller state instead of owning their own cache
+3. Import-safe and scope-scoped - no side effects on import, no global React state
 
 **Bundle size:** <2KB (estimated)
 
 **Dependencies:** Peer dependencies only (react >=18.0.0, @pumped-fn/lite >=1.4.0)
+
+## Responsibilities
+
+- Provide context and hook surfaces for accessing a lite scope inside React
+- Map controller state into Suspense, ErrorBoundary, and manual loading/error patterns
+- Preserve lite ownership of lifecycle and cache state while fitting React subscription semantics
 
 ## Technology Stack {#c3-3-stack}
 
@@ -85,20 +99,22 @@ flowchart TD
     Hook[useAtom/useSelect called]
     Hook --> CheckState{ctrl.state?}
 
-    CheckState -->|idle| ThrowError[Throw Error]
-    CheckState -->|resolving| ThrowPromise[Throw Promise]
+    CheckState -->|idle| AutoResolve[Auto-resolve + Throw Promise]
+    CheckState -->|resolving with stale value| ReturnStale[Return stale value]
+    CheckState -->|resolving without value| ThrowPromise[Throw Promise]
     CheckState -->|resolved| ReturnValue[Return value + subscribe]
     CheckState -->|failed| ThrowStored[Throw stored error]
 
+    AutoResolve --> Suspense[Suspense catches]
     ThrowPromise --> Suspense[Suspense catches]
     ThrowStored --> ErrorBoundary[ErrorBoundary catches]
-    ThrowError --> DevError[Dev must fix lifecycle]
+    ReturnStale --> Render[Keep current UI]
 ```
 
 | State | Hook Behavior |
 |-------|---------------|
-| `idle` | Throw `Error("Atom not resolved...")` |
-| `resolving` | Throw Promise from `ctrl.resolve()` - Suspense catches |
+| `idle` | Auto-resolve and suspend |
+| `resolving` | Return stale value if available, otherwise suspend |
 | `resolved` | Return value, subscribe to changes |
 | `failed` | Throw stored error - ErrorBoundary catches |
 
@@ -148,11 +164,11 @@ packages/lite-react/
 └── tsdown.config.ts
 ```
 
-## Components {#c3-3-components}
+## Components
 
 | ID | Component | Description |
 |----|-----------|-------------|
-| [c3-301](./c3-301-hooks.md) | React Hooks | useScope, useAtom, useSelect, useController |
+| c3-301 | React Hooks | useScope, useAtom, useSelect, useController |
 
 ## Usage Patterns {#c3-3-patterns}
 
@@ -167,7 +183,6 @@ const userAtom = atom({
 })
 
 const scope = createScope()
-await scope.resolve(userAtom)
 
 function App() {
   return (
@@ -219,9 +234,10 @@ function TodoCount() {
 
 **Test organization:**
 - Hook tests with @testing-library/react
-- State handling tests for all 4 atom states
+- State handling tests for idle, resolving, resolved, and failed controllers
 - Suspense and ErrorBoundary integration tests
-- 17 tests passing, 4 skipped (jsdom timing issues)
+- Refresh-path coverage for stale-while-revalidate and refresh-failure behavior
+- Selector equality and provider-switch coverage
 
 **Running tests:**
 ```bash
@@ -253,14 +269,16 @@ test('renders user name', async () => {
 
 ## SSR Compatibility {#c3-3-ssr}
 
-The package is SSR-compatible because:
-1. No side effects on import
-2. Uses `useSyncExternalStore` with `getServerSnapshot`
-3. No window/document access
-4. Scope passed as prop (no global state)
+The runtime is import-safe for SSR and hydration-oriented usage because:
+1. No side effects happen on import
+2. Hooks are driven by `useSyncExternalStore`
+3. Scope is passed as a prop rather than read from global state
+4. Request-scoped data can be pre-resolved on the server and replayed via presets or matching client resolution
+
+There is not yet package-level SSR or hydration test coverage in this repository, so treat this as the documented path rather than a fully verified compatibility guarantee.
 
 ## Related {#c3-3-related}
 
-- [c3-2](../c3-2-lite/) - @pumped-fn/lite base library
+- [c3-2-lite](../c3-2-lite/) - @pumped-fn/lite base library
 - [ADR-006](../adr/adr-006-select-fine-grained-reactivity.md) - select() API design
 - [ADR-003](../adr/adr-003-controller-reactivity.md) - Controller reactivity pattern

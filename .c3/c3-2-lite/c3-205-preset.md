@@ -1,13 +1,21 @@
 ---
 id: c3-205
-c3-version: 3
+c3-version: 4
 title: Preset
+type: component
+category: foundation
+parent: c3-2
+goal: Override atom and flow resolution for testing, composition, and environment-specific bootstrapping.
 summary: >
   Value injection and atom redirection for testing and configuration,
   allowing factory bypassing or atom substitution at scope creation.
 ---
 
 # Preset
+
+## Goal
+
+Provide a declarative override layer for the lite container so scopes can substitute values or redirect dependencies without rewriting factories.
 
 ## Overview {#c3-205-overview}
 <!-- Value injection and atom redirection -->
@@ -20,6 +28,19 @@ Primary use cases:
 - Testing: Inject mock values without changing atom definitions
 - Configuration: Override defaults per environment
 - Feature flags: Swap implementations at runtime
+
+## Container Connection
+
+Presets let the lite container adapt the same dependency graph to tests, bootstrapping, and environment-specific wiring without mutating the underlying atom or flow definitions.
+
+## Dependencies
+
+| Direction | What | From/To |
+|-----------|------|---------|
+| IN (uses) | Atom targets to override | c3-202 |
+| IN (uses) | Flow targets to override | c3-203 |
+| OUT (provides) | Override layer for scopes | c3-2 |
+| OUT (provides) | Override layer used by React tests | c3-301 |
 
 ## Concepts {#c3-205-concepts}
 
@@ -268,7 +289,7 @@ preset(atomA, atomB)
 preset(atomB, atomA) // Don't do this!
 ```
 
-## Source Files {#c3-205-source}
+## Code References {#c3-205-source}
 
 | File | Contents |
 |------|----------|
@@ -276,6 +297,10 @@ preset(atomB, atomA) // Don't do this!
 | `src/scope.ts` | Preset handling in `resolve()` |
 | `src/types.ts` | `Preset` interface |
 | `src/symbols.ts` | `presetSymbol` |
+
+## Related Refs
+
+No component-specific `ref-*` documents are wired yet for preset overrides.
 
 ## Testing {#c3-205-testing}
 
@@ -290,5 +315,5 @@ Key test scenarios in `tests/scope.test.ts`:
 
 ## Related {#c3-205-related}
 
-- [c3-201](./c3-201-scope.md) - Scope creation with presets
-- [c3-202](./c3-202-atom.md) - Atom definition
+- [c3-201-scope](./c3-201-scope.md) - Scope creation with presets
+- [c3-202-atom](./c3-202-atom.md) - Atom definition

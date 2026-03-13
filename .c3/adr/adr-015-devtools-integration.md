@@ -7,6 +7,10 @@ date: 2025-12-08
 
 # [ADR-015] Devtools via Extension + Fire-and-Forget Transports
 
+## Goal
+
+Capture the original devtools integration direction and its non-blocking transport constraints, even though the decision was later abandoned.
+
 ## Status
 **Abandoned** - 2025-12-15 (Original decision superseded by implementation in c3-4-lite-devtools)
 

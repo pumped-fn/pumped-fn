@@ -11,6 +11,10 @@ verified: 2025-12-09
 
 # [ADR-014] DataStore Map-like Semantics
 
+## Goal
+
+Clarify and lock the DataStore contract so callers treat it like a Map with explicit default materialization.
+
 ## Status {#adr-014-status}
 **Implemented** - Verified 2025-12-09
 

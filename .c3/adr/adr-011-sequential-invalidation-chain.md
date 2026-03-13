@@ -10,6 +10,10 @@ date: 2025-12-02
 
 # [ADR-011] Sequential Invalidation Chain with Loop Detection
 
+## Goal
+
+Make controller-driven invalidation cascades deterministic, awaited, and safe against infinite loops.
+
 ## Status {#adr-011-status}
 **Accepted** - 2025-12-02
 

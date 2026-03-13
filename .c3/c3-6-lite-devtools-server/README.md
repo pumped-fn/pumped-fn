@@ -1,16 +1,30 @@
 ---
 id: c3-6
-c3-version: 3
+c3-version: 4
 title: Lite Devtools Server (@pumped-fn/lite-devtools-server)
+type: container
+boundary: app
+parent: c3-0
+goal: Receive remote lite-devtools events and render them in a terminal dashboard.
 summary: >
   Standalone TUI server receiving devtools events via HTTP from application processes.
 ---
 
 # Lite Devtools Server (@pumped-fn/lite-devtools-server)
 
+## Goal
+
+Provide a separate-process terminal UI that can receive devtools events over HTTP and present runtime activity without embedding a browser app.
+
 ## Overview {#c3-6-overview}
 
 CLI tool that receives devtools events via HTTP and displays them in a terminal dashboard. Designed for cross-process observability where the application and devtools UI run in separate processes.
+
+## Responsibilities
+
+- Accept fire-and-forget devtools events over HTTP
+- Keep a reactive event buffer for the terminal UI
+- Render a terminal dashboard over that buffered state
 
 ## Architecture {#c3-6-architecture}
 
@@ -49,12 +63,14 @@ graph LR
 ### CLI
 
 ```bash
-# Start server on default port 3001
+# Intended CLI entrypoint on default port 3001
 npx @pumped-fn/lite-devtools-server
 
 # Custom port
 PORT=4000 npx @pumped-fn/lite-devtools-server
 ```
+
+The CLI is the intended primary entrypoint, but the packaged OpenTUI runtime still needs release-time verification in the target Node environment. The programmatic API below is the more reliable fallback if the bundled dashboard assets fail to load.
 
 ### HTTP Endpoints
 
@@ -90,6 +106,13 @@ packages/lite-devtools-server/
 ├── package.json
 └── tsconfig.json
 ```
+
+## Components
+
+| ID | Name | Category | Status | Goal Contribution |
+|----|------|----------|--------|-------------------|
+| c3-601 | Server State | foundation | active | Accepts remote events, maintains the bounded event buffer, and exposes the programmatic server surface. |
+| c3-602 | Terminal Dashboard | foundation | active | Boots the CLI dashboard and renders the buffered events through the shared lite state. |
 
 ## Related {#c3-6-related}
 
