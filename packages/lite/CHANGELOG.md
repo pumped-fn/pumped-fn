@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 2.1.3
+
+### Patch Changes
+
+- b84f763: Fix `watch: true` default equality so structurally equal plain-object results do not trigger false cascades, while non-plain values like `Map` and symbol-keyed state still invalidate correctly.
+
 ## 2.1.2
 
 ### Patch Changes

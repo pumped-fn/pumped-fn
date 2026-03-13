@@ -1,5 +1,13 @@
 # @pumped-fn/lite-devtools-server
 
+## 0.1.15
+
+### Patch Changes
+
+- Updated dependencies [b84f763]
+  - @pumped-fn/lite@2.1.3
+  - @pumped-fn/lite-react@1.1.1
+
 ## 0.1.14
 
 ### Patch Changes
