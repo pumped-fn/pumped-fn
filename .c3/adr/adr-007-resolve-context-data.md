@@ -89,8 +89,7 @@ const pollingAtom = atom({
 1. **Doesn't solve encapsulation** - Tags are globally accessible, any atom can read/write
 2. **Wrong granularity** - Scope-level when problem is atom-level
 3. **Tag semantic confusion** - Tags are immutable metadata, not mutable state
-4. **Symbol.for collision** - Same label = same key across modules
-5. **No cleanup on release** - Store persists after atom released
+4. **No cleanup on release** - Store persists after atom released
 
 **Key insight:** The problem is **atom-level private state**, not scope-level shared storage. Shared storage is already solved by atom composition.
 
