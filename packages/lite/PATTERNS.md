@@ -232,7 +232,7 @@ sequenceDiagram
     Parent->>Scope: resolve configAtom first
     Scope-->>Ctrl: ctrl (resolved)
     Parent->>Parent: factory(_, { cfg: ctrl })
-    Note over Scope: on dep 'resolved': compare prev/next via eq ?? Object.is
+    Note over Scope: on dep 'resolved': compare prev/next via eq ?? shallowEqual (plain objects, Object.is otherwise)
     Scope->>Parent: scheduleInvalidation if changed
     Note over Parent: watch listener auto-cleaned on re-resolve / release / dispose
 ```

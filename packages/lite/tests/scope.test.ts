@@ -2593,6 +2593,69 @@ describe("Triage regression tests", () => {
     await scope.dispose()
   })
 
+  it("watch cascades for Map values by default", async () => {
+    let derivedCount = 0
+    let counter = 0
+
+    const sourceAtom = atom({
+      factory: () => new Map([["k", counter++]]),
+    })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: unknown, { src }: { src: Lite.Controller<Map<string, number>> }) => {
+        derivedCount++
+        return `derived:${src.get().get("k")}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:0")
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:1")
+
+    await scope.dispose()
+  })
+
+  it("watch cascades for symbol-keyed objects by default", async () => {
+    const version = Symbol("version")
+    type VersionedState = { [version]: number }
+
+    let derivedCount = 0
+    let counter = 0
+
+    const sourceAtom = atom({
+      factory: (): VersionedState => ({ [version]: counter++ }),
+    })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: unknown, { src }: { src: Lite.Controller<VersionedState> }) => {
+        derivedCount++
+        return `derived:${src.get()[version]}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:0")
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(2)
+    expect(scope.controller(derivedAtom).get()).toBe("derived:1")
+
+    await scope.dispose()
+  })
+
   it("M5: diamond dependency — D depends on B and C which both watch A — D resolves once per change", async () => {
     let bCount = 0
     let cCount = 0
