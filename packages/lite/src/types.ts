@@ -256,6 +256,16 @@ export namespace Lite {
     readonly eq?: (a: any, b: any) => boolean
   }
 
+  export type WatchControllerDep<T> = ControllerDep<T> & {
+    readonly resolve: true
+    readonly watch: true
+  }
+
+  export type NonWatchControllerDep<T> = ControllerDep<T> & {
+    readonly watch?: never
+    readonly eq?: never
+  }
+
   export interface ControllerOptions {
     resolve?: boolean
   }
@@ -330,6 +340,14 @@ export namespace Lite {
     | ControllerDep<unknown>
     | TagExecutor<any>
     | Resource<unknown>
+
+  export type AtomDependency = Atom<unknown> | ControllerDep<unknown> | TagExecutor<any, any>
+
+  export type ExecutionDependency =
+    | Atom<unknown>
+    | NonWatchControllerDep<unknown>
+    | TagExecutor<any, any>
+    | Resource<unknown, Record<string, Dependency>>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T

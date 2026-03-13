@@ -28,7 +28,7 @@ export function resource<T>(config: {
 
 export function resource<
   T,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.Resource<unknown, Record<string, Lite.Dependency>> | { mode: string }>,
+  const D extends Record<string, Lite.ExecutionDependency>,
 >(config: {
   name?: string
   deps: D

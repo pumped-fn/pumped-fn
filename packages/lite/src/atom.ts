@@ -31,7 +31,7 @@ export function atom<T>(config: {
 
 export function atom<
   T,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | { mode: string }>,
+  const D extends Record<string, Lite.AtomDependency>,
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
