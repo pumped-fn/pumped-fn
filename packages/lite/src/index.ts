@@ -18,6 +18,7 @@ export { preset, isPreset } from "./preset"
 export { resource, isResource } from "./resource"
 export { service } from "./service"
 export { createScope } from "./scope"
+export { shallowEqual } from "./equality"
 export { ParseError } from "./errors"
 
 export const VERSION = "0.0.1"

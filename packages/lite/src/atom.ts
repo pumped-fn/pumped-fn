@@ -86,7 +86,7 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  * @param options - Optional configuration:
  *   - `resolve: true` — auto-resolves the dep before the parent factory runs; `config.get()` is safe.
  *   - `watch: true` — atom deps only; requires `resolve: true`; automatically re-runs the parent factory
- *     when the dep resolves to a new value (value-equality gated via `Object.is` by default). Replaces
+ *     when the dep resolves to a new value (value-equality gated via `shallowEqual` by default). Replaces
  *     manual `ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))` wiring. Watch
  *     listeners are auto-cleaned on re-resolve, release, and dispose.
  *   - `eq` — custom equality function `(a: T, b: T) => boolean`; only used with `watch: true`.

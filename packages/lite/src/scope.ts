@@ -1,6 +1,7 @@
 import { controllerSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise, AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
+import { shallowEqual } from "./equality"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { ParseError } from "./errors"
@@ -696,14 +697,14 @@ class ScopeImpl implements Lite.Scope {
                 if (depEntry) depEntry.dependents.add(dependentAtom)
               }
               if (dep.watch) {
-                const eq = dep.eq ?? Object.is
+                const eq = dep.eq ?? shallowEqual
                 let prev = ctrl.get() as unknown
                 const unsub = this.on("resolved", dep.atom, () => {
                   const next = ctrl.get() as unknown
                   if (!eq(prev, next)) {
-                    prev = next
                     this.scheduleInvalidation(dependentAtom!)
                   }
+                  prev = next
                 })
                 const depEntry = this.getEntry(dependentAtom!)
                 if (depEntry) depEntry.cleanups.push(unsub)

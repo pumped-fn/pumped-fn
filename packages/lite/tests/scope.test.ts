@@ -2511,7 +2511,7 @@ describe("Triage regression tests", () => {
     await scope.dispose()
   })
 
-  it("H1: watch cascades when source factory returns new object literal (Object.is)", async () => {
+  it("H1: watch skips cascade when source factory returns structurally equal object literal", async () => {
     let derivedCount = 0
 
     const sourceAtom = atom({
@@ -2520,6 +2520,61 @@ describe("Triage regression tests", () => {
 
     const derivedAtom = atom({
       deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { src }: any) => {
+        derivedCount++
+        return `derived:${src.get().key}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(1)
+
+    await scope.dispose()
+  })
+
+  it("H1b: watch cascades when source factory returns structurally different object", async () => {
+    let derivedCount = 0
+    let counter = 0
+
+    const sourceAtom = atom({
+      factory: () => ({ key: "value", num: counter++ }),
+    })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true }) },
+      factory: (_ctx: any, { src }: any) => {
+        derivedCount++
+        return `derived:${src.get().num}`
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(derivedAtom)
+    expect(derivedCount).toBe(1)
+
+    scope.controller(sourceAtom).invalidate()
+    await scope.flush()
+
+    expect(derivedCount).toBe(2)
+
+    await scope.dispose()
+  })
+
+  it("H1c: watch cascades with Object.is when explicitly passed as eq", async () => {
+    let derivedCount = 0
+
+    const sourceAtom = atom({
+      factory: () => ({ key: "value", num: 42 }),
+    })
+
+    const derivedAtom = atom({
+      deps: { src: controller(sourceAtom, { resolve: true, watch: true, eq: Object.is }) },
       factory: (_ctx: any, { src }: any) => {
         derivedCount++
         return `derived:${src.get().key}`
