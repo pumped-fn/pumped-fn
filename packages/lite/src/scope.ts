@@ -474,7 +474,7 @@ class ScopeImpl implements Lite.Scope {
     if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
 
     if (!this.initialized) {
-      return this.ready.then(() => this.resolve(atom))
+      return (this.ready ?? Promise.resolve()).then(() => this.resolve(atom))
     }
 
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
