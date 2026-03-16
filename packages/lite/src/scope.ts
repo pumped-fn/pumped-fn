@@ -393,7 +393,7 @@ class ScopeImpl implements Lite.Scope {
     await this.release(atom)
 
     if (atom.deps) {
-      for (const dep of Object.values(atom.deps)) {
+      for (const key in atom.deps) { const dep = atom.deps[key]!
         const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
         if (!depAtom) continue
 
@@ -980,7 +980,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     if (atom.deps) {
-      for (const dep of Object.values(atom.deps)) {
+      for (const key in atom.deps) { const dep = atom.deps[key]!
         const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
         if (!depAtom) continue
         const depEntry = this.cache.get(depAtom)
