@@ -431,10 +431,7 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private notifyListeners<T>(atom: Lite.Atom<T>, event: 'resolving' | 'resolved'): void {
-    const entry = this.cache.get(atom)
-    if (!entry) return
-
+  private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved'): void {
     const eventListeners = entry.listeners.get(event)
     if (eventListeners?.size) {
       for (const listener of [...eventListeners]) {
@@ -450,10 +447,7 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private notifyAllListeners<T>(atom: Lite.Atom<T>): void {
-    const entry = this.cache.get(atom)
-    if (!entry) return
-
+  private notifyEntryAll(entry: AtomEntry<unknown>): void {
     const allListeners = entry.listeners.get('*')
     if (allListeners?.size) {
       for (const listener of [...allListeners]) {
@@ -532,7 +526,7 @@ class ScopeImpl implements Lite.Scope {
       newEntry.value = presetValue as T
       newEntry.hasValue = true
       this.emitStateChange('resolved', atom)
-      this.notifyListeners(atom, 'resolved')
+      this.notifyEntry(newEntry as AtomEntry<unknown>, 'resolved')
       return newEntry.value
     }
 
@@ -560,7 +554,7 @@ class ScopeImpl implements Lite.Scope {
       entry.cleanups = []
       entry.state = 'resolving'
       this.emitStateChange('resolving', atom)
-      this.notifyListeners(atom, 'resolving')
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolving')
     }
 
     const resolvedDeps = await this.resolveDeps(atom.deps, undefined, atom)
@@ -598,7 +592,7 @@ class ScopeImpl implements Lite.Scope {
       entry.hasValue = true
       entry.error = undefined
       this.emitStateChange('resolved', atom)
-      this.notifyListeners(atom, 'resolved')
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
@@ -616,7 +610,7 @@ class ScopeImpl implements Lite.Scope {
       entry.value = undefined
       entry.hasValue = false
       this.emitStateChange('failed', atom)
-      this.notifyAllListeners(atom)
+      this.notifyEntryAll(entry as AtomEntry<unknown>)
 
       if (entry.pendingInvalidate) {
         entry.pendingInvalidate = false
@@ -943,7 +937,7 @@ class ScopeImpl implements Lite.Scope {
       this.pending.delete(atom)
       this.resolving.delete(atom)
       this.emitStateChange("resolving", atom)
-      this.notifyListeners(atom, "resolving")
+      this.notifyEntry(entry as AtomEntry<unknown>, "resolving")
 
       if ('value' in pendingSet) {
         entry.value = pendingSet.value
@@ -953,7 +947,7 @@ class ScopeImpl implements Lite.Scope {
       entry.state = 'resolved'
       entry.hasValue = true
       this.emitStateChange('resolved', atom)
-      this.notifyListeners(atom, 'resolved')
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
       this.invalidationChain?.delete(atom)
       return
     }
@@ -970,7 +964,7 @@ class ScopeImpl implements Lite.Scope {
     this.pending.delete(atom)
     this.resolving.delete(atom)
     this.emitStateChange("resolving", atom)
-    this.notifyListeners(atom, "resolving")
+    this.notifyEntry(entry as AtomEntry<unknown>, "resolving")
 
     try {
       await this.resolve(atom)
