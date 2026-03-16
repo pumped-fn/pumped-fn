@@ -140,7 +140,7 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
     }
   }, [ctrl, ctrlState, autoResolve, isSuspense])
 
-  const getSnapshot = useCallback((): T | UseAtomState<T> => {
+  const getSnapshot = (): T | UseAtomState<T> => {
     if (isSuspense) {
       if (ctrl.state === 'idle') {
         if (autoResolve) {
@@ -195,11 +195,12 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
 
     stateCache.current = { ctrl, ctrlState: ctrl.state, data, error, loading, result }
     return result
-  }, [ctrl, autoResolve, isSuspense])
+  }
 
   const subscribe = useCallback((onStoreChange: () => void) => {
+    if (isSuspense) return ctrl.on('*', onStoreChange)
     return ctrl.on('*', () => {
-      if (!isSuspense && ctrl.state === 'resolving') {
+      if (ctrl.state === 'resolving') {
         void getOrCreatePendingPromise(ctrl).catch(() => {})
       }
       onStoreChange()

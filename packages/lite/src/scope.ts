@@ -233,7 +233,7 @@ class ScopeImpl implements Lite.Scope {
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
-  private invalidationQueue = new Set<Lite.Atom<unknown>>()
+  private invalidationQueue: Lite.Atom<unknown>[] = []
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
@@ -247,19 +247,20 @@ class ScopeImpl implements Lite.Scope {
   readonly execExts: Lite.Extension[]
   readonly ready: Promise<void>
 
-  private scheduleInvalidation<T>(atom: Lite.Atom<T>): void {
-    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
-    if (!entry || entry.state === "idle") return
+  private scheduleInvalidation<T>(atom: Lite.Atom<T>, entry?: AtomEntry<T>): void {
+    if (!entry) {
+      entry = this.cache.get(atom) as AtomEntry<T> | undefined
+      if (!entry || entry.state === "idle") return
+    }
 
     if (entry.state === "resolving") {
       entry.pendingInvalidate = true
       return
     }
 
-    this.invalidationQueue.add(atom)
+    if (!this.invalidationQueue.includes(atom)) this.invalidationQueue.push(atom)
 
     if (!this.chainPromise) {
-      this.invalidationChain = new Set()
       this.chainError = null
       this.chainPromise = Promise.resolve().then(() =>
         this.processInvalidationChain().catch(error => {
@@ -271,21 +272,10 @@ class ScopeImpl implements Lite.Scope {
 
   private async processInvalidationChain(): Promise<void> {
     try {
-      while (this.invalidationQueue.size > 0 && !this.disposed) {
-        const atom = this.invalidationQueue.values().next().value as Lite.Atom<unknown>
-        this.invalidationQueue.delete(atom)
-
-        if (this.invalidationChain!.has(atom)) {
-          const chainAtoms = Array.from(this.invalidationChain!)
-          chainAtoms.push(atom)
-          const path = chainAtoms
-            .map(a => a.factory?.name || "<anonymous>")
-            .join(" → ")
-          throw new Error(`Infinite invalidation loop detected: ${path}`)
-        }
-
-        this.invalidationChain!.add(atom)
-        await this.doInvalidateSequential(atom)
+      while (this.invalidationQueue.length > 0 && !this.disposed) {
+        const atom = this.invalidationQueue.shift()!
+        const result = this.doInvalidateSequential(atom)
+        if (result) await result
       }
     } finally {
       this.invalidationChain = null
@@ -416,7 +406,7 @@ class ScopeImpl implements Lite.Scope {
 
     const allListeners = entry.listeners.get('*')
     if (allListeners?.size) {
-      for (const listener of [...allListeners]) {
+      for (const listener of allListeners) {
         listener()
       }
     }
@@ -425,7 +415,7 @@ class ScopeImpl implements Lite.Scope {
   private notifyEntryAll(entry: AtomEntry<unknown>): void {
     const allListeners = entry.listeners.get('*')
     if (allListeners?.size) {
-      for (const listener of [...allListeners]) {
+      for (const listener of allListeners) {
         listener()
       }
     }
@@ -898,7 +888,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     entry.pendingSet = { value }
-    this.scheduleInvalidation(atom)
+    this.scheduleInvalidation(atom, entry)
   }
 
   scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T): void {
@@ -916,10 +906,10 @@ class ScopeImpl implements Lite.Scope {
     }
 
     entry.pendingSet = { fn }
-    this.scheduleInvalidation(atom)
+    this.scheduleInvalidation(atom, entry)
   }
 
-  private async doInvalidateSequential<T>(atom: Lite.Atom<T>): Promise<void> {
+  private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (!entry) return
     if (entry.state === "idle") return
@@ -929,23 +919,31 @@ class ScopeImpl implements Lite.Scope {
     entry.pendingSet = undefined
 
     if (pendingSet) {
-      entry.state = "resolving"
-      entry.value = previousValue
-      entry.error = undefined
-      entry.pendingInvalidate = false
-      this.emitStateChange("resolving", atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, "resolving")
-
       entry.value = 'value' in pendingSet ? pendingSet.value : pendingSet.fn(previousValue as T)
       entry.state = 'resolved'
       entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = false
       entry.resolvedPromise = undefined
-      this.emitStateChange('resolved', atom)
+      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-      this.invalidationChain?.delete(atom)
       return
     }
 
+    if (!this.invalidationChain) this.invalidationChain = new Set()
+    if (this.invalidationChain.has(atom)) {
+      const chainAtoms = Array.from(this.invalidationChain)
+      chainAtoms.push(atom)
+      const path = chainAtoms
+        .map(a => a.factory?.name || "<anonymous>")
+        .join(" → ")
+      throw new Error(`Infinite invalidation loop detected: ${path}`)
+    }
+    this.invalidationChain.add(atom)
+    return this.doInvalidateAsync(atom, entry, previousValue)
+  }
+
+  private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
     for (let i = entry.cleanups.length - 1; i >= 0; i--) {
       try { await entry.cleanups[i]?.() } catch {}
     }
@@ -1008,7 +1006,7 @@ class ScopeImpl implements Lite.Scope {
 
     this.disposed = true
 
-    this.invalidationQueue.clear()
+    this.invalidationQueue.length = 0
     this.invalidationChain = null
     this.chainPromise = null
 
