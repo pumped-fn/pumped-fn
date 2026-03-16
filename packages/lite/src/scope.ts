@@ -495,16 +495,16 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  async resolve<T>(atom: Lite.Atom<T>): Promise<T> {
-    if (this.disposed) throw new Error("Scope is disposed")
+  resolve<T>(atom: Lite.Atom<T>): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
 
     if (!this.initialized) {
-      await this.ready
+      return this.ready.then(() => this.resolve(atom))
     }
 
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (entry?.state === 'resolved') {
-      return entry.value as T
+      return Promise.resolve(entry.value as T)
     }
 
     const pendingPromise = this.pending.get(atom)
@@ -513,7 +513,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     if (this.resolving.has(atom)) {
-      throw new Error("Circular dependency detected")
+      return Promise.reject(new Error("Circular dependency detected"))
     }
 
     if (this.presets.has(atom)) {
@@ -527,7 +527,7 @@ class ScopeImpl implements Lite.Scope {
       newEntry.hasValue = true
       this.emitStateChange('resolved', atom)
       this.notifyEntry(newEntry as AtomEntry<unknown>, 'resolved')
-      return newEntry.value
+      return Promise.resolve(newEntry.value)
     }
 
     this.resolving.add(atom)
@@ -535,12 +535,10 @@ class ScopeImpl implements Lite.Scope {
     const promise = this.doResolve(atom)
     this.pending.set(atom, promise as Promise<unknown>)
 
-    try {
-      return await promise
-    } finally {
+    return promise.finally(() => {
       this.resolving.delete(atom)
       this.pending.delete(atom)
-    }
+    })
   }
 
   private async doResolve<T>(atom: Lite.Atom<T>): Promise<T> {
