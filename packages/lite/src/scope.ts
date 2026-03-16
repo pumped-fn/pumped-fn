@@ -946,19 +946,13 @@ class ScopeImpl implements Lite.Scope {
       entry.value = previousValue
       entry.error = undefined
       entry.pendingInvalidate = false
-      this.pending.delete(atom)
-      this.resolving.delete(atom)
       this.emitStateChange("resolving", atom)
       this.notifyEntry(entry as AtomEntry<unknown>, "resolving")
 
-      if ('value' in pendingSet) {
-        entry.value = pendingSet.value
-      } else {
-        entry.value = pendingSet.fn(previousValue as T)
-      }
+      entry.value = 'value' in pendingSet ? pendingSet.value : pendingSet.fn(previousValue as T)
       entry.state = 'resolved'
       entry.hasValue = true
-      entry.resolvedPromise = Promise.resolve(entry.value)
+      entry.resolvedPromise = undefined
       this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
       this.invalidationChain?.delete(atom)
