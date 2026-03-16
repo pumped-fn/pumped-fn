@@ -31,8 +31,8 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "typecheck": "bunx @typescript/native-preview --noEmit",
-    "typecheck:full": "bunx @typescript/native-preview --noEmit -p tsconfig.test.json",
+    "typecheck": "npx @typescript/native-preview --noEmit",
+    "typecheck:full": "npx @typescript/native-preview --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
