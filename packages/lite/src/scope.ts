@@ -112,6 +112,7 @@ interface AtomEntry<T> {
   data?: ContextDataImpl
   dependents: Set<Lite.Atom<unknown>>
   gcScheduled: ReturnType<typeof setTimeout> | null
+  resolvedPromise?: Promise<T>
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -504,7 +505,7 @@ class ScopeImpl implements Lite.Scope {
 
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (entry?.state === 'resolved') {
-      return Promise.resolve(entry.value as T)
+      return entry.resolvedPromise ?? (entry.resolvedPromise = Promise.resolve(entry.value as T))
     }
 
     const pendingPromise = this.pending.get(atom)
@@ -530,15 +531,19 @@ class ScopeImpl implements Lite.Scope {
       return Promise.resolve(newEntry.value)
     }
 
-    this.resolving.add(atom)
+    return this.resolveAndTrack(atom)
+  }
 
+  private async resolveAndTrack<T>(atom: Lite.Atom<T>): Promise<T> {
+    this.resolving.add(atom)
     const promise = this.doResolve(atom)
     this.pending.set(atom, promise as Promise<unknown>)
-
-    return promise.finally(() => {
+    try {
+      return await promise
+    } finally {
       this.resolving.delete(atom)
       this.pending.delete(atom)
-    })
+    }
   }
 
   private async doResolve<T>(atom: Lite.Atom<T>): Promise<T> {
@@ -589,6 +594,7 @@ class ScopeImpl implements Lite.Scope {
       entry.value = value
       entry.hasValue = true
       entry.error = undefined
+      entry.resolvedPromise = Promise.resolve(value)
       this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
 
@@ -944,6 +950,7 @@ class ScopeImpl implements Lite.Scope {
       }
       entry.state = 'resolved'
       entry.hasValue = true
+      entry.resolvedPromise = Promise.resolve(entry.value)
       this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
       this.invalidationChain?.delete(atom)
