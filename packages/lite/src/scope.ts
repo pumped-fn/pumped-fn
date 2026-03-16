@@ -593,17 +593,15 @@ class ScopeImpl implements Lite.Scope {
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
 
-    const doResolve = async () => {
-      if (atom.deps) {
-        return factory(ctx, resolvedDeps)
-      } else {
-        return factory(ctx)
-      }
-    }
-
     try {
-      const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
-      const value = await this.applyResolveExtensions(event, doResolve)
+      let value: T
+      if (this.resolveExts.length === 0) {
+        value = atom.deps ? await factory(ctx, resolvedDeps) : await factory(ctx)
+      } else {
+        const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
+        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
+        value = await this.applyResolveExtensions(event, doResolve)
+      }
       entry.state = 'resolved'
       entry.value = value
       entry.hasValue = true
@@ -803,24 +801,19 @@ class ScopeImpl implements Lite.Scope {
         try {
           const resourceDeps = await this.resolveDeps(resource.deps, ctx)
 
-          const event: Lite.ResolveEvent = {
-            kind: "resource",
-            target: resource,
-            ctx: storeCtx,
-          }
+          const factory = resource.factory as (
+            ctx: Lite.ExecutionContext,
+            deps?: Record<string, unknown>
+          ) => MaybePromise<unknown>
 
-          const doResolve = async () => {
-            const factory = resource.factory as (
-              ctx: Lite.ExecutionContext,
-              deps?: Record<string, unknown>
-            ) => MaybePromise<unknown>
-            if (resource.deps) {
-              return factory(storeCtx, resourceDeps)
-            }
-            return factory(storeCtx)
+          let value: unknown
+          if (this.resolveExts.length === 0) {
+            value = resource.deps ? await factory(storeCtx, resourceDeps) : await factory(storeCtx)
+          } else {
+            const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: storeCtx }
+            const doResolve = async () => resource.deps ? factory(storeCtx, resourceDeps) : factory(storeCtx)
+            value = await this.applyResolveExtensions(event, doResolve)
           }
-
-          const value = await this.applyResolveExtensions(event, doResolve)
           storeCtx.data.set(resourceKey, value)
           return value
         } finally {
@@ -1210,19 +1203,19 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       deps?: Record<string, unknown>
     ) => MaybePromise<unknown>
 
-    const doExec = async (): Promise<unknown> => {
-      if (flow.deps) {
-        return factory(this, resolvedDeps)
-      } else {
-        return factory(this)
-      }
+    if (this.scope.execExts.length === 0) {
+      return flow.deps ? factory(this, resolvedDeps) : factory(this)
     }
 
+    const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
     return this.applyExecExtensions(flow, doExec)
   }
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
+    if (this.scope.execExts.length === 0) {
+      return fn(this, ...params)
+    }
     const doExec = () => Promise.resolve(fn(this, ...params))
     return this.applyExecExtensions(fn, doExec)
   }
@@ -1231,6 +1224,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     flow: Lite.Flow<unknown, unknown>,
     fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>
   ): Promise<unknown> {
+    if (this.scope.execExts.length === 0) {
+      return fn(this)
+    }
     const doExec = () => Promise.resolve(fn(this))
     return this.applyExecExtensions(flow, doExec)
   }
