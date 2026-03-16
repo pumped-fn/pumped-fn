@@ -1052,13 +1052,18 @@ class ScopeImpl implements Lite.Scope {
     if (this.disposed) throw new Error("Scope is disposed")
     const ctx = new ExecutionContextImpl(this, options)
 
-    for (const tagged of options?.tags ?? []) {
-      ctx.data.set(tagged.key, tagged.value)
+    const ctxTags = options?.tags
+    if (ctxTags && ctxTags.length > 0) {
+      for (let i = 0; i < ctxTags.length; i++) {
+        ctx.data.set(ctxTags[i]!.key, ctxTags[i]!.value)
+      }
     }
 
-    for (const tagged of this.tags) {
-      if (!ctx.data.has(tagged.key)) {
-        ctx.data.set(tagged.key, tagged.value)
+    if (this.tags.length > 0) {
+      for (let i = 0; i < this.tags.length; i++) {
+        if (!ctx.data.has(this.tags[i]!.key)) {
+          ctx.data.set(this.tags[i]!.key, this.tags[i]!.value)
+        }
       }
     }
 
@@ -1147,13 +1152,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         flowName: flow.name
       })
 
-      for (const tagged of execTags ?? []) {
-        childCtx.data.set(tagged.key, tagged.value)
+      if (execTags && execTags.length > 0) {
+        for (let i = 0; i < execTags.length; i++) {
+          childCtx.data.set(execTags[i]!.key, execTags[i]!.value)
+        }
       }
 
-      for (const tagged of flow.tags ?? []) {
-        if (!childCtx.data.has(tagged.key)) {
-          childCtx.data.set(tagged.key, tagged.value)
+      const flowTags = flow.tags
+      if (flowTags && flowTags.length > 0) {
+        for (let i = 0; i < flowTags.length; i++) {
+          if (!childCtx.data.has(flowTags[i]!.key)) {
+            childCtx.data.set(flowTags[i]!.key, flowTags[i]!.value)
+          }
         }
       }
 
