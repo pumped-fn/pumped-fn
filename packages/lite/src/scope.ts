@@ -662,15 +662,21 @@ class ScopeImpl implements Lite.Scope {
     for (const key in deps) {
       const dep = deps[key]!
       if (isAtom(dep)) {
-        parallel.push(
-          this.resolve(dep).then(value => {
-            result[key] = value
-            if (dependentAtom) {
-              const depEntry = this.getEntry(dep)
-              if (depEntry) depEntry.dependents.add(dependentAtom)
-            }
-          })
-        )
+        const cachedEntry = this.cache.get(dep)
+        if (cachedEntry?.state === 'resolved') {
+          result[key] = cachedEntry.value
+          if (dependentAtom) cachedEntry.dependents.add(dependentAtom)
+        } else {
+          parallel.push(
+            this.resolve(dep).then(value => {
+              result[key] = value
+              if (dependentAtom) {
+                const depEntry = this.getEntry(dep)
+                if (depEntry) depEntry.dependents.add(dependentAtom)
+              }
+            })
+          )
+        }
       } else if (isControllerDep(dep)) {
         if (dep.watch) {
           if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
