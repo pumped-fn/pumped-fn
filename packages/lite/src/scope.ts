@@ -682,29 +682,49 @@ class ScopeImpl implements Lite.Scope {
         }
         const ctrl = this.controller(dep.atom)
         if (dep.resolve) {
-          parallel.push(
-            ctrl.resolve().then(() => {
-              result[key] = ctrl
-              if (dependentAtom) {
-                const depEntry = this.getEntry(dep.atom)
-                if (depEntry) depEntry.dependents.add(dependentAtom)
-              }
-              if (dep.watch) {
-                const eq = dep.eq ?? shallowEqual
-                let prev = ctrl.get() as unknown
-                const unsub = this.on("resolved", dep.atom, () => {
-                  const next = ctrl.get() as unknown
-                  if (!eq(prev, next)) {
-                    this.scheduleInvalidation(dependentAtom!)
-                  }
-                  prev = next
-                })
-                const depEntry = this.getEntry(dependentAtom!)
-                if (depEntry) depEntry.cleanups.push(unsub)
-                else unsub()
-              }
-            })
-          )
+          const cachedCtrlEntry = this.cache.get(dep.atom)
+          if (cachedCtrlEntry?.state === 'resolved') {
+            result[key] = ctrl
+            if (dependentAtom) cachedCtrlEntry.dependents.add(dependentAtom)
+            if (dep.watch) {
+              const eq = dep.eq ?? shallowEqual
+              let prev = ctrl.get() as unknown
+              const unsub = this.on("resolved", dep.atom, () => {
+                const next = ctrl.get() as unknown
+                if (!eq(prev, next)) {
+                  this.scheduleInvalidation(dependentAtom!)
+                }
+                prev = next
+              })
+              const depEntry = this.getEntry(dependentAtom!)
+              if (depEntry) depEntry.cleanups.push(unsub)
+              else unsub()
+            }
+          } else {
+            parallel.push(
+              ctrl.resolve().then(() => {
+                result[key] = ctrl
+                if (dependentAtom) {
+                  const depEntry = this.getEntry(dep.atom)
+                  if (depEntry) depEntry.dependents.add(dependentAtom)
+                }
+                if (dep.watch) {
+                  const eq = dep.eq ?? shallowEqual
+                  let prev = ctrl.get() as unknown
+                  const unsub = this.on("resolved", dep.atom, () => {
+                    const next = ctrl.get() as unknown
+                    if (!eq(prev, next)) {
+                      this.scheduleInvalidation(dependentAtom!)
+                    }
+                    prev = next
+                  })
+                  const depEntry = this.getEntry(dependentAtom!)
+                  if (depEntry) depEntry.cleanups.push(unsub)
+                  else unsub()
+                }
+              })
+            )
+          }
         } else {
           result[key] = ctrl
           if (dependentAtom) {
