@@ -457,13 +457,13 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>): void {
+    if (this.stateListeners.size === 0) return
     const stateMap = this.stateListeners.get(state)
-    if (stateMap) {
-      const listeners = stateMap.get(atom)
-      if (listeners?.size) {
-        for (const listener of [...listeners]) {
-          listener()
-        }
+    if (!stateMap) return
+    const listeners = stateMap.get(atom)
+    if (listeners?.size) {
+      for (const listener of [...listeners]) {
+        listener()
       }
     }
   }
