@@ -1251,11 +1251,17 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.cleanups.push(fn)
   }
 
-  async close(result: Lite.CloseResult = { ok: true }): Promise<void> {
-    if (this.closed) return
+  close(result: Lite.CloseResult = { ok: true }): Promise<void> {
+    if (this.closed) return Promise.resolve()
 
     this.closed = true
 
+    if (this.cleanups.length === 0) return Promise.resolve()
+
+    return this.runCleanups(result)
+  }
+
+  private async runCleanups(result: Lite.CloseResult): Promise<void> {
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
       try { await this.cleanups[i]?.(result) } catch {}
     }
