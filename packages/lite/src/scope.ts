@@ -195,18 +195,9 @@ class ControllerImpl<T> implements Lite.Controller<T> {
 
   get(): T {
     const entry = this.scope.getEntry(this.atom)
-    if (!entry || entry.state === 'idle') {
-      throw new Error("Atom not resolved")
-    }
-    if (entry.state === 'failed' && entry.error) {
-      throw entry.error
-    }
-    if (entry.state === 'resolving' && entry.hasValue) {
-      return entry.value as T
-    }
-    if (entry.state === 'resolved' && entry.hasValue) {
-      return entry.value as T
-    }
+    if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
+    if (entry.state === 'failed') throw entry.error!
+    if (entry.hasValue) return entry.value as T
     throw new Error("Atom not resolved")
   }
 
