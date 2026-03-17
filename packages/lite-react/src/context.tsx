@@ -1,3 +1,5 @@
+'use client'
+
 import { createContext, type ReactNode } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 
