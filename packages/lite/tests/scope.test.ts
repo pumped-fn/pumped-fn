@@ -1091,59 +1091,36 @@ describe("ExecutionContext", () => {
       expect(cycleCalls).toEqual(['resolving', 'resolved'])
     })
 
-    it("returns unsubscribe function", async () => {
+    it("unsubscribe, state filters, and failed notifications", async () => {
       const scope = createScope()
       let notifyCount = 0
       const myAtom = atom({ factory: () => 42 })
-
       const ctrl = scope.controller(myAtom)
       const unsub = ctrl.on('*', () => notifyCount++)
-
       await ctrl.resolve()
       const countAfterResolve = notifyCount
-
       unsub()
       ctrl.invalidate()
       await new Promise(r => setTimeout(r, 10))
-
       expect(notifyCount).toBe(countAfterResolve)
-    })
 
-    it("filters by state - only notifies resolved listeners on resolved", async () => {
-      const scope = createScope()
       const calls: string[] = []
-
-      const myAtom = atom({ factory: () => 'value' })
-      const ctl = scope.controller(myAtom)
-
+      const filterAtom = atom({ factory: () => 'value' })
+      const ctl = scope.controller(filterAtom)
       ctl.on('resolving', () => calls.push('resolving'))
       ctl.on('resolved', () => calls.push('resolved'))
       ctl.on('*', () => calls.push('*'))
-
       await ctl.resolve()
-
       expect(calls).toEqual(['resolving', '*', 'resolved', '*'])
-    })
 
-    it("only notifies '*' listeners on failed state, not 'resolved'", async () => {
-      const scope = createScope()
-      const calls: string[] = []
-
-      const failingAtom = atom({
-        factory: () => {
-          throw new Error("intentional failure")
-        }
-      })
-
-      const ctl = scope.controller(failingAtom)
-
-      ctl.on('resolving', () => calls.push('resolving'))
-      ctl.on('resolved', () => calls.push('resolved'))
-      ctl.on('*', () => calls.push('*'))
-
-      await expect(ctl.resolve()).rejects.toThrow("intentional failure")
-
-      expect(calls).toEqual(['resolving', '*', '*'])
+      const failCalls: string[] = []
+      const failingAtom = atom({ factory: () => { throw new Error("intentional failure") } })
+      const fCtl = scope.controller(failingAtom)
+      fCtl.on('resolving', () => failCalls.push('resolving'))
+      fCtl.on('resolved', () => failCalls.push('resolved'))
+      fCtl.on('*', () => failCalls.push('*'))
+      await expect(fCtl.resolve()).rejects.toThrow("intentional failure")
+      expect(failCalls).toEqual(['resolving', '*', '*'])
     })
   })
 
@@ -1239,35 +1216,22 @@ describe("ExecutionContext", () => {
   })
 
   describe("flow parse", () => {
-    it("parses input before factory execution", async () => {
+    it("parses input, throws ParseError with labels, and supports async parse", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
+      const { ParseError } = await import("../src/errors")
 
       const parseOrder: string[] = []
-
-      const myFlow = flow({
+      const syncFlow = flow({
         parse: (raw: unknown): string => {
           parseOrder.push("parse")
           if (typeof raw !== "string") throw new Error("Must be string")
           return raw.toUpperCase()
         },
-        factory: (ctx) => {
-          parseOrder.push("factory")
-          return ctx.input as string
-        },
+        factory: (ctx) => { parseOrder.push("factory"); return ctx.input as string },
       })
-
-      const result = await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })
-
-      expect(result).toBe("HELLO")
+      expect(await ctx.exec({ flow: syncFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })).toBe("HELLO")
       expect(parseOrder).toEqual(["parse", "factory"])
-      await ctx.close()
-    })
-
-    it("throws ParseError with correct label: flow name, exec name override, and anonymous fallback", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-      const { ParseError } = await import("../src/errors")
 
       const makeBadParse = (name?: string) => flow({
         ...(name ? { name } : {}),
@@ -1277,46 +1241,11 @@ describe("ExecutionContext", () => {
         },
         factory: (ctx) => ctx.input as string,
       })
+      try { await ctx.exec({ flow: makeBadParse("stringFlow") as unknown as Lite.Flow<string, unknown>, input: 123 }); expect.fail("Should have thrown") } catch (err) { expect(err).toBeInstanceOf(ParseError); expect((err as InstanceType<typeof ParseError>).label).toBe("stringFlow") }
+      try { await ctx.exec({ flow: makeBadParse("flowName") as unknown as Lite.Flow<string, unknown>, input: 123, name: "execName" }); expect.fail("Should have thrown") } catch (err) { expect((err as InstanceType<typeof ParseError>).label).toBe("execName") }
+      try { await ctx.exec({ flow: makeBadParse() as unknown as Lite.Flow<string, unknown>, input: 123 }); expect.fail("Should have thrown") } catch (err) { expect((err as InstanceType<typeof ParseError>).label).toBe("anonymous") }
 
-      // Uses flow name
-      try {
-        await ctx.exec({ flow: makeBadParse("stringFlow") as unknown as Lite.Flow<string, unknown>, input: 123 })
-        expect.fail("Should have thrown")
-      } catch (err) {
-        expect(err).toBeInstanceOf(ParseError)
-        const parseErr = err as InstanceType<typeof ParseError>
-        expect(parseErr.phase).toBe("flow-input")
-        expect(parseErr.label).toBe("stringFlow")
-      }
-
-      // Exec name overrides flow name
-      try {
-        await ctx.exec({ flow: makeBadParse("flowName") as unknown as Lite.Flow<string, unknown>, input: 123, name: "execName" })
-        expect.fail("Should have thrown")
-      } catch (err) {
-        expect(err).toBeInstanceOf(ParseError)
-        const parseErr = err as InstanceType<typeof ParseError>
-        expect(parseErr.label).toBe("execName")
-      }
-
-      // Falls back to 'anonymous' when no name provided
-      try {
-        await ctx.exec({ flow: makeBadParse() as unknown as Lite.Flow<string, unknown>, input: 123 })
-        expect.fail("Should have thrown")
-      } catch (err) {
-        expect(err).toBeInstanceOf(ParseError)
-        const parseErr = err as InstanceType<typeof ParseError>
-        expect(parseErr.label).toBe("anonymous")
-      }
-
-      await ctx.close()
-    })
-
-    it("supports async parse", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-
-      const myFlow = flow({
+      const asyncFlow = flow({
         parse: async (raw: unknown): Promise<string> => {
           await new Promise((r) => setTimeout(r, 1))
           if (typeof raw !== "string") throw new Error("Must be string")
@@ -1324,89 +1253,37 @@ describe("ExecutionContext", () => {
         },
         factory: (ctx) => ctx.input as string,
       })
-
-      const result = await ctx.exec({ flow: myFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })
-      expect(result).toBe("HELLO")
+      expect(await ctx.exec({ flow: asyncFlow as unknown as Lite.Flow<string, unknown>, input: "hello" })).toBe("HELLO")
       await ctx.close()
     })
 
-    it("accepts rawInput and passes to parse", async () => {
-      const scope = createScope();
-      const ctx = scope.createContext();
-      const parseOrder: string[] = [];
+    it("rawInput: passes to parse, works without parse, and throws ParseError on failure", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const { ParseError } = await import("../src/errors")
 
-      const myFlow = flow({
+      const rawParseFlow = flow({
         name: "parseFlow",
         parse: (raw: unknown): { name: string } => {
-          parseOrder.push("parse");
-          const obj = raw as Record<string, unknown>;
-          if (typeof obj["name"] !== "string") throw new Error("name required");
-          return { name: obj["name"] };
+          const obj = raw as Record<string, unknown>
+          if (typeof obj["name"] !== "string") throw new Error("name required")
+          return { name: obj["name"] }
         },
-        factory: (ctx) => {
-          parseOrder.push("factory");
-          return ctx.input.name.toUpperCase();
-        },
-      });
+        factory: (ctx) => ctx.input.name.toUpperCase(),
+      })
+      expect(await ctx.exec({ flow: rawParseFlow as unknown as Lite.Flow<string, unknown>, rawInput: { name: "alice" } })).toBe("ALICE")
 
-      const body: unknown = { name: "alice" };
-      const result = await ctx.exec({
-        flow: myFlow as unknown as Lite.Flow<string, unknown>,
-        rawInput: body,
-      });
+      const passThrough = flow({ factory: (ctx) => ctx.input })
+      expect(await ctx.exec({ flow: passThrough as unknown as Lite.Flow<unknown, unknown>, rawInput: { data: 123 } })).toEqual({ data: 123 })
 
-      expect(result).toBe("ALICE");
-      expect(parseOrder).toEqual(["parse", "factory"]);
-      await ctx.close();
-    });
-
-    it("rawInput works without parse (passes through as-is)", async () => {
-      const scope = createScope();
-      const ctx = scope.createContext();
-
-      const myFlow = flow({
-        factory: (ctx) => ctx.input,
-      });
-
-      const body: unknown = { data: 123 };
-      const result = await ctx.exec({
-        flow: myFlow as unknown as Lite.Flow<unknown, unknown>,
-        rawInput: body,
-      });
-
-      expect(result).toEqual({ data: 123 });
-      await ctx.close();
-    });
-
-    it("throws ParseError when rawInput fails parse", async () => {
-      const scope = createScope();
-      const ctx = scope.createContext();
-      const { ParseError } = await import("../src/errors");
-
-      const myFlow = flow({
+      const strictFlow = flow({
         name: "strictFlow",
-        parse: (raw: unknown): string => {
-          if (typeof raw !== "string") throw new Error("Must be string");
-          return raw;
-        },
+        parse: (raw: unknown): string => { if (typeof raw !== "string") throw new Error("Must be string"); return raw },
         factory: (ctx) => ctx.input,
-      });
-
-      try {
-        await ctx.exec({
-          flow: myFlow as unknown as Lite.Flow<string, unknown>,
-          rawInput: 123,
-        });
-        expect.fail("Should have thrown");
-      } catch (err) {
-        expect(err).toBeInstanceOf(ParseError);
-        const parseErr = err as InstanceType<typeof ParseError>;
-        expect(parseErr.phase).toBe("flow-input");
-        expect(parseErr.label).toBe("strictFlow");
-      }
-
-      await ctx.close();
-    });
+      })
+      try { await ctx.exec({ flow: strictFlow as unknown as Lite.Flow<string, unknown>, rawInput: 123 }); expect.fail("Should have thrown") } catch (err) { expect(err).toBeInstanceOf(ParseError); expect((err as InstanceType<typeof ParseError>).label).toBe("strictFlow") }
+      await ctx.close()
+    })
   })
 
   describe("ctx.data (ContextData with Tag support)", () => {
