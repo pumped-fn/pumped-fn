@@ -141,57 +141,19 @@ describe('useAtom - state handling', () => {
     expect(screen.getByText('resolved value')).toBeInTheDocument()
   })
 
-  it('throws error when atom is in failed state', async () => {
-    const testError = new Error('Test error')
-    const testAtom = atom({
-      factory: async () => {
-        throw testError
-      },
-    })
-
+  it('throws error for failed state and idle with resolve:false', async () => {
+    const testAtom = atom({ factory: async () => { throw new Error('Test error') } })
     const scope = createScope()
     await scope.resolve(testAtom).catch(() => {})
-
-    function TestComponent() {
-      useAtom(testAtom)
-      return <div>test</div>
-    }
-
-    let errorCaught = false
-    render(
-      <ScopeProvider scope={scope}>
-        <ErrorBoundary fallback={<div>Error caught</div>}>
-          <TestComponent />
-        </ErrorBoundary>
-      </ScopeProvider>
-    )
-
-    errorCaught = screen.getByText('Error caught') !== null
-    expect(errorCaught).toBe(true)
-  })
-
-  it('throws error when atom is idle and resolve: false', () => {
-    const testAtom = atom({
-      factory: async () => 'value',
-    })
-
-    const scope = createScope()
-    // Note: NOT resolving the atom
-
-    function TestComponent() {
-      useAtom(testAtom, { resolve: false })
-      return <div>test</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <ErrorBoundary fallback={<div>Error caught</div>}>
-          <TestComponent />
-        </ErrorBoundary>
-      </ScopeProvider>
-    )
-
+    function FailedComp() { useAtom(testAtom); return <div>test</div> }
+    render(<ScopeProvider scope={scope}><ErrorBoundary fallback={<div>Error caught</div>}><FailedComp /></ErrorBoundary></ScopeProvider>)
     expect(screen.getByText('Error caught')).toBeInTheDocument()
+
+    const idleAtom = atom({ factory: async () => 'value' })
+    const scope2 = createScope()
+    function IdleComp() { useAtom(idleAtom, { resolve: false }); return <div>test</div> }
+    render(<ScopeProvider scope={scope2}><ErrorBoundary fallback={<div>Idle error</div>}><IdleComp /></ErrorBoundary></ScopeProvider>)
+    expect(screen.getByText('Idle error')).toBeInTheDocument()
   })
 
   it('suspends when resolving with resolve: false (already started)', async () => {
@@ -601,95 +563,30 @@ describe('useSelect - equality filtering', () => {
 })
 
 describe('useSelect - state handling', () => {
-  it('auto-resolves and suspends when atom is in idle state', async () => {
-    const testAtom = atom({
-      factory: async () => 'lazy selected value',
-    })
-
-    const scope = createScope()
-
-    function TestComponent() {
-      const value = useSelect(testAtom, (v) => v)
-      return <div>{value}</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <TestComponent />
-        </Suspense>
-      </ScopeProvider>
-    )
-
+  it('suspends on idle/resolving and throws on failed', async () => {
+    const idleAtom = atom({ factory: async () => 'lazy selected value' })
+    const scope1 = createScope()
+    function IdleSel() { const v = useSelect(idleAtom, (v) => v); return <div>{v}</div> }
+    render(<ScopeProvider scope={scope1}><Suspense fallback={<div>Loading...</div>}><IdleSel /></Suspense></ScopeProvider>)
     expect(screen.getByText('Loading...')).toBeInTheDocument()
+    await waitFor(() => { expect(screen.getByText('lazy selected value')).toBeInTheDocument() })
 
-    await waitFor(() => {
-      expect(screen.getByText('lazy selected value')).toBeInTheDocument()
-    })
-  })
-
-  it('suspends when atom is in resolving state', async () => {
     let resolveFactory: (value: string) => void
-    const promise = new Promise<string>((resolve) => {
-      resolveFactory = resolve
-    })
+    const promise = new Promise<string>((resolve) => { resolveFactory = resolve })
+    const resolvingAtom = atom({ factory: async () => promise })
+    const scope2 = createScope()
+    scope2.resolve(resolvingAtom)
+    function ResSel() { const v = useSelect(resolvingAtom, (v) => v); return <div>{v}</div> }
+    render(<ScopeProvider scope={scope2}><Suspense fallback={<div>Resolving...</div>}><ResSel /></Suspense></ScopeProvider>)
+    expect(screen.getByText('Resolving...')).toBeInTheDocument()
+    await act(async () => { resolveFactory!('resolved value'); await promise })
+    await waitFor(() => { expect(screen.getByText('resolved value')).toBeInTheDocument() })
 
-    const testAtom = atom({
-      factory: async () => promise,
-    })
-
-    const scope = createScope()
-    scope.resolve(testAtom)
-
-    function TestComponent() {
-      const value = useSelect(testAtom, (v) => v)
-      return <div>{value}</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <TestComponent />
-        </Suspense>
-      </ScopeProvider>
-    )
-
-    expect(screen.getByText('Loading...')).toBeInTheDocument()
-
-    await act(async () => {
-      resolveFactory!('resolved value')
-      await promise
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('resolved value')).toBeInTheDocument()
-    })
-  })
-
-  it('throws error when atom is in failed state', async () => {
-    const testError = new Error('Test error')
-    const testAtom = atom({
-      factory: async () => {
-        throw testError
-      },
-    })
-
-    const scope = createScope()
-    await scope.resolve(testAtom).catch(() => {})
-
-    function TestComponent() {
-      useSelect(testAtom, (v) => v)
-      return <div>test</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <ErrorBoundary fallback={<div>Error caught</div>}>
-          <TestComponent />
-        </ErrorBoundary>
-      </ScopeProvider>
-    )
-
+    const failAtom = atom({ factory: async () => { throw new Error('Test error') } })
+    const scope3 = createScope()
+    await scope3.resolve(failAtom).catch(() => {})
+    function FailSel() { useSelect(failAtom, (v) => v); return <div>test</div> }
+    render(<ScopeProvider scope={scope3}><ErrorBoundary fallback={<div>Error caught</div>}><FailSel /></ErrorBoundary></ScopeProvider>)
     expect(screen.getByText('Error caught')).toBeInTheDocument()
   })
 
