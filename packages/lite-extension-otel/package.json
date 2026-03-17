@@ -41,6 +41,7 @@
     "@pumped-fn/lite": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   },
   "keywords": [
