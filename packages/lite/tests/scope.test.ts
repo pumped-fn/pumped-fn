@@ -10,88 +10,48 @@ import type { Lite } from "../src/types"
 
 describe("Scope", () => {
   describe("scope.resolve()", () => {
-    it("resolves atom without deps", async () => {
+    it("resolves atoms: no deps, with deps, caching, async, undefined", async () => {
       const scope = createScope()
-      const myAtom = atom({ factory: () => 42 })
+      expect(await scope.resolve(atom({ factory: () => 42 }))).toBe(42)
 
-      const result = await scope.resolve(myAtom)
-      expect(result).toBe(42)
-    })
-
-    it("resolves atom with deps", async () => {
-      const scope = createScope()
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const serverAtom = atom({
         deps: { cfg: configAtom },
         factory: (ctx, { cfg }) => ({ port: cfg.port }),
       })
+      expect(await scope.resolve(serverAtom)).toEqual({ port: 3000 })
 
-      const result = await scope.resolve(serverAtom)
-      expect(result).toEqual({ port: 3000 })
-    })
-
-    it("caches resolved values", async () => {
-      const scope = createScope()
       let callCount = 0
-      const myAtom = atom({
-        factory: () => {
-          callCount++
-          return callCount
-        },
-      })
-
-      const first = await scope.resolve(myAtom)
-      const second = await scope.resolve(myAtom)
-
-      expect(first).toBe(1)
-      expect(second).toBe(1)
+      const cachedAtom = atom({ factory: () => ++callCount })
+      expect(await scope.resolve(cachedAtom)).toBe(1)
+      expect(await scope.resolve(cachedAtom)).toBe(1)
       expect(callCount).toBe(1)
-    })
 
-    it("resolves async factories", async () => {
-      const scope = createScope()
-      const myAtom = atom({
+      const asyncAtom = atom({
         factory: async () => {
           await new Promise((r) => setTimeout(r, 10))
           return "async result"
         },
       })
+      expect(await scope.resolve(asyncAtom)).toBe("async result")
 
-      const result = await scope.resolve(myAtom)
-      expect(result).toBe("async result")
-    })
-
-    it("handles undefined as valid resolved value", async () => {
-      const scope = createScope()
       const undefinedAtom = atom({ factory: () => undefined })
-
-      const result = await scope.resolve(undefinedAtom)
-      expect(result).toBe(undefined)
-
-      const ctrl = scope.controller(undefinedAtom)
-      expect(ctrl.state).toBe("resolved")
-      expect(ctrl.get()).toBe(undefined)
+      expect(await scope.resolve(undefinedAtom)).toBe(undefined)
+      expect(scope.controller(undefinedAtom).state).toBe("resolved")
     })
 
-    it("uses preset value", async () => {
+    it("uses preset value and preset atom", async () => {
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
-      const scope = createScope({
+      const scope1 = createScope({
         presets: [preset(configAtom, { port: 8080 })],
       })
+      expect(await scope1.resolve(configAtom)).toEqual({ port: 8080 })
 
-      const result = await scope.resolve(configAtom)
-      expect(result).toEqual({ port: 8080 })
-    })
-
-    it("uses preset atom", async () => {
-      const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const testConfigAtom = atom({ factory: () => ({ port: 9999 }) })
-      const scope = createScope({
+      const scope2 = createScope({
         presets: [preset(configAtom, testConfigAtom)],
       })
-
-      const result = await scope.resolve(configAtom)
-      expect(result).toEqual({ port: 9999 })
+      expect(await scope2.resolve(configAtom)).toEqual({ port: 9999 })
     })
   })
 
@@ -304,63 +264,41 @@ describe("Scope", () => {
   })
 
   describe("tag deps", () => {
-    it("resolves required tag from scope tags", async () => {
+    it("resolves required from scope, throws missing, resolves optional as undefined", async () => {
       const tenantId = tag<string>({ label: "tenantId" })
-      const scope = createScope({
-        tags: [tenantId("tenant-123")],
-      })
 
-      const myAtom = atom({
+      const scope1 = createScope({ tags: [tenantId("tenant-123")] })
+      const reqAtom = atom({
         deps: { tenant: tags.required(tenantId) },
         factory: (ctx, { tenant }) => tenant,
       })
+      expect(await scope1.resolve(reqAtom)).toBe("tenant-123")
 
-      const result = await scope.resolve(myAtom)
-      expect(result).toBe("tenant-123")
-    })
-
-    it("throws for missing required tag", async () => {
-      const tenantId = tag<string>({ label: "tenantId" })
-      const scope = createScope()
-
-      const myAtom = atom({
+      const scope2 = createScope()
+      await expect(scope2.resolve(atom({
         deps: { tenant: tags.required(tenantId) },
         factory: (ctx, { tenant }) => tenant,
-      })
+      }))).rejects.toThrow()
 
-      await expect(scope.resolve(myAtom)).rejects.toThrow()
-    })
-
-    it("resolves optional tag as undefined", async () => {
-      const tenantId = tag<string>({ label: "tenantId" })
-      const scope = createScope()
-
-      const myAtom = atom({
+      expect(await scope2.resolve(atom({
         deps: { tenant: tags.optional(tenantId) },
         factory: (ctx, { tenant }) => tenant,
-      })
-
-      const result = await scope.resolve(myAtom)
-      expect(result).toBeUndefined()
+      }))).toBeUndefined()
     })
   })
 
-  describe("cleanup", () => {
-    it("runs cleanups on release in LIFO order", async () => {
+  describe("cleanup and dispose", () => {
+    it("runs cleanups on release in LIFO order and dispose releases all atoms", async () => {
       const scope = createScope()
       let cleaned = false
       const singleCleanupAtom = atom({
         factory: (ctx) => {
-          ctx.cleanup(() => {
-            cleaned = true
-          })
+          ctx.cleanup(() => { cleaned = true })
           return 42
         },
       })
-
       await scope.resolve(singleCleanupAtom)
       expect(cleaned).toBe(false)
-
       await scope.release(singleCleanupAtom)
       expect(cleaned).toBe(true)
 
@@ -373,36 +311,17 @@ describe("Scope", () => {
           return 42
         },
       })
-
       await scope.resolve(multiCleanupAtom)
       await scope.release(multiCleanupAtom)
-
       expect(order).toEqual([3, 2, 1])
-    })
-  })
 
-  describe("dispose", () => {
-    it("releases all atoms", async () => {
-      const scope = createScope()
+      const scope2 = createScope()
       const cleanups: string[] = []
-
-      const a = atom({
-        factory: (ctx) => {
-          ctx.cleanup(() => { cleanups.push("a") })
-          return "a"
-        },
-      })
-      const b = atom({
-        factory: (ctx) => {
-          ctx.cleanup(() => { cleanups.push("b") })
-          return "b"
-        },
-      })
-
-      await scope.resolve(a)
-      await scope.resolve(b)
-      await scope.dispose()
-
+      const a = atom({ factory: (ctx) => { ctx.cleanup(() => { cleanups.push("a") }); return "a" } })
+      const b = atom({ factory: (ctx) => { ctx.cleanup(() => { cleanups.push("b") }); return "b" } })
+      await scope2.resolve(a)
+      await scope2.resolve(b)
+      await scope2.dispose()
       expect(cleanups).toContain("a")
       expect(cleanups).toContain("b")
     })
@@ -745,30 +664,21 @@ describe("ExecutionContext", () => {
   })
 
   describe("ctx.onClose()", () => {
-    it("runs cleanup on close", async () => {
+    it("runs cleanup on close in LIFO order", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
-
       let cleaned = false
-      ctx.onClose(() => {
-        cleaned = true
-      })
-
+      ctx.onClose(() => { cleaned = true })
       expect(cleaned).toBe(false)
       await ctx.close()
       expect(cleaned).toBe(true)
-    })
 
-    it("runs cleanups in LIFO order", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-
+      const ctx2 = scope.createContext()
       const order: number[] = []
-      ctx.onClose(() => { order.push(1) })
-      ctx.onClose(() => { order.push(2) })
-      ctx.onClose(() => { order.push(3) })
-
-      await ctx.close()
+      ctx2.onClose(() => { order.push(1) })
+      ctx2.onClose(() => { order.push(2) })
+      ctx2.onClose(() => { order.push(3) })
+      await ctx2.close()
       expect(order).toEqual([3, 2, 1])
     })
   })
@@ -1069,7 +979,7 @@ describe("ExecutionContext", () => {
   })
 
   describe("controller.set()", () => {
-    it("replaces value, notifies listeners, and does not run factory", async () => {
+    it("replaces value without factory, throws when idle, queues when resolving", async () => {
       const scope = createScope()
       let factoryCount = 0
       const myAtom = atom({
@@ -1079,53 +989,32 @@ describe("ExecutionContext", () => {
         },
       })
       const ctrl = scope.controller(myAtom)
-
       await ctrl.resolve()
       expect(factoryCount).toBe(1)
-
       const notifications: string[] = []
       ctrl.on("resolved", () => notifications.push("resolved"))
-
       ctrl.set({ name: "Alice" })
       await scope.flush()
-
       expect(ctrl.get()).toEqual({ name: "Alice" })
       expect(notifications).toEqual(["resolved"])
       expect(factoryCount).toBe(1)
-    })
 
-    it("throws when atom not resolved", () => {
-      const scope = createScope()
-      const myAtom = atom({ factory: () => ({ name: "Guest" }) })
-      const ctrl = scope.controller(myAtom)
+      const idleAtom = atom({ factory: () => ({ name: "Guest" }) })
+      expect(() => scope.controller(idleAtom).set({ name: "Alice" })).toThrow("Atom not resolved")
 
-      expect(() => ctrl.set({ name: "Alice" })).toThrow("Atom not resolved")
-    })
-
-    it("queues when atom is resolving", async () => {
-      const scope = createScope()
       let resolveFactory: () => void
-      const myAtom = atom({
-        factory: () =>
-          new Promise<{ name: string }>((r) => {
-            resolveFactory = () => r({ name: "Guest" })
-          }),
+      const queueAtom = atom({
+        factory: () => new Promise<{ name: string }>((r) => { resolveFactory = () => r({ name: "Guest" }) }),
       })
-
-      const ctrl = scope.controller(myAtom)
-      const resolvePromise = ctrl.resolve()
-
+      const qCtrl = scope.controller(queueAtom)
+      const resolvePromise = qCtrl.resolve()
       await Promise.resolve()
-
-      ctrl.set({ name: "Alice" })
-
+      qCtrl.set({ name: "Alice" })
       resolveFactory!()
       await resolvePromise
       await scope.flush()
-
-      expect(ctrl.get()).toEqual({ name: "Alice" })
+      expect(qCtrl.get()).toEqual({ name: "Alice" })
     })
-
   })
 
   describe("controller.update()", () => {
@@ -1259,52 +1148,34 @@ describe("ExecutionContext", () => {
   })
 
   describe("scope.on()", () => {
-    it("fires for specific state transitions", async () => {
+    it("fires state transitions, failed events, and supports unsubscribe", async () => {
       const scope = createScope()
       const events: string[] = []
-      const myAtom = atom({
+      const asyncAtom = atom({
         factory: async () => {
           await new Promise(r => setTimeout(r, 10))
           return 42
         }
       })
-
-      scope.on('resolving', myAtom, () => events.push('resolving'))
-      scope.on('resolved', myAtom, () => events.push('resolved'))
-
-      await scope.resolve(myAtom)
-
+      scope.on('resolving', asyncAtom, () => events.push('resolving'))
+      scope.on('resolved', asyncAtom, () => events.push('resolved'))
+      await scope.resolve(asyncAtom)
       expect(events).toEqual(['resolving', 'resolved'])
-    })
 
-    it("fires failed event on error", async () => {
-      const scope = createScope()
       let failedCalled = false
-      const myAtom = atom({
-        factory: () => {
-          throw new Error("oops")
-        }
-      })
-
-      scope.on('failed', myAtom, () => { failedCalled = true })
-
-      await expect(scope.resolve(myAtom)).rejects.toThrow("oops")
+      const failAtom = atom({ factory: () => { throw new Error("oops") } })
+      scope.on('failed', failAtom, () => { failedCalled = true })
+      await expect(scope.resolve(failAtom)).rejects.toThrow("oops")
       expect(failedCalled).toBe(true)
-    })
 
-    it("returns unsubscribe function", async () => {
-      const scope = createScope()
       let count = 0
-      const myAtom = atom({ factory: () => count++ })
-
-      const unsub = scope.on('resolved', myAtom, () => count += 10)
-
-      await scope.resolve(myAtom)
+      const countAtom = atom({ factory: () => count++ })
+      const unsub = scope.on('resolved', countAtom, () => count += 10)
+      await scope.resolve(countAtom)
       expect(count).toBe(11)
-
       unsub()
-      await scope.release(myAtom)
-      await scope.resolve(myAtom)
+      await scope.release(countAtom)
+      await scope.resolve(countAtom)
       expect(count).toBe(12)
     })
   })
@@ -2474,35 +2345,27 @@ describe("Triage regression tests", () => {
 })
 
 describe("release() cleanup", () => {
-  it("removes atom from dependency dependents sets on release", async () => {
+  it("removes dependents on release and controller ops throw after release", async () => {
     let factoryCalls = 0
     const depAtom = atom({ factory: () => { factoryCalls++; return "dep" } })
     const parentAtom = atom({
       deps: { dep: depAtom },
       factory: (_ctx, { dep }) => `parent-${dep}`,
     })
-
     const scope = createScope({ gc: { enabled: true, graceMs: 10 } })
     await scope.resolve(parentAtom)
     expect(factoryCalls).toBe(1)
-
     await scope.release(parentAtom)
-
     await new Promise(r => setTimeout(r, 50))
-
     await scope.resolve(depAtom)
     expect(factoryCalls).toBe(2)
     await scope.dispose()
-  })
 
-  it("controller operations throw after release", async () => {
     const myAtom = atom({ factory: () => 42 })
-    const scope = createScope()
-    await scope.resolve(myAtom)
-
-    const ctrl = scope.controller(myAtom)
-    await scope.release(myAtom)
-
+    const scope2 = createScope()
+    await scope2.resolve(myAtom)
+    const ctrl = scope2.controller(myAtom)
+    await scope2.release(myAtom)
     expect(() => ctrl.get()).toThrow()
   })
 })
@@ -2558,8 +2421,7 @@ describe("listener notification", () => {
 })
 
 describe("dispose() behavior", () => {
-  it("drains and awaits in-flight invalidation chains before disposing", async () => {
-    // Async factory: awaits in-flight invalidation chain before releasing
+  it("drains in-flight chains and throws after dispose", async () => {
     let factoryRuns = 0
     const asyncAtom = atom({
       factory: async () => {
@@ -2568,31 +2430,20 @@ describe("dispose() behavior", () => {
         return factoryRuns
       },
     })
-
     const scope1 = createScope()
     await scope1.resolve(asyncAtom)
-
     scope1.controller(asyncAtom).invalidate()
     await scope1.dispose()
-
     expect(factoryRuns).toBeGreaterThanOrEqual(1)
 
-    // Sync factory: drains pending invalidation chain before marking disposed
     let resolveCount = 0
-    const syncAtom = atom({
-      factory: () => ++resolveCount,
-    })
-
+    const syncAtom = atom({ factory: () => ++resolveCount })
     const scope2 = createScope()
     await scope2.resolve(syncAtom)
-    expect(resolveCount).toBe(1)
-
     scope2.controller(syncAtom).invalidate()
     await scope2.dispose()
-
     expect(resolveCount).toBe(2)
 
-    // Slow factory: dispose during active invalidation chain — no errors (triage Fix 5)
     let slowFactoryCount = 0
     const slowAtom = atom({
       factory: async () => {
@@ -2601,24 +2452,17 @@ describe("dispose() behavior", () => {
         return slowFactoryCount
       },
     })
-
     const scope3 = createScope()
     await scope3.resolve(slowAtom)
-    expect(slowFactoryCount).toBe(1)
-
     scope3.controller(slowAtom).invalidate()
     await scope3.dispose()
-
     expect(slowFactoryCount).toBeLessThanOrEqual(2)
-  })
 
-  it("throws on resolve() and createContext() after dispose()", async () => {
     const myAtom = atom({ factory: () => 42 })
-    const scope = createScope()
-    await scope.resolve(myAtom)
-    await scope.dispose()
-
-    await expect(scope.resolve(myAtom)).rejects.toThrow()
-    expect(() => scope.createContext()).toThrow()
+    const scope4 = createScope()
+    await scope4.resolve(myAtom)
+    await scope4.dispose()
+    await expect(scope4.resolve(myAtom)).rejects.toThrow()
+    expect(() => scope4.createContext()).toThrow()
   })
 })
