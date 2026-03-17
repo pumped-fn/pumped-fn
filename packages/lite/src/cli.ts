@@ -24,11 +24,49 @@ const categories: Record<string, { title: string; content: string | (() => strin
     content: extractOverview,
   },
 
+  "mental-model": {
+    title: "Mental Model",
+    content: `@pumped-fn/lite is a scoped dependency graph with three primitives:
+
+  ATOM = singleton (cached per scope)
+    Created once. Lives as long as the scope. Think: db pool, config, auth service.
+    Resolved via scope.resolve(atom). Second call returns cached value.
+    Factory receives ResolveContext: ctx.cleanup(), ctx.invalidate(), ctx.scope, ctx.data.
+
+  FLOW = transient operation (new instance per exec)
+    Runs once per ctx.exec() call. Think: HTTP handler, mutation, query.
+    Factory receives ExecutionContext: ctx.exec(), ctx.onClose(), ctx.input, ctx.parent, ctx.data.
+
+  RESOURCE = execution-scoped singleton (shared within an exec chain)
+    Created fresh per root ctx.exec(). Shared across nested exec() calls via seek-up.
+    Think: per-request logger, transaction, trace span.
+    Declared as a flow dep, NOT called directly.
+
+Scope = the container. Owns all atom caches. One per process (server) or per component tree (React).
+ExecutionContext = the request boundary. Created per request/operation. Carries tags. Closes with cleanup.
+Controller = opt-in reactive handle for an atom. Enables set/update/invalidate/subscribe.
+Tag = ambient typed value. Propagates through scope → context → nested exec. No parameter drilling.
+Preset = test/environment override. Replaces any atom or flow without touching production code.
+Extension = middleware for resolve and exec. Wraps every atom resolution and flow execution.
+
+Key invariant: atoms are resolved from scope, flows are executed from context.
+  scope.resolve(atom)         ✓ correct
+  ctx.exec({ flow, input })   ✓ correct
+  scope.resolve(flow)          ✗ wrong — flows are not cached
+  ctx.exec({ atom })           ✗ wrong — atoms are not executed`,
+  },
+
   primitives: {
     title: "Primitives API",
-    content: `atom({ factory, deps?, tags?, keepAlive? })
-  Creates a managed effect. Factory receives (ctx, resolvedDeps) and returns a value.
-  Cached per scope. Supports cleanup via ctx.onClose().
+    content: `There are three primitives with distinct lifetimes:
+  atom  — SINGLETON per scope. Created once, cached, reused everywhere. Think: db pool, config, service instance.
+  flow  — EPHEMERAL per call. New execution each time ctx.exec() is called. Think: HTTP handler, mutation, query.
+  resource — EPHEMERAL per execution chain. Created once per ctx.exec() tree, shared across nested execs. Think: logger, transaction, trace span.
+
+atom({ factory, deps?, tags?, keepAlive? })
+  Factory receives (resolveCtx, resolvedDeps) → value.
+  resolveCtx has: cleanup(fn), invalidate(), scope, data.
+  Resolved via scope.resolve(atom). Cached — second resolve() returns same value.
 
   import { atom } from "@pumped-fn/lite"
   const dbAtom = atom({ factory: () => createDbPool() })
@@ -38,7 +76,9 @@ const categories: Record<string, { title: string; content: string | (() => strin
   })
 
 flow({ factory, parse?, deps?, tags? })
-  Operation template executed per call. parse validates input, factory runs logic.
+  Factory receives (executionCtx, resolvedDeps) → output.
+  executionCtx has: exec(), onClose(fn), input, parent, data, scope, name.
+  Executed via ctx.exec({ flow, input }). Never cached — each call runs the factory.
 
   import { flow, typed } from "@pumped-fn/lite"
   const getUser = flow({
@@ -47,21 +87,45 @@ flow({ factory, parse?, deps?, tags? })
     factory: (ctx, { db }) => db.findUser(ctx.input.id),
   })
 
+resource({ factory, deps?, name? })
+  Like a flow factory but resolved as a DEPENDENCY of flows, not called directly.
+  Created fresh per execution chain. Shared via seek-up: nested ctx.exec() reuses parent's instance.
+  Factory receives (executionCtx, resolvedDeps) → instance.
+  Cleanup via ctx.onClose(fn).
+
+  import { resource } from "@pumped-fn/lite"
+  const txResource = resource({
+    deps: { db: dbAtom },
+    factory: (ctx, { db }) => {
+      const tx = db.beginTransaction()
+      ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())
+      return tx
+    },
+  })
+  // Used as a flow dep — NOT called directly
+  const saveUser = flow({
+    deps: { tx: txResource },
+    factory: (ctx, { tx }) => tx.insert("users", ctx.input),
+  })
+
 tag({ label, default?, parse? })
-  Ambient context value. Attach to atoms/flows/contexts. Retrieve via tag.get/find/collect.
+  Ambient context value. Propagates through scope → context → exec hierarchy.
+  Resolution order: exec tags > context tags > scope tags (nearest wins).
 
   import { tag } from "@pumped-fn/lite"
   const tenantTag = tag<string>({ label: "tenant" })
 
 preset(target, value)
-  Override an atom's resolved value. Used for testing and multi-tenant isolation.
+  Override an atom or flow's resolved value. Used for testing and multi-tenant isolation.
+  value can be: a literal, another atom (redirect), or a function (flow only).
 
   import { preset } from "@pumped-fn/lite"
   const mockDb = preset(dbAtom, fakeDatabaseInstance)
 
 service({ factory, deps? })
   Convenience wrapper for atom whose value is an object of methods.
-  Each method receives (ctx, ...args) for tracing/auth integration.`,
+  Each method MUST have (ctx: ExecutionContext, ...args) as signature.
+  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.`,
   },
 
   scope: {
@@ -90,91 +154,133 @@ scope.dispose()            → void                release everything, run all c
 
   context: {
     title: "ExecutionContext",
-    content: `ctx = scope.createContext({ tags? })
-  Execution boundary. Tags merge with scope tags. Cleanup runs LIFO on close.
+    content: `IMPORTANT: There are two context types. Don't confuse them.
 
-ctx.exec({ flow, input?, tags? })  → Promise<output>
-  Execute a flow within this context. Creates a child context with merged tags.
+ResolveContext (received by atom factories):
+  ctx.cleanup(fn)       register cleanup (runs LIFO on release/invalidate)
+  ctx.invalidate()      schedule re-resolution after current factory completes
+  ctx.scope             the owning Scope
+  ctx.data              per-atom key-value store (persists across invalidations)
+
+ExecutionContext (received by flow factories, resource factories, and inline fns):
+  ctx.exec(...)         execute a nested flow or function (creates child context)
+  ctx.onClose(fn)       register cleanup (runs LIFO on close, receives CloseResult)
+  ctx.close(result?)    close this context, run all cleanups
+  ctx.input             parsed input (flows only)
+  ctx.parent            parent ExecutionContext (undefined for root)
+  ctx.name              exec name or flow name
+  ctx.scope             the owning Scope
+  ctx.data              per-context key-value store with tag support
+
+ctx = scope.createContext({ tags? })
+  Creates a root ExecutionContext. Tags merge: exec tags > context tags > scope tags.
+
+ctx.exec({ flow, input?, rawInput?, tags? })  → Promise<output>
+  Execute a flow. Creates a child context with merged tags.
+  If flow has parse: rawInput goes through parse first, input skips parse.
   Child context closes automatically after execution.
 
-ctx.exec({ fn, params?, tags? })   → Promise<result>
+ctx.exec({ fn, params?, name?, tags? })  → Promise<result>
   Execute an inline function: fn(childCtx, ...params).
   Same child-context lifecycle as flow execution.
 
-ctx.onClose(cleanup)   → void     register cleanup (runs LIFO on ctx.close)
-ctx.close()            → void     run all registered cleanups in LIFO order
+ctx.data (both context types)
+  Raw:   get(key) / set(key, val) / has(key) / delete(key) / clear() / seek(key)
+  Typed: getTag(tag) / setTag(tag, val) / hasTag(tag) / deleteTag(tag) / seekTag(tag) / getOrSetTag(tag, default?)
 
-ctx.data
-  Key-value store scoped to the context:
-    Raw:   get(key) / set(key, val) / has(key) / delete(key) / clear() / seek(key)
-    Typed: getTag(tag) / setTag(tag, val) / hasTag(tag) / deleteTag(tag) / seekTag(tag) / getOrSetTag(tag, factory)
-
-  seek/seekTag walks up the context chain to find values in parent contexts.`,
+  seek/seekTag walks up the parent chain to find values set in ancestor contexts.
+  This is how tags propagate: middleware sets a tag, nested flows read it via seekTag.`,
   },
 
   reactivity: {
     title: "Reactivity (opt-in)",
-    content: `controller(atom)  → Controller
-  Opt-in reactive handle for an atom.
+    content: `Atoms are STATIC by default — resolved once, value never changes.
+Reactivity is opt-in via controllers. Two ways to get a controller:
 
-  ctrl.get()                  → current value (must be resolved first)
-  ctrl.resolve()              → Promise<value> (resolve if not yet)
-  ctrl.set(value)             → replace value, notify listeners
-  ctrl.update(fn)             → update value via function, notify listeners
-  ctrl.invalidate()           → re-run factory, notify listeners
-  ctrl.release()              → release atom, run cleanups
-  ctrl.on(event, listener)    → unsubscribe
-    events: 'resolving' | 'resolved' | '*'
+1. scope.controller(atom) → Controller
+   Retrieve the reactive handle for an atom. Same instance per atom per scope.
+   Used externally (app code, React hooks, middleware).
+
+2. controller(atom, opts?) → ControllerDep (dep marker)
+   Wrap an atom dep so the factory receives a Controller instead of the resolved value.
+   Used inside deps: { cfg: controller(configAtom, { resolve: true }) }
+   This is NOT the same as scope.controller() — it's a dep declaration.
+
+Controller API:
+  ctrl.state                → 'idle' | 'resolving' | 'resolved' | 'failed'
+  ctrl.get()                → current value (throws if not resolved)
+  ctrl.resolve()            → Promise<value> (resolve if not yet)
+  ctrl.set(value)           → replace value, notify listeners, skip factory
+  ctrl.update(fn)           → transform value via function, notify listeners
+  ctrl.invalidate()         → re-run factory, notify listeners
+  ctrl.release()            → release atom, run cleanups
+  ctrl.on(event, listener)  → unsubscribe
+    events: 'resolving' | 'resolved' | 'failed' | '*'
+
+Controller as dependency (opts):
+  controller(atom)                          → dep receives Controller (idle, must manually resolve)
+  controller(atom, { resolve: true })       → dep receives Controller (pre-resolved before factory runs)
+  controller(atom, { resolve: true, watch: true })  → ALSO auto-invalidates parent when dep value changes
+  controller(atom, { resolve: true, watch: true, eq })  → custom equality gate (default: structural deep equal for plain objects, Object.is otherwise)
+
+  watch:true replaces the manual pattern:
+    ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))
+  With the declarative:
+    deps: { src: controller(srcAtom, { resolve: true, watch: true }) }
+  The watch listener is auto-cleaned on re-resolve, release, and dispose.
 
 select(atom, selector, { eq? })  → SelectHandle
   Derived state slice. Only notifies when selected value changes per eq function.
-
   handle.get()              → current selected value
   handle.subscribe(fn)      → unsubscribe
+  handle.dispose()          → clean up internal subscription
 
-scope.on('resolved', atom, listener)  → unsubscribe
-  Listen to atom resolution events at scope level.
-
-Controller as dependency:
-  import { controller } from "@pumped-fn/lite"
-  const serverAtom = atom({
-    deps: { cfg: controller(configAtom, { resolve: true }) },
-    factory: (ctx, { cfg }) => {
-      cfg.on('resolved', () => ctx.invalidate())
-      return createServer(cfg.get())
-    },
-  })`,
+scope.on('resolving' | 'resolved' | 'failed', atom, listener)  → unsubscribe
+  Listen to atom state transitions at scope level.`,
   },
 
   tags: {
     title: "Tag System",
-    content: `tag<T>({ label, default?, parse? })  → Tag<T>
-  Define an ambient context value type.
+    content: `Tags are typed ambient values that propagate without parameter drilling.
 
-tag(value)  → Tagged<T>
-  Create a tagged value to attach to atoms, flows, or contexts.
+tag<T>({ label, default?, parse? })  → Tag<T>
+  Define a tag type. The tag object is both a type definition and a factory:
+  const tenantTag = tag<string>({ label: "tenant" })
+  const tagged = tenantTag("acme")  // creates Tagged<string>
+
+Resolution hierarchy (nearest wins):
+  1. exec tags:    ctx.exec({ flow, tags: [tenantTag("exec")] })
+  2. flow tags:    flow({ tags: [tenantTag("flow")] })
+  3. context tags: scope.createContext({ tags: [tenantTag("ctx")] })
+  4. ctx.data:     parent ctx.data.setTag(tenantTag, "middleware")  ← seekTag walks up
+  5. scope tags:   createScope({ tags: [tenantTag("scope")] })
+  6. tag default:  tag({ label: "tenant", default: "default" })
+
+In atom deps: tags resolve from scope tags (atoms live at scope level).
+In flow deps: tags resolve from exec/context/scope hierarchy + ctx.data seek-up.
 
 Attaching tags:
-  atom({ tags: [tenantTag("acme")] })
-  flow({ tags: [roleTag("admin")] })
-  scope.createContext({ tags: [userTag(currentUser)] })
-  ctx.exec({ flow, tags: [localeTag("en")] })
+  atom({ tags: [tenantTag("acme")] })                  metadata on atom definition
+  flow({ tags: [roleTag("admin")] })                   applied to child context
+  scope.createContext({ tags: [userTag(currentUser)] }) on context creation
+  ctx.exec({ flow, tags: [localeTag("en")] })          on specific execution
+  ctx.data.setTag(tenantTag, "middleware-set")          programmatic, propagates to children
 
 Reading tags:
-  tag.get(source)      → T           first match or throw
-  tag.find(source)     → T | undefined   first match or undefined
-  tag.collect(source)  → T[]         all matches
+  tag.get(source)      → T              first match or throw
+  tag.find(source)     → T | undefined  first match or undefined
+  tag.collect(source)  → T[]            all matches
 
-Context data integration:
-  ctx.data.setTag(tag, value)
-  ctx.data.getTag(tag)        → T
-  ctx.data.seekTag(tag)       → T (walks parent chain)
-  ctx.data.hasTag(tag)        → boolean
+Context data:
+  ctx.data.setTag(tag, value)   set on current context
+  ctx.data.getTag(tag)          read from current context only
+  ctx.data.seekTag(tag)         walk up parent chain until found
+  ctx.data.hasTag(tag)          check current context only
 
 Tag executor (dependency wiring):
-  tags.required(tag)   → resolves tag or throws
-  tags.optional(tag)   → resolves tag or undefined
-  tags.all(tag)        → resolves all values for tag
+  tags.required(tag)   → T        resolves tag or throws (atom deps: scope, flow deps: hierarchy)
+  tags.optional(tag)   → T | undefined   resolves or undefined
+  tags.all(tag)        → T[]      collects from all levels of hierarchy
 
 Introspection:
   tag.atoms()          → Atom[] with this tag attached
