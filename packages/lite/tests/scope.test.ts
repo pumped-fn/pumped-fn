@@ -1812,265 +1812,174 @@ describe("ExecutionContext", () => {
   })
 })
 
-describe("Coverage gaps", () => {
-  describe("controller.release()", () => {
-    it("releases the atom", async () => {
-      const scope = createScope()
-      let factoryCount = 0
-      const myAtom = atom({ factory: () => ++factoryCount })
-      const ctrl = await scope.controller(myAtom, { resolve: true })
-      expect(ctrl.get()).toBe(1)
-      await ctrl.release()
-      const val = await scope.resolve(myAtom)
-      expect(val).toBe(2)
+describe("Coverage: edge cases and error paths", () => {
+  it("controller.release(), set/update guards, update queuing, fn error, pending invalidate on error", async () => {
+    const scope = createScope()
+
+    let factoryCount = 0
+    const relAtom = atom({ factory: () => ++factoryCount })
+    const ctrl0 = await scope.controller(relAtom, { resolve: true })
+    expect(ctrl0.get()).toBe(1)
+    await ctrl0.release()
+    expect(await scope.resolve(relAtom)).toBe(2)
+
+    const err = new Error("boom")
+    const failingAtom = atom({ factory: (): string => { throw err } })
+    try { await scope.resolve(failingAtom) } catch {}
+    const failedCtrl = scope.controller(failingAtom)
+    expect(() => failedCtrl.set("new")).toThrow(err)
+    expect(() => failedCtrl.update(() => "new")).toThrow(err)
+
+    const idleAtom = atom({ factory: () => 42 })
+    const idleCtrl = scope.controller(idleAtom)
+    expect(() => idleCtrl.update((v) => v + 1)).toThrow("Atom not resolved")
+
+    let resolve!: (v: number) => void
+    const queueAtom = atom({
+      factory: () => new Promise<number>(r => { resolve = r }),
     })
+    const resolvePromise = scope.resolve(queueAtom)
+    await Promise.resolve()
+    const qCtrl = scope.controller(queueAtom)
+    qCtrl.update((prev) => (prev ?? 0) + 10)
+    resolve(5)
+    await resolvePromise
+    await scope.flush()
+    expect(qCtrl.get()).toBe(15)
+
+    const ctx = scope.createContext()
+    await expect(
+      ctx.exec({ fn: () => { throw new Error("fn-error") }, params: [] })
+    ).rejects.toThrow("fn-error")
+
+    let callCount = 0
+    const pendAtom = atom({
+      factory: (ctx: any) => {
+        callCount++
+        if (callCount === 2) {
+          ctx.invalidate()
+          throw new Error("fail-then-retry")
+        }
+        return callCount
+      },
+    })
+    await scope.resolve(pendAtom)
+    scope.controller(pendAtom).invalidate()
+    try { await scope.flush() } catch {}
+    expect(scope.controller(pendAtom).state).toBe("failed")
   })
 
-  describe("set/update guards on idle and failed atoms", () => {
-    it("throws on set/update for failed atoms and update for unresolved atoms", async () => {
-      const scope = createScope()
-      const err = new Error("boom")
-      const failingAtom = atom({ factory: (): string => { throw err } })
-      try { await scope.resolve(failingAtom) } catch {}
-      const failedCtrl = scope.controller(failingAtom)
-      expect(() => failedCtrl.set("new")).toThrow(err)
-      expect(() => failedCtrl.update(() => "new")).toThrow(err)
+  it("tag defaults, resolving get() throws, ContextData.delete, release non-existent, idle invalidate", async () => {
+    const scope = createScope()
 
-      const idleAtom = atom({ factory: () => 42 })
-      const idleCtrl = scope.controller(idleAtom)
-      expect(() => idleCtrl.update((v) => v + 1)).toThrow("Atom not resolved")
+    const myTag = tag<number>({ label: "defaultReq", default: 99 })
+    const tagAtom = atom({
+      deps: { val: tags.required(myTag) },
+      factory: (ctx: any, { val }: { val: number }) => val,
     })
+    expect(await scope.resolve(tagAtom)).toBe(99)
+
+    let resolveFactory!: () => void
+    const asyncAtom = atom({
+      factory: () => new Promise<string>(r => { resolveFactory = () => r("done") }),
+    })
+    const promise = scope.resolve(asyncAtom)
+    await Promise.resolve()
+    expect(() => scope.controller(asyncAtom).get()).toThrow("Atom not resolved")
+    resolveFactory()
+    await promise
+
+    const delAtom = atom({
+      factory: (ctx) => {
+        ctx.data.set("k", "v")
+        ctx.data.delete("k")
+        return ctx.data.has("k")
+      },
+    })
+    expect(await scope.resolve(delAtom)).toBe(false)
+
+    const nonExistent = atom({ factory: () => 42 })
+    await scope.release(nonExistent)
+    expect(await scope.resolve(nonExistent)).toBe(42)
+
+    const idleAtom2 = atom({ factory: () => 42 })
+    const idleCtrl2 = scope.controller(idleAtom2)
+    idleCtrl2.on("resolved", () => {})
+    idleCtrl2.invalidate()
+    expect(idleCtrl2.state).toBe("idle")
   })
 
-  describe("controller.update() queuing", () => {
-    it("queues when atom is resolving", async () => {
-      const scope = createScope()
-      let resolve!: (v: number) => void
-      const myAtom = atom({
-        factory: () => new Promise<number>(r => { resolve = r }),
-      })
+  it("flow tags, tag deps in flow context, resource cache, invalidation-then-release, non-Error throw, tags.all, circular resource", async () => {
+    const scope = createScope()
 
-      const resolvePromise = scope.resolve(myAtom)
-      await Promise.resolve()
-      const ctrl = scope.controller(myAtom)
-      ctrl.update((prev) => (prev ?? 0) + 10)
-      resolve(5)
-      await resolvePromise
-      await scope.flush()
-      expect(ctrl.get()).toBe(15)
+    const flowTag = tag<string>({ label: "flowApply" })
+    const tagFlow = flow({
+      tags: [flowTag("from-flow")],
+      factory: (ctx) => ctx.data.getTag(flowTag),
     })
-  })
+    const ctx1 = scope.createContext()
+    expect(await ctx1.exec({ flow: tagFlow })).toBe("from-flow")
+    await ctx1.close()
 
-  describe("exec fn error path", () => {
-    it("propagates errors and closes context", async () => {
-      const scope = createScope()
-      const ctx = scope.createContext()
-      const err = new Error("fn-error")
-      await expect(
-        ctx.exec({ fn: () => { throw err }, params: [] })
-      ).rejects.toThrow("fn-error")
+    const reqTag = tag<number>({ label: "ctxReqDef", default: 42 })
+    const reqFlow = flow({
+      deps: { val: tags.required(reqTag) },
+      factory: (_ctx, { val }) => val,
     })
-  })
+    const ctx2 = scope.createContext()
+    expect(await ctx2.exec({ flow: reqFlow })).toBe(42)
+    await ctx2.close()
 
-  describe("pending invalidate after factory error", () => {
-    it("preserves pending invalidate flag on failed re-resolution", async () => {
-      const scope = createScope()
-      let callCount = 0
-      const myAtom = atom({
-        factory: (ctx: any) => {
-          callCount++
-          if (callCount === 2) {
-            ctx.invalidate()
-            throw new Error("fail-then-retry")
-          }
-          return callCount
-        },
-      })
-
-      await scope.resolve(myAtom)
-      expect(callCount).toBe(1)
-
-      const ctrl = scope.controller(myAtom)
-      ctrl.invalidate()
-      try { await scope.flush() } catch {}
-
-      expect(callCount).toBe(2)
-      expect(ctrl.state).toBe("failed")
+    const optTag = tag<number>({ label: "ctxOptDef", default: 7 })
+    const optFlow = flow({
+      deps: { val: tags.optional(optTag) },
+      factory: (_ctx, { val }) => val,
     })
-  })
+    const ctx3 = scope.createContext()
+    expect(await ctx3.exec({ flow: optFlow })).toBe(7)
+    await ctx3.close()
 
-  describe("required tag dep with default", () => {
-    it("resolves required tag dep using default value", async () => {
-      const scope = createScope()
-      const myTag = tag<number>({ label: "defaultReq", default: 99 })
-      const myAtom = atom({
-        deps: { val: tags.required(myTag) },
-        factory: (ctx: any, { val }: { val: number }) => val,
-      })
-      const result = await scope.resolve(myAtom)
-      expect(result).toBe(99)
+    let rCount = 0
+    const r = resource({ factory: () => ++rCount })
+    const cacheFlow = flow({
+      deps: { a: r, b: r },
+      factory: (_ctx, { a, b }) => [a, b],
     })
-  })
+    const ctx4 = scope.createContext()
+    expect(await ctx4.exec({ flow: cacheFlow })).toEqual([1, 1])
+    expect(rCount).toBe(1)
+    await ctx4.close()
 
-  describe("controller.get() during resolving", () => {
-    it("throws on resolving atom without stale value", async () => {
-      const scope = createScope()
-      let resolveFactory!: () => void
-      const myAtom = atom({
-        factory: () => new Promise<string>(r => { resolveFactory = () => r("done") }),
-      })
-      const promise = scope.resolve(myAtom)
-      await Promise.resolve()
-      const ctrl = scope.controller(myAtom)
-      expect(() => ctrl.get()).toThrow("Atom not resolved")
-      resolveFactory()
-      await promise
+    let relCount = 0
+    const relAtom = atom({ factory: () => ++relCount })
+    const relCtrl = await scope.controller(relAtom, { resolve: true })
+    relCtrl.invalidate()
+    await scope.release(relAtom)
+    await scope.flush()
+    expect(relCtrl.state).toBe("idle")
+
+    const strAtom = atom({ factory: () => { throw "string-error" } })
+    await expect(scope.resolve(strAtom)).rejects.toThrow("string-error")
+
+    const allTag = tag<string>({ label: "atomAll" })
+    const scope2 = createScope({ tags: [allTag("scope-val")] })
+    const allAtom = atom({
+      deps: { vals: tags.all(allTag) },
+      factory: (_ctx, { vals }) => vals,
     })
-  })
+    expect(await scope2.resolve(allAtom)).toEqual(["scope-val"])
 
-  describe("ContextData.delete()", () => {
-    it("raw delete removes key", async () => {
-      const scope = createScope()
-      const myAtom = atom({
-        factory: (ctx) => {
-          ctx.data.set("k", "v")
-          ctx.data.delete("k")
-          return ctx.data.has("k")
-        },
-      })
-      expect(await scope.resolve(myAtom)).toBe(false)
+    const sym = Symbol.for("@pumped-fn/lite/resource")
+    const rA: any = { [sym]: true, factory: () => "a" }
+    const rB: any = { [sym]: true, deps: { a: rA }, factory: () => "b" }
+    rA.deps = { b: rB }
+    const circFlow = flow({
+      deps: { a: rA },
+      factory: (_ctx, { a }) => a,
     })
-  })
-
-  describe("release non-existent atom", () => {
-    it("does not throw and scope remains functional", async () => {
-      const scope = createScope()
-      const myAtom = atom({ factory: () => 42 })
-      await scope.release(myAtom)
-      expect(await scope.resolve(myAtom)).toBe(42)
-    })
-  })
-
-  describe("invalidate on idle entry", () => {
-    it("does not affect idle atom state", async () => {
-      const scope = createScope()
-      const myAtom = atom({ factory: () => 42 })
-      const ctrl = scope.controller(myAtom)
-      ctrl.on("resolved", () => {})
-      ctrl.invalidate()
-      expect(ctrl.state).toBe("idle")
-    })
-  })
-
-  describe("flow tags applied", () => {
-    it("applies flow tags to child context when no exec tags conflict", async () => {
-      const scope = createScope()
-      const myTag = tag<string>({ label: "flowApply" })
-      const myFlow = flow({
-        tags: [myTag("from-flow")],
-        factory: (ctx) => ctx.data.getTag(myTag),
-      })
-      const ctx = scope.createContext()
-      const result = await ctx.exec({ flow: myFlow })
-      expect(result).toBe("from-flow")
-      await ctx.close()
-    })
-  })
-
-  describe("tag deps via flow context", () => {
-    it("required and optional tag deps in flow use defaults when not in ctx", async () => {
-      const scope = createScope()
-
-      const reqTag = tag<number>({ label: "ctxReqDef", default: 42 })
-      const reqFlow = flow({
-        deps: { val: tags.required(reqTag) },
-        factory: (_ctx, { val }) => val,
-      })
-      const ctx1 = scope.createContext()
-      const reqResult = await ctx1.exec({ flow: reqFlow })
-      expect(reqResult).toBe(42)
-      await ctx1.close()
-
-      const optTag = tag<number>({ label: "ctxOptDef", default: 7 })
-      const optFlow = flow({
-        deps: { val: tags.optional(optTag) },
-        factory: (_ctx, { val }) => val,
-      })
-      const ctx2 = scope.createContext()
-      const optResult = await ctx2.exec({ flow: optFlow })
-      expect(optResult).toBe(7)
-      await ctx2.close()
-    })
-  })
-
-  describe("resource cache in storeCtx", () => {
-    it("second dep on same resource uses cache", async () => {
-      let callCount = 0
-      const r = resource({ factory: () => ++callCount })
-      const myFlow = flow({
-        deps: { a: r, b: r },
-        factory: (_ctx, { a, b }) => [a, b],
-      })
-      const scope = createScope()
-      const ctx = scope.createContext()
-      const result = await ctx.exec({ flow: myFlow })
-      expect(result).toEqual([1, 1])
-      expect(callCount).toBe(1)
-      await ctx.close()
-    })
-  })
-
-  describe("doInvalidateSequential guards", () => {
-    it("invalidation resolves safely when atom released before flush", async () => {
-      const scope = createScope()
-      let callCount = 0
-      const myAtom = atom({ factory: () => ++callCount })
-      const ctrl = await scope.controller(myAtom, { resolve: true })
-      expect(callCount).toBe(1)
-      ctrl.invalidate()
-      await scope.release(myAtom)
-      await scope.flush()
-      expect(ctrl.state).toBe("idle")
-    })
-  })
-
-  describe("non-Error throw", () => {
-    it("wraps non-Error throw in Error", async () => {
-      const scope = createScope()
-      const myAtom = atom({ factory: () => { throw "string-error" } })
-      await expect(scope.resolve(myAtom)).rejects.toThrow("string-error")
-    })
-  })
-
-  describe("atom-level tags.all dep", () => {
-    it("collects from scope tags", async () => {
-      const myTag = tag<string>({ label: "atomAll" })
-      const scope = createScope({ tags: [myTag("scope-val")] })
-      const myAtom = atom({
-        deps: { vals: tags.all(myTag) },
-        factory: (_ctx, { vals }) => vals,
-      })
-      const result = await scope.resolve(myAtom)
-      expect(result).toEqual(["scope-val"])
-    })
-  })
-
-  describe("circular resource detection", () => {
-    it("throws on circular resource deps", async () => {
-      const sym = Symbol.for("@pumped-fn/lite/resource")
-      const rA: any = { [sym]: true, factory: () => "a" }
-      const rB: any = { [sym]: true, deps: { a: rA }, factory: () => "b" }
-      rA.deps = { b: rB }
-
-      const myFlow = flow({
-        deps: { a: rA },
-        factory: (_ctx, { a }) => a,
-      })
-      const scope = createScope()
-      const ctx = scope.createContext()
-      await expect(ctx.exec({ flow: myFlow })).rejects.toThrow("Circular resource dependency detected: anonymous")
-      await ctx.close()
-    })
+    const ctx5 = scope.createContext()
+    await expect(ctx5.exec({ flow: circFlow })).rejects.toThrow("Circular resource dependency detected: anonymous")
+    await ctx5.close()
   })
 })
 
