@@ -25,65 +25,31 @@ class ErrorBoundary extends Component<
   }
 }
 
-describe('ScopeProvider', () => {
-  it('provides scope to descendants', () => {
+describe('ScopeProvider + useScope', () => {
+  it('provides scope, nests, and throws outside provider', () => {
     const scope = createScope()
     let capturedScope: Lite.Scope | null = null
-
-    function TestComponent() {
-      capturedScope = useScope()
-      return <div>test</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    function CaptureScope() { capturedScope = useScope(); return <div>test</div> }
+    render(<ScopeProvider scope={scope}><CaptureScope /></ScopeProvider>)
     expect(capturedScope).toBe(scope)
-  })
 
-  it('works with nested providers', () => {
     const parentScope = createScope()
     const childScope = createScope()
     let capturedParent: Lite.Scope | null = null
     let capturedChild: Lite.Scope | null = null
-
-    function ParentComponent() {
-      capturedParent = useScope()
-      return <div>parent</div>
-    }
-
-    function ChildComponent() {
-      capturedChild = useScope()
-      return <div>child</div>
-    }
-
+    function CaptureParent() { capturedParent = useScope(); return <div>parent</div> }
+    function CaptureChild() { capturedChild = useScope(); return <div>child</div> }
     render(
       <ScopeProvider scope={parentScope}>
-        <ParentComponent />
-        <ScopeProvider scope={childScope}>
-          <ChildComponent />
-        </ScopeProvider>
+        <CaptureParent />
+        <ScopeProvider scope={childScope}><CaptureChild /></ScopeProvider>
       </ScopeProvider>
     )
-
     expect(capturedParent).toBe(parentScope)
     expect(capturedChild).toBe(childScope)
-  })
-})
 
-describe('useScope', () => {
-  it('throws error when used outside ScopeProvider', () => {
-    function TestComponent() {
-      useScope()
-      return <div>test</div>
-    }
-
-    expect(() => {
-      render(<TestComponent />)
-    }).toThrow('useScope must be used within a ScopeProvider')
+    function NoProvider() { useScope(); return <div>test</div> }
+    expect(() => { render(<NoProvider />) }).toThrow('useScope must be used within a ScopeProvider')
   })
 })
 
@@ -829,121 +795,48 @@ describe('useSelect - state handling', () => {
 })
 
 describe('preset injection pattern', () => {
-  it('works with preset values in tests', async () => {
+  it('preset values, set() override, and multiple presets', async () => {
     type User = { id: string; name: string }
     const userAtom = atom<User>({
-      factory: async () => {
-        throw new Error('Should not call factory with preset')
-      },
+      factory: async () => { throw new Error('Should not call factory with preset') },
     })
-
-    const scope = createScope({
-      presets: [preset(userAtom, { id: '123', name: 'Test User' })],
-    })
-
-    await scope.resolve(userAtom)
-
-    function TestComponent() {
+    const scope1 = createScope({ presets: [preset(userAtom, { id: '123', name: 'Test User' })] })
+    await scope1.resolve(userAtom)
+    function ShowUser() {
       const user = useAtom(userAtom)
-      return (
-        <div>
-          <span data-testid="id">{user.id}</span>
-          <span data-testid="name">{user.name}</span>
-        </div>
-      )
+      return <div><span data-testid="id">{user.id}</span><span data-testid="name">{user.name}</span></div>
     }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    render(<ScopeProvider scope={scope1}><ShowUser /></ScopeProvider>)
     expect(screen.getByTestId('id')).toHaveTextContent('123')
     expect(screen.getByTestId('name')).toHaveTextContent('Test User')
-  })
 
-  it('allows presets to be overridden with set()', async () => {
-    const counterAtom = atom({
-      factory: async () => 0,
-    })
-
-    const scope = createScope({
-      presets: [preset(counterAtom, 10)],
-    })
-
-    await scope.resolve(counterAtom)
-
-    function TestComponent() {
+    const counterAtom = atom({ factory: async () => 0 })
+    const scope2 = createScope({ presets: [preset(counterAtom, 10)] })
+    await scope2.resolve(counterAtom)
+    function Counter() {
       const count = useAtom(counterAtom)
       const ctrl = useController(counterAtom)
-
-      return (
-        <div>
-          <span data-testid="count">{count}</span>
-          <button onClick={() => ctrl.set(count + 1)}>Increment</button>
-        </div>
-      )
+      return <div><span data-testid="count">{count}</span><button onClick={() => ctrl.set(count + 1)}>Increment</button></div>
     }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    render(<ScopeProvider scope={scope2}><Counter /></ScopeProvider>)
     expect(screen.getByTestId('count')).toHaveTextContent('10')
-
-    await act(async () => {
-      screen.getByText('Increment').click()
-      await scope.flush()
-    })
-
+    await act(async () => { screen.getByText('Increment').click(); await scope2.flush() })
     expect(screen.getByTestId('count')).toHaveTextContent('11')
-  })
 
-  it('supports multiple presets', async () => {
     type Config = { apiUrl: string }
-    type User = { name: string }
-
-    const configAtom = atom<Config>({
-      factory: async () => ({ apiUrl: '' }),
-    })
-
-    const userAtom = atom<User>({
-      factory: async () => ({ name: '' }),
-    })
-
-    const scope = createScope({
-      presets: [
-        preset(configAtom, { apiUrl: 'http://test.com' }),
-        preset(userAtom, { name: 'Test User' }),
-      ],
-    })
-
-    await scope.resolve(configAtom)
-    await scope.resolve(userAtom)
-
-    function TestComponent() {
+    const configAtom = atom<Config>({ factory: async () => ({ apiUrl: '' }) })
+    const userAtom2 = atom<{ name: string }>({ factory: async () => ({ name: '' }) })
+    const scope3 = createScope({ presets: [preset(configAtom, { apiUrl: 'http://test.com' }), preset(userAtom2, { name: 'Multi User' })] })
+    await scope3.resolve(configAtom)
+    await scope3.resolve(userAtom2)
+    function Multi() {
       const config = useAtom(configAtom)
-      const user = useAtom(userAtom)
-
-      return (
-        <div>
-          <span data-testid="url">{config.apiUrl}</span>
-          <span data-testid="name">{user.name}</span>
-        </div>
-      )
+      const user = useAtom(userAtom2)
+      return <div><span data-testid="url">{config.apiUrl}</span><span data-testid="mname">{user.name}</span></div>
     }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    render(<ScopeProvider scope={scope3}><Multi /></ScopeProvider>)
     expect(screen.getByTestId('url')).toHaveTextContent('http://test.com')
-    expect(screen.getByTestId('name')).toHaveTextContent('Test User')
+    expect(screen.getByTestId('mname')).toHaveTextContent('Multi User')
   })
 })
 
@@ -1366,165 +1259,59 @@ describe('useAtom - non-Suspense mode', () => {
 })
 
 describe('useController', () => {
-  it('returns memoized controller', async () => {
-    const testAtom = atom({
-      factory: async () => 'value',
-    })
-
-    const scope = createScope()
-    await scope.resolve(testAtom)
-
+  it('memoized, Suspense resolve, and already-resolved', async () => {
+    const memoAtom = atom({ factory: async () => 'value' })
+    const scope1 = createScope()
+    await scope1.resolve(memoAtom)
     const controllers: Lite.Controller<string>[] = []
-
-    function TestComponent() {
-      const ctrl = useController(testAtom)
-      controllers.push(ctrl)
-      return <div>test</div>
-    }
-
-    const { rerender } = render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
-    rerender(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    function MemoTest() { const ctrl = useController(memoAtom); controllers.push(ctrl); return <div>test</div> }
+    const { rerender } = render(<ScopeProvider scope={scope1}><MemoTest /></ScopeProvider>)
+    rerender(<ScopeProvider scope={scope1}><MemoTest /></ScopeProvider>)
     expect(controllers.length).toBe(2)
     expect(controllers[0]).toBe(controllers[1])
-  })
 
-  it('triggers Suspense with resolve: true when atom not resolved', async () => {
-    const testAtom = atom({
-      factory: async () => 'resolved value',
-    })
-
-    const scope = createScope()
-
-    function TestComponent() {
-      const ctrl = useController(testAtom, { resolve: true })
-      return <div>{ctrl.get()}</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <TestComponent />
-        </Suspense>
-      </ScopeProvider>
-    )
-
+    const susAtom = atom({ factory: async () => 'resolved value' })
+    const scope2 = createScope()
+    function SusTest() { const ctrl = useController(susAtom, { resolve: true }); return <div>{ctrl.get()}</div> }
+    render(<ScopeProvider scope={scope2}><Suspense fallback={<div>Loading...</div>}><SusTest /></Suspense></ScopeProvider>)
     expect(screen.getByText('Loading...')).toBeInTheDocument()
+    await waitFor(() => { expect(screen.getByText('resolved value')).toBeInTheDocument() })
 
-    await waitFor(() => {
-      expect(screen.getByText('resolved value')).toBeInTheDocument()
-    })
-  })
-
-  it('returns controller immediately with resolve: true when already resolved', async () => {
-    const testAtom = atom({
-      factory: async () => 'value',
-    })
-
-    const scope = createScope()
-    await scope.resolve(testAtom)
-
+    const preAtom = atom({ factory: async () => 'pre-value' })
+    const scope3 = createScope()
+    await scope3.resolve(preAtom)
     let capturedCtrl: Lite.Controller<string> | null = null
-
-    function TestComponent() {
-      const ctrl = useController(testAtom, { resolve: true })
-      capturedCtrl = ctrl
-      return <div>{ctrl.get()}</div>
-    }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
-    expect(screen.getByText('value')).toBeInTheDocument()
-    expect(capturedCtrl).not.toBeNull()
+    function PreTest() { const ctrl = useController(preAtom, { resolve: true }); capturedCtrl = ctrl; return <div>{ctrl.get()}</div> }
+    render(<ScopeProvider scope={scope3}><PreTest /></ScopeProvider>)
+    expect(screen.getByText('pre-value')).toBeInTheDocument()
     expect(capturedCtrl!.state).toBe('resolved')
   })
 
-  it('allows direct value manipulation with set()', async () => {
-    const counterAtom = atom({
-      factory: () => 0,
-    })
-
-    const scope = createScope()
-    await scope.resolve(counterAtom)
-
-    function TestComponent() {
-      const count = useAtom(counterAtom)
-      const ctrl = useController(counterAtom)
-
-      return (
-        <div>
-          <span data-testid="count">{count}</span>
-          <button onClick={() => ctrl.set(42)}>Set to 42</button>
-        </div>
-      )
+  it('set() and update() manipulate values', async () => {
+    const setAtom = atom({ factory: () => 0 })
+    const scope1 = createScope()
+    await scope1.resolve(setAtom)
+    function SetTest() {
+      const count = useAtom(setAtom)
+      const ctrl = useController(setAtom)
+      return <div><span data-testid="count">{count}</span><button onClick={() => ctrl.set(42)}>Set to 42</button></div>
     }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
+    render(<ScopeProvider scope={scope1}><SetTest /></ScopeProvider>)
     expect(screen.getByTestId('count')).toHaveTextContent('0')
+    await act(async () => { screen.getByText('Set to 42').click(); await scope1.flush() })
+    await waitFor(() => { expect(screen.getByTestId('count')).toHaveTextContent('42') })
 
-    await act(async () => {
-      screen.getByText('Set to 42').click()
-      await scope.flush()
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('count')).toHaveTextContent('42')
-    })
-  })
-
-  it('allows updating with update() function', async () => {
-    const counterAtom = atom({
-      factory: () => 5,
-    })
-
-    const scope = createScope()
-    await scope.resolve(counterAtom)
-
-    function TestComponent() {
-      const count = useAtom(counterAtom)
-      const ctrl = useController(counterAtom)
-
-      return (
-        <div>
-          <span data-testid="count">{count}</span>
-          <button onClick={() => ctrl.update((n) => n * 2)}>Double</button>
-        </div>
-      )
+    const updAtom = atom({ factory: () => 5 })
+    const scope2 = createScope()
+    await scope2.resolve(updAtom)
+    function UpdTest() {
+      const count = useAtom(updAtom)
+      const ctrl = useController(updAtom)
+      return <div><span data-testid="ucount">{count}</span><button onClick={() => ctrl.update((n) => n * 2)}>Double</button></div>
     }
-
-    render(
-      <ScopeProvider scope={scope}>
-        <TestComponent />
-      </ScopeProvider>
-    )
-
-    expect(screen.getByTestId('count')).toHaveTextContent('5')
-
-    await act(async () => {
-      screen.getByText('Double').click()
-      await scope.flush()
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('count')).toHaveTextContent('10')
-    })
+    render(<ScopeProvider scope={scope2}><UpdTest /></ScopeProvider>)
+    expect(screen.getByTestId('ucount')).toHaveTextContent('5')
+    await act(async () => { screen.getByText('Double').click(); await scope2.flush() })
+    await waitFor(() => { expect(screen.getByTestId('ucount')).toHaveTextContent('10') })
   })
 })
