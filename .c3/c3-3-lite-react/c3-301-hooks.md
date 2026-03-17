@@ -269,11 +269,13 @@ No component-specific `ref-*` documents are wired yet for the React hook layer.
 
 ## Testing {#c3-301-testing}
 
-Test coverage:
-- ScopeProvider context propagation
+Test coverage (97% stmt, 94% branch):
+- ScopeProvider context propagation and nesting
 - useScope error handling (outside provider)
-- useAtom all 4 states plus manual-mode auto-resolution and refresh behavior
+- useAtom all 4 states plus manual-mode auto-resolution, refresh, and unhandledRejection suppression
 - useSelect equality filtering, stale refresh rendering, and refresh-failure behavior
+- useSelect non-suspense mode: auto-resolve, failed atom error, refresh error surfacing
+- useController memoization, Suspense resolve, set(), update(), and ErrorBoundary recovery
 - Provider switching and preset injection patterns
 
 ## Related {#c3-301-related}

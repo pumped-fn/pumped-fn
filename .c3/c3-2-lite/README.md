@@ -340,9 +340,8 @@ await ctx.exec({
 <!-- Testing strategy -->
 
 **Test organization:**
-- Unit tests per source file
-- Type tests using `expectTypeOf` from Vitest
-- Focused behavior coverage for atoms, flows, resources, tags, presets, selection, extensions, and invalidation chains
+- `scope.test.ts` — comprehensive integration tests covering atoms, flows, resources, tags, presets, controllers, invalidation chains, GC, watch, extensions, and all error paths (99.5% statement coverage)
+- `select.test.ts` — focused `scope.select()` tests for equality gating, subscription lifecycle, and disposal
 
 **Running tests:**
 ```bash

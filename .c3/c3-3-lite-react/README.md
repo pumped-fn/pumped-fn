@@ -155,8 +155,9 @@ packages/lite-react/
 │   ├── context.tsx       # ScopeContext, ScopeProvider
 │   └── hooks.ts          # useScope, useAtom, useSelect, useController
 ├── tests/
-│   ├── hooks.test.tsx    # Comprehensive test suite
-│   └── setup.ts          # Test setup (jest-dom)
+│   ├── hooks.test.tsx              # Core hook tests (30 tests)
+│   ├── triage-findings.test.tsx    # Regression + coverage tests (7 tests)
+│   └── setup.ts                    # Test setup (jest-dom)
 ├── package.json
 ├── tsconfig.json
 ├── tsconfig.test.json
@@ -232,12 +233,13 @@ function TodoCount() {
 
 ## Testing {#c3-3-testing}
 
-**Test organization:**
+**Test organization (97% statement coverage, 94% branch):**
 - Hook tests with @testing-library/react
 - State handling tests for idle, resolving, resolved, and failed controllers
-- Suspense and ErrorBoundary integration tests
+- Suspense and ErrorBoundary integration tests (including retry recovery)
 - Refresh-path coverage for stale-while-revalidate and refresh-failure behavior
 - Selector equality and provider-switch coverage
+- Non-suspense mode for both useAtom and useSelect (auto-resolve, error, stale data)
 
 **Running tests:**
 ```bash
