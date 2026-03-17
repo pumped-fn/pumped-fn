@@ -210,4 +210,73 @@ describe('Triage regression tests', () => {
       expect(screen.getByTestId('error')).toHaveTextContent('refresh failed')
     })
   })
+
+  it('useSelect suspense throws on idle atom with resolve:false (L304)', () => {
+    const idleAtom = atom({ factory: async () => ({ x: 1 }) })
+    const scope = createScope()
+
+    class EB extends Component<{ children: ReactNode }, { hasError: boolean; msg: string }> {
+      state = { hasError: false, msg: '' }
+      static getDerivedStateFromError(e: unknown) { return { hasError: true, msg: String(e) } }
+      override render() {
+        if (this.state.hasError) return <div data-testid="err">{this.state.msg}</div>
+        return this.props.children
+      }
+    }
+
+    function Sel() {
+      useSelect(idleAtom, v => v.x, { resolve: false })
+      return <div>ok</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <EB><Sel /></EB>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('err').textContent).toContain('Atom is not resolved')
+  })
+
+  it('useSelect non-suspense shows error for failed atom (L382-383)', async () => {
+    let callCount = 0
+    const failAtom = atom({
+      factory: () => {
+        callCount++
+        if (callCount > 1) throw 'non-error-string'
+        return { name: 'ok' }
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(failAtom)
+
+    function Display() {
+      const state = useSelect(failAtom, v => v.name, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{state.data ?? 'undefined'}</span>
+          <span data-testid="error">{state.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Display />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('ok')
+
+    await act(async () => {
+      scope.controller(failAtom).invalidate()
+      try { await scope.flush() } catch {}
+      await new Promise(r => setTimeout(r, 50))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('non-error-string')
+    })
+  })
 })
