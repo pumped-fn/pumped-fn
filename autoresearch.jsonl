@@ -1,1 +1,2 @@
 {"run":1,"commit":"9b8c9cba","metrics":{"test_count":50,"test_files":2,"stmt_coverage":90.54,"branch_coverage":81.56,"fn_coverage":87.5,"line_coverage":91.91},"status":"keep","description":"baseline — lite-react","timestamp":1773722614}
+{"run":3,"commit":"ec6517be","metrics":{"test_count":42,"test_files":2,"stmt_coverage":90.54,"branch_coverage":81.56,"fn_coverage":87.5,"line_coverage":91.91},"status":"keep","description":"trim triage-findings.test.tsx: remove 8 source-file-reads/duplicates/non-react tests, keep F6+F7","timestamp":1773722741}
