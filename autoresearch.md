@@ -1,17 +1,18 @@
-# Autoresearch: Reduce lite test count without reducing coverage
+# Autoresearch: Reduce lite-react test count without reducing coverage
 
 ## Config
 - **Benchmark**: `bash autoresearch.sh`
-- **Target metrics**: `test_count` (lower is better), `stmt_coverage` (must stay >= 99.5%), `branch_coverage` (must stay >= 88.7%), `fn_coverage` (must stay = 100%)
-- **Scope**: `packages/lite/tests/`
+- **Target metrics**: `test_count` (lower is better), `stmt_coverage` (must stay >= 90.54%), `branch_coverage` (must stay >= 81.56%), `fn_coverage` (must stay >= 87.5%)
+- **Scope**: `packages/lite-react/tests/`
 - **Branch**: `autoresearch/reduce-lite-test-count-keep-coverage`
 - **Started**: 2026-03-17
 
 ## Baseline
-- 298 tests across 14 files
-- Statement coverage: 99.5% (644/647)
-- Branch coverage: 88.7% (338/381)
-- Function coverage: 100% (118/118)
+- 50 tests across 2 files (hooks.test.tsx: 40, triage-findings.test.tsx: 10)
+- Statement coverage: 90.54%
+- Branch coverage: 81.56%
+- Function coverage: 87.5%
+- Line coverage: 91.91%
 
 ## Rules
 1. One change per experiment
