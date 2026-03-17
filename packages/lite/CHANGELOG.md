@@ -1,5 +1,47 @@
 # @pumped-fn/lite
 
+## 2.1.5
+
+### Patch Changes
+
+- 10ec5a7: **@pumped-fn/lite-react** — Harden for modern React (RSC, Compiler, useSelect non-suspense)
+
+  - Add `'use client'` directive for RSC/Next.js App Router compatibility
+  - `useController({ resolve: true })` retries once on failed atoms before throwing to ErrorBoundary
+  - `useSelect` gains `{ suspense: false }` mode returning `UseSelectState<S>` with data/loading/error
+  - Selector errors in non-suspense `useSelect` now surface in the `error` field
+  - React Compiler-safe: selector/eq via plain closures, useRef caches in getSnapshot only
+  - `UseSelectOptions<S>` split into discriminated union for sound overload resolution
+  - New exports: `UseSelectSuspenseOptions`, `UseSelectManualOptions`, `UseSelectOptions`, `UseSelectState`
+
+  **@pumped-fn/lite** — `release()` now notifies listeners before cache deletion (fixes hanging promises)
+
+- 73d426b: Significant performance improvements to scope internals — no API changes.
+
+  **Resolve path**
+
+  - Non-async `resolve()` with cached Promise for resolved atoms (+56% cache hits)
+  - Sync fast-path in `resolveDeps` for already-resolved atom and controller deps
+  - Skip extension closure chain when scope has zero extensions (+111% flow execution)
+
+  **Invalidation & reactivity**
+
+  - Optimized `doInvalidateSequential` set fast-path (+57% listener dispatch, +75% select)
+  - Simplified invalidation chain scheduling (lighter microtask setup)
+  - Eliminated redundant Map.get calls in listener subscribe/unsubscribe (+63% churn)
+
+  **Execution context**
+
+  - Non-async `close()` when no cleanups registered
+  - Skip `ContextDataImpl` allocation when no tags configured
+  - Early return in `emitStateChange` for the common no-state-listeners case
+
+  **Misc**
+
+  - Pass entry directly to notification methods (avoid cache lookups)
+  - Simplified `controller.get()` branching
+  - `for-in` over `Object.values` in release/GC to avoid array allocation
+
 ## 2.1.4
 
 ### Patch Changes
