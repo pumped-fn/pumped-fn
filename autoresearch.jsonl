@@ -1,1 +1,2 @@
 {"run":1,"commit":"10ec5a75","metrics":{"test_count":298,"test_files":14,"stmt_coverage":99.5,"branch_coverage":88.7,"fn_coverage":100.0},"status":"keep","description":"baseline","timestamp":1773721185}
+{"run":2,"commit":"273b7143","metrics":{"test_count":250,"test_files":13,"stmt_coverage":99.5,"branch_coverage":88.7,"fn_coverage":100.0},"status":"keep","description":"remove invariants.test.ts (48 tests) — all covered by scope/extension/invalidation-chain/hierarchical-context/select tests","timestamp":1773721331}
