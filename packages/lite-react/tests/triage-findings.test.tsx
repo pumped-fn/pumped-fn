@@ -107,4 +107,108 @@ describe('Triage regression tests', () => {
     expect(parsed.loading).toBe(false)
     expect(parsed.error).toBeUndefined()
   })
+
+  it('useSelect non-suspense: auto-resolves idle atom with resolve:true', async () => {
+    const testAtom = atom({
+      factory: async () => ({ name: 'lazy', score: 100 }),
+    })
+
+    const scope = createScope()
+
+    function Display() {
+      const state = useSelect(testAtom, v => v.name, { suspense: false, resolve: true })
+      return (
+        <div>
+          <span data-testid="data">{state.data ?? 'undefined'}</span>
+          <span data-testid="loading">{state.loading.toString()}</span>
+          <span data-testid="error">{state.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Display />
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('true')
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('data')).toHaveTextContent('lazy')
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+  })
+
+  it('useSelect non-suspense: shows error for failed atom', async () => {
+    const testAtom = atom({
+      factory: async () => { throw new Error('select fail') },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom).catch(() => {})
+
+    function Display() {
+      const state = useSelect(testAtom, v => v, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{state.data ?? 'undefined'}</span>
+          <span data-testid="error">{state.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Display />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('undefined')
+    expect(screen.getByTestId('error')).toHaveTextContent('select fail')
+  })
+
+  it('useSelect non-suspense: keeps stale selection during refresh and surfaces refresh error', async () => {
+    let callCount = 0
+    const testAtom = atom({
+      factory: async () => {
+        callCount++
+        if (callCount === 1) return { name: 'first' }
+        throw new Error('refresh failed')
+      },
+    })
+
+    const scope = createScope()
+    await scope.resolve(testAtom)
+
+    function Display() {
+      const state = useSelect(testAtom, v => v.name, { suspense: false })
+      return (
+        <div>
+          <span data-testid="data">{state.data ?? 'undefined'}</span>
+          <span data-testid="loading">{state.loading.toString()}</span>
+          <span data-testid="error">{state.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Display />
+      </ScopeProvider>
+    )
+
+    expect(screen.getByTestId('data')).toHaveTextContent('first')
+
+    await act(async () => {
+      scope.controller(testAtom).invalidate()
+      await new Promise(r => setTimeout(r, 10))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('refresh failed')
+    })
+  })
 })
