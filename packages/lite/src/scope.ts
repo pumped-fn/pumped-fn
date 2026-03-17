@@ -990,6 +990,8 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
+    this.notifyEntryAll(entry as AtomEntry<unknown>)
+
     this.cache.delete(atom)
     this.controllers.delete(atom)
 
