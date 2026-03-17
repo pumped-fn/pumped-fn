@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
-import { atom, createScope } from '@pumped-fn/lite'
-import { ScopeProvider, useSelect, useController } from '../src'
+import { atom, createScope, ScopeProvider, useSelect, useController } from '../src'
 
 describe('Triage regression tests', () => {
   it('F6: ErrorBoundary recovery — failed atom retries on reset', async () => {

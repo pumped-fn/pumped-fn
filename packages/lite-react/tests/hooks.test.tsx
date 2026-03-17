@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
-import { atom, createScope, preset, type Lite } from '@pumped-fn/lite'
-import { ScopeProvider, useScope, useAtom, useSelect, useController } from '../src'
+import { type Lite } from '@pumped-fn/lite'
+import { atom, createScope, preset, ScopeProvider, useScope, useAtom, useSelect, useController } from '../src'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
