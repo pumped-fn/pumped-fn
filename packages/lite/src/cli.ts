@@ -288,6 +288,87 @@ Atom retention / GC:
   atom({ keepAlive: true })  // never GC'd`,
   },
 
+  "tanstack-start": {
+    title: "TanStack Start Integration",
+    content: `Singleton scope at server entry, per-request ExecutionContext via middleware.
+
+Server entry — one scope per process:
+  const scope = createScope({ extensions: [otel()], tags: [envTag(env)] })
+  export default createServerEntry({
+    async fetch(request) {
+      return handler.fetch(request, { context: { scope } })
+    },
+  })
+
+Execution context middleware — per-request lifecycle:
+  export const execCtxMiddleware = createMiddleware()
+    .server(async ({ next, context: { scope } }) => {
+      const execContext = scope.createContext({})
+      try {
+        return await next({ context: { execContext } })
+      } finally {
+        await execContext.close()
+      }
+    })
+
+Tag-seeding middleware — ambient data for downstream:
+  export const authMiddleware = createMiddleware()
+    .middleware([execCtxMiddleware])
+    .server(async ({ next, context: { execContext } }) => {
+      const user = await resolveCurrentUser()
+      execContext.data.setTag(currentUserTag, user)
+      return next({ context: { user } })
+    })
+
+  export const transactionMiddleware = createMiddleware()
+    .middleware([authMiddleware])
+    .server(async ({ next, context: { execContext } }) => {
+      const tx = await beginTransaction()
+      execContext.data.setTag(transactionTag, tx)
+      try {
+        const result = await next()
+        await tx.commit()
+        return result
+      } catch (e) {
+        await tx.rollback()
+        throw e
+      }
+    })
+
+Server functions — execute flows via context:
+  export const listInvoices = createServerFn({ method: 'POST' })
+    .middleware([transactionMiddleware])
+    .handler(async ({ data, context: { execContext } }) => {
+      return execContext.exec({ flow: invoiceFlows.list, rawInput: data })
+    })
+
+Client hydration — preset loader data into client scope:
+  const loaderData = Route.useLoaderData()
+  const scope = createScope({
+    presets: [
+      preset(invoicesAtom, loaderData.invoices),
+      preset(userAtom, loaderData.user),
+    ],
+  })
+  return <ScopeProvider scope={scope}><Outlet /></ScopeProvider>
+
+Rules:
+  One scope per server process    Atoms cache singletons (connections, services)
+  One execContext per request      Tag isolation (user, tx, tracing)
+  Middleware creates+closes ctx    Guarantees cleanup even on error
+  Tags over function params        Flows read ambient tags, no signature coupling
+  execContext.exec({ flow })       Flows get lifecycle, tracing, cleanup
+  scope.resolve(atom) for deps     Atoms are long-lived, cached in scope
+  Preset server data on client     No re-fetch; atoms hydrate from loader
+
+Don't:
+  createScope() in a server fn     New scope per request — atoms re-resolve, connections leak
+  flow.factory(ctx, deps) direct   Bypasses context lifecycle, tags, extensions, cleanup
+  User/tx as flow input            Couples signatures to transport; use tags instead
+  scope.resolve(flow)              Flows are ephemeral — exec(), don't resolve()
+  ScopeProvider without presets    Client re-fetches everything server already loaded`,
+  },
+
   diagrams: {
     title: "Visual Diagrams (mermaid)",
     content: extractDiagram,
