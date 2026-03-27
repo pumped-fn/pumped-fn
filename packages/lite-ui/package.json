@@ -1,0 +1,21 @@
+{
+  "name": "@pumped-fn/lite-ui",
+  "version": "0.0.1",
+  "description": "Fine-grained reactive DOM renderer for pumped-fn/lite",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "happy-dom": "^17.4.4",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
