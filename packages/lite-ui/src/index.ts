@@ -1,33 +1,56 @@
+import { track, registerInTracker, shallowEqual } from '@pumped-fn/lite'
 import type { Lite } from '@pumped-fn/lite'
+import { isVNode, mountVNode, type VNode } from './vnode'
+export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
 
-const FLUSH_HOOKS = Symbol('lite-ui-flush-hooks')
+export const DIRECTIVE_BRAND = Symbol('lite-ui-directive')
 
-interface FlushableScope extends Lite.Scope {
-  [FLUSH_HOOKS]?: Set<() => void>
+export interface Directive {
+  [DIRECTIVE_BRAND]: true
+  mount(container: HTMLElement, ctx: MountContext): void
 }
 
-function ensureFlushHook(scope: FlushableScope): Set<() => void> {
-  if (scope[FLUSH_HOOKS]) return scope[FLUSH_HOOKS]
-  const hooks = new Set<() => void>()
-  scope[FLUSH_HOOKS] = hooks
-  const originalFlush = scope.flush.bind(scope)
-  scope.flush = async function () {
-    await originalFlush()
-    for (const hook of hooks) hook()
-  }
-  return hooks
+export function isDirective(v: unknown): v is Directive {
+  return v != null && typeof v === 'object' && DIRECTIVE_BRAND in v
 }
 
 const LIST_BRAND = Symbol('lite-ui-list')
+
+interface ItemSignal<T> {
+  get(): T
+  set(next: T): void
+  on(event: string, fn: () => void): () => void
+}
+
+function createItemSignal<T>(initial: T): ItemSignal<T> {
+  let value = initial
+  const listeners = new Set<() => void>()
+  const signal: ItemSignal<T> = {
+    get(): T {
+      registerInTracker(signal)
+      return value
+    },
+    set(next: T) {
+      if (shallowEqual(next, value)) return
+      value = next
+      for (const fn of [...listeners]) fn()
+    },
+    on(_event: string, fn: () => void): () => void {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
+  }
+  return signal
+}
 
 interface ListDirective<T = unknown> {
   [LIST_BRAND]: true
   items: () => T[]
   keyFn: (item: T) => string | number
-  renderFn: (item: T) => Template
+  renderFn: (item: T, getItem: () => T) => Template | VNode
 }
 
-function isList(v: unknown): v is ListDirective {
+export function isList(v: unknown): v is ListDirective {
   return v != null && typeof v === 'object' && LIST_BRAND in v
 }
 
@@ -42,7 +65,7 @@ interface Template {
 
 const TEMPLATE_BRAND = Symbol('lite-ui-template')
 
-function isTemplate(v: unknown): v is Template & { [TEMPLATE_BRAND]: true } {
+export function isTemplate(v: unknown): v is Template & { [TEMPLATE_BRAND]: true } {
   return v != null && typeof v === 'object' && TEMPLATE_BRAND in v
 }
 
@@ -53,7 +76,7 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): Templ
 export function list<T>(
   items: () => T[],
   keyFn: (item: T) => string | number,
-  renderFn: (item: T) => Template,
+  renderFn: (item: T, getItem: () => T) => Template | VNode,
 ): ListDirective<T> {
   return { [LIST_BRAND]: true as const, items, keyFn, renderFn }
 }
@@ -65,14 +88,40 @@ function parseAttrBinding(precedingString: string): string | null {
   return match ? match[1] : null
 }
 
-interface ReactiveBinding {
+export interface ReactiveBinding {
   fn: () => unknown
   prev: unknown
-  updated: boolean
   update: (val: unknown) => void
+  alive: boolean
+  unsubs: (() => void)[]
 }
 
-interface MountContext {
+export function subscribeToControllers(binding: ReactiveBinding, controllers: Set<any>): void {
+  for (const unsub of binding.unsubs) unsub()
+  binding.unsubs.length = 0
+  if (!binding.alive) return
+
+  function onResolved() {
+    if (!binding.alive) return
+    const { result: next, controllers: newCtrls } = track(binding.fn)
+    if (next !== binding.prev) {
+      binding.prev = next
+      binding.update(next)
+    }
+    for (const unsub of binding.unsubs) unsub()
+    binding.unsubs.length = 0
+    if (!binding.alive) return
+    for (const ctrl of newCtrls) {
+      binding.unsubs.push(ctrl.on('resolved', onResolved))
+    }
+  }
+
+  for (const ctrl of controllers) {
+    binding.unsubs.push(ctrl.on('resolved', onResolved))
+  }
+}
+
+export interface MountContext {
   scope: Lite.Scope
   cleanups: (() => void)[]
   reactiveBindings: ReactiveBinding[]
@@ -93,7 +142,7 @@ function renderValue(
   return [text]
 }
 
-function clearBetween(startMarker: Comment, endMarker: Comment): void {
+export function clearBetween(startMarker: Comment, endMarker: Comment): void {
   while (startMarker.nextSibling && startMarker.nextSibling !== endMarker) {
     startMarker.nextSibling.remove()
   }
@@ -110,24 +159,56 @@ function mountReactiveText(
   parent.insertBefore(startMarker, before)
   parent.insertBefore(endMarker, before)
 
-  const initial = fn()
+  const { result: initial, controllers } = track(fn)
   const initialNodes = renderValue(initial, parent, endMarker, ctx)
 
   const binding: ReactiveBinding = {
     fn,
     prev: initial,
-    updated: false,
     update(val: unknown) {
       clearBetween(startMarker, endMarker)
       renderValue(val, parent, endMarker, ctx)
     },
+    alive: true,
+    unsubs: [],
   }
   ctx.reactiveBindings.push(binding)
+  subscribeToControllers(binding, controllers)
 
   return [startMarker, ...initialNodes, endMarker]
 }
 
-function mountListDirective(
+function lis(arr: number[]): number[] {
+  if (arr.length === 0) return []
+  const tails: number[] = []
+  const predecessors = new Int32Array(arr.length)
+  const indices: number[] = []
+
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i]
+    let lo = 0, hi = tails.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (arr[tails[mid]] < val) lo = mid + 1
+      else hi = mid
+    }
+    if (lo > 0) predecessors[i] = tails[lo - 1]
+    else predecessors[i] = -1
+    tails[lo] = i
+    if (lo === indices.length) indices.push(i)
+    else indices[lo] = i
+  }
+
+  const result: number[] = []
+  let k = tails[tails.length - 1]
+  for (let i = tails.length - 1; i >= 0; i--) {
+    result[i] = k
+    k = predecessors[k]
+  }
+  return result
+}
+
+export function mountListDirective(
   directive: ListDirective,
   parent: Node,
   before: Node | null,
@@ -138,72 +219,135 @@ function mountListDirective(
   parent.insertBefore(startMarker, before)
   parent.insertBefore(endMarker, before)
 
-  let keyMap = new Map<string | number, { nodes: Node[]; item: unknown }>()
+  let keyMap = new Map<string | number, { nodes: Node[]; item: unknown; ctx: MountContext; signal: ItemSignal<any> }>()
+  let oldKeys: (string | number)[] = []
 
   function reconcile(items: unknown[]) {
-    const newKeyMap = new Map<string | number, { nodes: Node[]; item: unknown }>()
+    const newKeyMap = new Map<string | number, { nodes: Node[]; item: unknown; ctx: MountContext; signal: ItemSignal<any> }>()
     const newKeys: (string | number)[] = []
 
     for (const item of items) {
       const key = directive.keyFn(item)
+      if (newKeyMap.has(key)) throw new Error(`Duplicate key in list: ${String(key)}`)
       newKeys.push(key)
       if (keyMap.has(key)) {
-        newKeyMap.set(key, keyMap.get(key)!)
+        const existing = keyMap.get(key)!
+        existing.signal.set(item)
+        existing.item = item
+        newKeyMap.set(key, existing)
       } else {
-        const tpl = directive.renderFn(item)
-        const nodes = mountTemplate(tpl as Template & { [TEMPLATE_BRAND]: true }, parent, endMarker, ctx)
-        newKeyMap.set(key, { nodes, item })
+        const signal = createItemSignal(item)
+        const frag = document.createDocumentFragment()
+        const rendered = directive.renderFn(item, signal.get.bind(signal))
+        const itemCtx: MountContext = {
+          scope: ctx.scope,
+          cleanups: [],
+          reactiveBindings: [],
+        }
+        const nodes = isVNode(rendered)
+          ? mountVNode(rendered, frag, null, itemCtx)
+          : mountTemplate(rendered as Template & { [TEMPLATE_BRAND]: true }, frag, null, itemCtx)
+        for (const b of itemCtx.reactiveBindings) ctx.reactiveBindings.push(b)
+        newKeyMap.set(key, { nodes, item, ctx: itemCtx, signal })
       }
     }
 
     for (const [key, entry] of keyMap) {
       if (!newKeyMap.has(key)) {
+        for (const b of entry.ctx.reactiveBindings) {
+          b.alive = false
+          for (const unsub of b.unsubs) unsub()
+          b.unsubs.length = 0
+        }
+        for (const cleanup of entry.ctx.cleanups) cleanup()
+        entry.ctx.reactiveBindings.length = 0
+        entry.ctx.cleanups.length = 0
         for (const node of entry.nodes) (node as ChildNode).remove()
       }
     }
 
-    let insertBefore: Node = endMarker
-    for (let i = newKeys.length - 1; i >= 0; i--) {
-      const entry = newKeyMap.get(newKeys[i])!
-      for (let j = entry.nodes.length - 1; j >= 0; j--) {
-        parent.insertBefore(entry.nodes[j], insertBefore)
-        insertBefore = entry.nodes[j]
+    if (newKeys.length === 0) {
+      oldKeys = newKeys
+      keyMap = newKeyMap
+      return
+    }
+
+    const oldKeyIndex = new Map<string | number, number>()
+    for (let i = 0; i < oldKeys.length; i++) oldKeyIndex.set(oldKeys[i], i)
+
+    const newOldIndices: number[] = []
+    for (const key of newKeys) {
+      const idx = oldKeyIndex.get(key)
+      newOldIndices.push(idx !== undefined ? idx : -1)
+    }
+
+    const surviving: number[] = []
+    const survivingNewIdx: number[] = []
+    for (let i = 0; i < newOldIndices.length; i++) {
+      if (newOldIndices[i] !== -1) {
+        surviving.push(newOldIndices[i])
+        survivingNewIdx.push(i)
       }
     }
 
+    const lisOfSurviving = lis(surviving)
+    const lisNewIndices = new Set<number>()
+    for (const idx of lisOfSurviving) lisNewIndices.add(survivingNewIdx[idx])
+
+    let anchor: Node = endMarker
+    for (let i = newKeys.length - 1; i >= 0; i--) {
+      const entry = newKeyMap.get(newKeys[i])!
+      if (lisNewIndices.has(i)) {
+        anchor = entry.nodes[0]
+      } else {
+        for (let j = entry.nodes.length - 1; j >= 0; j--) {
+          parent.insertBefore(entry.nodes[j], anchor)
+        }
+        anchor = entry.nodes[0]
+      }
+    }
+
+    oldKeys = newKeys
     keyMap = newKeyMap
   }
 
-  const initial = directive.items()
+  const { result: initial, controllers } = track(directive.items)
   reconcile(initial)
 
   const binding: ReactiveBinding = {
     fn: directive.items,
     prev: initial,
-    updated: false,
     update(val: unknown) {
       reconcile(val as unknown[])
     },
+    alive: true,
+    unsubs: [],
   }
   ctx.reactiveBindings.push(binding)
+  subscribeToControllers(binding, controllers)
 
   return [startMarker, endMarker]
 }
 
-function mountTemplate(
-  tpl: Template & { [TEMPLATE_BRAND]: true },
-  parent: Node,
-  before: Node | null,
-  ctx: MountContext,
-): Node[] {
-  const { strings, values } = tpl
+interface ParsedTemplate {
+  templateEl: HTMLTemplateElement
+  attrBindings: { index: number; attrName: string }[]
+  eventBindings: { index: number; eventName: string }[]
+}
+
+const templateCache = new WeakMap<TemplateStringsArray, ParsedTemplate>()
+
+function parseTemplate(strings: TemplateStringsArray): ParsedTemplate {
+  const cached = templateCache.get(strings)
+  if (cached) return cached
+
   let htmlStr = ''
   const attrBindings: { index: number; attrName: string }[] = []
   const eventBindings: { index: number; eventName: string }[] = []
 
   for (let i = 0; i < strings.length; i++) {
     htmlStr += strings[i]
-    if (i < values.length) {
+    if (i < strings.length - 1) {
       const attrName = parseAttrBinding(htmlStr)
       if (attrName) {
         if (attrName.startsWith('@')) {
@@ -221,9 +365,23 @@ function mountTemplate(
     }
   }
 
-  const template = document.createElement('template')
-  template.innerHTML = htmlStr
-  const fragment = template.content
+  const templateEl = document.createElement('template')
+  templateEl.innerHTML = htmlStr
+
+  const result: ParsedTemplate = { templateEl, attrBindings, eventBindings }
+  templateCache.set(strings, result)
+  return result
+}
+
+export function mountTemplate(
+  tpl: Template & { [TEMPLATE_BRAND]: true },
+  parent: Node,
+  before: Node | null,
+  ctx: MountContext,
+): Node[] {
+  const { strings, values } = tpl
+  const { templateEl, attrBindings, eventBindings } = parseTemplate(strings)
+  const fragment = templateEl.content.cloneNode(true) as DocumentFragment
 
   for (const { index, attrName } of attrBindings) {
     const el = fragment.querySelector(`[data-attr-${index}]`)
@@ -233,17 +391,20 @@ function mountTemplate(
 
     if (typeof value === 'function') {
       const fn = value as () => unknown
-      const initial = fn()
+      const { result: initial, controllers } = track(fn)
       applyAttribute(el, attrName, initial)
 
-      ctx.reactiveBindings.push({
+      const binding: ReactiveBinding = {
         fn,
         prev: initial,
-        updated: false,
         update(val: unknown) {
           applyAttribute(el, attrName, val)
         },
-      })
+        alive: true,
+        unsubs: [],
+      }
+      ctx.reactiveBindings.push(binding)
+      subscribeToControllers(binding, controllers)
     } else {
       applyAttribute(el, attrName, value)
     }
@@ -279,6 +440,12 @@ function mountTemplate(
     } else if (isList(value)) {
       mountListDirective(value, parentNode, comment, ctx)
       comment.remove()
+    } else if (isDirective(value)) {
+      const el = document.createElement('div')
+      el.style.display = 'contents'
+      parentNode.insertBefore(el, comment)
+      comment.remove()
+      value.mount(el, ctx)
     } else if (isTemplate(value)) {
       mountTemplate(value, parentNode, comment, ctx)
       comment.remove()
@@ -299,13 +466,13 @@ function mountTemplate(
   return nodes
 }
 
-const BOOLEAN_ATTRS = new Set([
+export const BOOLEAN_ATTRS = new Set([
   'disabled', 'checked', 'readonly', 'required', 'hidden',
   'selected', 'multiple', 'autofocus', 'autoplay', 'controls',
   'loop', 'muted', 'novalidate', 'open', 'reversed',
 ])
 
-function applyAttribute(el: Element, name: string, value: unknown): void {
+export function applyAttribute(el: Element, name: string, value: unknown): void {
   if (BOOLEAN_ATTRS.has(name)) {
     (el as unknown as Record<string, unknown>)[name] = !!value
     return
@@ -321,63 +488,33 @@ function applyAttribute(el: Element, name: string, value: unknown): void {
   }
 }
 
-export function mount(tpl: Template, container: HTMLElement, scope: Lite.Scope): MountHandle {
+export function mount(tpl: Template | VNode, container: HTMLElement, scope: Lite.Scope): MountHandle {
   const ctx: MountContext = {
     scope,
     cleanups: [],
     reactiveBindings: [],
   }
 
-  const nodes = mountTemplate(
-    tpl as Template & { [TEMPLATE_BRAND]: true },
-    container,
-    null,
-    ctx,
-  )
-
-  const hooks = ensureFlushHook(scope as FlushableScope)
+  const nodes = isVNode(tpl)
+    ? mountVNode(tpl, container, null, ctx)
+    : mountTemplate(
+        tpl as Template & { [TEMPLATE_BRAND]: true },
+        container,
+        null,
+        ctx,
+      )
 
   let disposed = false
-  let frozenTextValues: string[] | null = null
-
-  function dirtyCheck() {
-    if (disposed) {
-      hooks.delete(dirtyCheck)
-      if (frozenTextValues) {
-        for (const text of frozenTextValues) {
-          container.appendChild(document.createTextNode(text))
-        }
-      }
-      return
-    }
-    for (const binding of ctx.reactiveBindings) {
-      const next = binding.fn()
-      if (next !== binding.prev) {
-        binding.updated = true
-        binding.prev = next
-        binding.update(next)
-      }
-    }
-  }
-
-  hooks.add(dirtyCheck)
 
   return {
     dispose() {
       if (disposed) return
       disposed = true
-
-      const updatedTextValues: string[] = []
       for (const binding of ctx.reactiveBindings) {
-        if (binding.updated) {
-          const val = binding.prev
-          if (val != null && val !== false && !isTemplate(val)) {
-            updatedTextValues.push(String(val))
-          }
-        }
+        binding.alive = false
+        for (const unsub of binding.unsubs) unsub()
+        binding.unsubs.length = 0
       }
-      frozenTextValues = updatedTextValues.length > 0 ? updatedTextValues : null
-
       for (const cleanup of ctx.cleanups) cleanup()
       for (const node of nodes) (node as ChildNode).remove()
       ctx.reactiveBindings.length = 0
