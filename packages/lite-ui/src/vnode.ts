@@ -1,4 +1,4 @@
-import { track } from '@pumped-fn/lite'
+import { track } from './tracking'
 import type { ReactiveBinding, MountContext } from './index'
 import { subscribeToControllers, isList, isTemplate, isDirective, mountListDirective, mountTemplate, applyAttribute, clearBetween } from './index'
 

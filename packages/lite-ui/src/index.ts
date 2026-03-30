@@ -1,4 +1,5 @@
-import { track, registerInTracker, shallowEqual } from '@pumped-fn/lite'
+import { shallowEqual } from '@pumped-fn/lite'
+import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, type VNode } from './vnode'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
