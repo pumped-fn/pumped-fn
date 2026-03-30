@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 2.1.6
+
+### Patch Changes
+
+- d2fb81f: Tighten lite controller and dependency contracts, restore extension-safe scope initialization, and align the lite-react branch changes with the verified React test runtime.
+
 ## 2.1.5
 
 ### Patch Changes
