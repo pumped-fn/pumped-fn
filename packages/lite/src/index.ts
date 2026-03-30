@@ -17,7 +17,7 @@ export { flow, isFlow, typed } from "./flow"
 export { preset, isPreset } from "./preset"
 export { resource, isResource } from "./resource"
 export { service } from "./service"
-export { createScope } from "./scope"
+export { createScope, track, registerInTracker, startTracking, stopTracking, startArrayTracking, stopArrayTracking } from "./scope"
 export { shallowEqual } from "./equality"
 export { ParseError } from "./errors"
 

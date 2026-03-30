@@ -6,6 +6,9 @@ import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { ParseError } from "./errors"
 
+let currentTracker: Set<any> | null = null
+let currentArrayTracker: { deps: any[]; len: number } | null = null
+
 const resourceKeys = new WeakMap<Lite.Resource<unknown>, symbol>()
 let resourceKeyCounter = 0
 
@@ -195,6 +198,8 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   get(): T {
+    if (currentArrayTracker) currentArrayTracker.deps[currentArrayTracker.len++] = this
+    else if (currentTracker) currentTracker.add(this)
     const entry = this.scope.getEntry(this.atom)
     if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
     if (entry.state === 'failed') throw entry.error!
@@ -1287,6 +1292,49 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
  * const db = await scope.resolve(dbAtom)
  * ```
  */
+export function track<T>(fn: () => T): { result: T; controllers: Set<any> }
+export function track<T>(fn: () => T, into: Set<any>): { result: T; controllers: Set<any> }
+export function track<T>(fn: () => T, into?: Set<any>): { result: T; controllers: Set<any> } {
+  const prev = currentTracker
+  const controllers = into ?? new Set<any>()
+  if (into) into.clear()
+  currentTracker = controllers
+  try {
+    return { result: fn(), controllers }
+  } finally {
+    currentTracker = prev
+  }
+}
+
+export function startTracking(set: Set<any>): Set<any> | null {
+  const prev = currentTracker
+  currentTracker = set
+  return prev
+}
+
+export function stopTracking(prev: Set<any> | null): void {
+  currentTracker = prev
+}
+
+export function startArrayTracking(tracker: { deps: any[]; len: number }): { deps: any[]; len: number } | null {
+  const prev = currentArrayTracker
+  currentArrayTracker = tracker
+  tracker.len = 0
+  return prev
+}
+
+export function stopArrayTracking(prev: { deps: any[]; len: number } | null): void {
+  currentArrayTracker = prev
+}
+
+export function registerInTracker(target: any): void {
+  if (currentArrayTracker) {
+    currentArrayTracker.deps[currentArrayTracker.len++] = target
+    return
+  }
+  if (currentTracker) currentTracker.add(target)
+}
+
 export function createScope(options?: Lite.ScopeOptions): Lite.Scope {
   return new ScopeImpl(options)
 }
