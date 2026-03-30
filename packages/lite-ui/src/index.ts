@@ -383,9 +383,28 @@ export function mountTemplate(
   const { strings, values } = tpl
   const { templateEl, attrBindings, eventBindings } = parseTemplate(strings)
   const fragment = templateEl.content.cloneNode(true) as DocumentFragment
+  const boundElements = new Map<number, Element>()
+
+  if (attrBindings.length > 0 || eventBindings.length > 0) {
+    const elementWalker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT)
+    while (elementWalker.nextNode()) {
+      const el = elementWalker.currentNode as Element
+      for (const attr of el.getAttributeNames()) {
+        const attrMatch = attr.match(/^data-attr-(\d+)$/)
+        if (attrMatch) {
+          boundElements.set(parseInt(attrMatch[1], 10), el)
+          continue
+        }
+        const eventMatch = attr.match(/^data-evt-(\d+)$/)
+        if (eventMatch) {
+          boundElements.set(parseInt(eventMatch[1], 10), el)
+        }
+      }
+    }
+  }
 
   for (const { index, attrName } of attrBindings) {
-    const el = fragment.querySelector(`[data-attr-${index}]`)
+    const el = boundElements.get(index)
     if (!el) continue
     el.removeAttribute(`data-attr-${index}`)
     const value = values[index]
@@ -412,7 +431,7 @@ export function mountTemplate(
   }
 
   for (const { index, eventName } of eventBindings) {
-    const el = fragment.querySelector(`[data-evt-${index}]`)
+    const el = boundElements.get(index)
     if (!el) continue
     el.removeAttribute(`data-evt-${index}`)
     const handler = values[index] as EventListener
