@@ -108,13 +108,28 @@ interface AtomEntry<T> {
   hasValue: boolean
   error?: Error
   cleanups: (() => MaybePromise<void>)[]
-  listeners: Map<ListenerEvent, Set<() => void>>
+  resolvingListeners: Set<() => void>
+  resolvedListeners: Set<() => void>
+  allListeners: Set<() => void>
   pendingInvalidate: boolean
   pendingSet?: { value: T } | { fn: (prev: T) => T }
   data?: ContextDataImpl
   dependents: Set<Lite.Atom<unknown>>
+  gcPending: boolean
+  gcQueued: boolean
   gcScheduled: ReturnType<typeof setTimeout> | null
   resolvedPromise?: Promise<T>
+}
+
+function notifyListeners(listeners: Set<() => void> | undefined): void {
+  if (!listeners?.size) return
+  if (listeners.size === 1) {
+    listeners.values().next().value?.()
+    return
+  }
+  for (const listener of [...listeners]) {
+    listener()
+  }
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -167,9 +182,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   }
 
   private notifyListeners(): void {
-    for (const listener of [...this.listeners]) {
-      listener()
-    }
+    notifyListeners(this.listeners)
   }
 
   dispose(): void {
@@ -324,13 +337,13 @@ class ScopeImpl implements Lite.Scope {
         state: 'idle',
         hasValue: false,
         cleanups: [],
-        listeners: new Map([
-          ['resolving', new Set()],
-          ['resolved', new Set()],
-          ['*', new Set()],
-        ]),
+        resolvingListeners: new Set(),
+        resolvedListeners: new Set(),
+        allListeners: new Set(),
         pendingInvalidate: false,
         dependents: new Set(),
+        gcPending: false,
+        gcQueued: false,
         gcScheduled: null,
       }
       this.cache.set(atom, entry as AtomEntry<unknown>)
@@ -344,7 +357,12 @@ class ScopeImpl implements Lite.Scope {
       clearTimeout(entry.gcScheduled)
       entry.gcScheduled = null
     }
-    const listeners = entry.listeners.get(event)!
+    entry.gcPending = false
+    const listeners = event === 'resolving'
+      ? entry.resolvingListeners
+      : event === 'resolved'
+        ? entry.resolvedListeners
+        : entry.allListeners
     listeners.add(listener)
     return () => {
       listeners.delete(listener)
@@ -353,10 +371,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private hasSubscribers(entry: AtomEntry<unknown>): boolean {
-    for (const listeners of entry.listeners.values()) {
-      if (listeners.size > 0) return true
-    }
-    return false
+    return entry.resolvingListeners.size > 0 || entry.resolvedListeners.size > 0 || entry.allListeners.size > 0
   }
 
   private maybeScheduleGCEntry<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): void {
@@ -365,11 +380,25 @@ class ScopeImpl implements Lite.Scope {
     if (entry.state === 'idle') return
     if (this.hasSubscribers(entry)) return
     if (entry.dependents.size > 0) return
-    if (entry.gcScheduled) return
+    if (entry.gcScheduled || entry.gcQueued) return
 
-    entry.gcScheduled = setTimeout(() => {
-      this.executeGC(atom)
-    }, this.gcOptions.graceMs)
+    entry.gcPending = true
+    entry.gcQueued = true
+    queueMicrotask(() => {
+      entry.gcQueued = false
+      if (!entry.gcPending) return
+      entry.gcPending = false
+      if (this.disposed) return
+      const currentEntry = this.cache.get(atom)
+      if (currentEntry !== entry) return
+      if (entry.state === 'idle') return
+      if (this.hasSubscribers(entry)) return
+      if (entry.dependents.size > 0) return
+      if (atom.keepAlive || entry.gcScheduled) return
+      entry.gcScheduled = setTimeout(() => {
+        this.executeGC(atom)
+      }, this.gcOptions.graceMs)
+    })
   }
 
 
@@ -378,6 +407,7 @@ class ScopeImpl implements Lite.Scope {
     if (!entry) return
     
     entry.gcScheduled = null
+    entry.gcPending = false
     
     if (this.hasSubscribers(entry)) return
     if (entry.dependents.size > 0) return
@@ -400,40 +430,19 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved'): void {
-    const eventListeners = entry.listeners.get(event)
-    if (eventListeners?.size) {
-      for (const listener of [...eventListeners]) {
-        listener()
-      }
-    }
-
-    const allListeners = entry.listeners.get('*')
-    if (allListeners?.size) {
-      for (const listener of allListeners) {
-        listener()
-      }
-    }
+    notifyListeners(event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners)
+    notifyListeners(entry.allListeners)
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>): void {
-    const allListeners = entry.listeners.get('*')
-    if (allListeners?.size) {
-      for (const listener of allListeners) {
-        listener()
-      }
-    }
+    notifyListeners(entry.allListeners)
   }
 
   private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>): void {
     if (this.stateListeners.size === 0) return
     const stateMap = this.stateListeners.get(state)
     if (!stateMap) return
-    const listeners = stateMap.get(atom)
-    if (listeners?.size) {
-      for (const listener of [...listeners]) {
-        listener()
-      }
-    }
+    notifyListeners(stateMap.get(atom))
   }
 
   on(event: AtomState, atom: Lite.Atom<unknown>, listener: () => void): () => void {
