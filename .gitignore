@@ -173,6 +173,7 @@ pumped-go/examples/order-processing/order-processing
 *.db
 *.db-shm
 *.db-wal
+!.c3/c3.db
 
 # Logs
 logs
