@@ -1,6 +1,7 @@
 import { atom, controller } from "../src/atom"
 import { flow } from "../src/flow"
 import { resource } from "../src/resource"
+import type { Lite } from "../src/types"
 
 const sourceAtom = atom({
   factory: () => 1,
@@ -11,32 +12,44 @@ atom({
   factory: (_ctx, { source }) => source.get(),
 })
 
-// @ts-expect-error watch:true requires resolve:true
-controller(sourceAtom, { watch: true })
+flow({
+  deps: {
+    source: controller(sourceAtom, { resolve: true }),
+  },
+  factory: (_ctx, { source }) => source.get(),
+})
 
 flow({
   deps: {
-    // @ts-expect-error watch:true is only legal in atom deps
-    source: controller(sourceAtom, { resolve: true, watch: true }),
+    source: controller(sourceAtom),
   },
-  factory: () => 1,
+  factory: async (_ctx, { source }) => {
+    await source.resolve()
+    return source.get()
+  },
 })
 
 resource({
   deps: {
-    // @ts-expect-error watch:true is only legal in atom deps
-    source: controller(sourceAtom, { resolve: true, watch: true }),
+    source: controller(sourceAtom, { resolve: true }),
   },
-  factory: () => 1,
+  factory: (_ctx, { source }) => source.get(),
 })
 
-atom({
-  deps: {
-    // @ts-expect-error loose tag-like objects are not valid deps
-    source: { mode: "required" },
-  },
-  factory: () => 1,
-})
+// @ts-expect-error watch:true requires resolve:true
+controller(sourceAtom, { watch: true })
+
+const legalExecutionDep: Lite.ExecutionDependency = controller(sourceAtom, { resolve: true })
+
+// @ts-expect-error watch:true is only legal in execution deps
+const illegalExecutionDep: Lite.ExecutionDependency = controller(sourceAtom, { resolve: true, watch: true })
+
+// @ts-expect-error loose tag-like objects are not valid deps
+const illegalAtomDep: Lite.AtomDependency = { mode: "required" }
+
+void legalExecutionDep
+void illegalExecutionDep
+void illegalAtomDep
 
 flow({
   factory: (ctx) => {

@@ -67,24 +67,13 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
   const refs = registry.get(tag)
   if (!refs) return []
 
-  const live: Lite.Atom<unknown>[] = []
-  const liveRefs: WeakRef<Lite.Atom<unknown>>[] = []
+  const liveEntries = refs
+    .map((ref) => ({ ref, atom: ref.deref() }))
+    .filter((entry): entry is { ref: WeakRef<Lite.Atom<unknown>>, atom: Lite.Atom<unknown> } => entry.atom !== undefined)
 
-  for (const ref of refs) {
-    const atom = ref.deref()
-    if (atom) {
-      live.push(atom)
-      liveRefs.push(ref)
-    }
-  }
+  registry.set(tag, liveEntries.map((entry) => entry.ref))
 
-  if (liveRefs.length > 0) {
-    registry.set(tag, liveRefs)
-  } else {
-    registry.delete(tag)
-  }
-
-  return live
+  return liveEntries.map((entry) => entry.atom)
 }
 
 /**

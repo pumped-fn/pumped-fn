@@ -1,0 +1,20 @@
+{
+  "name": "js-framework-benchmark-pumped-fn-lite-ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "js-framework-benchmark": {
+    "frameworkVersionFromPackage": "@pumped-fn/lite-ui"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outfile=dist/main.js --format=iife --platform=browser",
+    "dev": "esbuild src/main.ts --bundle --outfile=dist/main.js --format=iife --platform=browser --watch --servedir=."
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

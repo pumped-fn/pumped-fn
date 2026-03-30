@@ -156,6 +156,7 @@ sequenceDiagram
 | `preset(atom, value)` | Create preset injection | `Preset<T>` |
 | `controller(atom)` | Create controller dependency | `ControllerDep<T>` |
 | `service(config)` | Define context-aware method container | `Atom<T extends ServiceMethods>` |
+| `setControllerReadHook(fn)` | Register or restore controller-read observers for integrations | `void` |
 | `scope.select(atom, selector, options?)` | Create fine-grained subscription | `SelectHandle<S>` |
 
 ### Type Guards
