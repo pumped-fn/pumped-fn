@@ -174,6 +174,9 @@ pumped-go/examples/order-processing/order-processing
 *.db-shm
 *.db-wal
 
+# C3 architecture database (source of truth)
+!.c3/c3.db
+
 # Logs
 logs
 *.log
