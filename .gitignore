@@ -332,3 +332,4 @@ autoresearch.md
 autoresearch.sh
 autoresearch.jsonl
 autoresearch.checks.sh
+examples/reactivity-bench/
