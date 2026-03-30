@@ -273,6 +273,40 @@ export function mountListDirective(
       return
     }
 
+    if (oldKeys.length === 0) {
+      const fragment = document.createDocumentFragment()
+      for (const key of newKeys) {
+        const entry = newKeyMap.get(key)!
+        for (const node of entry.nodes) fragment.appendChild(node)
+      }
+      parent.insertBefore(fragment, endMarker)
+      oldKeys = newKeys
+      keyMap = newKeyMap
+      return
+    }
+
+    let appendOnly = newKeys.length >= oldKeys.length
+    if (appendOnly) {
+      for (let i = 0; i < oldKeys.length; i++) {
+        if (newKeys[i] !== oldKeys[i]) {
+          appendOnly = false
+          break
+        }
+      }
+    }
+
+    if (appendOnly) {
+      const fragment = document.createDocumentFragment()
+      for (let i = oldKeys.length; i < newKeys.length; i++) {
+        const entry = newKeyMap.get(newKeys[i])!
+        for (const node of entry.nodes) fragment.appendChild(node)
+      }
+      if (fragment.firstChild) parent.insertBefore(fragment, endMarker)
+      oldKeys = newKeys
+      keyMap = newKeyMap
+      return
+    }
+
     const oldKeyIndex = new Map<string | number, number>()
     for (let i = 0; i < oldKeys.length; i++) oldKeyIndex.set(oldKeys[i], i)
 

@@ -33,23 +33,41 @@ async function init() {
   const dataCtrl = scope.controller(dataAtom)
   const selCtrl = scope.controller(selectedAtom)
 
-  function run() { dataCtrl.set(buildData(1000)) }
-  function runLots() { dataCtrl.set(buildData(10000)) }
-  function add() { dataCtrl.set([...dataCtrl.get(), ...buildData(1000)]) }
-  function update() {
+  async function flush() {
+    await scope.flush()
+  }
+
+  async function run() {
+    dataCtrl.set(buildData(1000))
+    await flush()
+  }
+  async function runLots() {
+    dataCtrl.set(buildData(10000))
+    await flush()
+  }
+  async function add() {
+    dataCtrl.set([...dataCtrl.get(), ...buildData(1000)])
+    await flush()
+  }
+  async function update() {
     const d = dataCtrl.get().slice()
     for (let i = 0; i < d.length; i += 10) {
       d[i] = { ...d[i], label: d[i].label + ' !!!' }
     }
     dataCtrl.set(d)
+    await flush()
   }
-  function clear() { dataCtrl.set([]) }
-  function swapRows() {
+  async function clear() {
+    dataCtrl.set([])
+    await flush()
+  }
+  async function swapRows() {
     const d = dataCtrl.get()
     if (d.length > 998) {
       const next = d.slice()
       ;[next[1], next[998]] = [next[998], next[1]]
       dataCtrl.set(next)
+      await flush()
     }
   }
 
@@ -70,8 +88,15 @@ async function init() {
       row => row.id,
       (row, getItem) => html`<tr class=${() => selCtrl.get() === getItem().id ? 'danger' : ''}>
         <td class="col-md-1">${row.id}</td>
-        <td class="col-md-4"><a @click=${() => selCtrl.set(getItem().id)}>${() => getItem().label}</a></td>
-        <td class="col-md-1"><a @click=${() => dataCtrl.update(d => d.filter(r => r.id !== getItem().id))}><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></td>
+        <td class="col-md-4"><a @click=${async () => {
+          selCtrl.set(getItem().id)
+          await flush()
+        }}>${() => getItem().label}</a></td>
+        <td class="col-md-1"><a @click=${async () => {
+          const id = getItem().id
+          dataCtrl.update(d => d.filter(r => r.id !== id))
+          await flush()
+        }}><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></td>
         <td class="col-md-6"></td>
       </tr>`,
     )}</tbody></table>
