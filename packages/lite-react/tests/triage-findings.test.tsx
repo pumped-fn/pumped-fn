@@ -216,7 +216,7 @@ describe('Triage regression tests', () => {
     const scope = createScope()
 
     class EB extends Component<{ children: ReactNode }, { hasError: boolean; msg: string }> {
-      state = { hasError: false, msg: '' }
+      override state = { hasError: false, msg: '' }
       static getDerivedStateFromError(e: unknown) { return { hasError: true, msg: String(e) } }
       override render() {
         if (this.state.hasError) return <div data-testid="err">{this.state.msg}</div>

@@ -280,7 +280,7 @@ class ScopeImpl implements Lite.Scope {
       this.chainError = null
       this.chainPromise = Promise.resolve().then(() =>
         this.processInvalidationChain().catch(error => {
-          if (this.chainError === null) this.chainError = error
+          this.chainError = error
         })
       )
     }
@@ -374,57 +374,74 @@ class ScopeImpl implements Lite.Scope {
     return entry.resolvingListeners.size > 0 || entry.resolvedListeners.size > 0 || entry.allListeners.size > 0
   }
 
-  private maybeScheduleGCEntry<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): void {
-    if (!this.gcOptions.enabled) return
-    if (atom.keepAlive) return
-    if (entry.state === 'idle') return
-    if (this.hasSubscribers(entry)) return
-    if (entry.dependents.size > 0) return
-    if (entry.gcScheduled || entry.gcQueued) return
+  private canQueueGC<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
+    return [
+      this.gcOptions.enabled,
+      !atom.keepAlive,
+      entry.state !== 'idle',
+      !this.hasSubscribers(entry),
+      entry.dependents.size === 0,
+      !entry.gcScheduled,
+      !entry.gcQueued,
+    ].every(Boolean)
+  }
 
-    entry.gcPending = true
-    entry.gcQueued = true
+  private canStartGCTimer<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
+    return [
+      !this.disposed,
+      this.cache.get(atom) === entry,
+      !this.hasSubscribers(entry),
+      entry.dependents.size === 0,
+      !entry.gcScheduled,
+    ].every(Boolean)
+  }
+
+  private canExecuteGC(entry: AtomEntry<unknown>): boolean {
+    return [
+      !this.hasSubscribers(entry),
+      entry.dependents.size === 0,
+    ].every(Boolean)
+  }
+
+  private trackDependent<T>(atom: Lite.Atom<T>, dependentAtom?: Lite.Atom<unknown>): void {
+    if (!dependentAtom) return
+    this.getEntry(atom)?.dependents.add(dependentAtom)
+  }
+
+  private maybeScheduleGCEntry<T>(atom: Lite.Atom<T>, entry?: AtomEntry<unknown>): void {
+    const gcEntry = entry ?? this.cache.get(atom)
+    if (!gcEntry || !this.canQueueGC(atom, gcEntry)) return
+
+    gcEntry.gcPending = true
+    gcEntry.gcQueued = true
     queueMicrotask(() => {
-      entry.gcQueued = false
-      if (!entry.gcPending) return
-      entry.gcPending = false
-      if (this.disposed) return
-      const currentEntry = this.cache.get(atom)
-      if (currentEntry !== entry) return
-      if (entry.state === 'idle') return
-      if (this.hasSubscribers(entry)) return
-      if (entry.dependents.size > 0) return
-      if (atom.keepAlive || entry.gcScheduled) return
-      entry.gcScheduled = setTimeout(() => {
-        this.executeGC(atom)
+      gcEntry.gcQueued = false
+      if (!gcEntry.gcPending) return
+      gcEntry.gcPending = false
+      if (!this.canStartGCTimer(atom, gcEntry)) return
+      gcEntry.gcScheduled = setTimeout(() => {
+        void this.executeGC(atom)
       }, this.gcOptions.graceMs)
     })
   }
 
 
   private async executeGC<T>(atom: Lite.Atom<T>): Promise<void> {
-    const entry = this.cache.get(atom)
-    if (!entry) return
-    
+    const entry = this.cache.get(atom)!
+
     entry.gcScheduled = null
     entry.gcPending = false
-    
-    if (this.hasSubscribers(entry)) return
-    if (entry.dependents.size > 0) return
-    if (atom.keepAlive) return
+
+    if (!this.canExecuteGC(entry)) return
 
     await this.release(atom)
 
     if (atom.deps) {
       for (const key in atom.deps) { const dep = atom.deps[key]!
-        const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
-        if (!depAtom) continue
-
-        const depEntry = this.cache.get(depAtom)
-        if (depEntry) {
-          depEntry.dependents.delete(atom)
-          this.maybeScheduleGCEntry(depAtom, depEntry)
-        }
+        const depAtom = isControllerDep(dep) ? dep.atom : dep
+        if (!isAtom(depAtom)) continue
+        this.cache.get(depAtom)?.dependents.delete(atom)
+        this.maybeScheduleGCEntry(depAtom)
       }
     }
   }
@@ -476,7 +493,6 @@ class ScopeImpl implements Lite.Scope {
     if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
 
     if (!this.initialized) {
-      if (!this.ready) return this.resolveAndTrack(atom)
       return this.ready.then(() => this.resolve(atom))
     }
 
@@ -640,15 +656,12 @@ class ScopeImpl implements Lite.Scope {
         const cachedEntry = this.cache.get(dep)
         if (cachedEntry?.state === 'resolved') {
           result[key] = cachedEntry.value
-          if (dependentAtom) cachedEntry.dependents.add(dependentAtom)
+          this.trackDependent(dep, dependentAtom)
         } else {
           parallel.push(
             this.resolve(dep).then(value => {
               result[key] = value
-              if (dependentAtom) {
-                const depEntry = this.getEntry(dep)
-                if (depEntry) depEntry.dependents.add(dependentAtom)
-              }
+              this.trackDependent(dep, dependentAtom)
             })
           )
         }
@@ -662,7 +675,7 @@ class ScopeImpl implements Lite.Scope {
           const cachedCtrlEntry = this.cache.get(dep.atom)
           if (cachedCtrlEntry?.state === 'resolved') {
             result[key] = ctrl
-            if (dependentAtom) cachedCtrlEntry.dependents.add(dependentAtom)
+            this.trackDependent(dep.atom, dependentAtom)
             if (dep.watch) {
               const eq = dep.eq ?? shallowEqual
               let prev = ctrl.get() as unknown
@@ -673,18 +686,13 @@ class ScopeImpl implements Lite.Scope {
                 }
                 prev = next
               })
-              const depEntry = this.getEntry(dependentAtom!)
-              if (depEntry) depEntry.cleanups.push(unsub)
-              else unsub()
+              this.getEntry(dependentAtom!)?.cleanups.push(unsub)
             }
           } else {
             parallel.push(
               ctrl.resolve().then(() => {
                 result[key] = ctrl
-                if (dependentAtom) {
-                  const depEntry = this.getEntry(dep.atom)
-                  if (depEntry) depEntry.dependents.add(dependentAtom)
-                }
+                this.trackDependent(dep.atom, dependentAtom)
                 if (dep.watch) {
                   const eq = dep.eq ?? shallowEqual
                   let prev = ctrl.get() as unknown
@@ -695,19 +703,14 @@ class ScopeImpl implements Lite.Scope {
                     }
                     prev = next
                   })
-                  const depEntry = this.getEntry(dependentAtom!)
-                  if (depEntry) depEntry.cleanups.push(unsub)
-                  else unsub()
+                  this.getEntry(dependentAtom!)?.cleanups.push(unsub)
                 }
               })
             )
           }
         } else {
           result[key] = ctrl
-          if (dependentAtom) {
-            const depEntry = this.getEntry(dep.atom)
-            if (depEntry) depEntry.dependents.add(dependentAtom)
-          }
+          this.trackDependent(dep.atom, dependentAtom)
         }
       } else if (tagExecutorSymbol in (dep as object)) {
         const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
@@ -740,7 +743,7 @@ class ScopeImpl implements Lite.Scope {
             break
           }
         }
-      } else if (isResource(dep)) {
+      } else {
         deferredResources.push([key, dep as Lite.Resource<unknown>])
       }
     }
@@ -924,7 +927,6 @@ class ScopeImpl implements Lite.Scope {
   private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (!entry) return
-    if (entry.state === "idle") return
 
     const previousValue = entry.value
     const pendingSet = entry.pendingSet
@@ -992,13 +994,10 @@ class ScopeImpl implements Lite.Scope {
 
     if (atom.deps) {
       for (const key in atom.deps) { const dep = atom.deps[key]!
-        const depAtom = isAtom(dep) ? dep : isControllerDep(dep) ? dep.atom : null
-        if (!depAtom) continue
-        const depEntry = this.cache.get(depAtom)
-        if (depEntry) {
-          depEntry.dependents.delete(atom)
-          this.maybeScheduleGCEntry(depAtom, depEntry)
-        }
+        const depAtom = isControllerDep(dep) ? dep.atom : dep
+        if (!isAtom(depAtom)) continue
+        this.cache.get(depAtom)?.dependents.delete(atom)
+        this.maybeScheduleGCEntry(depAtom)
       }
     }
 

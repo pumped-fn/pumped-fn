@@ -115,6 +115,30 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  * ```
  */
 export function controller<T>(
+  atom: Lite.Atom<T>
+): Lite.NonWatchControllerDep<T>
+
+export function controller<T>(
+  atom: Lite.Atom<T>,
+  options: { resolve: true; watch: true; eq: (a: T, b: T) => boolean }
+): Lite.WatchControllerDep<T>
+
+export function controller<T>(
+  atom: Lite.Atom<T>,
+  options: { resolve: true; watch: true; eq?: never }
+): Lite.WatchControllerDep<T>
+
+export function controller<T>(
+  atom: Lite.Atom<T>,
+  options: { resolve: true; watch?: never; eq?: never }
+): Lite.NonWatchControllerDep<T>
+
+export function controller<T>(
+  atom: Lite.Atom<T>,
+  options: { resolve?: never; watch?: never; eq?: never }
+): Lite.NonWatchControllerDep<T>
+
+export function controller<T>(
   atom: Lite.Atom<T>,
   options?: Lite.ControllerDepOptions<T>
 ): Lite.ControllerDep<T> {
