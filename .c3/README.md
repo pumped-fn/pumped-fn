@@ -40,6 +40,7 @@ graph TB
     subgraph "pumped-fn"
         Lite["@pumped-fn/lite<br/>(Core Library)"]
         ReactLite["@pumped-fn/lite-react<br/>(React Bindings)"]
+        LiteUI["@pumped-fn/lite-ui<br/>(DOM + JSX Renderer)"]
         Devtools["@pumped-fn/lite-devtools<br/>(Observability)"]
         DevtoolsServer["@pumped-fn/lite-devtools-server<br/>(TUI Server)"]
         LiteHMR["@pumped-fn/lite-hmr<br/>(HMR Plugin)"]
@@ -55,11 +56,14 @@ graph TB
 
     AppDev -->|uses| Lite
     AppDev -->|uses| ReactLite
+    AppDev -->|uses| LiteUI
     AppDev -->|uses| Devtools
     AppDev -->|uses| Codemod
     LibAuthor -->|extends| Lite
 
     ReactLite -->|depends on| Lite
+    LiteUI -->|depends on| Lite
+    LiteUI -.->|optional React islands| ReactLite
     Devtools -->|depends on| Lite
     DevtoolsServer -->|depends on| Lite
     DevtoolsServer -->|depends on| ReactLite
@@ -89,6 +93,7 @@ graph TB
 |-----------|------|-------------|---------------|
 | @pumped-fn/lite | Library | Lightweight DI with minimal reactivity - atoms, flows, tags, controllers | [c3-2-lite](./c3-2-lite/) |
 | @pumped-fn/lite-react | Library | Minimal React bindings with Suspense and useSyncExternalStore | [c3-3-lite-react](./c3-3-lite-react/) |
+| @pumped-fn/lite-ui | Library | DOM renderer with tagged-template, JSX, keyed list, and optional React island helpers on top of lite | [c3-9-lite-ui](./c3-9-lite-ui/) |
 | @pumped-fn/lite-devtools | Library | Observability extension with transport-based event streaming | [c3-4-lite-devtools](./c3-4-lite-devtools/) |
 | @pumped-fn/lite-hmr | Vite Plugin | Build-time transform preserving atom state across HMR reloads | [c3-5-lite-hmr](./c3-5-lite-hmr/) |
 | @pumped-fn/lite-devtools-server | CLI Tool | Standalone TUI server receiving devtools events via HTTP | [c3-6-lite-devtools-server](./c3-6-lite-devtools-server/) |
@@ -103,6 +108,8 @@ graph TB
 |------|-----|----------|-------------|
 | Framework integrations | @pumped-fn/lite | npm dependency | Frameworks use lite for DI and flow handling |
 | @pumped-fn/lite-react | @pumped-fn/lite | npm dependency | React hooks wrap lite Scope and Controller APIs |
+| @pumped-fn/lite-ui | @pumped-fn/lite | npm dependency | DOM bindings observe lite controllers and mount keyed template/JSX output |
+| @pumped-fn/lite-ui | @pumped-fn/lite-react | optional peer dependency | React island helpers reuse lite-react scope and controller semantics when React is present |
 | @pumped-fn/lite-devtools | @pumped-fn/lite | Extension interface | Devtools uses Extension hooks for instrumentation |
 | @pumped-fn/lite-devtools | External UI | Transport (fire-and-forget) | Events streamed via BroadcastChannel, WebSocket, or Memory |
 | @pumped-fn/lite-hmr | User code | AST transform | Plugin transforms atom() calls at build time |

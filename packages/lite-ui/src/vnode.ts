@@ -2,28 +2,40 @@ import { track } from './tracking'
 import type { ReactiveBinding, MountContext } from './index'
 import { subscribeToControllers, isList, isTemplate, isDirective, mountListDirective, mountTemplate, applyAttribute, clearBetween } from './index'
 
+const VNODE_BRAND = Symbol('lite-ui-vnode')
+
+/**
+ * Represents a JSX node before it is mounted into the DOM.
+ */
 export interface VNode {
+  readonly [VNODE_BRAND]: true
   tag: string | null
   props: Record<string, unknown> | null
   children: unknown[]
 }
 
-const VNODE_BRAND = Symbol('lite-ui-vnode')
-
+/**
+ * Creates a virtual node for the lite-ui JSX runtime.
+ */
 export function createVNode(
   tag: string | null,
   props: Record<string, unknown> | null,
   children: unknown[],
 ): VNode {
-  return { [VNODE_BRAND]: true, tag, props, children } as unknown as VNode
+  return { [VNODE_BRAND]: true, tag, props, children }
 }
 
+/**
+ * Checks whether a value is a lite-ui virtual node.
+ */
 export function isVNode(v: unknown): v is VNode {
   return v != null && typeof v === 'object' && VNODE_BRAND in v
 }
 
 function isEventProp(key: string, value: unknown): boolean {
-  return key.length > 2 && key[0] === 'o' && key[1] === 'n' && key.charCodeAt(2) >= 65 && key.charCodeAt(2) <= 90 && typeof value === 'function'
+  if (key.length <= 2 || key[0] !== 'o' || key[1] !== 'n' || typeof value !== 'function') return false
+  const code = key.charCodeAt(2)
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
 function mountChild(
@@ -36,9 +48,9 @@ function mountChild(
 
   if (isVNode(child)) return mountVNode(child, parent, before, ctx)
 
-  if (isTemplate(child)) return mountTemplate(child as any, parent, before, ctx)
+  if (isTemplate(child)) return mountTemplate(child, parent, before, ctx)
 
-  if (isList(child)) return mountListDirective(child as any, parent, before, ctx)
+  if (isList(child)) return mountListDirective(child, parent, before, ctx)
 
   if (isDirective(child)) {
     const el = document.createElement('div')
@@ -85,14 +97,25 @@ function renderChildValue(
   before: Node | null,
   ctx: MountContext,
 ): Node[] {
-  if (value == null || value === false) return []
+  if (value == null || value === false || value === true) return []
   if (isVNode(value)) return mountVNode(value, parent, before, ctx)
-  if (isTemplate(value)) return mountTemplate(value as any, parent, before, ctx)
+  if (isTemplate(value)) return mountTemplate(value, parent, before, ctx)
+  if (isList(value)) return mountListDirective(value, parent, before, ctx)
+  if (isDirective(value)) {
+    const el = document.createElement('div')
+    el.style.display = 'contents'
+    parent.insertBefore(el, before)
+    value.mount(el, ctx)
+    return [el]
+  }
   const text = document.createTextNode(String(value))
   parent.insertBefore(text, before)
   return [text]
 }
 
+/**
+ * Mounts a virtual node into the DOM.
+ */
 export function mountVNode(
   vnode: VNode,
   parent: Node,

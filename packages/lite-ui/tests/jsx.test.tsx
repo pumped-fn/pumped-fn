@@ -156,6 +156,20 @@ describe('JSX — events', () => {
     await scope.flush()
     expect(ctrl.get()).toBe(1)
   })
+
+  it('onclick binds click handler', async () => {
+    const countAtom = atom({ factory: () => 0 })
+    await scope.resolve(countAtom)
+    const ctrl = scope.controller(countAtom)
+
+    handle = mount(
+      <button onclick={() => ctrl.update(n => n + 1)}>inc</button>,
+      container, scope,
+    )
+    container.querySelector('button')!.click()
+    await scope.flush()
+    expect(ctrl.get()).toBe(1)
+  })
 })
 
 describe('JSX — conditionals', () => {
@@ -251,6 +265,22 @@ describe('JSX — list integration', () => {
     ctrl.set(['c', 'a'])
     await scope.flush()
     expect(container.querySelectorAll('li').length).toBe(2)
+  })
+
+  it('reactive child can return list()', async () => {
+    const itemsAtom = atom({ factory: () => ['a', 'b'] })
+    await scope.resolve(itemsAtom)
+    const ctrl = scope.controller(itemsAtom)
+
+    handle = mount(
+      <ul>{() => list(() => ctrl.get(), s => s, s => <li>{s}</li>)}</ul>,
+      container, scope,
+    )
+    expect(Array.from(container.querySelectorAll('li'), node => node.textContent)).toEqual(['a', 'b'])
+
+    ctrl.set(['b', 'c'])
+    await scope.flush()
+    expect(Array.from(container.querySelectorAll('li'), node => node.textContent)).toEqual(['b', 'c'])
   })
 
   it('list with reactive item getter in JSX', async () => {

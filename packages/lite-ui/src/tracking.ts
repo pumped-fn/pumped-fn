@@ -33,23 +33,23 @@ export function registerInTracker(target: any): void {
   if (currentTracker) currentTracker.add(target)
 }
 
-export function startTracking(set: Set<any>): Set<any> | null {
+function startTracking(set: Set<any>): Set<any> | null {
   const prev = currentTracker
   currentTracker = set
   return prev
 }
 
-export function stopTracking(prev: Set<any> | null): void {
+function stopTracking(prev: Set<any> | null): void {
   currentTracker = prev
 }
 
-export function startArrayTracking(tracker: { deps: any[]; len: number }): { deps: any[]; len: number } | null {
+function startArrayTracking(tracker: { deps: any[]; len: number }): { deps: any[]; len: number } | null {
   const prev = currentArrayTracker
   currentArrayTracker = tracker
   tracker.len = 0
   return prev
 }
 
-export function stopArrayTracking(prev: { deps: any[]; len: number } | null): void {
+function stopArrayTracking(prev: { deps: any[]; len: number } | null): void {
   currentArrayTracker = prev
 }

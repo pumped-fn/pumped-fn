@@ -44,12 +44,13 @@ function createItemSignal<T>(initial: T): ItemSignal<T> {
   return signal
 }
 
-interface ListDirective<T = unknown> {
-  [LIST_BRAND]: true
+export interface ListDirective<T = unknown> {
   items: () => T[]
   keyFn: (item: T) => string | number
   renderFn: (item: T, getItem: () => T) => Template | VNode
 }
+
+type RuntimeListDirective<T = unknown> = ListDirective<T> & { readonly [LIST_BRAND]: true }
 
 export function isList(v: unknown): v is ListDirective {
   return v != null && typeof v === 'object' && LIST_BRAND in v
@@ -59,19 +60,22 @@ export interface MountHandle {
   dispose(): void
 }
 
-interface Template {
+export interface Template {
   strings: TemplateStringsArray
   values: unknown[]
 }
 
 const TEMPLATE_BRAND = Symbol('lite-ui-template')
 
-export function isTemplate(v: unknown): v is Template & { [TEMPLATE_BRAND]: true } {
+type RuntimeTemplate = Template & { readonly [TEMPLATE_BRAND]: true }
+
+export function isTemplate(v: unknown): v is Template {
   return v != null && typeof v === 'object' && TEMPLATE_BRAND in v
 }
 
 export function html(strings: TemplateStringsArray, ...values: unknown[]): Template {
-  return { [TEMPLATE_BRAND]: true, strings, values } as Template & { [TEMPLATE_BRAND]: true }
+  const template: RuntimeTemplate = { [TEMPLATE_BRAND]: true, strings, values }
+  return template
 }
 
 export function list<T>(
@@ -79,7 +83,8 @@ export function list<T>(
   keyFn: (item: T) => string | number,
   renderFn: (item: T, getItem: () => T) => Template | VNode,
 ): ListDirective<T> {
-  return { [LIST_BRAND]: true as const, items, keyFn, renderFn }
+  const directive: RuntimeListDirective<T> = { [LIST_BRAND]: true, items, keyFn, renderFn }
+  return directive
 }
 
 const ATTR_RE = /\s([@a-zA-Z][\w.-]*)=$/
@@ -247,7 +252,7 @@ export function mountListDirective(
         }
         const nodes = isVNode(rendered)
           ? mountVNode(rendered, frag, null, itemCtx)
-          : mountTemplate(rendered as Template & { [TEMPLATE_BRAND]: true }, frag, null, itemCtx)
+          : mountTemplate(rendered, frag, null, itemCtx)
         for (const b of itemCtx.reactiveBindings) ctx.reactiveBindings.push(b)
         newKeyMap.set(key, { nodes, item, ctx: itemCtx, signal })
       }
@@ -409,7 +414,7 @@ function parseTemplate(strings: TemplateStringsArray): ParsedTemplate {
 }
 
 export function mountTemplate(
-  tpl: Template & { [TEMPLATE_BRAND]: true },
+  tpl: Template,
   parent: Node,
   before: Node | null,
   ctx: MountContext,
@@ -551,12 +556,7 @@ export function mount(tpl: Template | VNode, container: HTMLElement, scope: Lite
 
   const nodes = isVNode(tpl)
     ? mountVNode(tpl, container, null, ctx)
-    : mountTemplate(
-        tpl as Template & { [TEMPLATE_BRAND]: true },
-        container,
-        null,
-        ctx,
-      )
+    : mountTemplate(tpl, container, null, ctx)
 
   let disposed = false
 

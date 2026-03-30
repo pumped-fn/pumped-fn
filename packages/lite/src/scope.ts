@@ -6,7 +6,7 @@ import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { ParseError } from "./errors"
 
-let onControllerRead: ((ctrl: any) => void) | null = null
+const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 
 const resourceKeys = new WeakMap<Lite.Resource<unknown>, symbol>()
 let resourceKeyCounter = 0
@@ -124,7 +124,10 @@ interface AtomEntry<T> {
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
-    listeners.values().next().value?.()
+    for (const listener of listeners) {
+      listener()
+      return
+    }
     return
   }
   for (const listener of [...listeners]) {
@@ -210,7 +213,9 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   get(): T {
-    if (onControllerRead) onControllerRead(this)
+    for (let i = controllerReadHooks.length - 1; i >= 0; i--) {
+      controllerReadHooks[i]!(this)
+    }
     const entry = this.scope.getEntry(this.atom)
     if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
     if (entry.state === 'failed') throw entry.error!
@@ -375,32 +380,25 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private canQueueGC<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
-    return [
-      this.gcOptions.enabled,
-      !atom.keepAlive,
-      entry.state !== 'idle',
-      !this.hasSubscribers(entry),
-      entry.dependents.size === 0,
-      !entry.gcScheduled,
-      !entry.gcQueued,
-    ].every(Boolean)
+    return this.gcOptions.enabled
+      && !atom.keepAlive
+      && entry.state !== 'idle'
+      && !this.hasSubscribers(entry)
+      && entry.dependents.size === 0
+      && !entry.gcScheduled
+      && !entry.gcQueued
   }
 
   private canStartGCTimer<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
-    return [
-      !this.disposed,
-      this.cache.get(atom) === entry,
-      !this.hasSubscribers(entry),
-      entry.dependents.size === 0,
-      !entry.gcScheduled,
-    ].every(Boolean)
+    return !this.disposed
+      && this.cache.get(atom) === entry
+      && !this.hasSubscribers(entry)
+      && entry.dependents.size === 0
+      && !entry.gcScheduled
   }
 
   private canExecuteGC(entry: AtomEntry<unknown>): boolean {
-    return [
-      !this.hasSubscribers(entry),
-      entry.dependents.size === 0,
-    ].every(Boolean)
+    return !this.hasSubscribers(entry) && entry.dependents.size === 0
   }
 
   private trackDependent<T>(atom: Lite.Atom<T>, dependentAtom?: Lite.Atom<unknown>): void {
@@ -493,6 +491,7 @@ class ScopeImpl implements Lite.Scope {
     if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
 
     if (!this.initialized) {
+      if (!this.ready) return this.resolveAndTrack(atom)
       return this.ready.then(() => this.resolve(atom))
     }
 
@@ -1274,6 +1273,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 }
 
 /**
+ * Registers or restores controller-read observers used by integrations that
+ * need to track `controller.get()` access.
+ */
+export function setControllerReadHook(fn: ((ctrl: Lite.Controller<unknown>) => void) | null): void {
+  if (fn) {
+    controllerReadHooks.push(fn)
+    return
+  }
+  controllerReadHooks.pop()
+}
+
+/**
  * Creates a DI container that manages Atom resolution, caching, and lifecycle.
  *
  * The scope is returned synchronously, with a `ready` promise that resolves
@@ -1298,10 +1309,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
  * const db = await scope.resolve(dbAtom)
  * ```
  */
-export function setControllerReadHook(fn: ((ctrl: any) => void) | null): void {
-  onControllerRead = fn
-}
-
 export function createScope(options?: Lite.ScopeOptions): Lite.Scope {
   return new ScopeImpl(options)
 }

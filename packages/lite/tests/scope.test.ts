@@ -57,6 +57,24 @@ describe("Scope", () => {
       expect(scope.controller(undefinedAtom).state).toBe("resolved")
     })
 
+    it("allows extensions to resolve atoms during init", async () => {
+      const configAtom = atom({ factory: () => "config" })
+      let initValue: string | undefined
+
+      const scope = createScope({
+        extensions: [{
+          name: "init-resolve",
+          init: async (childScope: Lite.Scope) => {
+            initValue = await childScope.resolve(configAtom)
+          },
+        }],
+      })
+
+      await expect(scope.ready).resolves.toBeUndefined()
+      expect(initValue).toBe("config")
+      expect(await scope.resolve(configAtom)).toBe("config")
+    })
+
     it("uses preset value and preset atom", async () => {
       const configAtom = atom({ factory: () => ({ port: 3000 }) })
       const scope1 = createScope({
@@ -2740,6 +2758,34 @@ describe("public helper coverage", () => {
     }
 
     expect(registryTag.atoms()).toEqual(expect.arrayContaining([taggedAtom, taggedAtom2]))
+  })
+
+  it("stacks controller read hooks and restores the previous hook", async () => {
+    const trackedAtom = atom({ factory: () => 1 })
+    const scope = createScope()
+    await scope.resolve(trackedAtom)
+    const ctrl = scope.controller(trackedAtom)
+    const seen: string[] = []
+
+    setControllerReadHook(() => {
+      seen.push("base")
+    })
+    setControllerReadHook(() => {
+      seen.push("nested")
+    })
+
+    try {
+      expect(ctrl.get()).toBe(1)
+      expect(seen).toEqual(["nested", "base"])
+
+      seen.length = 0
+      setControllerReadHook(null)
+
+      expect(ctrl.get()).toBe(1)
+      expect(seen).toEqual(["base"])
+    } finally {
+      setControllerReadHook(null)
+    }
   })
 
   it("covers service without tags and extension-driven scope execution branches", async () => {
