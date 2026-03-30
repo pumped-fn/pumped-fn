@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { atom, createScope, controller, type Lite } from '@pumped-fn/lite'
-import { createElement, type FC } from 'react'
-import { act } from 'react-dom/test-utils'
+import { act, createElement, type FC } from 'react'
 import { useAtom, useController } from '@pumped-fn/lite-react'
 import { html, mount, type MountHandle } from '../src/index'
 import { react } from '../src/react'
@@ -243,9 +242,7 @@ describe('react() directive — bidirectional state', () => {
     expect(container.querySelector('.host-display')!.textContent).toBe('0')
 
     await act(async () => {
-      container.querySelector('.react-btn')!.dispatchEvent(new Event('click', { bubbles: true }))
-    })
-    await act(async () => {
+      container.querySelector('.react-btn')!.click()
       await scope.flush()
     })
     expect(container.querySelector('.host-display')!.textContent).toBe('1')

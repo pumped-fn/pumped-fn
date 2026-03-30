@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
-import { Component, type ReactNode, Suspense } from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { act, Component, type ReactNode, Suspense } from 'react'
 import { atom, createScope, ScopeProvider, useSelect, useController } from '../src'
 
 describe('Triage regression tests', () => {

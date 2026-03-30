@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
-import { Component, type ReactNode, Suspense } from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { act, Component, type ReactNode, Suspense } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { atom, createScope, preset, ScopeProvider, useScope, useAtom, useSelect, useController } from '../src'
 
@@ -23,6 +24,10 @@ class ErrorBoundary extends Component<
     }
     return this.props.children
   }
+}
+
+async function clickButton(name: string) {
+  await userEvent.setup().click(screen.getByRole('button', { name }))
 }
 
 describe('ScopeProvider + useScope', () => {
@@ -231,7 +236,7 @@ describe('useAtom - invalidation', () => {
     expect(screen.getByTestId('value')).toHaveTextContent('value-1')
 
     await act(async () => {
-      screen.getByText('Invalidate').click()
+      await clickButton('Invalidate')
       await scope.flush()
     })
 
@@ -268,7 +273,7 @@ describe('useAtom - invalidation', () => {
     expect(screen.getByTestId('value')).toHaveTextContent('0')
 
     await act(async () => {
-      screen.getByText('Increment').click()
+      await clickButton('Increment')
       await scope.flush()
     })
 
@@ -277,7 +282,7 @@ describe('useAtom - invalidation', () => {
     })
 
     await act(async () => {
-      screen.getByText('Increment').click()
+      await clickButton('Increment')
       await scope.flush()
     })
 
@@ -328,7 +333,7 @@ describe('useSelect - equality filtering', () => {
     expect(screen.getByTestId('renders')).toHaveTextContent('1')
 
     await act(async () => {
-      screen.getByText('Update Age').click()
+      await clickButton('Update Age')
       await scope.flush()
     })
 
@@ -336,7 +341,7 @@ describe('useSelect - equality filtering', () => {
     expect(screen.getByTestId('name')).toHaveTextContent('Alice')
 
     await act(async () => {
-      screen.getByText('Update Name').click()
+      await clickButton('Update Name')
       await scope.flush()
     })
 
@@ -407,7 +412,7 @@ describe('useSelect - equality filtering', () => {
     expect(screen.getByTestId('renders')).toHaveTextContent('1')
 
     await act(async () => {
-      screen.getByText('Add Zero Item').click()
+      await clickButton('Add Zero Item')
       await scope.flush()
     })
 
@@ -415,7 +420,7 @@ describe('useSelect - equality filtering', () => {
     expect(screen.getByTestId('total')).toHaveTextContent('15')
 
     await act(async () => {
-      screen.getByText('Add Item').click()
+      await clickButton('Add Item')
       await scope.flush()
     })
 
@@ -630,7 +635,7 @@ describe('useSelect - state handling', () => {
     expect(screen.getByTestId('value')).toHaveTextContent('ok')
 
     await act(async () => {
-      screen.getByText('Refresh').click()
+      await clickButton('Refresh')
       await scope.flush().catch(() => {})
     })
 
@@ -717,7 +722,7 @@ describe('preset injection pattern', () => {
     }
     render(<ScopeProvider scope={scope2}><Counter /></ScopeProvider>)
     expect(screen.getByTestId('count')).toHaveTextContent('10')
-    await act(async () => { screen.getByText('Increment').click(); await scope2.flush() })
+    await act(async () => { await clickButton('Increment'); await scope2.flush() })
     expect(screen.getByTestId('count')).toHaveTextContent('11')
 
     type Config = { apiUrl: string }
@@ -1001,7 +1006,7 @@ describe('useAtom - non-Suspense mode', () => {
       expect(screen.getByTestId('error')).toHaveTextContent('none')
 
       await act(async () => {
-        screen.getByText('Refresh').click()
+        await clickButton('Refresh')
         await Promise.resolve()
       })
 
@@ -1053,7 +1058,7 @@ describe('useAtom - non-Suspense mode', () => {
     expect(screen.getByTestId('data')).toHaveTextContent('value-1')
 
     await act(async () => {
-      screen.getByText('Refresh').click()
+      await clickButton('Refresh')
       await scope.flush()
     })
 
@@ -1101,7 +1106,7 @@ describe('useAtom - non-Suspense mode', () => {
     expect(screen.getByTestId('loading')).toHaveTextContent('false')
 
     await act(async () => {
-      screen.getByText('Refresh').click()
+      await clickButton('Refresh')
       await Promise.resolve()
     })
 
@@ -1195,7 +1200,7 @@ describe('useController', () => {
     }
     render(<ScopeProvider scope={scope1}><SetTest /></ScopeProvider>)
     expect(screen.getByTestId('count')).toHaveTextContent('0')
-    await act(async () => { screen.getByText('Set to 42').click(); await scope1.flush() })
+    await act(async () => { await clickButton('Set to 42'); await scope1.flush() })
     await waitFor(() => { expect(screen.getByTestId('count')).toHaveTextContent('42') })
 
     const updAtom = atom({ factory: () => 5 })
@@ -1208,7 +1213,7 @@ describe('useController', () => {
     }
     render(<ScopeProvider scope={scope2}><UpdTest /></ScopeProvider>)
     expect(screen.getByTestId('ucount')).toHaveTextContent('5')
-    await act(async () => { screen.getByText('Double').click(); await scope2.flush() })
+    await act(async () => { await clickButton('Double'); await scope2.flush() })
     await waitFor(() => { expect(screen.getByTestId('ucount')).toHaveTextContent('10') })
   })
 })
