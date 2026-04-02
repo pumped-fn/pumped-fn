@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { atom, createScope, controller, type Lite } from '@pumped-fn/lite'
-import { mount, list, type MountHandle, $ } from '../src/index'
+import { mount, list, type MountHandle, $, useScope } from '../src/index'
 
 let scope: Lite.Scope
 let container: HTMLElement
@@ -231,5 +231,110 @@ describe('$ atom binding in JSX', () => {
     expect(after.length).toBe(2)
     expect(after[0].textContent).toBe('B2')
     expect(after[1].textContent).toBe('C')
+  })
+})
+
+describe('useScope() — component scope access', () => {
+  it('useScope() returns the mount scope', async () => {
+    const counter = atom({ factory: () => 0 })
+    await scope.resolve(counter)
+
+    function Counter() {
+      const s = useScope()
+      const ctrl = s.controller(counter)
+      return (
+        <div>
+          <span>{$(counter)}</span>
+          <button onClick={() => ctrl.set(ctrl.get() + 1)}>+</button>
+        </div>
+      )
+    }
+
+    handle = mount(<Counter />, container, scope)
+    expect(container.querySelector('span')!.textContent).toBe('0')
+
+    container.querySelector('button')!.click()
+    await scope.flush()
+    expect(container.querySelector('span')!.textContent).toBe('1')
+  })
+
+  it('different scopes for same component — testable', async () => {
+    const msg = atom({ factory: () => 'default' })
+
+    function Display() {
+      return <span>{$(msg)}</span>
+    }
+
+    const scope1 = createScope()
+    await scope1.resolve(msg)
+    scope1.controller(msg).set('scope-1')
+    await scope1.flush()
+
+    const scope2 = createScope()
+    await scope2.resolve(msg)
+    scope2.controller(msg).set('scope-2')
+    await scope2.flush()
+
+    const c1 = document.createElement('div')
+    const c2 = document.createElement('div')
+    const h1 = mount(<Display />, c1, scope1)
+    const h2 = mount(<Display />, c2, scope2)
+
+    expect(c1.textContent).toBe('scope-1')
+    expect(c2.textContent).toBe('scope-2')
+
+    h1.dispose()
+    h2.dispose()
+    await scope1.dispose()
+    await scope2.dispose()
+  })
+
+  it('useScope() in nested components', async () => {
+    const title = atom({ factory: () => 'Hello' })
+    const count = atom({ factory: () => 0 })
+    await scope.resolve(title)
+    await scope.resolve(count)
+
+    function Header() {
+      return <h1>{$(title)}</h1>
+    }
+
+    function Counter() {
+      const s = useScope()
+      return (
+        <div>
+          <span class="count">{$(count)}</span>
+          <button onClick={() => {
+            const ctrl = s.controller(count)
+            ctrl.set(ctrl.get() + 1)
+          }}>+</button>
+        </div>
+      )
+    }
+
+    function App() {
+      return (
+        <main>
+          <Header />
+          <Counter />
+        </main>
+      )
+    }
+
+    handle = mount(<App />, container, scope)
+    expect(container.querySelector('h1')!.textContent).toBe('Hello')
+    expect(container.querySelector('.count')!.textContent).toBe('0')
+
+    container.querySelector('button')!.click()
+    await scope.flush()
+    expect(container.querySelector('.count')!.textContent).toBe('1')
+
+    scope.controller(title).set('World')
+    await scope.flush()
+    expect(container.querySelector('h1')!.textContent).toBe('World')
+  })
+
+  it('useScope() throws outside mount', () => {
+    expect(() => useScope()).toThrow('useScope() called outside of mount()')
   })
 })

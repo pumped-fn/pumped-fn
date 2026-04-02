@@ -3,8 +3,12 @@ import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, type VNode } from './vnode'
 import { isAtomBinding, type AtomBinding } from './bind'
+import { setCurrentScope } from './scope-context'
+import { isLazyVNode, type LazyVNode } from './jsx-runtime'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
 export { $, type AtomBinding } from './bind'
+export { useScope } from './scope-context'
+export { type LazyVNode } from './jsx-runtime'
 
 export const VALUE_NULL = 0
 export const VALUE_FUNCTION = 1
@@ -14,7 +18,8 @@ export const VALUE_TEMPLATE = 4
 export const VALUE_VNODE = 5
 export const VALUE_STATIC = 6
 export const VALUE_ATOM_BIND = 7
-export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC | typeof VALUE_ATOM_BIND
+export const VALUE_LAZY = 8
+export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC | typeof VALUE_ATOM_BIND | typeof VALUE_LAZY
 
 export const DIRECTIVE_BRAND = Symbol('lite-ui-directive')
 
@@ -90,6 +95,7 @@ export function classifyValue(v: unknown): ValueKind {
   if (typeof v === 'function') return VALUE_FUNCTION
   if (typeof v === 'object') {
     if (isAtomBinding(v)) return VALUE_ATOM_BIND
+    if (isLazyVNode(v)) return VALUE_LAZY
     if (LIST_BRAND in (v as object)) return VALUE_LIST
     if (DIRECTIVE_BRAND in (v as object)) return VALUE_DIRECTIVE
     if (TEMPLATE_BRAND in (v as object)) return VALUE_TEMPLATE
@@ -606,6 +612,10 @@ export function mountTemplate(
         mountAtomBinding(value as AtomBinding, parentNode, comment, ctx)
         comment.remove()
         break
+      case VALUE_LAZY:
+        mountLazy(value as LazyVNode, parentNode, comment, ctx)
+        comment.remove()
+        break
       case VALUE_FUNCTION:
         mountReactiveText(value as () => unknown, parentNode, comment, ctx)
         comment.remove()
@@ -669,16 +679,37 @@ export function applyAttribute(el: Element, name: string, value: unknown): void 
   }
 }
 
-export function mount(tpl: Template | VNode, container: HTMLElement, scope: Lite.Scope): MountHandle {
+export function mountLazy(
+  lazy: LazyVNode,
+  parent: Node,
+  before: Node | null,
+  ctx: MountContext,
+): Node[] {
+  const resolved = lazy.component(lazy.props) as VNode | LazyVNode
+  if (isLazyVNode(resolved)) return mountLazy(resolved, parent, before, ctx)
+  if (isVNode(resolved)) return mountVNode(resolved, parent, before, ctx)
+  if (isTemplate(resolved)) return mountTemplate(resolved as unknown as Template, parent, before, ctx)
+  return []
+}
+
+export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement, scope: Lite.Scope): MountHandle {
   const ctx: MountContext = {
     scope,
     cleanups: [],
     reactiveBindings: [],
   }
 
-  const nodes = isVNode(tpl)
-    ? mountVNode(tpl, container, null, ctx)
-    : mountTemplate(tpl, container, null, ctx)
+  const prev = setCurrentScope(scope)
+  let nodes: Node[]
+  try {
+    nodes = isLazyVNode(tpl)
+      ? mountLazy(tpl, container, null, ctx)
+      : isVNode(tpl)
+        ? mountVNode(tpl, container, null, ctx)
+        : mountTemplate(tpl, container, null, ctx)
+  } finally {
+    setCurrentScope(prev)
+  }
 
   let disposed = false
 

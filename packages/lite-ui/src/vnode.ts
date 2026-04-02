@@ -3,11 +3,12 @@ import type { ReactiveBinding, MountContext, ValueKind } from './index'
 import {
   subscribeToControllers, isList, isTemplate, isDirective,
   mountListDirective, mountTemplate, applyAttribute, clearBetween,
-  mountAtomBinding, bindAtomAttr,
-  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC, VALUE_ATOM_BIND,
+  mountAtomBinding, bindAtomAttr, mountLazy,
+  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC, VALUE_ATOM_BIND, VALUE_LAZY,
   classifyValue,
 } from './index'
 import { isAtomBinding, type AtomBinding } from './bind'
+import { isLazyVNode, type LazyVNode } from './jsx-runtime'
 
 const VNODE_BRAND = Symbol('lite-ui-vnode')
 
@@ -74,6 +75,8 @@ function mountChildByKind(
       return []
     case VALUE_ATOM_BIND:
       return mountAtomBinding(child as AtomBinding, parent, before, ctx)
+    case VALUE_LAZY:
+      return mountLazy(child as LazyVNode, parent, before, ctx)
     case VALUE_VNODE:
       return mountVNode(child as VNode, parent, before, ctx)
     case VALUE_TEMPLATE:
