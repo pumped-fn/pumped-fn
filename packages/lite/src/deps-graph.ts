@@ -2,11 +2,12 @@ import { tagExecutorSymbol } from "./symbols"
 import { isAtom, isControllerDep } from "./atom"
 import type { Lite } from "./types"
 
-interface DepsGraph {
+export interface DepsGraph {
   atoms: [string, Lite.Atom<unknown>][]
   controllers: [string, Lite.ControllerDep<unknown>][]
   tags: [string, Lite.TagExecutor<unknown, boolean>][]
   resources: [string, Lite.Resource<unknown>][]
+  syncable: boolean
 }
 
 const depsGraphCache = new WeakMap<Record<string, Lite.Dependency>, DepsGraph>()
@@ -15,7 +16,7 @@ export function classifyDeps(deps: Record<string, Lite.Dependency>): DepsGraph {
   let cached = depsGraphCache.get(deps)
   if (cached) return cached
 
-  const graph: DepsGraph = { atoms: [], controllers: [], tags: [], resources: [] }
+  const graph: DepsGraph = { atoms: [], controllers: [], tags: [], resources: [], syncable: true }
   let hasNulls = false
 
   for (const key in deps) {
@@ -32,6 +33,7 @@ export function classifyDeps(deps: Record<string, Lite.Dependency>): DepsGraph {
       graph.tags.push([key, dep as Lite.TagExecutor<unknown, boolean>])
     } else {
       graph.resources.push([key, dep as Lite.Resource<unknown>])
+      graph.syncable = false
     }
   }
 
