@@ -4,6 +4,15 @@ import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, type VNode } from './vnode'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
 
+export const VALUE_NULL = 0
+export const VALUE_FUNCTION = 1
+export const VALUE_LIST = 2
+export const VALUE_DIRECTIVE = 3
+export const VALUE_TEMPLATE = 4
+export const VALUE_VNODE = 5
+export const VALUE_STATIC = 6
+export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC
+
 export const DIRECTIVE_BRAND = Symbol('lite-ui-directive')
 
 export interface Directive {
@@ -71,6 +80,18 @@ type RuntimeTemplate = Template & { readonly [TEMPLATE_BRAND]: true }
 
 export function isTemplate(v: unknown): v is Template {
   return v != null && typeof v === 'object' && TEMPLATE_BRAND in v
+}
+
+export function classifyValue(v: unknown): ValueKind {
+  if (v == null || v === false) return VALUE_NULL
+  if (typeof v === 'function') return VALUE_FUNCTION
+  if (typeof v === 'object') {
+    if (LIST_BRAND in (v as object)) return VALUE_LIST
+    if (DIRECTIVE_BRAND in (v as object)) return VALUE_DIRECTIVE
+    if (TEMPLATE_BRAND in (v as object)) return VALUE_TEMPLATE
+    if (isVNode(v)) return VALUE_VNODE
+  }
+  return VALUE_STATIC
 }
 
 export function html(strings: TemplateStringsArray, ...values: unknown[]): Template {
@@ -446,10 +467,8 @@ export function mountTemplate(
     const el = boundElements.get(index)
     if (!el) continue
     el.removeAttribute(`data-attr-${index}`)
-    const value = values[index]
-
-    if (typeof value === 'function') {
-      const fn = value as () => unknown
+    if (typeof values[index] === 'function') {
+      const fn = values[index] as () => unknown
       const { result: initial, controllers } = track(fn)
       applyAttribute(el, attrName, initial)
 
@@ -465,7 +484,7 @@ export function mountTemplate(
       ctx.reactiveBindings.push(binding)
       subscribeToControllers(binding, controllers)
     } else {
-      applyAttribute(el, attrName, value)
+      applyAttribute(el, attrName, values[index])
     }
   }
 
@@ -492,26 +511,35 @@ export function mountTemplate(
   for (const { comment, index } of slotComments) {
     const value = values[index]
     const parentNode = comment.parentNode!
-
-    if (typeof value === 'function') {
-      mountReactiveText(value as () => unknown, parentNode, comment, ctx)
-      comment.remove()
-    } else if (isList(value)) {
-      mountListDirective(value, parentNode, comment, ctx)
-      comment.remove()
-    } else if (isDirective(value)) {
-      const el = document.createElement('div')
-      el.style.display = 'contents'
-      parentNode.insertBefore(el, comment)
-      comment.remove()
-      value.mount(el, ctx)
-    } else if (isTemplate(value)) {
-      mountTemplate(value, parentNode, comment, ctx)
-      comment.remove()
-    } else {
-      const textNode = document.createTextNode(value == null ? '' : String(value))
-      parentNode.insertBefore(textNode, comment)
-      comment.remove()
+    switch (classifyValue(value)) {
+      case VALUE_FUNCTION:
+        mountReactiveText(value as () => unknown, parentNode, comment, ctx)
+        comment.remove()
+        break
+      case VALUE_LIST:
+        mountListDirective(value as ListDirective, parentNode, comment, ctx)
+        comment.remove()
+        break
+      case VALUE_DIRECTIVE:
+        {
+          const el = document.createElement('div')
+          el.style.display = 'contents'
+          parentNode.insertBefore(el, comment)
+          comment.remove()
+          ;(value as Directive).mount(el, ctx)
+        }
+        break
+      case VALUE_TEMPLATE:
+        mountTemplate(value as Template, parentNode, comment, ctx)
+        comment.remove()
+        break
+      default:
+        {
+          const textNode = document.createTextNode(value == null ? '' : String(value))
+          parentNode.insertBefore(textNode, comment)
+          comment.remove()
+        }
+        break
     }
   }
 
