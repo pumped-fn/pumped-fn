@@ -1,6 +1,7 @@
 import { controllerSymbol, tagExecutorSymbol } from "./symbols"
 import type { Lite, MaybePromise, AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
+import { classifyDeps } from "./deps-graph"
 import { shallowEqual } from "./equality"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
@@ -645,112 +646,113 @@ class ScopeImpl implements Lite.Scope {
   ): Promise<Record<string, unknown>> {
     if (!deps) return {}
 
+    const graph = classifyDeps(deps)
     const result: Record<string, unknown> = {}
     const parallel: Promise<void>[] = []
-    const deferredResources: [string, Lite.Resource<unknown>][] = []
 
-    for (const key in deps) {
-      const dep = deps[key]!
-      if (isAtom(dep)) {
-        const cachedEntry = this.cache.get(dep)
-        if (cachedEntry?.state === 'resolved') {
-          result[key] = cachedEntry.value
-          this.trackDependent(dep, dependentAtom)
+    for (let i = 0; i < graph.atoms.length; i++) {
+      const [key, dep] = graph.atoms[i]!
+      const cachedEntry = this.cache.get(dep)
+      if (cachedEntry?.state === 'resolved') {
+        result[key] = cachedEntry.value
+        this.trackDependent(dep, dependentAtom)
+      } else {
+        parallel.push(
+          this.resolve(dep).then(value => {
+            result[key] = value
+            this.trackDependent(dep, dependentAtom)
+          })
+        )
+      }
+    }
+
+    for (let i = 0; i < graph.controllers.length; i++) {
+      const [key, dep] = graph.controllers[i]!
+      if (dep.watch) {
+        if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
+        if (!dep.resolve) throw new Error("controller({ watch: true }) requires resolve: true")
+      }
+      const ctrl = this.controller(dep.atom)
+      if (dep.resolve) {
+        const cachedCtrlEntry = this.cache.get(dep.atom)
+        if (cachedCtrlEntry?.state === 'resolved') {
+          result[key] = ctrl
+          this.trackDependent(dep.atom, dependentAtom)
+          if (dep.watch) {
+            const eq = dep.eq ?? shallowEqual
+            let prev = ctrl.get() as unknown
+            const unsub = this.on("resolved", dep.atom, () => {
+              const next = ctrl.get() as unknown
+              if (!eq(prev, next)) {
+                this.scheduleInvalidation(dependentAtom!)
+              }
+              prev = next
+            })
+            this.getEntry(dependentAtom!)?.cleanups.push(unsub)
+          }
         } else {
           parallel.push(
-            this.resolve(dep).then(value => {
-              result[key] = value
-              this.trackDependent(dep, dependentAtom)
+            ctrl.resolve().then(() => {
+              result[key] = ctrl
+              this.trackDependent(dep.atom, dependentAtom)
+              if (dep.watch) {
+                const eq = dep.eq ?? shallowEqual
+                let prev = ctrl.get() as unknown
+                const unsub = this.on("resolved", dep.atom, () => {
+                  const next = ctrl.get() as unknown
+                  if (!eq(prev, next)) {
+                    this.scheduleInvalidation(dependentAtom!)
+                  }
+                  prev = next
+                })
+                this.getEntry(dependentAtom!)?.cleanups.push(unsub)
+              }
             })
           )
         }
-      } else if (isControllerDep(dep)) {
-        if (dep.watch) {
-          if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
-          if (!dep.resolve) throw new Error("controller({ watch: true }) requires resolve: true")
-        }
-        const ctrl = this.controller(dep.atom)
-        if (dep.resolve) {
-          const cachedCtrlEntry = this.cache.get(dep.atom)
-          if (cachedCtrlEntry?.state === 'resolved') {
-            result[key] = ctrl
-            this.trackDependent(dep.atom, dependentAtom)
-            if (dep.watch) {
-              const eq = dep.eq ?? shallowEqual
-              let prev = ctrl.get() as unknown
-              const unsub = this.on("resolved", dep.atom, () => {
-                const next = ctrl.get() as unknown
-                if (!eq(prev, next)) {
-                  this.scheduleInvalidation(dependentAtom!)
-                }
-                prev = next
-              })
-              this.getEntry(dependentAtom!)?.cleanups.push(unsub)
-            }
-          } else {
-            parallel.push(
-              ctrl.resolve().then(() => {
-                result[key] = ctrl
-                this.trackDependent(dep.atom, dependentAtom)
-                if (dep.watch) {
-                  const eq = dep.eq ?? shallowEqual
-                  let prev = ctrl.get() as unknown
-                  const unsub = this.on("resolved", dep.atom, () => {
-                    const next = ctrl.get() as unknown
-                    if (!eq(prev, next)) {
-                      this.scheduleInvalidation(dependentAtom!)
-                    }
-                    prev = next
-                  })
-                  this.getEntry(dependentAtom!)?.cleanups.push(unsub)
-                }
-              })
-            )
-          }
-        } else {
-          result[key] = ctrl
-          this.trackDependent(dep.atom, dependentAtom)
-        }
-      } else if (tagExecutorSymbol in (dep as object)) {
-        const tagExecutor = dep as Lite.TagExecutor<unknown, boolean>
-
-        switch (tagExecutor.mode) {
-          case "required": {
-            const value = ctx
-              ? ctx.data.seekTag(tagExecutor.tag)
-              : tagExecutor.tag.find(this.tags)
-            if (value !== undefined) {
-              result[key] = value
-            } else if (tagExecutor.tag.hasDefault) {
-              result[key] = tagExecutor.tag.defaultValue
-            } else {
-              throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
-            }
-            break
-          }
-          case "optional": {
-            const value = ctx
-              ? ctx.data.seekTag(tagExecutor.tag)
-              : tagExecutor.tag.find(this.tags)
-            result[key] = value ?? tagExecutor.tag.defaultValue
-            break
-          }
-          case "all": {
-            result[key] = ctx
-              ? this.collectFromHierarchy(ctx, tagExecutor.tag)
-              : tagExecutor.tag.collect(this.tags)
-            break
-          }
-        }
       } else {
-        deferredResources.push([key, dep as Lite.Resource<unknown>])
+        result[key] = ctrl
+        this.trackDependent(dep.atom, dependentAtom)
+      }
+    }
+
+    for (let i = 0; i < graph.tags.length; i++) {
+      const [key, tagExecutor] = graph.tags[i]!
+      switch (tagExecutor.mode) {
+        case "required": {
+          const value = ctx
+            ? ctx.data.seekTag(tagExecutor.tag)
+            : tagExecutor.tag.find(this.tags)
+          if (value !== undefined) {
+            result[key] = value
+          } else if (tagExecutor.tag.hasDefault) {
+            result[key] = tagExecutor.tag.defaultValue
+          } else {
+            throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
+          }
+          break
+        }
+        case "optional": {
+          const value = ctx
+            ? ctx.data.seekTag(tagExecutor.tag)
+            : tagExecutor.tag.find(this.tags)
+          result[key] = value ?? tagExecutor.tag.defaultValue
+          break
+        }
+        case "all": {
+          result[key] = ctx
+            ? this.collectFromHierarchy(ctx, tagExecutor.tag)
+            : tagExecutor.tag.collect(this.tags)
+          break
+        }
       }
     }
 
     if (parallel.length === 1) await parallel[0]
     else if (parallel.length > 1) await Promise.all(parallel)
 
-    for (const [key, resource] of deferredResources) {
+    for (let i = 0; i < graph.resources.length; i++) {
+      const [key, resource] = graph.resources[i]!
       if (!ctx) {
         throw new Error("Resource deps require an ExecutionContext")
       }
@@ -1312,3 +1314,4 @@ export function setControllerReadHook(fn: ((ctrl: Lite.Controller<unknown>) => v
 export function createScope(options?: Lite.ScopeOptions): Lite.Scope {
   return new ScopeImpl(options)
 }
+
