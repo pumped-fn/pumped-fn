@@ -9,6 +9,15 @@ import { ParseError } from "./errors"
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 
+async function runCleanupsSafe(cleanups: (() => MaybePromise<void>)[]): Promise<void> {
+  for (let i = cleanups.length - 1; i >= 0; i--) {
+    try {
+      const result = cleanups[i]?.()
+      if (result != null && typeof (result as any).then === 'function') await result
+    } catch {}
+  }
+}
+
 const resourceKeys = new WeakMap<Lite.Resource<unknown>, symbol>()
 let resourceKeyCounter = 0
 
@@ -729,16 +738,19 @@ class ScopeImpl implements Lite.Scope {
 
     const wasResolving = entry.state === 'resolving'
     if (!wasResolving) {
-      for (let i = entry.cleanups.length - 1; i >= 0; i--) {
-        try { await entry.cleanups[i]?.() } catch {}
+      if (entry.cleanups.length > 0) {
+        await runCleanupsSafe(entry.cleanups)
+        entry.cleanups = []
       }
-      entry.cleanups = []
       entry.state = 'resolving'
       this.emitStateChange('resolving', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolving')
     }
 
-    const resolvedDeps = await this.resolveDeps(atom.deps, undefined, atom)
+    const depsResult = this.resolveDepsOptimistic(atom.deps, undefined, atom)
+    const resolvedDeps = depsResult != null && typeof (depsResult as any).then === 'function'
+      ? await (depsResult as Promise<Record<string, unknown>>)
+      : depsResult as Record<string, unknown>
 
     const ctx: Lite.ResolveContext = {
       cleanup: (fn) => entry.cleanups.push(fn),
@@ -762,7 +774,8 @@ class ScopeImpl implements Lite.Scope {
     try {
       let value: T
       if (this.resolveExts.length === 0) {
-        value = atom.deps ? await factory(ctx, resolvedDeps) : await factory(ctx)
+        const raw = atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
+        value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<T>) : raw as T
       } else {
         const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
         const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
@@ -775,15 +788,7 @@ class ScopeImpl implements Lite.Scope {
       entry.resolvedPromise = Promise.resolve(value)
       this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-
-      if (entry.pendingInvalidate) {
-        entry.pendingInvalidate = false
-        this.invalidationChain?.delete(atom)
-        this.scheduleInvalidation(atom)
-      } else if (entry.pendingSet) {
-        this.invalidationChain?.delete(atom)
-        this.scheduleInvalidation(atom)
-      }
+      this.handlePostResolve(atom, entry)
 
       return value
     } catch (err) {
@@ -793,17 +798,7 @@ class ScopeImpl implements Lite.Scope {
       entry.hasValue = false
       this.emitStateChange('failed', atom)
       this.notifyEntryAll(entry as AtomEntry<unknown>)
-
-      if (entry.pendingInvalidate) {
-        entry.pendingInvalidate = false
-        this.invalidationChain?.delete(atom)
-        this.scheduleInvalidation(atom)
-      } else if (entry.pendingSet && 'value' in entry.pendingSet) {
-        this.invalidationChain?.delete(atom)
-        this.scheduleInvalidation(atom)
-      } else {
-        entry.pendingSet = undefined
-      }
+      this.handlePostResolveError(atom, entry)
 
       throw entry.error
     }
@@ -824,11 +819,11 @@ class ScopeImpl implements Lite.Scope {
     return next()
   }
 
-  async resolveDeps(
+  resolveDepsOptimistic(
     deps: Record<string, Lite.Dependency> | undefined,
-    ctx?: Lite.ExecutionContext,
-    dependentAtom?: Lite.Atom<unknown>
-  ): Promise<Record<string, unknown>> {
+    ctx: Lite.ExecutionContext | undefined,
+    dependentAtom: Lite.Atom<unknown> | undefined,
+  ): Record<string, unknown> | Promise<Record<string, unknown>> {
     if (!deps) return {}
 
     const graph = classifyDeps(deps)
@@ -864,16 +859,7 @@ class ScopeImpl implements Lite.Scope {
           result[key] = ctrl
           this.trackDependent(dep.atom, dependentAtom)
           if (dep.watch) {
-            const eq = dep.eq ?? shallowEqual
-            let prev = ctrl.get() as unknown
-            const unsub = this.on("resolved", dep.atom, () => {
-              const next = ctrl.get() as unknown
-              if (!eq(prev, next)) {
-                this.scheduleInvalidation(dependentAtom!)
-              }
-              prev = next
-            })
-            this.getEntry(dependentAtom!)?.cleanups.push(unsub)
+            this.wireWatch(dep, ctrl, dependentAtom!)
           }
         } else {
           parallel.push(
@@ -881,16 +867,7 @@ class ScopeImpl implements Lite.Scope {
               result[key] = ctrl
               this.trackDependent(dep.atom, dependentAtom)
               if (dep.watch) {
-                const eq = dep.eq ?? shallowEqual
-                let prev = ctrl.get() as unknown
-                const unsub = this.on("resolved", dep.atom, () => {
-                  const next = ctrl.get() as unknown
-                  if (!eq(prev, next)) {
-                    this.scheduleInvalidation(dependentAtom!)
-                  }
-                  prev = next
-                })
-                this.getEntry(dependentAtom!)?.cleanups.push(unsub)
+                this.wireWatch(dep, ctrl, dependentAtom!)
               }
             })
           )
@@ -933,14 +910,42 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
-    if (parallel.length === 1) await parallel[0]
-    else if (parallel.length > 1) await Promise.all(parallel)
+    if (graph.resources.length > 0) {
+      if (!ctx) throw new Error("Resource deps require an ExecutionContext")
+      const afterParallel = parallel.length > 0
+        ? (parallel.length === 1 ? parallel[0]!.then(() => {}) : Promise.all(parallel).then(() => {}))
+        : null
+      return this.resolveResourceDeps(graph, result, ctx, afterParallel)
+    }
+
+    if (parallel.length === 0) return result
+    if (parallel.length === 1) return parallel[0]!.then(() => result)
+    return Promise.all(parallel).then(() => result)
+  }
+
+  private wireWatch(dep: Lite.ControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {
+    const eq = dep.eq ?? shallowEqual
+    let prev = ctrl.get() as unknown
+    const unsub = this.on("resolved", dep.atom, () => {
+      const next = ctrl.get() as unknown
+      if (!eq(prev, next)) {
+        this.scheduleInvalidation(dependentAtom)
+      }
+      prev = next
+    })
+    this.getEntry(dependentAtom)?.cleanups.push(unsub)
+  }
+
+  private async resolveResourceDeps(
+    graph: DepsGraph,
+    result: Record<string, unknown>,
+    ctx: Lite.ExecutionContext,
+    afterParallel: Promise<void> | null,
+  ): Promise<Record<string, unknown>> {
+    if (afterParallel) await afterParallel
 
     for (let i = 0; i < graph.resources.length; i++) {
       const [key, resource] = graph.resources[i]!
-      if (!ctx) {
-        throw new Error("Resource deps require an ExecutionContext")
-      }
 
       const resourceKey = getResourceKey(resource)
       const storeCtx = ctx.parent ?? ctx
@@ -977,10 +982,14 @@ class ScopeImpl implements Lite.Scope {
         throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
       }
 
+      const scope = this
       const resolve = async () => {
         localResolvingResources.add(resourceKey)
         try {
-          const resourceDeps = await this.resolveDeps(resource.deps, ctx)
+          const depsResult = scope.resolveDepsOptimistic(resource.deps, ctx, undefined)
+          const resourceDeps = depsResult != null && typeof (depsResult as any).then === 'function'
+            ? await (depsResult as Promise<Record<string, unknown>>)
+            : depsResult as Record<string, unknown>
 
           const factory = resource.factory as (
             ctx: Lite.ExecutionContext,
@@ -988,12 +997,13 @@ class ScopeImpl implements Lite.Scope {
           ) => MaybePromise<unknown>
 
           let value: unknown
-          if (this.resolveExts.length === 0) {
-            value = resource.deps ? await factory(storeCtx, resourceDeps) : await factory(storeCtx)
+          if (scope.resolveExts.length === 0) {
+            const raw = resource.deps ? factory(storeCtx, resourceDeps) : factory(storeCtx)
+            value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<unknown>) : raw
           } else {
             const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: storeCtx }
             const doResolve = async () => resource.deps ? factory(storeCtx, resourceDeps) : factory(storeCtx)
-            value = await this.applyResolveExtensions(event, doResolve)
+            value = await scope.applyResolveExtensions(event, doResolve)
           }
           storeCtx.data.set(resourceKey, value)
           return value
@@ -1013,6 +1023,17 @@ class ScopeImpl implements Lite.Scope {
     }
 
     return result
+  }
+
+  async resolveDeps(
+    deps: Record<string, Lite.Dependency> | undefined,
+    ctx?: Lite.ExecutionContext,
+    dependentAtom?: Lite.Atom<unknown>
+  ): Promise<Record<string, unknown>> {
+    const r = this.resolveDepsOptimistic(deps, ctx, dependentAtom)
+    return r != null && typeof (r as any).then === 'function'
+      ? r as Promise<Record<string, unknown>>
+      : r as Record<string, unknown>
   }
 
   private collectFromHierarchy<T>(ctx: Lite.ExecutionContext, tag: Lite.Tag<T, boolean>): T[] {
@@ -1144,10 +1165,10 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
-    for (let i = entry.cleanups.length - 1; i >= 0; i--) {
-      try { await entry.cleanups[i]?.() } catch {}
+    if (entry.cleanups.length > 0) {
+      await runCleanupsSafe(entry.cleanups)
+      entry.cleanups = []
     }
-    entry.cleanups = []
 
     entry.state = "resolving"
     entry.value = previousValue
@@ -1174,9 +1195,7 @@ class ScopeImpl implements Lite.Scope {
       entry.gcScheduled = null
     }
 
-    for (let i = entry.cleanups.length - 1; i >= 0; i--) {
-      try { await entry.cleanups[i]?.() } catch {}
-    }
+    if (entry.cleanups.length > 0) await runCleanupsSafe(entry.cleanups)
 
     if (atom.deps) {
       for (const key in atom.deps) { const dep = atom.deps[key]!
@@ -1387,13 +1406,25 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private async execFlowInternal(flow: Lite.Flow<unknown, unknown>): Promise<unknown> {
-    const resolvedDeps = await this.scope.resolveDeps(flow.deps, this)
+  private execFlowInternal(flow: Lite.Flow<unknown, unknown>): MaybePromise<unknown> {
+    const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
       deps?: Record<string, unknown>
     ) => MaybePromise<unknown>
+
+    if (depsResult != null && typeof (depsResult as any).then === 'function') {
+      return (depsResult as Promise<Record<string, unknown>>).then((resolvedDeps) => {
+        if (this.scope.execExts.length === 0) {
+          return flow.deps ? factory(this, resolvedDeps) : factory(this)
+        }
+        const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
+        return this.applyExecExtensions(flow, doExec)
+      })
+    }
+
+    const resolvedDeps = depsResult as Record<string, unknown>
 
     if (this.scope.execExts.length === 0) {
       return flow.deps ? factory(this, resolvedDeps) : factory(this)

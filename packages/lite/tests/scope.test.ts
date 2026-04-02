@@ -934,13 +934,13 @@ describe("ExecutionContext", () => {
       await expect(ctrl.resolve()).rejects.toThrow("test error")
       expect(ctrl.state).toBe('failed')
 
+      let sawResolving = false
+      ctrl.on('resolving', () => { sawResolving = true })
+
       shouldFail = false
       ctrl.invalidate()
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(ctrl.state).toBe('resolving')
-
-      await new Promise(r => setTimeout(r, 10))
+      await scope.flush()
+      expect(sawResolving).toBe(true)
       expect(ctrl.state).toBe('resolved')
       expect(ctrl.get()).toBe("success")
     })
