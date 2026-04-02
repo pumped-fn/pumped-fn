@@ -3,9 +3,11 @@ import type { ReactiveBinding, MountContext, ValueKind } from './index'
 import {
   subscribeToControllers, isList, isTemplate, isDirective,
   mountListDirective, mountTemplate, applyAttribute, clearBetween,
-  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC,
+  mountAtomBinding, bindAtomAttr,
+  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC, VALUE_ATOM_BIND,
   classifyValue,
 } from './index'
+import { isAtomBinding, type AtomBinding } from './bind'
 
 const VNODE_BRAND = Symbol('lite-ui-vnode')
 
@@ -15,7 +17,7 @@ export interface VNode {
   props: Record<string, unknown> | null
   children: unknown[]
   childKinds: Uint8Array
-  propClassification: { events: [string, EventListener][]; reactive: [string, () => unknown][]; statics: [string, unknown][] } | null
+  propClassification: { events: [string, EventListener][]; reactive: [string, () => unknown][]; atomBinds: [string, AtomBinding][]; statics: [string, unknown][] } | null
 }
 
 export function createVNode(
@@ -30,18 +32,21 @@ export function createVNode(
   if (props) {
     const events: [string, EventListener][] = []
     const reactive: [string, () => unknown][] = []
+    const atomBinds: [string, AtomBinding][] = []
     const statics: [string, unknown][] = []
     for (const key of Object.keys(props)) {
       const value = props[key]
       if (isEventProp(key, value)) {
         events.push([key.slice(2).toLowerCase(), value as EventListener])
+      } else if (isAtomBinding(value)) {
+        atomBinds.push([key, value])
       } else if (typeof value === 'function') {
         reactive.push([key, value as () => unknown])
       } else {
         statics.push([key, value])
       }
     }
-    propClassification = { events, reactive, statics }
+    propClassification = { events, reactive, atomBinds, statics }
   }
 
   return { [VNODE_BRAND]: true, tag, props, children, childKinds, propClassification }
@@ -67,6 +72,8 @@ function mountChildByKind(
   switch (kind) {
     case VALUE_NULL:
       return []
+    case VALUE_ATOM_BIND:
+      return mountAtomBinding(child as AtomBinding, parent, before, ctx)
     case VALUE_VNODE:
       return mountVNode(child as VNode, parent, before, ctx)
     case VALUE_TEMPLATE:
@@ -158,6 +165,10 @@ export function mountVNode(
       const [eventName, handler] = pc.events[i]
       el.addEventListener(eventName, handler)
       ctx.cleanups.push(() => el.removeEventListener(eventName, handler))
+    }
+    for (let i = 0; i < pc.atomBinds.length; i++) {
+      const [key, ab] = pc.atomBinds[i]
+      bindAtomAttr(ab, el, key, ctx)
     }
     for (let i = 0; i < pc.reactive.length; i++) {
       const [key, fn] = pc.reactive[i]

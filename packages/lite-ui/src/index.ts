@@ -2,7 +2,9 @@ import { shallowEqual } from '@pumped-fn/lite'
 import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, type VNode } from './vnode'
+import { isAtomBinding, type AtomBinding } from './bind'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
+export { $, type AtomBinding } from './bind'
 
 export const VALUE_NULL = 0
 export const VALUE_FUNCTION = 1
@@ -11,7 +13,8 @@ export const VALUE_DIRECTIVE = 3
 export const VALUE_TEMPLATE = 4
 export const VALUE_VNODE = 5
 export const VALUE_STATIC = 6
-export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC
+export const VALUE_ATOM_BIND = 7
+export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC | typeof VALUE_ATOM_BIND
 
 export const DIRECTIVE_BRAND = Symbol('lite-ui-directive')
 
@@ -86,6 +89,7 @@ export function classifyValue(v: unknown): ValueKind {
   if (v == null || v === false) return VALUE_NULL
   if (typeof v === 'function') return VALUE_FUNCTION
   if (typeof v === 'object') {
+    if (isAtomBinding(v)) return VALUE_ATOM_BIND
     if (LIST_BRAND in (v as object)) return VALUE_LIST
     if (DIRECTIVE_BRAND in (v as object)) return VALUE_DIRECTIVE
     if (TEMPLATE_BRAND in (v as object)) return VALUE_TEMPLATE
@@ -173,6 +177,89 @@ export function clearBetween(startMarker: Comment, endMarker: Comment): void {
   while (startMarker.nextSibling && startMarker.nextSibling !== endMarker) {
     startMarker.nextSibling.remove()
   }
+}
+
+export function mountAtomBinding(
+  binding: AtomBinding,
+  parent: Node,
+  before: Node | null,
+  ctx: MountContext,
+): Node[] {
+  const scope = ctx.scope
+  const { atom, selector } = binding
+  const ctrl = scope.controller(atom)
+
+  const startMarker = document.createComment('')
+  const endMarker = document.createComment('')
+  parent.insertBefore(startMarker, before)
+  parent.insertBefore(endMarker, before)
+
+  const read = selector
+    ? () => selector(ctrl.get())
+    : () => ctrl.get()
+
+  const resolved = ctrl.state === 'resolved'
+  const initial = resolved ? read() : undefined
+  const initialNodes = resolved ? renderValue(initial, parent, endMarker, ctx) : []
+
+  const rb: ReactiveBinding = {
+    fn: read,
+    prev: initial,
+    update(val: unknown) {
+      clearBetween(startMarker, endMarker)
+      renderValue(val, parent, endMarker, ctx)
+    },
+    alive: true,
+    unsubs: [],
+  }
+  ctx.reactiveBindings.push(rb)
+
+  rb.unsubs.push(scope.on('resolved', atom, () => {
+    if (!rb.alive) return
+    const next = read()
+    if (next !== rb.prev) {
+      rb.prev = next
+      rb.update(next)
+    }
+  }))
+
+  return [startMarker, ...initialNodes, endMarker]
+}
+
+export function bindAtomAttr(
+  binding: AtomBinding,
+  el: Element,
+  attrName: string,
+  ctx: MountContext,
+): void {
+  const scope = ctx.scope
+  const { atom, selector } = binding
+  const ctrl = scope.controller(atom)
+
+  const read = selector
+    ? () => selector(ctrl.get())
+    : () => ctrl.get()
+
+  const initial = ctrl.state === 'resolved' ? read() : undefined
+  applyAttribute(el, attrName, initial)
+
+  const rb: ReactiveBinding = {
+    fn: read,
+    prev: initial,
+    update(val: unknown) { applyAttribute(el, attrName, val) },
+    alive: true,
+    unsubs: [],
+  }
+  ctx.reactiveBindings.push(rb)
+
+  rb.unsubs.push(scope.on('resolved', atom, () => {
+    if (!rb.alive) return
+    const next = read()
+    if (next !== rb.prev) {
+      rb.prev = next
+      rb.update(next)
+    }
+  }))
 }
 
 function mountReactiveText(
@@ -467,8 +554,11 @@ export function mountTemplate(
     const el = boundElements.get(index)
     if (!el) continue
     el.removeAttribute(`data-attr-${index}`)
-    if (typeof values[index] === 'function') {
-      const fn = values[index] as () => unknown
+    const attrVal = values[index]
+    if (isAtomBinding(attrVal)) {
+      bindAtomAttr(attrVal, el, attrName, ctx)
+    } else if (typeof attrVal === 'function') {
+      const fn = attrVal as () => unknown
       const { result: initial, controllers } = track(fn)
       applyAttribute(el, attrName, initial)
 
@@ -484,7 +574,7 @@ export function mountTemplate(
       ctx.reactiveBindings.push(binding)
       subscribeToControllers(binding, controllers)
     } else {
-      applyAttribute(el, attrName, values[index])
+      applyAttribute(el, attrName, attrVal)
     }
   }
 
@@ -512,6 +602,10 @@ export function mountTemplate(
     const value = values[index]
     const parentNode = comment.parentNode!
     switch (classifyValue(value)) {
+      case VALUE_ATOM_BIND:
+        mountAtomBinding(value as AtomBinding, parentNode, comment, ctx)
+        comment.remove()
+        break
       case VALUE_FUNCTION:
         mountReactiveText(value as () => unknown, parentNode, comment, ctx)
         comment.remove()
