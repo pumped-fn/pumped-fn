@@ -202,18 +202,15 @@ describe('$ atom binding in JSX', () => {
     expect(container.querySelector('.atom')!.textContent).toBe('Bob')
   })
 
-  it('list with $ and closure hybrid', async () => {
-    const data = atom({ factory: () => [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] })
+  it('$ list binding with keyed reconciliation', async () => {
+    type Row = { id: number; name: string }
+    const data = atom({ factory: () => [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] as Row[] })
     await scope.resolve(data)
     const ctrl = scope.controller(data)
 
     handle = mount(
       <div>
-        {list(
-          () => ctrl.get(),
-          row => row.id,
-          (_row, getItem) => <span>{() => getItem().name}</span>,
-        )}
+        {$(data, (row: Row) => row.id, (_row: Row, getItem: () => Row) => <span>{() => getItem().name}</span>)}
       </div>,
       container,
       scope,
