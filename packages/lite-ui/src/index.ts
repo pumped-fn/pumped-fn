@@ -2,13 +2,15 @@ import { shallowEqual } from '@pumped-fn/lite'
 import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, createVNode, type VNode } from './vnode'
-import { isAtomBinding, isAtomListBinding, type AtomBinding, type AtomListBinding, type AnyAtomBinding } from './bind'
+import { isAtomBinding, isAtomListBinding, isAtomsCtrlBinding, type AtomBinding, type AtomListBinding, type AnyAtomBinding, type AtomsCtrlBinding } from './bind'
 import { pushScope, popScope, useScope } from './scope-context'
 import { isLazyVNode, type LazyVNode } from './jsx-runtime'
+import { type AtomsCtrl } from './atoms'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
-export { $, type AtomBinding } from './bind'
+export { $, type AtomBinding, type AtomsCtrlBinding } from './bind'
 export { useScope } from './scope-context'
 export { type LazyVNode } from './jsx-runtime'
+export { atoms, isAtomsCtrl, type AtomsCtrl } from './atoms'
 
 export const VALUE_NULL = 0
 export const VALUE_FUNCTION = 1
@@ -19,7 +21,8 @@ export const VALUE_VNODE = 5
 export const VALUE_STATIC = 6
 export const VALUE_ATOM_BIND = 7
 export const VALUE_LAZY = 8
-export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC | typeof VALUE_ATOM_BIND | typeof VALUE_LAZY
+export const VALUE_ATOMS_CTRL = 9
+export type ValueKind = typeof VALUE_NULL | typeof VALUE_FUNCTION | typeof VALUE_LIST | typeof VALUE_DIRECTIVE | typeof VALUE_TEMPLATE | typeof VALUE_VNODE | typeof VALUE_STATIC | typeof VALUE_ATOM_BIND | typeof VALUE_LAZY | typeof VALUE_ATOMS_CTRL
 
 export const DIRECTIVE_BRAND = Symbol('lite-ui-directive')
 
@@ -94,6 +97,7 @@ export function classifyValue(v: unknown): ValueKind {
   if (v == null || v === false) return VALUE_NULL
   if (typeof v === 'function') return VALUE_FUNCTION
   if (typeof v === 'object') {
+    if (isAtomsCtrlBinding(v)) return VALUE_ATOMS_CTRL
     if (isAtomBinding(v)) return VALUE_ATOM_BIND
     if (isLazyVNode(v)) return VALUE_LAZY
     if (LIST_BRAND in (v as object)) return VALUE_LIST
@@ -183,6 +187,92 @@ export function clearBetween(startMarker: Comment, endMarker: Comment): void {
   while (startMarker.nextSibling && startMarker.nextSibling !== endMarker) {
     startMarker.nextSibling.remove()
   }
+}
+
+export function mountAtomsCtrlBinding(
+  binding: AtomsCtrlBinding,
+  parent: Node,
+  before: Node | null,
+  ctx: MountContext,
+): Node[] {
+  const { ctrl, renderFn } = binding as AtomsCtrlBinding<unknown>
+  const startMarker = document.createComment('')
+  const endMarker = document.createComment('')
+  parent.insertBefore(startMarker, before)
+  parent.insertBefore(endMarker, before)
+
+  interface ItemEntry {
+    nodes: Node[]
+    signal: ItemSignal<unknown>
+    unsub: () => void
+    itemCtx: MountContext
+  }
+
+  const keyMap = new Map<string | number, ItemEntry>()
+
+  function mountItem(key: string | number): ItemEntry {
+    const signal = createItemSignal(ctrl.get(key))
+    const unsub = ctrl.onItem(key, () => { signal.set(ctrl.get(key)) })
+    const frag = document.createDocumentFragment()
+    const rendered = renderFn(key, signal.get.bind(signal))
+    const itemCtx: MountContext = { scope: ctx.scope, cleanups: [], reactiveBindings: [] }
+    let nodes: Node[]
+    if (isLazyVNode(rendered)) nodes = mountLazy(rendered, frag, null, itemCtx)
+    else if (isVNode(rendered)) nodes = mountVNode(rendered, frag, null, itemCtx)
+    else nodes = mountTemplate(rendered as Template, frag, null, itemCtx)
+    for (const b of itemCtx.reactiveBindings) ctx.reactiveBindings.push(b)
+    parent.insertBefore(frag, endMarker)
+    return { nodes, signal, unsub, itemCtx }
+  }
+
+  function unmountItem(key: string | number) {
+    const entry = keyMap.get(key)
+    if (!entry) return
+    entry.unsub()
+    for (const b of entry.itemCtx.reactiveBindings) {
+      b.alive = false
+      for (const u of b.unsubs) u()
+      b.unsubs.length = 0
+    }
+    for (const cleanup of entry.itemCtx.cleanups) cleanup()
+    for (const node of entry.nodes) (node as ChildNode).remove()
+    keyMap.delete(key)
+  }
+
+  for (const key of ctrl.keys()) {
+    keyMap.set(key, mountItem(key))
+  }
+
+  const unsubStructure = ctrl.onStructure(() => {
+    const newKeys = ctrl.keys()
+    const newKeySet = new Set(newKeys)
+
+    for (const key of [...keyMap.keys()]) {
+      if (!newKeySet.has(key)) unmountItem(key)
+    }
+
+    for (const key of newKeys) {
+      if (!keyMap.has(key)) keyMap.set(key, mountItem(key))
+    }
+
+    let anchor: Node = endMarker
+    for (let i = newKeys.length - 1; i >= 0; i--) {
+      const entry = keyMap.get(newKeys[i])!
+      if (entry.nodes[entry.nodes.length - 1].nextSibling !== anchor) {
+        for (let j = entry.nodes.length - 1; j >= 0; j--) {
+          parent.insertBefore(entry.nodes[j], anchor)
+        }
+      }
+      anchor = entry.nodes[0]
+    }
+  })
+
+  ctx.cleanups.push(() => {
+    unsubStructure()
+    for (const key of [...keyMap.keys()]) unmountItem(key)
+  })
+
+  return [startMarker, endMarker]
 }
 
 export function mountAtomBinding(
@@ -713,8 +803,8 @@ export function mountTemplate(
     if (!el) continue
     el.removeAttribute(`data-attr-${index}`)
     const attrVal = values[index]
-    if (isAtomBinding(attrVal)) {
-      bindAtomAttr(attrVal, el, attrName, ctx)
+    if (isAtomBinding(attrVal) && !isAtomListBinding(attrVal)) {
+      bindAtomAttr(attrVal as AtomBinding, el, attrName, ctx)
     } else if (typeof attrVal === 'function') {
       const fn = attrVal as () => unknown
       const { result: initial, controllers } = track(fn)
@@ -760,6 +850,10 @@ export function mountTemplate(
     const value = values[index]
     const parentNode = comment.parentNode!
     switch (classifyValue(value)) {
+      case VALUE_ATOMS_CTRL:
+        mountAtomsCtrlBinding(value as AtomsCtrlBinding, parentNode, comment, ctx)
+        comment.remove()
+        break
       case VALUE_ATOM_BIND:
         mountAtomBinding(value as AtomBinding, parentNode, comment, ctx)
         comment.remove()

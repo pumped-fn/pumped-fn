@@ -3,11 +3,11 @@ import type { ReactiveBinding, MountContext, ValueKind } from './index'
 import {
   subscribeToControllers, isList, isTemplate, isDirective,
   mountListDirective, mountTemplate, applyAttribute, clearBetween,
-  mountAtomBinding, bindAtomAttr, mountLazy,
-  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC, VALUE_ATOM_BIND, VALUE_LAZY,
+  mountAtomBinding, bindAtomAttr, mountLazy, mountAtomsCtrlBinding,
+  VALUE_NULL, VALUE_FUNCTION, VALUE_LIST, VALUE_DIRECTIVE, VALUE_TEMPLATE, VALUE_VNODE, VALUE_STATIC, VALUE_ATOM_BIND, VALUE_LAZY, VALUE_ATOMS_CTRL,
   classifyValue,
 } from './index'
-import { isAtomBinding, type AtomBinding } from './bind'
+import { isAtomBinding, isAtomsCtrlBinding, type AtomBinding, type AtomsCtrlBinding } from './bind'
 import { isLazyVNode, type LazyVNode } from './jsx-runtime'
 
 const VNODE_BRAND = Symbol('lite-ui-vnode')
@@ -39,8 +39,8 @@ export function createVNode(
       const value = props[key]
       if (isEventProp(key, value)) {
         events.push([key.slice(2).toLowerCase(), value as EventListener])
-      } else if (isAtomBinding(value)) {
-        atomBinds.push([key, value])
+      } else if (isAtomBinding(value) && !isAtomsCtrlBinding(value)) {
+        atomBinds.push([key, value as AtomBinding])
       } else if (typeof value === 'function') {
         reactive.push([key, value as () => unknown])
       } else {
@@ -73,6 +73,8 @@ function mountChildByKind(
   switch (kind) {
     case VALUE_NULL:
       return []
+    case VALUE_ATOMS_CTRL:
+      return mountAtomsCtrlBinding(child as AtomsCtrlBinding, parent, before, ctx)
     case VALUE_ATOM_BIND:
       return mountAtomBinding(child as AtomBinding, parent, before, ctx)
     case VALUE_LAZY:
@@ -155,7 +157,7 @@ export function mountVNode(
     const nodes: Node[] = []
     const { children, childKinds } = vnode
     for (let i = 0; i < children.length; i++) {
-      nodes.push(...mountChildByKind(children[i], childKinds[i], parent, before, ctx))
+      nodes.push(...mountChildByKind(children[i], childKinds[i] as ValueKind, parent, before, ctx))
     }
     return nodes
   }
@@ -198,7 +200,7 @@ export function mountVNode(
 
   const { children, childKinds } = vnode
   for (let i = 0; i < children.length; i++) {
-    mountChildByKind(children[i], childKinds[i], el, null, ctx)
+    mountChildByKind(children[i], childKinds[i] as ValueKind, el, null, ctx)
   }
 
   parent.insertBefore(el, before)

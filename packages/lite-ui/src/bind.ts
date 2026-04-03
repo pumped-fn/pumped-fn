@@ -1,8 +1,11 @@
 import type { Lite } from '@pumped-fn/lite'
 import type { VNode } from './vnode'
 import type { Template } from './index'
+import type { LazyVNode } from './jsx-runtime'
+import { type AtomsCtrl, isAtomsCtrl } from './atoms'
 
 const BIND_BRAND = Symbol('lite-ui-bind')
+const ATOMS_BIND_BRAND = Symbol('lite-ui-atoms-bind')
 
 export interface AtomBinding<S = unknown> {
   readonly [BIND_BRAND]: true
@@ -22,6 +25,16 @@ export interface AtomListBinding<T = unknown> {
 
 export type AnyAtomBinding = AtomBinding | AtomListBinding
 
+export interface AtomsCtrlBinding<T = unknown> {
+  readonly [ATOMS_BIND_BRAND]: true
+  readonly ctrl: AtomsCtrl<T>
+  readonly renderFn: (key: string | number, getItem: () => T) => Template | VNode | LazyVNode
+}
+
+export function isAtomsCtrlBinding(v: unknown): v is AtomsCtrlBinding {
+  return v != null && typeof v === 'object' && ATOMS_BIND_BRAND in (v as object)
+}
+
 export function $<T>(atom: Lite.Atom<T>): AtomBinding<T>
 export function $<T, S>(atom: Lite.Atom<T>, selector: (value: T) => S): AtomBinding<S>
 export function $<T>(
@@ -29,24 +42,35 @@ export function $<T>(
   keyFn: (item: T) => string | number,
   renderFn: (item: T, getItem: () => T) => Template | VNode,
 ): AtomListBinding<T>
+export function $<T>(
+  ctrl: AtomsCtrl<T>,
+  renderFn: (key: string | number, getItem: () => T) => Template | VNode | LazyVNode,
+): AtomsCtrlBinding<T>
 export function $(
-  atom: Lite.Atom<unknown>,
-  selectorOrKeyFn?: ((value: unknown) => unknown) | ((item: unknown) => string | number),
+  atomOrCtrl: Lite.Atom<unknown> | AtomsCtrl<unknown>,
+  selectorOrKeyFnOrRenderFn?: ((value: unknown) => unknown) | ((item: unknown) => string | number) | ((key: string | number, getItem: () => unknown) => Template | VNode | LazyVNode),
   renderFn?: (item: unknown, getItem: () => unknown) => Template | VNode,
-): AnyAtomBinding {
+): AnyAtomBinding | AtomsCtrlBinding {
+  if (isAtomsCtrl(atomOrCtrl)) {
+    return {
+      [ATOMS_BIND_BRAND]: true,
+      ctrl: atomOrCtrl,
+      renderFn: selectorOrKeyFnOrRenderFn as (key: string | number, getItem: () => unknown) => Template | VNode | LazyVNode,
+    }
+  }
   if (renderFn) {
     return {
       [BIND_BRAND]: true,
-      atom,
+      atom: atomOrCtrl as Lite.Atom<unknown>,
       selector: undefined,
-      keyFn: selectorOrKeyFn as (item: unknown) => string | number,
+      keyFn: selectorOrKeyFnOrRenderFn as (item: unknown) => string | number,
       renderFn,
     }
   }
   return {
     [BIND_BRAND]: true,
-    atom,
-    selector: selectorOrKeyFn as ((value: unknown) => unknown) | undefined,
+    atom: atomOrCtrl as Lite.Atom<unknown>,
+    selector: selectorOrKeyFnOrRenderFn as ((value: unknown) => unknown) | undefined,
     keyFn: undefined,
     renderFn: undefined,
   }
