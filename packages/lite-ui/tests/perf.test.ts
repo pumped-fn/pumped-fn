@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { atom, createScope, type Lite } from '@pumped-fn/lite'
-import { html, mount, list, type MountHandle } from '../src/index'
+import { html, mount, list, $, atoms, type MountHandle } from '../src/index'
+import type { AtomsCtrl } from '../src/atoms'
 
 const adjectives = ['pretty', 'large', 'big', 'small', 'tall', 'short', 'long', 'handsome', 'plain', 'quaint']
 const colors = ['red', 'yellow', 'blue', 'green', 'pink', 'brown', 'purple', 'white', 'black', 'orange']
@@ -22,6 +23,18 @@ function mountTable(scope: Lite.Scope, container: HTMLElement, ctrl: Lite.Contro
     row => row.id,
     row => html`<div data-id=${row.id}><span>${row.id}</span><span>${row.label}</span></div>`,
   )}</div>`, container, scope)
+}
+
+function mountReactiveTable(scope: Lite.Scope, container: HTMLElement, ctrl: Lite.Controller<Row[]>) {
+  return mount(html`<div>${list(
+    () => ctrl.get(),
+    row => row.id,
+    (row, getItem) => html`<div data-id=${row.id}><span>${() => getItem().label}</span></div>`,
+  )}</div>`, container, scope)
+}
+
+function mountAtomsTable(scope: Lite.Scope, container: HTMLElement, ctrl: AtomsCtrl<Row>) {
+  return mount(html`<div>${$(ctrl, (key, getItem) => html`<div data-id=${key}><span>${() => getItem().label}</span></div>`)}</div>`, container, scope)
 }
 
 async function measure(fn: () => Promise<void>, warmup = 3, runs = 10): Promise<number> {
@@ -152,5 +165,88 @@ describe('performance baseline', { timeout: 30000 }, () => {
     })
     console.log(`METRIC append_1000_ms=${ms.toFixed(1)}`)
     expect(ms).toBeLessThan(800)
+  })
+})
+
+describe('atoms() vs list() — partial update and remove', { timeout: 30000 }, () => {
+  it('partial update 100/1000 — list (reactive getItem)', async () => {
+    nextId = 1
+    const scope = createScope()
+    const data = buildData(1000)
+    const dataAtom = atom({ factory: () => data })
+    await scope.resolve(dataAtom)
+    const ctrl = scope.controller(dataAtom)
+    const container = document.createElement('div')
+    const handle = mountReactiveTable(scope, container, ctrl)
+
+    const ms = await measure(async () => {
+      const current = ctrl.get()
+      ctrl.set(current.map((r, i) => i % 10 === 0 ? { ...r, label: r.label + '!' } : r))
+      await scope.flush()
+    }, 3, 20)
+
+    console.log(`METRIC partial_update_list_ms=${ms.toFixed(2)}`)
+    handle.dispose()
+    await scope.dispose()
+    expect(ms).toBeLessThan(100)
+  })
+
+  it('partial update 100/1000 — atoms (direct item update)', async () => {
+    nextId = 1
+    const scope = createScope()
+    const ctrl = atoms<Row>(r => r.id, buildData(1000))
+    const container = document.createElement('div')
+    const handle = mountAtomsTable(scope, container, ctrl)
+
+    const ms = await measure(async () => {
+      const keys = ctrl.keys()
+      for (let i = 0; i < keys.length; i += 10) {
+        ctrl.update(keys[i], r => ({ ...r, label: r.label + '!' }))
+      }
+    }, 3, 20)
+
+    console.log(`METRIC partial_update_atoms_ms=${ms.toFixed(2)}`)
+    handle.dispose()
+    await scope.dispose()
+    expect(ms).toBeLessThan(50)
+  })
+
+  it('remove one row — list', async () => {
+    nextId = 1
+    const scope = createScope()
+    const data = buildData(1000)
+    const dataAtom = atom({ factory: () => data })
+    await scope.resolve(dataAtom)
+    const ctrl = scope.controller(dataAtom)
+    const container = document.createElement('div')
+    const handle = mountReactiveTable(scope, container, ctrl)
+
+    const ms = await measure(async () => {
+      ctrl.set(ctrl.get().filter((_, i) => i !== 499))
+      await scope.flush()
+    }, 2, 10)
+
+    console.log(`METRIC remove_one_list_ms=${ms.toFixed(2)}`)
+    handle.dispose()
+    await scope.dispose()
+    expect(ms).toBeLessThan(50)
+  })
+
+  it('remove one row — atoms (direct remove)', async () => {
+    nextId = 1
+    const scope = createScope()
+    const ctrl = atoms<Row>(r => r.id, buildData(1000))
+    const container = document.createElement('div')
+    const handle = mountAtomsTable(scope, container, ctrl)
+
+    const ms = await measure(async () => {
+      const keys = ctrl.keys()
+      ctrl.remove(keys[Math.floor(keys.length / 2)])
+    }, 2, 10)
+
+    console.log(`METRIC remove_one_atoms_ms=${ms.toFixed(2)}`)
+    handle.dispose()
+    await scope.dispose()
+    expect(ms).toBeLessThan(10)
   })
 })
