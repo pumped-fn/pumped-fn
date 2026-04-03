@@ -19,6 +19,7 @@ export { resource, isResource } from "./resource"
 export { service } from "./service"
 export { createScope, setControllerReadHook } from "./scope"
 export { shallowEqual } from "./equality"
+export { registerInTracker, startArrayTracking, stopArrayTracking, startTracking, stopTracking } from "./tracker"
 export { ParseError } from "./errors"
 
 export const VERSION = "0.0.1"
