@@ -10,16 +10,14 @@ export {
   tagExecutorSymbol,
   typedSymbol,
   resourceSymbol,
-} from "./symbols"
+  ParseError,
+} from "./types"
 export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags } from "./tag"
-export { atom, isAtom, controller, isControllerDep } from "./atom"
+export { atom, isAtom, controller, isControllerDep, service } from "./atom"
 export { flow, isFlow, typed } from "./flow"
 export { preset, isPreset } from "./preset"
 export { resource, isResource } from "./resource"
-export { service } from "./service"
-export { createScope, setControllerReadHook } from "./scope"
-export { shallowEqual } from "./equality"
+export { createScope, setControllerReadHook, shallowEqual } from "./scope"
 export { registerInTracker, startArrayTracking, stopArrayTracking, startTracking, stopTracking } from "./tracker"
-export { ParseError } from "./errors"
 
 export const VERSION = "0.0.1"

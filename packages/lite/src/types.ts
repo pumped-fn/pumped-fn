@@ -1,15 +1,26 @@
-import type {
-  atomSymbol,
-  flowSymbol,
-  tagSymbol,
-  taggedSymbol,
-  controllerDepSymbol,
-  presetSymbol,
-  controllerSymbol,
-  tagExecutorSymbol,
-  typedSymbol,
-  resourceSymbol,
-} from "./symbols"
+export const atomSymbol: unique symbol = Symbol.for("@pumped-fn/lite/atom")
+export const flowSymbol: unique symbol = Symbol.for("@pumped-fn/lite/flow")
+export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag")
+export const taggedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tagged")
+export const controllerDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller-dep")
+export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/lite/preset")
+export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller")
+export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
+export const typedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/typed")
+export const resourceSymbol: unique symbol = Symbol.for("@pumped-fn/lite/resource")
+
+export class ParseError extends Error {
+  override readonly name = "ParseError"
+
+  constructor(
+    message: string,
+    readonly phase: "tag" | "flow-input",
+    readonly label: string,
+    override readonly cause: unknown
+  ) {
+    super(message)
+  }
+}
 
 export type MaybePromise<T> = T | Promise<T>
 
@@ -80,7 +91,6 @@ export namespace Lite {
    * Unified context data storage with both raw Map operations and Tag-based DX.
    */
   export interface ContextData {
-    // Raw Map operations (string | symbol keys)
     /** Get value by key */
     get(key: string | symbol): unknown
     /** Set value by key */
@@ -106,7 +116,6 @@ export namespace Lite {
      */
     seekHas(key: string | symbol): boolean
 
-    // Tag-based operations (type-safe DX)
     /** Get value by tag, returns undefined if not stored */
     getTag<T>(tag: Tag<T, boolean>): T | undefined
     /** Set value by tag */

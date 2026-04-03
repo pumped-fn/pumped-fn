@@ -1,5 +1,4 @@
-import { resourceSymbol } from "./symbols"
-import type { Lite, MaybePromise } from "./types"
+import { resourceSymbol, type Lite, type MaybePromise } from "./types"
 
 /**
  * Creates an execution-scoped dependency that is resolved per execution chain.

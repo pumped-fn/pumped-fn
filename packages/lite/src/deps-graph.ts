@@ -1,6 +1,5 @@
-import { tagExecutorSymbol } from "./symbols"
+import { tagExecutorSymbol, type Lite } from "./types"
 import { isAtom, isControllerDep } from "./atom"
-import type { Lite } from "./types"
 
 export interface DepsGraph {
   atoms: [string, Lite.Atom<unknown>][]

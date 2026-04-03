@@ -1254,7 +1254,7 @@ describe("ExecutionContext", () => {
     it("parses input, throws ParseError with labels, and supports async parse", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
-      const { ParseError } = await import("../src/errors")
+      const { ParseError } = await import("../src/types")
 
       const parseOrder: string[] = []
       const syncFlow = flow({
@@ -1295,7 +1295,7 @@ describe("ExecutionContext", () => {
     it("rawInput: passes to parse, works without parse, and throws ParseError on failure", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
-      const { ParseError } = await import("../src/errors")
+      const { ParseError } = await import("../src/types")
 
       const rawParseFlow = flow({
         name: "parseFlow",

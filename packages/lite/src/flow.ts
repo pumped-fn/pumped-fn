@@ -1,6 +1,5 @@
-import { flowSymbol, typedSymbol } from "./symbols"
+import { flowSymbol, typedSymbol, type Lite, type MaybePromise } from "./types"
 import { warmDepsGraph } from "./deps-graph"
-import type { Lite, MaybePromise } from "./types"
 
 /**
  * Type marker for flow input without runtime parsing.

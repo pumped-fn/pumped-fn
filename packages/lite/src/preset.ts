@@ -1,5 +1,4 @@
-import { presetSymbol } from "./symbols"
-import type { Lite, MaybePromise } from "./types"
+import { presetSymbol, type Lite, type MaybePromise } from "./types"
 import { isAtom } from "./atom"
 import { isFlow } from "./flow"
 

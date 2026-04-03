@@ -1,6 +1,4 @@
-import { tagSymbol, taggedSymbol, tagExecutorSymbol } from "./symbols"
-import { ParseError } from "./errors"
-import type { Lite } from "./types"
+import { tagSymbol, taggedSymbol, tagExecutorSymbol, ParseError, type Lite } from "./types"
 
 export interface TagOptions<T, HasDefault extends boolean> {
   label: string
@@ -33,19 +31,15 @@ const tagRegistry: WeakRef<Lite.Tag<unknown, boolean>>[] = []
  */
 export function getAllTags(): Lite.Tag<unknown, boolean>[] {
   const live: Lite.Tag<unknown, boolean>[] = []
-  const liveRefs: WeakRef<Lite.Tag<unknown, boolean>>[] = []
-
-  for (const ref of tagRegistry) {
-    const tag = ref.deref()
+  let j = 0
+  for (let i = 0; i < tagRegistry.length; i++) {
+    const tag = tagRegistry[i]!.deref()
     if (tag) {
       live.push(tag)
-      liveRefs.push(ref)
+      tagRegistry[j++] = tagRegistry[i]!
     }
   }
-
-  tagRegistry.length = 0
-  tagRegistry.push(...liveRefs)
-
+  tagRegistry.length = j
   return live
 }
 
@@ -67,13 +61,18 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
   const refs = registry.get(tag)
   if (!refs) return []
 
-  const liveEntries = refs
-    .map((ref) => ({ ref, atom: ref.deref() }))
-    .filter((entry): entry is { ref: WeakRef<Lite.Atom<unknown>>, atom: Lite.Atom<unknown> } => entry.atom !== undefined)
+  const liveRefs: WeakRef<Lite.Atom<unknown>>[] = []
+  const liveAtoms: Lite.Atom<unknown>[] = []
+  for (const ref of refs) {
+    const atom = ref.deref()
+    if (atom) {
+      liveRefs.push(ref)
+      liveAtoms.push(atom)
+    }
+  }
 
-  registry.set(tag, liveEntries.map((entry) => entry.ref))
-
-  return liveEntries.map((entry) => entry.atom)
+  registry.set(tag, liveRefs)
+  return liveAtoms
 }
 
 /**

@@ -1,11 +1,26 @@
-import { controllerSymbol, tagExecutorSymbol } from "./symbols"
-import type { Lite, MaybePromise, AtomState } from "./types"
+import { controllerSymbol, tagExecutorSymbol, ParseError, type Lite, type MaybePromise, type AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
-import { shallowEqual } from "./equality"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
-import { ParseError } from "./errors"
+
+function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+export function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
+  if (!isPlainObject(a) || !isPlainObject(b)) return false
+  const keysA = Reflect.ownKeys(a).filter((key) => Object.prototype.propertyIsEnumerable.call(a, key))
+  if (keysA.length !== Reflect.ownKeys(b).filter((key) => Object.prototype.propertyIsEnumerable.call(b, key)).length) return false
+  for (const key of keysA) {
+    if (!Object.hasOwn(b as Record<PropertyKey, unknown>, key)) return false
+    if (!Object.is((a as Record<PropertyKey, unknown>)[key], (b as Record<PropertyKey, unknown>)[key])) return false
+  }
+  return true
+}
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 
@@ -42,7 +57,6 @@ class ContextDataImpl implements Lite.ContextData {
     private readonly parentData?: Lite.ContextData
   ) {}
 
-  // Raw Map operations
   get(key: string | symbol): unknown {
     return this.map.get(key)
   }
@@ -75,7 +89,6 @@ class ContextDataImpl implements Lite.ContextData {
     return this.parentData?.seekHas(key) ?? false
   }
 
-  // Tag-based operations
   getTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
     return this.map.get(tag.key) as T | undefined
   }
@@ -134,15 +147,10 @@ interface AtomEntry<T> {
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
-    for (const listener of listeners) {
-      listener()
-      return
-    }
+    listeners.values().next().value!()
     return
   }
-  for (const listener of [...listeners]) {
-    listener()
-  }
+  for (const listener of [...listeners]) listener()
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -445,7 +453,8 @@ class ScopeImpl implements Lite.Scope {
     await this.release(atom)
 
     if (atom.deps) {
-      for (const key in atom.deps) { const dep = atom.deps[key]!
+      for (const key in atom.deps) {
+        const dep = atom.deps[key]!
         const depAtom = isControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
         this.cache.get(depAtom)?.dependents.delete(atom)
@@ -1198,7 +1207,8 @@ class ScopeImpl implements Lite.Scope {
     if (entry.cleanups.length > 0) await runCleanupsSafe(entry.cleanups)
 
     if (atom.deps) {
-      for (const key in atom.deps) { const dep = atom.deps[key]!
+      for (const key in atom.deps) {
+        const dep = atom.deps[key]!
         const depAtom = isControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
         this.cache.get(depAtom)?.dependents.delete(atom)
