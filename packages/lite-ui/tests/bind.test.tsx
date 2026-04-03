@@ -234,8 +234,8 @@ describe('$ atom binding in JSX', () => {
   })
 })
 
-describe('useScope() — component scope access', () => {
-  it('useScope() returns the mount scope', async () => {
+describe('useScope() — double context', () => {
+  it('explicit scope via mount(jsx, el, scope)', async () => {
     const counter = atom({ factory: () => 0 })
     await scope.resolve(counter)
 
@@ -289,7 +289,7 @@ describe('useScope() — component scope access', () => {
     await scope2.dispose()
   })
 
-  it('useScope() in nested components', async () => {
+  it('nested components with useScope()', async () => {
     const title = atom({ factory: () => 'Hello' })
     const count = atom({ factory: () => 0 })
     await scope.resolve(title)
@@ -334,7 +334,24 @@ describe('useScope() — component scope access', () => {
     expect(container.querySelector('h1')!.textContent).toBe('World')
   })
 
-  it('useScope() throws outside mount', () => {
-    expect(() => useScope()).toThrow('useScope() called outside of mount()')
+  it('self-managed scope — no explicit scope needed', async () => {
+    const greeting = atom({ factory: () => 'hi' })
+
+    function Greeter() {
+      const s = useScope()
+      s.resolve(greeting)
+      return <span>{$(greeting)}</span>
+    }
+
+    handle = mount(<Greeter />, container)
+    await useScope().resolve(greeting)
+    await useScope().flush()
+    expect(container.querySelector('span')).toBeTruthy()
+  })
+
+  it('useScope() returns default scope without mount', () => {
+    const s = useScope()
+    expect(s).toBeDefined()
+    expect(s.resolve).toBeDefined()
   })
 })

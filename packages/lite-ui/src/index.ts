@@ -3,7 +3,7 @@ import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
 import { isVNode, mountVNode, type VNode } from './vnode'
 import { isAtomBinding, type AtomBinding } from './bind'
-import { setCurrentScope } from './scope-context'
+import { setCurrentScope, useScope } from './scope-context'
 import { isLazyVNode, type LazyVNode } from './jsx-runtime'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
 export { $, type AtomBinding } from './bind'
@@ -692,14 +692,15 @@ export function mountLazy(
   return []
 }
 
-export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement, scope: Lite.Scope): MountHandle {
+export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement, scope?: Lite.Scope): MountHandle {
+  const resolvedScope = scope ?? useScope()
   const ctx: MountContext = {
-    scope,
+    scope: resolvedScope,
     cleanups: [],
     reactiveBindings: [],
   }
 
-  const prev = setCurrentScope(scope)
+  const prev = scope ? setCurrentScope(scope) : null
   let nodes: Node[]
   try {
     nodes = isLazyVNode(tpl)
@@ -708,7 +709,7 @@ export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement,
         ? mountVNode(tpl, container, null, ctx)
         : mountTemplate(tpl, container, null, ctx)
   } finally {
-    setCurrentScope(prev)
+    if (scope) setCurrentScope(prev)
   }
 
   let disposed = false
