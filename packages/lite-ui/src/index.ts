@@ -1,9 +1,9 @@
 import { shallowEqual } from '@pumped-fn/lite'
 import { track, registerInTracker } from './tracking'
 import type { Lite } from '@pumped-fn/lite'
-import { isVNode, mountVNode, type VNode } from './vnode'
+import { isVNode, mountVNode, createVNode, type VNode } from './vnode'
 import { isAtomBinding, isAtomListBinding, type AtomBinding, type AtomListBinding, type AnyAtomBinding } from './bind'
-import { setCurrentScope, useScope } from './scope-context'
+import { pushScope, popScope, useScope } from './scope-context'
 import { isLazyVNode, type LazyVNode } from './jsx-runtime'
 export { type VNode, isVNode, mountVNode, createVNode } from './vnode'
 export { $, type AtomBinding } from './bind'
@@ -831,12 +831,43 @@ export function applyAttribute(el: Element, name: string, value: unknown): void 
   }
 }
 
+export function ScopeProvider(_props: { scope: Lite.Scope; children?: unknown }): VNode {
+  return createVNode(null, null, [])
+}
+
 export function mountLazy(
   lazy: LazyVNode,
   parent: Node,
   before: Node | null,
   ctx: MountContext,
 ): Node[] {
+  if (lazy.component === ScopeProvider) {
+    const scopeProps = lazy.props as { scope: Lite.Scope; children?: unknown }
+    const childCtx: MountContext = { scope: scopeProps.scope, cleanups: [], reactiveBindings: [] }
+    pushScope(scopeProps.scope)
+    try {
+      const children = scopeProps.children
+      if (children == null) return []
+      if (isLazyVNode(children)) return mountLazy(children as LazyVNode, parent, before, childCtx)
+      if (isVNode(children)) return mountVNode(children as VNode, parent, before, childCtx)
+      if (isTemplate(children)) return mountTemplate(children as Template, parent, before, childCtx)
+      if (Array.isArray(children)) {
+        const nodes: Node[] = []
+        for (const child of children) {
+          if (isLazyVNode(child)) nodes.push(...mountLazy(child, parent, before, childCtx))
+          else if (isVNode(child)) nodes.push(...mountVNode(child, parent, before, childCtx))
+          else if (isTemplate(child)) nodes.push(...mountTemplate(child, parent, before, childCtx))
+        }
+        for (const b of childCtx.reactiveBindings) ctx.reactiveBindings.push(b)
+        for (const c of childCtx.cleanups) ctx.cleanups.push(c)
+        return nodes
+      }
+      return []
+    } finally {
+      popScope()
+    }
+  }
+
   const resolved = lazy.component(lazy.props) as VNode | LazyVNode
   if (isLazyVNode(resolved)) return mountLazy(resolved, parent, before, ctx)
   if (isVNode(resolved)) return mountVNode(resolved, parent, before, ctx)
@@ -844,15 +875,14 @@ export function mountLazy(
   return []
 }
 
-export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement, scope?: Lite.Scope): MountHandle {
-  const resolvedScope = scope ?? useScope()
+export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement, scope: Lite.Scope): MountHandle {
   const ctx: MountContext = {
-    scope: resolvedScope,
+    scope,
     cleanups: [],
     reactiveBindings: [],
   }
 
-  const prev = scope ? setCurrentScope(scope) : null
+  pushScope(scope)
   let nodes: Node[]
   try {
     nodes = isLazyVNode(tpl)
@@ -861,7 +891,7 @@ export function mount(tpl: Template | VNode | LazyVNode, container: HTMLElement,
         ? mountVNode(tpl, container, null, ctx)
         : mountTemplate(tpl, container, null, ctx)
   } finally {
-    if (scope) setCurrentScope(prev)
+    popScope()
   }
 
   let disposed = false

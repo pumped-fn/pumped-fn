@@ -1,21 +1,20 @@
-import { createScope } from '@pumped-fn/lite'
 import type { Lite } from '@pumped-fn/lite'
 
-let explicitScope: Lite.Scope | null = null
-let defaultScope: Lite.Scope | null = null
+const scopeStack: Lite.Scope[] = []
 
-export function setCurrentScope(scope: Lite.Scope | null): Lite.Scope | null {
-  const prev = explicitScope
-  explicitScope = scope
-  return prev
+export function pushScope(scope: Lite.Scope): void {
+  scopeStack.push(scope)
+}
+
+export function popScope(): void {
+  scopeStack.pop()
 }
 
 export function useScope(): Lite.Scope {
-  if (explicitScope) return explicitScope
-  if (!defaultScope) defaultScope = createScope()
-  return defaultScope
+  if (scopeStack.length === 0) throw new Error('useScope(): no scope — pass scope to mount() or wrap in ScopeProvider')
+  return scopeStack[scopeStack.length - 1]!
 }
 
-export function resetDefaultScope(): void {
-  defaultScope = null
+export function currentScopeOrNull(): Lite.Scope | null {
+  return scopeStack.length > 0 ? scopeStack[scopeStack.length - 1]! : null
 }

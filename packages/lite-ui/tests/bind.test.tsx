@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { atom, createScope, controller, type Lite } from '@pumped-fn/lite'
-import { mount, list, type MountHandle, $, useScope } from '../src/index'
+import { mount, list, type MountHandle, $, useScope, ScopeProvider } from '../src/index'
 
 let scope: Lite.Scope
 let container: HTMLElement
@@ -231,8 +231,8 @@ describe('$ atom binding in JSX', () => {
   })
 })
 
-describe('useScope() — double context', () => {
-  it('explicit scope via mount(jsx, el, scope)', async () => {
+describe('useScope() — tree-scoped, not global', () => {
+  it('useScope() returns mount scope', async () => {
     const counter = atom({ factory: () => 0 })
     await scope.resolve(counter)
 
@@ -331,24 +331,63 @@ describe('useScope() — double context', () => {
     expect(container.querySelector('h1')!.textContent).toBe('World')
   })
 
-  it('self-managed scope — no explicit scope needed', async () => {
-    const greeting = atom({ factory: () => 'hi' })
-
-    function Greeter() {
-      const s = useScope()
-      s.resolve(greeting)
-      return <span>{$(greeting)}</span>
-    }
-
-    handle = mount(<Greeter />, container)
-    await useScope().resolve(greeting)
-    await useScope().flush()
-    expect(container.querySelector('span')).toBeTruthy()
+  it('useScope() throws outside mount', () => {
+    expect(() => useScope()).toThrow('no scope')
   })
 
-  it('useScope() returns default scope without mount', () => {
-    const s = useScope()
-    expect(s).toBeDefined()
-    expect(s.resolve).toBeDefined()
+  it('ScopeProvider overrides scope for subtree', async () => {
+    const msg = atom({ factory: () => 'default' })
+
+    const innerScope = createScope()
+    await innerScope.resolve(msg)
+    innerScope.controller(msg).set('inner')
+    await innerScope.flush()
+
+    await scope.resolve(msg)
+    scope.controller(msg).set('outer')
+    await scope.flush()
+
+    function Display() {
+      return <span>{$(msg)}</span>
+    }
+
+    handle = mount(
+      <div>
+        <div class="outer"><Display /></div>
+        <ScopeProvider scope={innerScope}>
+          <div class="inner"><Display /></div>
+        </ScopeProvider>
+      </div>,
+      container,
+      scope,
+    )
+
+    expect(container.querySelector('.outer span')!.textContent).toBe('outer')
+    expect(container.querySelector('.inner span')!.textContent).toBe('inner')
+
+    await innerScope.dispose()
+  })
+
+  it('ScopeProvider useScope() returns overridden scope', async () => {
+    const innerScope = createScope()
+    let capturedScope: unknown = null
+
+    function Probe() {
+      capturedScope = useScope()
+      return <span>ok</span>
+    }
+
+    handle = mount(
+      <ScopeProvider scope={innerScope}>
+        <Probe />
+      </ScopeProvider>,
+      container,
+      scope,
+    )
+
+    expect(capturedScope).toBe(innerScope)
+    expect(capturedScope).not.toBe(scope)
+
+    await innerScope.dispose()
   })
 })
