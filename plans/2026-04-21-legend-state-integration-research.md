@@ -307,6 +307,21 @@ Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment l
 
 Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
 
+### Second autoresearch session — `autoresearch/lite-react-perf`
+
+Target flipped to `select_large_hz` (ops/sec for `lite-react/useSelect`). Hypothesis: the current `useSelect` runs its selector inside `useSyncExternalStore.getSnapshot` with a 5-way identity cache, which may be a bigger cost than needed. Four runs (1 baseline, 0 kept, 3 discarded), stopped at the 3-consecutive-discard rule.
+
+| Run | Status | Change | `select_large_hz` | `select_small_hz` |
+|---:|:-------|:-------|------------------:|------------------:|
+| 1 | keep | baseline | 114.6 | 439.2 |
+| 2 | discard | delegate Suspense-resolved path to `scope.select()` handle | 92.4 (−19%) | 361.5 |
+| 3 | discard | mutate `selectionCache.current` fields in place to skip allocations | 108.6 (−5%) | 406.3 |
+| 4 | discard | trim cache identity checks to `(selector, eq, source)` (3-way) | 103.2 (−10%) | 396.7 |
+
+**Verdict:** `useSelect` is already well-tuned. The 5-way identity cache + once-per-getSnapshot selector pattern is hard to beat with the current architecture. Delegating to core's `scope.select()` handle **doubles** the work (handle's own `ctrl.on('resolved')` listener runs the selector in parallel with the render-path selector call), and shrinking the cache checks has no measurable wins at this scale.
+
+Real opportunities likely lie one layer up — for example, a `useAtomPath(atom, 'some.deep.path')` that skips the selector closure entirely and reads via a compiled path, or an opt-in batch notify that collapses the 100 per-atom listeners into one fan-out walk.
+
 ### Known gaps / follow-ups
 
 1. Async error surfacing relies on `ctrl.state === 'failed'` → `onError` in the bridge *plus* first-observing the observable. We document that consumers read `syncState(obs).error` rather than relying on ErrorBoundary re-throw.
