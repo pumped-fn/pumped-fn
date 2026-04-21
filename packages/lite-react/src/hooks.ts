@@ -268,6 +268,7 @@ function useSelect<T, S>(
   selector: (value: T) => S,
   eqOrOptions?: ((a: S, b: S) => boolean) | UseSelectOptions<S>
 ): S | UseSelectState<S> {
+  const scope = useScope()
   const ctrl = useController(atom)
 
   const isOptions = typeof eqOrOptions === 'object' && eqOrOptions !== null
@@ -275,6 +276,23 @@ function useSelect<T, S>(
   const autoResolve = isOptions ? !!(eqOrOptions as UseSelectOptions<S>).resolve : true
   const eq = isOptions ? (eqOrOptions as UseSelectOptions<S>).eq : eqOrOptions as ((a: S, b: S) => boolean) | undefined
   const eqFn = eq ?? Object.is
+
+  // Aggressive: when Suspense + resolved, delegate change detection to the
+  // core scope.select() handle. The handle runs the selector inside its own
+  // ctrl.on('resolved') listener and only notifies on *actual value change*,
+  // so 99/100 sibling components never even schedule a React re-render.
+  const isResolved = ctrl.state === 'resolved'
+  const handle = useMemo(() => {
+    if (isSuspense && isResolved) {
+      return scope.select(atom, selector, { eq: eqFn })
+    }
+    return null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, atom, selector, eqFn, isSuspense, isResolved])
+
+  useEffect(() => {
+    return () => handle?.dispose()
+  }, [handle])
 
   const selectionCache = useRef<{
     ctrl: Lite.Controller<T>
@@ -307,6 +325,8 @@ function useSelect<T, S>(
         throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
       }
       if (state === 'failed') throw ctrl.get()
+      // Fast path when we have a handle: pure field read, no selector call.
+      if (handle) return handle.get()
       let value: T
       try { value = ctrl.get() } catch { throw getOrCreatePendingPromise(ctrl) }
 
@@ -404,12 +424,23 @@ function useSelect<T, S>(
   }
 
   const subscribe = useCallback((onStoreChange: () => void) => {
+    // With a handle, change detection happens inside the handle itself.
+    // Only 1/100 components fires onStoreChange per mutation — the rest never
+    // schedule a React re-render. We still subscribe to ctrl.on('*') so state
+    // transitions (idle/failed/resolving) re-render for Suspense/Error flows.
+    if (handle && isSuspense) {
+      const offHandle = handle.subscribe(onStoreChange)
+      const offCtrl = ctrl.on('*', () => {
+        if (ctrl.state !== 'resolved') onStoreChange()
+      })
+      return () => { offHandle(); offCtrl() }
+    }
     if (isSuspense) return ctrl.on('*', onStoreChange)
     return ctrl.on('*', () => {
       if (ctrl.state === 'resolving') void getOrCreatePendingPromise(ctrl).catch(() => {})
       onStoreChange()
     })
-  }, [ctrl, isSuspense])
+  }, [ctrl, isSuspense, handle])
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
