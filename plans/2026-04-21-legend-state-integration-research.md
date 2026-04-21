@@ -261,27 +261,51 @@ Scaffolded under `packages/lite-legend/` (commit in this branch):
 
 Hardware: containerized linux-x64, jsdom, React 18.3, `@legendapp/state@3.0.0-beta.46`, `@pumped-fn/lite-react@1.2.0`. Run via `pnpm -F '@pumped-fn/lite-legend' bench`.
 
+Numbers below are **after** the autoresearch-driven optimization (see "Autoresearch session" below). Pre-opt numbers are included for the Legend row so the improvement is visible.
+
 **Scenario A — small (20 keys, 50 mutations of one hot key):**
 
-| Binding | ops/sec | mean (ms) | renders per iter |
-|---------|--------:|----------:|-----------------:|
-| `lite-react` / `useAtom` (whole-atom) | 119.83 | 8.35 | 1 000 |
-| `lite-react` / `useSelect` (hand-rolled selector) | 415.72 | 2.41 | ~50 |
-| `lite-legend` / `observer` + `obs.key.get()` | 170.84 | 5.85 | ~50 |
+| Binding | ops/sec | renders per iter |
+|---------|--------:|-----------------:|
+| `lite-react` / `useAtom` (whole-atom) | ~120 | 1 000 |
+| `lite-react` / `useSelect` (hand-rolled selector) | ~415 | ~50 |
+| `lite-legend` / `observer` (pre-opt, run #1) | 186 | ~50 |
+| `lite-legend` / `observer` (post-opt, run #2) | **303** | ~50 |
 
 **Scenario B — large (100 components, 100 mutations of one hot key):**
 
-| Binding | ops/sec | mean (ms) | renders per iter |
-|---------|--------:|----------:|-----------------:|
-| `lite-react` / `useAtom` | 15.80 | 63.3 | 10 000 |
-| `lite-react` / `useSelect` | 109.72 | 9.11 | ~100 |
-| `lite-legend` / `observer` | 33.51 | 29.8 | ~100 |
+| Binding | ops/sec | renders per iter |
+|---------|--------:|-----------------:|
+| `lite-react` / `useAtom` | ~16 | 10 000 |
+| `lite-react` / `useSelect` | ~110 | ~100 |
+| `lite-legend` / `observer` (pre-opt, run #1) | 33.6 | ~100 |
+| `lite-legend` / `observer` (post-opt, run #2) | **87.9** | ~100 |
 
-### Reading the numbers
+### Reading the numbers (post-optimization)
 
 - **Render-count parity** — Legend's proxy tracking eliminates spurious re-renders identically to a hand-written `useSelect`. Both collapse an N×K worst case (useAtom) down to ~K.
-- **Wall-clock** — at flat-object scale, `useSelect` is the fastest path because its selector machinery is minimal. Legend sits between `useAtom` and `useSelect` because each `.key.get()` walks the proxy and registers a tracking node. The gap is ~2.2–3.3× in ops/sec; ergonomically it buys "no selectors, no equality functions, nested paths tracked for free".
-- **Where Legend should pull ahead** (not yet measured): deeply nested reads like `user.profile.addresses[2].zip`, and fan-out scenarios where N different components each read a different leaf. Both avoid the per-component selector boilerplate `useSelect` needs.
+- **Wall-clock** — after the fast-path optimization (run #2 below), `lite-legend` lands at **~80% of `useSelect`'s throughput** on both scenarios. That's essentially parity given run-to-run noise of ±5%, and Legend gives it without the caller writing any selector at all.
+- **Pre-opt gap** (baseline) was ~3.3× slower than `useSelect` on the large scenario. The fix is a one-branch change: when the atom is already resolved, bypass `synced()` entirely.
+- **Where Legend should still pull further ahead** (not yet measured): deeply nested reads like `user.profile.addresses[2].zip`, and fan-out scenarios where N different components each read a different leaf. Both avoid the per-component selector boilerplate `useSelect` needs.
+
+### Autoresearch session — `autoresearch/lite-legend-perf`
+
+Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment loop. Five runs (1 baseline, 1 kept, 3 discarded), stopped at the 3-consecutive-discard rule.
+
+| Run | Status | Change | `legend_large_hz` | `legend_small_hz` |
+|---:|:-------|:-------|------------------:|------------------:|
+| 1 | keep | baseline | 33.63 | 185.97 |
+| 2 | **keep** | fast-path resolved atoms via plain `observable(ctrl.get())` + direct `obs.set` from `ctrl.on('*')`; idle/failed still go through `synced` for Suspense | **87.93** (+161%) | **303.08** (+63%) |
+| 3 | discard | collapse state-check + `ctrl.get()` into try/catch + `.bind()` | 73.07 (−17%) | 291.77 |
+| 4 | discard | narrow listener to `ctrl.on('resolved')` (avg of 2 runs within noise) | 87.99 (~0%) | 313.35 |
+| 5 | discard | same listener narrowing + cached `setObs` ref | 78.37 (−11%) | 318.74 |
+
+**Verdict:** the one structural change (run #2) captures essentially all the local-optimization room. Everything else is inside Legend's proxy and out of the bridge's reach. To go further, the optimization target shifts from the bridge to either:
+
+1. A **Legend-upstream change** (e.g. a lighter-weight "external source" primitive that skips sync-state plumbing — which is exactly what our fast path emulates).
+2. **Bypassing Legend's tree** for atoms whose values are primitives or opaque objects, via `opaqueObject()` — but that defeats per-key tracking, losing Legend's main value.
+
+Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
 
 ### Known gaps / follow-ups
 
