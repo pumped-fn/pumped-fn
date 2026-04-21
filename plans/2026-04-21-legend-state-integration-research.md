@@ -307,6 +307,34 @@ Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment l
 
 Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
 
+### Third autoresearch session — `autoresearch/lite-core-perf` (10 rounds)
+
+Scope expanded to `lite` core + `lite-react` hooks. 10 rounds executed; primary target was `select_large_hz`.
+
+| # | Status | Change | `select_large_hz` | `legend_large_hz` |
+|--:|:-------|:-------|------------------:|------------------:|
+| 1 | keep | baseline | 113.7 | 82.0 |
+| 2 | discard | `notifyListeners`: forEach+preallocated-array snapshot | 107.5 (−5%) | — |
+| 3 | discard | `invalidationQueue` Array→Set (O(n) includes→O(1)) | 113.4 (≈0%) | — |
+| 4 | discard | inline `notifyEntry` into `doInvalidateSequential` pendingSet path | 114.9 (+1%) | — |
+| 5 | **keep** | **sync fast-path for `ctrl.set` when no chain pending** | 115.5 (+1.6%) | 88.8 (+8.4%) |
+| 6 | keep | parity sync fast-path for `scheduleUpdate` | 115.8 | 89.3 |
+| 7 | discard | maximal inlining in `scheduleSet` fast-path | 114.5 (−1%) | — |
+| 8 | **keep** | **`useController`: drop `useMemo` (scope.controller is idempotent)** | 117.3 (+1.3%) | — |
+| 9 | **keep** | **hoist `eq ?? Object.is` to const per render in `useSelect`** | 119.7 (+2.1%) | — |
+| 10 | discard | cache listener snapshot arrays on `AtomEntry` | 117.1 (−2.2%) | — |
+
+**Cumulative deltas vs baseline** (run 1 → post-round 10):
+
+| Metric | Baseline | After | Δ |
+|--------|---------:|------:|---:|
+| `select_large_hz` | 113.7 | ~119 | **+4.7%** |
+| `useatom_large_hz` | 16.2 | ~18 | **+11%** |
+| `legend_large_hz` | 82.0 | ~86 | **+5%** |
+| `legend_small_hz` | 291 | ~315 | **+8%** |
+
+Big win: **round 5** eliminated the Promise-microtask on every `ctrl.set` when the invalidation chain is empty — the common case for fine-grained mutations. `lite-legend` benefited most because its bridge pipes every mutation through `ctrl.set`. Rounds 8 and 9 were small but well-targeted lite-react hook cleanups. Rounds 2, 4, 7, 10 showed that once `notifyListeners` is on a hot path, V8 resists inline-transforms — the existing snapshot-spread implementation is hard to beat without restructuring the abstraction.
+
 ### Second autoresearch session — `autoresearch/lite-react-perf`
 
 Target flipped to `select_large_hz` (ops/sec for `lite-react/useSelect`). Hypothesis: the current `useSelect` runs its selector inside `useSyncExternalStore.getSnapshot` with a 5-way identity cache, which may be a bigger cost than needed. Four runs (1 baseline, 0 kept, 3 discarded), stopped at the 3-consecutive-discard rule.
