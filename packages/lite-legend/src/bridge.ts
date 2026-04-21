@@ -32,33 +32,44 @@ export function atomObs<T>(scope: Lite.Scope, atom: Lite.Atom<T>): Observable<T>
 
   const ctrl = scope.controller(atom)
 
-  const obs = observable<T>(
-    synced<T>({
-      get: () => {
-        if (ctrl.state === 'resolved') return ctrl.get()
-        if (ctrl.state === 'failed') {
-          return ctrl.get()
-        }
-        return ctrl.resolve()
-      },
-      set: ({ value }) => {
-        if (ctrl.state === 'resolved') ctrl.set(value as T)
-      },
-      subscribe: ({ update, onError }) => {
-        return ctrl.on('*', () => {
-          if (ctrl.state === 'resolved') {
-            update({ value: ctrl.get() })
-          } else if (ctrl.state === 'failed') {
-            try {
-              ctrl.get()
-            } catch (e) {
-              onError(e instanceof Error ? e : new Error(String(e)))
-            }
-          }
-        })
-      },
+  // Fast path: if the atom is already resolved, skip `synced` entirely and
+  // wire a plain observable to the controller. `synced` adds per-read sync
+  // state machinery we don't need when the value is live.
+  let obs: Observable<T>
+  if (ctrl.state === 'resolved') {
+    obs = observable<T>(ctrl.get()) as Observable<T>
+    ctrl.on('*', () => {
+      if (ctrl.state === 'resolved') {
+        ;(obs as unknown as { set: (v: T) => void }).set(ctrl.get())
+      }
     })
-  ) as Observable<T>
+  } else {
+    obs = observable<T>(
+      synced<T>({
+        get: () => {
+          if (ctrl.state === 'resolved') return ctrl.get()
+          if (ctrl.state === 'failed') return ctrl.get()
+          return ctrl.resolve()
+        },
+        set: ({ value }) => {
+          if (ctrl.state === 'resolved') ctrl.set(value as T)
+        },
+        subscribe: ({ update, onError }) => {
+          return ctrl.on('*', () => {
+            if (ctrl.state === 'resolved') {
+              update({ value: ctrl.get() })
+            } else if (ctrl.state === 'failed') {
+              try {
+                ctrl.get()
+              } catch (e) {
+                onError(e instanceof Error ? e : new Error(String(e)))
+              }
+            }
+          })
+        },
+      })
+    ) as Observable<T>
+  }
 
   byAtom.set(atom as Lite.Atom<unknown>, obs as Observable<unknown>)
   return obs
