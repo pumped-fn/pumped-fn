@@ -901,6 +901,21 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
+    // Fast path: no other chain work scheduled. Apply synchronously so the
+    // new value is visible and listeners fire before returning from set().
+    // Tests that rely on scope.flush() still work because the chain is empty.
+    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
+      entry.value = value
+      entry.state = 'resolved'
+      entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = false
+      entry.resolvedPromise = undefined
+      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      return
+    }
+
     entry.pendingSet = { value }
     this.scheduleInvalidation(atom, entry)
   }
