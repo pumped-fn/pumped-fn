@@ -934,6 +934,19 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
+    // Sync fast path mirroring scheduleSet.
+    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
+      entry.value = fn(entry.value as T)
+      entry.state = 'resolved'
+      entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = false
+      entry.resolvedPromise = undefined
+      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      return
+    }
+
     entry.pendingSet = { fn }
     this.scheduleInvalidation(atom, entry)
   }
