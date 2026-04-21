@@ -1,0 +1,281 @@
+# Legend-State v3 Integration Research
+
+Date: 2026-04-21
+Branch: `claude/legend-state-research-fI4Xq`
+Status: Research memo (no ADR yet — follow-up via `/c3-skill:c3` if adopted)
+
+## Goal
+
+Evaluate replacing (or complementing) `@pumped-fn/lite-react` with a Legend-State-based
+frontend adapter: `@pumped-fn/lite-legend`. Lite stays the source of truth for
+lifecycle, dependency graph and execution context; Legend-State owns the
+fine-grained reactivity surface that the UI reads from.
+
+## TL;DR
+
+- Lite and Legend-State are complementary, not competing. Lite models *managed
+  effects* (idle → resolving → resolved → failed, with cleanup & deps); Legend
+  models *fine-grained reads* (proxy-based observables with per-leaf tracking).
+- The bridge is small: every `Lite.Controller<T>` maps to an
+  `observable<T>(synced({ get, set, subscribe, initial }))`. Each `ctrl.on('*')`
+  becomes an `update(ctrl.get())` push into Legend.
+- The new package (`@pumped-fn/lite-legend`) can ship with **4 exports**
+  mirroring `lite-react`: `ScopeProvider`, `useScope`, `atomObs(atom)`,
+  `useAtomObs(atom)`. Rendering uses Legend's `observer()` HOC or `use$()` —
+  Lite does not own render tracking anymore.
+- Suspense and ErrorBoundary still work: Legend's `use$(obs, { suspense: true })`
+  + async `linked` handle both, so we do *not* need the `Promise`-throwing
+  plumbing that `lite-react` has today (see `packages/lite-react/src/hooks.ts:52-84`).
+
+## Legend-State v3 beta in one screen
+
+Legend v3 is a proxy-based signal library. The primitives we care about:
+
+```ts
+import { observable, observe, syncState } from '@legendapp/state'
+import { linked, synced } from '@legendapp/state/sync'
+import { observer, use$, useObservable, Memo } from '@legendapp/state/react'
+```
+
+| Primitive | Shape | Role |
+|-----------|-------|------|
+| `observable(value)` | `Observable<T>` | Reactive proxy over a value |
+| `observable(linked({ get, set }))` | `Observable<T>` | Pull-computed; re-runs `get` on dep change |
+| `observable(synced({ get, set, subscribe, initial }))` | `Observable<T>` | Like `linked` but *push-capable* via `subscribe({refresh, update})` |
+| `obs.onChange(cb)` / `obs.get()` / `obs.set(v)` / `obs.peek()` | methods | Core read/write surface |
+| `observe(fn)` | `() => void` | Run `fn` reactively, returns dispose |
+| `syncState(obs)` | `Observable<{ isLoaded, error, ... }>` | Async state inspector |
+| `observer(Component)` | HOC | Tracks every `.get()` read during render |
+| `use$(obs, opts?)` | hook | Track a single observable (alias of `useValue`) |
+| `useObservable(fn)` | hook | Component-scoped observable |
+
+v3 breaking changes relevant to us:
+- `computed`/`proxy` collapsed into `observable(fn)`; they only re-run when
+  observed, so they must not be used for side effects (matches Lite's atom
+  semantics — side effects go in `atom({ factory })`).
+- `useSelector`/`use$` renamed to `useValue` (old names still exported).
+- `set` / `toggle` now return `void`.
+- `persistObservable` → `syncObservable`; persistence moved under `persist`.
+
+Sources: [Legend-State v3 intro](https://legendapp.com/open-source/state/v3/intro/introduction/),
+[Observable docs](https://legendapp.com/open-source/state/v3/usage/observable/),
+[React API](https://legendapp.com/open-source/state/v3/react/react-api/),
+[Reactivity](https://legendapp.com/open-source/state/v3/usage/reactivity/),
+[Persist and Sync](https://legendapp.com/open-source/state/v3/sync/persist-sync/),
+[Migration guide](https://legendapp.com/open-source/state/v3/other/migrating/),
+[CHANGELOG](https://github.com/LegendApp/legend-state/blob/main/CHANGELOG.md).
+
+## What `lite-react` does today (reference)
+
+`packages/lite-react/src/` exposes `ScopeProvider`, `useScope`, `useController`,
+`useAtom`, `useSelect`. Under the hood:
+
+- `useController(atom)` memoizes `scope.controller(atom)` and optionally throws
+  the `resolve()` promise for Suspense (`hooks.ts:117-141`).
+- `useAtom` / `useSelect` manually implement `useSyncExternalStore`, caching
+  snapshots by `ctrl.state` + source identity to avoid tearing
+  (`hooks.ts:155-245`, `hooks.ts:264-411`).
+- A module-level `WeakMap<Controller, Promise>` caches in-flight `resolve()`
+  promises so multiple components Suspend on the same resolution
+  (`hooks.ts:52-84`).
+
+This works but carries ~410 lines of careful snapshot caching, retry tracking
+and Suspense plumbing. Legend absorbs most of it for free.
+
+## Conceptual mapping
+
+```
+Lite                              Legend-State
+──────────────────────────────    ─────────────────────────────────────
+Scope (lifecycle boundary)   ──▶  React context carrier only
+Atom<T>                      ──▶  factory used to produce Controller<T>
+Controller<T>                ──▶  Observable<T> (via synced({...}))
+ctrl.get()                   ──▶  obs.get()  (Legend tracks automatically)
+ctrl.set(v) / ctrl.update    ──▶  obs.set(v)
+ctrl.invalidate()            ──▶  syncState(obs).refresh() / explicit action
+ctrl.on('*', fn)             ──▶  subscribe({ update })    (inside synced)
+scope.select(atom, sel, eq)  ──▶  observable(() => sel(obs.get()))
+useAtom(atom)                ──▶  use$(atomObs(atom)) / observer(Component)
+useSelect(atom, sel)         ──▶  use$(() => sel(atomObs(atom).get()))
+```
+
+Key insight: Lite's `Controller` is already a push-based subscription
+(`on('resolving' | 'resolved' | '*')`). Legend's `synced({ subscribe })` is the
+matching reception end. The bridge is mechanical:
+
+```ts
+function toObservable<T>(scope: Lite.Scope, atom: Lite.Atom<T>) {
+  const ctrl = scope.controller(atom)
+  return observable<T>(synced({
+    get: async () => {
+      if (ctrl.state === 'idle') await ctrl.resolve()
+      return ctrl.get()
+    },
+    set: ({ value }) => ctrl.set(value),
+    subscribe: ({ update }) => ctrl.on('*', () => {
+      if (ctrl.state === 'resolved') update(ctrl.get())
+    }),
+    // Optional: initial value when async `get` has not resolved yet
+  }))
+}
+```
+
+- Suspense: `use$(obs, { suspense: true })` suspends on the Promise returned by
+  `get`. Lite's `resolving` state flows through naturally because `ctrl.resolve()`
+  returns a Promise.
+- ErrorBoundary: `synced` surfaces errors on `syncState(obs).error`; thrown in
+  `use$` when configured. Lite's `failed` controller state becomes that error.
+- Fine-grained reactivity: when the atom value is an object, Legend's proxy
+  gives per-key subscription — a bigger win than Lite's current `select` hack.
+
+## Proposed package: `@pumped-fn/lite-legend`
+
+### Structure (mirror of `lite-react`)
+
+```
+packages/lite-legend/
+├── src/
+│   ├── index.ts          # Public exports
+│   ├── context.tsx       # ScopeProvider, ScopeContext
+│   ├── bridge.ts         # atomObs(scope, atom) → Observable<T>
+│   └── hooks.ts          # useScope, useAtomObs, useAtom (sugar)
+├── package.json
+└── tsconfig.json
+```
+
+Peer deps: `@pumped-fn/lite`, `@legendapp/state` (>= `3.0.0-beta`), `react`.
+
+### Public API (draft)
+
+```ts
+export { ScopeProvider, ScopeContext } from './context'
+export { useScope } from './hooks'
+
+// Primary surface: get an observable for an atom within the current scope.
+export function atomObs<T>(scope: Lite.Scope, atom: Lite.Atom<T>): Observable<T>
+
+// React sugar — observes current scope automatically.
+export function useAtomObs<T>(atom: Lite.Atom<T>): Observable<T>
+
+// Convenience: read-through hook so consumers don't need observer() for
+// trivial cases. Suspense-compatible by default.
+export function useAtom<T>(atom: Lite.Atom<T>, opts?: { suspense?: boolean }): T
+```
+
+`atomObs` caches per `(scope, atom)` in a `WeakMap` so repeated calls share the
+same Observable (matches `useController`'s `useMemo` guarantee).
+
+### Usage patterns
+
+**Pattern A — `observer` HOC, fine-grained reactivity (preferred).**
+
+```tsx
+const userObs = atomObs(scope, userAtom) // or useAtomObs(userAtom)
+
+const UserCard = observer(() => {
+  // Proxy tracking: only re-renders when `.name` changes, not the whole atom.
+  return <div>{userObs.name.get()}</div>
+})
+```
+
+**Pattern B — single-value hook (cheapest migration from `useSelect`).**
+
+```tsx
+function Name() {
+  const name = useAtom(userAtom, { suspense: true })
+  return <div>{name}</div>
+}
+// Or with explicit projection:
+function Name() {
+  const obs = useAtomObs(userAtom)
+  return <div>{use$(() => obs.name.get())}</div>
+}
+```
+
+**Pattern C — derived observables without `select()`.**
+
+```tsx
+const fullNameObs = observable(() =>
+  `${atomObs(scope, userAtom).first.get()} ${atomObs(scope, userAtom).last.get()}`
+)
+```
+
+This replaces `scope.select(atom, selector, { eq })` — Legend's per-read tracking
+does the change-detection for free. We can deprecate `useSelect` in
+`lite-legend`.
+
+## What Lite should *not* give up
+
+Legend owns rendering; Lite still owns:
+
+1. **Scope lifecycle** — `createScope`, `scope.dispose()`, extensions, presets,
+   tags. Legend observables live inside a scope and die with it.
+2. **Atom factories with deps** — DI, `tags.required`, `controller(atom)` deps,
+   `resource()`. These drive *construction*; Legend drives *observation*.
+3. **ExecutionContext / flows** — request-scoped work, `ctx.data`, `ctx.cleanup`.
+   Legend has nothing equivalent and shouldn't.
+4. **GC** — `scope.gc` + controllers' release/invalidate semantics. The bridge
+   must release the atom when the last observer detaches; `synced.subscribe`
+   return value is the natural cleanup hook:
+
+```ts
+subscribe: ({ update }) => {
+  const off = ctrl.on('*', () => { /* ... */ })
+  return () => { off(); /* optionally ctrl.release() via gc */ }
+}
+```
+
+## Open questions / risks
+
+1. **Scope-per-Observable vs global scope.** Legend observables are usually
+   module-globals. Pumped-fn scopes are *instance-scoped* (per test, per
+   request, per HMR reload). Decision: `atomObs` is `(scope, atom) => obs`, and
+   the React sugar reads `scope` from context. No module-global observables.
+2. **HMR.** `@pumped-fn/lite-hmr` preserves atom state across reloads. Legend
+   observables in module state will be re-created on HMR; the bridge must
+   survive because it reads from the (preserved) scope, but any component-local
+   `useObservable` resets. Needs an HMR smoke test.
+3. **Async `linked`/`synced` initial vs Lite's `idle`.** `synced.get` fires
+   lazily when the observable is first observed. If Lite's atom was already
+   resolved (e.g. SSR), we want `initial: ctrl.get()` to avoid an unnecessary
+   loading flash. `atomObs` should branch on `ctrl.state` at construction.
+4. **Invalidate semantics.** Lite's `ctrl.invalidate()` re-runs the factory.
+   Mapping to Legend: expose `syncState(obs).refresh()` or an explicit
+   `invalidate(obs)` helper. Probably both.
+5. **`set` on async atoms.** `synced.set` is called with `{ value, changes }`.
+   Lite's `ctrl.set` accepts raw T. Trivial but worth a note in docs.
+6. **Bundle size.** `@legendapp/state` is small (~3–4 kB gz), but a dual React
+   binding is real cost. `lite-legend` should be opt-in, not a replacement for
+   `lite-react`. Document both.
+
+## Recommendation
+
+Yes, build `@pumped-fn/lite-legend` as a **sibling** to `lite-react`, not a
+replacement. The core value:
+
+- Legend's proxy tracking eliminates `useSelect` + snapshot caching → ~200–300
+  LOC deleted from the React adapter surface.
+- `observer()` + `use$()` give consumers the ergonomic fine-grained reactivity
+  story that Lite's `select()` only partially delivered.
+- Lite stays focused on lifecycle and DI; rendering concerns move out.
+
+Next step: open `/c3-skill:c3` to craft an ADR covering:
+- Exact API for `atomObs` / `useAtomObs` / `useAtom`.
+- HMR strategy (how `lite-hmr` atoms survive through Legend observables).
+- Async / Suspense contract (`synced.get` initial vs Lite state).
+- Deprecation (or retention) path for `useSelect` in the Legend adapter.
+- Interop: can both adapters coexist in one app?
+
+## Sources
+
+- [Legend-State v3 — Introduction](https://legendapp.com/open-source/state/v3/intro/introduction/)
+- [Legend-State v3 — Observable](https://legendapp.com/open-source/state/v3/usage/observable/)
+- [Legend-State v3 — Reactivity](https://legendapp.com/open-source/state/v3/usage/reactivity/)
+- [Legend-State v3 — React API](https://legendapp.com/open-source/state/v3/react/react-api/)
+- [Legend-State v3 — Persist and Sync](https://legendapp.com/open-source/state/v3/sync/persist-sync/)
+- [Legend-State v3 — Migration](https://legendapp.com/open-source/state/v3/other/migrating/)
+- [Legend-State CHANGELOG](https://github.com/LegendApp/legend-state/blob/main/CHANGELOG.md)
+- [@legendapp/state v3 beta on npm](https://www.npmjs.com/package/@legendapp/state/v/3.0.0-beta.0)
+- `packages/lite-react/src/hooks.ts` — reference React binding
+- `packages/lite/src/types.ts:179-220` — `Lite.Controller` shape
+- `packages/lite/src/scope.ts:138-200` — `SelectHandleImpl` (how `select` works today)
