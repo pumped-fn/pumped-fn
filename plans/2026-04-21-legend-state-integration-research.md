@@ -248,6 +248,49 @@ subscribe: ({ update }) => {
    binding is real cost. `lite-legend` should be opt-in, not a replacement for
    `lite-react`. Document both.
 
+## POC status
+
+Scaffolded under `packages/lite-legend/` (commit in this branch):
+
+- `src/bridge.ts` — `atomObs(scope, atom)` creates `observable<T>(synced({ get, set, subscribe }))`, forwards `ctrl.on('*')` → `update()` and `ctrl.state === 'failed'` → `onError()`. Cached in a per-scope `WeakMap`.
+- `src/hooks.ts` — `useScope`, `useAtomObs`, `useAtom` (Suspense by default; errors via `syncState(obs).error`).
+- `src/context.tsx` — `ScopeProvider` / `ScopeContext` matching `lite-react`.
+- `tests/bridge.test.tsx` — 8 POC tests covering Suspense, set/update, per-key tracking with `observer()`, invalidate, and async error flow. All passing.
+
+### Benchmark results
+
+Hardware: containerized linux-x64, jsdom, React 18.3, `@legendapp/state@3.0.0-beta.46`, `@pumped-fn/lite-react@1.2.0`. Run via `pnpm -F '@pumped-fn/lite-legend' bench`.
+
+**Scenario A — small (20 keys, 50 mutations of one hot key):**
+
+| Binding | ops/sec | mean (ms) | renders per iter |
+|---------|--------:|----------:|-----------------:|
+| `lite-react` / `useAtom` (whole-atom) | 119.83 | 8.35 | 1 000 |
+| `lite-react` / `useSelect` (hand-rolled selector) | 415.72 | 2.41 | ~50 |
+| `lite-legend` / `observer` + `obs.key.get()` | 170.84 | 5.85 | ~50 |
+
+**Scenario B — large (100 components, 100 mutations of one hot key):**
+
+| Binding | ops/sec | mean (ms) | renders per iter |
+|---------|--------:|----------:|-----------------:|
+| `lite-react` / `useAtom` | 15.80 | 63.3 | 10 000 |
+| `lite-react` / `useSelect` | 109.72 | 9.11 | ~100 |
+| `lite-legend` / `observer` | 33.51 | 29.8 | ~100 |
+
+### Reading the numbers
+
+- **Render-count parity** — Legend's proxy tracking eliminates spurious re-renders identically to a hand-written `useSelect`. Both collapse an N×K worst case (useAtom) down to ~K.
+- **Wall-clock** — at flat-object scale, `useSelect` is the fastest path because its selector machinery is minimal. Legend sits between `useAtom` and `useSelect` because each `.key.get()` walks the proxy and registers a tracking node. The gap is ~2.2–3.3× in ops/sec; ergonomically it buys "no selectors, no equality functions, nested paths tracked for free".
+- **Where Legend should pull ahead** (not yet measured): deeply nested reads like `user.profile.addresses[2].zip`, and fan-out scenarios where N different components each read a different leaf. Both avoid the per-component selector boilerplate `useSelect` needs.
+
+### Known gaps / follow-ups
+
+1. Async error surfacing relies on `ctrl.state === 'failed'` → `onError` in the bridge *plus* first-observing the observable. We document that consumers read `syncState(obs).error` rather than relying on ErrorBoundary re-throw.
+2. The `as T` cast in `set({ value })` is the library-boundary exception noted in CLAUDE.md — Legend types the callback value as `T extends Promise<infer t> ? t : T` and we already know the resolved type.
+3. Lite's `ctrl.set()` is asynchronously scheduled (`scheduleSet`), so benchmark callers must `await scope.flush()` (or `await act(async () => ...)`) for the update to propagate before the next render. This is expected Lite behavior.
+4. GC / release semantics: today `atomObs` caches observables per scope; nothing releases the underlying Lite atom when no observer subscribes anymore. This matches `lite-react`'s current behavior but could leak for short-lived atoms. Fix: count subscribers in the `synced.subscribe` callback and call `ctrl.release()` when the count drops to zero.
+5. `lite-legend` is not yet added to `pnpm-workspace.yaml` publishConfig — it's marked `private: true` for the POC.
+
 ## Recommendation
 
 Yes, build `@pumped-fn/lite-legend` as a **sibling** to `lite-react`, not a
