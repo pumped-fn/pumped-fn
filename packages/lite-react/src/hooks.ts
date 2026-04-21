@@ -274,6 +274,7 @@ function useSelect<T, S>(
   const isSuspense = isOptions ? (eqOrOptions as UseSelectOptions<S>).suspense !== false : true
   const autoResolve = isOptions ? !!(eqOrOptions as UseSelectOptions<S>).resolve : true
   const eq = isOptions ? (eqOrOptions as UseSelectOptions<S>).eq : eqOrOptions as ((a: S, b: S) => boolean) | undefined
+  const eqFn = eq ?? Object.is
 
   const selectionCache = useRef<{
     ctrl: Lite.Controller<T>
@@ -325,7 +326,7 @@ function useSelect<T, S>(
       const selectedValue = current &&
         current.ctrl === ctrl &&
         current.selector === selector &&
-        (eq ?? Object.is)(current.value, nextValue)
+        eqFn(current.value, nextValue)
         ? current.value
         : nextValue
 
@@ -362,7 +363,7 @@ function useSelect<T, S>(
           const selectedValue = current &&
             current.ctrl === ctrl &&
             current.selector === selector &&
-            (eq ?? Object.is)(current.value, nextValue)
+            eqFn(current.value, nextValue)
             ? current.value
             : nextValue
 
