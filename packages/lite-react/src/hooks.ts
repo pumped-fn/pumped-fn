@@ -118,7 +118,9 @@ function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
 function useController<T>(atom: Lite.Atom<T>, options: UseControllerOptions): Lite.Controller<T>
 function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): Lite.Controller<T> {
   const scope = useScope()
-  const ctrl = useMemo(() => scope.controller(atom), [scope, atom])
+  // scope.controller() is idempotent (caches by atom in a Map), so calling it
+  // every render is free and lets us skip a useMemo cell in the hook fiber.
+  const ctrl = scope.controller(atom)
 
   if (options?.resolve) {
     if (ctrl.state === 'idle' || ctrl.state === 'resolving') {
