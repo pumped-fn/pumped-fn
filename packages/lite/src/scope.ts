@@ -224,11 +224,11 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   ) {}
 
   private resolveEntry(): AtomEntry<T> | undefined {
-    let e = this._entryCache
-    if (e) return e
-    e = this.scope.getEntry(this.atom) as AtomEntry<T> | undefined
-    if (e) this._entryCache = e
-    return e
+    const cached = this._entryCache
+    if (cached) return cached
+    const fresh = this.scope.getEntry(this.atom) as AtomEntry<T> | undefined
+    if (fresh) this._entryCache = fresh
+    return fresh
   }
 
   /** @internal — called from Scope when the entry is released or replaced. */

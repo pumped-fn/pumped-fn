@@ -2,7 +2,7 @@
 
 import { useContext, useMemo } from 'react'
 import type { Lite } from '@pumped-fn/lite'
-import { syncState, type Observable } from '@legendapp/state'
+import { syncState, type Observable, type ObservableParam } from '@legendapp/state'
 import { use$ } from '@legendapp/state/react'
 import { ScopeContext } from './context'
 import { atomObs } from './bridge'
@@ -35,7 +35,10 @@ function useAtomObs<T>(atom: Lite.Atom<T>): Observable<T> {
 function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T {
   const obs = useAtomObs(atom)
   const suspense = options?.suspense !== false
-  const state = syncState(obs)
+  // Legend's syncState expects `ObservableParam`; our generic `Observable<T>`
+  // is compatible at runtime but TS can't narrow the union back. Cast here is
+  // the library-boundary exception noted in CLAUDE.md.
+  const state = syncState(obs as ObservableParam<T>)
   const err = use$(state.error) as Error | undefined
   if (err) throw err
   return use$(obs, { suspense }) as T
