@@ -307,6 +307,63 @@ Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment l
 
 Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
 
+### Fifth autoresearch session — `autoresearch/lite-prof-guided` (profile-guided, 10 rounds)
+
+Pivot: earlier React-bench numbers were dominated by React + JSDOM setup (~98% idle in `node --cpu-prof`). Built a standalone microbench (`packages/lite-legend/prof/micro.mjs` + `micro-select.mjs`) where 92% of samples land in our code, and drove optimization from the resulting profile.
+
+Baseline hotspots (microbench, 92% in-our-code):
+
+| Function | Self % | Notes |
+|----------|------:|-------|
+| user selector `(s) => s[k]` | 50 | Can't optimize — user code |
+| `notifyListeners` | 22 | `[...listeners]` spread every fire |
+| `ScopeImpl.getEntry` | 10 | `Map.get(atom)` per `ctrl.get()` / `ctrl.state` |
+| `notifyEntry` | 5 | dispatch to `notifyListeners` twice |
+| SelectHandle listener | ~3 | `this.*` accesses, `ctrl.get()` |
+
+**Kept (5):**
+
+| # | Status | Change | Primary delta |
+|--:|:-------|:-------|--:|
+| 1 | keep | `notifyListeners`: WeakMap-cached snapshot (skip `[...listeners]` spread per fire) | +1% microbench; **+80% select_large_hz**, **+78% select_small_hz** (React) |
+| 3 | keep | Controller lazy-caches `AtomEntry` reference (eliminates `scope.getEntry` Map lookup from `ctrl.get()`/`ctrl.state`) | **+33% primary** |
+| 8 | keep | Inline `notifyListeners` into `notifyEntry` (2 fewer function dispatches per mutation) | +2% primary; **+23% many_atoms_single_set_hz** |
+| 9 | keep | `Controller.set` forwards cached entry to `scheduleSet` (eliminates another `Map.get`) | **+5% primary** |
+| 10 | keep | Parity: same forward for `Controller.update`/`scheduleUpdate` | no-op (bench doesn't exercise update) |
+
+**Discarded (3):**
+
+| # | Status | Change | Outcome |
+|--:|:-------|:-------|:-------|
+| 2 | discard | `ListenerBag` abstraction (Set + parallel array + dirty flag) | closure alloc in callbacks regressed primary −12% |
+| 5 | discard | inline snapshot arrays on `AtomEntry` via `notifyCachedSet(cb)` | same closure-alloc problem −9% primary, −45% React |
+| 6 | discard | SelectHandle listener: hoist `this.*` into closure locals + `attach()` split | within noise |
+
+**Cumulative deltas, this session (microbench, same machine, 3-run avg):**
+
+| Metric | Baseline | Now | Δ |
+|--------|---------:|----:|---:|
+| `scope_select_100handles_hz` (primary) | 1965 | 2882 | **+47%** |
+| `raw_set_100listeners_hz` | 18 054 | 27 467 | **+52%** |
+| `raw_set_1000listeners_hz` | 1799 | 2412 | **+34%** |
+| `many_atoms_single_set_hz` | 17 441 | 23 660 | **+36%** |
+| `select_large_hz` (React) | 110 | 211 | **+92%** |
+| `select_small_hz` (React) | 404 | 761 | **+88%** |
+| `useatom_large_hz` (React) | 20.9 | 19.7 | −6% (noise) |
+| `legend_large_hz` (React) | 87 | 84 | −3% (noise) |
+
+**Takeaways:**
+
+1. **WeakMap-cached notify snapshot (round 1)** was the single biggest structural win for consumer-facing hooks. `useSelect` subscribes to both `resolvedListeners` (via handle) and `allListeners` (via state-transition fallback) — 2 × 100 listeners spread per mutation. Cache made that essentially free.
+
+2. **Controller entry-ref cache (round 3)** eliminated `scope.getEntry` from the hot path entirely (10% → absent in re-profile). The Controller now owns a lazy field invalidated by `scope.release`.
+
+3. **Inlining dispatches** (rounds 8+9) gave another ~7% combined by removing function-call overhead and an extra `Map.get` on the set path.
+
+4. **What wouldn't invert**: any attempt to replace the `Set+WeakMap` pair with a direct-on-entry parallel array required passing a setter callback (closure), which allocated per fire and regressed. The WeakMap stays.
+
+5. **The React bench is noisy** because most of its measured time is React + JSDOM setup, not our code. The microbench is the real signal going forward.
+
 ### Fourth autoresearch session — `autoresearch/lite-aggressive` (9 rounds)
 
 Goal: find structural wins after the third session hit a local optimum. Opened the scope to more invasive approaches (hook-rule bending, delegating to core primitives).

@@ -351,6 +351,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.0(vitest@4.1.0(@opentelemetry/api@1.9.0)(@types/node@20.19.26)(happy-dom@17.6.3)(jsdom@27.3.0(postcss@8.5.8))(vite@6.4.1(@types/node@20.19.26)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.2)))
+      global-jsdom:
+        specifier: ^29.0.0
+        version: 29.0.0(jsdom@27.3.0(postcss@8.5.8))
       jsdom:
         specifier: ^27.3.0
         version: 27.3.0(postcss@8.5.8)
@@ -2645,6 +2648,12 @@ packages:
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
     engines: {node: '>= 6'}
+
+  global-jsdom@29.0.0:
+    resolution: {integrity: sha512-S9Wl+EHDfkO8DYleqMYzf14hKfwIysEN/FvoVRdPif3uUGUlmiHs/gj1PVKXhmJ20DwUVACtdxxhNYYvvn9K7A==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      jsdom: '>=29 <30'
 
   globby@11.1.0:
     resolution: {integrity: sha512-jhIXaOzy1sb8IyocaruWSn1TjmnBVs8Ayhcy83rmxNJ8q2uWKCAj3CnJY+KpGSXCueAPc0i05kVvVKtP1t9S3g==}
@@ -6554,6 +6563,10 @@ snapshots:
   glob-parent@5.1.2:
     dependencies:
       is-glob: 4.0.3
+
+  global-jsdom@29.0.0(jsdom@27.3.0(postcss@8.5.8)):
+    dependencies:
+      jsdom: 27.3.0(postcss@8.5.8)
 
   globby@11.1.0:
     dependencies:
