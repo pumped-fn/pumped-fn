@@ -34,8 +34,7 @@ This is a pnpm workspace monorepo with the following structure:
 /
 ├── packages/
 │   └── lite/     - Core library (@pumped-fn/lite)
-├── docs/         - Documentation site
-└── .c3/          - C3 architecture documentation
+└── docs/         - Documentation site
 ```
 
 ## 🔄 Development Workflow
