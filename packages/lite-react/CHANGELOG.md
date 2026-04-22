@@ -1,5 +1,16 @@
 # @pumped-fn/lite-react
 
+## 1.2.1
+
+### Patch Changes
+
+- 593e023: Performance optimizations from autoresearch sessions:
+
+  - **lite**: Cache listener snapshots via `WeakMap<Set, snap>` (rebuild only when set size changes), cache controller entry references (`Controller._entryCache`) to skip repeated `scope.cache.get(atom)` lookups on hot paths, and add a sync fast-path for `ctrl.set` / `ctrl.update` that applies mutations synchronously when the invalidation queue is empty.
+  - **lite-react**: Drop `useMemo` wrapper around `useController` (idempotent), add Suspense fast-path in `useAtom` for resolved atoms that bypasses `useSyncExternalStore`, and hoist `eq ?? Object.is` per render.
+
+- d2fb81f: Tighten lite controller and dependency contracts, restore extension-safe scope initialization, and align the lite-react branch changes with the verified React test runtime.
+
 ## 1.2.0
 
 ### Minor Changes
