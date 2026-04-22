@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ScopeContext } from './context'
 
@@ -160,6 +160,27 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
 
   const isSuspense = options?.suspense !== false
   const autoResolve = isSuspense ? options?.resolve !== false : !!options?.resolve
+
+  // Aggressive fast path for the canonical Suspense + auto-resolve case.
+  // Skips useSyncExternalStore's snapshot-cache bookkeeping in favor of a
+  // direct useReducer forceUpdate driven by a layout-effect subscription.
+  // The non-Suspense path retains the full tearing-safe implementation below.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useLayoutEffect(() => {
+    if (!isSuspense) return
+    return ctrl.on('*', forceUpdate)
+  }, [ctrl, isSuspense])
+  if (isSuspense) {
+    const s = ctrl.state
+    if (s === 'idle') {
+      if (autoResolve) throw getOrCreatePendingPromise(ctrl)
+      throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
+    }
+    if (s === 'failed') throw ctrl.get()
+    try { return ctrl.get() } catch { throw getOrCreatePendingPromise(ctrl) }
+  }
 
   const stateCache = useRef<{
     ctrl: Lite.Controller<T>
