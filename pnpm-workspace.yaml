@@ -1,10 +1,12 @@
 packages:
   - 'packages/*'
   - 'examples/*'
+  - 'benchmarks/*'
   - 'docs'
   - '.claude/skills/pumped-design/examples/skill-examples'
 
 catalog:
+  "@legendapp/state": 3.0.0-beta.46
   "@hono/node-server": ^1.13.8
   "@opentelemetry/api": ^1.9.0
   "@opentelemetry/sdk-trace-base": ^1.30.1

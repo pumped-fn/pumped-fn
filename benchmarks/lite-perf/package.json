@@ -1,0 +1,39 @@
+{
+  "name": "@pumped-fn/lite-perf-bench",
+  "version": "0.0.0",
+  "description": "Benchmarks and profiling harness for @pumped-fn/lite (not published)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "bench": "vitest bench --run",
+    "bench:watch": "vitest bench",
+    "micro": "node prof/micro.mjs",
+    "prof:micro": "node --cpu-prof --cpu-prof-dir=prof/out --cpu-prof-name=micro.cpuprofile prof/micro-select.mjs",
+    "prof:react": "NODE_OPTIONS=\"--cpu-prof --cpu-prof-dir=$(pwd)/prof/out --cpu-prof-name=react.cpuprofile\" tsx prof/run.tsx",
+    "prof:analyze": "node prof/analyze.mjs",
+    "prof:ours": "node prof/our-code.mjs",
+    "all": "bash scripts/autoresearch.sh"
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-react": "workspace:*",
+    "@pumped-fn/lite-legend": "workspace:*",
+    "@legendapp/state": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "catalog:",
+    "@types/react": "^18.3.27",
+    "global-jsdom": "^29.0.0",
+    "jsdom": "^27.3.0",
+    "react": "^18.3.1",
+    "react-dom": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

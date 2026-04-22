@@ -121,6 +121,12 @@ interface AtomEntry<T> {
   resolvedPromise?: Promise<T>
 }
 
+// Cached snapshot arrays for notifyListeners. Rebuilt when the underlying
+// Set's size changes (the common case: listener added or removed); reused
+// across fires when the set is stable. Keyed by the Set itself so GC'd Sets
+// release their snapshots automatically.
+const listenerSnapshotCache = new WeakMap<Set<() => void>, { size: number, arr: (() => void)[] }>()
+
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
@@ -130,9 +136,14 @@ function notifyListeners(listeners: Set<() => void> | undefined): void {
     }
     return
   }
-  for (const listener of [...listeners]) {
-    listener()
+  let snap = listenerSnapshotCache.get(listeners)
+  if (!snap || snap.size !== listeners.size) {
+    snap = { size: listeners.size, arr: [...listeners] }
+    listenerSnapshotCache.set(listeners, snap)
   }
+  const arr = snap.arr
+  const n = arr.length
+  for (let i = 0; i < n; i++) arr[i]!()
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
@@ -201,22 +212,40 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
 
 class ControllerImpl<T> implements Lite.Controller<T> {
   readonly [controllerSymbol] = true
+  // Cached reference to the entry in scope.cache. Eliminates a Map.get per
+  // `.state` / `.get()` access on the hot path (scope-level notifyListeners
+  // fires into handle listeners which then call `ctrl.get()`).
+  // Invalidated by scope.release via clearEntryCache().
+  _entryCache: AtomEntry<T> | null = null
 
   constructor(
     private atom: Lite.Atom<T>,
     private scope: ScopeImpl
   ) {}
 
+  private resolveEntry(): AtomEntry<T> | undefined {
+    const cached = this._entryCache
+    if (cached) return cached
+    const fresh = this.scope.getEntry(this.atom) as AtomEntry<T> | undefined
+    if (fresh) this._entryCache = fresh
+    return fresh
+  }
+
+  /** @internal — called from Scope when the entry is released or replaced. */
+  _invalidateEntryCache(): void {
+    this._entryCache = null
+  }
+
   get state(): AtomState {
-    const entry = this.scope.getEntry(this.atom)
-    return entry?.state ?? 'idle'
+    const e = this.resolveEntry()
+    return e?.state ?? 'idle'
   }
 
   get(): T {
     for (let i = controllerReadHooks.length - 1; i >= 0; i--) {
       controllerReadHooks[i]!(this)
     }
-    const entry = this.scope.getEntry(this.atom)
+    const entry = this.resolveEntry()
     if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
     if (entry.state === 'failed') throw entry.error!
     if (entry.hasValue) return entry.value as T
@@ -236,11 +265,12 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   set(value: T): void {
-    this.scope.scheduleSet(this.atom, value)
+    // Pass our cached entry ref (if any) so scheduleSet skips a Map.get.
+    this.scope.scheduleSet(this.atom, value, this._entryCache ?? undefined)
   }
 
   update(fn: (prev: T) => T): void {
-    this.scope.scheduleUpdate(this.atom, fn)
+    this.scope.scheduleUpdate(this.atom, fn, this._entryCache ?? undefined)
   }
 
   on(event: ListenerEvent, listener: () => void): () => void {
@@ -445,8 +475,35 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved'): void {
-    notifyListeners(event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners)
-    notifyListeners(entry.allListeners)
+    // Inline notifyListeners for both phase-specific and allListeners sets.
+    // Direct WeakMap lookup + iteration avoids 2 function dispatches per fire
+    // (notifyEntry used to call notifyListeners twice).
+    const phase = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
+    const phSize = phase.size
+    if (phSize === 1) {
+      for (const fn of phase) { fn(); break }
+    } else if (phSize > 1) {
+      let snap = listenerSnapshotCache.get(phase)
+      if (!snap || snap.size !== phSize) {
+        snap = { size: phSize, arr: [...phase] }
+        listenerSnapshotCache.set(phase, snap)
+      }
+      const arr = snap.arr
+      for (let i = 0; i < phSize; i++) arr[i]!()
+    }
+    const all = entry.allListeners
+    const aSize = all.size
+    if (aSize === 1) {
+      for (const fn of all) { fn(); break }
+    } else if (aSize > 1) {
+      let snap = listenerSnapshotCache.get(all)
+      if (!snap || snap.size !== aSize) {
+        snap = { size: aSize, arr: [...all] }
+        listenerSnapshotCache.set(all, snap)
+      }
+      const arr = snap.arr
+      for (let i = 0; i < aSize; i++) arr[i]!()
+    }
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>): void {
@@ -887,8 +944,10 @@ class ScopeImpl implements Lite.Scope {
     this.scheduleInvalidation(atom)
   }
 
-  scheduleSet<T>(atom: Lite.Atom<T>, value: T): void {
-    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+  scheduleSet<T>(atom: Lite.Atom<T>, value: T, cachedEntry?: AtomEntry<T>): void {
+    // Controller.set can pass its cached entry reference — avoids a Map.get
+    // on the hot set path. Fall back to cache.get for external callers.
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
     if (!entry || entry.state === 'idle') {
       throw new Error("Atom not resolved")
     }
@@ -901,12 +960,27 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
+    // Fast path: no other chain work scheduled. Apply synchronously so the
+    // new value is visible and listeners fire before returning from set().
+    // Tests that rely on scope.flush() still work because the chain is empty.
+    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
+      entry.value = value
+      entry.state = 'resolved'
+      entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = false
+      entry.resolvedPromise = undefined
+      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      return
+    }
+
     entry.pendingSet = { value }
     this.scheduleInvalidation(atom, entry)
   }
 
-  scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T): void {
-    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+  scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T, cachedEntry?: AtomEntry<T>): void {
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
     if (!entry || entry.state === 'idle') {
       throw new Error("Atom not resolved")
     }
@@ -916,6 +990,19 @@ class ScopeImpl implements Lite.Scope {
 
     if (entry.state === 'resolving') {
       entry.pendingSet = { fn }
+      return
+    }
+
+    // Sync fast path mirroring scheduleSet.
+    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
+      entry.value = fn(entry.value as T)
+      entry.state = 'resolved'
+      entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = false
+      entry.resolvedPromise = undefined
+      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
       return
     }
 
@@ -1001,6 +1088,11 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.notifyEntryAll(entry as AtomEntry<unknown>)
+
+    // Invalidate the controller's cached entry reference before dropping it
+    // from the cache, so any subsequent .get() / .state access sees 'idle'.
+    const ctrl = this.controllers.get(atom) as ControllerImpl<unknown> | undefined
+    ctrl?._invalidateEntryCache()
 
     this.cache.delete(atom)
     this.controllers.delete(atom)
