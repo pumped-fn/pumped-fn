@@ -265,7 +265,8 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   set(value: T): void {
-    this.scope.scheduleSet(this.atom, value)
+    // Pass our cached entry ref (if any) so scheduleSet skips a Map.get.
+    this.scope.scheduleSet(this.atom, value, this._entryCache ?? undefined)
   }
 
   update(fn: (prev: T) => T): void {
@@ -943,8 +944,10 @@ class ScopeImpl implements Lite.Scope {
     this.scheduleInvalidation(atom)
   }
 
-  scheduleSet<T>(atom: Lite.Atom<T>, value: T): void {
-    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+  scheduleSet<T>(atom: Lite.Atom<T>, value: T, cachedEntry?: AtomEntry<T>): void {
+    // Controller.set can pass its cached entry reference — avoids a Map.get
+    // on the hot set path. Fall back to cache.get for external callers.
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
     if (!entry || entry.state === 'idle') {
       throw new Error("Atom not resolved")
     }
