@@ -31,7 +31,7 @@
     "vite": "^5.0.0 || ^6.0.0"
   },
   "dependencies": {
-    "acorn": "^8.15.0",
+    "acorn": "^8.16.0",
     "estree-walker": "^3.0.3",
     "magic-string": "^0.30.21"
   },
@@ -40,7 +40,7 @@
     "@types/estree": "^1.0.8",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vite": "^6.4.1",
+    "vite": "^6.4.2",
     "vitest": "catalog:"
   },
   "keywords": [

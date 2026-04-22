@@ -21,11 +21,11 @@
     "@legendapp/state": "catalog:"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.0",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "catalog:",
     "@types/react": "^18.3.27",
     "global-jsdom": "^29.0.0",
-    "jsdom": "^27.3.0",
+    "jsdom": "^27.4.0",
     "react": "^18.3.1",
     "react-dom": "catalog:",
     "tsx": "catalog:",
