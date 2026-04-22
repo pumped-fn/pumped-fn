@@ -270,7 +270,7 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   update(fn: (prev: T) => T): void {
-    this.scope.scheduleUpdate(this.atom, fn)
+    this.scope.scheduleUpdate(this.atom, fn, this._entryCache ?? undefined)
   }
 
   on(event: ListenerEvent, listener: () => void): () => void {
@@ -979,8 +979,8 @@ class ScopeImpl implements Lite.Scope {
     this.scheduleInvalidation(atom, entry)
   }
 
-  scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T): void {
-    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+  scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T, cachedEntry?: AtomEntry<T>): void {
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
     if (!entry || entry.state === 'idle') {
       throw new Error("Atom not resolved")
     }
