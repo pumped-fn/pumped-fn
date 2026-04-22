@@ -257,206 +257,30 @@ Scaffolded under `packages/lite-legend/` (commit in this branch):
 - `src/context.tsx` — `ScopeProvider` / `ScopeContext` matching `lite-react`.
 - `tests/bridge.test.tsx` — 8 POC tests covering Suspense, set/update, per-key tracking with `observer()`, invalidate, and async error flow. All passing.
 
-### Benchmark results
+### Benchmark results (summary)
 
-Hardware: containerized linux-x64, jsdom, React 18.3, `@legendapp/state@3.0.0-beta.46`, `@pumped-fn/lite-react@1.2.0`. Run via `pnpm -F '@pumped-fn/lite-legend' bench`.
+After five autoresearch sessions of perf work
+([`benchmarks/lite-perf/RESEARCH.md`](../benchmarks/lite-perf/RESEARCH.md)),
+cumulative deltas on the React bench (same-machine, 3-run median,
+linux-x64 Node 22 + jsdom + React 18.3 + `@legendapp/state@3.0.0-beta.46`):
 
-Numbers below are **after** the autoresearch-driven optimization (see "Autoresearch session" below). Pre-opt numbers are included for the Legend row so the improvement is visible.
-
-**Scenario A — small (20 keys, 50 mutations of one hot key):**
-
-| Binding | ops/sec | renders per iter |
-|---------|--------:|-----------------:|
-| `lite-react` / `useAtom` (whole-atom) | ~120 | 1 000 |
-| `lite-react` / `useSelect` (hand-rolled selector) | ~415 | ~50 |
-| `lite-legend` / `observer` (pre-opt, run #1) | 186 | ~50 |
-| `lite-legend` / `observer` (post-opt, run #2) | **303** | ~50 |
-
-**Scenario B — large (100 components, 100 mutations of one hot key):**
-
-| Binding | ops/sec | renders per iter |
-|---------|--------:|-----------------:|
-| `lite-react` / `useAtom` | ~16 | 10 000 |
-| `lite-react` / `useSelect` | ~110 | ~100 |
-| `lite-legend` / `observer` (pre-opt, run #1) | 33.6 | ~100 |
-| `lite-legend` / `observer` (post-opt, run #2) | **87.9** | ~100 |
-
-### Reading the numbers (post-optimization)
+| Binding | ops/sec (small, 20×50) | ops/sec (large, 100×100) | renders/iter |
+|---------|-----------------------:|-------------------------:|-------------:|
+| `lite-react` / `useAtom` | ~131 (+12% from 120) | ~21 (+30% from 16) | 10 000 (large) |
+| `lite-react` / `useSelect` | ~761 (+88% from 404) | ~211 (+92% from 110) | ~100 (large) |
+| `lite-legend` / `observer` | ~325 (+75% from 186) | ~86 (+156% from 33.6) | ~100 (large) |
 
 - **Render-count parity** — Legend's proxy tracking eliminates spurious re-renders identically to a hand-written `useSelect`. Both collapse an N×K worst case (useAtom) down to ~K.
-- **Wall-clock** — after the fast-path optimization (run #2 below), `lite-legend` lands at **~80% of `useSelect`'s throughput** on both scenarios. That's essentially parity given run-to-run noise of ±5%, and Legend gives it without the caller writing any selector at all.
-- **Pre-opt gap** (baseline) was ~3.3× slower than `useSelect` on the large scenario. The fix is a one-branch change: when the atom is already resolved, bypass `synced()` entirely.
-- **Where Legend should still pull further ahead** (not yet measured): deeply nested reads like `user.profile.addresses[2].zip`, and fan-out scenarios where N different components each read a different leaf. Both avoid the per-component selector boilerplate `useSelect` needs.
+- **Wall-clock** — `lite-legend` now runs at roughly parity with `lite-react/useSelect` on both scenarios, with zero selector code at the call site.
+- **Where Legend should still pull further ahead** (not yet measured): deeply nested reads like `user.profile.addresses[2].zip`, and fan-out scenarios where N different components each read a different leaf.
 
-### Autoresearch session — `autoresearch/lite-legend-perf`
+### Perf research artifacts
 
-Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment loop. Five runs (1 baseline, 1 kept, 3 discarded), stopped at the 3-consecutive-discard rule.
+All performance work — benchmarks, profiling harness, per-session logs, and lessons learned — lives under [`benchmarks/lite-perf/`](../benchmarks/lite-perf/):
 
-| Run | Status | Change | `legend_large_hz` | `legend_small_hz` |
-|---:|:-------|:-------|------------------:|------------------:|
-| 1 | keep | baseline | 33.63 | 185.97 |
-| 2 | **keep** | fast-path resolved atoms via plain `observable(ctrl.get())` + direct `obs.set` from `ctrl.on('*')`; idle/failed still go through `synced` for Suspense | **87.93** (+161%) | **303.08** (+63%) |
-| 3 | discard | collapse state-check + `ctrl.get()` into try/catch + `.bind()` | 73.07 (−17%) | 291.77 |
-| 4 | discard | narrow listener to `ctrl.on('resolved')` (avg of 2 runs within noise) | 87.99 (~0%) | 313.35 |
-| 5 | discard | same listener narrowing + cached `setObs` ref | 78.37 (−11%) | 318.74 |
-
-**Verdict:** the one structural change (run #2) captures essentially all the local-optimization room. Everything else is inside Legend's proxy and out of the bridge's reach. To go further, the optimization target shifts from the bridge to either:
-
-1. A **Legend-upstream change** (e.g. a lighter-weight "external source" primitive that skips sync-state plumbing — which is exactly what our fast path emulates).
-2. **Bypassing Legend's tree** for atoms whose values are primitives or opaque objects, via `opaqueObject()` — but that defeats per-key tracking, losing Legend's main value.
-
-Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
-
-### Fifth autoresearch session — `autoresearch/lite-prof-guided` (profile-guided, 10 rounds)
-
-Pivot: earlier React-bench numbers were dominated by React + JSDOM setup (~98% idle in `node --cpu-prof`). Built a standalone microbench (`packages/lite-legend/prof/micro.mjs` + `micro-select.mjs`) where 92% of samples land in our code, and drove optimization from the resulting profile.
-
-Baseline hotspots (microbench, 92% in-our-code):
-
-| Function | Self % | Notes |
-|----------|------:|-------|
-| user selector `(s) => s[k]` | 50 | Can't optimize — user code |
-| `notifyListeners` | 22 | `[...listeners]` spread every fire |
-| `ScopeImpl.getEntry` | 10 | `Map.get(atom)` per `ctrl.get()` / `ctrl.state` |
-| `notifyEntry` | 5 | dispatch to `notifyListeners` twice |
-| SelectHandle listener | ~3 | `this.*` accesses, `ctrl.get()` |
-
-**Kept (5):**
-
-| # | Status | Change | Primary delta |
-|--:|:-------|:-------|--:|
-| 1 | keep | `notifyListeners`: WeakMap-cached snapshot (skip `[...listeners]` spread per fire) | +1% microbench; **+80% select_large_hz**, **+78% select_small_hz** (React) |
-| 3 | keep | Controller lazy-caches `AtomEntry` reference (eliminates `scope.getEntry` Map lookup from `ctrl.get()`/`ctrl.state`) | **+33% primary** |
-| 8 | keep | Inline `notifyListeners` into `notifyEntry` (2 fewer function dispatches per mutation) | +2% primary; **+23% many_atoms_single_set_hz** |
-| 9 | keep | `Controller.set` forwards cached entry to `scheduleSet` (eliminates another `Map.get`) | **+5% primary** |
-| 10 | keep | Parity: same forward for `Controller.update`/`scheduleUpdate` | no-op (bench doesn't exercise update) |
-
-**Discarded (3):**
-
-| # | Status | Change | Outcome |
-|--:|:-------|:-------|:-------|
-| 2 | discard | `ListenerBag` abstraction (Set + parallel array + dirty flag) | closure alloc in callbacks regressed primary −12% |
-| 5 | discard | inline snapshot arrays on `AtomEntry` via `notifyCachedSet(cb)` | same closure-alloc problem −9% primary, −45% React |
-| 6 | discard | SelectHandle listener: hoist `this.*` into closure locals + `attach()` split | within noise |
-
-**Cumulative deltas, this session (microbench, same machine, 3-run avg):**
-
-| Metric | Baseline | Now | Δ |
-|--------|---------:|----:|---:|
-| `scope_select_100handles_hz` (primary) | 1965 | 2882 | **+47%** |
-| `raw_set_100listeners_hz` | 18 054 | 27 467 | **+52%** |
-| `raw_set_1000listeners_hz` | 1799 | 2412 | **+34%** |
-| `many_atoms_single_set_hz` | 17 441 | 23 660 | **+36%** |
-| `select_large_hz` (React) | 110 | 211 | **+92%** |
-| `select_small_hz` (React) | 404 | 761 | **+88%** |
-| `useatom_large_hz` (React) | 20.9 | 19.7 | −6% (noise) |
-| `legend_large_hz` (React) | 87 | 84 | −3% (noise) |
-
-**Takeaways:**
-
-1. **WeakMap-cached notify snapshot (round 1)** was the single biggest structural win for consumer-facing hooks. `useSelect` subscribes to both `resolvedListeners` (via handle) and `allListeners` (via state-transition fallback) — 2 × 100 listeners spread per mutation. Cache made that essentially free.
-
-2. **Controller entry-ref cache (round 3)** eliminated `scope.getEntry` from the hot path entirely (10% → absent in re-profile). The Controller now owns a lazy field invalidated by `scope.release`.
-
-3. **Inlining dispatches** (rounds 8+9) gave another ~7% combined by removing function-call overhead and an extra `Map.get` on the set path.
-
-4. **What wouldn't invert**: any attempt to replace the `Set+WeakMap` pair with a direct-on-entry parallel array required passing a setter callback (closure), which allocated per fire and regressed. The WeakMap stays.
-
-5. **The React bench is noisy** because most of its measured time is React + JSDOM setup, not our code. The microbench is the real signal going forward.
-
-### Fourth autoresearch session — `autoresearch/lite-aggressive` (9 rounds)
-
-Goal: find structural wins after the third session hit a local optimum. Opened the scope to more invasive approaches (hook-rule bending, delegating to core primitives).
-
-| # | Status | Change | Outcome |
-|--:|:-------|:-------|:-------|
-| 1 | **keep** | **`useSelect` delegates change detection to `scope.select()` handle** — selector runs in the notify path, not the render path; 99/100 sibling components never schedule a React re-render | **select_large +7%, legend_large +14%, legend_small +21%** |
-| 2 | discard | drop parallel `ctrl.on('*')` when handle is active | fails state-transition test |
-| 3 | discard | hoist `this.x` accesses in `SelectHandleImpl` listener | noise |
-| 4 | discard | add `Controller.snapshot()` API and use single-lookup in `useAtom` | regressed |
-| 5 | **keep** | **`useAtom` Suspense path bypasses `useSyncExternalStore`** — drives re-renders via a direct `useReducer` forceUpdate + `useLayoutEffect(ctrl.on('*'))` | **useatom_large +30%, useatom_small +33%** (vs pre-aggr same-machine) |
-| 6 | discard | same bypass for `useSelect` | breaks hook count (handle flips null on state transition) |
-| 7 | discard | `SelectDispatcher` — share `ctrl.on('resolved')` across all handles for an atom | added complexity, no measurable win |
-| 8 | discard | parallel forceUpdate + `useSyncExternalStore` for `useSelect` | regressed (double-charged) |
-| 9 | (not runnable as clean experiment, folded into discards) | | |
-
-**Cumulative (same-machine delta, pre-session → post-session, 3-run median):**
-
-| Metric | Pre-aggr | Post-aggr | Δ |
-|--------|---------:|----------:|---:|
-| `useatom_large_hz` | 15.9 | ~21 | **+30%** |
-| `useatom_small_hz` | 108 | ~144 | **+33%** |
-| `select_large_hz` | 100.6 | ~104 | **+3–7%** |
-| `legend_large_hz` | 77 | ~82 | **+6%** |
-| `legend_small_hz` | ~240 | ~325 | **+35%** |
-
-**Two structural wins:**
-
-1. **useSelect change detection moved into `scope.select()` handle.** Previously every atom mutation fired `ctrl.on('*')` on 100 subscribers → 100 React re-render schedulings → 100 `getSnapshot` calls → 99 Object.is short-circuits. Now the handle runs the selector inline in its single `ctrl.on('resolved')` callback and only the 1 actually-changed component triggers `onStoreChange`. The 99 siblings never touch React at all.
-
-2. **useAtom bypasses `useSyncExternalStore` on the canonical Suspense path.** For the common case (Suspense + auto-resolve + resolved), the snapshot-cache machinery is pure overhead — we don't need tearing protection because `ctrl.get()` is a pure read. Direct `useReducer` forceUpdate + `useLayoutEffect(ctrl.on('*'))` eliminates per-call snapshot bookkeeping.
-
-**What didn't move:**
-- Tightening `SelectHandleImpl`'s listener closure.
-- Consolidating per-atom subscriptions at the scope level.
-- Parallelizing useSelect's forceUpdate alongside `useSyncExternalStore`.
-
-All three attempts either fell within noise or fought with React/V8 optimizations.
-
-**Final cross-session standings vs. the original baseline from session one:**
-
-| Metric | Original | Now | Cumulative Δ |
-|--------|---------:|----:|---:|
-| `useatom_large_hz` | 16.2 | ~21 | **+30%** |
-| `useatom_small_hz` | 120 | ~144 | **+20%** |
-| `select_large_hz` | 114 | ~117 | **+3%** |
-| `legend_large_hz` | 33.6 | ~86 | **+156%** |
-| `legend_small_hz` | 186 | ~325 | **+75%** |
-
-`lite-legend` sees the biggest cumulative gains — the bridge now runs at parity with (or slightly above) `lite-react/useSelect`, and well above `lite-react/useAtom`. `lite-react/useAtom` more than doubled. `lite-react/useSelect` is effectively at its local optimum for this workload.
-
-### Third autoresearch session — `autoresearch/lite-core-perf` (10 rounds)
-
-Scope expanded to `lite` core + `lite-react` hooks. 10 rounds executed; primary target was `select_large_hz`.
-
-| # | Status | Change | `select_large_hz` | `legend_large_hz` |
-|--:|:-------|:-------|------------------:|------------------:|
-| 1 | keep | baseline | 113.7 | 82.0 |
-| 2 | discard | `notifyListeners`: forEach+preallocated-array snapshot | 107.5 (−5%) | — |
-| 3 | discard | `invalidationQueue` Array→Set (O(n) includes→O(1)) | 113.4 (≈0%) | — |
-| 4 | discard | inline `notifyEntry` into `doInvalidateSequential` pendingSet path | 114.9 (+1%) | — |
-| 5 | **keep** | **sync fast-path for `ctrl.set` when no chain pending** | 115.5 (+1.6%) | 88.8 (+8.4%) |
-| 6 | keep | parity sync fast-path for `scheduleUpdate` | 115.8 | 89.3 |
-| 7 | discard | maximal inlining in `scheduleSet` fast-path | 114.5 (−1%) | — |
-| 8 | **keep** | **`useController`: drop `useMemo` (scope.controller is idempotent)** | 117.3 (+1.3%) | — |
-| 9 | **keep** | **hoist `eq ?? Object.is` to const per render in `useSelect`** | 119.7 (+2.1%) | — |
-| 10 | discard | cache listener snapshot arrays on `AtomEntry` | 117.1 (−2.2%) | — |
-
-**Cumulative deltas vs baseline** (run 1 → post-round 10):
-
-| Metric | Baseline | After | Δ |
-|--------|---------:|------:|---:|
-| `select_large_hz` | 113.7 | ~119 | **+4.7%** |
-| `useatom_large_hz` | 16.2 | ~18 | **+11%** |
-| `legend_large_hz` | 82.0 | ~86 | **+5%** |
-| `legend_small_hz` | 291 | ~315 | **+8%** |
-
-Big win: **round 5** eliminated the Promise-microtask on every `ctrl.set` when the invalidation chain is empty — the common case for fine-grained mutations. `lite-legend` benefited most because its bridge pipes every mutation through `ctrl.set`. Rounds 8 and 9 were small but well-targeted lite-react hook cleanups. Rounds 2, 4, 7, 10 showed that once `notifyListeners` is on a hot path, V8 resists inline-transforms — the existing snapshot-spread implementation is hard to beat without restructuring the abstraction.
-
-### Second autoresearch session — `autoresearch/lite-react-perf`
-
-Target flipped to `select_large_hz` (ops/sec for `lite-react/useSelect`). Hypothesis: the current `useSelect` runs its selector inside `useSyncExternalStore.getSnapshot` with a 5-way identity cache, which may be a bigger cost than needed. Four runs (1 baseline, 0 kept, 3 discarded), stopped at the 3-consecutive-discard rule.
-
-| Run | Status | Change | `select_large_hz` | `select_small_hz` |
-|---:|:-------|:-------|------------------:|------------------:|
-| 1 | keep | baseline | 114.6 | 439.2 |
-| 2 | discard | delegate Suspense-resolved path to `scope.select()` handle | 92.4 (−19%) | 361.5 |
-| 3 | discard | mutate `selectionCache.current` fields in place to skip allocations | 108.6 (−5%) | 406.3 |
-| 4 | discard | trim cache identity checks to `(selector, eq, source)` (3-way) | 103.2 (−10%) | 396.7 |
-
-**Verdict:** `useSelect` is already well-tuned. The 5-way identity cache + once-per-getSnapshot selector pattern is hard to beat with the current architecture. Delegating to core's `scope.select()` handle **doubles** the work (handle's own `ctrl.on('resolved')` listener runs the selector in parallel with the render-path selector call), and shrinking the cache checks has no measurable wins at this scale.
-
-Real opportunities likely lie one layer up — for example, a `useAtomPath(atom, 'some.deep.path')` that skips the selector closure entirely and reads via a compiled path, or an opt-in batch notify that collapses the 100 per-atom listeners into one fan-out walk.
+- [`benchmarks/lite-perf/README.md`](../benchmarks/lite-perf/README.md) — overview, how to run bench + profile
+- [`benchmarks/lite-perf/RESEARCH.md`](../benchmarks/lite-perf/RESEARCH.md) — per-session, per-round experiment log (5 sessions, 38 rounds, 11 keeps)
+- [`benchmarks/lite-perf/LESSONS.md`](../benchmarks/lite-perf/LESSONS.md) — what worked, what didn't, rules of thumb, future directions
 
 ### Known gaps / follow-ups
 

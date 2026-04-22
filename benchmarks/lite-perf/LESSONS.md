@@ -1,13 +1,11 @@
 # Lessons from perf research on `lite` / `lite-react` / `lite-legend`
 
-Date: 2026-04-22
+Consolidated here so future perf work doesn't re-discover the same dead ends.
+Per-round session detail lives in [`RESEARCH.md`](./RESEARCH.md).
+
 Source sessions: `autoresearch/lite-legend-perf`, `autoresearch/lite-react-perf`,
 `autoresearch/lite-core-perf`, `autoresearch/lite-aggressive`,
 `autoresearch/lite-prof-guided`.
-
-Consolidated here so future perf work doesn't re-discover the same dead ends.
-Per-round detail lives in
-[`2026-04-21-legend-state-integration-research.md`](./2026-04-21-legend-state-integration-research.md).
 
 ## Cumulative wins
 
