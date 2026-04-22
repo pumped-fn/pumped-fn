@@ -474,8 +474,35 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved'): void {
-    notifyListeners(event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners)
-    notifyListeners(entry.allListeners)
+    // Inline notifyListeners for both phase-specific and allListeners sets.
+    // Direct WeakMap lookup + iteration avoids 2 function dispatches per fire
+    // (notifyEntry used to call notifyListeners twice).
+    const phase = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
+    const phSize = phase.size
+    if (phSize === 1) {
+      for (const fn of phase) { fn(); break }
+    } else if (phSize > 1) {
+      let snap = listenerSnapshotCache.get(phase)
+      if (!snap || snap.size !== phSize) {
+        snap = { size: phSize, arr: [...phase] }
+        listenerSnapshotCache.set(phase, snap)
+      }
+      const arr = snap.arr
+      for (let i = 0; i < phSize; i++) arr[i]!()
+    }
+    const all = entry.allListeners
+    const aSize = all.size
+    if (aSize === 1) {
+      for (const fn of all) { fn(); break }
+    } else if (aSize > 1) {
+      let snap = listenerSnapshotCache.get(all)
+      if (!snap || snap.size !== aSize) {
+        snap = { size: aSize, arr: [...all] }
+        listenerSnapshotCache.set(all, snap)
+      }
+      const arr = snap.arr
+      for (let i = 0; i < aSize; i++) arr[i]!()
+    }
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>): void {
