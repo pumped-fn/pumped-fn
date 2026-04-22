@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'examples/*'
+  - 'benchmarks/*'
   - 'docs'
   - '.claude/skills/pumped-design/examples/skill-examples'
 

@@ -25,7 +25,7 @@ import { observer } from '@legendapp/state/react'
 import {
   ScopeProvider as LL_ScopeProvider,
   useAtomObs as LL_useAtomObs,
-} from '../src'
+} from '@pumped-fn/lite-legend'
 
 type State = Record<string, number>
 const KEY_COUNT = 20

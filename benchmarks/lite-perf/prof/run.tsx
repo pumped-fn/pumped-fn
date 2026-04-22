@@ -2,17 +2,13 @@
  * Standalone profiler-friendly bench runner.
  *
  * Run with:
- *   node --cpu-prof --cpu-prof-name=prof.cpuprofile \
- *     --import=tsx --experimental-vm-modules packages/lite-legend/prof/run.tsx
+ *   pnpm -F '@pumped-fn/lite-perf-bench' prof:react
+ * or explicitly:
+ *   NODE_OPTIONS="--cpu-prof --cpu-prof-dir=./prof/out" tsx prof/run.tsx
  *
- * Or just run it plain (no profiler) to measure timings cleanly.
- *
- * Emits:
- *   - JSON METRIC lines for autoresearch.sh compatibility (small + large scenarios)
- *   - Exits 0 on success, non-zero if something went wrong
- *
- * The script runs each scenario in a tight loop (ITERATIONS) to give the
- * profiler plenty of samples in the hot paths.
+ * Emits METRIC name=value lines for autoresearch.sh to parse. The script runs
+ * each scenario in a tight loop (ITERATIONS env var) to give the profiler
+ * plenty of samples in the hot paths.
  */
 import 'global-jsdom/register'
 import * as React from 'react'
@@ -28,7 +24,7 @@ import { observer } from '@legendapp/state/react'
 import {
   ScopeProvider as LL_ScopeProvider,
   useAtomObs as LL_useAtomObs,
-} from '../src'
+} from '@pumped-fn/lite-legend'
 
 type State = Record<string, number>
 
