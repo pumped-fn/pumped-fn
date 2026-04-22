@@ -121,6 +121,12 @@ interface AtomEntry<T> {
   resolvedPromise?: Promise<T>
 }
 
+// Cached snapshot arrays for notifyListeners. Rebuilt when the underlying
+// Set's size changes (the common case: listener added or removed); reused
+// across fires when the set is stable. Keyed by the Set itself so GC'd Sets
+// release their snapshots automatically.
+const listenerSnapshotCache = new WeakMap<Set<() => void>, { size: number, arr: (() => void)[] }>()
+
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
@@ -130,9 +136,14 @@ function notifyListeners(listeners: Set<() => void> | undefined): void {
     }
     return
   }
-  for (const listener of [...listeners]) {
-    listener()
+  let snap = listenerSnapshotCache.get(listeners)
+  if (!snap || snap.size !== listeners.size) {
+    snap = { size: listeners.size, arr: [...listeners] }
+    listenerSnapshotCache.set(listeners, snap)
   }
+  const arr = snap.arr
+  const n = arr.length
+  for (let i = 0; i < n; i++) arr[i]!()
 }
 
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
