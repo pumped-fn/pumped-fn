@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-perf-bench",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Benchmarks and profiling harness for @pumped-fn/lite (not published)",
   "type": "module",
   "private": true,

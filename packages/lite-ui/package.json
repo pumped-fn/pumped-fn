@@ -22,9 +22,15 @@
     "@pumped-fn/lite-react": ">=1.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "react-dom": { "optional": true },
-    "@pumped-fn/lite-react": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "@pumped-fn/lite-react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
