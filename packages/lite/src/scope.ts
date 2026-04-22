@@ -212,22 +212,40 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
 
 class ControllerImpl<T> implements Lite.Controller<T> {
   readonly [controllerSymbol] = true
+  // Cached reference to the entry in scope.cache. Eliminates a Map.get per
+  // `.state` / `.get()` access on the hot path (scope-level notifyListeners
+  // fires into handle listeners which then call `ctrl.get()`).
+  // Invalidated by scope.release via clearEntryCache().
+  _entryCache: AtomEntry<T> | null = null
 
   constructor(
     private atom: Lite.Atom<T>,
     private scope: ScopeImpl
   ) {}
 
+  private resolveEntry(): AtomEntry<T> | undefined {
+    let e = this._entryCache
+    if (e) return e
+    e = this.scope.getEntry(this.atom) as AtomEntry<T> | undefined
+    if (e) this._entryCache = e
+    return e
+  }
+
+  /** @internal — called from Scope when the entry is released or replaced. */
+  _invalidateEntryCache(): void {
+    this._entryCache = null
+  }
+
   get state(): AtomState {
-    const entry = this.scope.getEntry(this.atom)
-    return entry?.state ?? 'idle'
+    const e = this.resolveEntry()
+    return e?.state ?? 'idle'
   }
 
   get(): T {
     for (let i = controllerReadHooks.length - 1; i >= 0; i--) {
       controllerReadHooks[i]!(this)
     }
-    const entry = this.scope.getEntry(this.atom)
+    const entry = this.resolveEntry()
     if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
     if (entry.state === 'failed') throw entry.error!
     if (entry.hasValue) return entry.value as T
@@ -1040,6 +1058,11 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.notifyEntryAll(entry as AtomEntry<unknown>)
+
+    // Invalidate the controller's cached entry reference before dropping it
+    // from the cache, so any subsequent .get() / .state access sees 'idle'.
+    const ctrl = this.controllers.get(atom) as ControllerImpl<unknown> | undefined
+    ctrl?._invalidateEntryCache()
 
     this.cache.delete(atom)
     this.controllers.delete(atom)
