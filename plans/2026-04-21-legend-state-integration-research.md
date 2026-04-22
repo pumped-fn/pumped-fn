@@ -307,6 +307,57 @@ Used the `lagz0ne/1percent` autoresearch skill to run a disciplined experiment l
 
 Session artifacts (all gitignored): `autoresearch.md`, `autoresearch.sh`, `autoresearch.jsonl`. The wrapper script and JSONL log are kept locally for reproducibility; the kept change is cherry-picked onto the research branch.
 
+### Fourth autoresearch session — `autoresearch/lite-aggressive` (9 rounds)
+
+Goal: find structural wins after the third session hit a local optimum. Opened the scope to more invasive approaches (hook-rule bending, delegating to core primitives).
+
+| # | Status | Change | Outcome |
+|--:|:-------|:-------|:-------|
+| 1 | **keep** | **`useSelect` delegates change detection to `scope.select()` handle** — selector runs in the notify path, not the render path; 99/100 sibling components never schedule a React re-render | **select_large +7%, legend_large +14%, legend_small +21%** |
+| 2 | discard | drop parallel `ctrl.on('*')` when handle is active | fails state-transition test |
+| 3 | discard | hoist `this.x` accesses in `SelectHandleImpl` listener | noise |
+| 4 | discard | add `Controller.snapshot()` API and use single-lookup in `useAtom` | regressed |
+| 5 | **keep** | **`useAtom` Suspense path bypasses `useSyncExternalStore`** — drives re-renders via a direct `useReducer` forceUpdate + `useLayoutEffect(ctrl.on('*'))` | **useatom_large +30%, useatom_small +33%** (vs pre-aggr same-machine) |
+| 6 | discard | same bypass for `useSelect` | breaks hook count (handle flips null on state transition) |
+| 7 | discard | `SelectDispatcher` — share `ctrl.on('resolved')` across all handles for an atom | added complexity, no measurable win |
+| 8 | discard | parallel forceUpdate + `useSyncExternalStore` for `useSelect` | regressed (double-charged) |
+| 9 | (not runnable as clean experiment, folded into discards) | | |
+
+**Cumulative (same-machine delta, pre-session → post-session, 3-run median):**
+
+| Metric | Pre-aggr | Post-aggr | Δ |
+|--------|---------:|----------:|---:|
+| `useatom_large_hz` | 15.9 | ~21 | **+30%** |
+| `useatom_small_hz` | 108 | ~144 | **+33%** |
+| `select_large_hz` | 100.6 | ~104 | **+3–7%** |
+| `legend_large_hz` | 77 | ~82 | **+6%** |
+| `legend_small_hz` | ~240 | ~325 | **+35%** |
+
+**Two structural wins:**
+
+1. **useSelect change detection moved into `scope.select()` handle.** Previously every atom mutation fired `ctrl.on('*')` on 100 subscribers → 100 React re-render schedulings → 100 `getSnapshot` calls → 99 Object.is short-circuits. Now the handle runs the selector inline in its single `ctrl.on('resolved')` callback and only the 1 actually-changed component triggers `onStoreChange`. The 99 siblings never touch React at all.
+
+2. **useAtom bypasses `useSyncExternalStore` on the canonical Suspense path.** For the common case (Suspense + auto-resolve + resolved), the snapshot-cache machinery is pure overhead — we don't need tearing protection because `ctrl.get()` is a pure read. Direct `useReducer` forceUpdate + `useLayoutEffect(ctrl.on('*'))` eliminates per-call snapshot bookkeeping.
+
+**What didn't move:**
+- Tightening `SelectHandleImpl`'s listener closure.
+- Consolidating per-atom subscriptions at the scope level.
+- Parallelizing useSelect's forceUpdate alongside `useSyncExternalStore`.
+
+All three attempts either fell within noise or fought with React/V8 optimizations.
+
+**Final cross-session standings vs. the original baseline from session one:**
+
+| Metric | Original | Now | Cumulative Δ |
+|--------|---------:|----:|---:|
+| `useatom_large_hz` | 16.2 | ~21 | **+30%** |
+| `useatom_small_hz` | 120 | ~144 | **+20%** |
+| `select_large_hz` | 114 | ~117 | **+3%** |
+| `legend_large_hz` | 33.6 | ~86 | **+156%** |
+| `legend_small_hz` | 186 | ~325 | **+75%** |
+
+`lite-legend` sees the biggest cumulative gains — the bridge now runs at parity with (or slightly above) `lite-react/useSelect`, and well above `lite-react/useAtom`. `lite-react/useAtom` more than doubled. `lite-react/useSelect` is effectively at its local optimum for this workload.
+
 ### Third autoresearch session — `autoresearch/lite-core-perf` (10 rounds)
 
 Scope expanded to `lite` core + `lite-react` hooks. 10 rounds executed; primary target was `select_large_hz`.
