@@ -1,4 +1,5 @@
 import { flowSymbol, typedSymbol } from "./symbols"
+import { warmDepsGraph } from "./deps-graph"
 import type { Lite, MaybePromise } from "./types"
 
 /**
@@ -114,6 +115,8 @@ export function flow<
   const parse = config.parse
   const isTypedMarker =
     typeof parse === "object" && parse !== null && typedSymbol in parse
+
+  if (config.deps) warmDepsGraph(config.deps as unknown as Record<string, Lite.Dependency>)
 
   return {
     [flowSymbol]: true,

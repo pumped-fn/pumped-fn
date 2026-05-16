@@ -1,5 +1,6 @@
 import { atomSymbol, controllerDepSymbol } from "./symbols"
 import { registerAtomToTags } from "./tag"
+import { warmDepsGraph } from "./deps-graph"
 import type { Lite, MaybePromise } from "./types"
 
 export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
@@ -53,6 +54,8 @@ export function atom<T, D extends Record<string, Lite.Dependency>>(
   if (config.tags?.length) {
     registerAtomToTags(atomInstance, config.tags)
   }
+
+  if (config.deps) warmDepsGraph(config.deps as Record<string, Lite.Dependency>)
 
   return atomInstance
 }
