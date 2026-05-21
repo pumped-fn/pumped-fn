@@ -84,6 +84,65 @@ sequenceDiagram
     Scope-->>Test: ctx with tenantTag
 ```
 
+### Execution-Scoped Resource
+
+Resolve resource values from an `ExecutionContext` when the value should live for one request/span instead of the whole scope.
+
+```ts
+import { createScope, resource } from "@pumped-fn/lite"
+
+const txResource = resource({
+  name: "tx",
+  factory: (ctx) => {
+    const tx = {
+      commit: async () => {},
+      rollback: async () => {},
+      release: async () => {},
+    }
+
+    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
+    ctx.cleanup(() => tx.release())
+    return tx
+  },
+})
+
+const scope = createScope()
+const ctx = scope.createContext()
+const tx = await ctx.resolve(txResource)
+
+await ctx.release(txResource) // reset this context's tx
+await ctx.close()
+await scope.dispose()
+```
+
+Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. Resource ownership stays local to the execution context that created it; child executions can read ancestor-owned resources, but they do not release them.
+
+### Resource Controller Dependency
+
+Use `controller(resource)` when a resource should decide whether or when to load another resource. Use `watch: true` only in resource deps, never in atom or flow deps.
+
+```ts
+import { controller, resource } from "@pumped-fn/lite"
+
+const configResource = resource({
+  factory: () => ({ namespace: "app", version: 1 }),
+})
+
+const cacheResource = resource({
+  deps: {
+    config: controller(configResource, {
+      resolve: true,
+      watch: true,
+      eq: (a, b) => a.namespace === b.namespace && a.version === b.version,
+    }),
+  },
+  factory: (_ctx, { config }) => {
+    const cfg = config.get()
+    return new Map<string, unknown>([["namespace", cfg.namespace]])
+  },
+})
+```
+
 ## B. Advanced Client/State Usage
 
 ### Controller Reactivity
