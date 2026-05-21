@@ -82,6 +82,7 @@ Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on
 ## Scoped Form State
 
 `scopedValue` is the form/draft primitive. Define dependencies and actions with the value, then let React subscribe at the boundary.
+Complete React modules should show the provider boundary too: `ScopeProvider` owns the scope, and `ExecutionContextProvider` owns the execution context where the scoped value lives.
 
 ```tsx
 const loginForm = scopedValue({
@@ -104,6 +105,18 @@ const loginForm = scopedValue({
   }),
 })
 
+const scope = createScope()
+
+function LoginScreen() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <LoginForm />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
+
 function LoginForm() {
   const form = useScopedValue(loginForm)
 
@@ -124,10 +137,13 @@ The same value is testable without React:
 const ctx = scope.createContext()
 const form = await loginForm.resolve(ctx)
 form.actions.setEmail('a@example.com')
+if (form.getSnapshot().email !== 'a@example.com') throw new Error('expected updated email')
 await form.actions.submit()
 await ctx.release(loginForm)
 await ctx.close()
 ```
+
+Outside React, resolved access uses `getSnapshot()` or `get()`; `snapshot` exists only on the value returned by `useScopedValue`.
 
 Avoid `useState` mirrors for scoped fields. Render from `form.snapshot`; mutate through `form.actions`.
 

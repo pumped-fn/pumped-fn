@@ -142,8 +142,8 @@ Do not load resources with `useEffect`. `useResource` observes the resource cont
 Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is resource-backed, so it can be tested without React and is discarded when the execution context is released or closed.
 
 ```tsx
-import { resource } from '@pumped-fn/lite'
-import { scopedValue, useScopedValue } from '@pumped-fn/lite-react'
+import { createScope, resource } from '@pumped-fn/lite'
+import { ExecutionContextProvider, ScopeProvider, scopedValue, useScopedValue } from '@pumped-fn/lite-react'
 
 const authResource = resource({
   factory: () => ({
@@ -183,6 +183,18 @@ const loginForm = scopedValue({
   }),
 })
 
+const scope = createScope()
+
+export function LoginScreen() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <LoginForm />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
+
 function LoginForm() {
   const form = useScopedValue(loginForm)
 
@@ -205,12 +217,15 @@ const ctx = scope.createContext()
 const form = await loginForm.resolve(ctx)
 
 form.actions.setEmail('a@example.com')
+if (form.getSnapshot().email !== 'a@example.com') throw new Error('expected updated email')
 await form.actions.submit()
 
 await ctx.release(loginForm)
 await ctx.close()
 await scope.dispose()
 ```
+
+Resolved scoped-value access does not have a `snapshot` property. Outside React, read current state with `form.getSnapshot()` or `form.get()`. The `snapshot` property is only added by `useScopedValue` for React rendering.
 
 Components should not mirror scoped-value fields into `useState`. Use `form.snapshot` for render state and `form.actions` for mutations.
 
