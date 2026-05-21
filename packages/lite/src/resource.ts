@@ -13,7 +13,7 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  *   deps: { logService: logServiceAtom },
  *   factory: (ctx, { logService }) => {
  *     const logger = logService.child({ requestId: ctx.data.get("requestId") })
- *     ctx.onClose(() => logger.flush())
+ *     ctx.cleanup(() => logger.flush())
  *     return logger
  *   }
  * })
@@ -21,22 +21,25 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  */
 export function resource<T>(config: {
   name?: string
+  tags?: Lite.Tagged<any>[]
   deps?: undefined
-  factory: (ctx: Lite.ExecutionContext) => MaybePromise<T>
+  factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
 }): Lite.Resource<T>
 
 export function resource<
   T,
-  const D extends Record<string, Lite.ExecutionDependency>,
+  const D extends Record<string, Lite.ResourceDependency>,
 >(config: {
   name?: string
+  tags?: Lite.Tagged<any>[]
   deps: D
-  factory: (ctx: Lite.ExecutionContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
+  factory: (ctx: Lite.ResourceContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
 }): Lite.Resource<T>
 
 export function resource<T, D extends Record<string, Lite.Dependency>>(
   config: {
     name?: string
+    tags?: Lite.Tagged<any>[]
     deps?: D
     factory: Lite.ResourceFactory<T, D>
   }
@@ -44,6 +47,7 @@ export function resource<T, D extends Record<string, Lite.Dependency>>(
   return Object.freeze({
     [resourceSymbol]: true,
     name: config.name,
+    tags: config.tags,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     factory: config.factory as unknown as Lite.ResourceFactory<T, Record<string, Lite.Dependency>>,
   }) as Lite.Resource<T>

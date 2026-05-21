@@ -1,11 +1,11 @@
 import { type ReactNode } from "react";
+import type { JSX as OpenTuiJSX } from "@opentui/react/jsx-runtime";
 import { ScopeProvider, useAtom } from "@pumped-fn/lite-react";
 import type { Devtools } from "@pumped-fn/lite-devtools";
 import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
 function ReactTypeBridge({ children }: { children: ReactNode }) {
-  // @ts-expect-error lite-react uses React 18 types, OpenTUI requires React 19
   return <ScopeProvider scope={scope} children={children} />;
 }
 
@@ -50,7 +50,7 @@ function Content({ port }: { port: number }) {
   );
 }
 
-export function App({ port }: { port: number }) {
+export function App({ port }: { port: number }): OpenTuiJSX.Element {
   return (
     <ReactTypeBridge>
       <Content port={port} />

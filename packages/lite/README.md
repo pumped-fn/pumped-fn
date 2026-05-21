@@ -18,6 +18,66 @@ npx @pumped-fn/lite primitives   # API
 npx @pumped-fn/lite diagrams     # mermaid source
 ```
 
+## Execution-Scoped Resources
+
+Use `resource()` for values that belong to one `ExecutionContext`: request loggers, transactions, trace spans, per-request clients. The value is cached on the context that owns the miss, can be read by child executions through upward lookup, and is reset with `ctx.release(resource)` or `ctx.close()`.
+
+```ts
+import { createScope, resource } from "@pumped-fn/lite"
+
+const auditLogger = resource({
+  name: "audit-logger",
+  factory: (ctx) => {
+    const lines: string[] = []
+    ctx.cleanup(() => {
+      lines.length = 0
+    })
+    return {
+      log(line: string) {
+        lines.push(line)
+      },
+      snapshot: () => [...lines],
+    }
+  },
+})
+
+const scope = createScope()
+const ctx = scope.createContext()
+
+const audit = await ctx.resolve(auditLogger)
+audit.log("request started")
+
+await ctx.release(auditLogger) // owner-local reset
+await ctx.close()
+await scope.dispose()
+```
+
+Resource factories receive a `ResourceContext`: all normal execution-context APIs plus `ctx.cleanup(fn)` for resource-local cleanup. Use `ctx.onClose(result => ...)` for execution-boundary commit/rollback decisions, and `ctx.cleanup(fn)` for releasing the resource itself.
+
+Resource controllers are execution-context handles:
+
+```ts
+import { controller, resource } from "@pumped-fn/lite"
+
+const configResource = resource({ factory: () => ({ version: 1 }) })
+
+const clientResource = resource({
+  deps: {
+    config: controller(configResource, {
+      resolve: true,
+      watch: true,
+      eq: (a, b) => a.version === b.version,
+    }),
+  },
+  factory: (_ctx, { config }) => {
+    const cfg = config.get()
+    return { version: cfg.version }
+  },
+})
+```
+
+`watch: true` for resource controllers is valid only inside resource deps. It listens for resolved value changes and releases the dependent resource lazily. Atom deps cannot depend on resources, and flow deps cannot use watched resource controllers.
+
 ## How It Works
 
 ```mermaid

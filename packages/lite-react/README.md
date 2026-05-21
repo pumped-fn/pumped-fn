@@ -75,6 +75,160 @@ await scope.resolve(userAtom)
 </ScopeProvider>
 ```
 
+### ExecutionContextProvider
+
+Provides an execution context to resource and scoped-value hooks. In tests or request boundaries, pass the context explicitly with `ctx`.
+
+```tsx
+import { createScope } from '@pumped-fn/lite'
+import { ExecutionContextProvider, ScopeProvider } from '@pumped-fn/lite-react'
+
+const scope = createScope()
+const ctx = scope.createContext()
+
+<ScopeProvider scope={scope}>
+  <ExecutionContextProvider ctx={ctx}>
+    <App />
+  </ExecutionContextProvider>
+</ScopeProvider>
+```
+
+Create the scope and explicit context outside component bodies. Do not call `createScope()` or `scope.createContext()` inside a React component; that creates a new graph during render. Components should consume an existing boundary through `ExecutionContextProvider`.
+
+Managed mode creates an execution context from the surrounding `ScopeProvider` after commit and closes it on unmount:
+
+```tsx
+<ScopeProvider scope={scope}>
+  <ExecutionContextProvider>
+    <App />
+  </ExecutionContextProvider>
+</ScopeProvider>
+```
+
+### useResource
+
+Read execution-scoped resources at the React boundary. Suspense mode is the default:
+
+```tsx
+const user = useResource(currentUserResource)
+```
+
+Without Suspense, the hook returns a stable load union:
+
+```tsx
+function CurrentUser() {
+  const user = useResource(currentUserResource, { suspense: false })
+
+  if (user.status === 'loading') return <p>Loading...</p>
+  if (user.status === 'error') return <p role="alert">{user.error.message}</p>
+
+  return <p>{user.data.name}</p>
+}
+```
+
+The non-Suspense union is:
+
+```ts
+type Load<T> =
+  | { status: 'loading'; data: undefined; error: undefined }
+  | { status: 'ready'; data: T; error: undefined }
+  | { status: 'error'; data: undefined; error: Error }
+```
+
+Do not load resources with `useEffect`. `useResource` observes the resource controller, starts work at the right React boundary, and stays reset-aware when the owner context releases the resource.
+
+### scopedValue
+
+Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is resource-backed, so it can be tested without React and is discarded when the execution context is released or closed.
+
+```tsx
+import { createScope, resource } from '@pumped-fn/lite'
+import { ExecutionContextProvider, ScopeProvider, scopedValue, useScopedValue } from '@pumped-fn/lite-react'
+
+const authResource = resource({
+  factory: () => ({
+    login: async (email: string, password: string) => ({ email }),
+  }),
+})
+
+const loginForm = scopedValue({
+  name: 'login-form',
+  deps: { auth: authResource },
+  initial: () => ({ email: '', password: '', status: 'editing' as const, error: undefined as string | undefined }),
+  actions: ({ get, patch }, { auth }) => ({
+    setEmail(email: string) {
+      patch({ email, status: 'editing', error: undefined })
+    },
+    setPassword(password: string) {
+      patch({ password, status: 'editing', error: undefined })
+    },
+    submit() {
+      const snapshot = get()
+      if (!snapshot.email.includes('@')) {
+        patch({ status: 'editing', error: 'Enter a valid email' })
+        return Promise.resolve(undefined)
+      }
+      patch({ status: 'submitting', error: undefined })
+      return auth.login(snapshot.email, snapshot.password).then(
+        (user) => {
+          patch({ status: 'submitted', error: undefined })
+          return user
+        },
+        (error: Error) => {
+          patch({ status: 'editing', error: error.message })
+          return undefined
+        },
+      )
+    },
+  }),
+})
+
+const scope = createScope()
+
+export function LoginScreen() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <LoginForm />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
+
+function LoginForm() {
+  const form = useScopedValue(loginForm)
+
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); void form.actions.submit() }}>
+      <input value={form.snapshot.email} onChange={(event) => form.actions.setEmail(event.currentTarget.value)} />
+      <input value={form.snapshot.password} onChange={(event) => form.actions.setPassword(event.currentTarget.value)} />
+      {form.snapshot.error ? <p role="alert">{form.snapshot.error}</p> : null}
+      <button disabled={form.snapshot.status === 'submitting'}>Sign in</button>
+    </form>
+  )
+}
+```
+
+Test the same graph without React:
+
+```ts
+const scope = createScope()
+const ctx = scope.createContext()
+const form = await loginForm.resolve(ctx)
+
+form.actions.setEmail('a@example.com')
+if (form.getSnapshot().email !== 'a@example.com') throw new Error('expected updated email')
+await form.actions.submit()
+
+await ctx.release(loginForm)
+await ctx.close()
+await scope.dispose()
+```
+
+Resolved scoped-value access does not have a `snapshot` property. Outside React, read current state with `form.getSnapshot()` or `form.get()`. The `snapshot` property is only added by `useScopedValue` for React rendering.
+
+Components should not mirror scoped-value fields into `useState`. Use `form.snapshot` for render state and `form.actions` for mutations.
+
 ### useScope
 
 Access scope from context.

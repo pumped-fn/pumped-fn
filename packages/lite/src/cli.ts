@@ -90,8 +90,8 @@ flow({ factory, parse?, deps?, tags? })
 resource({ factory, deps?, name? })
   Like a flow factory but resolved as a DEPENDENCY of flows, not called directly.
   Created fresh per execution chain. Shared via seek-up: nested ctx.exec() reuses parent's instance.
-  Factory receives (executionCtx, resolvedDeps) → instance.
-  Cleanup via ctx.onClose(fn).
+  Factory receives (resourceCtx, resolvedDeps) → instance.
+  Resource cleanup via ctx.cleanup(fn); execution-boundary cleanup via ctx.onClose(fn).
 
   import { resource } from "@pumped-fn/lite"
   const txResource = resource({
@@ -99,6 +99,7 @@ resource({ factory, deps?, name? })
     factory: (ctx, { db }) => {
       const tx = db.beginTransaction()
       ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())
+      ctx.cleanup(() => tx.release())
       return tx
     },
   })
@@ -162,7 +163,7 @@ ResolveContext (received by atom factories):
   ctx.scope             the owning Scope
   ctx.data              per-atom key-value store (persists across invalidations)
 
-ExecutionContext (received by flow factories, resource factories, and inline fns):
+ExecutionContext (received by flow factories and inline fns):
   ctx.exec(...)         execute a nested flow or function (creates child context)
   ctx.onClose(fn)       register cleanup (runs LIFO on close, receives CloseResult)
   ctx.close(result?)    close this context, run all cleanups
@@ -171,6 +172,10 @@ ExecutionContext (received by flow factories, resource factories, and inline fns
   ctx.name              exec name or flow name
   ctx.scope             the owning Scope
   ctx.data              per-context key-value store with tag support
+
+ResourceContext (received by resource factories):
+  all ExecutionContext fields/methods above, plus:
+  ctx.cleanup(fn)       register resource cleanup (runs LIFO on release/context close)
 
 ctx = scope.createContext({ tags? })
   Creates a root ExecutionContext. Tags merge: exec tags > context tags > scope tags.
