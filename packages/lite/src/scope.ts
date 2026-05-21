@@ -12,26 +12,11 @@ const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 async function runCleanupsSafe(cleanups: (() => MaybePromise<void>)[]): Promise<void> {
   for (let i = cleanups.length - 1; i >= 0; i--) {
     try {
-      const result = cleanups[i]?.()
+      const result = cleanups[i]!()
       if (result != null && typeof (result as any).then === 'function') await result
     } catch {}
   }
 }
-
-const resourceKeys = new WeakMap<Lite.Resource<unknown>, symbol>()
-let resourceKeyCounter = 0
-
-function getResourceKey(resource: Lite.Resource<unknown>): symbol {
-  let key = resourceKeys.get(resource)
-  if (!key) {
-    key = Symbol(`resource:${resource.name ?? resourceKeyCounter++}`)
-    resourceKeys.set(resource, key)
-  }
-  return key
-}
-
-const inflightResources = new WeakMap<Lite.ContextData, Map<symbol, Promise<unknown>>>()
-const resolvingResourcesMap = new WeakMap<Lite.ContextData, Set<symbol>>()
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
@@ -129,6 +114,39 @@ interface AtomEntry<T> {
   gcQueued: boolean
   gcScheduled: ReturnType<typeof setTimeout> | null
   resolvedPromise?: Promise<T>
+}
+
+interface ResourceEntry<T> {
+  state: AtomState
+  value?: T
+  hasValue: boolean
+  error?: Error
+  cleanups: (() => MaybePromise<void>)[]
+  promise?: Promise<T>
+}
+
+interface ResourceListeners {
+  idle: Set<() => void>
+  resolving: Set<() => void>
+  resolved: Set<() => void>
+  failed: Set<() => void>
+  all: Set<() => void>
+}
+
+type ResourceDependencyConsumer = {
+  ownerCtx: ExecutionContextImpl
+  resource: Lite.Resource<unknown>
+  entry: ResourceEntry<unknown>
+}
+
+function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
+  if (!(ctx instanceof ExecutionContextImpl)) {
+    throw new Error("Resource deps require an ExecutionContext")
+  }
+}
+
+function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.AtomControllerDep<unknown> {
+  return dep.atom !== undefined
 }
 
 function notifyListeners(listeners: Set<() => void> | undefined): void {
@@ -258,9 +276,42 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 }
 
+class ResourceControllerImpl<T> implements Lite.ResourceController<T> {
+  constructor(
+    private resource: Lite.Resource<T>,
+    private ctx: ExecutionContextImpl
+  ) {}
+
+  get state(): AtomState {
+    const found = this.ctx.findResourceEntry(this.resource)
+    return found?.entry.state ?? "idle"
+  }
+
+  get(): T {
+    const found = this.ctx.findResourceEntry(this.resource)
+    const entry = found?.entry
+    if (!entry || entry.state === "idle") throw new Error("Resource not resolved")
+    if (entry.state === "failed") throw entry.error!
+    if (entry.hasValue) return entry.value as T
+    throw new Error("Resource not resolved")
+  }
+
+  resolve(): Promise<T> {
+    return this.ctx.resolve(this.resource)
+  }
+
+  release(): Promise<void> {
+    return this.ctx.release(this.resource)
+  }
+
+  on(event: Lite.ResourceControllerEvent, listener: () => void): () => void {
+    return this.ctx.addResourceListener(this.resource, event, listener)
+  }
+}
+
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
-  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown>, unknown>()
+  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown> | Lite.Resource<unknown>, unknown>()
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
@@ -446,7 +497,7 @@ class ScopeImpl implements Lite.Scope {
 
     if (atom.deps) {
       for (const key in atom.deps) { const dep = atom.deps[key]!
-        const depAtom = isControllerDep(dep) ? dep.atom : dep
+        const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
         this.cache.get(depAtom)?.dependents.delete(atom)
         this.maybeScheduleGCEntry(depAtom)
@@ -513,6 +564,7 @@ class ScopeImpl implements Lite.Scope {
 
     for (let i = 0; i < graph.controllers.length; i++) {
       const [key, dep] = graph.controllers[i]!
+      if (!isAtomControllerDep(dep)) return null
       if (dep.watch) {
         if (!dependentAtom) return null
         if (!dep.resolve) return null
@@ -525,16 +577,7 @@ class ScopeImpl implements Lite.Scope {
         this.trackDependent(dep.atom, dependentAtom)
         if (dep.watch) {
           if (!dependentAtom) return null
-          const eq = dep.eq ?? shallowEqual
-          let prev = ctrl.get() as unknown
-          const unsub = this.on("resolved", dep.atom, () => {
-            const next = ctrl.get() as unknown
-            if (!eq(prev, next)) {
-              this.scheduleInvalidation(dependentAtom!)
-            }
-            prev = next
-          })
-          this.getEntry(dependentAtom!)?.cleanups.push(unsub)
+          this.wireWatch(dep, ctrl, dependentAtom)
         }
       } else {
         result[key] = ctrl
@@ -823,6 +866,8 @@ class ScopeImpl implements Lite.Scope {
     deps: Record<string, Lite.Dependency> | undefined,
     ctx: Lite.ExecutionContext | undefined,
     dependentAtom: Lite.Atom<unknown> | undefined,
+    resourcePath?: Set<Lite.Resource<unknown>>,
+    dependentResource?: ResourceDependencyConsumer,
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     if (!deps) return {}
 
@@ -848,6 +893,31 @@ class ScopeImpl implements Lite.Scope {
 
     for (let i = 0; i < graph.controllers.length; i++) {
       const [key, dep] = graph.controllers[i]!
+      if (!isAtomControllerDep(dep)) {
+        if (!ctx) throw new Error("Resource controller deps require an ExecutionContext")
+        if (dep.watch && !dep.resolve) throw new Error("Resource controller watch requires resolve: true")
+        if (dep.watch && !dependentResource) {
+          throw new Error("Resource controller watch is only supported in resource dependencies")
+        }
+        assertExecutionContextImpl(ctx)
+        const ctrl = ctx.controller(dep.resource)
+        if (dep.resolve) {
+          const found = ctx.findResourceEntry(dep.resource)
+          if (found?.entry.state === "resolved") {
+            result[key] = ctrl
+            if (dep.watch) this.wireResourceWatch(dep, ctrl, dependentResource!)
+          } else {
+            parallel.push(ctrl.resolve().then(() => {
+              result[key] = ctrl
+              if (dep.watch) this.wireResourceWatch(dep, ctrl, dependentResource!)
+            }))
+          }
+        } else {
+          result[key] = ctrl
+        }
+        continue
+      }
+
       if (dep.watch) {
         if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
         if (!dep.resolve) throw new Error("controller({ watch: true }) requires resolve: true")
@@ -915,7 +985,7 @@ class ScopeImpl implements Lite.Scope {
       const afterParallel = parallel.length > 0
         ? (parallel.length === 1 ? parallel[0]!.then(() => {}) : Promise.all(parallel).then(() => {}))
         : null
-      return this.resolveResourceDeps(graph, result, ctx, afterParallel)
+      return this.resolveResourceDeps(graph, result, ctx, afterParallel, resourcePath)
     }
 
     if (parallel.length === 0) return result
@@ -923,7 +993,7 @@ class ScopeImpl implements Lite.Scope {
     return Promise.all(parallel).then(() => result)
   }
 
-  private wireWatch(dep: Lite.ControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {
+  private wireWatch(dep: Lite.AtomControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {
     const eq = dep.eq ?? shallowEqual
     let prev = ctrl.get() as unknown
     const unsub = this.on("resolved", dep.atom, () => {
@@ -936,90 +1006,36 @@ class ScopeImpl implements Lite.Scope {
     this.getEntry(dependentAtom)?.cleanups.push(unsub)
   }
 
+  private wireResourceWatch(
+    dep: Lite.ResourceControllerDep<unknown>,
+    ctrl: Lite.ResourceController<unknown>,
+    dependent: ResourceDependencyConsumer
+  ): void {
+    const eq = dep.eq ?? shallowEqual
+    let prev = ctrl.get()
+    const unsub = ctrl.on("resolved", () => {
+      const next = ctrl.get()
+      if (!eq(prev, next)) {
+        void dependent.ownerCtx.release(dependent.resource)
+      }
+      prev = next
+    })
+    dependent.entry.cleanups.push(unsub)
+  }
+
   private async resolveResourceDeps(
     graph: DepsGraph,
     result: Record<string, unknown>,
     ctx: Lite.ExecutionContext,
     afterParallel: Promise<void> | null,
+    resourcePath?: Set<Lite.Resource<unknown>>,
   ): Promise<Record<string, unknown>> {
     if (afterParallel) await afterParallel
+    assertExecutionContextImpl(ctx)
 
     for (let i = 0; i < graph.resources.length; i++) {
       const [key, resource] = graph.resources[i]!
-
-      const resourceKey = getResourceKey(resource)
-      const storeCtx = ctx.parent ?? ctx
-
-      if (storeCtx.data.has(resourceKey)) {
-        result[key] = storeCtx.data.get(resourceKey)
-        continue
-      }
-
-      if (ctx.data.seekHas(resourceKey)) {
-        result[key] = ctx.data.seek(resourceKey)
-        continue
-      }
-
-      let flights = inflightResources.get(storeCtx.data)
-      if (!flights) {
-        flights = new Map()
-        inflightResources.set(storeCtx.data, flights)
-      }
-
-      const inflight = flights.get(resourceKey)
-      if (inflight) {
-        result[key] = await inflight
-        continue
-      }
-
-      let localResolvingResources = resolvingResourcesMap.get(storeCtx.data)
-      if (!localResolvingResources) {
-        localResolvingResources = new Set()
-        resolvingResourcesMap.set(storeCtx.data, localResolvingResources)
-      }
-
-      if (localResolvingResources.has(resourceKey)) {
-        throw new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`)
-      }
-
-      const scope = this
-      const resolve = async () => {
-        localResolvingResources.add(resourceKey)
-        try {
-          const depsResult = scope.resolveDepsOptimistic(resource.deps, ctx, undefined)
-          const resourceDeps = depsResult != null && typeof (depsResult as any).then === 'function'
-            ? await (depsResult as Promise<Record<string, unknown>>)
-            : depsResult as Record<string, unknown>
-
-          const factory = resource.factory as (
-            ctx: Lite.ExecutionContext,
-            deps?: Record<string, unknown>
-          ) => MaybePromise<unknown>
-
-          let value: unknown
-          if (scope.resolveExts.length === 0) {
-            const raw = resource.deps ? factory(storeCtx, resourceDeps) : factory(storeCtx)
-            value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<unknown>) : raw
-          } else {
-            const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: storeCtx }
-            const doResolve = async () => resource.deps ? factory(storeCtx, resourceDeps) : factory(storeCtx)
-            value = await scope.applyResolveExtensions(event, doResolve)
-          }
-          storeCtx.data.set(resourceKey, value)
-          return value
-        } finally {
-          localResolvingResources.delete(resourceKey)
-        }
-      }
-
-      const promise = resolve()
-      flights.set(resourceKey, promise)
-
-      try {
-        result[key] = await promise
-      } finally {
-        flights.delete(resourceKey)
-      }
+      result[key] = await this.resolveResource(resource, ctx, resourcePath)
     }
 
     return result
@@ -1079,6 +1095,121 @@ class ScopeImpl implements Lite.Scope {
 
   getFlowPreset<O, I>(flow: Lite.Flow<O, I>): Lite.PresetValue<O, I> | undefined {
     return this.presets.get(flow as Lite.Flow<unknown, unknown>) as Lite.PresetValue<O, I> | undefined
+  }
+
+  resolveResource<T>(
+    resource: Lite.Resource<T>,
+    receiverCtx: ExecutionContextImpl,
+    resourcePath?: Set<Lite.Resource<unknown>>
+  ): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
+
+    try {
+      receiverCtx.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    if (resourcePath?.has(resource as Lite.Resource<unknown>)) {
+      return Promise.reject(new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`))
+    }
+
+    const found = receiverCtx.findResourceEntry(resource)
+    if (found) {
+      const entry = found.entry as ResourceEntry<T>
+      if (entry.state === "resolved") return Promise.resolve(entry.value as T)
+      if (entry.state === "failed") return Promise.reject(entry.error!)
+      if (entry.promise) return entry.promise
+    }
+
+    const ownerCtx = receiverCtx.resourceOwner()
+    const entry = ownerCtx.createResourceEntry(resource)
+    const nextPath = new Set(resourcePath)
+    nextPath.add(resource as Lite.Resource<unknown>)
+
+    entry.state = "resolving"
+    entry.promise = this.resolveResourceValue(resource, receiverCtx, ownerCtx, entry, nextPath).then(
+      (value) => {
+        if (ownerCtx.getLocalResourceEntry(resource) !== entry) {
+          throw new Error("Resource is released")
+        }
+        ownerCtx.assertOpen()
+        entry.state = "resolved"
+        entry.value = value
+        entry.hasValue = true
+        entry.error = undefined
+        entry.promise = undefined
+        ownerCtx.emitResourceState(resource, "resolved")
+        return value
+      },
+      async (error) => {
+        if (ownerCtx.getLocalResourceEntry(resource) === entry) {
+          entry.state = "failed"
+          entry.error = error instanceof Error ? error : new Error(String(error))
+          entry.value = undefined
+          entry.hasValue = false
+          entry.promise = undefined
+          if (entry.cleanups.length > 0) {
+            await runCleanupsSafe(entry.cleanups)
+            entry.cleanups = []
+          }
+          ownerCtx.emitResourceState(resource, "failed")
+          throw entry.error
+        }
+        throw error instanceof Error ? error : new Error(String(error))
+      }
+    )
+    ownerCtx.emitResourceState(resource, "resolving")
+
+    return entry.promise
+  }
+
+  private async resolveResourceValue<T>(
+    resource: Lite.Resource<T>,
+    receiverCtx: ExecutionContextImpl,
+    ownerCtx: ExecutionContextImpl,
+    entry: ResourceEntry<T>,
+    resourcePath: Set<Lite.Resource<unknown>>,
+  ): Promise<T> {
+    if (this.presets.has(resource)) {
+      const presetValue = this.presets.get(resource)
+      if (isResource(presetValue)) {
+        return this.resolveResource(presetValue as Lite.Resource<T>, receiverCtx, resourcePath)
+      }
+      if (typeof presetValue === "function") {
+        const factory = presetValue as (ctx: Lite.ResourceContext) => MaybePromise<T>
+        if (this.resolveExts.length === 0) {
+          return ownerCtx.runResourceFactory(resource, entry, factory)
+        }
+        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
+        const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, factory)
+        return this.applyResolveExtensions(event, doResolve)
+      }
+      return presetValue as T
+    }
+
+    const depsResult = this.resolveDepsOptimistic(
+      resource.deps,
+      ownerCtx,
+      undefined,
+      resourcePath,
+      { ownerCtx, resource: resource as Lite.Resource<unknown>, entry: entry as ResourceEntry<unknown> }
+    )
+    const resourceDeps = depsResult != null && typeof (depsResult as any).then === 'function'
+      ? await (depsResult as Promise<Record<string, unknown>>)
+      : depsResult as Record<string, unknown>
+
+    const factory = resource.factory as (
+      ctx: Lite.ResourceContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<T>
+
+    if (this.resolveExts.length === 0) {
+      return ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
+    }
+    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
+    const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
+    return this.applyResolveExtensions(event, doResolve)
   }
 
   invalidate<T>(atom: Lite.Atom<T>): void {
@@ -1199,7 +1330,7 @@ class ScopeImpl implements Lite.Scope {
 
     if (atom.deps) {
       for (const key in atom.deps) { const dep = atom.deps[key]!
-        const depAtom = isControllerDep(dep) ? dep.atom : dep
+        const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
         this.cache.get(depAtom)?.dependents.delete(atom)
         this.maybeScheduleGCEntry(depAtom)
@@ -1283,6 +1414,9 @@ class ScopeImpl implements Lite.Scope {
 
 class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: ((result: Lite.CloseResult) => MaybePromise<void>)[] = []
+  private resources = new Map<Lite.Resource<unknown>, ResourceEntry<unknown>>()
+  private resourceListeners = new Map<Lite.Resource<unknown>, ResourceListeners>()
+  private resourceControllers = new Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>>()
   private closed = false
   private readonly _input: unknown
   private _data: ContextDataImpl | undefined
@@ -1320,6 +1454,143 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this._data
   }
 
+  assertOpen(): void {
+    if (this.closed) {
+      throw new Error("ExecutionContext is closed")
+    }
+  }
+
+  resourceOwner(): ExecutionContextImpl {
+    if (!this.parent) return this
+    assertExecutionContextImpl(this.parent)
+    return this.parent
+  }
+
+  findResourceEntry<T>(resource: Lite.Resource<T>): { owner: ExecutionContextImpl; entry: ResourceEntry<T> } | undefined {
+    let current: ExecutionContextImpl | undefined = this
+    while (current) {
+      const entry = current.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+      if (entry) return { owner: current, entry }
+      if (!current.parent) return undefined
+      assertExecutionContextImpl(current.parent)
+      current = current.parent
+    }
+    return undefined
+  }
+
+  createResourceEntry<T>(resource: Lite.Resource<T>): ResourceEntry<T> {
+    const entry: ResourceEntry<T> = {
+      state: "idle",
+      hasValue: false,
+      cleanups: [],
+    }
+    this.resources.set(resource as Lite.Resource<unknown>, entry as ResourceEntry<unknown>)
+    return entry
+  }
+
+  getLocalResourceEntry<T>(resource: Lite.Resource<T>): ResourceEntry<T> | undefined {
+    return this.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+  }
+
+  controller<T>(resource: Lite.Resource<T>): Lite.ResourceController<T> {
+    let ctrl = this.resourceControllers.get(resource as Lite.Resource<unknown>) as ResourceControllerImpl<T> | undefined
+    if (!ctrl) {
+      ctrl = new ResourceControllerImpl(resource, this)
+      this.resourceControllers.set(resource as Lite.Resource<unknown>, ctrl as ResourceControllerImpl<unknown>)
+    }
+    return ctrl
+  }
+
+  private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
+    let listeners = this.resourceListeners.get(resource)
+    if (!listeners) {
+      listeners = {
+        idle: new Set(),
+        resolving: new Set(),
+        resolved: new Set(),
+        failed: new Set(),
+        all: new Set(),
+      }
+      this.resourceListeners.set(resource, listeners)
+    }
+    return listeners
+  }
+
+  addResourceListener(
+    resource: Lite.Resource<unknown>,
+    event: Lite.ResourceControllerEvent,
+    listener: () => void
+  ): () => void {
+    const owner = this.findResourceEntry(resource)?.owner ?? this.resourceOwner()
+    const listeners = owner.getResourceListeners(resource)
+    const set = event === "*" ? listeners.all : listeners[event]
+    set.add(listener)
+    return () => {
+      set.delete(listener)
+    }
+  }
+
+  emitResourceState(resource: Lite.Resource<unknown>, state: AtomState): void {
+    const listeners = this.resourceListeners.get(resource)
+    if (!listeners) return
+    notifyListeners(listeners[state])
+    notifyListeners(listeners.all)
+  }
+
+  runResourceFactory<T>(
+    resource: Lite.Resource<unknown>,
+    entry: ResourceEntry<unknown>,
+    factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
+  ): MaybePromise<T> {
+    const owner = this
+    const resourceCtx: Lite.ResourceContext = {
+      get input() { return owner.input },
+      get name() { return owner.name },
+      get scope() { return owner.scope },
+      get parent() { return owner.parent },
+      get data() { return owner.data },
+      exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
+      resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
+      release: owner.release.bind(owner) as Lite.ResourceContext["release"],
+      controller: owner.controller.bind(owner),
+      onClose: owner.onClose.bind(owner),
+      close: owner.close.bind(owner),
+      cleanup(fn) {
+        owner.assertOpen()
+        if (owner.getLocalResourceEntry(resource) !== entry) {
+          throw new Error("Resource is released")
+        }
+        entry.cleanups.push(fn)
+      },
+    }
+    return factory(resourceCtx)
+  }
+
+  resolve<T>(target: Lite.Atom<T>): Promise<T>
+  resolve<T>(target: Lite.Resource<T>): Promise<T>
+  resolve<T>(target: Lite.Atom<T> | Lite.Resource<T>): Promise<T> {
+    try {
+      this.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (isAtom(target)) return this.scope.resolve(target)
+    if (isResource(target)) return this.scope.resolveResource(target, this)
+    return Promise.reject(new Error("ExecutionContext can only resolve atoms and resources"))
+  }
+
+  async release<T>(resource: Lite.Resource<T>): Promise<void> {
+    this.assertOpen()
+    const entry = this.resources.get(resource as Lite.Resource<unknown>)
+    if (!entry) return
+    this.resources.delete(resource as Lite.Resource<unknown>)
+    if (entry.cleanups.length > 0) {
+      await runCleanupsSafe(entry.cleanups)
+      entry.cleanups = []
+    }
+    this.emitResourceState(resource, "idle")
+  }
+
   async exec(options: {
     flow: Lite.Flow<unknown, unknown>
     input?: unknown
@@ -1327,9 +1598,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     name?: string
     tags?: Lite.Tagged<any>[]
   } | Lite.ExecFnOptions<unknown>): Promise<unknown> {
-    if (this.closed) {
-      throw new Error("ExecutionContext is closed")
-    }
+    this.assertOpen()
 
     if ("flow" in options) {
       const { flow, input, rawInput, name: execName, tags: execTags } = options
@@ -1469,8 +1738,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return next()
   }
 
-  onClose(fn: (result: Lite.CloseResult) => MaybePromise<void>): void {
+  onClose(fn: (result: Lite.CloseResult) => MaybePromise<void>): () => void {
     this.cleanups.push(fn)
+    return () => {
+      const index = this.cleanups.indexOf(fn)
+      if (index >= 0) this.cleanups.splice(index, 1)
+    }
   }
 
   close(result: Lite.CloseResult = { ok: true }): Promise<void> {
@@ -1478,14 +1751,24 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     this.closed = true
 
-    if (this.cleanups.length === 0) return Promise.resolve()
+    if (this.resources.size === 0 && this.cleanups.length === 0) return Promise.resolve()
 
-    return this.runCleanups(result)
+    return this.runCloseCleanups(result)
   }
 
-  private async runCleanups(result: Lite.CloseResult): Promise<void> {
+  private async runCloseCleanups(result: Lite.CloseResult): Promise<void> {
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
       try { await this.cleanups[i]?.(result) } catch {}
+    }
+    const resources = Array.from(this.resources.keys())
+    for (let i = resources.length - 1; i >= 0; i--) {
+      const entry = this.resources.get(resources[i]!)
+      this.resources.delete(resources[i]!)
+      if (entry && entry.cleanups.length > 0) {
+        await runCleanupsSafe(entry.cleanups)
+        entry.cleanups = []
+      }
+      this.emitResourceState(resources[i]!, "idle")
     }
   }
 }
@@ -1530,4 +1813,3 @@ export function setControllerReadHook(fn: ((ctrl: Lite.Controller<unknown>) => v
 export function createScope(options?: Lite.ScopeOptions): Lite.Scope {
   return new ScopeImpl(options)
 }
-

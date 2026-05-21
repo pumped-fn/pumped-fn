@@ -73,6 +73,7 @@ export namespace Lite {
     readonly [resourceSymbol]: true
     readonly name?: string
     readonly deps?: D
+    readonly tags?: Tagged<any>[]
     readonly factory: ResourceFactory<T, D>
   }
 
@@ -147,10 +148,18 @@ export namespace Lite {
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
     readonly data: ContextData
+    resolve<T>(target: Atom<T>): Promise<T>
+    resolve<T>(target: Resource<T>): Promise<T>
+    release<T>(resource: Resource<T>): Promise<void>
+    controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
-    onClose(fn: (result: CloseResult) => MaybePromise<void>): void
+    onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
     close(result?: CloseResult): Promise<void>
+  }
+
+  export interface ResourceContext extends ExecutionContext {
+    cleanup(fn: () => MaybePromise<void>): void
   }
 
   export type ExecFlowOptions<Output, Input> = {
@@ -172,6 +181,7 @@ export namespace Lite {
   }
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'
+  export type ResourceControllerEvent = AtomState | '*'
 
   /**
    * Reactive handle for observing and controlling atom state.
@@ -207,6 +217,25 @@ export namespace Lite {
     update(fn: (prev: T) => T): void
     /** Subscribe to state changes */
     on(event: ControllerEvent, listener: () => void): () => void
+  }
+
+  /**
+   * Execution-context handle for observing and controlling a resource.
+   */
+  export interface ResourceController<T> {
+    /** Current lifecycle state visible from this execution context */
+    readonly state: AtomState
+    /**
+     * Get current value synchronously.
+     * @throws If resource is idle, resolving without a value, or failed
+     */
+    get(): T
+    /** Trigger resolution if not already resolved */
+    resolve(): Promise<T>
+    /** Owner-local release/reset */
+    release(): Promise<void>
+    /** Subscribe to resource state changes visible from this execution context */
+    on(event: ResourceControllerEvent, listener: () => void): () => void
   }
 
   export interface SelectOptions<S> {
@@ -248,22 +277,44 @@ export namespace Lite {
     readonly mode: "required" | "optional" | "all"
   }
 
-  export interface ControllerDep<T> {
+  export interface AtomControllerDep<T> {
     readonly [controllerDepSymbol]: true
     readonly atom: Atom<T>
+    readonly resource?: undefined
     readonly resolve?: boolean
     readonly watch?: boolean
     readonly eq?: (a: any, b: any) => boolean
   }
 
-  export type WatchControllerDep<T> = ControllerDep<T> & {
+  export interface ResourceControllerDep<T> {
+    readonly [controllerDepSymbol]: true
+    readonly atom?: undefined
+    readonly resource: Resource<T>
+    readonly resolve?: boolean
+    readonly watch?: boolean
+    readonly eq?: (a: any, b: any) => boolean
+  }
+
+  export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T>
+
+  export type WatchControllerDep<T> = AtomControllerDep<T> & {
     readonly resolve: true
     readonly watch: true
   }
 
-  export type NonWatchControllerDep<T> = ControllerDep<T> & {
+  export type NonWatchControllerDep<T> = AtomControllerDep<T> & {
     readonly watch?: never
     readonly eq?: never
+  }
+
+  export type NonWatchResourceControllerDep<T> = ResourceControllerDep<T> & {
+    readonly watch?: never
+    readonly eq?: never
+  }
+
+  export type WatchResourceControllerDep<T> = ResourceControllerDep<T> & {
+    readonly resolve: true
+    readonly watch: true
   }
 
   export interface ControllerOptions {
@@ -276,17 +327,25 @@ export namespace Lite {
     | { resolve: true; watch?: never; eq?: never }
     | { resolve?: never; watch?: never; eq?: never }
 
+  export type ResourceControllerDepOptions =
+    | { resolve: true; watch: true; eq: (a: any, b: any) => boolean }
+    | { resolve: true; watch: true; eq?: never }
+    | { resolve: true; watch?: never; eq?: never }
+    | { resolve?: never; watch?: never; eq?: never }
+
   export interface Typed<T> {
     readonly [typedSymbol]: true
   }
 
-  export type PresetTarget<T, I = unknown> = Atom<T> | Flow<T, I>
+  export type PresetTarget<T, I = unknown> = Atom<T> | Flow<T, I> | Resource<T>
 
   export type PresetValue<T, I = unknown> =
     | T
     | Atom<T>
     | Flow<T, I>
+    | Resource<T>
     | ((ctx: ExecutionContext & { readonly input: I }) => MaybePromise<T>)
+    | ((ctx: ResourceContext) => MaybePromise<T>)
 
   export interface Preset<T, I = unknown> {
     readonly [presetSymbol]: true
@@ -341,18 +400,28 @@ export namespace Lite {
     | TagExecutor<any>
     | Resource<unknown>
 
-  export type AtomDependency = Atom<unknown> | ControllerDep<unknown> | TagExecutor<any, any>
+  export type AtomDependency = Atom<unknown> | AtomControllerDep<unknown> | TagExecutor<any, any>
 
   export type ExecutionDependency =
     | Atom<unknown>
     | NonWatchControllerDep<unknown>
+    | NonWatchResourceControllerDep<unknown>
+    | TagExecutor<any, any>
+    | Resource<unknown, Record<string, Dependency>>
+
+  export type ResourceDependency =
+    | Atom<unknown>
+    | NonWatchControllerDep<unknown>
+    | ResourceControllerDep<unknown>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
-    : D extends ControllerDep<infer T>
+    : D extends AtomControllerDep<infer T>
       ? Controller<T>
+      : D extends ResourceControllerDep<infer T>
+        ? ResourceController<T>
       : D extends TagExecutor<infer TOutput, infer _TTag>
         ? TOutput
         : D extends Resource<infer T>
@@ -376,8 +445,8 @@ export namespace Lite {
 
   export type ResourceFactory<T, D extends Record<string, Dependency>> =
     keyof D extends never
-      ? (ctx: ExecutionContext) => MaybePromise<T>
-      : (ctx: ExecutionContext, deps: InferDeps<D>) => MaybePromise<T>
+      ? (ctx: ResourceContext) => MaybePromise<T>
+      : (ctx: ResourceContext, deps: InferDeps<D>) => MaybePromise<T>
 
   export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
 

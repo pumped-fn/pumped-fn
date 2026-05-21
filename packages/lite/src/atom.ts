@@ -1,4 +1,4 @@
-import { atomSymbol, controllerDepSymbol } from "./symbols"
+import { atomSymbol, controllerDepSymbol, resourceSymbol } from "./symbols"
 import { registerAtomToTags } from "./tag"
 import { warmDepsGraph } from "./deps-graph"
 import type { Lite, MaybePromise } from "./types"
@@ -82,19 +82,18 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
 }
 
 /**
- * Wraps an Atom to receive a Controller instead of the resolved value.
- * The Controller provides full lifecycle control: get, resolve, release, invalidate, and subscribe.
+ * Wraps an Atom or Resource to receive a controller instead of the resolved value.
+ * Atom controllers provide value mutation and invalidation. Resource controllers
+ * provide execution-scoped observation plus resolve/release only.
  *
- * @param atom - The Atom to wrap
+ * @param atom - The Atom or Resource to wrap
  * @param options - Optional configuration:
  *   - `resolve: true` — auto-resolves the dep before the parent factory runs; `config.get()` is safe.
- *   - `watch: true` — atom deps only; requires `resolve: true`; automatically re-runs the parent factory
- *     when the dep resolves to a new value (value-equality gated via plain-object `shallowEqual` by default,
- *     otherwise `Object.is`). Replaces
- *     manual `ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))` wiring. Watch
- *     listeners are auto-cleaned on re-resolve, release, and dispose.
+ *   - `watch: true` — requires `resolve: true`; atom deps re-run the parent atom factory when
+ *     the dep resolves to a new value. Resource deps release the dependent resource on value
+ *     change and re-resolve lazily on the next access. Flow deps do not support watch.
  *   - `eq` — custom equality function `(a: T, b: T) => boolean`; only used with `watch: true`.
- * @returns A ControllerDep that resolves to a Controller for the Atom
+ * @returns A ControllerDep that resolves to a Controller for the Atom or Resource
  *
  * @example
  * ```typescript
@@ -142,15 +141,49 @@ export function controller<T>(
 ): Lite.NonWatchControllerDep<T>
 
 export function controller<T>(
-  atom: Lite.Atom<T>,
-  options?: Lite.ControllerDepOptions<T>
+  resource: Lite.Resource<T>
+): Lite.NonWatchResourceControllerDep<T>
+
+export function controller<T>(
+  resource: Lite.Resource<T>,
+  options: { resolve: true; watch?: never; eq?: never }
+): Lite.NonWatchResourceControllerDep<T>
+
+export function controller<T>(
+  resource: Lite.Resource<T>,
+  options: { resolve: true; watch: true; eq: (a: T, b: T) => boolean }
+): Lite.WatchResourceControllerDep<T>
+
+export function controller<T>(
+  resource: Lite.Resource<T>,
+  options: { resolve: true; watch: true; eq?: never }
+): Lite.WatchResourceControllerDep<T>
+
+export function controller<T>(
+  resource: Lite.Resource<T>,
+  options: { resolve?: never; watch?: never; eq?: never }
+): Lite.NonWatchResourceControllerDep<T>
+
+export function controller<T>(
+  target: Lite.Atom<T> | Lite.Resource<T>,
+  options?: Lite.ControllerDepOptions<T> | Lite.ResourceControllerDepOptions
 ): Lite.ControllerDep<T> {
+  if ((target as unknown as Record<symbol, unknown>)[resourceSymbol] === true) {
+    return {
+      [controllerDepSymbol]: true,
+      resource: target as Lite.Resource<T>,
+      resolve: options?.resolve,
+      watch: (options as Lite.ResourceControllerDepOptions | undefined)?.watch,
+      eq: (options as Lite.ResourceControllerDepOptions | undefined)?.eq,
+    }
+  }
+
   return {
     [controllerDepSymbol]: true,
-    atom,
-    resolve: options?.resolve,
-    watch: options?.watch,
-    eq: options?.eq,
+    atom: target as Lite.Atom<T>,
+    resolve: (options as Lite.ControllerDepOptions<T> | undefined)?.resolve,
+    watch: (options as Lite.ControllerDepOptions<T> | undefined)?.watch,
+    eq: (options as Lite.ControllerDepOptions<T> | undefined)?.eq,
   }
 }
 

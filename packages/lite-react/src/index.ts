@@ -4,8 +4,10 @@
  */
 
 export type { Lite } from '@pumped-fn/lite'
-export { createScope, atom, flow, preset } from '@pumped-fn/lite'
-export { ScopeContext, ScopeProvider } from './context'
-export type { ScopeProviderProps } from './context'
-export { useScope, useController, useAtom, useSelect } from './hooks'
-export type { UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState } from './hooks'
+export { createScope, atom, flow, preset, resource } from '@pumped-fn/lite'
+export { ScopeContext, ScopeProvider, ExecutionContextContext, ExecutionContextProvider } from './context'
+export type { ScopeProviderProps, ExecutionContextProviderProps } from './context'
+export { scopedValue } from './scoped-value'
+export type { ScopedValue, ScopedValueAccess, ScopedValueActions, ScopedValueCloseHelpers, ScopedValueConfig, ScopedValueHelpers, ScopedValueView } from './scoped-value'
+export { useScope, useExecutionContext, useController, useAtom, useSelect, useResource, useScopedValue } from './hooks'
+export type { Load, UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState, UseResourceSuspenseOptions, UseResourceManualOptions, UseResourceOptions, UseScopedValueSuspenseOptions, UseScopedValueManualOptions, UseScopedValueSelectSuspenseOptions, UseScopedValueSelectManualOptions, UseScopedValueOptions } from './hooks'

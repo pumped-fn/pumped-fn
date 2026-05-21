@@ -328,6 +328,7 @@ docs/plans/
 dist/skills/
 .claude/plugins/local/
 # autoresearch runtime files
+.autoresearch/
 autoresearch.md
 autoresearch.sh
 autoresearch.jsonl

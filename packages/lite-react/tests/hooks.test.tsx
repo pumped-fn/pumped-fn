@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
 import { type Lite } from '@pumped-fn/lite'
-import { atom, createScope, preset, ScopeProvider, useScope, useAtom, useSelect, useController } from '../src'
+import { tag, tags } from '@pumped-fn/lite'
+import { atom, createScope, flow, preset, resource, ExecutionContextProvider, ScopeProvider, useScope, useAtom, useSelect, useController, useResource } from '../src'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -50,6 +51,406 @@ describe('ScopeProvider + useScope', () => {
 
     function NoProvider() { useScope(); return <div>test</div> }
     expect(() => { render(<NoProvider />) }).toThrow('useScope must be used within a ScopeProvider')
+  })
+})
+
+describe('ExecutionContextProvider + useResource', () => {
+  it('can read execution resources without Suspense as a stable load union', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let createCount = 0
+
+    const currentRequest = resource({
+      name: 'current-request',
+      factory: async () => {
+        createCount++
+        await Promise.resolve()
+        return { id: createCount }
+      },
+    })
+
+    const readRequestFlow = flow({
+      name: 'read-request',
+      deps: { request: currentRequest },
+      factory: (_ctx, { request }) => request,
+    })
+
+    function TestComponent() {
+      const request = useResource(currentRequest, { suspense: false })
+      return (
+        <div>
+          status:{request.status};data:{request.data?.id ?? 'none'};error:{request.error?.message ?? 'none'}
+        </div>
+      )
+    }
+
+    render(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent />
+      </ExecutionContextProvider>
+    )
+
+    expect(screen.getByText('status:loading;data:none;error:none')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('status:ready;data:1;error:none')).toBeInTheDocument()
+    })
+
+    const request = await ctx.exec({ flow: readRequestFlow })
+    expect(request).toEqual({ id: 1 })
+    expect(createCount).toBe(1)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('re-resolves resources after owner release and rerender', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let createCount = 0
+
+    const currentRequest = resource({
+      name: 'release-aware-request',
+      factory: async () => {
+        createCount++
+        await Promise.resolve()
+        return { id: createCount }
+      },
+    })
+
+    function TestComponent({ tick }: { tick: number }) {
+      const request = useResource(currentRequest, { suspense: false })
+      return (
+        <div>
+          tick:{tick};status:{request.status};data:{request.data?.id ?? 'none'}
+        </div>
+      )
+    }
+
+    const view = render(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent tick={0} />
+      </ExecutionContextProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('tick:0;status:ready;data:1')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      await ctx.release(currentRequest)
+    })
+
+    view.rerender(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent tick={1} />
+      </ExecutionContextProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('tick:1;status:ready;data:2')).toBeInTheDocument()
+    })
+    expect(createCount).toBe(2)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('does not poll ready resources on rerender but remains release-aware', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const resolveSpy = vi.spyOn(ctx, 'resolve')
+    let createCount = 0
+
+    const currentRequest = resource({
+      name: 'release-aware-without-polling',
+      factory: async () => {
+        createCount++
+        await Promise.resolve()
+        return { id: createCount }
+      },
+    })
+
+    function TestComponent({ tick }: { tick: number }) {
+      const request = useResource(currentRequest, { suspense: false })
+      return (
+        <div>
+          tick:{tick};status:{request.status};data:{request.data?.id ?? 'none'}
+        </div>
+      )
+    }
+
+    const view = render(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent tick={0} />
+      </ExecutionContextProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('tick:0;status:ready;data:1')).toBeInTheDocument()
+    })
+    expect(resolveSpy).toHaveBeenCalledTimes(1)
+
+    view.rerender(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent tick={1} />
+      </ExecutionContextProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('tick:1;status:ready;data:1')).toBeInTheDocument()
+    })
+    expect(resolveSpy).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await ctx.release(currentRequest)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('tick:1;status:ready;data:2')).toBeInTheDocument()
+    })
+    expect(resolveSpy).toHaveBeenCalledTimes(2)
+    expect(createCount).toBe(2)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('returns resource errors without Suspense as a stable load union', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const failingResource = resource({
+      name: 'failing-resource',
+      factory: async () => {
+        throw new Error('resource failed')
+      },
+    })
+
+    function TestComponent() {
+      const request = useResource(failingResource, { suspense: false })
+      return (
+        <div>
+          status:{request.status};data:{request.data ?? 'none'};error:{request.error?.message ?? 'none'}
+        </div>
+      )
+    }
+
+    render(
+      <ExecutionContextProvider ctx={ctx}>
+        <TestComponent />
+      </ExecutionContextProvider>
+    )
+
+    expect(screen.getByText('status:loading;data:none;error:none')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('status:error;data:none;error:resource failed')).toBeInTheDocument()
+    })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('does not start non-Suspense resource work for renders that abort before commit', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let createCount = 0
+    const currentRequest = resource({
+      name: 'current-request',
+      factory: () => {
+        createCount++
+        return { id: createCount }
+      },
+    })
+
+    function AbortedComponent() {
+      useResource(currentRequest, { suspense: false })
+      throw new Error('abort render')
+      return null
+    }
+
+    render(
+      <ExecutionContextProvider ctx={ctx}>
+        <ErrorBoundary fallback={<div>aborted</div>}>
+          <AbortedComponent />
+        </ErrorBoundary>
+      </ExecutionContextProvider>
+    )
+
+    expect(screen.getByText('aborted')).toBeInTheDocument()
+    expect(createCount).toBe(0)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('can create and close a managed execution context from the surrounding scope', async () => {
+    const tenantTag = tag<string>({ label: 'tenant' })
+    const closed: string[] = []
+    const scope = createScope()
+    const currentTenant = resource({
+      name: 'current-tenant',
+      deps: { tenant: tags.required(tenantTag) },
+      factory: (ctx, { tenant }) => {
+        ctx.onClose(() => { closed.push(tenant) })
+        return { tenant }
+      },
+    })
+
+    function TestComponent() {
+      const tenant = useResource(currentTenant, { suspense: false })
+      return <div>status:{tenant.status};tenant:{tenant.data?.tenant ?? 'none'}</div>
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[tenantTag('acme')]}>
+          <TestComponent />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('status:ready;tenant:acme')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      view.unmount()
+      await Promise.resolve()
+    })
+    expect(closed).toEqual(['acme'])
+
+    await scope.dispose()
+  })
+
+  it('closes managed contexts that start Suspense work before children commit', async () => {
+    const scope = createScope()
+    const cleanups: string[] = []
+    let started = false
+    let resume!: () => void
+    const slowResource = resource({
+      name: 'managed-suspense-leak-check',
+      factory: async (ctx) => {
+        started = true
+        ctx.cleanup(() => {
+          cleanups.push('resource')
+        })
+        await new Promise<void>((resolve) => {
+          resume = resolve
+        })
+        return 'ready'
+      },
+    })
+
+    function TestComponent() {
+      const value = useResource(slowResource)
+      return <div>{value}</div>
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading managed...</div>}>
+          <ExecutionContextProvider>
+            <TestComponent />
+          </ExecutionContextProvider>
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(started).toBe(true)
+      expect(screen.getByText('Loading managed...')).toBeInTheDocument()
+    })
+
+    view.unmount()
+    resume()
+
+    await waitFor(() => {
+      expect(cleanups).toEqual(['resource'])
+    })
+    await scope.dispose()
+  })
+
+  it('suspends while resolving an execution resource and reuses it across nested execs', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let createCount = 0
+
+    const currentRequest = resource({
+      name: 'current-request',
+      factory: async () => {
+        createCount++
+        await Promise.resolve()
+        return { id: createCount }
+      },
+    })
+
+    const readRequestFlow = flow({
+      name: 'read-request',
+      deps: { request: currentRequest },
+      factory: (_ctx, { request }) => request,
+    })
+
+    function TestComponent() {
+      const request = useResource(currentRequest)
+      return <div>request:{request.id}</div>
+    }
+
+    render(
+      <ExecutionContextProvider ctx={ctx}>
+        <Suspense fallback={<div>Loading resource...</div>}>
+          <TestComponent />
+        </Suspense>
+      </ExecutionContextProvider>
+    )
+
+    expect(screen.getByText('Loading resource...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('request:1')).toBeInTheDocument()
+    })
+
+    const request = await ctx.exec({ flow: readRequestFlow })
+    expect(request).toEqual({ id: 1 })
+    expect(createCount).toBe(1)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it('throws resource resolution errors to the nearest error boundary', async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const failingResource = resource({
+      name: 'failing-resource',
+      factory: async () => {
+        throw new Error('resource failed')
+      },
+    })
+
+    function TestComponent() {
+      useResource(failingResource)
+      return <div>ready</div>
+    }
+
+    render(
+      <ExecutionContextProvider ctx={ctx}>
+        <ErrorBoundary fallback={<div>Resource error</div>}>
+          <Suspense fallback={<div>Loading resource...</div>}>
+            <TestComponent />
+          </Suspense>
+        </ErrorBoundary>
+      </ExecutionContextProvider>
+    )
+
+    expect(screen.getByText('Loading resource...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Resource error')).toBeInTheDocument()
+    })
+
+    await ctx.close()
+    await scope.dispose()
   })
 })
 

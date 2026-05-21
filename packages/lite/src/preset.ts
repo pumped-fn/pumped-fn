@@ -2,6 +2,12 @@ import { presetSymbol } from "./symbols"
 import type { Lite, MaybePromise } from "./types"
 import { isAtom } from "./atom"
 import { isFlow } from "./flow"
+import { isResource } from "./resource"
+
+type ResourcePresetValue<T> =
+  | (T extends (...args: any[]) => any ? never : T)
+  | Lite.Resource<T>
+  | ((ctx: Lite.ResourceContext) => MaybePromise<T>)
 
 /**
  * Creates a preset that overrides an Atom's factory within a scope.
@@ -47,12 +53,24 @@ export function preset<TOutput, TInput>(
   value: Lite.Flow<TOutput, TInput> | ((ctx: Lite.ExecutionContext & { readonly input: TInput }) => MaybePromise<TOutput>)
 ): Lite.Preset<TOutput, TInput>
 
+/**
+ * Creates a preset that overrides a Resource within an execution context.
+ *
+ * @param target - The Resource to preset
+ * @param value - Direct value, replacement Resource, or function that receives the execution context
+ * @returns A Preset instance to be used in scope configuration
+ */
+export function preset<T>(
+  target: Lite.Resource<T>,
+  value: ResourcePresetValue<T>
+): Lite.Preset<T>
+
 export function preset<T, I>(
   target: Lite.PresetTarget<T, I>,
   value: Lite.PresetValue<T, I>
 ): Lite.Preset<T, I> {
-  if (!isAtom(target) && !isFlow(target)) {
-    throw new Error("preset target must be Atom or Flow")
+  if (!isAtom(target) && !isFlow(target) && !isResource(target)) {
+    throw new Error("preset target must be Atom, Flow, or Resource")
   }
   if (target === value) {
     throw new Error("preset cannot reference itself")

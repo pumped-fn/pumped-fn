@@ -23,7 +23,7 @@ import {
   tags,
   typed,
 } from "../src/index"
-import type { Lite } from "../src/index"
+import type { AtomState, Lite } from "../src/index"
 
 describe("Scope", () => {
   describe("scope.resolve()", () => {
@@ -573,6 +573,636 @@ describe('Automatic GC - Edge Cases', () => {
 })
 
 describe("ExecutionContext", () => {
+  describe("resource presets and metadata", () => {
+    it("presets resources with direct values and replacement resources", async () => {
+      const targetResource = resource({
+        name: "target-resource",
+        factory: () => "real",
+      })
+      const replacementResource = resource({
+        name: "replacement-resource",
+        factory: () => "replacement",
+      })
+      const readResourceFlow = flow({
+        name: "read-resource",
+        deps: { value: targetResource },
+        factory: (_ctx, { value }) => value,
+      })
+
+      const directScope = createScope({
+        presets: [preset(targetResource, "direct")],
+      })
+      const directCtx = directScope.createContext()
+      expect(await directCtx.exec({ flow: readResourceFlow })).toBe("direct")
+      await directCtx.close()
+      await directScope.dispose()
+
+      const replacementScope = createScope({
+        presets: [preset(targetResource, replacementResource)],
+      })
+      const replacementCtx = replacementScope.createContext()
+      expect(await replacementCtx.exec({ flow: readResourceFlow })).toBe("replacement")
+      await replacementCtx.close()
+      await replacementScope.dispose()
+    })
+
+    it("presets resources with replacement functions and exposes resource tags to extensions", async () => {
+      const resourceKind = tag<string>({ label: "resourceKind" })
+      const events: string[] = []
+      const closed: string[] = []
+
+      const targetResource = resource({
+        name: "target-resource",
+        tags: [resourceKind("target")],
+        factory: () => "real",
+      })
+      const readResourceFlow = flow({
+        name: "read-resource",
+        deps: { value: targetResource },
+        factory: (_ctx, { value }) => value,
+      })
+
+      const scope = createScope({
+        extensions: [{
+          name: "resource-tags",
+          wrapResolve: async (next, event) => {
+            if (event.kind === "resource") {
+              events.push(event.target.tags?.[0]?.value as string)
+            }
+            return next()
+          },
+        }],
+        presets: [
+          preset(targetResource, (ctx) => {
+            ctx.onClose(() => { closed.push("target") })
+            return "preset"
+          }),
+        ],
+      })
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: readResourceFlow })).toBe("preset")
+      expect(await ctx.exec({ flow: readResourceFlow })).toBe("preset")
+      expect(events).toEqual(["target"])
+
+      await ctx.close()
+      expect(closed).toEqual(["target"])
+      await scope.dispose()
+    })
+  })
+
+  describe("ctx.resolve() and ctx.release()", () => {
+    it("resolves atoms through the owning scope and ignores context tags", async () => {
+      const requestTag = tag<string>({ label: "ctx-resolve-request" })
+      const taggedAtom = atom({
+        deps: { request: tags.required(requestTag) },
+        factory: (_ctx, { request }) => request,
+      })
+
+      const scope = createScope({
+        tags: [requestTag("scope-value")],
+      })
+      const ctx = scope.createContext({
+        tags: [requestTag("context-value")],
+      })
+
+      expect(await ctx.resolve(taggedAtom)).toBe("scope-value")
+
+      const contextOnlyScope = createScope()
+      const contextOnlyCtx = contextOnlyScope.createContext({
+        tags: [requestTag("context-value")],
+      })
+
+      await expect(contextOnlyCtx.resolve(taggedAtom)).rejects.toThrow('Tag "ctx-resolve-request" not found')
+
+      await ctx.close()
+      await contextOnlyCtx.close()
+      await scope.dispose()
+      await contextOnlyScope.dispose()
+    })
+
+    it("rejects ctx.resolve() on closed contexts before resolving atoms or resources", async () => {
+      let atomCalls = 0
+      let resourceCalls = 0
+      const closedAtom = atom({
+        factory: () => {
+          atomCalls++
+          return "atom"
+        },
+      })
+      const closedResource = resource({
+        name: "closed-resource",
+        factory: () => {
+          resourceCalls++
+          return "resource"
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      await ctx.close()
+
+      await expect(ctx.resolve(closedAtom)).rejects.toThrow("closed")
+      await expect(ctx.resolve(closedResource)).rejects.toThrow("closed")
+      expect(atomCalls).toBe(0)
+      expect(resourceCalls).toBe(0)
+
+      await scope.dispose()
+    })
+
+    it("exposes a resource controller that observes resolve, failure, and release state", async () => {
+      let attempt = 0
+      let resume!: () => void
+      const observedResource = resource({
+        name: "controller-observed-resource",
+        factory: async () => {
+          attempt++
+          if (attempt === 2) throw new Error("boom")
+          await new Promise<void>((resolve) => {
+            resume = resolve
+          })
+          return `value-${attempt}`
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const ctrl = ctx.controller(observedResource)
+      const events: AtomState[] = []
+      ctrl.on("*", () => {
+        events.push(ctrl.state)
+      })
+
+      expect(ctrl.state).toBe("idle")
+      const first = ctrl.resolve()
+      expect(ctrl.state).toBe("resolving")
+      resume()
+      await expect(first).resolves.toBe("value-1")
+      expect(ctrl.state).toBe("resolved")
+      expect(ctrl.get()).toBe("value-1")
+
+      await ctrl.release()
+      expect(ctrl.state).toBe("idle")
+      expect(() => ctrl.get()).toThrow("Resource not resolved")
+
+      await expect(ctrl.resolve()).rejects.toThrow("boom")
+      expect(ctrl.state).toBe("failed")
+      expect(() => ctrl.get()).toThrow("boom")
+
+      await ctrl.release()
+      expect(ctrl.state).toBe("idle")
+      expect(events).toEqual(["resolving", "resolved", "idle", "resolving", "failed", "idle"])
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("supports lazy resource controller deps for conditional resource loading", async () => {
+      let enabled = false
+      let creates = 0
+      const dbResource = resource({
+        name: "conditional-db",
+        factory: () => ({ id: ++creates }),
+      })
+      const serviceResource = resource({
+        name: "conditional-service",
+        deps: { db: controller(dbResource) },
+        factory: async (_ctx, { db }) => {
+          if (!enabled) return "skipped"
+          const dbValue = await db.resolve()
+          return `db:${dbValue.id}`
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.resolve(serviceResource)).toBe("skipped")
+      expect(creates).toBe(0)
+
+      await ctx.release(serviceResource)
+      enabled = true
+
+      expect(await ctx.resolve(serviceResource)).toBe("db:1")
+      expect(ctx.controller(dbResource).get()).toEqual({ id: 1 })
+      expect(creates).toBe(1)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("supports resource controller deps in flows without resolving until requested", async () => {
+      let creates = 0
+      const sessionResource = resource({
+        name: "conditional-flow-session",
+        factory: () => ({ id: ++creates }),
+      })
+      const readSession = flow({
+        name: "read-session-conditionally",
+        parse: typed<{ load: boolean }>(),
+        deps: { session: controller(sessionResource) },
+        factory: async (_ctx, { session }) => {
+          if (!_ctx.input.load) return "none"
+          return (await session.resolve()).id
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: readSession, input: { load: false } })).toBe("none")
+      expect(creates).toBe(0)
+
+      expect(await ctx.exec({ flow: readSession, input: { load: true } })).toBe(1)
+      expect(ctx.controller(sessionResource).get()).toEqual({ id: 1 })
+      expect(creates).toBe(1)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("auto-resolves resource controller deps with resolve: true", async () => {
+      let creates = 0
+      const configResource = resource({
+        name: "auto-config",
+        factory: () => ({ version: ++creates }),
+      })
+      const serviceResource = resource({
+        name: "auto-service",
+        deps: { config: controller(configResource, { resolve: true }) },
+        factory: (_ctx, { config }) => {
+          expect(config.state).toBe("resolved")
+          return `version:${config.get().version}`
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.resolve(serviceResource)).toBe("version:1")
+      expect(creates).toBe(1)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("watches resource resolved events and releases dependent only when the value changes", async () => {
+      const values = [1, 1, 2]
+      let sourceCreates = 0
+      let dependentCreates = 0
+      const sourceResource = resource({
+        name: "watched-source",
+        factory: () => values[sourceCreates++]!,
+      })
+      const dependentResource = resource({
+        name: "watched-dependent",
+        deps: { source: controller(sourceResource, { resolve: true, watch: true }) },
+        factory: (_ctx, { source }) => `dependent:${++dependentCreates}:${source.get()}`,
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.resolve(dependentResource)).toBe("dependent:1:1")
+      expect(ctx.controller(dependentResource).state).toBe("resolved")
+
+      await ctx.release(sourceResource)
+      expect(ctx.controller(dependentResource).state).toBe("resolved")
+      expect(await ctx.resolve(dependentResource)).toBe("dependent:1:1")
+
+      await ctx.resolve(sourceResource)
+      expect(ctx.controller(dependentResource).state).toBe("resolved")
+
+      await ctx.release(sourceResource)
+      await ctx.resolve(sourceResource)
+      expect(ctx.controller(dependentResource).state).toBe("idle")
+      expect(await ctx.resolve(dependentResource)).toBe("dependent:2:2")
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("uses custom resource watch equality to gate dependent release", async () => {
+      const values = [
+        { id: 1, name: "alice" },
+        { id: 1, name: "ada" },
+        { id: 2, name: "grace" },
+      ]
+      let sourceCreates = 0
+      let dependentCreates = 0
+      const sourceResource = resource({
+        name: "watched-object-source",
+        factory: () => values[sourceCreates++]!,
+      })
+      const dependentResource = resource({
+        name: "watched-object-dependent",
+        deps: {
+          source: controller(sourceResource, {
+            resolve: true,
+            watch: true,
+            eq: (a, b) => a.id === b.id,
+          }),
+        },
+        factory: (_ctx, { source }) => {
+          const value = source.get()
+          return `dependent:${++dependentCreates}:${value.id}:${value.name}`
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.resolve(dependentResource)).toBe("dependent:1:1:alice")
+      await ctx.release(sourceResource)
+      await ctx.resolve(sourceResource)
+      expect(ctx.controller(dependentResource).state).toBe("resolved")
+
+      await ctx.release(sourceResource)
+      await ctx.resolve(sourceResource)
+      expect(ctx.controller(dependentResource).state).toBe("idle")
+      expect(await ctx.resolve(dependentResource)).toBe("dependent:2:2:grace")
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("rejects resource controller dependency anti-patterns at runtime", async () => {
+      let sourceCreates = 0
+      const dbResource = resource({
+        name: "bad-controller-resource",
+        factory: () => {
+          sourceCreates++
+          return 1
+        },
+      })
+      const badAtom = atom({
+        deps: { db: controller(dbResource) as any },
+        factory: (_ctx, { db }) => db,
+      })
+
+      let flowRuns = 0
+      const watchedDep = controller(dbResource, { resolve: true, watch: true } as any)
+      const badFlow = flow({
+        deps: { db: watchedDep as any },
+        factory: () => {
+          flowRuns++
+          return "bad"
+        },
+      })
+
+      const scope = createScope()
+      await expect(scope.resolve(badAtom)).rejects.toThrow("Resource controller deps require an ExecutionContext")
+      const ctx = scope.createContext()
+      await expect(ctx.exec({ flow: badFlow })).rejects.toThrow("Resource controller watch")
+      expect(sourceCreates).toBe(0)
+      expect(flowRuns).toBe(0)
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("owns direct resource misses in the context and releases owner-local state", async () => {
+      let creates = 0
+      let factoryScope: Lite.Scope | undefined
+      let factoryParent: Lite.ExecutionContext | undefined
+      const cleanups: string[] = []
+      const scopedResource = resource({
+        name: "context-owned",
+        factory: (ctx) => {
+          creates++
+          factoryScope = ctx.scope
+          factoryParent = ctx.parent
+          ctx.cleanup(() => {
+            cleanups.push(`cleanup:${creates}`)
+          })
+          return { id: creates }
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      const first = await ctx.resolve(scopedResource)
+      const second = await ctx.resolve(scopedResource)
+      expect(second).toBe(first)
+      expect(factoryScope).toBe(scope)
+      expect(factoryParent).toBeUndefined()
+      expect(creates).toBe(1)
+
+      await ctx.release(scopedResource)
+      expect(cleanups).toEqual(["cleanup:1"])
+
+      const third = await ctx.resolve(scopedResource)
+      expect(third).not.toBe(first)
+      expect(creates).toBe(2)
+
+      await ctx.close()
+      expect(cleanups).toEqual(["cleanup:1", "cleanup:2"])
+      await scope.dispose()
+    })
+
+    it("looks up parent-owned resources upward and makes child release a no-op", async () => {
+      let creates = 0
+      const sharedResource = resource({
+        name: "parent-owned",
+        factory: async () => {
+          creates++
+          await new Promise(r => setTimeout(r, 10))
+          return { id: creates }
+        },
+      })
+      const childFlow = flow({
+        name: "child-reads-parent-resource",
+        factory: (ctx) => ctx.resolve(sharedResource),
+      })
+      const childReleaseFlow = flow({
+        name: "child-release-parent-resource",
+        factory: (ctx) => ctx.release(sharedResource),
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext()
+
+      const parentValuePromise = parentCtx.resolve(sharedResource)
+      const childValuePromise = parentCtx.exec({ flow: childFlow })
+      const [parentValue, childValue] = await Promise.all([parentValuePromise, childValuePromise])
+
+      expect(childValue).toBe(parentValue)
+      expect(creates).toBe(1)
+
+      await parentCtx.exec({ flow: childReleaseFlow })
+      expect(await parentCtx.resolve(sharedResource)).toBe(parentValue)
+
+      await parentCtx.release(sharedResource)
+      const nextParentValue = await parentCtx.resolve(sharedResource)
+      expect(nextParentValue).not.toBe(parentValue)
+      expect(creates).toBe(2)
+
+      await parentCtx.close()
+      await scope.dispose()
+    })
+
+    it("stores flow-child resource misses on the surrounding execution boundary", async () => {
+      let creates = 0
+      const cleanups: string[] = []
+      const localResource = resource({
+        name: "boundary-local-resource",
+        factory: (ctx) => {
+          creates++
+          ctx.cleanup(() => {
+            cleanups.push(ctx.name ?? "root")
+          })
+          return { id: creates }
+        },
+      })
+      const childFlow = flow({
+        name: "child-local-flow",
+        factory: (ctx) => ctx.resolve(localResource),
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext()
+
+      const childValue = await parentCtx.exec({ flow: childFlow })
+      expect(cleanups).toEqual([])
+
+      const parentValue = await parentCtx.resolve(localResource)
+      expect(parentValue).toBe(childValue)
+      expect(creates).toBe(1)
+
+      await parentCtx.close()
+      expect(cleanups).toEqual(["root"])
+      await scope.dispose()
+    })
+
+    it("resolves boundary-owned resource deps from the owner context tags", async () => {
+      const requestTag = tag<string>({ label: "boundary-request" })
+      const taggedResource = resource({
+        name: "boundary-tagged",
+        deps: { request: tags.required(requestTag) },
+        factory: (_ctx, { request }) => ({ request }),
+      })
+      const childFlow = flow({
+        name: "child-with-own-tag",
+        factory: (ctx) => ctx.resolve(taggedResource),
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext({
+        tags: [requestTag("parent")],
+      })
+
+      const childValue = await parentCtx.exec({
+        flow: childFlow,
+        tags: [requestTag("child")],
+      })
+      const parentValue = await parentCtx.resolve(taggedResource)
+
+      expect(childValue).toEqual({ request: "parent" })
+      expect(parentValue).toBe(childValue)
+
+      await parentCtx.close()
+      await scope.dispose()
+    })
+
+    it("caches failed resources until owner release resets them", async () => {
+      let attempts = 0
+      const cleanups: string[] = []
+      const failingResource = resource({
+        name: "cached-failure-resource",
+        factory: (ctx) => {
+          attempts++
+          ctx.cleanup(() => {
+            cleanups.push(`cleanup:${attempts}`)
+          })
+          throw new Error("resource exploded")
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      await expect(ctx.resolve(failingResource)).rejects.toThrow("resource exploded")
+      await expect(ctx.resolve(failingResource)).rejects.toThrow("resource exploded")
+      expect(attempts).toBe(1)
+      expect(cleanups).toEqual(["cleanup:1"])
+
+      await ctx.release(failingResource)
+      await expect(ctx.resolve(failingResource)).rejects.toThrow("resource exploded")
+      expect(attempts).toBe(2)
+      expect(cleanups).toEqual(["cleanup:1", "cleanup:2"])
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("rejects late resource cleanup registration after release during resolution", async () => {
+      let continueFactory!: () => void
+      let markStarted!: () => void
+      let cleanupRegistrationError: unknown
+      let cleanupCalls = 0
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve
+      })
+      const lateCleanupResource = resource({
+        name: "late-cleanup",
+        factory: async (ctx) => {
+          markStarted()
+          await new Promise<void>((resume) => {
+            continueFactory = resume
+          })
+          try {
+            ctx.cleanup(() => {
+              cleanupCalls++
+            })
+          } catch (error) {
+            cleanupRegistrationError = error
+          }
+          return "late"
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const pending = ctx.resolve(lateCleanupResource)
+
+      await started
+      await ctx.release(lateCleanupResource)
+      continueFactory()
+
+      await expect(pending).rejects.toThrow("released")
+      expect(cleanupRegistrationError).toBeInstanceOf(Error)
+      expect((cleanupRegistrationError as Error).message).toContain("released")
+      expect(cleanupCalls).toBe(0)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("runs execution onClose before resource cleanup when closing a context", async () => {
+      const order: string[] = []
+      const txResource = resource({
+        name: "tx-close-order",
+        factory: (ctx) => {
+          ctx.onClose((result) => {
+            order.push(result.ok ? "commit" : "rollback")
+          })
+          ctx.cleanup(() => {
+            order.push("release")
+          })
+          return { tx: true }
+        },
+      })
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      await ctx.resolve(txResource)
+
+      await ctx.close({ ok: false, error: new Error("failed") })
+
+      expect(order).toEqual(["rollback", "release"])
+      await scope.dispose()
+    })
+  })
 
   describe("ctx.exec() with flow", () => {
     it("executes flow without deps", async () => {
@@ -715,6 +1345,25 @@ describe("ExecutionContext", () => {
       ctx2.onClose(() => { order.push(3) })
       await ctx2.close()
       expect(order).toEqual([3, 2, 1])
+    })
+
+    it("can unregister close callbacks before close", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const closed: string[] = []
+
+      const offFirst = ctx.onClose(() => {
+        closed.push("first")
+      })
+      ctx.onClose(() => {
+        closed.push("second")
+      })
+
+      offFirst()
+      await ctx.close()
+
+      expect(closed).toEqual(["second"])
+      await scope.dispose()
     })
   })
 
@@ -2711,7 +3360,7 @@ describe("public helper coverage", () => {
 
     const atomPreset = preset(taggedAtom, { ok: false })
     expect(isPreset(atomPreset)).toBe(true)
-    expect(() => preset({} as never, 1)).toThrow("preset target must be Atom or Flow")
+    expect(() => preset({} as never, 1)).toThrow("preset target must be Atom, Flow, or Resource")
     expect(() => preset(taggedAtom, taggedAtom)).toThrow("preset cannot reference itself")
 
     expect(parsedTag.get([taggedValue])).toBe(4)

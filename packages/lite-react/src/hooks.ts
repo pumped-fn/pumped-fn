@@ -2,7 +2,8 @@
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
-import { ScopeContext } from './context'
+import { ExecutionContextContext, ScopeContext } from './context'
+import type { ScopedValue, ScopedValueAccess, ScopedValueView } from './scoped-value'
 
 interface UseAtomSuspenseOptions {
   suspense?: true
@@ -49,8 +50,239 @@ interface UseSelectState<S> {
   error: Error | undefined
 }
 
+type Load<Value> =
+  | { status: 'loading'; data: undefined; error: undefined }
+  | { status: 'ready'; data: Value; error: undefined }
+  | { status: 'error'; data: undefined; error: Error }
+
+interface UseResourceSuspenseOptions {
+  suspense?: true
+}
+
+interface UseResourceManualOptions {
+  suspense: false
+}
+
+type UseResourceOptions = UseResourceSuspenseOptions | UseResourceManualOptions
+
+interface UseScopedValueSuspenseOptions {
+  suspense?: true
+}
+
+interface UseScopedValueManualOptions {
+  suspense: false
+}
+
+interface UseScopedValueSelectSuspenseOptions<State, Selected> {
+  suspense?: true
+  select: (snapshot: State) => Selected
+  eq?: (prev: Selected, next: Selected) => boolean
+}
+
+interface UseScopedValueSelectManualOptions<State, Selected> {
+  suspense: false
+  select: (snapshot: State) => Selected
+  eq?: (prev: Selected, next: Selected) => boolean
+}
+
+type UseScopedValueOptions<State, Selected = never> =
+  | UseScopedValueSuspenseOptions
+  | UseScopedValueManualOptions
+  | UseScopedValueSelectSuspenseOptions<State, Selected>
+  | UseScopedValueSelectManualOptions<State, Selected>
+
 const pendingPromises = new WeakMap<Lite.Controller<unknown>, Promise<unknown>>()
 const retriedControllers = new WeakSet<Lite.Controller<unknown>>()
+type ResourceRecord = {
+  controller: Lite.ResourceController<unknown>
+  promise?: Promise<unknown>
+  snapshot?: Load<unknown>
+  snapshotStatus?: Load<unknown>['status']
+  snapshotValue?: unknown
+  snapshotError?: Error
+}
+const resourceRecords = new WeakMap<Lite.ExecutionContext, WeakMap<Lite.Resource<unknown>, ResourceRecord>>()
+
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
+function getResourceLoad<T>(record: ResourceRecord): Load<T> {
+  const controllerState = record.controller.state
+  const loadStatus = controllerState === 'resolved'
+    ? 'ready'
+    : controllerState === 'failed'
+      ? 'error'
+      : 'loading'
+  let value: unknown
+  let error: Error | undefined
+
+  if (loadStatus === 'ready') {
+    value = record.controller.get()
+  } else if (loadStatus === 'error') {
+    try {
+      record.controller.get()
+    } catch (e) {
+      error = normalizeError(e)
+    }
+  }
+
+  if (
+    record.snapshot &&
+    record.snapshotStatus === loadStatus &&
+    record.snapshotValue === value &&
+    record.snapshotError === error
+  ) {
+    return record.snapshot as Load<T>
+  }
+
+  const snapshot: Load<unknown> = loadStatus === 'ready'
+    ? { status: 'ready', data: value, error: undefined }
+    : loadStatus === 'error'
+      ? { status: 'error', data: undefined, error: error! }
+      : { status: 'loading', data: undefined, error: undefined }
+
+  record.snapshot = snapshot
+  record.snapshotStatus = loadStatus
+  record.snapshotValue = value
+  record.snapshotError = error
+  return snapshot as Load<T>
+}
+
+function getResourceRecord(ctx: Lite.ExecutionContext, target: Lite.Resource<unknown>) {
+  let ctxRecords = resourceRecords.get(ctx)
+  if (!ctxRecords) {
+    ctxRecords = new WeakMap()
+    resourceRecords.set(ctx, ctxRecords)
+  }
+
+  let record = ctxRecords.get(target)
+  if (!record) {
+    const nextRecord: ResourceRecord = {
+      controller: ctx.controller(target),
+    }
+    ctxRecords.set(target, nextRecord)
+    record = nextRecord
+  }
+  return record
+}
+
+function startResourceRecord(record: ResourceRecord): Promise<unknown> {
+  if (record.promise) return record.promise
+  if (record.controller.state === 'resolved') return Promise.resolve(record.controller.get())
+  const promise = record.controller.resolve().then(
+    value => value,
+    error => { throw normalizeError(error) },
+  )
+  promise.then(
+    () => { record.promise = undefined },
+    () => { record.promise = undefined },
+  )
+  record.promise = promise
+  void promise.catch(() => {})
+  return promise
+}
+
+function useResourceState<T>(resource: Lite.Resource<T>, startInRender: boolean) {
+  const ctx = useExecutionContext()
+  const record = getResourceRecord(ctx, resource)
+  if (startInRender && record.controller.state !== 'resolved' && record.controller.state !== 'failed') {
+    startResourceRecord(record)
+  }
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    return record.controller.on('*', onStoreChange)
+  }, [record])
+  const load = useSyncExternalStore(
+    subscribe,
+    () => getResourceLoad<T>(record),
+    () => getResourceLoad<T>(record),
+  )
+
+  useEffect(() => {
+    if (!startInRender && (record.controller.state === 'idle' || record.controller.state === 'resolving')) {
+      startResourceRecord(record)
+    }
+  }, [load.status, record, startInRender])
+
+  return { load, promise: record.promise }
+}
+
+const emptySubscribe = () => () => {}
+
+function makeScopedValueView<State, Actions extends object>(
+  access: ScopedValueAccess<State, Actions>,
+  snapshot: State
+): ScopedValueView<State, Actions> {
+  return {
+    get disposed() {
+      return access.disposed
+    },
+    actions: access.actions,
+    get: access.get,
+    getSnapshot: access.getSnapshot,
+    subscribe: access.subscribe,
+    set: access.set,
+    update: access.update,
+    patch: access.patch,
+    snapshot,
+  }
+}
+
+function useScopedSnapshot<State, Actions extends object, Selected>(
+  access: ScopedValueAccess<State, Actions> | undefined,
+  selector: ((snapshot: State) => Selected) | undefined,
+  eq: ((prev: Selected, next: Selected) => boolean) | undefined,
+): ScopedValueView<State, Actions> | Selected | undefined {
+  const cache = useRef<{
+    access: ScopedValueAccess<State, Actions>
+    snapshot: State
+    selector: ((snapshot: State) => Selected) | undefined
+    eq: ((prev: Selected, next: Selected) => boolean) | undefined
+    value: ScopedValueView<State, Actions> | Selected
+  } | null>(null)
+
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    return access ? access.subscribe(onStoreChange) : emptySubscribe()
+  }, [access])
+
+  const getSnapshot = useCallback(() => {
+    if (!access) return undefined
+
+    const snapshot = access.getSnapshot()
+    const current = cache.current
+    if (
+      current &&
+      current.access === access &&
+      Object.is(current.snapshot, snapshot) &&
+      current.selector === selector &&
+      current.eq === eq
+    ) {
+      return current.value
+    }
+
+    let value: ScopedValueView<State, Actions> | Selected
+    if (selector) {
+      const next = selector(snapshot)
+      value = current &&
+        current.access === access &&
+        current.selector === selector &&
+        (eq ?? Object.is)(current.value as Selected, next)
+        ? current.value as Selected
+        : next
+    } else {
+      value = makeScopedValueView(access, snapshot)
+    }
+
+    cache.current = { access, snapshot, selector, eq, value }
+    return value
+  }, [access, selector, eq])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+function readyLoad<T>(data: T): Load<T> {
+  return { status: 'ready', data, error: undefined }
+}
 
 function getOrCreatePendingPromise<T>(ctrl: Lite.Controller<T>): Promise<T> {
   let pending = pendingPromises.get(ctrl) as Promise<T> | undefined
@@ -103,6 +335,68 @@ function useScope(): Lite.Scope {
     throw new Error("useScope must be used within a ScopeProvider")
   }
   return scope
+}
+
+function useExecutionContext(): Lite.ExecutionContext {
+  const ctx = useContext(ExecutionContextContext)
+  if (!ctx) {
+    throw new Error("useExecutionContext must be used within an ExecutionContextProvider")
+  }
+  return ctx
+}
+
+function useResource<T>(resource: Lite.Resource<T>): T
+function useResource<T>(resource: Lite.Resource<T>, options: UseResourceSuspenseOptions): T
+function useResource<T>(resource: Lite.Resource<T>, options: UseResourceManualOptions): Load<T>
+function useResource<T>(resource: Lite.Resource<T>, options?: UseResourceOptions): T | Load<T> {
+  const { load, promise } = useResourceState(resource, options?.suspense !== false)
+
+  if (options?.suspense === false) return load
+  if (load.status === 'ready') return load.data
+  if (load.status === 'error') throw load.error
+  throw promise
+}
+
+function useScopedValue<State, Actions extends object>(
+  value: ScopedValue<State, Actions>
+): ScopedValueView<State, Actions>
+function useScopedValue<State, Actions extends object>(
+  value: ScopedValue<State, Actions>,
+  options: UseScopedValueSuspenseOptions
+): ScopedValueView<State, Actions>
+function useScopedValue<State, Actions extends object, Selected>(
+  value: ScopedValue<State, Actions>,
+  options: UseScopedValueSelectSuspenseOptions<State, Selected>
+): Selected
+function useScopedValue<State, Actions extends object>(
+  value: ScopedValue<State, Actions>,
+  options: UseScopedValueManualOptions
+): Load<ScopedValueView<State, Actions>>
+function useScopedValue<State, Actions extends object, Selected>(
+  value: ScopedValue<State, Actions>,
+  options: UseScopedValueSelectManualOptions<State, Selected>
+): Load<Selected>
+function useScopedValue<State, Actions extends object, Selected>(
+  value: ScopedValue<State, Actions>,
+  options?: UseScopedValueOptions<State, Selected>
+): ScopedValueView<State, Actions> | Selected | Load<ScopedValueView<State, Actions>> | Load<Selected> {
+  const selector = options && 'select' in options ? options.select : undefined
+  const eq = options && 'eq' in options ? options.eq : undefined
+  const { load, promise } = useResourceState(value, options?.suspense !== false)
+  const data = useScopedSnapshot(
+    load.status === 'ready' ? load.data : undefined,
+    selector,
+    eq,
+  ) as ScopedValueView<State, Actions> | Selected | undefined
+
+  if (options?.suspense === false) {
+    if (load.status !== 'ready') return load as Load<ScopedValueView<State, Actions>> | Load<Selected>
+    return readyLoad(data) as Load<ScopedValueView<State, Actions>> | Load<Selected>
+  }
+
+  if (load.status === 'error') throw load.error
+  if (load.status === 'loading') throw promise
+  return data as ScopedValueView<State, Actions> | Selected
 }
 
 /**
@@ -411,5 +705,5 @@ function useSelect<T, S>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export { useScope, useController, useAtom, useSelect }
-export type { UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState }
+export { useScope, useExecutionContext, useController, useAtom, useSelect, useResource, useScopedValue }
+export type { Load, UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState, UseResourceSuspenseOptions, UseResourceManualOptions, UseResourceOptions, UseScopedValueSuspenseOptions, UseScopedValueManualOptions, UseScopedValueSelectSuspenseOptions, UseScopedValueSelectManualOptions, UseScopedValueOptions }
