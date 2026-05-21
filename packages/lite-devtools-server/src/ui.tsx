@@ -5,8 +5,10 @@ import type { Devtools } from "@pumped-fn/lite-devtools";
 import { TextAttributes } from "@opentui/core";
 import { scope, eventsAtom } from "./state";
 
+type ScopeProviderChild = Parameters<typeof ScopeProvider>[0]["children"];
+
 function ReactTypeBridge({ children }: { children: ReactNode }) {
-  return <ScopeProvider scope={scope} children={children} />;
+  return <ScopeProvider scope={scope} children={children as unknown as ScopeProviderChild} />;
 }
 
 const ICONS: Record<Devtools.EventType, string> = {
