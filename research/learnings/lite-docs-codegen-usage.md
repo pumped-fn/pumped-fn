@@ -18,6 +18,9 @@ Docs iteration 1:
 - documented `ExecutionContextProvider ctx`, `useResource(..., { suspense: false })` load union, `scopedValue` `initial/actions` shape, and no-`useState` scoped form usage in lite-react docs
 - run 4: `total_score=71.2`, `anti_pattern_hits=1`
 
+Docs iteration 2:
+- strengthened the `ExecutionContextProvider` docs to forbid `createScope()` and `scope.createContext()` inside component bodies
+- run 5: `total_score=74.4`, `anti_pattern_hits=0`
+
 Remaining gap:
-- resource-watch output can still create a scope inside an example component/request wrapper
 - scoped login output can omit an explicit `ExecutionContextProvider` wrapper when the prompt asks for a full React form module
