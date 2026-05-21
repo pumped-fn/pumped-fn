@@ -93,6 +93,8 @@ const ctx = scope.createContext()
 </ScopeProvider>
 ```
 
+Create the scope and explicit context outside component bodies. Do not call `createScope()` or `scope.createContext()` inside a React component; that creates a new graph during render. Components should consume an existing boundary through `ExecutionContextProvider`.
+
 Managed mode creates an execution context from the surrounding `ScopeProvider` after commit and closes it on unmount:
 
 ```tsx
