@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-ui",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Fine-grained reactive DOM renderer for pumped-fn/lite",
   "type": "module",
   "private": true,
