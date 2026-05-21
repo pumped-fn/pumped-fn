@@ -30,16 +30,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
 
-      - name: Setup npm for OIDC trusted publishing
+      - name: Configure npm for OIDC trusted publishing
         run: |
-          npm install -g npm@^11.5.1
           npm config set registry https://registry.npmjs.org/
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
           echo "npm version: $(npm --version)"
-          npm config list
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

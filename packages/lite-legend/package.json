@@ -1,14 +1,12 @@
 {
-  "name": "@pumped-fn/lite",
-  "version": "2.1.6",
-  "description": "Lightweight dependency injection with minimal reactivity",
+  "name": "@pumped-fn/lite-legend",
+  "version": "0.0.0-poc",
+  "description": "Legend-State v3 bridge for @pumped-fn/lite (POC)",
   "type": "module",
+  "private": true,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
-  "bin": {
-    "pumped-lite": "./dist/cli.mjs"
-  },
   "exports": {
     ".": {
       "import": {
@@ -24,21 +22,31 @@
   "files": [
     "dist",
     "README.md",
-    "PATTERNS.md",
-    "MIGRATION.md",
-    "LICENSE",
-    "CHANGELOG.md"
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
-    "typecheck": "npx @typescript/native-preview --noEmit",
-    "typecheck:full": "npx @typescript/native-preview --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit",
+    "typecheck:full": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "peerDependencies": {
+    "@legendapp/state": "^3.0.0-beta.0",
+    "@pumped-fn/lite": ">=1.4.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
   "devDependencies": {
+    "@legendapp/state": "catalog:",
+    "@pumped-fn/lite": "workspace:*",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "catalog:",
+    "@types/react": "^18.3.27",
     "@vitest/coverage-v8": "catalog:",
+    "jsdom": "^27.3.0",
+    "react": "^18.3.1",
+    "react-dom": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
@@ -47,22 +55,5 @@
   "engines": {
     "node": ">=18"
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "directory": "packages/lite",
-    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
-  },
-  "keywords": [
-    "dependency-injection",
-    "di",
-    "lite",
-    "reactivity",
-    "typescript",
-    "ioc",
-    "inversion-of-control"
-  ],
   "license": "MIT"
 }
