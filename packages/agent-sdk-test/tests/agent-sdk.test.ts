@@ -1,0 +1,194 @@
+import { describe, expect, it } from "vitest"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import {
+  CliWorkerError,
+  SuspendSignal,
+  claudeCliWorker,
+  cliWorker,
+  codexCliWorker,
+  createAgentContext,
+  delegate,
+  derivedMaterial,
+  material,
+  patchMaterial,
+  remoteTag,
+  durableTag,
+  workflowTag,
+  workerKindTag,
+  workerRegistry,
+} from "@pumped-fn/agent-sdk"
+import { InMemoryAgentEventLog, createAgentTestExtension } from "../src/index"
+
+describe("agent sdk", () => {
+  it("memoizes completed workflow execution", async () => {
+    const { extension } = createAgentTestExtension()
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    let calls = 0
+    const worker = flow({
+      name: "memo-worker",
+      parse: typed<number>(),
+      tags: [workflowTag(true)],
+      factory: (ctx) => {
+        calls++
+        return ctx.input * 2
+      },
+    })
+    const root = flow({
+      name: "memo-root",
+      parse: typed<number>(),
+      tags: [workflowTag(true)],
+      factory: async (ctx) => ctx.exec({ flow: worker, input: ctx.input }),
+    })
+
+    const ctx1 = createAgentContext(scope, { taskId: "task-a", runId: "run-a" })
+    expect(await ctx1.exec({ flow: root, input: 3 })).toBe(6)
+    await ctx1.close()
+
+    const ctx2 = createAgentContext(scope, { taskId: "task-a", runId: "run-a" })
+    expect(await ctx2.exec({ flow: root, input: 3 })).toBe(6)
+    await ctx2.close()
+
+    expect(calls).toBe(1)
+  })
+
+  it("suspends durable work and replays memoized steps on resolution", async () => {
+    const log = new InMemoryAgentEventLog()
+    const { extension } = createAgentTestExtension({ log })
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    let expensiveCalls = 0
+    const expensive = flow({
+      name: "expensive",
+      tags: [workflowTag(true)],
+      factory: () => {
+        expensiveCalls++
+        return "ready"
+      },
+    })
+    const approve = flow({
+      name: "approve",
+      tags: [durableTag(true)],
+      factory: () => "unreachable",
+    })
+    const root = flow({
+      name: "approval-root",
+      tags: [workflowTag(true)],
+      factory: async (ctx) => {
+        const first = await ctx.exec({ flow: expensive })
+        const decision = await ctx.exec({ flow: approve })
+        return `${first}:${decision}`
+      },
+    })
+
+    const ctx1 = createAgentContext(scope, { taskId: "task-b", runId: "run-b" })
+    await expect(ctx1.exec({ flow: root })).rejects.toBeInstanceOf(SuspendSignal)
+    await ctx1.close({ ok: false, error: new Error("suspended") })
+
+    const pending = log.entries().find((entry) => entry.status === "pending")
+    expect(pending?.targetName).toBe("approve")
+    if (!pending) throw new Error("approve step did not suspend")
+    await log.resolve(pending.key, "yes")
+
+    const ctx2 = createAgentContext(scope, { taskId: "task-b", runId: "run-b" })
+    expect(await ctx2.exec({ flow: root })).toBe("ready:yes")
+    await ctx2.close()
+    expect(expensiveCalls).toBe(1)
+  })
+
+  it("delegates by worker registry and routes remote-tagged workers", async () => {
+    const { extension } = createAgentTestExtension()
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    const worker = flow({
+      name: "upper",
+      parse: typed<{ text: string }>(),
+      tags: [remoteTag(true), workerKindTag("code")],
+      factory: (ctx) => ctx.input.text.toUpperCase(),
+    })
+    const registry = workerRegistry([worker])
+    const root = flow({
+      name: "delegate-root",
+      parse: typed<{ text: string }>(),
+      tags: [workflowTag(true)],
+      factory: (ctx) => delegate<string, { text: string }>(ctx, "upper", ctx.input),
+    })
+    const ctx = createAgentContext(scope, { taskId: "task-c", runId: "run-c", registry })
+    expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
+    await ctx.close()
+  })
+
+  it("patches JSON materials with revision conflicts", async () => {
+    const scope = createScope()
+    const ctx = createAgentContext(scope, { taskId: "task-d", runId: "run-d" })
+    const prStatus = material("pr-status", {
+      kind: "json",
+      initialState: { prs: {} as Record<string, { status: string }> },
+    })
+
+    const next = await patchMaterial(ctx, prStatus, [
+      { op: "add", path: "/prs/12", value: { status: "ok" } },
+    ])
+    expect(next).toEqual({
+      name: "pr-status",
+      kind: "json",
+      revision: 1,
+      state: { prs: { "12": { status: "ok" } } },
+    })
+    await expect(
+      patchMaterial(ctx, prStatus, [
+        { op: "replace", path: "/prs/12/status", value: "stale" },
+      ], { expectedRevision: 0 })
+    ).rejects.toThrow("Material revision conflict")
+    await ctx.close()
+  })
+
+  it("derives material state from primary material", async () => {
+    const source = material("count", {
+      kind: "json",
+      initialState: { value: 2 },
+    })
+    const doubled = derivedMaterial("double", source, (state) => state.value * 2, { kind: "json" })
+    const scope = createScope()
+    expect(await scope.resolve(doubled)).toEqual({
+      name: "double",
+      kind: "json",
+      revision: 0,
+      state: 4,
+    })
+  })
+
+  it("runs a real CLI worker", async () => {
+    const cli = cliWorker<{ text: string }, string>({
+      name: "printf",
+      command: "printf",
+      args: (input) => ["%s", input.text],
+      timeoutMs: 5_000,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    expect(await ctx.exec({ flow: cli, input: { text: "agent-sdk-cli-ok" } })).toBe("agent-sdk-cli-ok")
+    await ctx.close()
+  })
+
+  it("tags CLI-backed LLM helpers as LLM workers", () => {
+    expect(workerKindTag.find(cliWorker({ name: "x", command: "printf" }))).toBe("cli")
+    expect(workerKindTag.find(claudeCliWorker())).toBe("llm")
+    expect(workerKindTag.find(codexCliWorker())).toBe("llm")
+  })
+
+  it("reports CLI failures with captured stderr", async () => {
+    const cli = cliWorker({
+      name: "sh-fail",
+      command: "sh",
+      args: ["-c", "echo bad >&2; exit 7"],
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: cli, input: { prompt: "" } })).rejects.toMatchObject({
+      name: "CliWorkerError",
+      result: { exitCode: 7, stderr: "bad\n" },
+    } satisfies Partial<CliWorkerError>)
+    await ctx.close({ ok: false, error: new Error("expected") })
+  })
+})
