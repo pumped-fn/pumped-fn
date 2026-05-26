@@ -30,7 +30,7 @@ flowchart TD
 
 - Agent markers: `workflow`, `remote`, `durable`, `workerKind`, `timeout`.
 - `createAgentExtension()` for agent policy: replay, suspend, timeout, and remote dispatch.
-- `createAgentContext()` for run-scoped root contexts.
+- `agentRun()` for run-scoped `scope.createContext()` options.
 - `WorkerRegistry` and `delegate()` for named worker calls.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
@@ -46,9 +46,9 @@ Suspense is the reusable substrate under the agent extension. It only knows abou
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import {
-  createSuspenseContext,
   createSuspenseExtension,
   suspend,
+  suspenseRun,
 } from "@pumped-fn/lite-extension-suspense"
 
 const externalSync = flow({
@@ -62,10 +62,7 @@ const scope = createScope({
   extensions: [createSuspenseExtension({ log })],
 })
 
-const ctx = createSuspenseContext(scope, {
-  taskId: "doc-1",
-  runId: "sync-1",
-})
+const ctx = scope.createContext(suspenseRun({ taskId: "doc-1", runId: "sync-1" }))
 
 await ctx.exec({ flow: externalSync })
 ```
@@ -77,7 +74,7 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ```ts
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
-  createAgentContext,
+  agentRun,
   createAgentExtension,
   delegate,
   remote,
@@ -110,11 +107,11 @@ const scope = createScope({
   extensions: [createAgentExtension({ log: eventLog })],
 })
 
-const ctx = createAgentContext(scope, {
+const ctx = scope.createContext(agentRun({
   taskId: "issue-123",
   runId: "run-1",
   registry: workerRegistry([summarize]),
-})
+}))
 
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```

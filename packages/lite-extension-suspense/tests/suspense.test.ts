@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest"
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
   SuspendSignal,
-  createSuspenseContext,
   createSuspenseExtension,
   formatSuspenseStepKey,
   suspend,
+  suspenseRun,
   suspense,
   type SuspenseEventLog,
   type SuspenseStepEntry,
@@ -59,11 +59,11 @@ describe("suspense extension", () => {
       },
     })
 
-    const ctx1 = createSuspenseContext(scope, { taskId: "sync-a", runId: "run-a" })
+    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx1.exec({ flow: step, input: 1 })).toBe(2)
     await ctx1.close()
 
-    const ctx2 = createSuspenseContext(scope, { taskId: "sync-a", runId: "run-a" })
+    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx2.exec({ flow: step, input: 100 })).toBe(2)
     await ctx2.close()
     expect(calls).toBe(1)
@@ -79,7 +79,7 @@ describe("suspense extension", () => {
       factory: () => "unreachable",
     })
 
-    const ctx1 = createSuspenseContext(scope, { taskId: "sync-b", runId: "run-b" })
+    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
     await expect(ctx1.exec({ flow: externalSync })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx1.close({ ok: false, error: new Error("suspended") })
 
@@ -88,7 +88,7 @@ describe("suspense extension", () => {
     if (!pending) throw new Error("external-sync step did not suspend")
     await log.resolve(pending.key, "synced")
 
-    const ctx2 = createSuspenseContext(scope, { taskId: "sync-b", runId: "run-b" })
+    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: externalSync })).toBe("synced")
     await ctx2.close()
   })

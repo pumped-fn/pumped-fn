@@ -3,10 +3,10 @@ import { createScope, flow, tag as marker, tags, typed } from "@pumped-fn/lite"
 import {
   CliWorkerError,
   SuspendSignal,
+  agentRun,
   claudeCliWorker,
   cliWorker,
   codexCliWorker,
-  createAgentContext,
   delegate,
   derivedMaterial,
   material,
@@ -17,7 +17,7 @@ import {
   workerKind,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
-import { createSuspenseContext, suspend, suspense } from "@pumped-fn/lite-extension-suspense"
+import { suspend, suspense, suspenseRun } from "@pumped-fn/lite-extension-suspense"
 import {
   InMemoryAgentEventLog,
   InMemorySuspenseEventLog,
@@ -42,11 +42,11 @@ describe("agent sdk", () => {
       },
     })
 
-    const ctx1 = createSuspenseContext(scope, { taskId: "sync-a", runId: "run-a" })
+    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx1.exec({ flow: step, input: 1 })).toBe(2)
     await ctx1.close()
 
-    const ctx2 = createSuspenseContext(scope, { taskId: "sync-a", runId: "run-a" })
+    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx2.exec({ flow: step, input: 100 })).toBe(2)
     await ctx2.close()
     expect(calls).toBe(1)
@@ -63,7 +63,7 @@ describe("agent sdk", () => {
       factory: () => "unreachable",
     })
 
-    const ctx1 = createSuspenseContext(scope, { taskId: "sync-b", runId: "run-b" })
+    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
     await expect(ctx1.exec({ flow: externalSync })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx1.close({ ok: false, error: new Error("suspended") })
 
@@ -72,7 +72,7 @@ describe("agent sdk", () => {
     if (!pending) throw new Error("external-sync step did not suspend")
     await log.resolve(pending.key, "synced")
 
-    const ctx2 = createSuspenseContext(scope, { taskId: "sync-b", runId: "run-b" })
+    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: externalSync })).toBe("synced")
     await ctx2.close()
   })
@@ -98,11 +98,11 @@ describe("agent sdk", () => {
       factory: async (ctx) => ctx.exec({ flow: worker, input: ctx.input }),
     })
 
-    const ctx1 = createAgentContext(scope, { taskId: "task-a", runId: "run-a" })
+    const ctx1 = scope.createContext(agentRun({ taskId: "task-a", runId: "run-a" }))
     expect(await ctx1.exec({ flow: root, input: 3 })).toBe(6)
     await ctx1.close()
 
-    const ctx2 = createAgentContext(scope, { taskId: "task-a", runId: "run-a" })
+    const ctx2 = scope.createContext(agentRun({ taskId: "task-a", runId: "run-a" }))
     expect(await ctx2.exec({ flow: root, input: 3 })).toBe(6)
     await ctx2.close()
 
@@ -125,15 +125,15 @@ describe("agent sdk", () => {
       },
     })
 
-    const ctx1 = createAgentContext(scope, {
+    const ctx1 = scope.createContext(agentRun({
       taskId: "task-replay-deps",
       runId: "run-replay-deps",
       markers: [gate("first")],
-    })
+    }))
     expect(await ctx1.exec({ flow: worker })).toBe("ok:first")
     await ctx1.close()
 
-    const ctx2 = createAgentContext(scope, { taskId: "task-replay-deps", runId: "run-replay-deps" })
+    const ctx2 = scope.createContext(agentRun({ taskId: "task-replay-deps", runId: "run-replay-deps" }))
     expect(await ctx2.exec({ flow: worker })).toBe("ok:first")
     await ctx2.close()
     expect(calls).toBe(1)
@@ -168,7 +168,7 @@ describe("agent sdk", () => {
       },
     })
 
-    const ctx1 = createAgentContext(scope, { taskId: "task-b", runId: "run-b" })
+    const ctx1 = scope.createContext(agentRun({ taskId: "task-b", runId: "run-b" }))
     await expect(ctx1.exec({ flow: root })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx1.close({ ok: false, error: new Error("suspended") })
 
@@ -177,7 +177,7 @@ describe("agent sdk", () => {
     if (!pending) throw new Error("approve step did not suspend")
     await log.resolve(pending.key, "yes")
 
-    const ctx2 = createAgentContext(scope, { taskId: "task-b", runId: "run-b" })
+    const ctx2 = scope.createContext(agentRun({ taskId: "task-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: root })).toBe("ready:yes")
     await ctx2.close()
     expect(expensiveCalls).toBe(1)
@@ -195,7 +195,7 @@ describe("agent sdk", () => {
       factory: (_ctx, { gate }) => gate,
     })
 
-    const ctx = createAgentContext(scope, { taskId: "task-durable-deps", runId: "run-durable-deps" })
+    const ctx = scope.createContext(agentRun({ taskId: "task-durable-deps", runId: "run-durable-deps" }))
     await expect(ctx.exec({ flow: approve })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx.close({ ok: false, error: new Error("suspended") })
   })
@@ -217,7 +217,7 @@ describe("agent sdk", () => {
       tags: [workflow(true)],
       factory: (ctx) => delegate<string, { text: string }>(ctx, "upper", ctx.input),
     })
-    const ctx = createAgentContext(scope, { taskId: "task-c", runId: "run-c", registry })
+    const ctx = scope.createContext(agentRun({ taskId: "task-c", runId: "run-c", registry }))
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
     await ctx.close()
   })
@@ -241,14 +241,14 @@ describe("agent sdk", () => {
       factory: (_ctx, { gate }) => gate,
     })
 
-    const ctx = createAgentContext(scope, { taskId: "task-remote-deps", runId: "run-remote-deps" })
+    const ctx = scope.createContext(agentRun({ taskId: "task-remote-deps", runId: "run-remote-deps" }))
     expect(await ctx.exec({ flow: worker })).toBe("remote-only")
     await ctx.close()
   })
 
   it("patches JSON materials with revision conflicts", async () => {
     const scope = createScope()
-    const ctx = createAgentContext(scope, { taskId: "task-d", runId: "run-d" })
+    const ctx = scope.createContext(agentRun({ taskId: "task-d", runId: "run-d" }))
     const prStatus = material("pr-status", {
       kind: "json",
       initialState: { prs: {} as Record<string, { status: string }> },

@@ -7,7 +7,7 @@ Use this package as a small convention layer over `@pumped-fn/lite`. If a use ca
 Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
 
 ```ts
-import { createSuspenseContext, createSuspenseExtension, suspend } from "@pumped-fn/lite-extension-suspense"
+import { createSuspenseExtension, suspend, suspenseRun } from "@pumped-fn/lite-extension-suspense"
 
 const waitForCommit = flow({
   name: "wait-for-commit",
@@ -22,10 +22,7 @@ const scope = createScope({
   extensions: [createSuspenseExtension({ log })],
 })
 
-const ctx = createSuspenseContext(scope, {
-  taskId: "doc-123",
-  runId: "sync-42",
-})
+const ctx = scope.createContext(suspenseRun({ taskId: "doc-123", runId: "sync-42" }))
 ```
 
 Suspense has no agent knowledge. It sees marked `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.

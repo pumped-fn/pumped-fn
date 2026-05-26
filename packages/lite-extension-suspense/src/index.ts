@@ -81,22 +81,21 @@ export function formatSuspenseStepKey(key: SuspenseStepKey): string {
   return `${key.taskId}:${key.runId}:${key.step}`
 }
 
-export function createSuspenseContext(
-  scope: Lite.Scope,
-  options: {
-    taskId: string
-    runId: string
-    markers?: Lite.Tagged<any>[]
-  }
-): Lite.ExecutionContext {
-  return scope.createContext({
+export interface SuspenseRunOptions {
+  taskId: string
+  runId: string
+  markers?: Lite.Tagged<any>[]
+}
+
+export function suspenseRun(options: SuspenseRunOptions): Lite.CreateContextOptions {
+  return {
     tags: [
       taskId(options.taskId),
       runId(options.runId),
       stepCounter({ next: 0 }),
       ...(options.markers ?? []),
     ],
-  })
+  }
 }
 
 export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite.Extension {

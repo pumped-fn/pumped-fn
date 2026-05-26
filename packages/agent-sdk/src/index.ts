@@ -1,11 +1,11 @@
 import { atom, flow, tag, typed, type Lite } from "@pumped-fn/lite"
 import {
-  createSuspenseContext,
   createSuspenseExtension,
   formatSuspenseStepKey,
   hasMarker,
   suspend,
   suspense,
+  suspenseRun,
   type SuspenseEventLog,
   type SuspenseExecEvent,
   type SuspenseStepCounter,
@@ -74,16 +74,15 @@ export function formatStepKey(key: AgentStepKey): string {
   return formatSuspenseStepKey(key)
 }
 
-export function createAgentContext(
-  scope: Lite.Scope,
-  options: {
-    taskId: string
-    runId: string
-    registry?: WorkerRegistry
-    markers?: Lite.Tagged<any>[]
-  }
-): Lite.ExecutionContext {
-  return createSuspenseContext(scope, {
+export interface AgentRunOptions {
+  taskId: string
+  runId: string
+  registry?: WorkerRegistry
+  markers?: Lite.Tagged<any>[]
+}
+
+export function agentRun(options: AgentRunOptions): Lite.CreateContextOptions {
+  return suspenseRun({
     taskId: options.taskId,
     runId: options.runId,
     markers: [
