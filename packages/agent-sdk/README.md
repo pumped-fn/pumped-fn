@@ -10,7 +10,7 @@ This package does not add an agent runtime. It gives names and conventions to th
 | `atom()` / `service()` | Provider, config, registry, model client, material state |
 | `tag()` | Routing metadata and ambient run data |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
-| Extension `wrapExec` | Durable router around one executable step |
+| Extension `wrapExec` | Suspense/replay router around one executable step |
 
 The core idea: author orchestration as normal TypeScript `flow()` code. Put every side effect behind `ctx.exec()`. Then an extension can replay, memoize, route, or suspend those steps without changing workflow code.
 
@@ -29,14 +29,50 @@ flowchart TD
 ## What Is In This Package
 
 - Agent tags: `workflowTag`, `remoteTag`, `durableTag`, `workerKindTag`, `timeoutTag`.
-- Ambient run tags: `taskIdTag`, `runIdTag`, `stepCounterTag`, `workerRegistryTag`.
-- `createAgentExtension()` for replay, suspend, timeout, and remote dispatch.
+- Standalone suspense tags: `suspenseTag`, `suspendTag`, `suspenseTaskIdTag`, `suspenseRunIdTag`, `suspenseStepCounterTag`.
+- `createSuspenseExtension()` for replay, suspend, and external resolution without agent concepts.
+- `createAgentExtension()` for agent policy: replay, suspend, timeout, and remote dispatch.
 - `createAgentContext()` for run-scoped root contexts.
 - `WorkerRegistry` and `delegate()` for named worker calls.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
+`workflowTag` is the agent-facing alias for `suspenseTag`; `durableTag` is the agent-facing alias for `suspendTag`.
+
 Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `AgentEventLog` and `AgentRemoteRunner` contracts.
+
+## Standalone Suspense
+
+Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `suspenseTag(true)` and externally resolved steps with `suspendTag(true)`.
+
+```ts
+import { createScope, flow } from "@pumped-fn/lite"
+import {
+  createSuspenseContext,
+  createSuspenseExtension,
+  suspendTag,
+} from "@pumped-fn/agent-sdk"
+
+const externalSync = flow({
+  name: "external-sync",
+  tags: [suspendTag(true)],
+  factory: () => "unreachable until resolved",
+})
+
+const log = makeEventLog()
+const scope = createScope({
+  extensions: [createSuspenseExtension({ log })],
+})
+
+const ctx = createSuspenseContext(scope, {
+  taskId: "doc-1",
+  runId: "sync-1",
+})
+
+await ctx.exec({ flow: externalSync })
+```
+
+First run writes a pending entry and throws `SuspendSignal`. A resolver writes the value into the log, then replay returns the resolved value and continues. Sync can use the same shape for "wait until remote commit arrives", "wait until peer state catches up", or "resume after external acknowledgement".
 
 ## Minimal Workflow
 

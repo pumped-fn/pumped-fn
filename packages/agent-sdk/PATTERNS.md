@@ -2,6 +2,32 @@
 
 Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, `atom` or `service`, `tag`, and `ctx.exec`, do that before adding another primitive.
 
+## 0. Standalone Suspense
+
+Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
+
+```ts
+const waitForCommit = flow({
+  name: "wait-for-commit",
+  parse: typed<{ revision: number }>(),
+  tags: [suspendTag(true)],
+  factory: () => {
+    throw new Error("resolved by sync service")
+  },
+})
+
+const scope = createScope({
+  extensions: [createSuspenseExtension({ log })],
+})
+
+const ctx = createSuspenseContext(scope, {
+  taskId: "doc-123",
+  runId: "sync-42",
+})
+```
+
+Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
+
 ## 1. Workflow Flow
 
 Use a workflow flow when code chooses order, branching, retries, and fan-out.
@@ -157,7 +183,7 @@ const count = derivedMaterial("inventory-count", inventory, (state) => state.ite
 
 ## 8. Event Log Boundary
 
-The event log key is `(taskId, runId, step)`. The step increments in `wrapExec`.
+The event log key is `(taskId, runId, step)`. The step increments in standalone suspense `wrapExec`; the agent extension composes that lower layer.
 
 ```mermaid
 sequenceDiagram

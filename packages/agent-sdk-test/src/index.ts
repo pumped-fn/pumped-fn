@@ -1,30 +1,35 @@
 import {
   createAgentExtension,
+  createSuspenseExtension,
   formatStepKey,
   type AgentEventLog,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
   type AgentStepEntry,
   type AgentStepKey,
+  type SuspenseEventLog,
+  type SuspenseExtensionOptions,
+  type SuspenseStepEntry,
+  type SuspenseStepKey,
 } from "@pumped-fn/agent-sdk"
 import type { Lite } from "@pumped-fn/lite"
 
-export class InMemoryAgentEventLog implements AgentEventLog {
-  private readonly store = new Map<string, AgentStepEntry>()
+export class InMemorySuspenseEventLog implements SuspenseEventLog {
+  private readonly store = new Map<string, SuspenseStepEntry>()
 
-  async get(key: AgentStepKey): Promise<AgentStepEntry | undefined> {
+  async get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined> {
     return this.store.get(formatStepKey(key))
   }
 
-  async putPending(entry: Extract<AgentStepEntry, { status: "pending" }>): Promise<void> {
+  async putPending(entry: Extract<SuspenseStepEntry, { status: "pending" }>): Promise<void> {
     this.store.set(formatStepKey(entry.key), entry)
   }
 
-  async putCompleted(entry: Extract<AgentStepEntry, { status: "completed" }>): Promise<void> {
+  async putCompleted(entry: Extract<SuspenseStepEntry, { status: "completed" }>): Promise<void> {
     this.store.set(formatStepKey(entry.key), entry)
   }
 
-  async resolve(key: AgentStepKey, value: unknown): Promise<void> {
+  async resolve(key: SuspenseStepKey, value: unknown): Promise<void> {
     const current = this.store.get(formatStepKey(key))
     if (!current || current.status !== "pending") throw new Error(`Pending step "${formatStepKey(key)}" not found`)
     this.store.set(formatStepKey(key), {
@@ -35,13 +40,28 @@ export class InMemoryAgentEventLog implements AgentEventLog {
     })
   }
 
-  entries(): AgentStepEntry[] {
+  entries(): SuspenseStepEntry[] {
     return [...this.store.values()]
   }
 }
 
+export class InMemoryAgentEventLog extends InMemorySuspenseEventLog implements AgentEventLog {}
+
 export const localRemoteRunner: AgentRemoteRunner = {
   run: (_event, next) => next(),
+}
+
+export function createSuspenseTestExtension(
+  options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}
+): { extension: Lite.Extension; log: SuspenseEventLog } {
+  const log = options.log ?? new InMemorySuspenseEventLog()
+  return {
+    log,
+    extension: createSuspenseExtension({
+      ...options,
+      log,
+    }),
+  }
 }
 
 export function createAgentTestExtension(

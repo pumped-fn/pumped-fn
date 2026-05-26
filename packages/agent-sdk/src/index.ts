@@ -3,51 +3,75 @@ import { execFile } from "node:child_process"
 
 export type WorkerKind = "code" | "llm" | "cli" | string
 export type MaterialKind = "json" | "text" | "binary" | "reference"
+type MaybePromise<T> = T | Promise<T>
 
-export interface StepCounter {
+export interface SuspenseStepCounter {
   next: number
 }
 
-export interface AgentStepKey {
+export type StepCounter = SuspenseStepCounter
+
+export interface SuspenseStepKey {
   taskId: string
   runId: string
   step: number
 }
 
-export type AgentStepEntry =
+export type AgentStepKey = SuspenseStepKey
+
+export type SuspenseStepEntry =
   | {
       status: "pending"
-      key: AgentStepKey
+      key: SuspenseStepKey
       targetName: string
       input: unknown
-      durable: boolean
+      kind?: string
     }
   | {
       status: "resolved"
-      key: AgentStepKey
+      key: SuspenseStepKey
       targetName: string
       value: unknown
     }
   | {
       status: "completed"
-      key: AgentStepKey
+      key: SuspenseStepKey
       targetName: string
       result: unknown
     }
 
-export interface AgentEventLog {
-  get(key: AgentStepKey): Promise<AgentStepEntry | undefined>
-  putPending(entry: Extract<AgentStepEntry, { status: "pending" }>): Promise<void>
-  putCompleted(entry: Extract<AgentStepEntry, { status: "completed" }>): Promise<void>
-  resolve(key: AgentStepKey, value: unknown): Promise<void>
+export type AgentStepEntry = SuspenseStepEntry
+
+export interface SuspenseEventLog {
+  get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined>
+  putPending(entry: Extract<SuspenseStepEntry, { status: "pending" }>): Promise<void>
+  putCompleted(entry: Extract<SuspenseStepEntry, { status: "completed" }>): Promise<void>
+  resolve(key: SuspenseStepKey, value: unknown): Promise<void>
 }
 
-export interface AgentExecEvent {
-  key: AgentStepKey
+export interface AgentEventLog extends SuspenseEventLog {}
+
+export interface SuspenseExecEvent {
+  key: SuspenseStepKey
   target: Lite.ExecTarget
   ctx: Lite.ExecutionContext
   targetName: string
   input: unknown
+}
+
+export interface AgentExecEvent extends SuspenseExecEvent {}
+
+export interface SuspenseExtensionOptions {
+  log: SuspenseEventLog
+  name?: string
+  defaultTaskId?: string
+  defaultRunId?: string
+  shouldHandle?: (target: Lite.ExecTarget, ctx: Lite.ExecutionContext) => boolean
+  shouldSuspend?: (event: SuspenseExecEvent) => MaybePromise<boolean>
+  run?: (event: SuspenseExecEvent, next: () => Promise<unknown>) => Promise<unknown>
+  getKey?: (ctx: Lite.ExecutionContext, target: Lite.ExecTarget) => SuspenseStepKey
+  getTargetName?: (target: Lite.ExecTarget, ctx: Lite.ExecutionContext) => string
+  createPendingEntry?: (event: SuspenseExecEvent) => Extract<SuspenseStepEntry, { status: "pending" }>
 }
 
 export interface AgentRemoteRunner {
@@ -61,24 +85,31 @@ export interface AgentExtensionOptions {
   defaultRunId?: string
 }
 
-export const workflowTag = tag<boolean>({ label: "agent.workflow", default: false })
+export const suspenseTag = tag<boolean>({ label: "suspense.step", default: false })
+export const suspendTag = tag<boolean>({ label: "suspense.suspend", default: false })
+export const suspenseTaskIdTag = tag<string>({ label: "suspense.taskId" })
+export const suspenseRunIdTag = tag<string>({ label: "suspense.runId" })
+export const suspenseStepCounterTag = tag<SuspenseStepCounter>({ label: "suspense.stepCounter" })
+export const workflowTag = suspenseTag
 export const workerKindTag = tag<WorkerKind>({ label: "agent.workerKind" })
 export const remoteTag = tag<boolean>({ label: "agent.remote", default: false })
-export const durableTag = tag<boolean>({ label: "agent.durable", default: false })
+export const durableTag = suspendTag
 export const materialKindTag = tag<MaterialKind>({ label: "agent.materialKind" })
 export const timeoutTag = tag<number>({ label: "agent.timeoutMs" })
-export const taskIdTag = tag<string>({ label: "agent.taskId" })
-export const runIdTag = tag<string>({ label: "agent.runId" })
-export const stepCounterTag = tag<StepCounter>({ label: "agent.stepCounter" })
+export const taskIdTag = suspenseTaskIdTag
+export const runIdTag = suspenseRunIdTag
+export const stepCounterTag = suspenseStepCounterTag
 export const workerRegistryTag = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
 
 export class SuspendSignal extends Error {
   override readonly name = "SuspendSignal"
 
-  constructor(readonly entry: AgentStepEntry) {
-    super(`Agent execution suspended at ${formatStepKey(entry.key)}`)
+  constructor(readonly entry: SuspenseStepEntry) {
+    super(`Execution suspended at ${formatSuspenseStepKey(entry.key)}`)
   }
 }
+
+export { SuspendSignal as SuspenseSignal }
 
 export class WorkerRegistry {
   private readonly flows = new Map<string, Lite.Flow<unknown, unknown>>()
@@ -106,8 +137,30 @@ export function workerRegistry(flows: Lite.Flow<unknown, unknown>[] = []): Worke
   return registry
 }
 
-export function formatStepKey(key: AgentStepKey): string {
+export function formatSuspenseStepKey(key: SuspenseStepKey): string {
   return `${key.taskId}:${key.runId}:${key.step}`
+}
+
+export function formatStepKey(key: AgentStepKey): string {
+  return formatSuspenseStepKey(key)
+}
+
+export function createSuspenseContext(
+  scope: Lite.Scope,
+  options: {
+    taskId: string
+    runId: string
+    tags?: Lite.Tagged<any>[]
+  }
+): Lite.ExecutionContext {
+  return scope.createContext({
+    tags: [
+      suspenseTaskIdTag(options.taskId),
+      suspenseRunIdTag(options.runId),
+      suspenseStepCounterTag({ next: 0 }),
+      ...(options.tags ?? []),
+    ],
+  })
 }
 
 export function createAgentContext(
@@ -119,14 +172,14 @@ export function createAgentContext(
     tags?: Lite.Tagged<any>[]
   }
 ): Lite.ExecutionContext {
-  const tags = [
-    taskIdTag(options.taskId),
-    runIdTag(options.runId),
-    stepCounterTag({ next: 0 }),
-    ...(options.registry ? [workerRegistryTag(options.registry)] : []),
-    ...(options.tags ?? []),
-  ]
-  return scope.createContext({ tags })
+  return createSuspenseContext(scope, {
+    taskId: options.taskId,
+    runId: options.runId,
+    tags: [
+      ...(options.registry ? [workerRegistryTag(options.registry)] : []),
+      ...(options.tags ?? []),
+    ],
+  })
 }
 
 export async function delegate<Output = unknown, Input = unknown>(
@@ -141,51 +194,70 @@ export async function delegate<Output = unknown, Input = unknown>(
 }
 
 export function createAgentExtension(options: AgentExtensionOptions): Lite.Extension {
-  return {
+  return createSuspenseExtension({
     name: "agent-sdk",
-    async wrapExec(next, target, ctx) {
-      if (!shouldHandle(target)) return next()
+    log: options.log,
+    defaultTaskId: options.defaultTaskId,
+    defaultRunId: options.defaultRunId,
+    shouldHandle: (target) => shouldHandleAgentTarget(target),
+    shouldSuspend: (event) => isTagged(event.target, durableTag) && !isTagged(event.target, remoteTag),
+    createPendingEntry: (event) => ({
+      status: "pending",
+      key: event.key,
+      targetName: event.targetName,
+      input: event.input,
+      kind: "durable",
+    }),
+    run: (event, next) => runTimed(event.target, () =>
+      isTagged(event.target, remoteTag) && options.remoteRunner
+        ? options.remoteRunner.run(event, next)
+        : next()
+    ),
+  })
+}
 
-      const key = nextKey(ctx, options)
-      const targetName = getTargetName(target, ctx)
+export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite.Extension {
+  return {
+    name: options.name ?? "suspense",
+    async wrapExec(next, target, ctx) {
+      if (!(options.shouldHandle ?? shouldHandleSuspenseTarget)(target, ctx)) return next()
+
+      const key = options.getKey ? options.getKey(ctx, target) : nextSuspenseKey(ctx, options)
+      const targetName = options.getTargetName ? options.getTargetName(target, ctx) : getTargetName(target, ctx)
+      const event = { key, target, ctx, targetName, input: ctx.input }
       const existing = await options.log.get(key)
       if (existing?.status === "completed") return existing.result
       if (existing?.status === "resolved") return existing.value
       if (existing?.status === "pending") throw new SuspendSignal(existing)
 
-      const remote = isTagged(target, remoteTag)
-      const durable = isTagged(target, durableTag)
-
-      if (remote) {
-        const result = await runTimed(target, () =>
-          options.remoteRunner
-            ? options.remoteRunner.run({ key, target, ctx, targetName, input: ctx.input }, next)
-            : next()
-        )
-        await options.log.putCompleted({ status: "completed", key, targetName, result })
-        return result
-      }
-
-      if (durable) {
-        const pending = {
-          status: "pending" as const,
-          key,
-          targetName,
-          input: ctx.input,
-          durable: true,
-        }
+      const shouldSuspend = await (options.shouldSuspend ?? shouldSuspendTarget)(event)
+      if (shouldSuspend) {
+        const pending = options.createPendingEntry
+          ? options.createPendingEntry(event)
+          : { status: "pending" as const, key, targetName, input: ctx.input }
         await options.log.putPending(pending)
         throw new SuspendSignal(pending)
       }
 
-      const result = await runTimed(target, next)
+      const result = await (options.run ? options.run(event, next) : next())
       await options.log.putCompleted({ status: "completed", key, targetName, result })
       return result
     },
   }
 }
 
-function shouldHandle(target: Lite.ExecTarget): boolean {
+function shouldHandleSuspenseTarget(target: Lite.ExecTarget): boolean {
+  return typeof target !== "function" && (
+    suspenseTag.find(target) === true ||
+    suspendTag.find(target) === true
+  )
+}
+
+function shouldSuspendTarget(event: SuspenseExecEvent): boolean {
+  return isTagged(event.target, suspendTag)
+}
+
+function shouldHandleAgentTarget(target: Lite.ExecTarget): boolean {
   if (typeof target === "function") return false
   return (
     workflowTag.find(target) === true ||
@@ -200,13 +272,16 @@ function isTagged<T>(target: Lite.ExecTarget, targetTag: Lite.Tag<T, boolean>): 
   return targetTag.find(target) === true
 }
 
-function nextKey(ctx: Lite.ExecutionContext, options: AgentExtensionOptions): AgentStepKey {
-  const taskId = ctx.data.seekTag(taskIdTag) ?? options.defaultTaskId ?? "default-task"
-  const runId = ctx.data.seekTag(runIdTag) ?? options.defaultRunId ?? "default-run"
-  let counter = ctx.data.seekTag(stepCounterTag)
+function nextSuspenseKey(
+  ctx: Lite.ExecutionContext,
+  options: Pick<SuspenseExtensionOptions, "defaultTaskId" | "defaultRunId">
+): SuspenseStepKey {
+  const taskId = ctx.data.seekTag(suspenseTaskIdTag) ?? options.defaultTaskId ?? "default-task"
+  const runId = ctx.data.seekTag(suspenseRunIdTag) ?? options.defaultRunId ?? "default-run"
+  let counter = ctx.data.seekTag(suspenseStepCounterTag)
   if (!counter) {
     counter = { next: 0 }
-    ctx.data.setTag(stepCounterTag, counter)
+    ctx.data.setTag(suspenseStepCounterTag, counter)
   }
   return { taskId, runId, step: counter.next++ }
 }
