@@ -32,6 +32,9 @@
   "peerDependencies": {
     "@pumped-fn/lite": "^2.0.0"
   },
+  "dependencies": {
+    "@pumped-fn/lite-extension-suspense": "workspace:*"
+  },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@types/node": "catalog:",

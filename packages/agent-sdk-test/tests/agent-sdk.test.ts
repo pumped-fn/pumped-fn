@@ -8,18 +8,16 @@ import {
   codexCliWorker,
   createAgentContext,
   delegate,
-  createSuspenseContext,
   derivedMaterial,
   material,
   patchMaterial,
   remote,
   durable,
-  suspense,
-  suspend,
   workflow,
   workerKind,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
+import { createSuspenseContext, suspend, suspense } from "@pumped-fn/lite-extension-suspense"
 import {
   InMemoryAgentEventLog,
   InMemorySuspenseEventLog,
@@ -130,7 +128,7 @@ describe("agent sdk", () => {
     const ctx1 = createAgentContext(scope, {
       taskId: "task-replay-deps",
       runId: "run-replay-deps",
-      tags: [gate("first")],
+      markers: [gate("first")],
     })
     expect(await ctx1.exec({ flow: worker })).toBe("ok:first")
     await ctx1.close()

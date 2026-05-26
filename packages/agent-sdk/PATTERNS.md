@@ -7,6 +7,8 @@ Use this package as a small convention layer over `@pumped-fn/lite`. If a use ca
 Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
 
 ```ts
+import { createSuspenseContext, createSuspenseExtension, suspend } from "@pumped-fn/lite-extension-suspense"
+
 const waitForCommit = flow({
   name: "wait-for-commit",
   parse: typed<{ revision: number }>(),
@@ -70,15 +72,22 @@ export const lint = flow({
 
 ## 3. LLM Provider
 
-Prefer AI provider as state or service. The flow owns prompt shape and output parsing.
+Prefer AI provider as a service. The flow owns prompt shape and output parsing.
 
 ```ts
+import { service, type Lite } from "@pumped-fn/lite"
+
 interface Model {
-  complete(input: { system: string; prompt: string }): Promise<string>
+  complete(ctx: Lite.ExecutionContext, input: { system: string; prompt: string }): Promise<string>
 }
 
-export const model = atom<Model>({
-  factory: () => new ClaudeModel(),
+export const model = service<Model>({
+  factory: () => {
+    const client = new ClaudeModel()
+    return {
+      complete: async (_ctx, input) => client.complete(input),
+    }
+  },
 })
 
 export const classify = flow({
@@ -87,7 +96,7 @@ export const classify = flow({
   deps: { model },
   tags: [workerKind("llm")],
   factory: async (ctx, { model }) => {
-    const raw = await model.complete({
+    const raw = await model.complete(ctx, {
       system: "Return JSON only.",
       prompt: ctx.input.text,
     })

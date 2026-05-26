@@ -1,7 +1,7 @@
 {
-  "name": "@pumped-fn/agent-sdk-test",
+  "name": "@pumped-fn/lite-extension-suspense",
   "version": "0.0.0",
-  "description": "In-memory test helpers for @pumped-fn/agent-sdk",
+  "description": "Replay and suspend extension for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -19,7 +19,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsdown",
@@ -28,14 +29,9 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/agent-sdk": "^0.0.0",
     "@pumped-fn/lite": "^2.0.0"
   },
-  "dependencies": {
-    "@pumped-fn/lite-extension-suspense": "workspace:*"
-  },
   "devDependencies": {
-    "@pumped-fn/agent-sdk": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
@@ -44,10 +40,16 @@
     "vite": "catalog:",
     "vitest": "catalog:"
   },
+  "keywords": [
+    "pumped-fn",
+    "suspense",
+    "replay",
+    "workflow"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "directory": "packages/agent-sdk-test",
+    "directory": "packages/lite-extension-suspense",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }

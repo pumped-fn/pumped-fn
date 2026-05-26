@@ -208,6 +208,10 @@ importers:
         version: 0.25.12
 
   packages/agent-sdk:
+    dependencies:
+      '@pumped-fn/lite-extension-suspense':
+        specifier: workspace:*
+        version: link:../lite-extension-suspense
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
@@ -232,6 +236,10 @@ importers:
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@20.19.26)(happy-dom@20.9.0)(jsdom@27.3.0(postcss@8.5.8))(vite@6.4.2(@types/node@20.19.26)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/agent-sdk-test:
+    dependencies:
+      '@pumped-fn/lite-extension-suspense':
+        specifier: workspace:*
+        version: link:../lite-extension-suspense
     devDependencies:
       '@pumped-fn/agent-sdk':
         specifier: workspace:*
@@ -404,6 +412,30 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(happy-dom@20.9.0)(jsdom@27.3.0(postcss@8.5.8))(vite@6.4.2(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/lite-extension-suspense:
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../lite
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.26
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260222.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.17.2(@typescript/native-preview@7.0.0-dev.20260222.1)(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 6.4.2(@types/node@20.19.26)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@20.19.26)(happy-dom@20.9.0)(jsdom@27.3.0(postcss@8.5.8))(vite@6.4.2(@types/node@20.19.26)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/lite-hmr:
     dependencies:

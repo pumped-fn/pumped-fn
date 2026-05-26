@@ -1,78 +1,29 @@
 import { atom, flow, tag, typed, type Lite } from "@pumped-fn/lite"
+import {
+  createSuspenseContext,
+  createSuspenseExtension,
+  formatSuspenseStepKey,
+  hasMarker,
+  suspend,
+  suspense,
+  type SuspenseEventLog,
+  type SuspenseExecEvent,
+  type SuspenseStepCounter,
+  type SuspenseStepEntry,
+  type SuspenseStepKey,
+} from "@pumped-fn/lite-extension-suspense"
 import { execFile } from "node:child_process"
 
 export type WorkerKind = "code" | "llm" | "cli" | string
 export type MaterialKind = "json" | "text" | "binary" | "reference"
-type MaybePromise<T> = T | Promise<T>
-
-export interface SuspenseStepCounter {
-  next: number
-}
 
 export type StepCounter = SuspenseStepCounter
-
-export interface SuspenseStepKey {
-  taskId: string
-  runId: string
-  step: number
-}
-
 export type AgentStepKey = SuspenseStepKey
-
-export type SuspenseStepEntry =
-  | {
-      status: "pending"
-      key: SuspenseStepKey
-      targetName: string
-      input: unknown
-      kind?: string
-    }
-  | {
-      status: "resolved"
-      key: SuspenseStepKey
-      targetName: string
-      value: unknown
-    }
-  | {
-      status: "completed"
-      key: SuspenseStepKey
-      targetName: string
-      result: unknown
-    }
-
 export type AgentStepEntry = SuspenseStepEntry
-
-export interface SuspenseEventLog {
-  get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined>
-  putPending(entry: Extract<SuspenseStepEntry, { status: "pending" }>): Promise<void>
-  putCompleted(entry: Extract<SuspenseStepEntry, { status: "completed" }>): Promise<void>
-  resolve(key: SuspenseStepKey, value: unknown): Promise<void>
-}
-
 export interface AgentEventLog extends SuspenseEventLog {}
-
-export interface SuspenseExecEvent {
-  key: SuspenseStepKey
-  target: Lite.ExecTarget
-  ctx: Lite.ExecutionContext
-  targetName: string
-  input: unknown
-}
-
 export interface AgentExecEvent extends SuspenseExecEvent {}
 
-export interface SuspenseExtensionOptions {
-  log: SuspenseEventLog
-  name?: string
-  defaultTaskId?: string
-  defaultRunId?: string
-  shouldHandle?: (target: Lite.ExecTarget, ctx: Lite.ExecutionContext) => boolean
-  shouldSuspend?: (event: SuspenseExecEvent) => MaybePromise<boolean>
-  run?: (event: SuspenseExecEvent, next: () => Promise<unknown>) => Promise<unknown>
-  getKey?: (ctx: Lite.ExecutionContext, target: Lite.ExecTarget) => SuspenseStepKey
-  getTargetName?: (target: Lite.ExecTarget, ctx: Lite.ExecutionContext) => string
-  createPendingEntry?: (event: SuspenseExecEvent) => Extract<SuspenseStepEntry, { status: "pending" }>
-}
+export { SuspendSignal, SuspenseSignal } from "@pumped-fn/lite-extension-suspense"
 
 export interface AgentRemoteRunner {
   run(event: AgentExecEvent, next: () => Promise<unknown>): Promise<unknown>
@@ -85,11 +36,6 @@ export interface AgentExtensionOptions {
   defaultRunId?: string
 }
 
-export const suspense = tag<boolean>({ label: "suspense.step", default: false })
-export const suspend = tag<boolean>({ label: "suspense.suspend", default: false })
-export const taskId = tag<string>({ label: "suspense.taskId" })
-export const runId = tag<string>({ label: "suspense.runId" })
-export const stepCounter = tag<SuspenseStepCounter>({ label: "suspense.stepCounter" })
 export const workflow = suspense
 export const workerKind = tag<WorkerKind>({ label: "agent.workerKind" })
 export const remote = tag<boolean>({ label: "agent.remote", default: false })
@@ -97,16 +43,6 @@ export const durable = suspend
 export const materialKind = tag<MaterialKind>({ label: "agent.materialKind" })
 export const timeout = tag<number>({ label: "agent.timeoutMs" })
 export const workers = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
-
-export class SuspendSignal extends Error {
-  override readonly name = "SuspendSignal"
-
-  constructor(readonly entry: SuspenseStepEntry) {
-    super(`Execution suspended at ${formatSuspenseStepKey(entry.key)}`)
-  }
-}
-
-export { SuspendSignal as SuspenseSignal }
 
 export class WorkerRegistry {
   private readonly flows = new Map<string, Lite.Flow<unknown, unknown>>()
@@ -134,30 +70,8 @@ export function workerRegistry(flows: Lite.Flow<unknown, unknown>[] = []): Worke
   return registry
 }
 
-export function formatSuspenseStepKey(key: SuspenseStepKey): string {
-  return `${key.taskId}:${key.runId}:${key.step}`
-}
-
 export function formatStepKey(key: AgentStepKey): string {
   return formatSuspenseStepKey(key)
-}
-
-export function createSuspenseContext(
-  scope: Lite.Scope,
-  options: {
-    taskId: string
-    runId: string
-    tags?: Lite.Tagged<any>[]
-  }
-): Lite.ExecutionContext {
-  return scope.createContext({
-    tags: [
-      taskId(options.taskId),
-      runId(options.runId),
-      stepCounter({ next: 0 }),
-      ...(options.tags ?? []),
-    ],
-  })
 }
 
 export function createAgentContext(
@@ -166,15 +80,15 @@ export function createAgentContext(
     taskId: string
     runId: string
     registry?: WorkerRegistry
-    tags?: Lite.Tagged<any>[]
+    markers?: Lite.Tagged<any>[]
   }
 ): Lite.ExecutionContext {
   return createSuspenseContext(scope, {
     taskId: options.taskId,
     runId: options.runId,
-    tags: [
+    markers: [
       ...(options.registry ? [workers(options.registry)] : []),
-      ...(options.tags ?? []),
+      ...(options.markers ?? []),
     ],
   })
 }
@@ -213,47 +127,6 @@ export function createAgentExtension(options: AgentExtensionOptions): Lite.Exten
   })
 }
 
-export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite.Extension {
-  return {
-    name: options.name ?? "suspense",
-    async wrapExec(next, target, ctx) {
-      if (!(options.shouldHandle ?? shouldHandleSuspenseTarget)(target, ctx)) return next()
-
-      const key = options.getKey ? options.getKey(ctx, target) : nextSuspenseKey(ctx, options)
-      const targetName = options.getTargetName ? options.getTargetName(target, ctx) : getTargetName(target, ctx)
-      const event = { key, target, ctx, targetName, input: ctx.input }
-      const existing = await options.log.get(key)
-      if (existing?.status === "completed") return existing.result
-      if (existing?.status === "resolved") return existing.value
-      if (existing?.status === "pending") throw new SuspendSignal(existing)
-
-      const shouldSuspend = await (options.shouldSuspend ?? shouldSuspendTarget)(event)
-      if (shouldSuspend) {
-        const pending = options.createPendingEntry
-          ? options.createPendingEntry(event)
-          : { status: "pending" as const, key, targetName, input: ctx.input }
-        await options.log.putPending(pending)
-        throw new SuspendSignal(pending)
-      }
-
-      const result = await (options.run ? options.run(event, next) : next())
-      await options.log.putCompleted({ status: "completed", key, targetName, result })
-      return result
-    },
-  }
-}
-
-function shouldHandleSuspenseTarget(target: Lite.ExecTarget): boolean {
-  return typeof target !== "function" && (
-    suspense.find(target) === true ||
-    suspend.find(target) === true
-  )
-}
-
-function shouldSuspendTarget(event: SuspenseExecEvent): boolean {
-  return hasMarker(event.target, suspend)
-}
-
 function shouldHandleAgentTarget(target: Lite.ExecTarget): boolean {
   if (typeof target === "function") return false
   return (
@@ -262,30 +135,6 @@ function shouldHandleAgentTarget(target: Lite.ExecTarget): boolean {
     durable.find(target) === true ||
     timeout.find(target) !== undefined
   )
-}
-
-function hasMarker<T>(target: Lite.ExecTarget, marker: Lite.Tag<T, boolean>): boolean {
-  if (typeof target === "function") return false
-  return marker.find(target) === true
-}
-
-function nextSuspenseKey(
-  ctx: Lite.ExecutionContext,
-  options: Pick<SuspenseExtensionOptions, "defaultTaskId" | "defaultRunId">
-): SuspenseStepKey {
-  const foundTaskId = ctx.data.seekTag(taskId) ?? options.defaultTaskId ?? "default-task"
-  const foundRunId = ctx.data.seekTag(runId) ?? options.defaultRunId ?? "default-run"
-  let counter = ctx.data.seekTag(stepCounter)
-  if (!counter) {
-    counter = { next: 0 }
-    ctx.data.setTag(stepCounter, counter)
-  }
-  return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
-}
-
-function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
-  if (typeof target === "function") return ctx.name ?? target.name ?? "anonymous"
-  return ctx.name ?? target.name ?? "anonymous"
 }
 
 function runTimed(target: Lite.ExecTarget, next: () => Promise<unknown>): Promise<unknown> {
@@ -315,7 +164,7 @@ export interface MaterialState<T> {
 export interface MaterialOptions<T> {
   kind: MaterialKind
   initialState: T
-  tags?: Lite.Tagged<any>[]
+  markers?: Lite.Tagged<any>[]
 }
 
 export class MaterialConflictError extends Error {
@@ -329,7 +178,7 @@ export class MaterialConflictError extends Error {
 export function material<T>(name: string, options: MaterialOptions<T>): Lite.Atom<MaterialState<T>> {
   return atom({
     keepAlive: true,
-    tags: [materialKind(options.kind), ...(options.tags ?? [])],
+    tags: [materialKind(options.kind), ...(options.markers ?? [])],
     factory: () => ({
       name,
       kind: options.kind,
@@ -364,12 +213,12 @@ export function derivedMaterial<TSource, TOutput>(
   name: string,
   source: Lite.Atom<MaterialState<TSource>>,
   derive: (state: TSource) => TOutput,
-  options: { kind: MaterialKind; tags?: Lite.Tagged<any>[] }
+  options: { kind: MaterialKind; markers?: Lite.Tagged<any>[] }
 ): Lite.Atom<MaterialState<TOutput>> {
   return atom({
     keepAlive: true,
     deps: { source },
-    tags: [materialKind(options.kind), ...(options.tags ?? [])],
+    tags: [materialKind(options.kind), ...(options.markers ?? [])],
     factory: (_ctx, deps) => ({
       name,
       kind: options.kind,
@@ -481,7 +330,7 @@ export interface CliWorkerOptions<Input, Output> {
   timeoutMs?: number
   kind?: WorkerKind
   parseOutput?: (result: CliResult, input: Input) => Output
-  tags?: Lite.Tagged<any>[]
+  markers?: Lite.Tagged<any>[]
 }
 
 export class CliWorkerError extends Error {
@@ -495,10 +344,10 @@ export class CliWorkerError extends Error {
 export function cliWorker<Input = { prompt: string }, Output = string>(
   options: CliWorkerOptions<Input, Output>
 ): Lite.Flow<Output, Input> {
-  const tags = [
+  const markers = [
     workerKind(options.kind ?? "cli"),
     ...(options.timeoutMs !== undefined ? [timeout(options.timeoutMs)] : []),
-    ...(options.tags ?? []),
+    ...(options.markers ?? []),
   ]
   const factory = async (ctx: Lite.ExecutionContext & { readonly input: Input }) => {
     const input = ctx.input
@@ -517,7 +366,7 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
     return flow<Output, Input>({
       name: options.name,
       parse: options.parse,
-      tags,
+      tags: markers,
       factory,
     })
   }
@@ -525,7 +374,7 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
   return flow<Output, Input>({
     name: options.name,
     parse: options.parse ?? typed<Input>(),
-    tags,
+    tags: markers,
     factory,
   })
 }
@@ -599,7 +448,7 @@ export interface ClaudeCliWorkerOptions {
   command?: string
   extraArgs?: readonly string[]
   timeoutMs?: number
-  tags?: Lite.Tagged<any>[]
+  markers?: Lite.Tagged<any>[]
 }
 
 export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
@@ -609,7 +458,7 @@ export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow
     args: (input) => ["-p", ...(options.extraArgs ?? []), input.prompt],
     timeoutMs: options.timeoutMs,
     kind: "llm",
-    tags: options.tags,
+    markers: options.markers,
   })
 }
 
@@ -619,7 +468,7 @@ export interface CodexCliWorkerOptions {
   sandbox?: "read-only" | "workspace-write" | "danger-full-access"
   extraArgs?: readonly string[]
   timeoutMs?: number
-  tags?: Lite.Tagged<any>[]
+  markers?: Lite.Tagged<any>[]
 }
 
 export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
@@ -635,6 +484,6 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
     ],
     timeoutMs: options.timeoutMs,
     kind: "llm",
-    tags: options.tags,
+    markers: options.markers,
   })
 }

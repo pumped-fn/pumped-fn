@@ -29,15 +29,13 @@ flowchart TD
 ## What Is In This Package
 
 - Agent markers: `workflow`, `remote`, `durable`, `workerKind`, `timeout`.
-- Suspense markers: `suspense`, `suspend`, `taskId`, `runId`, `stepCounter`.
-- `createSuspenseExtension()` for replay, suspend, and external resolution without agent concepts.
 - `createAgentExtension()` for agent policy: replay, suspend, timeout, and remote dispatch.
 - `createAgentContext()` for run-scoped root contexts.
 - `WorkerRegistry` and `delegate()` for named worker calls.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
-`workflow` is the agent-facing alias for `suspense`; `durable` is the agent-facing alias for `suspend`.
+`workflow` and `durable` are agent-facing aliases over `@pumped-fn/lite-extension-suspense` markers.
 
 Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `AgentEventLog` and `AgentRemoteRunner` contracts.
 
@@ -51,7 +49,7 @@ import {
   createSuspenseContext,
   createSuspenseExtension,
   suspend,
-} from "@pumped-fn/agent-sdk"
+} from "@pumped-fn/lite-extension-suspense"
 
 const externalSync = flow({
   name: "external-sync",
@@ -128,16 +126,16 @@ const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all fit behind the same shape: a flow calls an injected provider or a CLI helper.
 
 ```ts
-import { atom, createScope, flow, preset, typed } from "@pumped-fn/lite"
+import { createScope, flow, preset, service, typed, type Lite } from "@pumped-fn/lite"
 import { workerKind } from "@pumped-fn/agent-sdk"
 
 interface Model {
-  complete(prompt: string): Promise<string>
+  complete(ctx: Lite.ExecutionContext, prompt: string): Promise<string>
 }
 
-const model = atom<Model>({
+const model = service<Model>({
   factory: () => ({
-    complete: async (prompt) => runRealModel(prompt),
+    complete: async (_ctx, prompt) => runRealModel(prompt),
   }),
 })
 
@@ -147,7 +145,7 @@ export const classify = flow({
   deps: { model },
   tags: [workerKind("llm")],
   factory: async (ctx, { model }) => {
-    const answer = await model.complete(`Classify:\n${ctx.input.text}`)
+    const answer = await model.complete(ctx, `Classify:\n${ctx.input.text}`)
     return JSON.parse(answer) as { label: string }
   },
 })

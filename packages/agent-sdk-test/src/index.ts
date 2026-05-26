@@ -1,38 +1,38 @@
 import {
   createAgentExtension,
-  createSuspenseExtension,
-  formatStepKey,
   type AgentEventLog,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
-  type AgentStepEntry,
-  type AgentStepKey,
+} from "@pumped-fn/agent-sdk"
+import {
+  createSuspenseExtension,
+  formatSuspenseStepKey,
   type SuspenseEventLog,
   type SuspenseExtensionOptions,
   type SuspenseStepEntry,
   type SuspenseStepKey,
-} from "@pumped-fn/agent-sdk"
+} from "@pumped-fn/lite-extension-suspense"
 import type { Lite } from "@pumped-fn/lite"
 
 export class InMemorySuspenseEventLog implements SuspenseEventLog {
   private readonly store = new Map<string, SuspenseStepEntry>()
 
   async get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined> {
-    return this.store.get(formatStepKey(key))
+    return this.store.get(formatSuspenseStepKey(key))
   }
 
   async putPending(entry: Extract<SuspenseStepEntry, { status: "pending" }>): Promise<void> {
-    this.store.set(formatStepKey(entry.key), entry)
+    this.store.set(formatSuspenseStepKey(entry.key), entry)
   }
 
   async putCompleted(entry: Extract<SuspenseStepEntry, { status: "completed" }>): Promise<void> {
-    this.store.set(formatStepKey(entry.key), entry)
+    this.store.set(formatSuspenseStepKey(entry.key), entry)
   }
 
   async resolve(key: SuspenseStepKey, value: unknown): Promise<void> {
-    const current = this.store.get(formatStepKey(key))
-    if (!current || current.status !== "pending") throw new Error(`Pending step "${formatStepKey(key)}" not found`)
-    this.store.set(formatStepKey(key), {
+    const current = this.store.get(formatSuspenseStepKey(key))
+    if (!current || current.status !== "pending") throw new Error(`Pending step "${formatSuspenseStepKey(key)}" not found`)
+    this.store.set(formatSuspenseStepKey(key), {
       status: "resolved",
       key,
       targetName: current.targetName,
