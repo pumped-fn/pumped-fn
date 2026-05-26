@@ -1,11 +1,11 @@
 import {
-  createAgentExtension,
+  extension as agentExtension,
   type AgentEventLog,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
 } from "@pumped-fn/agent-sdk"
 import {
-  createSuspenseExtension,
+  extension as suspenseExtension,
   formatSuspenseStepKey,
   type SuspenseEventLog,
   type SuspenseExtensionOptions,
@@ -51,26 +51,26 @@ export const localRemoteRunner: AgentRemoteRunner = {
   run: (_event, next) => next(),
 }
 
-export function createSuspenseTestExtension(
+export function suspense(
   options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}
 ): { extension: Lite.Extension; log: SuspenseEventLog } {
   const log = options.log ?? new InMemorySuspenseEventLog()
   return {
     log,
-    extension: createSuspenseExtension({
+    extension: suspenseExtension({
       ...options,
       log,
     }),
   }
 }
 
-export function createAgentTestExtension(
+export function agent(
   options: Omit<AgentExtensionOptions, "log"> & { log?: AgentEventLog } = {}
 ): { extension: Lite.Extension; log: AgentEventLog } {
   const log = options.log ?? new InMemoryAgentEventLog()
   return {
     log,
-    extension: createAgentExtension({
+    extension: agentExtension({
       ...options,
       log,
       remoteRunner: options.remoteRunner ?? localRemoteRunner,

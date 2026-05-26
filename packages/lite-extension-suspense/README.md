@@ -7,9 +7,9 @@ Use it when `ctx.exec()` steps need deterministic replay or external resolution 
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import {
-  createSuspenseExtension,
+  extension,
   suspend,
-  suspenseRun,
+  run,
 } from "@pumped-fn/lite-extension-suspense"
 
 const waitForCommit = flow({
@@ -21,10 +21,10 @@ const waitForCommit = flow({
 })
 
 const scope = createScope({
-  extensions: [createSuspenseExtension({ log })],
+  extensions: [extension({ log })],
 })
 
-const ctx = scope.createContext(suspenseRun({ taskId: "doc-123", runId: "sync-42" }))
+const ctx = scope.createContext(run({ taskId: "doc-123", runId: "sync-42" }))
 
 await ctx.exec({ flow: waitForCommit })
 ```

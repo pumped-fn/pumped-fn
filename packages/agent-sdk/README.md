@@ -8,7 +8,7 @@ This package does not add an agent runtime. It gives names and conventions to th
 |---|---|
 | `flow()` | Workflow, worker, durable step, CLI-backed LLM call |
 | state/service | Provider, config, registry, model client, material state |
-| typed marker | Routing metadata and ambient run data |
+| typed tag | Routing config and ambient run data |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
 | Extension `wrapExec` | Suspense/replay router around one executable step |
 
@@ -17,38 +17,38 @@ The core idea: author orchestration as normal TypeScript `flow()` code. Put ever
 ```mermaid
 flowchart TD
   Root["workflow flow"] --> Exec["ctx.exec"]
-  Exec --> Markers["read target markers"]
-  Markers --> Replay["completed? return cached"]
-  Markers --> Durable["durable? write pending + suspend"]
-  Markers --> Remote["remote? hand to worker runner"]
-  Markers --> Local["otherwise run next()"]
+  Exec --> Config["read step config"]
+  Config --> Replay["completed? return cached"]
+  Config --> Durable["durable? write pending + suspend"]
+  Config --> Remote["remote? hand to worker runner"]
+  Config --> Local["otherwise run next()"]
   Local --> Log["write completed"]
   Remote --> Log
 ```
 
 ## What Is In This Package
 
-- Agent markers: `workflow`, `remote`, `durable`, `workerKind`, `timeout`.
-- `createAgentExtension()` for agent policy: replay, suspend, timeout, and remote dispatch.
-- `agentRun()` for run-scoped `scope.createContext()` options.
+- `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
+- `extension()` for agent policy: replay, suspend, timeout, and remote dispatch.
+- `run()` for run-scoped `scope.createContext()` options.
 - `WorkerRegistry` and `delegate()` for named worker calls.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
-`workflow` and `durable` are agent-facing aliases over `@pumped-fn/lite-extension-suspense` markers.
+`step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
 Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `AgentEventLog` and `AgentRemoteRunner` contracts.
 
 ## Standalone Suspense
 
-Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `suspense(true)` and externally resolved steps with `suspend(true)`.
+Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `replay(true)` and externally resolved steps with `suspend(true)`.
 
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import {
-  createSuspenseExtension,
+  extension,
   suspend,
-  suspenseRun,
+  run,
 } from "@pumped-fn/lite-extension-suspense"
 
 const externalSync = flow({
@@ -59,10 +59,10 @@ const externalSync = flow({
 
 const log = makeEventLog()
 const scope = createScope({
-  extensions: [createSuspenseExtension({ log })],
+  extensions: [extension({ log })],
 })
 
-const ctx = scope.createContext(suspenseRun({ taskId: "doc-1", runId: "sync-1" }))
+const ctx = scope.createContext(run({ taskId: "doc-1", runId: "sync-1" }))
 
 await ctx.exec({ flow: externalSync })
 ```
@@ -74,26 +74,24 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ```ts
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
-  agentRun,
-  createAgentExtension,
+  run,
+  extension,
   delegate,
-  remote,
-  workflow,
-  workerKind,
+  step,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
 
 const summarize = flow({
   name: "summarize",
   parse: typed<{ text: string }>(),
-  tags: [remote(true), workerKind("llm")],
+  tags: [step({ remote: true, kind: "llm" })],
   factory: async (ctx) => `summary: ${ctx.input.text}`,
 })
 
 const processIssue = flow({
   name: "process_issue",
   parse: typed<{ body: string }>(),
-  tags: [workflow(true)],
+  tags: [step({ workflow: true })],
   factory: async (ctx) => {
     const summary = await delegate<string, { text: string }>(ctx, "summarize", {
       text: ctx.input.body,
@@ -104,10 +102,10 @@ const processIssue = flow({
 
 const eventLog = makeEventLog()
 const scope = createScope({
-  extensions: [createAgentExtension({ log: eventLog })],
+  extensions: [extension({ log: eventLog })],
 })
 
-const ctx = scope.createContext(agentRun({
+const ctx = scope.createContext(run({
   taskId: "issue-123",
   runId: "run-1",
   registry: workerRegistry([summarize]),
@@ -124,7 +122,7 @@ Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all 
 
 ```ts
 import { createScope, flow, preset, service, typed, type Lite } from "@pumped-fn/lite"
-import { workerKind } from "@pumped-fn/agent-sdk"
+import { step } from "@pumped-fn/agent-sdk"
 
 interface Model {
   complete(ctx: Lite.ExecutionContext, prompt: string): Promise<string>
@@ -140,7 +138,7 @@ export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
   deps: { model },
-  tags: [workerKind("llm")],
+  tags: [step({ kind: "llm" })],
   factory: async (ctx, { model }) => {
     const answer = await model.complete(ctx, `Classify:\n${ctx.input.text}`)
     return JSON.parse(answer) as { label: string }
@@ -204,9 +202,9 @@ const html = derivedMaterial("status-html", status, renderStatus, { kind: "text"
 Use `@pumped-fn/agent-sdk-test` for in-memory replay and fake remote routing:
 
 ```ts
-import { createAgentTestExtension } from "@pumped-fn/agent-sdk-test"
+import { agent } from "@pumped-fn/agent-sdk-test"
 
-const { extension, log } = createAgentTestExtension({
+const { extension, log } = agent({
   remoteRunner: {
     run: async (event) => ({ routed: event.targetName }),
   },

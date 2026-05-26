@@ -1,11 +1,8 @@
 import { atom, flow, tag, typed, type Lite } from "@pumped-fn/lite"
 import {
-  createSuspenseExtension,
+  extension as suspenseExtension,
   formatSuspenseStepKey,
-  hasMarker,
-  suspend,
-  suspense,
-  suspenseRun,
+  run as baseRun,
   type SuspenseEventLog,
   type SuspenseExecEvent,
   type SuspenseStepCounter,
@@ -22,6 +19,13 @@ export type AgentStepKey = SuspenseStepKey
 export type AgentStepEntry = SuspenseStepEntry
 export interface AgentEventLog extends SuspenseEventLog {}
 export interface AgentExecEvent extends SuspenseExecEvent {}
+export interface Step {
+  workflow?: boolean
+  remote?: boolean
+  durable?: boolean
+  kind?: WorkerKind
+  timeoutMs?: number
+}
 
 export { SuspendSignal, SuspenseSignal } from "@pumped-fn/lite-extension-suspense"
 
@@ -36,12 +40,8 @@ export interface AgentExtensionOptions {
   defaultRunId?: string
 }
 
-export const workflow = suspense
-export const workerKind = tag<WorkerKind>({ label: "agent.workerKind" })
-export const remote = tag<boolean>({ label: "agent.remote", default: false })
-export const durable = suspend
+export const step = tag<Step>({ label: "agent.step", default: {} })
 export const materialKind = tag<MaterialKind>({ label: "agent.materialKind" })
-export const timeout = tag<number>({ label: "agent.timeoutMs" })
 export const workers = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
 
 export class WorkerRegistry {
@@ -78,16 +78,16 @@ export interface AgentRunOptions {
   taskId: string
   runId: string
   registry?: WorkerRegistry
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
-export function agentRun(options: AgentRunOptions): Lite.CreateContextOptions {
-  return suspenseRun({
+export function run(options: AgentRunOptions): Lite.CreateContextOptions {
+  return baseRun({
     taskId: options.taskId,
     runId: options.runId,
-    markers: [
+    tags: [
       ...(options.registry ? [workers(options.registry)] : []),
-      ...(options.markers ?? []),
+      ...(options.tags ?? []),
     ],
   })
 }
@@ -103,14 +103,17 @@ export async function delegate<Output = unknown, Input = unknown>(
   return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
 }
 
-export function createAgentExtension(options: AgentExtensionOptions): Lite.Extension {
-  return createSuspenseExtension({
+export function extension(options: AgentExtensionOptions): Lite.Extension {
+  return suspenseExtension({
     name: "agent-sdk",
     log: options.log,
     defaultTaskId: options.defaultTaskId,
     defaultRunId: options.defaultRunId,
-    shouldHandle: (target) => shouldHandleAgentTarget(target),
-    shouldSuspend: (event) => hasMarker(event.target, durable) && !hasMarker(event.target, remote),
+    shouldHandle: (target, ctx) => shouldHandleAgentTarget(target, ctx),
+    shouldSuspend: (event) => {
+      const config = stepOf(event.target, event.ctx)
+      return config.durable === true && config.remote !== true
+    },
     createPendingEntry: (event) => ({
       status: "pending",
       key: event.key,
@@ -118,26 +121,26 @@ export function createAgentExtension(options: AgentExtensionOptions): Lite.Exten
       input: event.input,
       kind: "durable",
     }),
-    run: (event, next) => runTimed(event.target, () =>
-      hasMarker(event.target, remote) && options.remoteRunner
+    run: (event, next) => runTimed(event.target, event.ctx, () =>
+      stepOf(event.target, event.ctx).remote === true && options.remoteRunner
         ? options.remoteRunner.run(event, next)
         : next()
     ),
   })
 }
 
-function shouldHandleAgentTarget(target: Lite.ExecTarget): boolean {
-  if (typeof target === "function") return false
+function shouldHandleAgentTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
+  const config = stepOf(target, ctx)
   return (
-    workflow.find(target) === true ||
-    remote.find(target) === true ||
-    durable.find(target) === true ||
-    timeout.find(target) !== undefined
+    config.workflow === true ||
+    config.remote === true ||
+    config.durable === true ||
+    config.timeoutMs !== undefined
   )
 }
 
-function runTimed(target: Lite.ExecTarget, next: () => Promise<unknown>): Promise<unknown> {
-  const timeoutMs = typeof target === "function" ? undefined : timeout.find(target)
+function runTimed(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () => Promise<unknown>): Promise<unknown> {
+  const timeoutMs = stepOf(target, ctx).timeoutMs
   if (timeoutMs === undefined) return next()
   let timer: ReturnType<typeof setTimeout>
   return Promise.race([
@@ -146,6 +149,11 @@ function runTimed(target: Lite.ExecTarget, next: () => Promise<unknown>): Promis
       timer = setTimeout(() => reject(new Error(`Agent step timed out after ${timeoutMs}ms`)), timeoutMs)
     }),
   ]).finally(() => clearTimeout(timer))
+}
+
+function stepOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): Step {
+  const flowStep = typeof target === "function" ? {} : step.find(target)
+  return { ...flowStep, ...(ctx.data.seekTag(step) ?? {}) }
 }
 
 export type JsonPatchOperation =
@@ -163,7 +171,7 @@ export interface MaterialState<T> {
 export interface MaterialOptions<T> {
   kind: MaterialKind
   initialState: T
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
 export class MaterialConflictError extends Error {
@@ -177,7 +185,7 @@ export class MaterialConflictError extends Error {
 export function material<T>(name: string, options: MaterialOptions<T>): Lite.Atom<MaterialState<T>> {
   return atom({
     keepAlive: true,
-    tags: [materialKind(options.kind), ...(options.markers ?? [])],
+    tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: () => ({
       name,
       kind: options.kind,
@@ -212,12 +220,12 @@ export function derivedMaterial<TSource, TOutput>(
   name: string,
   source: Lite.Atom<MaterialState<TSource>>,
   derive: (state: TSource) => TOutput,
-  options: { kind: MaterialKind; markers?: Lite.Tagged<any>[] }
+  options: { kind: MaterialKind; tags?: Lite.Tagged<any>[] }
 ): Lite.Atom<MaterialState<TOutput>> {
   return atom({
     keepAlive: true,
     deps: { source },
-    tags: [materialKind(options.kind), ...(options.markers ?? [])],
+    tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: (_ctx, deps) => ({
       name,
       kind: options.kind,
@@ -329,7 +337,7 @@ export interface CliWorkerOptions<Input, Output> {
   timeoutMs?: number
   kind?: WorkerKind
   parseOutput?: (result: CliResult, input: Input) => Output
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
 export class CliWorkerError extends Error {
@@ -343,10 +351,11 @@ export class CliWorkerError extends Error {
 export function cliWorker<Input = { prompt: string }, Output = string>(
   options: CliWorkerOptions<Input, Output>
 ): Lite.Flow<Output, Input> {
-  const markers = [
-    workerKind(options.kind ?? "cli"),
-    ...(options.timeoutMs !== undefined ? [timeout(options.timeoutMs)] : []),
-    ...(options.markers ?? []),
+  const config: Step = { kind: options.kind ?? "cli" }
+  if (options.timeoutMs !== undefined) config.timeoutMs = options.timeoutMs
+  const tags = [
+    step(config),
+    ...(options.tags ?? []),
   ]
   const factory = async (ctx: Lite.ExecutionContext & { readonly input: Input }) => {
     const input = ctx.input
@@ -365,7 +374,7 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
     return flow<Output, Input>({
       name: options.name,
       parse: options.parse,
-      tags: markers,
+      tags,
       factory,
     })
   }
@@ -373,7 +382,7 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
   return flow<Output, Input>({
     name: options.name,
     parse: options.parse ?? typed<Input>(),
-    tags: markers,
+    tags,
     factory,
   })
 }
@@ -447,7 +456,7 @@ export interface ClaudeCliWorkerOptions {
   command?: string
   extraArgs?: readonly string[]
   timeoutMs?: number
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
 export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
@@ -457,7 +466,7 @@ export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow
     args: (input) => ["-p", ...(options.extraArgs ?? []), input.prompt],
     timeoutMs: options.timeoutMs,
     kind: "llm",
-    markers: options.markers,
+    tags: options.tags,
   })
 }
 
@@ -467,7 +476,7 @@ export interface CodexCliWorkerOptions {
   sandbox?: "read-only" | "workspace-write" | "danger-full-access"
   extraArgs?: readonly string[]
   timeoutMs?: number
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
 export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
@@ -483,6 +492,6 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
     ],
     timeoutMs: options.timeoutMs,
     kind: "llm",
-    markers: options.markers,
+    tags: options.tags,
   })
 }

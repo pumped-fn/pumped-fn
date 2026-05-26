@@ -1,13 +1,13 @@
 # Agent SDK Patterns
 
-Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, state/service, markers, and `ctx.exec`, do that before adding another primitive.
+Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, state/service, tags, and `ctx.exec`, do that before adding another primitive.
 
 ## 0. Standalone Suspense
 
 Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
 
 ```ts
-import { createSuspenseExtension, suspend, suspenseRun } from "@pumped-fn/lite-extension-suspense"
+import { extension, suspend, run } from "@pumped-fn/lite-extension-suspense"
 
 const waitForCommit = flow({
   name: "wait-for-commit",
@@ -19,13 +19,13 @@ const waitForCommit = flow({
 })
 
 const scope = createScope({
-  extensions: [createSuspenseExtension({ log })],
+  extensions: [extension({ log })],
 })
 
-const ctx = scope.createContext(suspenseRun({ taskId: "doc-123", runId: "sync-42" }))
+const ctx = scope.createContext(run({ taskId: "doc-123", runId: "sync-42" }))
 ```
 
-Suspense has no agent knowledge. It sees marked `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
+Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
 
 ## 1. Workflow Flow
 
@@ -35,7 +35,7 @@ Use a workflow flow when code chooses order, branching, retries, and fan-out.
 export const processPr = flow({
   name: "process_pr",
   parse: typed<PrEvent>(),
-  tags: [workflow(true)],
+  tags: [step({ workflow: true })],
   factory: async (ctx) => {
     const lint = await delegate(ctx, "lint", { sha: ctx.input.sha })
     if (lint.failed) return { status: "lint-failed" }
@@ -54,18 +54,18 @@ Why: normal TypeScript control flow stays visible. Replay still works because ex
 
 ## 2. Worker Flow
 
-Use a worker flow for one executable unit. Markers say how it may run.
+Use a worker flow for one executable unit. `step()` says how it may run.
 
 ```ts
 export const lint = flow({
   name: "lint",
   parse: typed<{ sha: string }>(),
-  tags: [remote(true), workerKind("code"), timeout(30_000)],
+  tags: [step({ remote: true, kind: "code", timeoutMs: 30_000 })],
   factory: async (ctx) => runLinter(ctx.input.sha),
 })
 ```
 
-`remote(true)` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
+`remote: true` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
 
 ## 3. LLM Provider
 
@@ -91,7 +91,7 @@ export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
   deps: { model },
-  tags: [workerKind("llm")],
+  tags: [step({ kind: "llm" })],
   factory: async (ctx, { model }) => {
     const raw = await model.complete(ctx, {
       system: "Return JSON only.",
@@ -131,13 +131,13 @@ Keep CLI workers at the edge. Stable domain tests should use provider state and 
 
 ## 5. Durable Step
 
-Use `durable(true)` for a step that should suspend until another process resolves it.
+Use `step({ durable: true })` for a step that should suspend until another process resolves it.
 
 ```ts
 const approve = flow({
   name: "approve",
   parse: typed<{ title: string }>(),
-  tags: [durable(true)],
+  tags: [step({ durable: true })],
   factory: () => {
     throw new Error("durable step should be resolved externally")
   },
@@ -151,7 +151,7 @@ First run writes a pending log entry and throws `SuspendSignal`. Replay returns 
 Remote routing belongs in `AgentRemoteRunner`, not inside workflow code.
 
 ```ts
-const extension = createAgentExtension({
+const ext = extension({
   log,
   remoteRunner: {
     run: async (event, next) => {
@@ -231,7 +231,7 @@ Tests should prove the owning layer. Do not hide a missing dependency by adding 
 
 Before adding an agent SDK primitive, ask:
 
-1. Can this be a marker on a `flow`?
+1. Can this be a tag on a `flow`?
 2. Can this be a state/service dependency?
 3. Can this be a `ctx.exec()` helper?
 4. Can this be an extension policy?

@@ -61,7 +61,7 @@ export interface SuspenseExtensionOptions {
   createPendingEntry?: (event: SuspenseExecEvent) => Extract<SuspenseStepEntry, { status: "pending" }>
 }
 
-export const suspense = tag<boolean>({ label: "suspense.step", default: false })
+export const replay = tag<boolean>({ label: "suspense.step", default: false })
 export const suspend = tag<boolean>({ label: "suspense.suspend", default: false })
 export const taskId = tag<string>({ label: "suspense.taskId" })
 export const runId = tag<string>({ label: "suspense.runId" })
@@ -84,21 +84,21 @@ export function formatSuspenseStepKey(key: SuspenseStepKey): string {
 export interface SuspenseRunOptions {
   taskId: string
   runId: string
-  markers?: Lite.Tagged<any>[]
+  tags?: Lite.Tagged<any>[]
 }
 
-export function suspenseRun(options: SuspenseRunOptions): Lite.CreateContextOptions {
+export function run(options: SuspenseRunOptions): Lite.CreateContextOptions {
   return {
     tags: [
       taskId(options.taskId),
       runId(options.runId),
       stepCounter({ next: 0 }),
-      ...(options.markers ?? []),
+      ...(options.tags ?? []),
     ],
   }
 }
 
-export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite.Extension {
+export function extension(options: SuspenseExtensionOptions): Lite.Extension {
   return {
     name: options.name ?? "suspense",
     async wrapExec(next, target, ctx) {
@@ -128,20 +128,19 @@ export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite
   }
 }
 
-function shouldHandleSuspenseTarget(target: Lite.ExecTarget): boolean {
-  return typeof target !== "function" && (
-    suspense.find(target) === true ||
-    suspend.find(target) === true
-  )
+function shouldHandleSuspenseTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
+  return active(target, replay, ctx) || active(target, suspend, ctx)
 }
 
 function shouldSuspendTarget(event: SuspenseExecEvent): boolean {
-  return hasMarker(event.target, suspend)
+  return active(event.target, suspend, event.ctx)
 }
 
-export function hasMarker<T>(target: Lite.ExecTarget, marker: Lite.Tag<T, boolean>): boolean {
+function active(target: Lite.ExecTarget, tag: Lite.Tag<boolean, boolean>, ctx?: Lite.ExecutionContext): boolean {
+  const value = ctx?.data.seekTag(tag)
+  if (value !== undefined) return value === true
   if (typeof target === "function") return false
-  return marker.find(target) === true
+  return tag.find(target) === true
 }
 
 function nextSuspenseKey(

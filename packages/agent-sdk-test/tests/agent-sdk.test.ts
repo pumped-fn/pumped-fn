@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow, tag as marker, tags, typed } from "@pumped-fn/lite"
+import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   CliWorkerError,
   SuspendSignal,
-  agentRun,
   claudeCliWorker,
   cliWorker,
   codexCliWorker,
@@ -11,42 +10,40 @@ import {
   derivedMaterial,
   material,
   patchMaterial,
-  remote,
-  durable,
-  workflow,
-  workerKind,
+  run,
+  step,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
-import { suspend, suspense, suspenseRun } from "@pumped-fn/lite-extension-suspense"
+import { replay, run as replayRun, suspend } from "@pumped-fn/lite-extension-suspense"
 import {
   InMemoryAgentEventLog,
   InMemorySuspenseEventLog,
-  createAgentTestExtension,
-  createSuspenseTestExtension,
+  agent,
+  suspense,
 } from "../src/index"
 
 describe("agent sdk", () => {
-  it("replays standalone suspense steps without agent markers", async () => {
+  it("replays standalone suspense steps without agent config", async () => {
     const log = new InMemorySuspenseEventLog()
-    const { extension } = createSuspenseTestExtension({ log })
+    const { extension } = suspense({ log })
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     let calls = 0
     const step = flow({
       name: "standalone-step",
       parse: typed<number>(),
-      tags: [suspense(true)],
+      tags: [replay(true)],
       factory: (ctx) => {
         calls++
         return ctx.input + 1
       },
     })
 
-    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
+    const ctx1 = scope.createContext(replayRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx1.exec({ flow: step, input: 1 })).toBe(2)
     await ctx1.close()
 
-    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-a", runId: "run-a" }))
+    const ctx2 = scope.createContext(replayRun({ taskId: "sync-a", runId: "run-a" }))
     expect(await ctx2.exec({ flow: step, input: 100 })).toBe(2)
     await ctx2.close()
     expect(calls).toBe(1)
@@ -54,7 +51,7 @@ describe("agent sdk", () => {
 
   it("suspends standalone suspense steps and resumes from resolved value", async () => {
     const log = new InMemorySuspenseEventLog()
-    const { extension } = createSuspenseTestExtension({ log })
+    const { extension } = suspense({ log })
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     const externalSync = flow({
@@ -63,7 +60,7 @@ describe("agent sdk", () => {
       factory: () => "unreachable",
     })
 
-    const ctx1 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
+    const ctx1 = scope.createContext(replayRun({ taskId: "sync-b", runId: "run-b" }))
     await expect(ctx1.exec({ flow: externalSync })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx1.close({ ok: false, error: new Error("suspended") })
 
@@ -72,20 +69,20 @@ describe("agent sdk", () => {
     if (!pending) throw new Error("external-sync step did not suspend")
     await log.resolve(pending.key, "synced")
 
-    const ctx2 = scope.createContext(suspenseRun({ taskId: "sync-b", runId: "run-b" }))
+    const ctx2 = scope.createContext(replayRun({ taskId: "sync-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: externalSync })).toBe("synced")
     await ctx2.close()
   })
 
   it("memoizes completed workflow execution", async () => {
-    const { extension } = createAgentTestExtension()
+    const { extension } = agent()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     let calls = 0
     const worker = flow({
       name: "memo-worker",
       parse: typed<number>(),
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       factory: (ctx) => {
         calls++
         return ctx.input * 2
@@ -94,15 +91,15 @@ describe("agent sdk", () => {
     const root = flow({
       name: "memo-root",
       parse: typed<number>(),
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       factory: async (ctx) => ctx.exec({ flow: worker, input: ctx.input }),
     })
 
-    const ctx1 = scope.createContext(agentRun({ taskId: "task-a", runId: "run-a" }))
+    const ctx1 = scope.createContext(run({ taskId: "task-a", runId: "run-a" }))
     expect(await ctx1.exec({ flow: root, input: 3 })).toBe(6)
     await ctx1.close()
 
-    const ctx2 = scope.createContext(agentRun({ taskId: "task-a", runId: "run-a" }))
+    const ctx2 = scope.createContext(run({ taskId: "task-a", runId: "run-a" }))
     expect(await ctx2.exec({ flow: root, input: 3 })).toBe(6)
     await ctx2.close()
 
@@ -110,14 +107,14 @@ describe("agent sdk", () => {
   })
 
   it("replays completed flow before resolving deps", async () => {
-    const gate = marker<string>({ label: "agent.replay.gate" })
-    const { extension } = createAgentTestExtension()
+    const gate = tag<string>({ label: "agent.replay.gate" })
+    const { extension } = agent()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     let calls = 0
     const worker = flow({
       name: "replay-before-deps",
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => {
         calls++
@@ -125,15 +122,15 @@ describe("agent sdk", () => {
       },
     })
 
-    const ctx1 = scope.createContext(agentRun({
+    const ctx1 = scope.createContext(run({
       taskId: "task-replay-deps",
       runId: "run-replay-deps",
-      markers: [gate("first")],
+      tags: [gate("first")],
     }))
     expect(await ctx1.exec({ flow: worker })).toBe("ok:first")
     await ctx1.close()
 
-    const ctx2 = scope.createContext(agentRun({ taskId: "task-replay-deps", runId: "run-replay-deps" }))
+    const ctx2 = scope.createContext(run({ taskId: "task-replay-deps", runId: "run-replay-deps" }))
     expect(await ctx2.exec({ flow: worker })).toBe("ok:first")
     await ctx2.close()
     expect(calls).toBe(1)
@@ -141,13 +138,13 @@ describe("agent sdk", () => {
 
   it("suspends durable work and replays memoized steps on resolution", async () => {
     const log = new InMemoryAgentEventLog()
-    const { extension } = createAgentTestExtension({ log })
+    const { extension } = agent({ log })
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     let expensiveCalls = 0
     const expensive = flow({
       name: "expensive",
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       factory: () => {
         expensiveCalls++
         return "ready"
@@ -155,12 +152,12 @@ describe("agent sdk", () => {
     })
     const approve = flow({
       name: "approve",
-      tags: [durable(true)],
+      tags: [step({ durable: true })],
       factory: () => "unreachable",
     })
     const root = flow({
       name: "approval-root",
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       factory: async (ctx) => {
         const first = await ctx.exec({ flow: expensive })
         const decision = await ctx.exec({ flow: approve })
@@ -168,7 +165,7 @@ describe("agent sdk", () => {
       },
     })
 
-    const ctx1 = scope.createContext(agentRun({ taskId: "task-b", runId: "run-b" }))
+    const ctx1 = scope.createContext(run({ taskId: "task-b", runId: "run-b" }))
     await expect(ctx1.exec({ flow: root })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx1.close({ ok: false, error: new Error("suspended") })
 
@@ -177,54 +174,53 @@ describe("agent sdk", () => {
     if (!pending) throw new Error("approve step did not suspend")
     await log.resolve(pending.key, "yes")
 
-    const ctx2 = scope.createContext(agentRun({ taskId: "task-b", runId: "run-b" }))
+    const ctx2 = scope.createContext(run({ taskId: "task-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: root })).toBe("ready:yes")
     await ctx2.close()
     expect(expensiveCalls).toBe(1)
   })
 
   it("suspends durable work before resolving deps", async () => {
-    const gate = marker<string>({ label: "agent.durable.gate" })
-    const { extension } = createAgentTestExtension()
+    const gate = tag<string>({ label: "agent.durable.gate" })
+    const { extension } = agent()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     const approve = flow({
       name: "durable-before-deps",
-      tags: [durable(true)],
       deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => gate,
     })
 
-    const ctx = scope.createContext(agentRun({ taskId: "task-durable-deps", runId: "run-durable-deps" }))
-    await expect(ctx.exec({ flow: approve })).rejects.toBeInstanceOf(SuspendSignal)
+    const ctx = scope.createContext(run({ taskId: "task-durable-deps", runId: "run-durable-deps" }))
+    await expect(ctx.exec({ flow: approve, tags: [step({ durable: true })] })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx.close({ ok: false, error: new Error("suspended") })
   })
 
   it("delegates by worker registry and routes remote workers", async () => {
-    const { extension } = createAgentTestExtension()
+    const { extension } = agent()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     const worker = flow({
       name: "upper",
       parse: typed<{ text: string }>(),
-      tags: [remote(true), workerKind("code")],
+      tags: [step({ remote: true, kind: "code" })],
       factory: (ctx) => ctx.input.text.toUpperCase(),
     })
     const registry = workerRegistry([worker])
     const root = flow({
       name: "delegate-root",
       parse: typed<{ text: string }>(),
-      tags: [workflow(true)],
+      tags: [step({ workflow: true })],
       factory: (ctx) => delegate<string, { text: string }>(ctx, "upper", ctx.input),
     })
-    const ctx = scope.createContext(agentRun({ taskId: "task-c", runId: "run-c", registry }))
+    const ctx = scope.createContext(run({ taskId: "task-c", runId: "run-c", registry }))
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
     await ctx.close()
   })
 
   it("routes remote work before resolving deps when runner handles it", async () => {
-    const gate = marker<string>({ label: "agent.remote.gate" })
-    const { extension } = createAgentTestExtension({
+    const gate = tag<string>({ label: "agent.remote.gate" })
+    const { extension } = agent({
       remoteRunner: {
         run: async (event) => {
           expect(event.targetName).toBe("remote-before-deps")
@@ -236,19 +232,18 @@ describe("agent sdk", () => {
     await scope.ready
     const worker = flow({
       name: "remote-before-deps",
-      tags: [remote(true)],
       deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => gate,
     })
 
-    const ctx = scope.createContext(agentRun({ taskId: "task-remote-deps", runId: "run-remote-deps" }))
-    expect(await ctx.exec({ flow: worker })).toBe("remote-only")
+    const ctx = scope.createContext(run({ taskId: "task-remote-deps", runId: "run-remote-deps" }))
+    expect(await ctx.exec({ flow: worker, tags: [step({ remote: true })] })).toBe("remote-only")
     await ctx.close()
   })
 
   it("patches JSON materials with revision conflicts", async () => {
     const scope = createScope()
-    const ctx = scope.createContext(agentRun({ taskId: "task-d", runId: "run-d" }))
+    const ctx = scope.createContext(run({ taskId: "task-d", runId: "run-d" }))
     const prStatus = material("pr-status", {
       kind: "json",
       initialState: { prs: {} as Record<string, { status: string }> },
@@ -300,9 +295,9 @@ describe("agent sdk", () => {
   })
 
   it("marks CLI-backed LLM helpers as LLM workers", () => {
-    expect(workerKind.find(cliWorker({ name: "x", command: "printf" }))).toBe("cli")
-    expect(workerKind.find(claudeCliWorker())).toBe("llm")
-    expect(workerKind.find(codexCliWorker())).toBe("llm")
+    expect(step.find(cliWorker({ name: "x", command: "printf" })).kind).toBe("cli")
+    expect(step.find(claudeCliWorker()).kind).toBe("llm")
+    expect(step.find(codexCliWorker()).kind).toBe("llm")
   })
 
   it("reports CLI failures with captured stderr", async () => {
