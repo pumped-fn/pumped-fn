@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow, typed } from "@pumped-fn/lite"
+import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   CliWorkerError,
   SuspendSignal,
@@ -52,6 +52,36 @@ describe("agent sdk", () => {
     expect(calls).toBe(1)
   })
 
+  it("replays completed flow before resolving deps", async () => {
+    const gateTag = tag<string>({ label: "agent.replay.gate" })
+    const { extension } = createAgentTestExtension()
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    let calls = 0
+    const worker = flow({
+      name: "replay-before-deps",
+      tags: [workflowTag(true)],
+      deps: { gate: tags.required(gateTag) },
+      factory: (_ctx, { gate }) => {
+        calls++
+        return `ok:${gate}`
+      },
+    })
+
+    const ctx1 = createAgentContext(scope, {
+      taskId: "task-replay-deps",
+      runId: "run-replay-deps",
+      tags: [gateTag("first")],
+    })
+    expect(await ctx1.exec({ flow: worker })).toBe("ok:first")
+    await ctx1.close()
+
+    const ctx2 = createAgentContext(scope, { taskId: "task-replay-deps", runId: "run-replay-deps" })
+    expect(await ctx2.exec({ flow: worker })).toBe("ok:first")
+    await ctx2.close()
+    expect(calls).toBe(1)
+  })
+
   it("suspends durable work and replays memoized steps on resolution", async () => {
     const log = new InMemoryAgentEventLog()
     const { extension } = createAgentTestExtension({ log })
@@ -96,6 +126,23 @@ describe("agent sdk", () => {
     expect(expensiveCalls).toBe(1)
   })
 
+  it("suspends durable work before resolving deps", async () => {
+    const gateTag = tag<string>({ label: "agent.durable.gate" })
+    const { extension } = createAgentTestExtension()
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    const approve = flow({
+      name: "durable-before-deps",
+      tags: [durableTag(true)],
+      deps: { gate: tags.required(gateTag) },
+      factory: (_ctx, { gate }) => gate,
+    })
+
+    const ctx = createAgentContext(scope, { taskId: "task-durable-deps", runId: "run-durable-deps" })
+    await expect(ctx.exec({ flow: approve })).rejects.toBeInstanceOf(SuspendSignal)
+    await ctx.close({ ok: false, error: new Error("suspended") })
+  })
+
   it("delegates by worker registry and routes remote-tagged workers", async () => {
     const { extension } = createAgentTestExtension()
     const scope = createScope({ extensions: [extension] })
@@ -115,6 +162,30 @@ describe("agent sdk", () => {
     })
     const ctx = createAgentContext(scope, { taskId: "task-c", runId: "run-c", registry })
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
+    await ctx.close()
+  })
+
+  it("routes remote work before resolving deps when runner handles it", async () => {
+    const gateTag = tag<string>({ label: "agent.remote.gate" })
+    const { extension } = createAgentTestExtension({
+      remoteRunner: {
+        run: async (event) => {
+          expect(event.targetName).toBe("remote-before-deps")
+          return "remote-only"
+        },
+      },
+    })
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    const worker = flow({
+      name: "remote-before-deps",
+      tags: [remoteTag(true)],
+      deps: { gate: tags.required(gateTag) },
+      factory: (_ctx, { gate }) => gate,
+    })
+
+    const ctx = createAgentContext(scope, { taskId: "task-remote-deps", runId: "run-remote-deps" })
+    expect(await ctx.exec({ flow: worker })).toBe("remote-only")
     await ctx.close()
   })
 

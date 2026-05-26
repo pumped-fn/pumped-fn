@@ -58,7 +58,7 @@ sequenceDiagram
     App->>Ctx: ctx.exec({ flow })
     Ctx->>Ext: wrapExec(next, flow, childCtx)
     Ext->>Ext: ctx.onClose(result => result.ok ? commit : rollback)
-    Ext->>Flow: next()
+    Ext->>Flow: next() resolves deps + factory
     Flow-->>Ext: output
     Ext-->>Ctx: output
 

@@ -19,7 +19,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "PATTERNS.md"
   ],
   "scripts": {
     "build": "tsdown",

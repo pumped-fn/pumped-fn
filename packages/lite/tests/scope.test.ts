@@ -1311,6 +1311,101 @@ describe("ExecutionContext", () => {
 
       await ctx.close()
     })
+
+    it("lets wrapExec short-circuit flow before deps and factory", async () => {
+      let depCalls = 0
+      let factoryCalls = 0
+      const dep = atom({
+        factory: () => {
+          depCalls++
+          return 1
+        },
+      })
+      const target = flow({
+        name: "short-circuit-target",
+        deps: { dep },
+        factory: () => {
+          factoryCalls++
+          return "ran"
+        },
+      })
+      const ext = {
+        name: "short-circuit",
+        wrapExec: async () => "memo",
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: target })).toBe("memo")
+      expect(depCalls).toBe(0)
+      expect(factoryCalls).toBe(0)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("exposes exec and flow tags to wrapExec before deps resolve", async () => {
+      const marker = tag<string>({ label: "exec-boundary-marker" })
+      let depCalls = 0
+      const dep = atom({
+        factory: () => {
+          depCalls++
+          return 1
+        },
+      })
+      const target = flow({
+        name: "tagged-boundary-target",
+        tags: [marker("flow")],
+        deps: { dep },
+        factory: () => "ran",
+      })
+      const ext = {
+        name: "tag-reader",
+        wrapExec: async (_next, _target, childCtx) => childCtx.data.seekTag(marker),
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext({ tags: [marker("ctx")] })
+
+      expect(await ctx.exec({ flow: target, tags: [marker("exec")] })).toBe("exec")
+      expect(await ctx.exec({ flow: target })).toBe("flow")
+      expect(depCalls).toBe(0)
+
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("wraps dependency errors inside wrapExec", async () => {
+      let observed = false
+      const dep = atom({
+        factory: () => {
+          throw new Error("dep failed")
+        },
+      })
+      const target = flow({
+        name: "failing-dep-target",
+        deps: { dep },
+        factory: () => "unreachable",
+      })
+      const ext = {
+        name: "error-observer",
+        wrapExec: async (next) => {
+          try {
+            return await next()
+          } catch (error) {
+            observed = error instanceof Error && error.message === "dep failed"
+            throw error
+          }
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      await expect(ctx.exec({ flow: target })).rejects.toThrow("dep failed")
+      expect(observed).toBe(true)
+
+      await ctx.close({ ok: false, error: new Error("expected") })
+      await scope.dispose()
+    })
   })
 
   describe("ctx.exec() with fn", () => {
@@ -1324,6 +1419,21 @@ describe("ExecutionContext", () => {
       })
 
       expect(result).toBe(3)
+      await ctx.close()
+    })
+
+    it("applies exec tags to function child context", async () => {
+      const marker = tag<string>({ label: "fn-exec-marker" })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      const result = await ctx.exec({
+        fn: (childCtx: Lite.ExecutionContext) => childCtx.data.seekTag(marker),
+        params: [],
+        tags: [marker("fn")],
+      })
+
+      expect(result).toBe("fn")
       await ctx.close()
     })
   })

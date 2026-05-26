@@ -1751,9 +1751,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
 
       try {
-        const result = presetValue !== undefined && typeof presetValue === 'function'
-          ? await childCtx.execPresetFn(flow, presetValue as (ctx: Lite.ExecutionContext) => unknown)
+        const runFlow = async () => presetValue !== undefined && typeof presetValue === 'function'
+          ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
           : await childCtx.execFlowInternal(flow)
+        const result = this.scope.execExts.length === 0
+          ? await runFlow()
+          : await childCtx.applyExecExtensions(flow, runFlow)
         await childCtx.close({ ok: true })
         return result
       } catch (error) {
@@ -1768,8 +1771,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         input: options.params
       })
 
+      const execTags = options.tags
+      if (execTags && execTags.length > 0) {
+        for (let i = 0; i < execTags.length; i++) {
+          childCtx.data.set(execTags[i]!.key, execTags[i]!.value)
+        }
+      }
+
       try {
-        const result = await childCtx.execFnInternal(options)
+        const runFn = () => childCtx.execFnInternal(options)
+        const result = this.scope.execExts.length === 0
+          ? await runFn()
+          : await childCtx.applyExecExtensions(options.fn, runFn)
         await childCtx.close({ ok: true })
         return result
       } catch (error) {
@@ -1789,42 +1802,22 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     if (depsResult != null && typeof (depsResult as any).then === 'function') {
       return (depsResult as Promise<Record<string, unknown>>).then((resolvedDeps) => {
-        if (this.scope.execExts.length === 0) {
-          return flow.deps ? factory(this, resolvedDeps) : factory(this)
-        }
-        const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
-        return this.applyExecExtensions(flow, doExec)
+        return flow.deps ? factory(this, resolvedDeps) : factory(this)
       })
     }
 
     const resolvedDeps = depsResult as Record<string, unknown>
 
-    if (this.scope.execExts.length === 0) {
-      return flow.deps ? factory(this, resolvedDeps) : factory(this)
-    }
-
-    const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
-    return this.applyExecExtensions(flow, doExec)
+    return flow.deps ? factory(this, resolvedDeps) : factory(this)
   }
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
-    if (this.scope.execExts.length === 0) {
-      return fn(this, ...params)
-    }
-    const doExec = () => Promise.resolve(fn(this, ...params))
-    return this.applyExecExtensions(fn, doExec)
+    return fn(this, ...params)
   }
 
-  async execPresetFn(
-    flow: Lite.Flow<unknown, unknown>,
-    fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>
-  ): Promise<unknown> {
-    if (this.scope.execExts.length === 0) {
-      return fn(this)
-    }
-    const doExec = () => Promise.resolve(fn(this))
-    return this.applyExecExtensions(flow, doExec)
+  private async execPresetFn(fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>): Promise<unknown> {
+    return fn(this)
   }
 
   private async applyExecExtensions(

@@ -147,7 +147,7 @@ sequenceDiagram
         Ctx->>Ctx: flow.parse(input) if defined
         Ctx->>Child: create child (parent = ctx, merged tags)
         Child->>Ext: wrapExec(next, flow, childCtx)
-        Ext->>Flow: next() → factory(childCtx, deps)
+        Ext->>Flow: next() → resolve deps + factory(childCtx, deps)
         Note right of Flow: childCtx.onClose(result: CloseResult) → { ok: true } | { ok: false, error }
         Flow-->>Ext: output
         Note right of Ext: ext returns output — may transform or replace
