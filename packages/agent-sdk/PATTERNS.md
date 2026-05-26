@@ -1,6 +1,6 @@
 # Agent SDK Patterns
 
-Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, `atom` or `service`, `tag`, and `ctx.exec`, do that before adding another primitive.
+Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, state/service, markers, and `ctx.exec`, do that before adding another primitive.
 
 ## 0. Standalone Suspense
 
@@ -10,7 +10,7 @@ Use suspense when the system needs deterministic replay or external resolution, 
 const waitForCommit = flow({
   name: "wait-for-commit",
   parse: typed<{ revision: number }>(),
-  tags: [suspendTag(true)],
+  tags: [suspend(true)],
   factory: () => {
     throw new Error("resolved by sync service")
   },
@@ -26,7 +26,7 @@ const ctx = createSuspenseContext(scope, {
 })
 ```
 
-Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
+Suspense has no agent knowledge. It sees marked `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
 
 ## 1. Workflow Flow
 
@@ -36,7 +36,7 @@ Use a workflow flow when code chooses order, branching, retries, and fan-out.
 export const processPr = flow({
   name: "process_pr",
   parse: typed<PrEvent>(),
-  tags: [workflowTag(true)],
+  tags: [workflow(true)],
   factory: async (ctx) => {
     const lint = await delegate(ctx, "lint", { sha: ctx.input.sha })
     if (lint.failed) return { status: "lint-failed" }
@@ -55,22 +55,22 @@ Why: normal TypeScript control flow stays visible. Replay still works because ex
 
 ## 2. Worker Flow
 
-Use a worker flow for one executable unit. Tags say how it may run.
+Use a worker flow for one executable unit. Markers say how it may run.
 
 ```ts
 export const lint = flow({
   name: "lint",
   parse: typed<{ sha: string }>(),
-  tags: [remoteTag(true), workerKindTag("code"), timeoutTag(30_000)],
+  tags: [remote(true), workerKind("code"), timeout(30_000)],
   factory: async (ctx) => runLinter(ctx.input.sha),
 })
 ```
 
-`remoteTag(true)` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
+`remote(true)` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
 
-## 3. LLM Provider Atom
+## 3. LLM Provider
 
-Prefer AI provider as an atom or service. The flow owns prompt shape and output parsing.
+Prefer AI provider as state or service. The flow owns prompt shape and output parsing.
 
 ```ts
 interface Model {
@@ -85,7 +85,7 @@ export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
   deps: { model },
-  tags: [workerKindTag("llm")],
+  tags: [workerKind("llm")],
   factory: async (ctx, { model }) => {
     const raw = await model.complete({
       system: "Return JSON only.",
@@ -121,17 +121,17 @@ const plan = claudeCliWorker({
 })
 ```
 
-Keep CLI workers at the edge. Stable domain tests should use provider atoms and presets.
+Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
 
 ## 5. Durable Step
 
-Use `durableTag(true)` for a step that should suspend until another process resolves it.
+Use `durable(true)` for a step that should suspend until another process resolves it.
 
 ```ts
 const approve = flow({
   name: "approve",
   parse: typed<{ title: string }>(),
-  tags: [durableTag(true)],
+  tags: [durable(true)],
   factory: () => {
     throw new Error("durable step should be resolved externally")
   },
@@ -225,8 +225,8 @@ Tests should prove the owning layer. Do not hide a missing dependency by adding 
 
 Before adding an agent SDK primitive, ask:
 
-1. Can this be a `flow` tag?
-2. Can this be an atom/service dependency?
+1. Can this be a marker on a `flow`?
+2. Can this be a state/service dependency?
 3. Can this be a `ctx.exec()` helper?
 4. Can this be an extension policy?
 

@@ -7,8 +7,8 @@ This package does not add an agent runtime. It gives names and conventions to th
 | Lite primitive | Agent SDK use |
 |---|---|
 | `flow()` | Workflow, worker, durable step, CLI-backed LLM call |
-| `atom()` / `service()` | Provider, config, registry, model client, material state |
-| `tag()` | Routing metadata and ambient run data |
+| state/service | Provider, config, registry, model client, material state |
+| typed marker | Routing metadata and ambient run data |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
 | Extension `wrapExec` | Suspense/replay router around one executable step |
 
@@ -17,19 +17,19 @@ The core idea: author orchestration as normal TypeScript `flow()` code. Put ever
 ```mermaid
 flowchart TD
   Root["workflow flow"] --> Exec["ctx.exec"]
-  Exec --> Tags["read target tags"]
-  Tags --> Replay["completed? return cached"]
-  Tags --> Durable["durable? write pending + suspend"]
-  Tags --> Remote["remote? hand to worker runner"]
-  Tags --> Local["otherwise run next()"]
+  Exec --> Markers["read target markers"]
+  Markers --> Replay["completed? return cached"]
+  Markers --> Durable["durable? write pending + suspend"]
+  Markers --> Remote["remote? hand to worker runner"]
+  Markers --> Local["otherwise run next()"]
   Local --> Log["write completed"]
   Remote --> Log
 ```
 
 ## What Is In This Package
 
-- Agent tags: `workflowTag`, `remoteTag`, `durableTag`, `workerKindTag`, `timeoutTag`.
-- Standalone suspense tags: `suspenseTag`, `suspendTag`, `suspenseTaskIdTag`, `suspenseRunIdTag`, `suspenseStepCounterTag`.
+- Agent markers: `workflow`, `remote`, `durable`, `workerKind`, `timeout`.
+- Suspense markers: `suspense`, `suspend`, `taskId`, `runId`, `stepCounter`.
 - `createSuspenseExtension()` for replay, suspend, and external resolution without agent concepts.
 - `createAgentExtension()` for agent policy: replay, suspend, timeout, and remote dispatch.
 - `createAgentContext()` for run-scoped root contexts.
@@ -37,25 +37,25 @@ flowchart TD
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
-`workflowTag` is the agent-facing alias for `suspenseTag`; `durableTag` is the agent-facing alias for `suspendTag`.
+`workflow` is the agent-facing alias for `suspense`; `durable` is the agent-facing alias for `suspend`.
 
 Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `AgentEventLog` and `AgentRemoteRunner` contracts.
 
 ## Standalone Suspense
 
-Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `suspenseTag(true)` and externally resolved steps with `suspendTag(true)`.
+Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `suspense(true)` and externally resolved steps with `suspend(true)`.
 
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import {
   createSuspenseContext,
   createSuspenseExtension,
-  suspendTag,
+  suspend,
 } from "@pumped-fn/agent-sdk"
 
 const externalSync = flow({
   name: "external-sync",
-  tags: [suspendTag(true)],
+  tags: [suspend(true)],
   factory: () => "unreachable until resolved",
 })
 
@@ -82,23 +82,23 @@ import {
   createAgentContext,
   createAgentExtension,
   delegate,
-  remoteTag,
-  workflowTag,
-  workerKindTag,
+  remote,
+  workflow,
+  workerKind,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
 
 const summarize = flow({
   name: "summarize",
   parse: typed<{ text: string }>(),
-  tags: [remoteTag(true), workerKindTag("llm")],
+  tags: [remote(true), workerKind("llm")],
   factory: async (ctx) => `summary: ${ctx.input.text}`,
 })
 
 const processIssue = flow({
   name: "process_issue",
   parse: typed<{ body: string }>(),
-  tags: [workflowTag(true)],
+  tags: [workflow(true)],
   factory: async (ctx) => {
     const summary = await delegate<string, { text: string }>(ctx, "summarize", {
       text: ctx.input.body,
@@ -129,7 +129,7 @@ Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all 
 
 ```ts
 import { atom, createScope, flow, preset, typed } from "@pumped-fn/lite"
-import { workerKindTag } from "@pumped-fn/agent-sdk"
+import { workerKind } from "@pumped-fn/agent-sdk"
 
 interface Model {
   complete(prompt: string): Promise<string>
@@ -145,7 +145,7 @@ export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
   deps: { model },
-  tags: [workerKindTag("llm")],
+  tags: [workerKind("llm")],
   factory: async (ctx, { model }) => {
     const answer = await model.complete(`Classify:\n${ctx.input.text}`)
     return JSON.parse(answer) as { label: string }
@@ -170,7 +170,7 @@ const codex = codexCliWorker({ name: "codex-review", sandbox: "workspace-write" 
 const claude = claudeCliWorker({ name: "claude-plan" })
 ```
 
-Use them when the backend should invoke the real CLI. For stable tests, prefer provider atoms plus presets.
+Use them when the backend should invoke the real CLI. For stable tests, prefer provider state plus presets.
 
 ## Replay Contract
 
@@ -179,13 +179,13 @@ Use them when the backend should invoke the real CLI. For stable tests, prefer p
 That means workflow bodies must be deterministic between `ctx.exec()` calls:
 
 - Use `ctx.exec({ flow })` for side effects.
-- Use provider atoms/services for swappable integrations.
+- Use provider state/services for swappable integrations.
 - Do not read time, random, network, filesystem, or process state directly in workflow orchestration code.
 - Keep dependency factories pure enough that replay skipping them is valid.
 
 ## Materials
 
-Materials are atom-backed task state with a patch-oriented API.
+Materials are state-backed task data with a patch-oriented API.
 
 ```ts
 const status = material("pr-status", {
@@ -198,7 +198,7 @@ await patchMaterial(ctx, status, [
 ])
 ```
 
-Derived materials are plain atoms that recompute from source material state.
+Derived materials are plain derived state that recomputes from source material state.
 
 ```ts
 const html = derivedMaterial("status-html", status, renderStatus, { kind: "text" })

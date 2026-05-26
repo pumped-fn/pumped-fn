@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
+import { createScope, flow, tag as marker, tags, typed } from "@pumped-fn/lite"
 import {
   CliWorkerError,
   SuspendSignal,
@@ -12,12 +12,12 @@ import {
   derivedMaterial,
   material,
   patchMaterial,
-  remoteTag,
-  durableTag,
-  suspenseTag,
-  suspendTag,
-  workflowTag,
-  workerKindTag,
+  remote,
+  durable,
+  suspense,
+  suspend,
+  workflow,
+  workerKind,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
 import {
@@ -28,7 +28,7 @@ import {
 } from "../src/index"
 
 describe("agent sdk", () => {
-  it("replays standalone suspense steps without agent tags", async () => {
+  it("replays standalone suspense steps without agent markers", async () => {
     const log = new InMemorySuspenseEventLog()
     const { extension } = createSuspenseTestExtension({ log })
     const scope = createScope({ extensions: [extension] })
@@ -37,7 +37,7 @@ describe("agent sdk", () => {
     const step = flow({
       name: "standalone-step",
       parse: typed<number>(),
-      tags: [suspenseTag(true)],
+      tags: [suspense(true)],
       factory: (ctx) => {
         calls++
         return ctx.input + 1
@@ -61,7 +61,7 @@ describe("agent sdk", () => {
     await scope.ready
     const externalSync = flow({
       name: "external-sync",
-      tags: [suspendTag(true)],
+      tags: [suspend(true)],
       factory: () => "unreachable",
     })
 
@@ -87,7 +87,7 @@ describe("agent sdk", () => {
     const worker = flow({
       name: "memo-worker",
       parse: typed<number>(),
-      tags: [workflowTag(true)],
+      tags: [workflow(true)],
       factory: (ctx) => {
         calls++
         return ctx.input * 2
@@ -96,7 +96,7 @@ describe("agent sdk", () => {
     const root = flow({
       name: "memo-root",
       parse: typed<number>(),
-      tags: [workflowTag(true)],
+      tags: [workflow(true)],
       factory: async (ctx) => ctx.exec({ flow: worker, input: ctx.input }),
     })
 
@@ -112,15 +112,15 @@ describe("agent sdk", () => {
   })
 
   it("replays completed flow before resolving deps", async () => {
-    const gateTag = tag<string>({ label: "agent.replay.gate" })
+    const gate = marker<string>({ label: "agent.replay.gate" })
     const { extension } = createAgentTestExtension()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     let calls = 0
     const worker = flow({
       name: "replay-before-deps",
-      tags: [workflowTag(true)],
-      deps: { gate: tags.required(gateTag) },
+      tags: [workflow(true)],
+      deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => {
         calls++
         return `ok:${gate}`
@@ -130,7 +130,7 @@ describe("agent sdk", () => {
     const ctx1 = createAgentContext(scope, {
       taskId: "task-replay-deps",
       runId: "run-replay-deps",
-      tags: [gateTag("first")],
+      tags: [gate("first")],
     })
     expect(await ctx1.exec({ flow: worker })).toBe("ok:first")
     await ctx1.close()
@@ -149,7 +149,7 @@ describe("agent sdk", () => {
     let expensiveCalls = 0
     const expensive = flow({
       name: "expensive",
-      tags: [workflowTag(true)],
+      tags: [workflow(true)],
       factory: () => {
         expensiveCalls++
         return "ready"
@@ -157,12 +157,12 @@ describe("agent sdk", () => {
     })
     const approve = flow({
       name: "approve",
-      tags: [durableTag(true)],
+      tags: [durable(true)],
       factory: () => "unreachable",
     })
     const root = flow({
       name: "approval-root",
-      tags: [workflowTag(true)],
+      tags: [workflow(true)],
       factory: async (ctx) => {
         const first = await ctx.exec({ flow: expensive })
         const decision = await ctx.exec({ flow: approve })
@@ -186,14 +186,14 @@ describe("agent sdk", () => {
   })
 
   it("suspends durable work before resolving deps", async () => {
-    const gateTag = tag<string>({ label: "agent.durable.gate" })
+    const gate = marker<string>({ label: "agent.durable.gate" })
     const { extension } = createAgentTestExtension()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     const approve = flow({
       name: "durable-before-deps",
-      tags: [durableTag(true)],
-      deps: { gate: tags.required(gateTag) },
+      tags: [durable(true)],
+      deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => gate,
     })
 
@@ -202,21 +202,21 @@ describe("agent sdk", () => {
     await ctx.close({ ok: false, error: new Error("suspended") })
   })
 
-  it("delegates by worker registry and routes remote-tagged workers", async () => {
+  it("delegates by worker registry and routes remote workers", async () => {
     const { extension } = createAgentTestExtension()
     const scope = createScope({ extensions: [extension] })
     await scope.ready
     const worker = flow({
       name: "upper",
       parse: typed<{ text: string }>(),
-      tags: [remoteTag(true), workerKindTag("code")],
+      tags: [remote(true), workerKind("code")],
       factory: (ctx) => ctx.input.text.toUpperCase(),
     })
     const registry = workerRegistry([worker])
     const root = flow({
       name: "delegate-root",
       parse: typed<{ text: string }>(),
-      tags: [workflowTag(true)],
+      tags: [workflow(true)],
       factory: (ctx) => delegate<string, { text: string }>(ctx, "upper", ctx.input),
     })
     const ctx = createAgentContext(scope, { taskId: "task-c", runId: "run-c", registry })
@@ -225,7 +225,7 @@ describe("agent sdk", () => {
   })
 
   it("routes remote work before resolving deps when runner handles it", async () => {
-    const gateTag = tag<string>({ label: "agent.remote.gate" })
+    const gate = marker<string>({ label: "agent.remote.gate" })
     const { extension } = createAgentTestExtension({
       remoteRunner: {
         run: async (event) => {
@@ -238,8 +238,8 @@ describe("agent sdk", () => {
     await scope.ready
     const worker = flow({
       name: "remote-before-deps",
-      tags: [remoteTag(true)],
-      deps: { gate: tags.required(gateTag) },
+      tags: [remote(true)],
+      deps: { gate: tags.required(gate) },
       factory: (_ctx, { gate }) => gate,
     })
 
@@ -301,10 +301,10 @@ describe("agent sdk", () => {
     await ctx.close()
   })
 
-  it("tags CLI-backed LLM helpers as LLM workers", () => {
-    expect(workerKindTag.find(cliWorker({ name: "x", command: "printf" }))).toBe("cli")
-    expect(workerKindTag.find(claudeCliWorker())).toBe("llm")
-    expect(workerKindTag.find(codexCliWorker())).toBe("llm")
+  it("marks CLI-backed LLM helpers as LLM workers", () => {
+    expect(workerKind.find(cliWorker({ name: "x", command: "printf" }))).toBe("cli")
+    expect(workerKind.find(claudeCliWorker())).toBe("llm")
+    expect(workerKind.find(codexCliWorker())).toBe("llm")
   })
 
   it("reports CLI failures with captured stderr", async () => {

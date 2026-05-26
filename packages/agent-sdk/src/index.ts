@@ -85,21 +85,18 @@ export interface AgentExtensionOptions {
   defaultRunId?: string
 }
 
-export const suspenseTag = tag<boolean>({ label: "suspense.step", default: false })
-export const suspendTag = tag<boolean>({ label: "suspense.suspend", default: false })
-export const suspenseTaskIdTag = tag<string>({ label: "suspense.taskId" })
-export const suspenseRunIdTag = tag<string>({ label: "suspense.runId" })
-export const suspenseStepCounterTag = tag<SuspenseStepCounter>({ label: "suspense.stepCounter" })
-export const workflowTag = suspenseTag
-export const workerKindTag = tag<WorkerKind>({ label: "agent.workerKind" })
-export const remoteTag = tag<boolean>({ label: "agent.remote", default: false })
-export const durableTag = suspendTag
-export const materialKindTag = tag<MaterialKind>({ label: "agent.materialKind" })
-export const timeoutTag = tag<number>({ label: "agent.timeoutMs" })
-export const taskIdTag = suspenseTaskIdTag
-export const runIdTag = suspenseRunIdTag
-export const stepCounterTag = suspenseStepCounterTag
-export const workerRegistryTag = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
+export const suspense = tag<boolean>({ label: "suspense.step", default: false })
+export const suspend = tag<boolean>({ label: "suspense.suspend", default: false })
+export const taskId = tag<string>({ label: "suspense.taskId" })
+export const runId = tag<string>({ label: "suspense.runId" })
+export const stepCounter = tag<SuspenseStepCounter>({ label: "suspense.stepCounter" })
+export const workflow = suspense
+export const workerKind = tag<WorkerKind>({ label: "agent.workerKind" })
+export const remote = tag<boolean>({ label: "agent.remote", default: false })
+export const durable = suspend
+export const materialKind = tag<MaterialKind>({ label: "agent.materialKind" })
+export const timeout = tag<number>({ label: "agent.timeoutMs" })
+export const workers = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
 
 export class SuspendSignal extends Error {
   override readonly name = "SuspendSignal"
@@ -155,9 +152,9 @@ export function createSuspenseContext(
 ): Lite.ExecutionContext {
   return scope.createContext({
     tags: [
-      suspenseTaskIdTag(options.taskId),
-      suspenseRunIdTag(options.runId),
-      suspenseStepCounterTag({ next: 0 }),
+      taskId(options.taskId),
+      runId(options.runId),
+      stepCounter({ next: 0 }),
       ...(options.tags ?? []),
     ],
   })
@@ -176,7 +173,7 @@ export function createAgentContext(
     taskId: options.taskId,
     runId: options.runId,
     tags: [
-      ...(options.registry ? [workerRegistryTag(options.registry)] : []),
+      ...(options.registry ? [workers(options.registry)] : []),
       ...(options.tags ?? []),
     ],
   })
@@ -187,7 +184,7 @@ export async function delegate<Output = unknown, Input = unknown>(
   name: string,
   input: Input
 ): Promise<Output> {
-  const registry = ctx.data.seekTag(workerRegistryTag)
+  const registry = ctx.data.seekTag(workers)
   if (!registry) throw new Error("Worker registry not found")
   const target = registry.get(name) as Lite.Flow<Output, Input>
   return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
@@ -200,7 +197,7 @@ export function createAgentExtension(options: AgentExtensionOptions): Lite.Exten
     defaultTaskId: options.defaultTaskId,
     defaultRunId: options.defaultRunId,
     shouldHandle: (target) => shouldHandleAgentTarget(target),
-    shouldSuspend: (event) => isTagged(event.target, durableTag) && !isTagged(event.target, remoteTag),
+    shouldSuspend: (event) => hasMarker(event.target, durable) && !hasMarker(event.target, remote),
     createPendingEntry: (event) => ({
       status: "pending",
       key: event.key,
@@ -209,7 +206,7 @@ export function createAgentExtension(options: AgentExtensionOptions): Lite.Exten
       kind: "durable",
     }),
     run: (event, next) => runTimed(event.target, () =>
-      isTagged(event.target, remoteTag) && options.remoteRunner
+      hasMarker(event.target, remote) && options.remoteRunner
         ? options.remoteRunner.run(event, next)
         : next()
     ),
@@ -248,42 +245,42 @@ export function createSuspenseExtension(options: SuspenseExtensionOptions): Lite
 
 function shouldHandleSuspenseTarget(target: Lite.ExecTarget): boolean {
   return typeof target !== "function" && (
-    suspenseTag.find(target) === true ||
-    suspendTag.find(target) === true
+    suspense.find(target) === true ||
+    suspend.find(target) === true
   )
 }
 
 function shouldSuspendTarget(event: SuspenseExecEvent): boolean {
-  return isTagged(event.target, suspendTag)
+  return hasMarker(event.target, suspend)
 }
 
 function shouldHandleAgentTarget(target: Lite.ExecTarget): boolean {
   if (typeof target === "function") return false
   return (
-    workflowTag.find(target) === true ||
-    remoteTag.find(target) === true ||
-    durableTag.find(target) === true ||
-    timeoutTag.find(target) !== undefined
+    workflow.find(target) === true ||
+    remote.find(target) === true ||
+    durable.find(target) === true ||
+    timeout.find(target) !== undefined
   )
 }
 
-function isTagged<T>(target: Lite.ExecTarget, targetTag: Lite.Tag<T, boolean>): boolean {
+function hasMarker<T>(target: Lite.ExecTarget, marker: Lite.Tag<T, boolean>): boolean {
   if (typeof target === "function") return false
-  return targetTag.find(target) === true
+  return marker.find(target) === true
 }
 
 function nextSuspenseKey(
   ctx: Lite.ExecutionContext,
   options: Pick<SuspenseExtensionOptions, "defaultTaskId" | "defaultRunId">
 ): SuspenseStepKey {
-  const taskId = ctx.data.seekTag(suspenseTaskIdTag) ?? options.defaultTaskId ?? "default-task"
-  const runId = ctx.data.seekTag(suspenseRunIdTag) ?? options.defaultRunId ?? "default-run"
-  let counter = ctx.data.seekTag(suspenseStepCounterTag)
+  const foundTaskId = ctx.data.seekTag(taskId) ?? options.defaultTaskId ?? "default-task"
+  const foundRunId = ctx.data.seekTag(runId) ?? options.defaultRunId ?? "default-run"
+  let counter = ctx.data.seekTag(stepCounter)
   if (!counter) {
     counter = { next: 0 }
-    ctx.data.setTag(suspenseStepCounterTag, counter)
+    ctx.data.setTag(stepCounter, counter)
   }
-  return { taskId, runId, step: counter.next++ }
+  return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
 }
 
 function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
@@ -292,15 +289,15 @@ function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): str
 }
 
 function runTimed(target: Lite.ExecTarget, next: () => Promise<unknown>): Promise<unknown> {
-  const timeoutMs = typeof target === "function" ? undefined : timeoutTag.find(target)
+  const timeoutMs = typeof target === "function" ? undefined : timeout.find(target)
   if (timeoutMs === undefined) return next()
-  let timeout: ReturnType<typeof setTimeout>
+  let timer: ReturnType<typeof setTimeout>
   return Promise.race([
     next(),
     new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => reject(new Error(`Agent step timed out after ${timeoutMs}ms`)), timeoutMs)
+      timer = setTimeout(() => reject(new Error(`Agent step timed out after ${timeoutMs}ms`)), timeoutMs)
     }),
-  ]).finally(() => clearTimeout(timeout))
+  ]).finally(() => clearTimeout(timer))
 }
 
 export type JsonPatchOperation =
@@ -332,7 +329,7 @@ export class MaterialConflictError extends Error {
 export function material<T>(name: string, options: MaterialOptions<T>): Lite.Atom<MaterialState<T>> {
   return atom({
     keepAlive: true,
-    tags: [materialKindTag(options.kind), ...(options.tags ?? [])],
+    tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: () => ({
       name,
       kind: options.kind,
@@ -372,7 +369,7 @@ export function derivedMaterial<TSource, TOutput>(
   return atom({
     keepAlive: true,
     deps: { source },
-    tags: [materialKindTag(options.kind), ...(options.tags ?? [])],
+    tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: (_ctx, deps) => ({
       name,
       kind: options.kind,
@@ -499,8 +496,8 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
   options: CliWorkerOptions<Input, Output>
 ): Lite.Flow<Output, Input> {
   const tags = [
-    workerKindTag(options.kind ?? "cli"),
-    ...(options.timeoutMs !== undefined ? [timeoutTag(options.timeoutMs)] : []),
+    workerKind(options.kind ?? "cli"),
+    ...(options.timeoutMs !== undefined ? [timeout(options.timeoutMs)] : []),
     ...(options.tags ?? []),
   ]
   const factory = async (ctx: Lite.ExecutionContext & { readonly input: Input }) => {
