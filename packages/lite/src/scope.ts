@@ -1495,6 +1495,7 @@ class ScopeImpl implements Lite.Scope {
 
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     if (this.disposed) throw new Error("Scope is disposed")
+    if (Array.isArray(options)) throw new Error("createContext() expects { tags }")
     const ctx = new ExecutionContextImpl(this, options)
 
     const ctxTags = options?.tags
