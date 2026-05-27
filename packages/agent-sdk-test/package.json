@@ -28,7 +28,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/agent-sdk": "^0.0.0",
+    "@pumped-fn/agent-sdk": ">=0.0.0 <0.2.0",
     "@pumped-fn/lite": "^2.0.0"
   },
   "dependencies": {

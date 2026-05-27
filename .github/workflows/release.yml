@@ -7,6 +7,9 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     name: Release
@@ -25,7 +28,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,7 +46,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm -r --filter=!docs build
+        run: pnpm -r build
 
       - name: Generate release title
         id: release_title

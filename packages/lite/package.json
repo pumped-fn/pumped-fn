@@ -7,7 +7,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "bin": {
-    "pumped-lite": "./dist/cli.mjs"
+    "pumped-lite": "./bin/pumped-lite.mjs"
   },
   "exports": {
     ".": {
@@ -22,6 +22,7 @@
     }
   },
   "files": [
+    "bin",
     "dist",
     "README.md",
     "PATTERNS.md",

@@ -8,6 +8,9 @@ export default defineConfig({
   ],
   dts: true,
   format: ["cjs", "esm"],
+  outputOptions: {
+    exports: "named",
+  },
   clean: true,
   outDir: "dist",
 });

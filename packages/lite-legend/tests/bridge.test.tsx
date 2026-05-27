@@ -73,23 +73,33 @@ describe('atomObs bridge', () => {
 
 describe('useAtom', () => {
   it('suspends on idle async atom and resolves via Suspense', async () => {
-    const a = atom({ factory: async () => 'lazy' })
+    let resolveLazy!: (value: string) => void
+    const lazy = new Promise<string>((resolve) => {
+      resolveLazy = resolve
+    })
+    const a = atom({ factory: () => lazy })
     const scope = createScope()
 
     function C() {
       return <div>{useAtom(a)}</div>
     }
 
-    render(
-      <ScopeProvider scope={scope}>
-        <Suspense fallback={<div>Loading…</div>}>
-          <C />
-        </Suspense>
-      </ScopeProvider>
-    )
+    await act(async () => {
+      render(
+        <ScopeProvider scope={scope}>
+          <Suspense fallback={<div>Loading…</div>}>
+            <C />
+          </Suspense>
+        </ScopeProvider>
+      )
+    })
 
     expect(screen.getByText('Loading…')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByText('lazy')).toBeInTheDocument())
+    await act(async () => {
+      resolveLazy('lazy')
+      await lazy
+    })
+    expect(await screen.findByText('lazy')).toBeInTheDocument()
   })
 
   it('re-renders on ctrl.set via the bridge', async () => {

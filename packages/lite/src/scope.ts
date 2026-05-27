@@ -1787,10 +1787,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
             ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
             : await childCtx.execFlowInternal(flow)
         } else {
-          const runFlow = () => Promise.resolve(presetValue !== undefined && typeof presetValue === 'function'
-            ? childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
-            : childCtx.execFlowInternal(flow)
-          )
+          const runFlow = async () => presetValue !== undefined && typeof presetValue === 'function'
+            ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
+            : await childCtx.execFlowInternal(flow)
           result = await childCtx.applyExecExtensions(flow, runFlow)
         }
         await childCtx.close({ ok: true })
@@ -1815,9 +1814,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
 
       try {
-        const result = this.scope.execExts.length === 0
-          ? await childCtx.execFnInternal(options)
-          : await childCtx.applyExecExtensions(options.fn, () => childCtx.execFnInternal(options))
+        let result: unknown
+        if (this.scope.execExts.length === 0) {
+          result = await childCtx.execFnInternal(options)
+        } else {
+          const runFn = async () => await childCtx.execFnInternal(options)
+          result = await childCtx.applyExecExtensions(options.fn, runFn)
+        }
         await childCtx.close({ ok: true })
         return result
       } catch (error) {
