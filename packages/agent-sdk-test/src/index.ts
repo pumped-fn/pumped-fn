@@ -1,9 +1,9 @@
 import {
   extension as agentExtension,
   workflowExtension,
-  type AgentEventLog,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
+  type WorkflowEventLog,
   type WorkflowExtensionOptions,
 } from "@pumped-fn/agent-sdk"
 import {
@@ -16,7 +16,7 @@ import {
 } from "@pumped-fn/lite-extension-suspense"
 import type { Lite } from "@pumped-fn/lite"
 
-export class InMemorySuspenseEventLog implements SuspenseEventLog {
+export class MemorySuspenseLog implements SuspenseEventLog {
   private readonly store = new Map<string, SuspenseStepEntry>()
 
   async get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined> {
@@ -47,7 +47,7 @@ export class InMemorySuspenseEventLog implements SuspenseEventLog {
   }
 }
 
-export class InMemoryAgentEventLog extends InMemorySuspenseEventLog implements AgentEventLog {}
+export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog {}
 
 export const localRemoteRunner: AgentRemoteRunner = {
   run: (_event, next) => next(),
@@ -56,7 +56,7 @@ export const localRemoteRunner: AgentRemoteRunner = {
 export function suspense(
   options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}
 ): { extension: Lite.Extension; log: SuspenseEventLog } {
-  const log = options.log ?? new InMemorySuspenseEventLog()
+  const log = options.log ?? new MemorySuspenseLog()
   return {
     log,
     extension: suspenseExtension({
@@ -67,9 +67,9 @@ export function suspense(
 }
 
 export function agent(
-  options: AgentExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: AgentEventLog } = {}
-): { extensions: Lite.Extension[]; log: AgentEventLog } {
-  const log = options.log ?? new InMemoryAgentEventLog()
+  options: AgentExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: WorkflowEventLog } = {}
+): { extensions: Lite.Extension[]; log: WorkflowEventLog } {
+  const log = options.log ?? new MemoryWorkflowLog()
   return {
     log,
     extensions: [

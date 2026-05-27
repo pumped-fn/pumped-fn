@@ -13,7 +13,7 @@
 
 Add tag-first agent workflow helpers and tighten context tag handling across lite primitives.
 
-Move serializability policy out of lite core, remove the experimental primitive `use` surface, make `run()` a composable workflow tag, expose workflow and agent runtime contracts as required tags, and split workflow replay/logging from agent remote routing.
+Move serializability policy out of lite core, remove the experimental primitive `use` surface, make `workflowRun()` a composable workflow tag, expose workflow and agent runtime contracts as required tags, and split workflow replay/logging from agent remote routing.
 
 Preserve exec extension async error semantics, make the lite CLI bin install-safe before build, and suppress the lite-hmr CJS import.meta build warning.
 

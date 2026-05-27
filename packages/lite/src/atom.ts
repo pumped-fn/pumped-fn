@@ -39,9 +39,7 @@ export function atom<
   keepAlive?: boolean
 }): Lite.Atom<T>
 
-export function atom<T, D extends Record<string, Lite.Dependency>>(
-  config: any
-): Lite.Atom<any> {
+export function atom(config: any): Lite.Atom<any> {
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<any, Record<string, Lite.Dependency>>,

@@ -34,7 +34,7 @@ flowchart TD
 - `workflowExtension()` for replay, suspend, timeout, and event-log policy.
 - `extension()` for agent remote dispatch.
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
-- `run()` tag for workflow-scoped context data.
+- `workflowRun()` tag for workflow-scoped context data.
 - `agent` runtime tag for named worker delegation.
 - `WorkerRegistry` for named worker calls through `agent.delegate()`.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
@@ -81,7 +81,7 @@ import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
   agent as agentRuntime,
   extension,
-  run,
+  workflowRun,
   workflow as workflowRuntime,
   workflowExtension,
   step,
@@ -124,7 +124,7 @@ const scope = createScope({
 })
 
 const ctx = scope.createContext({
-  tags: [run({
+  tags: [workflowRun({
     taskId: "issue-123",
     runId: "run-1",
   })],
@@ -186,7 +186,7 @@ Use them when the backend should invoke the real CLI. For stable tests, prefer p
 
 ## Replay Contract
 
-`ctx.exec()` is the durable step boundary. On first execution, the agent extension assigns `(taskId, runId, step)` and writes the result. On replay, the same code runs from the top, but completed steps return cached values before dependencies or factory code run.
+`ctx.exec()` is the durable step boundary. On first execution, the workflow extension assigns `(taskId, runId, step)` and writes the result. On replay, the same code runs from the top, but completed steps return cached values before dependencies or factory code run.
 
 That means workflow bodies must be deterministic between `ctx.exec()` calls:
 
@@ -194,6 +194,7 @@ That means workflow bodies must be deterministic between `ctx.exec()` calls:
 - Use provider state/services for swappable integrations.
 - Do not read time, random, network, filesystem, or process state directly in workflow orchestration code.
 - Keep dependency factories pure enough that replay skipping them is valid.
+- `timeoutMs` rejects the step promise; it does not abort already-started work.
 
 ## Materials
 
@@ -223,11 +224,11 @@ Use `@pumped-fn/agent-sdk-test` for in-memory replay and fake remote routing:
 ```ts
 import { agent } from "@pumped-fn/agent-sdk-test"
 
-const { extension, log } = agent({
+const { extensions, log } = agent({
   remoteRunner: {
     run: async (event) => ({ routed: event.targetName }),
   },
 })
 ```
 
-This keeps tests fast and proves the same extension contract a NATS-backed runtime will use.
+Use `extensions` in `createScope({ extensions })`. This keeps tests fast and proves the same extension contract a NATS-backed runtime will use.

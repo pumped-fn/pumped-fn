@@ -26,7 +26,7 @@
   "scripts": {
     "build": "tsdown --config-loader tsx",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {

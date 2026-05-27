@@ -161,7 +161,7 @@ function nextSuspenseKey(
   let counter = ctx.data.seekTag(stepCounter)
   if (!counter) {
     counter = { next: 0 }
-    ctx.data.setTag(stepCounter, counter)
+    rootContext(ctx).data.setTag(stepCounter, counter)
   }
   return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
 }
@@ -170,4 +170,10 @@ function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): str
   const name = ctx.name || target.name
   if (!name) throw new Error("Suspense target must have a name")
   return name
+}
+
+function rootContext(ctx: Lite.ExecutionContext): Lite.ExecutionContext {
+  let current = ctx
+  while (current.parent) current = current.parent
+  return current
 }

@@ -17,11 +17,8 @@ export type MaterialKind = "json" | "text" | "binary" | "reference"
 export type StepCounter = SuspenseStepCounter
 export type WorkflowStepKey = SuspenseStepKey
 export type WorkflowStepEntry = SuspenseStepEntry
-export interface WorkflowEventLog extends SuspenseEventLog {}
-export interface WorkflowExecEvent extends SuspenseExecEvent {}
-export type AgentStepKey = WorkflowStepKey
-export type AgentStepEntry = WorkflowStepEntry
-export interface AgentEventLog extends WorkflowEventLog {}
+export type WorkflowEventLog = SuspenseEventLog
+export type WorkflowExecEvent = SuspenseExecEvent
 export interface AgentExecEvent {
   readonly key?: WorkflowStepKey
   readonly target: Lite.ExecTarget
@@ -83,7 +80,7 @@ export function workerRegistry(flows: Lite.Flow<unknown, unknown>[] = []): Worke
   return registry
 }
 
-export function formatStepKey(key: AgentStepKey): string {
+export function formatStepKey(key: WorkflowStepKey): string {
   return formatSuspenseStepKey(key)
 }
 
@@ -91,8 +88,6 @@ export interface WorkflowRunOptions {
   taskId: string
   runId: string
 }
-
-export interface AgentRunOptions extends WorkflowRunOptions {}
 
 export interface WorkflowContext {
   readonly taskId: string
@@ -105,7 +100,7 @@ export interface AgentContext {
   delegate<Output = unknown, Input = unknown>(name: string, input: Input): Promise<Output>
 }
 
-export const run = tag<WorkflowRunOptions>({ label: "workflow.run" })
+export const workflowRun = tag<WorkflowRunOptions>({ label: "workflow.run" })
 export const workflow = tag<WorkflowContext>({ label: "workflow.runtime" })
 export const agent = tag<AgentContext>({ label: "agent.runtime" })
 
@@ -206,7 +201,7 @@ function nextWorkflowKey(
   ctx: Lite.ExecutionContext,
   options: Pick<WorkflowExtensionOptions, "defaultTaskId" | "defaultRunId">
 ): WorkflowStepKey {
-  const config = ctx.data.seekTag(run)
+  const config = ctx.data.seekTag(workflowRun)
   const foundTaskId = config?.taskId ?? options.defaultTaskId ?? "default-task"
   const foundRunId = config?.runId ?? options.defaultRunId ?? "default-run"
   let counter = ctx.data.seekTag(stepCounter)
@@ -221,7 +216,7 @@ function workflowRuntimeOf(
   ctx: Lite.ExecutionContext,
   options: Pick<WorkflowExtensionOptions, "defaultTaskId" | "defaultRunId">
 ): WorkflowContext {
-  const config = ctx.data.seekTag(run)
+  const config = ctx.data.seekTag(workflowRun)
   return {
     taskId: config?.taskId ?? options.defaultTaskId ?? "default-task",
     runId: config?.runId ?? options.defaultRunId ?? "default-run",
@@ -229,7 +224,7 @@ function workflowRuntimeOf(
 }
 
 function agentRuntimeOf(ctx: Lite.ExecutionContext): AgentContext {
-  const config = workflowRuntimeOf(ctx, {})
+  const config = ctx.data.seekTag(workflow) ?? workflowRuntimeOf(ctx, {})
   return {
     taskId: config.taskId,
     runId: config.runId,
@@ -292,8 +287,8 @@ function stepOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): Step {
 }
 
 export type JsonPatchOperation =
-  | { op: "add"; path: string; value: unknown }
-  | { op: "replace"; path: string; value: unknown }
+  | { op: "add"; path: string; value: Lite.JsonValue }
+  | { op: "replace"; path: string; value: Lite.JsonValue }
   | { op: "remove"; path: string }
 
 export interface MaterialState<T> {
