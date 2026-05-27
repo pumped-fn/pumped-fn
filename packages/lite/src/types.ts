@@ -403,6 +403,67 @@ export namespace Lite {
     dispose?(scope: Scope): MaybePromise<void>
   }
 
+  export type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | readonly JsonValue[]
+    | { readonly [key: string]: JsonValue }
+
+  export type FlowExtensionArgs<Config> = [Config] extends [void]
+    ? []
+    : [config: Config]
+
+  export interface FlowExtensionEvent {
+    readonly target: Flow<unknown, unknown>
+    readonly ctx: ExecutionContext
+  }
+
+  export interface FlowExtensionInstance<Ext extends object = {}, Output = unknown> {
+    readonly ext?: Ext
+    wrapExec?(
+      next: () => Promise<Output>,
+      event: FlowExtensionEvent
+    ): MaybePromise<Output>
+  }
+
+  export interface FlowExtensionUse<Ext extends object = {}, Output = unknown> {
+    readonly key: symbol
+    readonly name: string
+    create(ctx: ExecutionContext): FlowExtensionInstance<Ext, Output>
+  }
+
+  export interface FlowExtension<Config = void, Ext extends object = {}, Output = unknown> {
+    readonly key: symbol
+    readonly name: string
+    (...args: FlowExtensionArgs<Config>): FlowExtensionUse<Ext, Output>
+  }
+
+  type FlowExtensionExtFn<Use> = Use extends FlowExtensionUse<infer Ext, any>
+    ? (value: Ext) => void
+    : never
+
+  type FlowExtensionOutputFn<Use> = Use extends FlowExtensionUse<any, infer Output>
+    ? (value: Output) => void
+    : never
+
+  export type FlowExtensionExt<Extensions extends readonly FlowExtensionUse<any, any>[]> =
+    [Extensions[number]] extends [never]
+      ? {}
+      : FlowExtensionExtFn<Extensions[number]> extends (value: infer I) => void ? I : never
+
+  export type FlowExtensionOutput<Extensions extends readonly FlowExtensionUse<any, any>[]> =
+    [Extensions[number]] extends [never]
+      ? unknown
+      : FlowExtensionOutputFn<Extensions[number]> extends (value: infer I) => void ? I : never
+
+  export type FlowExtensionContext<Extensions extends readonly FlowExtensionUse<any, any>[]> =
+    ExecutionContext & { readonly ext: FlowExtensionExt<Extensions> }
+
+  export type FlowContext<Input, Extensions extends readonly FlowExtensionUse<any, any>[]> =
+    FlowExtensionContext<Extensions> & { readonly input: Input }
+
   export type Dependency =
     | Atom<unknown>
     | ControllerDep<unknown>

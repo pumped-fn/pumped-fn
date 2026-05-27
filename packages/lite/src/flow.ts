@@ -1,5 +1,6 @@
 import { flowSymbol, typedSymbol, type Lite, type MaybePromise } from "./types"
 import { warmDepsGraph } from "./deps-graph"
+import { flowExtensions } from "./flow-extension"
 
 /**
  * Type marker for flow input without runtime parsing.
@@ -47,6 +48,85 @@ export interface FlowConfig<
  * })
  * ```
  */
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+>(config: {
+  name?: string
+  parse?: undefined
+  deps?: undefined
+  extensions: E
+  factory: (ctx: Lite.FlowExtensionContext<E>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, void>
+
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+  TInput,
+>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
+  deps?: undefined
+  extensions: E
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput>
+
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+  TInput,
+>(config: {
+  name?: string
+  parse: Lite.Typed<TInput>
+  deps?: undefined
+  extensions: E
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput>
+
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+  const D extends Record<string, Lite.ExecutionDependency>,
+>(config: {
+  name?: string
+  parse?: undefined
+  deps: D
+  extensions: E
+  factory: (ctx: Lite.FlowExtensionContext<E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, void>
+
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+  TInput,
+  const D extends Record<string, Lite.ExecutionDependency>,
+>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
+  deps: D
+  extensions: E
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput>
+
+export function flow<
+  const E extends readonly Lite.FlowExtensionUse<any, any>[],
+  TOutput extends Lite.FlowExtensionOutput<E>,
+  TInput,
+  const D extends Record<string, Lite.ExecutionDependency>,
+>(config: {
+  name?: string
+  parse: Lite.Typed<TInput>
+  deps: D
+  extensions: E
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput>
+
 export function flow<TOutput>(config: {
   name?: string
   parse?: undefined
@@ -106,30 +186,29 @@ export function flow<
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
-export function flow<
-  TOutput,
-  TInput,
-  D extends Record<string, Lite.Dependency>,
->(config: FlowConfig<TOutput, TInput, D>): Lite.Flow<TOutput, TInput> {
+export function flow(config: any): Lite.Flow<any, any> {
   const parse = config.parse
   const isTypedMarker =
     typeof parse === "object" && parse !== null && typedSymbol in parse
 
   if (config.deps) warmDepsGraph(config.deps as unknown as Record<string, Lite.Dependency>)
+  const tags = config.extensions && config.extensions.length > 0
+    ? [...(config.tags ?? []), flowExtensions(config.extensions)]
+    : config.tags
 
   return {
     [flowSymbol]: true,
     name: config.name,
     parse: isTypedMarker
       ? undefined
-      : (parse as ((raw: unknown) => MaybePromise<TInput>) | undefined),
+      : (parse as ((raw: unknown) => MaybePromise<unknown>) | undefined),
     factory: config.factory as unknown as Lite.FlowFactory<
-      TOutput,
-      TInput,
+      unknown,
+      unknown,
       Record<string, Lite.Dependency>
     >,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    tags: config.tags,
+    tags,
   }
 }
 

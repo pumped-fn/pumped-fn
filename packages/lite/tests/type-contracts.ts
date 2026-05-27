@@ -1,5 +1,6 @@
 import { atom, controller } from "../src/atom"
-import { flow } from "../src/flow"
+import { flow, typed } from "../src/flow"
+import { defineFlowExtension, serializable } from "../src/flow-extension"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
@@ -68,6 +69,43 @@ flow({
     ctx.cleanup(() => {})
     return 1
   },
+})
+
+const agentExtension = defineFlowExtension<string, { agent: { runId: string } }>({
+  name: "agent",
+  create: (runId) => ({ ext: { agent: { runId } } }),
+})
+
+flow({
+  extensions: [agentExtension("run-1")],
+  factory: (ctx) => {
+    const runId: string = ctx.ext.agent.runId
+    return runId
+  },
+})
+
+flow({
+  parse: typed<{ value: string }>(),
+  extensions: [agentExtension("run-1")],
+  factory: (ctx) => `${ctx.input.value}:${ctx.ext.agent.runId}`,
+})
+
+flow({
+  factory: (ctx) => {
+    // @ts-expect-error base flow ctx has no extension namespace
+    return ctx.ext.agent.runId
+  },
+})
+
+flow({
+  extensions: [serializable()],
+  factory: () => ({ ok: true, values: [1, "x", null] }),
+})
+
+flow({
+  // @ts-expect-error serializable flows must return JsonValue
+  extensions: [serializable()],
+  factory: () => new Date(),
 })
 
 resource({
