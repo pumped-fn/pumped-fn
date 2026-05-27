@@ -32,13 +32,14 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "typecheck": "npx @typescript/native-preview --noEmit",
-    "typecheck:full": "npx @typescript/native-preview --noEmit -p tsconfig.test.json",
+    "typecheck": "tsgo --noEmit",
+    "typecheck:full": "tsgo --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
