@@ -11,7 +11,9 @@
 "@pumped-fn/agent-sdk-test": patch
 ---
 
-Add explicit primitive extension registration for lite flows, atoms, resources, and configs; add agent workflow helpers; and tighten context tag handling.
+Add native primitive `use` support for lite flows, atoms, resources, and configs through keyed `use: { name: glyph() }` maps; add agent workflow helpers; and tighten context tag handling.
+
+Move serializability policy out of lite core, make agent `run()` a composable tag, and expose agent delegation through `ctx.agent`.
 
 Preserve exec extension async error semantics, make the lite CLI bin install-safe before build, and suppress the lite-hmr CJS import.meta build warning.
 

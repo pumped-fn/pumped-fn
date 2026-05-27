@@ -21,7 +21,7 @@ import { addUses } from "./use"
  * ```
  */
 export function resource<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.UseOutput<U>,
 >(config: {
   name?: string
@@ -29,10 +29,10 @@ export function resource<
   deps?: undefined
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ResourceContext, U>) => MaybePromise<T>
-}): Lite.Resource<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Resource<T>
 
 export function resource<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.UseOutput<U>,
   const D extends Record<string, Lite.ResourceDependency>,
 >(config: {
@@ -41,7 +41,7 @@ export function resource<
   deps: D
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ResourceContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
-}): Lite.Resource<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Resource<T>
 
 export function resource<T>(config: {
   name?: string

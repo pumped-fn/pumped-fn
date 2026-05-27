@@ -30,8 +30,9 @@ flowchart TD
 
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
 - `extension()` for agent policy: replay, suspend, timeout, and remote dispatch.
-- `run()` for run-scoped `scope.createContext()` options.
-- `WorkerRegistry` and `delegate()` for named worker calls.
+- `run()` tag for run-scoped context data.
+- `agent()` use for `ctx.agent` and named worker delegation.
+- `WorkerRegistry` for named worker calls through `ctx.agent.delegate()`.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
@@ -74,9 +75,9 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ```ts
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
-  run,
+  agent,
   extension,
-  delegate,
+  run,
   step,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
@@ -91,9 +92,10 @@ const summarize = flow({
 const processIssue = flow({
   name: "process_issue",
   parse: typed<{ body: string }>(),
+  use: { agent: agent() },
   tags: [step({ workflow: true })],
   factory: async (ctx) => {
-    const summary = await delegate<string, { text: string }>(ctx, "summarize", {
+    const summary = await ctx.agent.delegate<string, { text: string }>("summarize", {
       text: ctx.input.body,
     })
     return { summary }
@@ -105,16 +107,18 @@ const scope = createScope({
   extensions: [extension({ log: eventLog })],
 })
 
-const ctx = scope.createContext(run({
-  taskId: "issue-123",
-  runId: "run-1",
-  registry: workerRegistry([summarize]),
-}))
+const ctx = scope.createContext({
+  tags: [run({
+    taskId: "issue-123",
+    runId: "run-1",
+    registry: workerRegistry([summarize]),
+  })],
+})
 
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Nothing special happens in the worker itself.
+`ctx.agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Nothing special happens in the worker itself.
 
 ## AI Is Just A Provider
 

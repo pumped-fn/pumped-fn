@@ -3,6 +3,7 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
+import { applyUseExec, applyUseResolve, hasUses } from "./use"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
   const prototype = Object.getPrototypeOf(value)
@@ -681,7 +682,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private tryResolveCurrentTick<T>(atom: Lite.Atom<T>): Promise<T> | null {
-    if (this.resolveExts.length > 0) return null
+    if (this.hasResolvePipeline(atom)) return null
 
     const entry = this.getOrCreateEntry(atom)
     if (entry.state !== 'idle') return null
@@ -885,13 +886,13 @@ class ScopeImpl implements Lite.Scope {
 
     try {
       let value: T
-      if (this.resolveExts.length === 0) {
+      if (!this.hasResolvePipeline(atom)) {
         const raw = atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
         value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<T>) : raw as T
       } else {
         const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
         const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this, ctx }
-        value = await this.applyResolveExtensions(event, doResolve)
+        value = await this.applyResolvePipeline(event, doResolve)
       }
       entry.state = 'resolved'
       entry.value = value
@@ -916,7 +917,11 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private async applyResolveExtensions<T>(
+  private hasResolvePipeline(target: { readonly tags?: Lite.Tagged<any>[] }): boolean {
+    return this.resolveExts.length > 0 || hasUses(target)
+  }
+
+  private async applyResolvePipeline<T>(
     event: Lite.ResolveEvent,
     doResolve: () => Promise<T>
   ): Promise<T> {
@@ -927,6 +932,8 @@ class ScopeImpl implements Lite.Scope {
       const currentNext = next
       next = ext.wrapResolve!.bind(ext, currentNext, event) as () => Promise<T>
     }
+
+    next = applyUseResolve(next, event)
 
     return next()
   }
@@ -1247,13 +1254,13 @@ class ScopeImpl implements Lite.Scope {
       }
       if (typeof presetValue === "function") {
         const factory = presetValue as (ctx: Lite.ResourceContext) => MaybePromise<T>
-        if (this.resolveExts.length === 0) {
+        if (!this.hasResolvePipeline(resource)) {
           return ownerCtx.runResourceFactory(resource, entry, factory)
         }
         const resourceCtx = ownerCtx.createResourceContext(resource, entry)
         const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
         const doResolve = async () => factory(resourceCtx)
-        return this.applyResolveExtensions(event, doResolve)
+        return this.applyResolvePipeline(event, doResolve)
       }
       return presetValue as T
     }
@@ -1274,13 +1281,13 @@ class ScopeImpl implements Lite.Scope {
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
 
-    if (this.resolveExts.length === 0) {
+    if (!this.hasResolvePipeline(resource)) {
       return ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
     }
     const resourceCtx = ownerCtx.createResourceContext(resource, entry)
     const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
     const doResolve = async () => resource.deps ? factory(resourceCtx, resourceDeps) : factory(resourceCtx)
-    return this.applyResolveExtensions(event, doResolve)
+    return this.applyResolvePipeline(event, doResolve)
   }
 
   invalidate<T>(atom: Lite.Atom<T>): void {
@@ -1782,7 +1789,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
       try {
         let result: unknown
-        if (this.scope.execExts.length === 0) {
+        if (this.scope.execExts.length === 0 && !hasUses(flow)) {
           result = presetValue !== undefined && typeof presetValue === 'function'
             ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
             : await childCtx.execFlowInternal(flow)
@@ -1790,7 +1797,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
           const runFlow = async () => presetValue !== undefined && typeof presetValue === 'function'
             ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
             : await childCtx.execFlowInternal(flow)
-          result = await childCtx.applyExecExtensions(flow, runFlow)
+          result = await childCtx.applyExecPipeline(flow, runFlow)
         }
         await childCtx.close({ ok: true })
         return result
@@ -1819,7 +1826,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
           result = await childCtx.execFnInternal(options)
         } else {
           const runFn = async () => await childCtx.execFnInternal(options)
-          result = await childCtx.applyExecExtensions(options.fn, runFn)
+          result = await childCtx.applyExecPipeline(options.fn, runFn)
         }
         await childCtx.close({ ok: true })
         return result
@@ -1858,7 +1865,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return fn(this)
   }
 
-  private async applyExecExtensions(
+  private async applyExecPipeline(
     target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
     doExec: () => Promise<unknown>
   ): Promise<unknown> {
@@ -1869,6 +1876,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       const currentNext = next
       next = ext.wrapExec!.bind(ext, currentNext, target, this) as () => Promise<unknown>
     }
+
+    next = applyUseExec(next, target, this)
 
     return next()
   }

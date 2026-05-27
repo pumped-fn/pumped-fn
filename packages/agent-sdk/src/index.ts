@@ -1,8 +1,8 @@
-import { atom, flow, tag, typed, type Lite } from "@pumped-fn/lite"
+import { atom, defineUse, flow, tag, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
-  run as baseRun,
+  stepCounter,
   type SuspenseEventLog,
   type SuspenseExecEvent,
   type SuspenseStepCounter,
@@ -78,26 +78,44 @@ export interface AgentRunOptions {
   taskId: string
   runId: string
   registry?: WorkerRegistry
-  tags?: Lite.Tagged<any>[]
 }
 
-export function run(options: AgentRunOptions): Lite.CreateContextOptions {
-  return baseRun({
-    taskId: options.taskId,
-    runId: options.runId,
-    tags: [
-      ...(options.registry ? [workers(options.registry)] : []),
-      ...(options.tags ?? []),
-    ],
-  })
+export interface AgentContext {
+  readonly taskId: string
+  readonly runId: string
+  readonly registry?: WorkerRegistry
+  delegate<Output = unknown, Input = unknown>(name: string, input: Input): Promise<Output>
 }
 
-export async function delegate<Output = unknown, Input = unknown>(
+export type AgentUseExt = AgentContext
+
+export const run = tag<AgentRunOptions>({ label: "agent.run" })
+
+export const agent = defineUse<void, AgentUseExt>({
+  label: "agent",
+  create: (_config, event) => {
+    if (!isExecutionContext(event.ctx)) throw new Error("Agent use requires an execution context")
+    const config = event.ctx.data.seekTag(run)
+    if (!config) throw new Error("Agent run tag not found")
+    const execCtx = event.ctx
+    return {
+      ext: {
+        taskId: config.taskId,
+        runId: config.runId,
+        registry: config.registry,
+        delegate: <Output = unknown, Input = unknown>(name: string, input: Input) =>
+          delegateWorker<Output, Input>(execCtx, name, input),
+      },
+    }
+  },
+})
+
+async function delegateWorker<Output = unknown, Input = unknown>(
   ctx: Lite.ExecutionContext,
   name: string,
   input: Input
 ): Promise<Output> {
-  const registry = ctx.data.seekTag(workers)
+  const registry = registryOf(ctx)
   if (!registry) throw new Error("Worker registry not found")
   const target = registry.get(name) as Lite.Flow<Output, Input>
   return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
@@ -109,6 +127,7 @@ export function extension(options: AgentExtensionOptions): Lite.Extension {
     log: options.log,
     defaultTaskId: options.defaultTaskId,
     defaultRunId: options.defaultRunId,
+    getKey: (ctx) => nextAgentKey(ctx, options),
     shouldHandle: (target, ctx) => shouldHandleAgentTarget(target, ctx),
     shouldSuspend: (event) => {
       const config = stepOf(event.target, event.ctx)
@@ -127,6 +146,36 @@ export function extension(options: AgentExtensionOptions): Lite.Extension {
       return options.remoteRunner.run(event, next)
     }),
   })
+}
+
+function registryOf(ctx: Lite.ExecutionContext): WorkerRegistry | undefined {
+  const agentCtx = (ctx as Lite.ExecutionContext & { readonly agent?: AgentContext }).agent
+  return agentCtx?.registry ?? ctx.data.seekTag(run)?.registry ?? ctx.data.seekTag(workers)
+}
+
+function isExecutionContext(ctx: Lite.UseContextBase): ctx is Lite.ExecutionContext {
+  return "exec" in ctx
+}
+
+function nextAgentKey(
+  ctx: Lite.ExecutionContext,
+  options: Pick<AgentExtensionOptions, "defaultTaskId" | "defaultRunId">
+): AgentStepKey {
+  const config = ctx.data.seekTag(run)
+  const foundTaskId = config?.taskId ?? options.defaultTaskId ?? "default-task"
+  const foundRunId = config?.runId ?? options.defaultRunId ?? "default-run"
+  let counter = ctx.data.seekTag(stepCounter)
+  if (!counter) {
+    counter = { next: 0 }
+    rootContext(ctx).data.setTag(stepCounter, counter)
+  }
+  return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
+}
+
+function rootContext(ctx: Lite.ExecutionContext): Lite.ExecutionContext {
+  let current = ctx
+  while (current.parent) current = current.parent
+  return current
 }
 
 function shouldHandleAgentTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {

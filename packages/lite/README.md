@@ -80,22 +80,22 @@ const clientResource = resource({
 
 ## Primitive Use
 
-Use `use` for primitive-local contracts and context shape. `atom`, `flow`, `resource`, and `service` store uses as normal metadata tags; `useRunner()` is the opt-in scope extension that instantiates each glyph per resolve/exec, dedupes duplicate glyphs, exposes `ctx.ext`, and applies wrappers.
+Use `use` for primitive-local contracts and context shape. `atom`, `flow`, `resource`, and `service` store keyed uses as normal metadata tags; scope instantiates each glyph per resolve/exec, dedupes duplicate glyphs, assigns context fields from the object keys, and applies wrappers.
 
 ```ts
-import { createScope, defineUse, flow, serializable, useRunner } from "@pumped-fn/lite"
+import { createScope, defineUse, flow } from "@pumped-fn/lite"
 
-const agent = defineUse<{ runId: string }, { agent: { runId: string } }>({
-  name: "agent",
-  create: ({ runId }) => ({ ext: { agent: { runId } } }),
+const agent = defineUse<{ runId: string }, { runId: string }>({
+  label: "agent",
+  create: ({ runId }) => ({ ext: { runId } }),
 })
 
 const run = flow({
-  use: [agent({ runId: "run-1" }), serializable()],
-  factory: (ctx) => ({ runId: ctx.ext.agent.runId }),
+  use: { agent: agent({ runId: "run-1" }) },
+  factory: (ctx) => ({ runId: ctx.agent.runId }),
 })
 
-const scope = createScope({ extensions: [useRunner()] })
+const scope = createScope()
 const ctx = scope.createContext()
 await ctx.exec({ flow: run })
 ```
@@ -168,7 +168,7 @@ sequenceDiagram
         Ctx->>Ctx: preset? → flow: re‑exec with replacement / fn: run as factory
         Ctx->>Ctx: flow.parse(input) if defined
         Ctx->>Child: create child (parent = ctx, merged tags)
-        Note right of Child: useRunner reads use metadata → ctx.ext + wrappers
+        Note right of Child: Scope use pipeline reads metadata → context fields + wrappers
         Child->>Ext: wrapExec(next, flow, childCtx)
         Ext->>Flow: next() → resolve deps + factory(childCtx, deps)
         Note right of Flow: childCtx.onClose(result: CloseResult) → { ok: true } | { ok: false, error }

@@ -35,14 +35,15 @@ Use a workflow flow when code chooses order, branching, retries, and fan-out.
 export const processPr = flow({
   name: "process_pr",
   parse: typed<PrEvent>(),
+  use: { agent: agent() },
   tags: [step({ workflow: true })],
   factory: async (ctx) => {
-    const lint = await delegate(ctx, "lint", { sha: ctx.input.sha })
+    const lint = await ctx.agent.delegate("lint", { sha: ctx.input.sha })
     if (lint.failed) return { status: "lint-failed" }
 
     const [tests, security] = await Promise.all([
-      delegate(ctx, "test", { sha: ctx.input.sha }),
-      delegate(ctx, "security", { sha: ctx.input.sha }),
+      ctx.agent.delegate("test", { sha: ctx.input.sha }),
+      ctx.agent.delegate("security", { sha: ctx.input.sha }),
     ])
 
     return { status: "ok", tests, security }
@@ -50,7 +51,7 @@ export const processPr = flow({
 })
 ```
 
-Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `delegate()`.
+Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `ctx.agent.delegate()`.
 
 ## 2. Worker Flow
 

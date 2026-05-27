@@ -49,7 +49,7 @@ export interface FlowConfig<
  * ```
  */
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
 >(config: {
   name?: string
@@ -58,10 +58,10 @@ export function flow<
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ExecutionContext, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, void>
 
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
   TInput,
 >(config: {
@@ -71,10 +71,10 @@ export function flow<
   use: U
   factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
   TInput,
 >(config: {
@@ -84,10 +84,10 @@ export function flow<
   use: U
   factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
   const D extends Record<string, Lite.ExecutionDependency>,
 >(config: {
@@ -97,10 +97,10 @@ export function flow<
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ExecutionContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, void>
 
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
   TInput,
   const D extends Record<string, Lite.ExecutionDependency>,
@@ -111,10 +111,10 @@ export function flow<
   use: U
   factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   TOutput extends Lite.UseOutput<U>,
   TInput,
   const D extends Record<string, Lite.ExecutionDependency>,
@@ -125,7 +125,7 @@ export function flow<
   use: U
   factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput>
+} & Lite.NoReservedUseKeys<U>): Lite.Flow<TOutput, TInput>
 
 export function flow<TOutput>(config: {
   name?: string

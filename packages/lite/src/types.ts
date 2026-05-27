@@ -416,6 +416,15 @@ export namespace Lite {
     ? []
     : [config: Config]
 
+  export type UseMap = Record<string, Use<any, any>>
+
+  export type ReservedUseContextKey = keyof ResolveContext | keyof ExecutionContext | keyof ResourceContext
+
+  export type NoReservedUseKeys<Uses extends UseMap> =
+    [Extract<keyof Uses, ReservedUseContextKey>] extends [never]
+      ? {}
+      : { readonly __reservedUseContextKey: Extract<keyof Uses, ReservedUseContextKey> }
+
   export type UseTarget = Atom<unknown> | Resource<unknown> | Flow<unknown, unknown>
 
   export type UseContextBase = ResolveContext | ExecutionContext
@@ -444,38 +453,38 @@ export namespace Lite {
 
   export interface Use<Ext extends object = {}, Output = unknown> {
     readonly key: symbol
-    readonly name: string
+    readonly label: string
     create(event: UseCreateEvent): UseInstance<Ext, Output>
   }
 
   export interface UseFactory<Config = void, Ext extends object = {}, Output = unknown> {
     readonly key: symbol
-    readonly name: string
+    readonly label: string
     (...args: UseArgs<Config>): Use<Ext, Output>
   }
 
-  type UseExtFn<Item> = Item extends Use<infer Ext, any>
-    ? (value: Ext) => void
-    : never
+  export interface NamedUse<Ext extends object = {}, Output = unknown> {
+    readonly name: string
+    readonly use: Use<Ext, Output>
+  }
 
   type UseOutputFn<Item> = Item extends Use<any, infer Output>
     ? (value: Output) => void
     : never
 
-  export type UseExt<Uses extends readonly Use<any, any>[]> =
-    [Uses[number]] extends [never]
-      ? {}
-      : UseExtFn<Uses[number]> extends (value: infer I) => void ? I : never
+  export type UseExt<Uses extends UseMap> = {
+    readonly [K in keyof Uses]: Uses[K] extends Use<infer Ext, any> ? Ext : never
+  }
 
-  export type UseOutput<Uses extends readonly Use<any, any>[]> =
-    [Uses[number]] extends [never]
+  export type UseOutput<Uses extends UseMap> =
+    [Uses[keyof Uses]] extends [never]
       ? unknown
-      : UseOutputFn<Uses[number]> extends (value: infer I) => void ? I : never
+      : UseOutputFn<Uses[keyof Uses]> extends (value: infer I) => void ? I : never
 
-  export type WithUseExt<Ctx, Uses extends readonly Use<any, any>[]> =
-    Ctx & { readonly ext: UseExt<Uses> }
+  export type WithUseExt<Ctx, Uses extends UseMap> =
+    Ctx & UseExt<Uses>
 
-  export type FlowContext<Input, Uses extends readonly Use<any, any>[]> =
+  export type FlowContext<Input, Uses extends UseMap> =
     WithUseExt<ExecutionContext & { readonly input: Input }, Uses>
 
   export type Dependency =

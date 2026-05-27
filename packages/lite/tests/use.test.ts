@@ -5,22 +5,20 @@ import {
   defineUse,
   flow,
   resource,
-  serializable,
   service,
-  useRunner,
   type Lite,
 } from "../src/index"
 
 describe("primitive use", () => {
-  it("adds flow ctx.ext and creates fresh instances", async () => {
+  it("adds flow ctx fields and creates fresh instances", async () => {
     let created = 0
-    const agent = defineUse<{ label: string }, { agent: { label: string; instance: number } }>({
-      name: "agent",
+    const agent = defineUse<{ label: string }, { label: string; instance: number }>({
+      label: "agent",
       create: (config) => {
         created++
         const instance = created
         return {
-          ext: { agent: { label: config.label, instance } },
+          ext: { label: config.label, instance },
           wrapExec: async (next) => `${await next()}:${instance}`,
         }
       },
@@ -28,11 +26,11 @@ describe("primitive use", () => {
 
     const target = flow({
       name: "agent",
-      use: [agent({ label: "first" })],
-      factory: (ctx) => `${ctx.ext.agent.label}:${ctx.ext.agent.instance}`,
+      use: { agent: agent({ label: "first" }) },
+      factory: (ctx) => `${ctx.agent.label}:${ctx.agent.instance}`,
     })
 
-    const scope = createScope({ extensions: [useRunner()] })
+    const scope = createScope()
     const ctx = scope.createContext()
     expect(await ctx.exec({ flow: target })).toBe("first:1:1")
     expect(await ctx.exec({ flow: target })).toBe("first:2:2")
@@ -42,94 +40,86 @@ describe("primitive use", () => {
   })
 
   it("rejects duplicate uses by glyph", async () => {
-    const agent = defineUse<{ label: string }, { agent: { label: string } }>({
-      name: "agent",
-      create: (config) => ({ ext: { agent: { label: config.label } } }),
+    const agent = defineUse<{ label: string }, { label: string }>({
+      label: "agent",
+      create: (config) => ({ ext: { label: config.label } }),
     })
-    const target = flow({
+    expect(() => flow({
       name: "duplicate-agent",
-      use: [agent({ label: "first" }), agent({ label: "second" })],
-      factory: (ctx) => ctx.ext.agent.label,
-    })
-
-    const scope = createScope({ extensions: [useRunner()] })
-    const ctx = scope.createContext()
-    await expect(ctx.exec({ flow: target })).rejects.toThrow('Duplicate use "agent" on "duplicate-agent"')
-    await ctx.close({ ok: false, error: new Error("expected") })
-    await scope.dispose()
+      use: {
+        first: agent({ label: "first" }),
+        second: agent({ label: "second" }),
+      },
+      factory: () => "unreachable",
+    })).toThrow('Duplicate use "agent" as "first" and "second"')
   })
 
-  it("adds atom and service resolve ctx.ext through one runner", async () => {
-    const tenant = defineUse<string, { tenant: { id: string } }>({
-      name: "tenant",
-      create: (id) => ({ ext: { tenant: { id } } }),
+  it("adds atom and service resolve ctx fields", async () => {
+    const tenant = defineUse<string, { id: string }>({
+      label: "tenant",
+      create: (id) => ({ ext: { id } }),
     })
     const config = atom({
-      use: [tenant("acme")],
-      factory: (ctx) => ({ tenantId: ctx.ext.tenant.id }),
+      use: { tenant: tenant("acme") },
+      factory: (ctx) => ({ tenantId: ctx.tenant.id }),
     })
     const svc = service({
-      use: [tenant("svc")],
+      use: { tenant: tenant("svc") },
       factory: (ctx) => ({
-        call: (execCtx: Lite.ExecutionContext) => `${ctx.ext.tenant.id}:${execCtx.name ?? "root"}`,
+        call: (execCtx: Lite.ExecutionContext) => `${ctx.tenant.id}:${execCtx.name ?? "root"}`,
       }),
     })
 
-    const scope = createScope({ extensions: [useRunner()] })
+    const scope = createScope()
     expect(await scope.resolve(config)).toEqual({ tenantId: "acme" })
     expect((await scope.resolve(svc)).call(scope.createContext())).toBe("svc:root")
     await scope.dispose()
   })
 
-  it("adds resource ctx.ext and validates serializable resolve outputs", async () => {
-    const trace = defineUse<string, { trace: { id: string } }>({
-      name: "trace",
-      create: (id) => ({ ext: { trace: { id } } }),
+  it("adds resource ctx fields", async () => {
+    const trace = defineUse<string, { id: string }>({
+      label: "trace",
+      create: (id) => ({ ext: { id } }),
     })
     const good = resource({
-      use: [trace("trace-1"), serializable()],
-      factory: (ctx) => ({ traceId: ctx.ext.trace.id }),
+      use: { trace: trace("trace-1") },
+      factory: (ctx) => ({ traceId: ctx.trace.id }),
     })
-    const bad = atom({
-      use: [serializable()],
-      factory: () => new Date() as unknown as Lite.JsonValue,
-    })
-    const scope = createScope({ extensions: [useRunner()] })
+    const scope = createScope()
     const ctx = scope.createContext()
 
     await expect(ctx.resolve(good)).resolves.toEqual({ traceId: "trace-1" })
-    await expect(scope.resolve(bad)).rejects.toThrow("Non-plain object at $")
 
     await ctx.close()
     await scope.dispose()
   })
 
-  it("keeps resource ctx.ext isolated from sibling resources and parent exec ctx", async () => {
-    const tenant = defineUse<string, { tenant: { id: string } }>({
-      name: "tenant",
-      create: (id) => ({ ext: { tenant: { id } } }),
+  it("keeps resource ctx fields isolated from sibling resources and parent exec ctx", async () => {
+    const tenant = defineUse<string, { id: string }>({
+      label: "tenant",
+      create: (id) => ({ ext: { id } }),
     })
     const left = resource({
       name: "left",
-      use: [tenant("left")],
-      factory: (ctx) => ctx.ext.tenant.id,
+      use: { tenant: tenant("left") },
+      factory: (ctx) => ctx.tenant.id,
     })
     const right = resource({
       name: "right",
-      use: [tenant("right")],
-      factory: (ctx) => ctx.ext.tenant.id,
+      use: { tenant: tenant("right") },
+      factory: (ctx) => ctx.tenant.id,
     })
     const target = flow({
       name: "resource-isolation",
       factory: async (ctx) => {
         const leftValue = await ctx.resolve(left)
         const rightValue = await ctx.resolve(right)
-        const parentTenant = (ctx as Lite.ExecutionContext & { ext?: { tenant?: { id: string } } }).ext?.tenant?.id
+        const parentTenant = (ctx as Lite.ExecutionContext & { tenant?: { id: string } }).tenant?.id
         return { leftValue, rightValue, parentTenant }
       },
     })
 
-    const scope = createScope({ extensions: [useRunner()] })
+    const scope = createScope()
     const ctx = scope.createContext()
     await expect(ctx.exec({ flow: target })).resolves.toEqual({
       leftValue: "left",
@@ -140,11 +130,11 @@ describe("primitive use", () => {
     await scope.dispose()
   })
 
-  it("exposes use ctx.ext to downstream scope extensions", async () => {
+  it("exposes use ctx fields to downstream scope extensions", async () => {
     const seen: Array<string | undefined> = []
-    const agent = defineUse<string, { agent: { runId: string } }>({
-      name: "agent",
-      create: (runId) => ({ ext: { agent: { runId } } }),
+    const agent = defineUse<string, { runId: string }>({
+      label: "agent",
+      create: (runId) => ({ ext: { runId } }),
     })
     const observer = {
       name: "observer",
@@ -153,21 +143,33 @@ describe("primitive use", () => {
         _target: Lite.ExecTarget,
         ctx: Lite.ExecutionContext
       ) => {
-        seen.push((ctx as Lite.ExecutionContext & { ext?: { agent?: { runId: string } } }).ext?.agent?.runId)
+        seen.push((ctx as Lite.ExecutionContext & { agent?: { runId: string } }).agent?.runId)
         return next()
       },
     } satisfies Lite.Extension
     const target = flow({
       name: "agent-shaped",
-      use: [agent("run-1")],
-      factory: (ctx) => ctx.ext.agent.runId,
+      use: { agent: agent("run-1") },
+      factory: (ctx) => ctx.agent.runId,
     })
 
-    const scope = createScope({ extensions: [useRunner(), observer] })
+    const scope = createScope({ extensions: [observer] })
     const ctx = scope.createContext()
     expect(await ctx.exec({ flow: target })).toBe("run-1")
     expect(seen).toEqual(["run-1"])
     await ctx.close()
     await scope.dispose()
+  })
+
+  it("rejects use context key collisions", async () => {
+    const bad = defineUse<void, { value: string }>({
+      label: "bad",
+      create: () => ({ ext: { value: "nope" } }),
+    })
+    expect(() => flow({
+      // @ts-expect-error use keys cannot overwrite base context keys
+      use: { exec: bad() },
+      factory: () => "unreachable",
+    })).toThrow('Use key "exec" is reserved')
   })
 })

@@ -5,7 +5,7 @@ import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
 import { tag } from "../src/tag"
 import type { Lite } from "../src/types"
-import { defineUse, serializable } from "../src/use"
+import { defineUse } from "../src/use"
 
 const sourceAtom = atom({
   factory: () => 1,
@@ -74,78 +74,74 @@ flow({
   },
 })
 
-const agentUse = defineUse<string, { agent: { runId: string } }>({
-  name: "agent",
-  create: (runId) => ({ ext: { agent: { runId } } }),
+const agentUse = defineUse<string, { runId: string }>({
+  label: "agent",
+  create: (runId) => ({ ext: { runId } }),
 })
 
 flow({
-  use: [agentUse("run-1")],
+  use: { agent: agentUse("run-1") },
   factory: (ctx) => {
-    const runId: string = ctx.ext.agent.runId
+    const { agent } = ctx
+    const runId: string = agent.runId
     return runId
   },
 })
 
 flow({
   parse: typed<{ value: string }>(),
-  use: [agentUse("run-1")],
-  factory: (ctx) => `${ctx.input.value}:${ctx.ext.agent.runId}`,
+  use: { agent: agentUse("run-1") },
+  factory: (ctx) => `${ctx.input.value}:${ctx.agent.runId}`,
 })
 
 atom({
-  use: [agentUse("run-1")],
-  factory: (ctx) => ctx.ext.agent.runId,
+  use: { agent: agentUse("run-1") },
+  factory: (ctx) => ctx.agent.runId,
 })
 
 resource({
-  use: [agentUse("run-1")],
-  factory: (ctx) => ctx.ext.agent.runId,
+  use: { agent: agentUse("run-1") },
+  factory: (ctx) => ctx.agent.runId,
 })
 
 service({
-  use: [agentUse("run-1")],
+  use: { agent: agentUse("run-1") },
   factory: (ctx) => ({
-    call: () => ctx.ext.agent.runId,
+    call: () => ctx.agent.runId,
   }),
 })
 
 flow({
   factory: (ctx) => {
     // @ts-expect-error base flow ctx has no use namespace
-    return ctx.ext.agent.runId
+    return ctx.agent.runId
   },
 })
 
 atom({
   factory: (ctx) => {
     // @ts-expect-error base atom ctx has no use namespace
-    return ctx.ext.agent.runId
+    return ctx.agent.runId
   },
 })
 
 resource({
   factory: (ctx) => {
     // @ts-expect-error base resource ctx has no use namespace
-    return ctx.ext.agent.runId
+    return ctx.agent.runId
   },
 })
 
-flow({
-  use: [serializable()],
-  factory: () => ({ ok: true, values: [1, "x", null] }),
+const inputUse = defineUse<void, { value: string }>({
+  label: "input",
+  create: () => ({ ext: { value: "bad" } }),
 })
 
 flow({
-  // @ts-expect-error serializable flows must return JsonValue
-  use: [serializable()],
-  factory: () => new Date(),
-})
-
-atom({
-  // @ts-expect-error serializable atoms must return JsonValue
-  use: [serializable()],
-  factory: () => new Date(),
+  parse: typed<{ value: string }>(),
+  use: { input: inputUse() },
+  // @ts-expect-error use ext cannot overwrite input on parsed flow contexts
+  factory: (ctx) => ctx.input.value,
 })
 
 resource({

@@ -24,7 +24,7 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
  * ```
  */
 export function atom<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.UseOutput<U>,
 >(config: {
   deps?: undefined
@@ -32,10 +32,10 @@ export function atom<
   factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>) => MaybePromise<T>
   tags?: Lite.Tagged<any>[]
   keepAlive?: boolean
-}): Lite.Atom<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
 
 export function atom<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.UseOutput<U>,
   const D extends Record<string, Lite.AtomDependency>,
 >(config: {
@@ -44,7 +44,7 @@ export function atom<
   factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
   tags?: Lite.Tagged<any>[]
   keepAlive?: boolean
-}): Lite.Atom<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
 
 export function atom<T>(config: {
   deps?: undefined
@@ -234,17 +234,17 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
 
 /** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */
 export function service<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.ServiceMethods & Lite.UseOutput<U>,
 >(config: {
   deps?: undefined
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>) => MaybePromise<T>
   tags?: Lite.Tagged<any>[]
-}): Lite.Atom<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
 
 export function service<
-  const U extends readonly Lite.Use<any, any>[],
+  const U extends Lite.UseMap,
   T extends Lite.ServiceMethods & Lite.UseOutput<U>,
   const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<any>>,
 >(config: {
@@ -252,7 +252,7 @@ export function service<
   use: U
   factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
   tags?: Lite.Tagged<any>[]
-}): Lite.Atom<T>
+} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
 
 export function service<T extends Lite.ServiceMethods>(config: {
   deps?: undefined
