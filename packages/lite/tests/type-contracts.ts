@@ -5,7 +5,6 @@ import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
 import { tag } from "../src/tag"
 import type { Lite } from "../src/types"
-import { defineUse } from "../src/use"
 
 const sourceAtom = atom({
   factory: () => 1,
@@ -72,76 +71,6 @@ flow({
     ctx.cleanup(() => {})
     return 1
   },
-})
-
-const agentUse = defineUse<string, { runId: string }>({
-  label: "agent",
-  create: (runId) => ({ ext: { runId } }),
-})
-
-flow({
-  use: { agent: agentUse("run-1") },
-  factory: (ctx) => {
-    const { agent } = ctx
-    const runId: string = agent.runId
-    return runId
-  },
-})
-
-flow({
-  parse: typed<{ value: string }>(),
-  use: { agent: agentUse("run-1") },
-  factory: (ctx) => `${ctx.input.value}:${ctx.agent.runId}`,
-})
-
-atom({
-  use: { agent: agentUse("run-1") },
-  factory: (ctx) => ctx.agent.runId,
-})
-
-resource({
-  use: { agent: agentUse("run-1") },
-  factory: (ctx) => ctx.agent.runId,
-})
-
-service({
-  use: { agent: agentUse("run-1") },
-  factory: (ctx) => ({
-    call: () => ctx.agent.runId,
-  }),
-})
-
-flow({
-  factory: (ctx) => {
-    // @ts-expect-error base flow ctx has no use namespace
-    return ctx.agent.runId
-  },
-})
-
-atom({
-  factory: (ctx) => {
-    // @ts-expect-error base atom ctx has no use namespace
-    return ctx.agent.runId
-  },
-})
-
-resource({
-  factory: (ctx) => {
-    // @ts-expect-error base resource ctx has no use namespace
-    return ctx.agent.runId
-  },
-})
-
-const inputUse = defineUse<void, { value: string }>({
-  label: "input",
-  create: () => ({ ext: { value: "bad" } }),
-})
-
-flow({
-  parse: typed<{ value: string }>(),
-  use: { input: inputUse() },
-  // @ts-expect-error use ext cannot overwrite input on parsed flow contexts
-  factory: (ctx) => ctx.input.value,
 })
 
 resource({

@@ -3,7 +3,7 @@ import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   CliWorkerError,
   SuspendSignal,
-  agent as agentUse,
+  agent as agentRuntime,
   claudeCliWorker,
   cliWorker,
   codexCliWorker,
@@ -13,6 +13,9 @@ import {
   patchMaterial,
   run,
   step,
+  workers,
+  workflow as workflowRuntime,
+  workflowExtension,
   workerRegistry,
 } from "@pumped-fn/agent-sdk"
 import { replay, run as replayRun, suspend } from "@pumped-fn/lite-extension-suspense"
@@ -75,9 +78,76 @@ describe("agent sdk", () => {
     await ctx2.close()
   })
 
-  it("memoizes completed workflow execution", async () => {
-    const { extension } = agent()
+  it("memoizes workflow runtime tag with workflow extension", async () => {
+    const log = new InMemoryAgentEventLog()
+    const extension = workflowExtension({ log })
     const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    let calls = 0
+    const root = flow({
+      name: "workflow-root",
+      parse: typed<number>(),
+      tags: [step({ workflow: true })],
+      deps: { workflow: tags.required(workflowRuntime) },
+      factory: (ctx, { workflow }) => {
+        calls++
+        return `${workflow.taskId}:${workflow.runId}:${ctx.input}`
+      },
+    })
+
+    const ctx1 = scope.createContext({ tags: [run({ taskId: "workflow-task", runId: "workflow-run" })] })
+    expect(await ctx1.exec({ flow: root, input: 1 })).toBe("workflow-task:workflow-run:1")
+    await ctx1.close()
+
+    const ctx2 = scope.createContext({ tags: [run({ taskId: "workflow-task", runId: "workflow-run" })] })
+    expect(await ctx2.exec({ flow: root, input: 2 })).toBe("workflow-task:workflow-run:1")
+    await ctx2.close()
+    expect(calls).toBe(1)
+  })
+
+  it("rejects workflow dependency without workflow extension", async () => {
+    const root = flow({
+      name: "unguarded-workflow",
+      tags: [step({ workflow: true })],
+      deps: { workflow: tags.required(workflowRuntime) },
+      factory: (_ctx, { workflow }) => workflow.taskId,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext({ tags: [run({ taskId: "workflow-missing-extension", runId: "run" })] })
+    await expect(ctx.exec({ flow: root })).rejects.toThrow('Tag "workflow.runtime" not found')
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
+  })
+
+  it("provides workflow runtime deps without workflow memoization", async () => {
+    const log = new InMemoryAgentEventLog()
+    const extension = workflowExtension({ log })
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    let calls = 0
+    const root = flow({
+      name: "workflow-runtime-only",
+      parse: typed<number>(),
+      deps: { workflow: tags.required(workflowRuntime) },
+      factory: (ctx, { workflow }) => {
+        calls++
+        return `${workflow.taskId}:${ctx.input}`
+      },
+    })
+
+    const ctx1 = scope.createContext({ tags: [run({ taskId: "runtime-task", runId: "runtime-run" })] })
+    expect(await ctx1.exec({ flow: root, input: 1 })).toBe("runtime-task:1")
+    await ctx1.close()
+
+    const ctx2 = scope.createContext({ tags: [run({ taskId: "runtime-task", runId: "runtime-run" })] })
+    expect(await ctx2.exec({ flow: root, input: 2 })).toBe("runtime-task:2")
+    await ctx2.close()
+    expect(calls).toBe(2)
+  })
+
+  it("memoizes completed workflow execution", async () => {
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
     await scope.ready
     let calls = 0
     const worker = flow({
@@ -93,7 +163,11 @@ describe("agent sdk", () => {
       name: "memo-root",
       parse: typed<number>(),
       tags: [step({ workflow: true })],
-      factory: async (ctx) => ctx.exec({ flow: worker, input: ctx.input }),
+      deps: { workflow: tags.required(workflowRuntime) },
+      factory: async (ctx, { workflow }) => {
+        expect(workflow.taskId).toBe("task-a")
+        return ctx.exec({ flow: worker, input: ctx.input })
+      },
     })
 
     const ctx1 = scope.createContext({ tags: [run({ taskId: "task-a", runId: "run-a" })] })
@@ -109,8 +183,8 @@ describe("agent sdk", () => {
 
   it("replays completed flow before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.replay.gate" })
-    const { extension } = agent()
-    const scope = createScope({ extensions: [extension] })
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
     await scope.ready
     let calls = 0
     const worker = flow({
@@ -137,8 +211,8 @@ describe("agent sdk", () => {
 
   it("suspends durable work and replays memoized steps on resolution", async () => {
     const log = new InMemoryAgentEventLog()
-    const { extension } = agent({ log })
-    const scope = createScope({ extensions: [extension] })
+    const { extensions } = agent({ log })
+    const scope = createScope({ extensions })
     await scope.ready
     let expensiveCalls = 0
     const expensive = flow({
@@ -181,8 +255,8 @@ describe("agent sdk", () => {
 
   it("suspends durable work before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.durable.gate" })
-    const { extension } = agent()
-    const scope = createScope({ extensions: [extension] })
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
     await scope.ready
     const approve = flow({
       name: "durable-before-deps",
@@ -196,8 +270,8 @@ describe("agent sdk", () => {
   })
 
   it("delegates by worker registry and routes remote workers", async () => {
-    const { extension } = agent()
-    const scope = createScope({ extensions: [extension] })
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
     await scope.ready
     const worker = flow({
       name: "upper",
@@ -209,19 +283,66 @@ describe("agent sdk", () => {
     const root = flow({
       name: "delegate-root",
       parse: typed<{ text: string }>(),
-      use: { agent: agentUse() },
-      tags: [step({ workflow: true })],
-      factory: (ctx) => ctx.agent.delegate<string, { text: string }>("upper", ctx.input),
+      tags: [step({ workflow: true }), workers(registry)],
+      deps: { agent: tags.required(agentRuntime) },
+      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("upper", ctx.input),
     })
-    const ctx = scope.createContext({ tags: [run({ taskId: "task-c", runId: "run-c", registry })] })
+    const ctx = scope.createContext({ tags: [run({ taskId: "task-c", runId: "run-c" })] })
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
     await ctx.close()
   })
 
+  it("delegates by worker registry tag", async () => {
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
+    await scope.ready
+    const worker = flow({
+      name: "reverse",
+      parse: typed<{ text: string }>(),
+      factory: (ctx) => ctx.input.text.split("").reverse().join(""),
+    })
+    const registry = workerRegistry([worker])
+    const root = flow({
+      name: "delegate-root-tag",
+      parse: typed<{ text: string }>(),
+      tags: [step({ workflow: true })],
+      deps: { agent: tags.required(agentRuntime) },
+      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("reverse", ctx.input),
+    })
+    const ctx = scope.createContext({
+      tags: [run({ taskId: "task-c-tag", runId: "run-c-tag" }), workers(registry)],
+    })
+    expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("skrow")
+    await ctx.close()
+  })
+
+  it("rejects agent dependency without agent extension", async () => {
+    const worker = flow({
+      name: "unguarded-worker",
+      parse: typed<{ text: string }>(),
+      factory: (ctx) => ctx.input.text,
+    })
+    const root = flow({
+      name: "unguarded-root",
+      parse: typed<{ text: string }>(),
+      tags: [step({ workflow: true }), workers(workerRegistry([worker]))],
+      deps: { agent: tags.required(agentRuntime) },
+      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("unguarded-worker", ctx.input),
+    })
+    const scope = createScope({ extensions: [workflowExtension({ log: new InMemoryAgentEventLog() })] })
+    await scope.ready
+    const ctx = scope.createContext({
+      tags: [run({ taskId: "task-missing-extension", runId: "run-missing-extension" })],
+    })
+    await expect(ctx.exec({ flow: root, input: { text: "unsafe" } }))
+      .rejects.toThrow('Tag "agent.runtime" not found')
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
+  })
+
   it("rejects remote steps when no remote runner is configured", async () => {
     const log = new InMemoryAgentEventLog()
-    const extension = agentExtension({ log })
-    const scope = createScope({ extensions: [extension] })
+    const scope = createScope({ extensions: [workflowExtension({ log }), agentExtension()] })
     await scope.ready
     const worker = flow({
       name: "missing-remote-runner",
@@ -236,7 +357,7 @@ describe("agent sdk", () => {
 
   it("routes remote work before resolving deps when runner handles it", async () => {
     const gate = tag<string>({ label: "agent.remote.gate" })
-    const { extension } = agent({
+    const { extensions } = agent({
       remoteRunner: {
         run: async (event) => {
           expect(event.targetName).toBe("remote-before-deps")
@@ -244,7 +365,7 @@ describe("agent sdk", () => {
         },
       },
     })
-    const scope = createScope({ extensions: [extension] })
+    const scope = createScope({ extensions })
     await scope.ready
     const worker = flow({
       name: "remote-before-deps",

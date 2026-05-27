@@ -1,7 +1,6 @@
 import { atomSymbol, controllerDepSymbol, resourceSymbol, type Lite, type MaybePromise } from "./types"
 import { registerAtomToTags } from "./tag"
 import { warmDepsGraph } from "./deps-graph"
-import { addUses } from "./use"
 
 export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
@@ -23,29 +22,6 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
  * })
  * ```
  */
-export function atom<
-  const U extends Lite.UseMap,
-  T extends Lite.UseOutput<U>,
->(config: {
-  deps?: undefined
-  use: U
-  factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-  keepAlive?: boolean
-} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
-
-export function atom<
-  const U extends Lite.UseMap,
-  T extends Lite.UseOutput<U>,
-  const D extends Record<string, Lite.AtomDependency>,
->(config: {
-  deps: D
-  use: U
-  factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-  keepAlive?: boolean
-} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
-
 export function atom<T>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
@@ -66,17 +42,16 @@ export function atom<
 export function atom<T, D extends Record<string, Lite.Dependency>>(
   config: any
 ): Lite.Atom<any> {
-  const tags = addUses(config.tags, config.use)
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<any, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    tags,
+    tags: config.tags,
     keepAlive: config.keepAlive,
   }
 
-  if (tags?.length) {
-    registerAtomToTags(atomInstance, tags)
+  if (config.tags?.length) {
+    registerAtomToTags(atomInstance, config.tags)
   }
 
   if (config.deps) warmDepsGraph(config.deps as Record<string, Lite.Dependency>)
@@ -233,27 +208,6 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
 }
 
 /** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */
-export function service<
-  const U extends Lite.UseMap,
-  T extends Lite.ServiceMethods & Lite.UseOutput<U>,
->(config: {
-  deps?: undefined
-  use: U
-  factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
-
-export function service<
-  const U extends Lite.UseMap,
-  T extends Lite.ServiceMethods & Lite.UseOutput<U>,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<any>>,
->(config: {
-  deps: D
-  use: U
-  factory: (ctx: Lite.WithUseExt<Lite.ResolveContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-} & Lite.NoReservedUseKeys<U>): Lite.Atom<T>
-
 export function service<T extends Lite.ServiceMethods>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
@@ -270,16 +224,15 @@ export function service<
 }): Lite.Atom<T>
 
 export function service(config: any): Lite.Atom<any> {
-  const tags = addUses(config.tags, config.use)
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
     factory: config.factory as unknown as Lite.AtomFactory<any, Record<string, Lite.Dependency>>,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    tags,
+    tags: config.tags,
   }
 
-  if (tags?.length) {
-    registerAtomToTags(atomInstance, tags)
+  if (config.tags?.length) {
+    registerAtomToTags(atomInstance, config.tags)
   }
 
   return atomInstance

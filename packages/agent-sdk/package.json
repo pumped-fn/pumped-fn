@@ -26,11 +26,11 @@
   "scripts": {
     "build": "tsdown --config-loader tsx",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^2.0.0"
+    "@pumped-fn/lite": "^3.0.0"
   },
   "dependencies": {
     "@pumped-fn/lite-extension-suspense": "workspace:*"

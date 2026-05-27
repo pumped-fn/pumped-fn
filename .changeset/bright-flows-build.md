@@ -1,19 +1,19 @@
 ---
-"@pumped-fn/lite": minor
-"@pumped-fn/lite-extension-suspense": minor
+"@pumped-fn/lite": major
+"@pumped-fn/lite-extension-suspense": major
 "@pumped-fn/codemod": patch
-"@pumped-fn/lite-devtools": patch
+"@pumped-fn/lite-devtools": major
 "@pumped-fn/lite-devtools-server": patch
-"@pumped-fn/lite-extension-otel": patch
+"@pumped-fn/lite-extension-otel": major
 "@pumped-fn/lite-hmr": patch
-"@pumped-fn/lite-react": patch
-"@pumped-fn/agent-sdk": minor
-"@pumped-fn/agent-sdk-test": patch
+"@pumped-fn/lite-react": major
+"@pumped-fn/agent-sdk": major
+"@pumped-fn/agent-sdk-test": major
 ---
 
-Add native primitive `use` support for lite flows, atoms, resources, and configs through keyed `use: { name: glyph() }` maps; add agent workflow helpers; and tighten context tag handling.
+Add tag-first agent workflow helpers and tighten context tag handling across lite primitives.
 
-Move serializability policy out of lite core, make agent `run()` a composable tag, and expose agent delegation through `ctx.agent`.
+Move serializability policy out of lite core, remove the experimental primitive `use` surface, make `run()` a composable workflow tag, expose workflow and agent runtime contracts as required tags, and split workflow replay/logging from agent remote routing.
 
 Preserve exec extension async error semantics, make the lite CLI bin install-safe before build, and suppress the lite-hmr CJS import.meta build warning.
 

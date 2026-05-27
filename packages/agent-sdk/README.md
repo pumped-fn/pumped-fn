@@ -6,11 +6,13 @@ This package does not add an agent runtime. It gives names and conventions to th
 
 | Lite primitive | Agent SDK use |
 |---|---|
-| `flow()` | Workflow, worker, durable step, CLI-backed LLM call |
+| `flow()` + `step({ workflow: true })` | Workflow boundary |
+| `flow()` | Worker, durable step, CLI-backed LLM call |
 | state/service | Provider, config, registry, model client, material state |
 | typed tag | Routing config and ambient run data |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
-| Extension `wrapExec` | Suspense/replay router around one executable step |
+| `workflowExtension()` | Replay, suspend, timeout, and event-log policy |
+| `extension()` | Agent remote-routing policy |
 
 The core idea: author orchestration as normal TypeScript `flow()` code. Put every side effect behind `ctx.exec()`. Then an extension can replay, memoize, route, or suspend those steps without changing workflow code.
 
@@ -28,21 +30,23 @@ flowchart TD
 
 ## What Is In This Package
 
+- `workflow` runtime tag for workflow-scoped deps.
+- `workflowExtension()` for replay, suspend, timeout, and event-log policy.
+- `extension()` for agent remote dispatch.
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
-- `extension()` for agent policy: replay, suspend, timeout, and remote dispatch.
-- `run()` tag for run-scoped context data.
-- `agent()` use for `ctx.agent` and named worker delegation.
-- `WorkerRegistry` for named worker calls through `ctx.agent.delegate()`.
+- `run()` tag for workflow-scoped context data.
+- `agent` runtime tag for named worker delegation.
+- `WorkerRegistry` for named worker calls through `agent.delegate()`.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
 
 `step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
-Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `AgentEventLog` and `AgentRemoteRunner` contracts.
+Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `WorkflowEventLog` and `AgentRemoteRunner` contracts.
 
 ## Standalone Suspense
 
-Suspense is the reusable substrate under the agent extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `replay(true)` and externally resolved steps with `suspend(true)`.
+Suspense is the reusable substrate under the workflow extension. It only knows about `(taskId, runId, step)`, an event log, and `ctx.exec()`. Mark replayable steps with `replay(true)` and externally resolved steps with `suspend(true)`.
 
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
@@ -73,52 +77,63 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ## Minimal Workflow
 
 ```ts
-import { createScope, flow, typed } from "@pumped-fn/lite"
+import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
-  agent,
+  agent as agentRuntime,
   extension,
   run,
+  workflow as workflowRuntime,
+  workflowExtension,
   step,
   workerRegistry,
+  workers,
 } from "@pumped-fn/agent-sdk"
 
 const summarize = flow({
   name: "summarize",
   parse: typed<{ text: string }>(),
-  tags: [step({ remote: true, kind: "llm" })],
+  tags: [step({ kind: "llm" })],
   factory: async (ctx) => `summary: ${ctx.input.text}`,
 })
 
 const processIssue = flow({
   name: "process_issue",
   parse: typed<{ body: string }>(),
-  use: { agent: agent() },
-  tags: [step({ workflow: true })],
-  factory: async (ctx) => {
-    const summary = await ctx.agent.delegate<string, { text: string }>("summarize", {
+  tags: [
+    step({ workflow: true }),
+    workers(workerRegistry([summarize])),
+  ],
+  deps: {
+    workflow: tags.required(workflowRuntime),
+    agent: tags.required(agentRuntime),
+  },
+  factory: async (ctx, { workflow, agent }) => {
+    const summary = await agent.delegate<string, { text: string }>("summarize", {
       text: ctx.input.body,
     })
-    return { summary }
+    return { taskId: workflow.taskId, summary }
   },
 })
 
 const eventLog = makeEventLog()
 const scope = createScope({
-  extensions: [extension({ log: eventLog })],
+  extensions: [
+    workflowExtension({ log: eventLog }),
+    extension(),
+  ],
 })
 
 const ctx = scope.createContext({
   tags: [run({
     taskId: "issue-123",
     runId: "run-1",
-    registry: workerRegistry([summarize]),
   })],
 })
 
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`ctx.agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Nothing special happens in the worker itself.
+`agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
 
 ## AI Is Just A Provider
 

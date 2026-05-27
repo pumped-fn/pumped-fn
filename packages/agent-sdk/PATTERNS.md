@@ -32,26 +32,37 @@ Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(task
 Use a workflow flow when code chooses order, branching, retries, and fan-out.
 
 ```ts
+import { flow, tags, typed } from "@pumped-fn/lite"
+import { agent as agentRuntime, step, workflow as workflowRuntime, workerRegistry, workers } from "@pumped-fn/agent-sdk"
+
 export const processPr = flow({
   name: "process_pr",
   parse: typed<PrEvent>(),
-  use: { agent: agent() },
-  tags: [step({ workflow: true })],
-  factory: async (ctx) => {
-    const lint = await ctx.agent.delegate("lint", { sha: ctx.input.sha })
-    if (lint.failed) return { status: "lint-failed" }
+  tags: [
+    step({ workflow: true }),
+    workers(workerRegistry([lint, test, security])),
+  ],
+  deps: {
+    workflow: tags.required(workflowRuntime),
+    agent: tags.required(agentRuntime),
+  },
+  factory: async (ctx, { workflow, agent }) => {
+    const lintResult = await agent.delegate<{ failed: boolean }>("lint", { sha: ctx.input.sha })
+    if (lintResult.failed) return { taskId: workflow.taskId, status: "lint-failed" }
 
     const [tests, security] = await Promise.all([
-      ctx.agent.delegate("test", { sha: ctx.input.sha }),
-      ctx.agent.delegate("security", { sha: ctx.input.sha }),
+      agent.delegate("test", { sha: ctx.input.sha }),
+      agent.delegate("security", { sha: ctx.input.sha }),
     ])
 
-    return { status: "ok", tests, security }
+    return { taskId: workflow.taskId, status: "ok", tests, security }
   },
 })
 ```
 
-Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `ctx.agent.delegate()`.
+Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `agent.delegate()`.
+
+`step({ workflow: true })` marks the flow as workflow policy surface. `workflow` and `agent` runtime tags are required deps, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition.
 
 ## 2. Worker Flow
 
@@ -152,14 +163,18 @@ First run writes a pending log entry and throws `SuspendSignal`. Replay returns 
 Remote routing belongs in `AgentRemoteRunner`, not inside workflow code.
 
 ```ts
-const ext = extension({
-  log,
-  remoteRunner: {
-    run: async (event, next) => {
-      if (canRoute(event.target)) return publishAndAwaitReply(event)
-      return next()
-    },
-  },
+const scope = createScope({
+  extensions: [
+    workflowExtension({ log }),
+    extension({
+      remoteRunner: {
+        run: async (event, next) => {
+          if (canRoute(event.target)) return publishAndAwaitReply(event)
+          return next()
+        },
+      },
+    }),
+  ],
 })
 ```
 

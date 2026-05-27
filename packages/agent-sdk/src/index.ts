@@ -1,4 +1,4 @@
-import { atom, defineUse, flow, tag, typed, type Lite } from "@pumped-fn/lite"
+import { atom, flow, tag, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -15,10 +15,20 @@ export type WorkerKind = "code" | "llm" | "cli" | string
 export type MaterialKind = "json" | "text" | "binary" | "reference"
 
 export type StepCounter = SuspenseStepCounter
-export type AgentStepKey = SuspenseStepKey
-export type AgentStepEntry = SuspenseStepEntry
-export interface AgentEventLog extends SuspenseEventLog {}
-export interface AgentExecEvent extends SuspenseExecEvent {}
+export type WorkflowStepKey = SuspenseStepKey
+export type WorkflowStepEntry = SuspenseStepEntry
+export interface WorkflowEventLog extends SuspenseEventLog {}
+export interface WorkflowExecEvent extends SuspenseExecEvent {}
+export type AgentStepKey = WorkflowStepKey
+export type AgentStepEntry = WorkflowStepEntry
+export interface AgentEventLog extends WorkflowEventLog {}
+export interface AgentExecEvent {
+  readonly key?: WorkflowStepKey
+  readonly target: Lite.ExecTarget
+  readonly ctx: Lite.ExecutionContext
+  readonly targetName: string
+  readonly input: unknown
+}
 export interface Step {
   workflow?: boolean
   remote?: boolean
@@ -33,11 +43,14 @@ export interface AgentRemoteRunner {
   run(event: AgentExecEvent, next: () => Promise<unknown>): Promise<unknown>
 }
 
-export interface AgentExtensionOptions {
-  log: AgentEventLog
-  remoteRunner?: AgentRemoteRunner
+export interface WorkflowExtensionOptions {
+  log: WorkflowEventLog
   defaultTaskId?: string
   defaultRunId?: string
+}
+
+export interface AgentExtensionOptions {
+  remoteRunner?: AgentRemoteRunner
 }
 
 export const step = tag<Step>({ label: "agent.step", default: {} })
@@ -74,41 +87,29 @@ export function formatStepKey(key: AgentStepKey): string {
   return formatSuspenseStepKey(key)
 }
 
-export interface AgentRunOptions {
+export interface WorkflowRunOptions {
   taskId: string
   runId: string
-  registry?: WorkerRegistry
+}
+
+export interface AgentRunOptions extends WorkflowRunOptions {}
+
+export interface WorkflowContext {
+  readonly taskId: string
+  readonly runId: string
 }
 
 export interface AgentContext {
   readonly taskId: string
   readonly runId: string
-  readonly registry?: WorkerRegistry
   delegate<Output = unknown, Input = unknown>(name: string, input: Input): Promise<Output>
 }
 
-export type AgentUseExt = AgentContext
+export const run = tag<WorkflowRunOptions>({ label: "workflow.run" })
+export const workflow = tag<WorkflowContext>({ label: "workflow.runtime" })
+export const agent = tag<AgentContext>({ label: "agent.runtime" })
 
-export const run = tag<AgentRunOptions>({ label: "agent.run" })
-
-export const agent = defineUse<void, AgentUseExt>({
-  label: "agent",
-  create: (_config, event) => {
-    if (!isExecutionContext(event.ctx)) throw new Error("Agent use requires an execution context")
-    const config = event.ctx.data.seekTag(run)
-    if (!config) throw new Error("Agent run tag not found")
-    const execCtx = event.ctx
-    return {
-      ext: {
-        taskId: config.taskId,
-        runId: config.runId,
-        registry: config.registry,
-        delegate: <Output = unknown, Input = unknown>(name: string, input: Input) =>
-          delegateWorker<Output, Input>(execCtx, name, input),
-      },
-    }
-  },
-})
+const activeWorkflowEvent = tag<WorkflowExecEvent>({ label: "workflow.event" })
 
 async function delegateWorker<Output = unknown, Input = unknown>(
   ctx: Lite.ExecutionContext,
@@ -121,14 +122,50 @@ async function delegateWorker<Output = unknown, Input = unknown>(
   return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
 }
 
-export function extension(options: AgentExtensionOptions): Lite.Extension {
-  return suspenseExtension({
+export function workflowExtension(options: WorkflowExtensionOptions): Lite.Extension {
+  const base = createWorkflowExtension({
+    name: "workflow",
+    options,
+    shouldHandle: shouldHandleWorkflowTarget,
+    run: (event, next) => runTimed(event.target, event.ctx, next),
+  })
+
+  return {
+    ...base,
+    async wrapExec(next, target, ctx) {
+      const wrapExec = base.wrapExec
+      if (!wrapExec) return withRuntimeTag(ctx, workflow, workflowRuntimeOf(ctx, options), next)
+      return withRuntimeTag(ctx, workflow, workflowRuntimeOf(ctx, options), () => wrapExec(next, target, ctx))
+    },
+  }
+}
+
+export function extension(options: AgentExtensionOptions = {}): Lite.Extension {
+  return {
     name: "agent-sdk",
-    log: options.log,
-    defaultTaskId: options.defaultTaskId,
-    defaultRunId: options.defaultRunId,
-    getKey: (ctx) => nextAgentKey(ctx, options),
-    shouldHandle: (target, ctx) => shouldHandleAgentTarget(target, ctx),
+    async wrapExec(next, target, ctx) {
+      return withRuntimeTag(ctx, agent, agentRuntimeOf(ctx), async () => {
+        if (stepOf(target, ctx).remote !== true) return next()
+        if (!options.remoteRunner) throw new Error("Remote step requires remoteRunner")
+        return options.remoteRunner.run(agentExecEvent(target, ctx), next)
+      })
+    },
+  }
+}
+
+function createWorkflowExtension(options: {
+  name: string
+  options: WorkflowExtensionOptions
+  shouldHandle(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean
+  run(event: WorkflowExecEvent, next: () => Promise<unknown>): Promise<unknown>
+}): Lite.Extension {
+  return suspenseExtension({
+    name: options.name,
+    log: options.options.log,
+    defaultTaskId: options.options.defaultTaskId,
+    defaultRunId: options.options.defaultRunId,
+    getKey: (ctx) => nextWorkflowKey(ctx, options.options),
+    shouldHandle: options.shouldHandle,
     shouldSuspend: (event) => {
       const config = stepOf(event.target, event.ctx)
       return config.durable === true && config.remote !== true
@@ -140,27 +177,35 @@ export function extension(options: AgentExtensionOptions): Lite.Extension {
       input: event.input,
       kind: "durable",
     }),
-    run: (event, next) => runTimed(event.target, event.ctx, () => {
-      if (stepOf(event.target, event.ctx).remote !== true) return next()
-      if (!options.remoteRunner) throw new Error("Remote step requires remoteRunner")
-      return options.remoteRunner.run(event, next)
-    }),
+    run: (event, next) => {
+      const previous = event.ctx.data.getTag(activeWorkflowEvent)
+      event.ctx.data.setTag(activeWorkflowEvent, event)
+      return options.run(event, next).finally(() => {
+        if (previous) event.ctx.data.setTag(activeWorkflowEvent, previous)
+        else event.ctx.data.deleteTag(activeWorkflowEvent)
+      })
+    },
   })
 }
 
 function registryOf(ctx: Lite.ExecutionContext): WorkerRegistry | undefined {
-  const agentCtx = (ctx as Lite.ExecutionContext & { readonly agent?: AgentContext }).agent
-  return agentCtx?.registry ?? ctx.data.seekTag(run)?.registry ?? ctx.data.seekTag(workers)
+  return ctx.data.seekTag(workers)
 }
 
-function isExecutionContext(ctx: Lite.UseContextBase): ctx is Lite.ExecutionContext {
-  return "exec" in ctx
+function agentExecEvent(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): AgentExecEvent {
+  const workflowEvent = ctx.data.seekTag(activeWorkflowEvent)
+  return workflowEvent ?? {
+    target,
+    ctx,
+    targetName: targetNameOf(target, ctx),
+    input: ctx.input,
+  }
 }
 
-function nextAgentKey(
+function nextWorkflowKey(
   ctx: Lite.ExecutionContext,
-  options: Pick<AgentExtensionOptions, "defaultTaskId" | "defaultRunId">
-): AgentStepKey {
+  options: Pick<WorkflowExtensionOptions, "defaultTaskId" | "defaultRunId">
+): WorkflowStepKey {
   const config = ctx.data.seekTag(run)
   const foundTaskId = config?.taskId ?? options.defaultTaskId ?? "default-task"
   const foundRunId = config?.runId ?? options.defaultRunId ?? "default-run"
@@ -172,20 +217,61 @@ function nextAgentKey(
   return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
 }
 
+function workflowRuntimeOf(
+  ctx: Lite.ExecutionContext,
+  options: Pick<WorkflowExtensionOptions, "defaultTaskId" | "defaultRunId">
+): WorkflowContext {
+  const config = ctx.data.seekTag(run)
+  return {
+    taskId: config?.taskId ?? options.defaultTaskId ?? "default-task",
+    runId: config?.runId ?? options.defaultRunId ?? "default-run",
+  }
+}
+
+function agentRuntimeOf(ctx: Lite.ExecutionContext): AgentContext {
+  const config = workflowRuntimeOf(ctx, {})
+  return {
+    taskId: config.taskId,
+    runId: config.runId,
+    delegate: <Output = unknown, Input = unknown>(name: string, input: Input) =>
+      delegateWorker<Output, Input>(ctx, name, input),
+  }
+}
+
+function withRuntimeTag<T, R>(
+  ctx: Lite.ExecutionContext,
+  runtimeTag: Lite.Tag<T, boolean>,
+  value: T,
+  next: () => Promise<R>
+): Promise<R> {
+  const hadPrevious = ctx.data.hasTag(runtimeTag)
+  const previous = ctx.data.getTag(runtimeTag)
+  ctx.data.setTag(runtimeTag, value)
+  return next().finally(() => {
+    if (hadPrevious) ctx.data.setTag(runtimeTag, previous as T)
+    else ctx.data.deleteTag(runtimeTag)
+  })
+}
+
+function shouldHandleWorkflowTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
+  const config = stepOf(target, ctx)
+  return (
+    config.workflow === true ||
+    config.durable === true ||
+    config.timeoutMs !== undefined
+  )
+}
+
 function rootContext(ctx: Lite.ExecutionContext): Lite.ExecutionContext {
   let current = ctx
   while (current.parent) current = current.parent
   return current
 }
 
-function shouldHandleAgentTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
-  const config = stepOf(target, ctx)
-  return (
-    config.workflow === true ||
-    config.remote === true ||
-    config.durable === true ||
-    config.timeoutMs !== undefined
-  )
+function targetNameOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
+  const name = ctx.name || target.name
+  if (!name) throw new Error("Agent target must have a name")
+  return name
 }
 
 function runTimed(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () => Promise<unknown>): Promise<unknown> {
@@ -195,7 +281,7 @@ function runTimed(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () 
   return Promise.race([
     next(),
     new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Agent step timed out after ${timeoutMs}ms`)), timeoutMs)
+      timer = setTimeout(() => reject(new Error(`Workflow step timed out after ${timeoutMs}ms`)), timeoutMs)
     }),
   ]).finally(() => clearTimeout(timer))
 }

@@ -1,8 +1,10 @@
 import {
   extension as agentExtension,
+  workflowExtension,
   type AgentEventLog,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
+  type WorkflowExtensionOptions,
 } from "@pumped-fn/agent-sdk"
 import {
   extension as suspenseExtension,
@@ -65,15 +67,20 @@ export function suspense(
 }
 
 export function agent(
-  options: Omit<AgentExtensionOptions, "log"> & { log?: AgentEventLog } = {}
-): { extension: Lite.Extension; log: AgentEventLog } {
+  options: AgentExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: AgentEventLog } = {}
+): { extensions: Lite.Extension[]; log: AgentEventLog } {
   const log = options.log ?? new InMemoryAgentEventLog()
   return {
     log,
-    extension: agentExtension({
-      ...options,
-      log,
-      remoteRunner: options.remoteRunner ?? localRemoteRunner,
-    }),
+    extensions: [
+      workflowExtension({
+        log,
+        defaultTaskId: options.defaultTaskId,
+        defaultRunId: options.defaultRunId,
+      }),
+      agentExtension({
+        remoteRunner: options.remoteRunner ?? localRemoteRunner,
+      }),
+    ],
   }
 }
