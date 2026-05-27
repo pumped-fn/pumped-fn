@@ -1,11 +1,11 @@
-import { atom, controller } from "../src/atom"
+import { atom, controller, service } from "../src/atom"
 import { flow, typed } from "../src/flow"
-import { defineFlowExtension, serializable } from "../src/flow-extension"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
 import { tag } from "../src/tag"
 import type { Lite } from "../src/types"
+import { defineUse, serializable } from "../src/use"
 
 const sourceAtom = atom({
   factory: () => 1,
@@ -71,13 +71,13 @@ flow({
   },
 })
 
-const agentExtension = defineFlowExtension<string, { agent: { runId: string } }>({
+const agentUse = defineUse<string, { agent: { runId: string } }>({
   name: "agent",
   create: (runId) => ({ ext: { agent: { runId } } }),
 })
 
 flow({
-  extensions: [agentExtension("run-1")],
+  use: [agentUse("run-1")],
   factory: (ctx) => {
     const runId: string = ctx.ext.agent.runId
     return runId
@@ -86,25 +86,62 @@ flow({
 
 flow({
   parse: typed<{ value: string }>(),
-  extensions: [agentExtension("run-1")],
+  use: [agentUse("run-1")],
   factory: (ctx) => `${ctx.input.value}:${ctx.ext.agent.runId}`,
+})
+
+atom({
+  use: [agentUse("run-1")],
+  factory: (ctx) => ctx.ext.agent.runId,
+})
+
+resource({
+  use: [agentUse("run-1")],
+  factory: (ctx) => ctx.ext.agent.runId,
+})
+
+service({
+  use: [agentUse("run-1")],
+  factory: (ctx) => ({
+    call: () => ctx.ext.agent.runId,
+  }),
 })
 
 flow({
   factory: (ctx) => {
-    // @ts-expect-error base flow ctx has no extension namespace
+    // @ts-expect-error base flow ctx has no use namespace
+    return ctx.ext.agent.runId
+  },
+})
+
+atom({
+  factory: (ctx) => {
+    // @ts-expect-error base atom ctx has no use namespace
+    return ctx.ext.agent.runId
+  },
+})
+
+resource({
+  factory: (ctx) => {
+    // @ts-expect-error base resource ctx has no use namespace
     return ctx.ext.agent.runId
   },
 })
 
 flow({
-  extensions: [serializable()],
+  use: [serializable()],
   factory: () => ({ ok: true, values: [1, "x", null] }),
 })
 
 flow({
   // @ts-expect-error serializable flows must return JsonValue
-  extensions: [serializable()],
+  use: [serializable()],
+  factory: () => new Date(),
+})
+
+atom({
+  // @ts-expect-error serializable atoms must return JsonValue
+  use: [serializable()],
   factory: () => new Date(),
 })
 

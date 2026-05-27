@@ -1,6 +1,6 @@
 import { flowSymbol, typedSymbol, type Lite, type MaybePromise } from "./types"
 import { warmDepsGraph } from "./deps-graph"
-import { flowExtensions } from "./flow-extension"
+import { addUses } from "./use"
 
 /**
  * Type marker for flow input without runtime parsing.
@@ -49,81 +49,81 @@ export interface FlowConfig<
  * ```
  */
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
 >(config: {
   name?: string
   parse?: undefined
   deps?: undefined
-  extensions: E
-  factory: (ctx: Lite.FlowExtensionContext<E>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.WithUseExt<Lite.ExecutionContext, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, void>
 
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
   TInput,
 >(config: {
   name?: string
   parse: (raw: unknown) => MaybePromise<TInput>
   deps?: undefined
-  extensions: E
-  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
   TInput,
 >(config: {
   name?: string
   parse: Lite.Typed<TInput>
   deps?: undefined
-  extensions: E
-  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
   const D extends Record<string, Lite.ExecutionDependency>,
 >(config: {
   name?: string
   parse?: undefined
   deps: D
-  extensions: E
-  factory: (ctx: Lite.FlowExtensionContext<E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.WithUseExt<Lite.ExecutionContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, void>
 
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
   TInput,
   const D extends Record<string, Lite.ExecutionDependency>,
 >(config: {
   name?: string
   parse: (raw: unknown) => MaybePromise<TInput>
   deps: D
-  extensions: E
-  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
 export function flow<
-  const E extends readonly Lite.FlowExtensionUse<any, any>[],
-  TOutput extends Lite.FlowExtensionOutput<E>,
+  const U extends readonly Lite.Use<any, any>[],
+  TOutput extends Lite.UseOutput<U>,
   TInput,
   const D extends Record<string, Lite.ExecutionDependency>,
 >(config: {
   name?: string
   parse: Lite.Typed<TInput>
   deps: D
-  extensions: E
-  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, E>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  use: U
+  factory: (ctx: Lite.FlowContext<NoInfer<TInput>, U>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
@@ -192,9 +192,7 @@ export function flow(config: any): Lite.Flow<any, any> {
     typeof parse === "object" && parse !== null && typedSymbol in parse
 
   if (config.deps) warmDepsGraph(config.deps as unknown as Record<string, Lite.Dependency>)
-  const tags = config.extensions && config.extensions.length > 0
-    ? [...(config.tags ?? []), flowExtensions(config.extensions)]
-    : config.tags
+  const tags = addUses(config.tags, config.use)
 
   return {
     [flowSymbol]: true,

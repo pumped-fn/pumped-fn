@@ -1,4 +1,5 @@
 import { resourceSymbol, type Lite, type MaybePromise } from "./types"
+import { addUses } from "./use"
 
 /**
  * Creates an execution-scoped dependency that is resolved per execution chain.
@@ -19,6 +20,29 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  * })
  * ```
  */
+export function resource<
+  const U extends readonly Lite.Use<any, any>[],
+  T extends Lite.UseOutput<U>,
+>(config: {
+  name?: string
+  tags?: Lite.Tagged<any>[]
+  deps?: undefined
+  use: U
+  factory: (ctx: Lite.WithUseExt<Lite.ResourceContext, U>) => MaybePromise<T>
+}): Lite.Resource<T>
+
+export function resource<
+  const U extends readonly Lite.Use<any, any>[],
+  T extends Lite.UseOutput<U>,
+  const D extends Record<string, Lite.ResourceDependency>,
+>(config: {
+  name?: string
+  tags?: Lite.Tagged<any>[]
+  deps: D
+  use: U
+  factory: (ctx: Lite.WithUseExt<Lite.ResourceContext, U>, deps: Lite.InferDeps<D>) => MaybePromise<T>
+}): Lite.Resource<T>
+
 export function resource<T>(config: {
   name?: string
   tags?: Lite.Tagged<any>[]
@@ -36,21 +60,15 @@ export function resource<
   factory: (ctx: Lite.ResourceContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
 }): Lite.Resource<T>
 
-export function resource<T, D extends Record<string, Lite.Dependency>>(
-  config: {
-    name?: string
-    tags?: Lite.Tagged<any>[]
-    deps?: D
-    factory: Lite.ResourceFactory<T, D>
-  }
-): Lite.Resource<T> {
+export function resource(config: any): Lite.Resource<any> {
+  const tags = addUses(config.tags, config.use)
   return Object.freeze({
     [resourceSymbol]: true,
     name: config.name,
-    tags: config.tags,
+    tags,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    factory: config.factory as unknown as Lite.ResourceFactory<T, Record<string, Lite.Dependency>>,
-  }) as Lite.Resource<T>
+    factory: config.factory as unknown as Lite.ResourceFactory<any, Record<string, Lite.Dependency>>,
+  }) as Lite.Resource<any>
 }
 
 /**

@@ -889,7 +889,7 @@ class ScopeImpl implements Lite.Scope {
         value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<T>) : raw as T
       } else {
         const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
-        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
+        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this, ctx }
         value = await this.applyResolveExtensions(event, doResolve)
       }
       entry.state = 'resolved'
@@ -1648,12 +1648,17 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
   ): MaybePromise<T> {
     const owner = this
-    const resourceCtx: Lite.ResourceContext = {
+    const resourceCtx = {
       get input() { return owner.input },
       get name() { return owner.name },
       get scope() { return owner.scope },
       get parent() { return owner.parent },
       get data() { return owner.data },
+      get ext() {
+        const ownerWithExt = owner as ExecutionContextImpl & { ext?: object }
+        ownerWithExt.ext ??= {}
+        return ownerWithExt.ext
+      },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
       resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
       release: owner.release.bind(owner) as Lite.ResourceContext["release"],
@@ -1667,7 +1672,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         }
         entry.cleanups.push(fn)
       },
-    }
+    } as Lite.ResourceContext
     return factory(resourceCtx)
   }
 

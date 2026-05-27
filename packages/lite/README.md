@@ -78,24 +78,24 @@ const clientResource = resource({
 
 `watch: true` for resource controllers is valid only inside resource deps. It listens for resolved value changes and releases the dependent resource lazily. Atom deps cannot depend on resources, and flow deps cannot use watched resource controllers.
 
-## Flow Extensions
+## Primitive Use
 
-Use flow extensions for flow-local execution shape. `flow({ extensions })` stores extension uses as normal flow metadata; `flowExtensionRunner()` is the opt-in scope extension that instantiates each glyph per execution, dedupes duplicate glyphs, exposes `ctx.ext`, and applies output wrappers.
+Use `use` for primitive-local contracts and context shape. `atom`, `flow`, `resource`, and `service` store uses as normal metadata tags; `useRunner()` is the opt-in scope extension that instantiates each glyph per resolve/exec, dedupes duplicate glyphs, exposes `ctx.ext`, and applies wrappers.
 
 ```ts
-import { createScope, defineFlowExtension, flow, flowExtensionRunner, serializable } from "@pumped-fn/lite"
+import { createScope, defineUse, flow, serializable, useRunner } from "@pumped-fn/lite"
 
-const agent = defineFlowExtension<{ runId: string }, { agent: { runId: string } }>({
+const agent = defineUse<{ runId: string }, { agent: { runId: string } }>({
   name: "agent",
   create: ({ runId }) => ({ ext: { agent: { runId } } }),
 })
 
 const run = flow({
-  extensions: [agent({ runId: "run-1" }), serializable()],
+  use: [agent({ runId: "run-1" }), serializable()],
   factory: (ctx) => ({ runId: ctx.ext.agent.runId }),
 })
 
-const scope = createScope({ extensions: [flowExtensionRunner()] })
+const scope = createScope({ extensions: [useRunner()] })
 const ctx = scope.createContext()
 await ctx.exec({ flow: run })
 ```
@@ -168,7 +168,7 @@ sequenceDiagram
         Ctx->>Ctx: preset? → flow: re‑exec with replacement / fn: run as factory
         Ctx->>Ctx: flow.parse(input) if defined
         Ctx->>Child: create child (parent = ctx, merged tags)
-        Note right of Child: flowExtensionRunner reads flow.extensions tag → ctx.ext + output wrappers
+        Note right of Child: useRunner reads use metadata → ctx.ext + wrappers
         Child->>Ext: wrapExec(next, flow, childCtx)
         Ext->>Flow: next() → resolve deps + factory(childCtx, deps)
         Note right of Flow: childCtx.onClose(result: CloseResult) → { ok: true } | { ok: false, error }
