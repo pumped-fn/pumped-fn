@@ -2,6 +2,7 @@
 "@pumped-fn/lite": minor
 "@pumped-fn/lite-extension-suspense": minor
 "@pumped-fn/codemod": patch
+"@pumped-fn/lite-devtools": patch
 "@pumped-fn/lite-devtools-server": patch
 "@pumped-fn/lite-extension-otel": patch
 "@pumped-fn/lite-hmr": patch
