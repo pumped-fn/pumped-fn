@@ -119,7 +119,7 @@ function createUseInstances(
   ctxWithExt.ext ??= {}
 
   for (const use of targetUses) {
-    if (seen.has(use.key)) continue
+    if (seen.has(use.key)) throw new Error(`Duplicate use "${use.name}"`)
     seen.add(use.key)
     const instance = use.create(event)
     if (instance.ext) Object.assign(ctxWithExt.ext, instance.ext)

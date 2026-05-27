@@ -44,6 +44,11 @@ class InMemorySuspenseEventLog implements SuspenseEventLog {
 }
 
 describe("suspense extension", () => {
+  it("uses distinct tag labels", () => {
+    expect(replay.label).toBe("suspense.replay")
+    expect(suspend.label).toBe("suspense.suspend")
+  })
+
   it("replays completed marked steps", async () => {
     const log = new InMemorySuspenseEventLog()
     const scope = createScope({ extensions: [extension({ log })] })
@@ -67,6 +72,30 @@ describe("suspense extension", () => {
     expect(await ctx2.exec({ flow: step, input: 100 })).toBe(2)
     await ctx2.close()
     expect(calls).toBe(1)
+  })
+
+  it("rejects replay when the positional key points at a different target", async () => {
+    const log = new InMemorySuspenseEventLog()
+    const scope = createScope({ extensions: [extension({ log })] })
+    await scope.ready
+    const first = flow({
+      name: "first-step",
+      tags: [replay(true)],
+      factory: () => "first",
+    })
+    const second = flow({
+      name: "second-step",
+      tags: [replay(true)],
+      factory: () => "second",
+    })
+
+    const ctx1 = scope.createContext(run({ taskId: "sync-mismatch", runId: "run-mismatch" }))
+    expect(await ctx1.exec({ flow: first })).toBe("first")
+    await ctx1.close()
+
+    const ctx2 = scope.createContext(run({ taskId: "sync-mismatch", runId: "run-mismatch" }))
+    await expect(ctx2.exec({ flow: second })).rejects.toThrow("Suspense replay target mismatch")
+    await ctx2.close({ ok: false, error: new Error("expected") })
   })
 
   it("suspends marked steps and resumes from resolved value", async () => {

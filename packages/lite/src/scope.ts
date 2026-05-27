@@ -142,6 +142,7 @@ interface ResourceEntry<T> {
   error?: Error
   cleanups: (() => MaybePromise<void>)[]
   promise?: Promise<T>
+  ext?: object
 }
 
 interface ResourceListeners {
@@ -1249,8 +1250,9 @@ class ScopeImpl implements Lite.Scope {
         if (this.resolveExts.length === 0) {
           return ownerCtx.runResourceFactory(resource, entry, factory)
         }
-        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
-        const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, factory)
+        const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+        const doResolve = async () => factory(resourceCtx)
         return this.applyResolveExtensions(event, doResolve)
       }
       return presetValue as T
@@ -1275,8 +1277,9 @@ class ScopeImpl implements Lite.Scope {
     if (this.resolveExts.length === 0) {
       return ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
     }
-    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
-    const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
+    const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+    const doResolve = async () => resource.deps ? factory(resourceCtx, resourceDeps) : factory(resourceCtx)
     return this.applyResolveExtensions(event, doResolve)
   }
 
@@ -1647,6 +1650,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     entry: ResourceEntry<unknown>,
     factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
   ): MaybePromise<T> {
+    return factory(this.createResourceContext(resource, entry))
+  }
+
+  createResourceContext(
+    resource: Lite.Resource<unknown>,
+    entry: ResourceEntry<unknown>
+  ): Lite.ResourceContext {
     const owner = this
     const resourceCtx = {
       get input() { return owner.input },
@@ -1655,9 +1665,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       get parent() { return owner.parent },
       get data() { return owner.data },
       get ext() {
-        const ownerWithExt = owner as ExecutionContextImpl & { ext?: object }
-        ownerWithExt.ext ??= {}
-        return ownerWithExt.ext
+        entry.ext ??= {}
+        return entry.ext
       },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
       resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
@@ -1665,15 +1674,15 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       controller: owner.controller.bind(owner),
       onClose: owner.onClose.bind(owner),
       close: owner.close.bind(owner),
-      cleanup(fn) {
+      cleanup(fn: () => MaybePromise<void>) {
         owner.assertOpen()
         if (owner.getLocalResourceEntry(resource) !== entry) {
           throw new Error("Resource is released")
         }
         entry.cleanups.push(fn)
       },
-    } as Lite.ResourceContext
-    return factory(resourceCtx)
+    }
+    return resourceCtx as Lite.ResourceContext
   }
 
   resolve<T>(target: Lite.Atom<T>): Promise<T>

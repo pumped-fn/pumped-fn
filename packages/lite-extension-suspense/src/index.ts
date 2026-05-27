@@ -61,7 +61,7 @@ export interface SuspenseExtensionOptions {
   createPendingEntry?: (event: SuspenseExecEvent) => Extract<SuspenseStepEntry, { status: "pending" }>
 }
 
-export const replay = tag<boolean>({ label: "suspense.step", default: false })
+export const replay = tag<boolean>({ label: "suspense.replay", default: false })
 export const suspend = tag<boolean>({ label: "suspense.suspend", default: false })
 export const taskId = tag<string>({ label: "suspense.taskId" })
 export const runId = tag<string>({ label: "suspense.runId" })
@@ -108,6 +108,7 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
       const targetName = options.getTargetName ? options.getTargetName(target, ctx) : getTargetName(target, ctx)
       const event = { key, target, ctx, targetName, input: ctx.input }
       const existing = await options.log.get(key)
+      if (existing) assertSameTarget(existing, targetName)
       if (existing?.status === "completed") return existing.result
       if (existing?.status === "resolved") return existing.value
       if (existing?.status === "pending") throw new SuspendSignal(existing)
@@ -130,6 +131,14 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
 
 function shouldHandleSuspenseTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
   return active(target, replay, ctx) || active(target, suspend, ctx)
+}
+
+function assertSameTarget(entry: SuspenseStepEntry, targetName: string): void {
+  if (entry.targetName !== targetName) {
+    throw new Error(
+      `Suspense replay target mismatch at ${formatSuspenseStepKey(entry.key)}: expected "${entry.targetName}", got "${targetName}"`
+    )
+  }
 }
 
 function shouldSuspendTarget(event: SuspenseExecEvent): boolean {
@@ -158,6 +167,5 @@ function nextSuspenseKey(
 }
 
 function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
-  if (typeof target === "function") return ctx.name ?? target.name ?? "anonymous"
   return ctx.name ?? target.name ?? "anonymous"
 }

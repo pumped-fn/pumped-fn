@@ -8,6 +8,7 @@ import {
   codexCliWorker,
   delegate,
   derivedMaterial,
+  extension as agentExtension,
   material,
   patchMaterial,
   run,
@@ -216,6 +217,22 @@ describe("agent sdk", () => {
     const ctx = scope.createContext(run({ taskId: "task-c", runId: "run-c", registry }))
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
     await ctx.close()
+  })
+
+  it("rejects remote steps when no remote runner is configured", async () => {
+    const log = new InMemoryAgentEventLog()
+    const extension = agentExtension({ log })
+    const scope = createScope({ extensions: [extension] })
+    await scope.ready
+    const worker = flow({
+      name: "missing-remote-runner",
+      tags: [step({ remote: true })],
+      factory: () => "local",
+    })
+
+    const ctx = scope.createContext(run({ taskId: "task-missing-remote", runId: "run-missing-remote" }))
+    await expect(ctx.exec({ flow: worker })).rejects.toThrow("Remote step requires remoteRunner")
+    await ctx.close({ ok: false, error: new Error("expected") })
   })
 
   it("routes remote work before resolving deps when runner handles it", async () => {

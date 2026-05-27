@@ -12,7 +12,7 @@ import {
 } from "../src/index"
 
 describe("primitive use", () => {
-  it("adds flow ctx.ext, dedupes by glyph, and creates fresh instances", async () => {
+  it("adds flow ctx.ext and creates fresh instances", async () => {
     let created = 0
     const agent = defineUse<{ label: string }, { agent: { label: string; instance: number } }>({
       name: "agent",
@@ -27,8 +27,8 @@ describe("primitive use", () => {
     })
 
     const target = flow({
-      name: "dedupe-agent",
-      use: [agent({ label: "first" }), agent({ label: "second" })],
+      name: "agent",
+      use: [agent({ label: "first" })],
       factory: (ctx) => `${ctx.ext.agent.label}:${ctx.ext.agent.instance}`,
     })
 
@@ -38,6 +38,24 @@ describe("primitive use", () => {
     expect(await ctx.exec({ flow: target })).toBe("first:2:2")
     expect(created).toBe(2)
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("rejects duplicate uses by glyph", async () => {
+    const agent = defineUse<{ label: string }, { agent: { label: string } }>({
+      name: "agent",
+      create: (config) => ({ ext: { agent: { label: config.label } } }),
+    })
+    const target = flow({
+      name: "duplicate-agent",
+      use: [agent({ label: "first" }), agent({ label: "second" })],
+      factory: (ctx) => ctx.ext.agent.label,
+    })
+
+    const scope = createScope({ extensions: [useRunner()] })
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: target })).rejects.toThrow('Duplicate use "agent"')
+    await ctx.close({ ok: false, error: new Error("expected") })
     await scope.dispose()
   })
 
@@ -82,6 +100,42 @@ describe("primitive use", () => {
     await expect(ctx.resolve(good)).resolves.toEqual({ traceId: "trace-1" })
     await expect(scope.resolve(bad)).rejects.toThrow("Non-plain object at $")
 
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("keeps resource ctx.ext isolated from sibling resources and parent exec ctx", async () => {
+    const tenant = defineUse<string, { tenant: { id: string } }>({
+      name: "tenant",
+      create: (id) => ({ ext: { tenant: { id } } }),
+    })
+    const left = resource({
+      name: "left",
+      use: [tenant("left")],
+      factory: (ctx) => ctx.ext.tenant.id,
+    })
+    const right = resource({
+      name: "right",
+      use: [tenant("right")],
+      factory: (ctx) => ctx.ext.tenant.id,
+    })
+    const target = flow({
+      name: "resource-isolation",
+      factory: async (ctx) => {
+        const leftValue = await ctx.resolve(left)
+        const rightValue = await ctx.resolve(right)
+        const parentTenant = (ctx as Lite.ExecutionContext & { ext?: { tenant?: { id: string } } }).ext?.tenant?.id
+        return { leftValue, rightValue, parentTenant }
+      },
+    })
+
+    const scope = createScope({ extensions: [useRunner()] })
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: target })).resolves.toEqual({
+      leftValue: "left",
+      rightValue: "right",
+      parentTenant: undefined,
+    })
     await ctx.close()
     await scope.dispose()
   })

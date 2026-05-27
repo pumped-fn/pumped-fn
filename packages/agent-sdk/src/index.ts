@@ -121,11 +121,11 @@ export function extension(options: AgentExtensionOptions): Lite.Extension {
       input: event.input,
       kind: "durable",
     }),
-    run: (event, next) => runTimed(event.target, event.ctx, () =>
-      stepOf(event.target, event.ctx).remote === true && options.remoteRunner
-        ? options.remoteRunner.run(event, next)
-        : next()
-    ),
+    run: (event, next) => runTimed(event.target, event.ctx, () => {
+      if (stepOf(event.target, event.ctx).remote !== true) return next()
+      if (!options.remoteRunner) throw new Error("Remote step requires remoteRunner")
+      return options.remoteRunner.run(event, next)
+    }),
   })
 }
 
@@ -463,7 +463,7 @@ export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow
   return cliWorker({
     name: options.name ?? "claude",
     command: options.command ?? "claude",
-    args: (input) => ["-p", ...(options.extraArgs ?? []), input.prompt],
+    args: (input) => ["-p", ...(options.extraArgs ?? []), "--", input.prompt],
     timeoutMs: options.timeoutMs,
     kind: "llm",
     tags: options.tags,
@@ -488,6 +488,7 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
       "-s",
       options.sandbox ?? "read-only",
       ...(options.extraArgs ?? []),
+      "--",
       input.prompt,
     ],
     timeoutMs: options.timeoutMs,
