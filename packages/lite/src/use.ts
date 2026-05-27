@@ -119,7 +119,9 @@ function createUseInstances(
   ctxWithExt.ext ??= {}
 
   for (const use of targetUses) {
-    if (seen.has(use.key)) throw new Error(`Duplicate use "${use.name}"`)
+    if (seen.has(use.key)) {
+      throw new Error(`Duplicate use "${use.name}" on "${useTargetName(event.target)}"`)
+    }
     seen.add(use.key)
     const instance = use.create(event)
     if (instance.ext) Object.assign(ctxWithExt.ext, instance.ext)
@@ -127,6 +129,10 @@ function createUseInstances(
   }
 
   return { instances }
+}
+
+function useTargetName(target: Lite.UseTarget): string {
+  return "name" in target && target.name ? target.name : "anonymous"
 }
 
 function assertSerializableValue(value: unknown, path: string, seen: WeakSet<object>): void {

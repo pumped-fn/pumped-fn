@@ -1498,7 +1498,7 @@ class ScopeImpl implements Lite.Scope {
 
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     if (this.disposed) throw new Error("Scope is disposed")
-    if (Array.isArray(options)) throw new Error("createContext() expects { tags }")
+    assertCreateContextOptions(options)
     const ctx = new ExecutionContextImpl(this, options)
 
     const ctxTags = options?.tags
@@ -1517,6 +1517,21 @@ class ScopeImpl implements Lite.Scope {
     }
 
     return ctx
+  }
+}
+
+function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
+  if (options === undefined) return
+  if (options === null || typeof options !== "object" || Array.isArray(options)) {
+    throw new Error("createContext() expects { tags }")
+  }
+
+  const record = options as Record<string, unknown>
+  if (Object.keys(record).some((key) => key !== "tags")) {
+    throw new Error("createContext() expects { tags }")
+  }
+  if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
+    throw new Error("createContext() expects { tags }")
   }
 }
 

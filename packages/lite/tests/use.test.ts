@@ -54,7 +54,7 @@ describe("primitive use", () => {
 
     const scope = createScope({ extensions: [useRunner()] })
     const ctx = scope.createContext()
-    await expect(ctx.exec({ flow: target })).rejects.toThrow('Duplicate use "agent"')
+    await expect(ctx.exec({ flow: target })).rejects.toThrow('Duplicate use "agent" on "duplicate-agent"')
     await ctx.close({ ok: false, error: new Error("expected") })
     await scope.dispose()
   })

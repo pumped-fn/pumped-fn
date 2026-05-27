@@ -463,7 +463,7 @@ export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow
   return cliWorker({
     name: options.name ?? "claude",
     command: options.command ?? "claude",
-    args: (input) => ["-p", ...(options.extraArgs ?? []), "--", input.prompt],
+    args: (input) => cliPromptArgs(["-p", ...(options.extraArgs ?? [])], input.prompt),
     timeoutMs: options.timeoutMs,
     kind: "llm",
     tags: options.tags,
@@ -483,16 +483,18 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
   return cliWorker({
     name: options.name ?? "codex",
     command: options.command ?? "codex",
-    args: (input) => [
+    args: (input) => cliPromptArgs([
       "exec",
       "-s",
       options.sandbox ?? "read-only",
       ...(options.extraArgs ?? []),
-      "--",
-      input.prompt,
-    ],
+    ], input.prompt),
     timeoutMs: options.timeoutMs,
     kind: "llm",
     tags: options.tags,
   })
+}
+
+function cliPromptArgs(args: readonly string[], prompt: string): string[] {
+  return [...args.filter((arg) => arg !== "--"), "--", prompt]
 }

@@ -19,6 +19,9 @@ scope.createContext({ tags: [contextTag("ok")] })
 // @ts-expect-error createContext takes an options object, not bare tags
 scope.createContext([contextTag("legacy")])
 
+// @ts-expect-error createContext options only accept tags
+scope.createContext({ tag: [contextTag("typo")] })
+
 atom({
   deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
   factory: (_ctx, { source }) => source.get(),

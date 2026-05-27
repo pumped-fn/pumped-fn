@@ -98,6 +98,20 @@ describe("suspense extension", () => {
     await ctx2.close({ ok: false, error: new Error("expected") })
   })
 
+  it("rejects unnamed suspense targets", async () => {
+    const log = new InMemorySuspenseEventLog()
+    const scope = createScope({ extensions: [extension({ log })] })
+    await scope.ready
+    const unnamed = flow({
+      tags: [replay(true)],
+      factory: () => "unsafe",
+    })
+
+    const ctx = scope.createContext(run({ taskId: "sync-unnamed", runId: "run-unnamed" }))
+    await expect(ctx.exec({ flow: unnamed })).rejects.toThrow("Suspense target must have a name")
+    await ctx.close({ ok: false, error: new Error("expected") })
+  })
+
   it("suspends marked steps and resumes from resolved value", async () => {
     const log = new InMemorySuspenseEventLog()
     const scope = createScope({ extensions: [extension({ log })] })

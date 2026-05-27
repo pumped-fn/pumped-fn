@@ -317,6 +317,22 @@ describe("agent sdk", () => {
     expect(step.find(codexCliWorker()).kind).toBe("llm")
   })
 
+  it("passes LLM helper prompts after one argv terminator", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    expect(await ctx.exec({
+      flow: claudeCliWorker({ command: "echo", extraArgs: ["--", "--verbose"] }),
+      input: { prompt: "--help" },
+    })).toBe("-p --verbose -- --help")
+    expect(await ctx.exec({
+      flow: codexCliWorker({ command: "echo", extraArgs: ["--", "--verbose"] }),
+      input: { prompt: "--help" },
+    })).toBe("exec -s read-only --verbose -- --help")
+
+    await ctx.close()
+  })
+
   it("reports CLI failures with captured stderr", async () => {
     const cli = cliWorker({
       name: "sh-fail",

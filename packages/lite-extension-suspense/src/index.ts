@@ -167,5 +167,7 @@ function nextSuspenseKey(
 }
 
 function getTargetName(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
-  return ctx.name ?? target.name ?? "anonymous"
+  const name = ctx.name || target.name
+  if (!name) throw new Error("Suspense target must have a name")
+  return name
 }

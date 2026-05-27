@@ -379,7 +379,7 @@ export namespace Lite {
     | {
         readonly kind: "resource"
         readonly target: Resource<unknown>
-        readonly ctx: ExecutionContext
+        readonly ctx: ResourceContext
       }
 
   export interface Extension {
