@@ -78,6 +78,25 @@ const clientResource = resource({
 
 `watch: true` for resource controllers is valid only inside resource deps. It listens for resolved value changes and releases the dependent resource lazily. Atom deps cannot depend on resources, and flow deps cannot use watched resource controllers.
 
+## Tags And Extensions
+
+Use tags for primitive metadata, context config, and typed injection contracts. Use extensions for scope behavior that wraps resolve/exec. Extensions can set typed runtime tags before dependencies resolve; flows then request those contracts with `tags.required()`.
+
+```ts
+import { createScope, flow, tag, tags } from "@pumped-fn/lite"
+
+const runId = tag<string>({ label: "run.id" })
+
+const run = flow({
+  deps: { runId: tags.required(runId) },
+  factory: (_ctx, deps) => ({ runId: deps.runId }),
+})
+
+const scope = createScope()
+const ctx = scope.createContext({ tags: [runId("run-1")] })
+await ctx.exec({ flow: run })
+```
+
 ## How It Works
 
 ```mermaid
@@ -146,8 +165,9 @@ sequenceDiagram
         Ctx->>Ctx: preset? → flow: re‑exec with replacement / fn: run as factory
         Ctx->>Ctx: flow.parse(input) if defined
         Ctx->>Child: create child (parent = ctx, merged tags)
+        Note right of Child: Tags are visible before deps; extensions wrap exec
         Child->>Ext: wrapExec(next, flow, childCtx)
-        Ext->>Flow: next() → factory(childCtx, deps)
+        Ext->>Flow: next() → resolve deps + factory(childCtx, deps)
         Note right of Flow: childCtx.onClose(result: CloseResult) → { ok: true } | { ok: false, error }
         Flow-->>Ext: output
         Note right of Ext: ext returns output — may transform or replace

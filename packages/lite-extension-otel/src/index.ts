@@ -2,7 +2,7 @@ import type { Lite } from "@pumped-fn/lite"
 import { tag, atom, tags } from "@pumped-fn/lite"
 import { trace, SpanStatusCode, type Tracer, type Context, ROOT_CONTEXT } from "@opentelemetry/api"
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions"
-import { Resource } from "@opentelemetry/resources"
+import { defaultResource, resourceFromAttributes } from "@opentelemetry/resources"
 import {
   BasicTracerProvider,
   ConsoleSpanExporter,
@@ -78,7 +78,7 @@ export function otel(): Lite.Extension {
 
       provider = new BasicTracerProvider({
         spanProcessors: [new SimpleSpanProcessor(exporter)],
-        resource: Resource.default().merge(new Resource({
+        resource: defaultResource().merge(resourceFromAttributes({
           [ATTR_SERVICE_NAME]: config.name,
         }))
       })

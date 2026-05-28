@@ -22,14 +22,14 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown --config-loader tsx",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "tsx examples/demo.ts"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^2.0.0"
+    "@pumped-fn/lite": "^3.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

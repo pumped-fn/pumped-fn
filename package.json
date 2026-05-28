@@ -1,13 +1,11 @@
 {
   "name": "pumped-fn-monorepo",
   "private": true,
+  "packageManager": "pnpm@10.33.4",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "docs:dev": "cd docs && pnpm dev",
-    "docs:build": "pnpm --filter @pumped-fn/lite build && cd docs && NODE_ENV=production pnpm build",
-    "docs:preview": "cd docs && pnpm preview",
     "verify": "pnpm build && pnpm test && pnpm typecheck",
     "format": "echo 'Formatting disabled'",
     "format:check": "echo 'Format check disabled'",
@@ -19,37 +17,12 @@
     "changeset:status": "changeset status --verbose",
     "release": "pnpm verify && pnpm changeset:publish",
     "test:ci": "act -j test",
-    "test:release": "act -j release --secret-file .secrets",
-    "test:docs": "act -j build -W .github/workflows/deploy-docs.yml"
+    "test:release": "act -j release --secret-file .secrets"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.2",
-    "@changesets/cli": "^2.29.8",
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
     "typescript": "catalog:"
   },
-  "license": "MIT",
-  "pnpm": {
-    "overrides": {
-      "esbuild": "^0.25.0",
-      "@babel/runtime": "^7.26.10",
-      "@babel/helpers": "^7.26.10",
-      "js-yaml": "3.14.2",
-      "rolldown": "1.0.0-beta.53",
-      "brace-expansion@>=2 <3": "^2.0.3",
-      "dompurify": "^3.4.0",
-      "lodash-es": "^4.18.0",
-      "picomatch@>=2 <3": "^2.3.2",
-      "picomatch@>=4": "^4.0.4",
-      "protobufjs@>=7 <8": "^7.5.5",
-      "yaml@>=2 <3": "^2.8.3",
-      "vite@>=6 <7": "^6.4.2"
-    },
-    "ignoredBuiltDependencies": [
-      "puppeteer"
-    ],
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp"
-    ]
-  }
+  "license": "MIT"
 }

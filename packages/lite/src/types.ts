@@ -374,11 +374,12 @@ export namespace Lite {
         readonly kind: "atom"
         readonly target: Atom<unknown>
         readonly scope: Scope
+        readonly ctx: ResolveContext
       }
     | {
         readonly kind: "resource"
         readonly target: Resource<unknown>
-        readonly ctx: ExecutionContext
+        readonly ctx: ResourceContext
       }
 
   export interface Extension {
@@ -387,7 +388,7 @@ export namespace Lite {
     /**
      * Wraps dependency resolution. Dispatch by `event.kind`:
      *
-     * - `"atom"` — `event.scope`, `event.target: Atom`. Cached in scope.
+     * - `"atom"` — `event.scope`, `event.ctx`, `event.target: Atom`. Cached in scope.
      * - `"resource"` — `event.ctx`, `event.target: Resource`. Seek-up in
      *   execution hierarchy, factory(ctx, deps) on miss.
      */
@@ -402,6 +403,14 @@ export namespace Lite {
     ): Promise<unknown>
     dispose?(scope: Scope): MaybePromise<void>
   }
+
+  export type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | readonly JsonValue[]
+    | { readonly [key: string]: JsonValue }
 
   export type Dependency =
     | Atom<unknown>

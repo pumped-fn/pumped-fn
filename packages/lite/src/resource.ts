@@ -36,21 +36,14 @@ export function resource<
   factory: (ctx: Lite.ResourceContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
 }): Lite.Resource<T>
 
-export function resource<T, D extends Record<string, Lite.Dependency>>(
-  config: {
-    name?: string
-    tags?: Lite.Tagged<any>[]
-    deps?: D
-    factory: Lite.ResourceFactory<T, D>
-  }
-): Lite.Resource<T> {
+export function resource(config: any): Lite.Resource<any> {
   return Object.freeze({
     [resourceSymbol]: true,
     name: config.name,
     tags: config.tags,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    factory: config.factory as unknown as Lite.ResourceFactory<T, Record<string, Lite.Dependency>>,
-  }) as Lite.Resource<T>
+    factory: config.factory as unknown as Lite.ResourceFactory<any, Record<string, Lite.Dependency>>,
+  }) as Lite.Resource<any>
 }
 
 /**

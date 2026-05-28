@@ -106,11 +106,7 @@ export function flow<
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput>
 
-export function flow<
-  TOutput,
-  TInput,
-  D extends Record<string, Lite.Dependency>,
->(config: FlowConfig<TOutput, TInput, D>): Lite.Flow<TOutput, TInput> {
+export function flow(config: any): Lite.Flow<any, any> {
   const parse = config.parse
   const isTypedMarker =
     typeof parse === "object" && parse !== null && typedSymbol in parse
@@ -122,10 +118,10 @@ export function flow<
     name: config.name,
     parse: isTypedMarker
       ? undefined
-      : (parse as ((raw: unknown) => MaybePromise<TInput>) | undefined),
+      : (parse as ((raw: unknown) => MaybePromise<unknown>) | undefined),
     factory: config.factory as unknown as Lite.FlowFactory<
-      TOutput,
-      TInput,
+      unknown,
+      unknown,
       Record<string, Lite.Dependency>
     >,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,

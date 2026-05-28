@@ -7,7 +7,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "bin": {
-    "pumped-lite": "./dist/cli.mjs"
+    "pumped-lite": "./bin/pumped-lite.mjs"
   },
   "exports": {
     ".": {
@@ -22,6 +22,7 @@
     }
   },
   "files": [
+    "bin",
     "dist",
     "README.md",
     "PATTERNS.md",
@@ -30,14 +31,15 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsdown",
-    "typecheck": "npx @typescript/native-preview --noEmit",
-    "typecheck:full": "npx @typescript/native-preview --noEmit -p tsconfig.test.json",
+    "build": "tsdown --config-loader tsx",
+    "typecheck": "tsgo --noEmit",
+    "typecheck:full": "tsgo --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

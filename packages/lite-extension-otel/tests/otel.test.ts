@@ -94,7 +94,7 @@ describe("otel extension (simplified)", () => {
 
       expect(childSpan).toBeDefined()
       expect(parentSpan).toBeDefined()
-      expect(childSpan?.parentSpanId).toBe(parentSpan?.spanContext().spanId)
+      expect(childSpan?.parentSpanContext?.spanId).toBe(parentSpan?.spanContext().spanId)
     })
 
     it("records exception on span when flow fails", async () => {

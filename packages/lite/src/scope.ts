@@ -680,7 +680,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private tryResolveCurrentTick<T>(atom: Lite.Atom<T>): Promise<T> | null {
-    if (this.resolveExts.length > 0) return null
+    if (this.hasResolvePipeline()) return null
 
     const entry = this.getOrCreateEntry(atom)
     if (entry.state !== 'idle') return null
@@ -884,13 +884,13 @@ class ScopeImpl implements Lite.Scope {
 
     try {
       let value: T
-      if (this.resolveExts.length === 0) {
+      if (!this.hasResolvePipeline()) {
         const raw = atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
         value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<T>) : raw as T
       } else {
         const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
-        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this }
-        value = await this.applyResolveExtensions(event, doResolve)
+        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this, ctx }
+        value = await this.applyResolvePipeline(event, doResolve)
       }
       entry.state = 'resolved'
       entry.value = value
@@ -915,7 +915,11 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private async applyResolveExtensions<T>(
+  private hasResolvePipeline(): boolean {
+    return this.resolveExts.length > 0
+  }
+
+  private async applyResolvePipeline<T>(
     event: Lite.ResolveEvent,
     doResolve: () => Promise<T>
   ): Promise<T> {
@@ -1246,12 +1250,13 @@ class ScopeImpl implements Lite.Scope {
       }
       if (typeof presetValue === "function") {
         const factory = presetValue as (ctx: Lite.ResourceContext) => MaybePromise<T>
-        if (this.resolveExts.length === 0) {
+        if (!this.hasResolvePipeline()) {
           return ownerCtx.runResourceFactory(resource, entry, factory)
         }
-        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
-        const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, factory)
-        return this.applyResolveExtensions(event, doResolve)
+        const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+        const doResolve = async () => factory(resourceCtx)
+        return this.applyResolvePipeline(event, doResolve)
       }
       return presetValue as T
     }
@@ -1272,12 +1277,13 @@ class ScopeImpl implements Lite.Scope {
       deps?: Record<string, unknown>
     ) => MaybePromise<T>
 
-    if (this.resolveExts.length === 0) {
+    if (!this.hasResolvePipeline()) {
       return ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
     }
-    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: ownerCtx }
-    const doResolve = async () => ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
-    return this.applyResolveExtensions(event, doResolve)
+    const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+    const doResolve = async () => resource.deps ? factory(resourceCtx, resourceDeps) : factory(resourceCtx)
+    return this.applyResolvePipeline(event, doResolve)
   }
 
   invalidate<T>(atom: Lite.Atom<T>): void {
@@ -1495,6 +1501,7 @@ class ScopeImpl implements Lite.Scope {
 
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     if (this.disposed) throw new Error("Scope is disposed")
+    assertCreateContextOptions(options)
     const ctx = new ExecutionContextImpl(this, options)
 
     const ctxTags = options?.tags
@@ -1513,6 +1520,22 @@ class ScopeImpl implements Lite.Scope {
     }
 
     return ctx
+  }
+}
+
+function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
+  if (options === undefined) return
+  if (options === null || typeof options !== "object" || Array.isArray(options)) {
+    throw new Error("createContext() expects { tags }")
+  }
+
+  const record = options as Record<string, unknown>
+  const invalidKey = Object.keys(record).find((key) => key !== "tags")
+  if (invalidKey) {
+    throw new Error(`createContext() expects { tags }; received "${invalidKey}"`)
+  }
+  if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
+    throw new Error("createContext() expects { tags }")
   }
 }
 
@@ -1646,8 +1669,15 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     entry: ResourceEntry<unknown>,
     factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
   ): MaybePromise<T> {
+    return factory(this.createResourceContext(resource, entry))
+  }
+
+  createResourceContext(
+    resource: Lite.Resource<unknown>,
+    entry: ResourceEntry<unknown>
+  ): Lite.ResourceContext {
     const owner = this
-    const resourceCtx: Lite.ResourceContext = {
+    const resourceCtx = {
       get input() { return owner.input },
       get name() { return owner.name },
       get scope() { return owner.scope },
@@ -1659,7 +1689,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       controller: owner.controller.bind(owner),
       onClose: owner.onClose.bind(owner),
       close: owner.close.bind(owner),
-      cleanup(fn) {
+      cleanup(fn: () => MaybePromise<void>) {
         owner.assertOpen()
         if (owner.getLocalResourceEntry(resource) !== entry) {
           throw new Error("Resource is released")
@@ -1667,7 +1697,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         entry.cleanups.push(fn)
       },
     }
-    return factory(resourceCtx)
+    return resourceCtx as Lite.ResourceContext
   }
 
   resolve<T>(target: Lite.Atom<T>): Promise<T>
@@ -1751,9 +1781,17 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
 
       try {
-        const result = presetValue !== undefined && typeof presetValue === 'function'
-          ? await childCtx.execPresetFn(flow, presetValue as (ctx: Lite.ExecutionContext) => unknown)
-          : await childCtx.execFlowInternal(flow)
+        let result: unknown
+        if (this.scope.execExts.length === 0) {
+          result = presetValue !== undefined && typeof presetValue === 'function'
+            ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
+            : await childCtx.execFlowInternal(flow)
+        } else {
+          const runFlow = async () => presetValue !== undefined && typeof presetValue === 'function'
+            ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
+            : await childCtx.execFlowInternal(flow)
+          result = await childCtx.applyExecPipeline(flow, runFlow)
+        }
         await childCtx.close({ ok: true })
         return result
       } catch (error) {
@@ -1768,8 +1806,21 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         input: options.params
       })
 
+      const execTags = options.tags
+      if (execTags && execTags.length > 0) {
+        for (let i = 0; i < execTags.length; i++) {
+          childCtx.data.set(execTags[i]!.key, execTags[i]!.value)
+        }
+      }
+
       try {
-        const result = await childCtx.execFnInternal(options)
+        let result: unknown
+        if (this.scope.execExts.length === 0) {
+          result = await childCtx.execFnInternal(options)
+        } else {
+          const runFn = async () => await childCtx.execFnInternal(options)
+          result = await childCtx.applyExecPipeline(options.fn, runFn)
+        }
         await childCtx.close({ ok: true })
         return result
       } catch (error) {
@@ -1789,45 +1840,25 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     if (depsResult != null && typeof (depsResult as any).then === 'function') {
       return (depsResult as Promise<Record<string, unknown>>).then((resolvedDeps) => {
-        if (this.scope.execExts.length === 0) {
-          return flow.deps ? factory(this, resolvedDeps) : factory(this)
-        }
-        const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
-        return this.applyExecExtensions(flow, doExec)
+        return flow.deps ? factory(this, resolvedDeps) : factory(this)
       })
     }
 
     const resolvedDeps = depsResult as Record<string, unknown>
 
-    if (this.scope.execExts.length === 0) {
-      return flow.deps ? factory(this, resolvedDeps) : factory(this)
-    }
-
-    const doExec = async (): Promise<unknown> => flow.deps ? factory(this, resolvedDeps) : factory(this)
-    return this.applyExecExtensions(flow, doExec)
+    return flow.deps ? factory(this, resolvedDeps) : factory(this)
   }
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const { fn, params } = options
-    if (this.scope.execExts.length === 0) {
-      return fn(this, ...params)
-    }
-    const doExec = () => Promise.resolve(fn(this, ...params))
-    return this.applyExecExtensions(fn, doExec)
+    return fn(this, ...params)
   }
 
-  async execPresetFn(
-    flow: Lite.Flow<unknown, unknown>,
-    fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>
-  ): Promise<unknown> {
-    if (this.scope.execExts.length === 0) {
-      return fn(this)
-    }
-    const doExec = () => Promise.resolve(fn(this))
-    return this.applyExecExtensions(flow, doExec)
+  private async execPresetFn(fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>): Promise<unknown> {
+    return fn(this)
   }
 
-  private async applyExecExtensions(
+  private async applyExecPipeline(
     target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
     doExec: () => Promise<unknown>
   ): Promise<unknown> {

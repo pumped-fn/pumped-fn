@@ -1,12 +1,25 @@
-import { atom, controller } from "../src/atom"
-import { flow } from "../src/flow"
+import { atom, controller, service } from "../src/atom"
+import { flow, typed } from "../src/flow"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
+import { createScope } from "../src/scope"
+import { tag } from "../src/tag"
 import type { Lite } from "../src/types"
 
 const sourceAtom = atom({
   factory: () => 1,
 })
+
+const contextTag = tag<string>({ label: "context" })
+const scope = createScope()
+
+scope.createContext({ tags: [contextTag("ok")] })
+
+// @ts-expect-error createContext takes an options object, not bare tags
+scope.createContext([contextTag("legacy")])
+
+// @ts-expect-error createContext options only accept tags
+scope.createContext({ tag: [contextTag("typo")] })
 
 atom({
   deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },

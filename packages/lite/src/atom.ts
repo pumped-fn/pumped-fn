@@ -39,13 +39,11 @@ export function atom<
   keepAlive?: boolean
 }): Lite.Atom<T>
 
-export function atom<T, D extends Record<string, Lite.Dependency>>(
-  config: AtomConfig<T, D>
-): Lite.Atom<T> {
-  const atomInstance: Lite.Atom<T> = {
+export function atom(config: any): Lite.Atom<any> {
+  const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
-    factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
-    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory,
+    deps: config.deps,
     tags: config.tags,
     keepAlive: config.keepAlive,
   }
@@ -223,15 +221,11 @@ export function service<
   tags?: Lite.Tagged<any>[]
 }): Lite.Atom<T>
 
-export function service<T extends Lite.ServiceMethods, D extends Record<string, Lite.Dependency>>(config: {
-  deps?: D
-  factory: Lite.AtomFactory<T, D>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Atom<T> {
-  const atomInstance: Lite.Atom<T> = {
+export function service(config: any): Lite.Atom<any> {
+  const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
-    factory: config.factory as unknown as Lite.AtomFactory<T, Record<string, Lite.Dependency>>,
-    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory,
+    deps: config.deps,
     tags: config.tags,
   }
 
