@@ -28,7 +28,6 @@ Describe application state, execution-scoped work, and cross-cutting behavior as
 | `@pumped-fn/lite` | Core runtime: atoms, flows, resources, tags, presets, controllers |
 | `@pumped-fn/lite-react` | React bindings over Lite controllers and subscriptions |
 | `@pumped-fn/lite-devtools` | Observability extension and transports |
-| `@pumped-fn/lite-devtools-server` | Terminal dashboard for remote devtools events |
 | `@pumped-fn/lite-hmr` | HMR helpers for atom state preservation |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
 
