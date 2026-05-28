@@ -316,7 +316,7 @@ export interface MaterialOptions<T> {
   keepAlive?: boolean
 }
 
-const materialPatches = new WeakMap<object, Promise<void>>()
+const materialPatches = new WeakMap<object, WeakMap<object, Promise<void>>>()
 
 export class MaterialConflictError extends Error {
   override readonly name = "MaterialConflictError"
@@ -345,7 +345,7 @@ export async function patchMaterial<T>(
   ops: JsonPatchOperation[],
   options: { expectedRevision?: number } = {}
 ): Promise<MaterialState<T>> {
-  return queueMaterialPatch(target, async () => {
+  return queueMaterialPatch(ctx.scope, target, async () => {
     const ctrl = ctx.scope.controller(target)
     if (ctrl.state === "idle") await ctrl.resolve()
     const current = ctrl.get()
@@ -382,15 +382,21 @@ export function derivedMaterial<TSource, TOutput>(
 }
 
 function queueMaterialPatch<T>(
+  scope: Lite.Scope,
   target: Lite.Atom<MaterialState<T>>,
   run: () => Promise<MaterialState<T>>
 ): Promise<MaterialState<T>> {
-  const previous = materialPatches.get(target) ?? Promise.resolve()
+  let scopePatches = materialPatches.get(scope)
+  if (!scopePatches) {
+    scopePatches = new WeakMap()
+    materialPatches.set(scope, scopePatches)
+  }
+  const previous = scopePatches.get(target) ?? Promise.resolve()
   const current = previous.catch(() => undefined).then(run)
   const lock = current.then(() => undefined, () => undefined)
-  materialPatches.set(target, lock)
-  lock.then(() => {
-    if (materialPatches.get(target) === lock) materialPatches.delete(target)
+  scopePatches.set(target, lock)
+  void lock.then(() => {
+    if (scopePatches.get(target) === lock) scopePatches.delete(target)
   })
   return current
 }
