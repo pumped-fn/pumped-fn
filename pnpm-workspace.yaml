@@ -21,7 +21,7 @@ packageManagerStrict: true
 savePrefix: ""
 
 overrides:
-  esbuild: 0.27.7
+  esbuild: 0.28.0
   "@babel/runtime": 7.29.7
   "@babel/helpers": 7.29.7
   js-yaml: 4.1.1
@@ -69,7 +69,7 @@ catalog:
   "@typescript/native-preview": 7.0.0-dev.20260526.1
   "@vitest/coverage-v8": 4.1.7
   acorn: 8.16.0
-  esbuild: 0.27.7
+  esbuild: 0.28.0
   estree-walker: 3.0.3
   global-jsdom: 29.0.0
   happy-dom: 20.9.0
