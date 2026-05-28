@@ -27,6 +27,7 @@ overrides:
   js-yaml: 4.1.1
   read-yaml-file: 2.1.0
   rolldown: 1.0.2
+  ws@>=8 <9: 8.20.1
   brace-expansion@>=2 <3: 2.0.3
   dompurify: 3.4.6
   lodash-es: 4.18.1
@@ -87,8 +88,14 @@ catalog:
   typescript: 6.0.3
   vite: 8.0.14
   vitest: 4.1.7
+  ws: 8.20.1
 
 minimumReleaseAgeExclude:
+  - '@babel/helpers@7.29.7'
+  - '@babel/runtime@7.29.7'
+  - '@types/node@25.9.1'
+  - '@vitest/coverage-v8@4.1.7'
+  - esbuild@0.27.7
   - '@opentui/core-darwin-arm64@0.2.16'
   - '@opentui/core-darwin-x64@0.2.16'
   - '@opentui/core-linux-arm64@0.2.16'
@@ -112,6 +119,9 @@ minimumReleaseAgeExclude:
   - '@rolldown/binding-wasm32-wasi@1.0.2'
   - '@rolldown/binding-win32-arm64-msvc@1.0.2'
   - '@rolldown/binding-win32-x64-msvc@1.0.2'
+  - tsdown@0.22.0
+  - tsx@4.22.3
+  - typescript@6.0.3
   - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview-darwin-x64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview-linux-arm64@7.0.0-dev.20260526.1'
@@ -120,5 +130,8 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview@7.0.0-dev.20260526.1'
+  - vite@8.0.14
+  - vitest@4.1.7
+  - ws@8.20.1
   - electron-to-chromium@1.5.362
   - tmp@0.2.6

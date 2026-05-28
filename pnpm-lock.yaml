@@ -111,6 +111,9 @@ catalogs:
     vitest:
       specifier: 4.1.7
       version: 4.1.7
+    ws:
+      specifier: 8.20.1
+      version: 8.20.1
 
 overrides:
   esbuild: 0.27.7
@@ -119,6 +122,7 @@ overrides:
   js-yaml: 4.1.1
   read-yaml-file: 2.1.0
   rolldown: 1.0.2
+  ws@>=8 <9: 8.20.1
   brace-expansion@>=2 <3: 2.0.3
   dompurify: 3.4.6
   lodash-es: 4.18.1
@@ -341,7 +345,7 @@ importers:
         version: 0.2.16(typescript@6.0.3)(web-tree-sitter@0.25.10)
       '@opentui/react':
         specifier: 'catalog:'
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@6.0.3)(web-tree-sitter@0.25.10)(ws@8.21.0)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@6.0.3)(web-tree-sitter@0.25.10)(ws@8.20.1)
       '@pumped-fn/lite':
         specifier: workspace:*
         version: link:../lite
@@ -354,6 +358,9 @@ importers:
       react:
         specifier: 'catalog:'
         version: 19.2.6
+      ws:
+        specifier: 'catalog:'
+        version: 8.20.1
     devDependencies:
       '@pumped-fn/lite-devtools':
         specifier: workspace:*
@@ -612,6 +619,10 @@ packages:
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
 
+  '@babel/code-frame@7.29.0':
+    resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
+    engines: {node: '>=6.9.0'}
+
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
     engines: {node: '>=6.9.0'}
@@ -689,6 +700,10 @@ packages:
   '@babel/helper-string-parser@8.0.0-rc.6':
     resolution: {integrity: sha512-BCkFy+zN6kXQed3YOT7aJl93NfDSzQc3pBfsvTVPs9gU9X3V0aefEF5kwBT0E+mDWH9QgKaZstYUQN9VdQZT4g==}
     engines: {node: ^22.18.0 || >=24.11.0}
+
+  '@babel/helper-validator-identifier@7.28.5':
+    resolution: {integrity: sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q==}
+    engines: {node: '>=6.9.0'}
 
   '@babel/helper-validator-identifier@7.29.7':
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
@@ -1265,7 +1280,7 @@ packages:
     peerDependencies:
       react: '>=19.2.0'
       react-devtools-core: ^7.0.1
-      ws: ^8.18.0
+      ws: 8.20.1
 
   '@oxc-project/types@0.132.0':
     resolution: {integrity: sha512-FESMOxil5Se014ui/Eq8fT5uHJo6nIRwH0PfJrZJXs6Gek3ZVFOrpUv3YIZT20m+extU98Hg1Ym72U58rlsxUQ==}
@@ -2345,8 +2360,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  shell-quote@1.8.4:
-    resolution: {integrity: sha512-VsC6n6vz1ihYYyZZwX7YZSF5l5x36ca17OC+a69h94YqB7X6XLwf+5MOgynYir2SLFUbl8gIYvBo8K8RoNQ6bQ==}
+  shell-quote@1.8.3:
+    resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
     engines: {node: '>= 0.4'}
 
   siginfo@2.0.0:
@@ -2663,8 +2678,8 @@ packages:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
-  ws@7.5.11:
-    resolution: {integrity: sha512-zS54Oen9bITtp7kp2XM3AydrCIq1D+HwJOuH+c+e4LfpL/lotP5osijd+UoMnxwAam1GN8R4KtLAyIrIcBNpiA==}
+  ws@7.5.10:
+    resolution: {integrity: sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ==}
     engines: {node: '>=8.3.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -2675,8 +2690,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.21.0:
-    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+  ws@8.20.1:
+    resolution: {integrity: sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -2723,6 +2738,12 @@ snapshots:
   '@asamuzakjp/generational-cache@1.0.1': {}
 
   '@asamuzakjp/nwsapi@2.3.9': {}
+
+  '@babel/code-frame@7.29.0':
+    dependencies:
+      '@babel/helper-validator-identifier': 7.28.5
+      js-tokens: 4.0.0
+      picocolors: 1.1.1
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -2844,6 +2865,8 @@ snapshots:
   '@babel/helper-string-parser@7.29.7': {}
 
   '@babel/helper-string-parser@8.0.0-rc.6': {}
+
+  '@babel/helper-validator-identifier@7.28.5': {}
 
   '@babel/helper-validator-identifier@7.29.7': {}
 
@@ -3453,13 +3476,13 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@6.0.3)(web-tree-sitter@0.25.10)(ws@8.21.0)':
+  '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@6.0.3)(web-tree-sitter@0.25.10)(ws@8.20.1)':
     dependencies:
       '@opentui/core': 0.2.16(typescript@6.0.3)(web-tree-sitter@0.25.10)
       react: 19.2.6
       react-devtools-core: 7.0.1
       react-reconciler: 0.33.0(react@19.2.6)
-      ws: 8.21.0
+      ws: 8.20.1
     transitivePeerDependencies:
       - typescript
       - web-tree-sitter
@@ -3525,7 +3548,7 @@ snapshots:
 
   '@testing-library/dom@10.4.1':
     dependencies:
-      '@babel/code-frame': 7.29.7
+      '@babel/code-frame': 7.29.0
       '@babel/runtime': 7.29.7
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
@@ -3966,7 +3989,7 @@ snapshots:
       '@types/ws': 8.18.1
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.0
+      ws: 8.20.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -4297,8 +4320,8 @@ snapshots:
 
   react-devtools-core@7.0.1:
     dependencies:
-      shell-quote: 1.8.4
-      ws: 7.5.11
+      shell-quote: 1.8.3
+      ws: 7.5.10
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -4409,7 +4432,7 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  shell-quote@1.8.4: {}
+  shell-quote@1.8.3: {}
 
   siginfo@2.0.0: {}
 
@@ -4642,9 +4665,9 @@ snapshots:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
 
-  ws@7.5.11: {}
+  ws@7.5.10: {}
 
-  ws@8.21.0: {}
+  ws@8.20.1: {}
 
   xml-name-validator@5.0.0: {}
 
