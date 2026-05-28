@@ -1530,8 +1530,9 @@ function assertCreateContextOptions(options: unknown): asserts options is Lite.C
   }
 
   const record = options as Record<string, unknown>
-  if (Object.keys(record).some((key) => key !== "tags")) {
-    throw new Error("createContext() expects { tags }")
+  const invalidKey = Object.keys(record).find((key) => key !== "tags")
+  if (invalidKey) {
+    throw new Error(`createContext() expects { tags }; received "${invalidKey}"`)
   }
   if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
     throw new Error("createContext() expects { tags }")

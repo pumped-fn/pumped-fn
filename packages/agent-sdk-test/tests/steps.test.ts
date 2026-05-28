@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
+  abortSignal,
   workflowRun,
   step,
   SuspendSignal,
@@ -134,5 +135,29 @@ describe("workflow steps", () => {
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "task-durable-deps", runId: "run-durable-deps" })] })
     await expect(ctx.exec({ flow: approve, tags: [step({ durable: true })] })).rejects.toBeInstanceOf(SuspendSignal)
     await ctx.close({ ok: false, error: new Error("suspended") })
+  })
+
+  it("aborts timed workflow steps cooperatively", async () => {
+    const { extensions } = agent()
+    const scope = createScope({ extensions })
+    await scope.ready
+    let aborted = false
+    const timed = flow({
+      name: "timed-abort",
+      tags: [step({ workflow: true, timeoutMs: 5 })],
+      deps: { signal: tags.required(abortSignal) },
+      factory: (_ctx, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => {
+          aborted = true
+          reject(signal.reason)
+        }, { once: true })
+      }),
+    })
+
+    const ctx = scope.createContext({ tags: [workflowRun({ taskId: "task-timeout", runId: "run-timeout" })] })
+    await expect(ctx.exec({ flow: timed })).rejects.toThrow("Workflow step timed out after 5ms")
+    expect(aborted).toBe(true)
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
   })
 })

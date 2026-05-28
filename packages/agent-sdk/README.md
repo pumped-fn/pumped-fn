@@ -35,6 +35,7 @@ flowchart TD
 - `extension()` for agent remote dispatch.
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
 - `workflowRun()` tag for workflow-scoped context data.
+- `abortSignal` tag for cooperative timeout cancellation.
 - `agent` runtime tag for named worker delegation.
 - `WorkerRegistry` for named worker calls through `agent.delegate()`.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
@@ -194,11 +195,11 @@ That means workflow bodies must be deterministic between `ctx.exec()` calls:
 - Use provider state/services for swappable integrations.
 - Do not read time, random, network, filesystem, or process state directly in workflow orchestration code.
 - Keep dependency factories pure enough that replay skipping them is valid.
-- `timeoutMs` rejects the step promise; it does not abort already-started work.
+- `timeoutMs` rejects the step promise and aborts the `abortSignal` tag. Work must observe the signal to stop cooperatively.
 
 ## Materials
 
-Materials are state-backed task data with a patch-oriented API.
+Materials are state-backed task data with a patch-oriented API. Patches serialize per material; pass `expectedRevision` when callers need optimistic conflict detection. Materials are keep-alive by default and can opt out with `keepAlive: false`.
 
 ```ts
 const status = material("pr-status", {

@@ -42,8 +42,8 @@ export function atom<
 export function atom(config: any): Lite.Atom<any> {
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
-    factory: config.factory as unknown as Lite.AtomFactory<any, Record<string, Lite.Dependency>>,
-    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory,
+    deps: config.deps,
     tags: config.tags,
     keepAlive: config.keepAlive,
   }
@@ -224,8 +224,8 @@ export function service<
 export function service(config: any): Lite.Atom<any> {
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
-    factory: config.factory as unknown as Lite.AtomFactory<any, Record<string, Lite.Dependency>>,
-    deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
+    factory: config.factory,
+    deps: config.deps,
     tags: config.tags,
   }
 

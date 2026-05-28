@@ -676,7 +676,7 @@ describe("ExecutionContext", () => {
       await expect(contextOnlyCtx.resolve(taggedAtom)).rejects.toThrow('Tag "ctx-resolve-request" not found')
       expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags }")
       expect(() => scope.createContext({ tag: [requestTag("typo")] } as never))
-        .toThrow("createContext() expects { tags }")
+        .toThrow('createContext() expects { tags }; received "tag"')
       expect(() => scope.createContext({ tags: requestTag("bad") } as never))
         .toThrow("createContext() expects { tags }")
 

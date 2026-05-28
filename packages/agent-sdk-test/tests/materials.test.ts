@@ -33,6 +33,36 @@ describe("materials", () => {
     await ctx.close()
   })
 
+  it("serializes concurrent material patches", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const queue = material("queue", {
+      kind: "json",
+      initialState: { items: [] as string[] },
+    })
+
+    await Promise.all([
+      patchMaterial(ctx, queue, [{ op: "add", path: "/items/-", value: "a" }]),
+      patchMaterial(ctx, queue, [{ op: "add", path: "/items/-", value: "b" }]),
+    ])
+
+    expect(ctx.scope.controller(queue).get()).toEqual({
+      name: "queue",
+      kind: "json",
+      revision: 2,
+      state: { items: ["a", "b"] },
+    })
+    await ctx.close()
+  })
+
+  it("allows ephemeral materials", () => {
+    expect(material("ephemeral", {
+      kind: "json",
+      initialState: {},
+      keepAlive: false,
+    }).keepAlive).toBe(false)
+  })
+
   it("derives material state from primary material", async () => {
     const source = material("count", {
       kind: "json",

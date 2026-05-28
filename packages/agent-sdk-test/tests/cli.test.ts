@@ -33,15 +33,27 @@ describe("CLI workers", () => {
     const ctx = scope.createContext()
 
     expect(await ctx.exec({
-      flow: claudeCliWorker({ command: "echo", extraArgs: ["--", "--verbose"] }),
+      flow: claudeCliWorker({ command: "echo", extraArgs: ["--verbose"] }),
       input: { prompt: "--help" },
     })).toBe("-p --verbose -- --help")
     expect(await ctx.exec({
-      flow: codexCliWorker({ command: "echo", extraArgs: ["--", "--verbose"] }),
+      flow: codexCliWorker({ command: "echo", extraArgs: ["--verbose"] }),
       input: { prompt: "--help" },
     })).toBe("exec -s read-only --verbose -- --help")
 
     await ctx.close()
+  })
+
+  it("rejects argv terminators in LLM helper extra args", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: claudeCliWorker({ command: "echo", extraArgs: ["--"] }),
+      input: { prompt: "x" },
+    })).rejects.toThrow("CLI helper extraArgs cannot include --")
+
+    await ctx.close({ ok: false, error: new Error("expected") })
   })
 
   it("reports CLI failures with captured stderr", async () => {

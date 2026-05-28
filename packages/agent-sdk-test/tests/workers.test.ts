@@ -86,6 +86,22 @@ describe("worker delegation", () => {
     await scope.dispose()
   })
 
+  it("rejects agent extension without workflow extension", async () => {
+    const scope = createScope({ extensions: [agentExtension({ remoteRunner: { run: (_event, next) => next() } })] })
+    await scope.ready
+    const root = flow({
+      name: "agent-without-workflow",
+      tags: [step({ workflow: true })],
+      deps: { agent: tags.required(agentRuntime) },
+      factory: (_ctx, { agent }) => agent.taskId,
+    })
+
+    const ctx = scope.createContext({ tags: [workflowRun({ taskId: "task-agent-only", runId: "run-agent-only" })] })
+    await expect(ctx.exec({ flow: root })).rejects.toThrow("agent extension requires workflow extension")
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
+  })
+
   it("rejects remote steps when no remote runner is configured", async () => {
     const log = new MemoryWorkflowLog()
     const scope = createScope({ extensions: [workflowExtension({ log }), agentExtension()] })

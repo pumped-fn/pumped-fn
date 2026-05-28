@@ -205,7 +205,7 @@ const count = derivedMaterial("inventory-count", inventory, (state) => state.ite
 
 ## 8. Event Log Boundary
 
-The event log key is `(taskId, runId, step)`. The step increments in standalone suspense `wrapExec`; the agent extension composes that lower layer.
+The event log key is `(taskId, runId, step)`. The step increments in standalone suspense `wrapExec`; `workflowExtension()` composes that lower layer.
 
 ```mermaid
 sequenceDiagram

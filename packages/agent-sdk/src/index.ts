@@ -103,6 +103,7 @@ export interface AgentContext {
 export const workflowRun = tag<WorkflowRunOptions>({ label: "workflow.run" })
 export const workflow = tag<WorkflowContext>({ label: "workflow.runtime" })
 export const agent = tag<AgentContext>({ label: "agent.runtime" })
+export const abortSignal = tag<AbortSignal>({ label: "workflow.abortSignal" })
 
 const activeWorkflowEvent = tag<WorkflowExecEvent>({ label: "workflow.event" })
 
@@ -224,7 +225,8 @@ function workflowRuntimeOf(
 }
 
 function agentRuntimeOf(ctx: Lite.ExecutionContext): AgentContext {
-  const config = ctx.data.seekTag(workflow) ?? workflowRuntimeOf(ctx, {})
+  const config = ctx.data.seekTag(workflow)
+  if (!config) throw new Error("agent extension requires workflow extension")
   return {
     taskId: config.taskId,
     runId: config.runId,
@@ -272,13 +274,22 @@ function targetNameOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): stri
 function runTimed(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () => Promise<unknown>): Promise<unknown> {
   const timeoutMs = stepOf(target, ctx).timeoutMs
   if (timeoutMs === undefined) return next()
-  let timer: ReturnType<typeof setTimeout>
-  return Promise.race([
-    next(),
-    new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Workflow step timed out after ${timeoutMs}ms`)), timeoutMs)
-    }),
-  ]).finally(() => clearTimeout(timer))
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return withRuntimeTag(ctx, abortSignal, controller.signal, () =>
+    Promise.race([
+      next(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          const error = new Error(`Workflow step timed out after ${timeoutMs}ms`)
+          controller.abort(error)
+          reject(error)
+        }, timeoutMs)
+      }),
+    ])
+  ).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
 }
 
 function stepOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): Step {
@@ -302,7 +313,10 @@ export interface MaterialOptions<T> {
   kind: MaterialKind
   initialState: T
   tags?: Lite.Tagged<any>[]
+  keepAlive?: boolean
 }
+
+const materialPatches = new WeakMap<object, Promise<void>>()
 
 export class MaterialConflictError extends Error {
   override readonly name = "MaterialConflictError"
@@ -314,7 +328,7 @@ export class MaterialConflictError extends Error {
 
 export function material<T>(name: string, options: MaterialOptions<T>): Lite.Atom<MaterialState<T>> {
   return atom({
-    keepAlive: true,
+    keepAlive: options.keepAlive ?? true,
     tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: () => ({
       name,
@@ -331,29 +345,31 @@ export async function patchMaterial<T>(
   ops: JsonPatchOperation[],
   options: { expectedRevision?: number } = {}
 ): Promise<MaterialState<T>> {
-  const ctrl = ctx.scope.controller(target)
-  if (ctrl.state === "idle") await ctrl.resolve()
-  const current = ctrl.get()
-  if (current.kind !== "json") throw new Error(`Material "${current.name}" does not accept JSON Patch`)
-  if (options.expectedRevision !== undefined && options.expectedRevision !== current.revision) {
-    throw new MaterialConflictError(options.expectedRevision, current.revision)
-  }
-  ctrl.set({
-    ...current,
-    revision: current.revision + 1,
-    state: applyJsonPatch(current.state, ops),
+  return queueMaterialPatch(target, async () => {
+    const ctrl = ctx.scope.controller(target)
+    if (ctrl.state === "idle") await ctrl.resolve()
+    const current = ctrl.get()
+    if (current.kind !== "json") throw new Error(`Material "${current.name}" does not accept JSON Patch`)
+    if (options.expectedRevision !== undefined && options.expectedRevision !== current.revision) {
+      throw new MaterialConflictError(options.expectedRevision, current.revision)
+    }
+    ctrl.set({
+      ...current,
+      revision: current.revision + 1,
+      state: applyJsonPatch(current.state, ops),
+    })
+    return ctrl.get()
   })
-  return ctrl.get()
 }
 
 export function derivedMaterial<TSource, TOutput>(
   name: string,
   source: Lite.Atom<MaterialState<TSource>>,
   derive: (state: TSource) => TOutput,
-  options: { kind: MaterialKind; tags?: Lite.Tagged<any>[] }
+  options: { kind: MaterialKind; tags?: Lite.Tagged<any>[]; keepAlive?: boolean }
 ): Lite.Atom<MaterialState<TOutput>> {
   return atom({
-    keepAlive: true,
+    keepAlive: options.keepAlive ?? true,
     deps: { source },
     tags: [materialKind(options.kind), ...(options.tags ?? [])],
     factory: (_ctx, deps) => ({
@@ -363,6 +379,20 @@ export function derivedMaterial<TSource, TOutput>(
       state: derive(deps.source.state),
     }),
   })
+}
+
+function queueMaterialPatch<T>(
+  target: Lite.Atom<MaterialState<T>>,
+  run: () => Promise<MaterialState<T>>
+): Promise<MaterialState<T>> {
+  const previous = materialPatches.get(target) ?? Promise.resolve()
+  const current = previous.catch(() => undefined).then(run)
+  const lock = current.then(() => undefined, () => undefined)
+  materialPatches.set(target, lock)
+  lock.then(() => {
+    if (materialPatches.get(target) === lock) materialPatches.delete(target)
+  })
+  return current
 }
 
 function applyJsonPatch<T>(source: T, ops: JsonPatchOperation[]): T {
@@ -496,25 +526,20 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
       cwd: resolveValue(options.cwd, input, ctx),
       env: resolveValue(options.env, input, ctx),
       timeoutMs: options.timeoutMs,
+      signal: ctx.data.seekTag(abortSignal),
     })
     return options.parseOutput ? options.parseOutput(result, input) : (result.stdout.trim() as Output)
   }
 
-  if (typeof options.parse === "function") {
-    return flow<Output, Input>({
-      name: options.name,
-      parse: options.parse,
-      tags,
-      factory,
-    })
-  }
-
-  return flow<Output, Input>({
+  const flowOptions = {
     name: options.name,
-    parse: options.parse ?? typed<Input>(),
     tags,
     factory,
-  })
+  }
+
+  return typeof options.parse === "function"
+    ? flow<Output, Input>({ ...flowOptions, parse: options.parse })
+    : flow<Output, Input>({ ...flowOptions, parse: options.parse ?? typed<Input>() })
 }
 
 export interface RunCliOptions {
@@ -524,6 +549,7 @@ export interface RunCliOptions {
   cwd?: string
   env?: Record<string, string | undefined>
   timeoutMs?: number
+  signal?: AbortSignal
 }
 
 export function runCli(options: RunCliOptions): Promise<CliResult> {
@@ -532,6 +558,7 @@ export function runCli(options: RunCliOptions): Promise<CliResult> {
       cwd: options.cwd,
       env: { ...process.env, ...options.env },
       timeout: options.timeoutMs,
+      signal: options.signal,
     }, (error, stdout, stderr) => {
       const execError = error as ExecFileError | null
       const exitCode = typeof execError?.code === "number" ? execError.code : error ? null : 0
@@ -539,6 +566,10 @@ export function runCli(options: RunCliOptions): Promise<CliResult> {
       const result = { stdout: String(stdout), stderr: String(stderr), exitCode, signal }
       if (execError?.killed && options.timeoutMs !== undefined) {
         reject(new CliWorkerError(`CLI command timed out after ${options.timeoutMs}ms`, result))
+        return
+      }
+      if (execError?.name === "AbortError") {
+        reject(new CliWorkerError("CLI command aborted", result))
         return
       }
       if (error) {
@@ -626,5 +657,6 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
 }
 
 function cliPromptArgs(args: readonly string[], prompt: string): string[] {
-  return [...args.filter((arg) => arg !== "--"), "--", prompt]
+  if (args.includes("--")) throw new Error("CLI helper extraArgs cannot include --")
+  return [...args, "--", prompt]
 }

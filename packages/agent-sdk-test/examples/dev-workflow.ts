@@ -96,7 +96,7 @@ export async function runDevWorkflow(
     name: "await-product-review",
     tags: [step({ durable: true, kind: "review" })],
     factory: () => {
-      throw new Error("resolved by product review")
+      throw new Error("await-product-review should suspend before factory runs")
     },
   })
 

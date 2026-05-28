@@ -49,6 +49,7 @@ export class MemorySuspenseLog implements SuspenseEventLog {
 
 export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog {}
 
+/** Test runner that executes remote-tagged steps in-process. */
 export const localRemoteRunner: AgentRemoteRunner = {
   run: (_event, next) => next(),
 }
