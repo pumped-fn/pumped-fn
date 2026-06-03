@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-suspense",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Replay and suspend extension for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
