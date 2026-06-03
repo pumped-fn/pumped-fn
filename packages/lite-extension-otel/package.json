@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-otel",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "OpenTelemetry extension for @pumped-fn/lite with tracing and context propagation",
   "type": "module",
   "main": "./dist/index.cjs",
