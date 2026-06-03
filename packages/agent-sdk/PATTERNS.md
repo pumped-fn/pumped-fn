@@ -7,7 +7,7 @@ Use this package as a small convention layer over `@pumped-fn/lite`. If a use ca
 Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
 
 ```ts
-import { extension, suspend, run } from "@pumped-fn/lite-extension-suspense"
+import { extension, runId, stepCounter, suspend, taskId } from "@pumped-fn/lite-extension-suspense"
 
 const waitForCommit = flow({
   name: "wait-for-commit",
@@ -22,7 +22,13 @@ const scope = createScope({
   extensions: [extension({ log })],
 })
 
-const ctx = scope.createContext(run({ taskId: "doc-123", runId: "sync-42" }))
+const ctx = scope.createContext({
+  tags: [
+    taskId("doc-123"),
+    runId("sync-42"),
+    stepCounter({ next: 0 }),
+  ],
+})
 ```
 
 Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
@@ -32,8 +38,16 @@ Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(task
 Use a workflow flow when code chooses order, branching, retries, and fan-out.
 
 ```ts
-import { flow, tags, typed } from "@pumped-fn/lite"
-import { agent as agentRuntime, step, workflow as workflowRuntime, workerRegistry, workers } from "@pumped-fn/agent-sdk"
+import { createScope, flow, tags, typed } from "@pumped-fn/lite"
+import {
+  agent as agentRuntime,
+  step,
+  workflow as workflowRuntime,
+  workflowRun,
+  workerRegistry,
+  workers,
+} from "@pumped-fn/agent-sdk"
+import { agent as testAgent } from "@pumped-fn/agent-sdk-test"
 
 export const processPr = flow({
   name: "process_pr",
@@ -58,11 +72,26 @@ export const processPr = flow({
     return { taskId: workflow.taskId, status: "ok", tests, security }
   },
 })
+
+export async function runProcessPr(input: PrEvent) {
+  const { extensions } = testAgent()
+  const scope = createScope({ extensions })
+  const ctx = scope.createContext({
+    tags: [workflowRun({ taskId: input.sha, runId: "run-1" })],
+  })
+
+  try {
+    return await ctx.exec({ flow: processPr, input })
+  } finally {
+    await ctx.close()
+    await scope.dispose()
+  }
+}
 ```
 
 Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `agent.delegate()`.
 
-`step({ workflow: true })` marks the flow as workflow policy surface. `workflow` and `agent` runtime tags are required deps, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition.
+`step({ workflow: true })` marks the flow as workflow policy surface. `workflowRun()` is a context tag for run metadata, passed through `createContext({ tags: [...] })`. `workflow` and `agent` runtime tags are required deps, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition.
 
 ## 2. Worker Flow
 

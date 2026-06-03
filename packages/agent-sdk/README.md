@@ -34,7 +34,7 @@ flowchart TD
 - `workflowExtension()` for replay, suspend, timeout, and event-log policy.
 - `extension()` for agent remote dispatch.
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
-- `workflowRun()` tag for workflow-scoped context data.
+- `workflowRun()` context tag for workflow-scoped run data.
 - `abortSignal` tag for cooperative timeout cancellation.
 - `agent` runtime tag for named worker delegation.
 - `WorkerRegistry` for named worker calls through `agent.delegate()`.
@@ -54,7 +54,9 @@ import { createScope, flow } from "@pumped-fn/lite"
 import {
   extension,
   suspend,
-  run,
+  taskId,
+  runId,
+  stepCounter,
 } from "@pumped-fn/lite-extension-suspense"
 
 const externalSync = flow({
@@ -68,7 +70,13 @@ const scope = createScope({
   extensions: [extension({ log })],
 })
 
-const ctx = scope.createContext(run({ taskId: "doc-1", runId: "sync-1" }))
+const ctx = scope.createContext({
+  tags: [
+    taskId("doc-1"),
+    runId("sync-1"),
+    stepCounter({ next: 0 }),
+  ],
+})
 
 await ctx.exec({ flow: externalSync })
 ```
@@ -134,7 +142,7 @@ const ctx = scope.createContext({
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
+`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. `agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
 
 ## AI Is Just A Provider
 

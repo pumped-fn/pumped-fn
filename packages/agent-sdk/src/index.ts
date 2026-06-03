@@ -54,16 +54,18 @@ export const step = tag<Step>({ label: "agent.step", default: {} })
 export const materialKind = tag<MaterialKind>({ label: "agent.materialKind" })
 export const workers = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
 
-export class WorkerRegistry {
-  private readonly flows = new Map<string, Lite.Flow<unknown, unknown>>()
+type WorkerFlow = Lite.AnyFlow
 
-  register(flow: Lite.Flow<unknown, unknown>, name = flow.name): this {
+export class WorkerRegistry {
+  private readonly flows = new Map<string, WorkerFlow>()
+
+  register(flow: WorkerFlow, name = flow.name): this {
     if (!name) throw new Error("Worker flow must have a name")
     this.flows.set(name, flow)
     return this
   }
 
-  get(name: string): Lite.Flow<unknown, unknown> {
+  get(name: string): WorkerFlow {
     const found = this.flows.get(name)
     if (!found) throw new Error(`Worker "${name}" not registered`)
     return found
@@ -74,7 +76,7 @@ export class WorkerRegistry {
   }
 }
 
-export function workerRegistry(flows: Lite.Flow<unknown, unknown>[] = []): WorkerRegistry {
+export function workerRegistry(flows: readonly WorkerFlow[] = []): WorkerRegistry {
   const registry = new WorkerRegistry()
   for (const workerFlow of flows) registry.register(workerFlow)
   return registry
