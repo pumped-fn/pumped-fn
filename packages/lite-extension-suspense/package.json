@@ -22,6 +22,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown --config-loader tsx",
     "typecheck": "tsgo --noEmit",
