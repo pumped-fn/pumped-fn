@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/agent-sdk",
   "version": "1.0.0",
+  "private": true,
   "description": "Agent workflow substrate helpers for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
