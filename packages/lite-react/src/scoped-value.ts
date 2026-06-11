@@ -1,4 +1,5 @@
 'use client'
+'use no memo'
 
 import { resource, type Lite } from '@pumped-fn/lite'
 import { createStore, type PatchValue } from './store'

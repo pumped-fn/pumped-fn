@@ -1,9 +1,13 @@
 'use client'
+'use no memo'
 
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { ExecutionContextContext, ScopeContext } from './context'
+import { trackPendingWork } from './pending-work'
 import type { ScopedValue, ScopedValueAccess, ScopedValueView } from './scoped-value'
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 interface UseAtomSuspenseOptions {
   suspense?: true
@@ -187,7 +191,7 @@ function useResourceState<T>(resource: Lite.Resource<T>, startInRender: boolean)
   const ctx = useExecutionContext()
   const record = getResourceRecord(ctx, resource)
   if (startInRender && record.controller.state !== 'resolved' && record.controller.state !== 'failed') {
-    startResourceRecord(record)
+    trackPendingWork(ctx, startResourceRecord(record))
   }
   const subscribe = useCallback((onStoreChange: () => void) => {
     return record.controller.on('*', onStoreChange)
@@ -200,9 +204,9 @@ function useResourceState<T>(resource: Lite.Resource<T>, startInRender: boolean)
 
   useEffect(() => {
     if (!startInRender && (record.controller.state === 'idle' || record.controller.state === 'resolving')) {
-      startResourceRecord(record)
+      trackPendingWork(ctx, startResourceRecord(record))
     }
-  }, [load.status, record, startInRender])
+  }, [ctx, load.status, record, startInRender])
 
   return { load, promise: record.promise }
 }
@@ -459,12 +463,19 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
   // Skips useSyncExternalStore's snapshot-cache bookkeeping in favor of a
   // direct useReducer forceUpdate driven by a layout-effect subscription.
   // The non-Suspense path retains the full tearing-safe implementation below.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useLayoutEffect(() => {
+  const served = useRef<{ ctrl: Lite.Controller<T>; value: T } | null>(null)
+  useIsomorphicLayoutEffect(() => {
     if (!isSuspense) return
-    return ctrl.on('*', forceUpdate)
+    return ctrl.on('*', () => {
+      const last = served.current
+      if (last && last.ctrl === ctrl && (ctrl.state === 'resolved' || ctrl.state === 'resolving')) {
+        try {
+          if (Object.is(ctrl.get(), last.value)) return
+        } catch {}
+      }
+      forceUpdate()
+    })
   }, [ctrl, isSuspense])
   if (isSuspense) {
     const s = ctrl.state
@@ -473,7 +484,13 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
       throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
     }
     if (s === 'failed') throw ctrl.get()
-    try { return ctrl.get() } catch { throw getOrCreatePendingPromise(ctrl) }
+    try {
+      const value = ctrl.get()
+      served.current = { ctrl, value }
+      return value
+    } catch {
+      throw getOrCreatePendingPromise(ctrl)
+    }
   }
 
   const stateCache = useRef<{

@@ -95,7 +95,7 @@ const ctx = scope.createContext()
 
 Create the scope and explicit context outside component bodies. Do not call `createScope()` or `scope.createContext()` inside a React component; that creates a new graph during render. Components should consume an existing boundary through `ExecutionContextProvider`.
 
-Managed mode creates an execution context from the surrounding `ScopeProvider` after commit and closes it on unmount:
+Managed mode creates an execution context from the surrounding `ScopeProvider` synchronously during render — so the subtree renders on the server — and closes it on unmount. Contexts created by renders that suspend before committing are reclaimed automatically once their in-flight work settles:
 
 ```tsx
 <ScopeProvider scope={scope}>
@@ -369,13 +369,14 @@ render(
 
 ## SSR
 
-SSR-compatible when request-scoped atoms are resolved before rendering:
+Fully SSR-compatible — `'use client'` ships in the build output, all hooks provide server snapshots, and managed `ExecutionContextProvider` renders its subtree on the server:
 
 - No side effects on import
-- Scope passed as prop (no global state)
+- Scope passed as prop (no global state); module caches are keyed per controller/context, so concurrent requests stay isolated
+- Suspense resolution starts during the server render — `renderToPipeableStream`/`renderToReadableStream` stream final content; `renderToString` emits fallbacks for unresolved atoms
 
 ```tsx
-// Server
+// Server — pre-resolve for renderToString, or let Suspense stream
 const scope = createScope()
 await scope.resolve(dataAtom)
 const html = renderToString(<ScopeProvider scope={scope}><App /></ScopeProvider>)
@@ -387,6 +388,10 @@ const clientScope = createScope({
 await clientScope.resolve(dataAtom)
 hydrateRoot(root, <ScopeProvider scope={clientScope}><App /></ScopeProvider>)
 ```
+
+## React Compiler
+
+Compatible with apps compiled by the React Compiler — hooks return referentially stable values for unchanged state, and compiler-memoized inline selectors make `useSelect` cheaper, not broken. The library itself ships `'use no memo'` so source-compiling setups (Metro, monorepos) never auto-memoize hook internals that read live controller state during render.
 
 ## Full API
 

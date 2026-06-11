@@ -1,3 +1,6 @@
+'use client'
+'use no memo'
+
 type PatchValue<T> = T extends object ? Partial<T> : never
 
 interface Store<T> {
@@ -13,6 +16,10 @@ interface Store<T> {
 
 function notify(listeners: Set<() => void>): void {
   if (listeners.size === 0) return
+  if (listeners.size === 1) {
+    listeners.values().next().value!()
+    return
+  }
   for (const listener of [...listeners]) listener()
 }
 
