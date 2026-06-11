@@ -1,0 +1,23 @@
+{
+  "name": "@pumped-fn/lite-perf",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "bench": "vitest bench --run",
+    "bench:lite": "vitest bench --run bench/lite",
+    "bench:react": "vitest bench --run bench/react",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-react": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
