@@ -129,12 +129,6 @@ interface AtomEntry<T> {
   resolvedPromise?: Promise<T>
 }
 
-// Cached snapshot arrays for notifyListeners. Rebuilt when the underlying
-// Set's size changes (the common case: listener added or removed); reused
-// across fires when the set is stable. Keyed by the Set itself so GC'd Sets
-// release their snapshots automatically.
-const listenerSnapshotCache = new WeakMap<Set<() => void>, { size: number, arr: (() => void)[] }>()
-
 interface ResourceEntry<T> {
   state: AtomState
   value?: T
@@ -168,26 +162,30 @@ function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.Atom
   return dep.atom !== undefined
 }
 
+// Snapshot per dispatch, no caching: a size- or version-validated cache over a
+// subclassed Set was measured slower on the dominant 0/1-listener path (V8
+// drops built-in Set fast paths for subclasses), and membership-change bugs
+// hide behind equal sizes (see "listener replacement between dispatches").
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
     listeners.values().next().value!()
     return
   }
-  let snap = listenerSnapshotCache.get(listeners)
-  if (!snap || snap.size !== listeners.size) {
-    snap = { size: listeners.size, arr: [...listeners] }
-    listenerSnapshotCache.set(listeners, snap)
-  }
-  const arr = snap.arr
-  const n = arr.length
-  for (let i = 0; i < n; i++) arr[i]!()
+  const arr = [...listeners]
+  for (let i = 0; i < arr.length; i++) arr[i]!()
 }
 
+// The controller subscription is registered lazily on first subscribe(), so
+// creating a handle during a React render (which may be discarded) acquires
+// no resources. Until then get()/subscribe() refresh by source-value identity;
+// after dispose or last-unsubscribe the handle freezes (existing contract).
 class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   private listeners = new Set<() => void>()
+  private sourceValue: T
   private currentValue: S
   private ctrlUnsub: (() => void) | null = null
+  private frozen = false
 
   constructor(
     private ctrl: Lite.Controller<T>,
@@ -198,28 +196,35 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
       throw new Error("Cannot select from unresolved atom")
     }
 
-    this.currentValue = selector(ctrl.get())
-    this.ctrlUnsub = ctrl.on('resolved', () => {
-      const nextValue = this.selector(this.ctrl.get())
-      if (!this.eq(this.currentValue, nextValue)) {
-        this.currentValue = nextValue
-        this.notifyListeners()
-      }
-    })
+    this.sourceValue = ctrl.get()
+    this.currentValue = selector(this.sourceValue)
+  }
+
+  private refreshFromSource(): void {
+    const source = this.ctrl.get()
+    if (Object.is(source, this.sourceValue)) return
+    this.sourceValue = source
+    const nextValue = this.selector(source)
+    if (!this.eq(this.currentValue, nextValue)) {
+      this.currentValue = nextValue
+    }
   }
 
   get(): S {
+    if (!this.ctrlUnsub && !this.frozen) this.refreshFromSource()
     return this.currentValue
   }
 
   subscribe(listener: () => void): () => void {
     if (!this.ctrlUnsub) {
-      this.currentValue = this.selector(this.ctrl.get())
+      this.refreshFromSource()
+      this.frozen = false
       this.ctrlUnsub = this.ctrl.on('resolved', () => {
-        const nextValue = this.selector(this.ctrl.get())
+        this.sourceValue = this.ctrl.get()
+        const nextValue = this.selector(this.sourceValue)
         if (!this.eq(this.currentValue, nextValue)) {
           this.currentValue = nextValue
-          this.notifyListeners()
+          notifyListeners(this.listeners)
         }
       })
     }
@@ -233,10 +238,6 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
     }
   }
 
-  private notifyListeners(): void {
-    notifyListeners(this.listeners)
-  }
-
   dispose(): void {
     this.listeners.clear()
     this.cleanup()
@@ -245,6 +246,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   private cleanup(): void {
     this.ctrlUnsub?.()
     this.ctrlUnsub = null
+    this.frozen = true
   }
 }
 
@@ -356,6 +358,7 @@ class ScopeImpl implements Lite.Scope {
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
   private invalidationQueue: Lite.Atom<unknown>[] = []
+  private invalidationQueued = new Set<Lite.Atom<unknown>>()
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
@@ -380,7 +383,10 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    if (!this.invalidationQueue.includes(atom)) this.invalidationQueue.push(atom)
+    if (!this.invalidationQueued.has(atom)) {
+      this.invalidationQueued.add(atom)
+      this.invalidationQueue.push(atom)
+    }
 
     if (!this.chainPromise) {
       this.chainError = null
@@ -396,6 +402,7 @@ class ScopeImpl implements Lite.Scope {
     try {
       while (this.invalidationQueue.length > 0 && !this.disposed) {
         const atom = this.invalidationQueue.shift()!
+        this.invalidationQueued.delete(atom)
         const result = this.doInvalidateSequential(atom)
         if (result) await result
       }
@@ -547,35 +554,8 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved'): void {
-    // Inline notifyListeners for both phase-specific and allListeners sets.
-    // Direct WeakMap lookup + iteration avoids 2 function dispatches per fire
-    // (notifyEntry used to call notifyListeners twice).
-    const phase = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
-    const phSize = phase.size
-    if (phSize === 1) {
-      for (const fn of phase) { fn(); break }
-    } else if (phSize > 1) {
-      let snap = listenerSnapshotCache.get(phase)
-      if (!snap || snap.size !== phSize) {
-        snap = { size: phSize, arr: [...phase] }
-        listenerSnapshotCache.set(phase, snap)
-      }
-      const arr = snap.arr
-      for (let i = 0; i < phSize; i++) arr[i]!()
-    }
-    const all = entry.allListeners
-    const aSize = all.size
-    if (aSize === 1) {
-      for (const fn of all) { fn(); break }
-    } else if (aSize > 1) {
-      let snap = listenerSnapshotCache.get(all)
-      if (!snap || snap.size !== aSize) {
-        snap = { size: aSize, arr: [...all] }
-        listenerSnapshotCache.set(all, snap)
-      }
-      const arr = snap.arr
-      for (let i = 0; i < aSize; i++) arr[i]!()
-    }
+    notifyListeners(event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners)
+    notifyListeners(entry.allListeners)
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>): void {
@@ -1466,6 +1446,7 @@ class ScopeImpl implements Lite.Scope {
     this.disposed = true
 
     this.invalidationQueue.length = 0
+    this.invalidationQueued.clear()
     this.invalidationChain = null
     this.chainPromise = null
 

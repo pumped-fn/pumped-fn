@@ -4122,3 +4122,54 @@ describe("dispose() behavior", () => {
     expect(() => scope4.createContext()).toThrow()
   })
 })
+
+describe("listener replacement between dispatches", () => {
+  it("notifies fresh ctrl.on listeners after equal-count unsubscribe/resubscribe", async () => {
+    const scope = createScope()
+    const a = atom({ factory: () => 0 })
+    await scope.resolve(a)
+    const ctrl = scope.controller(a)
+
+    const log: string[] = []
+    const u1 = ctrl.on("resolved", () => log.push("old1"))
+    const u2 = ctrl.on("resolved", () => log.push("old2"))
+    ctrl.set(1)
+    expect(log).toEqual(["old1", "old2"])
+
+    u1()
+    u2()
+    ctrl.on("resolved", () => log.push("new1"))
+    ctrl.on("resolved", () => log.push("new2"))
+    log.length = 0
+    ctrl.set(2)
+    expect(log).toEqual(["new1", "new2"])
+    await scope.dispose()
+  })
+
+  it("notifies fresh select handles after equal-count handle churn", async () => {
+    const scope = createScope()
+    const a = atom({ factory: () => 0 })
+    await scope.resolve(a)
+    const ctrl = scope.controller(a)
+
+    const fired: number[] = []
+    const makeHandles = (n: number) =>
+      Array.from({ length: n }, (_, i) => {
+        const h = scope.select(a, (v) => v)
+        h.subscribe(() => fired.push(i))
+        return h
+      })
+
+    const gen1 = makeHandles(2)
+    ctrl.set(1)
+    expect(fired).toEqual([0, 1])
+
+    const gen2 = makeHandles(2)
+    for (const h of gen1) h.dispose()
+    fired.length = 0
+    ctrl.set(2)
+    expect(fired).toEqual([0, 1])
+    for (const h of gen2) h.dispose()
+    await scope.dispose()
+  })
+})
