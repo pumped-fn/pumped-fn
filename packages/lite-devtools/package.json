@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/lite-devtools",
   "version": "3.0.0",
+  "private": true,
   "description": "Observability extension for @pumped-fn/lite with fire-and-forget transport-based event streaming",
   "type": "module",
   "main": "./dist/index.cjs",

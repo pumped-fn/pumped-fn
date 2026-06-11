@@ -1,6 +1,7 @@
 {
   "name": "@pumped-fn/lite-hmr",
   "version": "1.0.1",
+  "private": true,
   "description": "Vite HMR plugin for @pumped-fn/lite atoms",
   "type": "module",
   "main": "./dist/index.cjs",
