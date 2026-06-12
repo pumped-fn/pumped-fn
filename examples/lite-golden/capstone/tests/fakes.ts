@@ -17,7 +17,7 @@ export async function exec<O, I>(scope: Lite.Scope, flow: Lite.Flow<O, I>, input
 type Timer = {
   ms: number
   next: number
-  fn: () => void
+  fn: () => unknown
 }
 
 export class FakeClock implements ClockPort {
@@ -31,7 +31,7 @@ export class FakeClock implements ClockPort {
     return this.time
   }
 
-  every(ms: number, fn: () => void): () => void {
+  every(ms: number, fn: () => unknown): () => void {
     const id = ++this.nextId
     this.created++
     this.timers.set(id, { ms, next: this.time + ms, fn })
@@ -60,13 +60,11 @@ export class FakeClock implements ClockPort {
       for (const [id, timer] of [...this.timers]) {
         if (timer.next === next) {
           timer.next += timer.ms
-          if (this.timers.has(id)) timer.fn()
+          if (this.timers.has(id)) await timer.fn()
         }
       }
-      await this.drain()
     }
     this.time = end
-    await this.drain()
   }
 
   private hasDue(end: number): boolean {
@@ -75,9 +73,5 @@ export class FakeClock implements ClockPort {
 
   private nextDue(): number {
     return Math.min(...[...this.timers.values()].map((timer) => timer.next))
-  }
-
-  private async drain(): Promise<void> {
-    for (let i = 0; i < 50; i++) await Promise.resolve()
   }
 }

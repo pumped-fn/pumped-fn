@@ -30,9 +30,10 @@ export const scheduler = atom({
             }
           )
         pending.add(work)
-        void work.finally(() => {
+        work.finally(() => {
           pending.delete(work)
         })
+        return work
       })
     )
     ctx.cleanup(async () => {
