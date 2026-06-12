@@ -76,12 +76,12 @@ sequenceDiagram
     participant Scope
     participant Atom
 
-    Test->>Scope: createScope({ presets: [preset(dbAtom, mockDb)], tags: [tenantTag(id)] })
-    Test->>Scope: resolve(dbAtom)
+    Test->>Scope: createScope({ presets: [preset(db, mockDb)], tags: [tenant(id)] })
+    Test->>Scope: resolve(db)
     Scope-->>Test: mockDb (not real db)
 
     Test->>Scope: createContext()
-    Scope-->>Test: ctx with tenantTag
+    Scope-->>Test: ctx with tenant(id)
 ```
 
 ### Execution-Scoped Resource
@@ -91,7 +91,7 @@ Resolve resource values from an `ExecutionContext` when the value should live fo
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
 
-const txResource = resource({
+const tx = resource({
   name: "tx",
   factory: (ctx) => {
     const tx = {
@@ -108,14 +108,16 @@ const txResource = resource({
 
 const scope = createScope()
 const ctx = scope.createContext()
-const tx = await ctx.resolve(txResource)
+await ctx.resolve(tx)
 
-await ctx.release(txResource) // reset this context's tx
-await ctx.close()
+// Normal flow: close the context — onClose fires commit/rollback, then cleanup fires release
+await ctx.close({ ok: true })
 await scope.dispose()
 ```
 
 Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. Resource ownership stays local to the execution context that created it; child executions can read ancestor-owned resources, but they do not release them.
+
+> **`ctx.release(tx)` vs `ctx.close()`**: `ctx.release(tx)` runs only the resource's `ctx.cleanup` handlers (owner-local reset for mid-request recycle), but `onClose` handlers registered by that resource still fire when `ctx.close()` is eventually called. Do not follow `ctx.release(tx)` with `ctx.close()` if the resource registered an `onClose` side effect (e.g., commit) — the released resource will be committed again. Use `ctx.release` only when you need a fresh resource instance within the same open context and the `onClose` side effect is safe to run regardless.
 
 ### Resource Controller Dependency
 
@@ -124,13 +126,13 @@ Use `controller(resource)` when a resource should decide whether or when to load
 ```ts
 import { controller, resource } from "@pumped-fn/lite"
 
-const configResource = resource({
+const config = resource({
   factory: () => ({ namespace: "app", version: 1 }),
 })
 
-const cacheResource = resource({
+const cache = resource({
   deps: {
-    config: controller(configResource, {
+    config: controller(config, {
       resolve: true,
       watch: true,
       eq: (a, b) => a.namespace === b.namespace && a.version === b.version,
@@ -159,6 +161,10 @@ sequenceDiagram
     App->>Scope: controller(atom)
     Scope-->>App: ctrl
 
+    Note over App,Atom: atom must be resolved before get/set/update/invalidate — all throw on idle
+    App->>Scope: resolve(atom)
+    Scope-->>App: value
+
     App->>Ctrl: ctrl.on('resolving' | 'resolved' | '*', listener)
     Ctrl-->>App: unsubscribe
 
@@ -166,14 +172,20 @@ sequenceDiagram
     Ctrl-->>App: current value
 
     App->>Ctrl: ctrl.set(newValue)
-    Ctrl->>Ctrl: notify listeners
+    Note right of Ctrl: apply value, skip factory, cleanups NOT run
+    Ctrl->>Ctrl: emit 'resolved'
 
     App->>Ctrl: ctrl.update(v => v + 1)
-    Ctrl->>Ctrl: notify listeners
+    Note right of Ctrl: apply fn(prev), skip factory, cleanups NOT run
+    Ctrl->>Ctrl: emit 'resolved'
 
     App->>Ctrl: ctrl.invalidate()
-    Ctrl->>Atom: re-run factory
-    Ctrl->>Ctrl: notify listeners
+    Ctrl->>Scope: scheduleInvalidation
+    Scope->>Scope: run atom cleanups (LIFO)
+    Scope->>Scope: emit 'resolving'
+    Scope->>Atom: re-run factory
+    Scope->>Scope: state resolved
+    Ctrl->>Ctrl: emit 'resolved'
 ```
 
 ### Ambient Context (Tags)
@@ -189,21 +201,21 @@ sequenceDiagram
     participant ChildCtx
     participant Data as ctx.data
 
-    App->>Scope: createScope({ tags: [configTag(cfg)] })
-    App->>Scope: resolve(dbAtom)
-    Note right of Atom: deps: { config: tags.required(configTag) }
+    App->>Scope: createScope({ tags: [config(cfg)] })
+    App->>Scope: resolve(db)
+    Note right of Atom: deps: { config: tags.required(config) }
     Scope->>Atom: factory(ctx, { config: cfg })
 
-    App->>Scope: scope.createContext({ tags: [requestIdTag(rid)] })
+    App->>Scope: scope.createContext({ tags: [requestId(rid)] })
     Scope-->>App: ctx
 
-    App->>Ctx: ctx.exec({ flow, tags: [localeTag('en')] })
+    App->>Ctx: ctx.exec({ flow, tags: [locale('en')] })
     Ctx->>ChildCtx: create with merged tags
 
-    ChildCtx->>Data: ctx.data.seekTag(requestIdTag)
+    ChildCtx->>Data: ctx.data.seekTag(requestId)
     Data-->>ChildCtx: rid (from parent)
 
-    ChildCtx->>Data: ctx.data.getTag(localeTag)
+    ChildCtx->>Data: ctx.data.getTag(locale)
     Data-->>ChildCtx: 'en'
 ```
 
@@ -217,6 +229,10 @@ sequenceDiagram
     participant Scope
     participant Handle as SelectHandle
     participant Atom
+
+    Note over App,Atom: atom must be resolved before select() — throws on unresolved atom
+    App->>Scope: resolve(atom)
+    Scope-->>App: value
 
     App->>Scope: select(atom, v => v.count, { eq: shallowEqual })
     Scope-->>App: handle
@@ -282,13 +298,13 @@ Receive a reactive handle instead of the resolved value in atom deps. Use `resol
 ```mermaid
 sequenceDiagram
     participant Scope
-    participant Parent as derivedAtom
-    participant Dep as configAtom
+    participant Parent as derived
+    participant Dep as config
     participant Ctrl as Controller
 
-    Scope->>Parent: resolve(derivedAtom)
-    Note over Parent: deps: { cfg: controller(configAtom, { resolve: true, watch: true, eq? }) }
-    Parent->>Scope: resolve configAtom first
+    Scope->>Parent: resolve(derived)
+    Note over Parent: deps: { cfg: controller(config, { resolve: true, watch: true, eq? }) }
+    Parent->>Scope: resolve config first
     Scope-->>Ctrl: ctrl (resolved)
     Parent->>Parent: factory(_, { cfg: ctrl })
     Note over Scope: on dep 'resolved': compare prev/next via eq ?? shallowEqual (plain objects, Object.is otherwise)
@@ -327,15 +343,30 @@ sequenceDiagram
 
     App->>Scope: resolve(atom)
     Scope-->>App: value
-    Note over Scope: no refs → start grace timer
+    Note over Scope: bare resolve does not trigger GC
+
+    Note over App,Scope: later — subscriber unsubscribes or dependent released
+    App->>Scope: ctrl.on unsub() or release(parent)
+    Scope->>Scope: no refs left? queue GC check
 
     alt keepAlive: true
-        Note over Atom: never GC'd
+        Note over Atom: never GCd
     else graceMs expires
         Scope->>Atom: release()
         Atom->>Atom: run cleanups
     end
 
     App->>Scope: flush()
-    Note over Scope: wait all pending
+    Note over Scope: await invalidation chain only
+```
+
+## Golden Examples
+
+Runnable examples live in `examples/lite-golden`. They cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
+
+Run them with:
+
+```bash
+pnpm -F @pumped-fn/lite-golden test
+pnpm -F @pumped-fn/lite-golden typecheck
 ```

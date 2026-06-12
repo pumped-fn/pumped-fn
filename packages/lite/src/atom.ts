@@ -17,8 +17,12 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
  *
  * @example
  * ```typescript
- * const dbAtom = atom({
- *   factory: async (ctx) => createDatabase()
+ * const db = atom({
+ *   factory: async (ctx) => {
+ *     const pool = await createDatabase()
+ *     ctx.cleanup(() => pool.end())
+ *     return pool
+ *   }
  * })
  * ```
  */
@@ -95,20 +99,24 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  * @example
  * ```typescript
  * // resolve only
- * const serverAtom = atom({
- *   deps: { config: controller(configAtom, { resolve: true }) },
- *   factory: (_, { config }) => createServer(config.get().port),
+ * const server = atom({
+ *   deps: { config: controller(config, { resolve: true }) },
+ *   factory: (ctx, { config }) => {
+ *     const s = createServer(config.get().port)
+ *     ctx.cleanup(() => s.close())
+ *     return s
+ *   },
  * })
  *
  * // watch: re-runs parent when dep value changes
- * const profileAtom = atom({
- *   deps: { token: controller(tokenAtom, { resolve: true, watch: true }) },
+ * const profile = atom({
+ *   deps: { token: controller(token, { resolve: true, watch: true }) },
  *   factory: (_, { token }) => ({ id: `user-${token.get().jwt}` }),
  * })
  *
  * // watch with custom equality
- * const derivedAtom = atom({
- *   deps: { src: controller(srcAtom, { resolve: true, watch: true, eq: (a, b) => a.id === b.id }) },
+ * const derived = atom({
+ *   deps: { src: controller(src, { resolve: true, watch: true, eq: (a, b) => a.name === b.name }) },
  *   factory: (_, { src }) => src.get().name,
  * })
  * ```
@@ -193,7 +201,9 @@ export function controller<T>(
  * @example
  * ```typescript
  * if (isControllerDep(dep)) {
- *   const ctrl = scope.controller(dep.atom)
+ *   if (dep.atom) {
+ *     const ctrl = scope.controller(dep.atom)
+ *   }
  * }
  * ```
  */

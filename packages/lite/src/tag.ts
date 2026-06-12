@@ -83,10 +83,10 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
  *
  * @example
  * ```typescript
- * const nameTag = tag<string>({ label: "name" })
- * const myAtom = atom({
+ * const name = tag<string>({ label: "name" })
+ * const greeting = atom({
  *   factory: (ctx) => "value",
- *   tags: [nameTag("MyAtom")]
+ *   tags: [name("greeting")]
  * })
  * ```
  */
@@ -248,8 +248,8 @@ export const tags = {
    *
    * @example
    * ```typescript
-   * const myAtom = atom({
-   *   deps: { name: tags.required(nameTag) },
+   * const greeting = atom({
+   *   deps: { name: tags.required(name) },
    *   factory: (ctx, { name }) => `Hello ${name}`
    * })
    * ```
@@ -266,8 +266,8 @@ export const tags = {
    *
    * @example
    * ```typescript
-   * const myAtom = atom({
-   *   deps: { name: tags.optional(nameTag) },
+   * const greeting = atom({
+   *   deps: { name: tags.optional(name) },
    *   factory: (ctx, { name }) => name ?? "Anonymous"
    * })
    * ```
@@ -284,8 +284,8 @@ export const tags = {
    *
    * @example
    * ```typescript
-   * const myAtom = atom({
-   *   deps: { names: tags.all(nameTag) },
+   * const roster = atom({
+   *   deps: { names: tags.all(name) },
    *   factory: (ctx, { names }) => names.join(", ")
    * })
    * ```

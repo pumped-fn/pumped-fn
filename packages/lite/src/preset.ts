@@ -18,7 +18,7 @@ type ResourcePresetValue<T> =
  * @example
  * ```typescript
  * const scope = createScope({
- *   presets: [preset(dbAtom, mockDatabase)]
+ *   presets: [preset(db, mockDatabase)]
  * })
  * ```
  */
@@ -37,13 +37,13 @@ export function preset<T>(
  * @example
  * ```typescript
  * // Replace with another flow
- * const scope = createScope({
- *   presets: [preset(processFlow, mockProcessFlow)]
+ * const scopeA = createScope({
+ *   presets: [preset(process, processStub)]
  * })
  *
  * // Replace with a function (deps are NOT resolved)
- * const scope = createScope({
- *   presets: [preset(processFlow, (ctx) => ({ result: ctx.input }))]
+ * const scopeB = createScope({
+ *   presets: [preset(process, (ctx) => ({ result: ctx.input }))]
  * })
  * ```
  */

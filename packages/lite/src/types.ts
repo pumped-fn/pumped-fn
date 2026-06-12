@@ -201,8 +201,10 @@ export namespace Lite {
     readonly state: AtomState
     /**
      * Get current value synchronously.
-     * @throws If atom is idle or failed
-     * @returns Current value (stale value during resolving)
+     * @throws If atom is idle, failed, or in `'resolving'` state without a
+     *   prior value (first resolution not yet complete)
+     * @returns Current value; during re-resolution returns the previous
+     *   (stale) value
      */
     get(): T
     /** Trigger resolution if not already resolved */
@@ -212,15 +214,17 @@ export namespace Lite {
     /** Schedule re-resolution (runs factory) */
     invalidate(): void
     /**
-     * Replace value directly without running factory.
-     * Runs cleanups, transitions resolving→resolved, notifies listeners.
+     * Replace the stored value without running the factory or cleanups.
+     * Emits `'resolved'` only. Use `invalidate()` when the previous value's
+     * resources must be released.
      * @throws If atom is idle or failed
      */
     set(value: T): void
     /**
-     * Transform value using function without running factory.
-     * Equivalent to `set(fn(get()))` but queued atomically.
-     * Runs cleanups, transitions resolving→resolved, notifies listeners.
+     * Transform the stored value using a function without running the factory
+     * or cleanups. Equivalent to `set(fn(get()))` but queued atomically.
+     * Emits `'resolved'` only. Use `invalidate()` when the previous value's
+     * resources must be released.
      * @throws If atom is idle or failed
      */
     update(fn: (prev: T) => T): void
@@ -506,42 +510,45 @@ export namespace Lite {
   /**
    * Utility types for type extraction and manipulation.
    * @example
-   * type Config = Lite.Utils.AtomValue<typeof configAtom>
-   * type Result = Lite.Utils.FlowOutput<typeof processFlow>
+   * type Config = Lite.Utils.AtomValue<typeof config>
+   * type Result = Lite.Utils.FlowOutput<typeof process>
    */
   export namespace Utils {
     /**
      * Extract value type from an Atom.
      * @example
-     * type Config = Lite.Utils.AtomValue<typeof configAtom> // string
+     * type Config = Lite.Utils.AtomValue<typeof config> // string
      */
     export type AtomValue<A> = A extends Atom<infer T> ? T : never
 
     /**
      * Extract output type from a Flow.
      * @example
-     * type Result = Lite.Utils.FlowOutput<typeof processFlow> // ProcessResult
+     * type Result = Lite.Utils.FlowOutput<typeof process> // ProcessResult
      */
-    export type FlowOutput<F> = F extends Flow<infer O, unknown> ? O : never
+    export type FlowOutput<F> = F extends Flow<infer O, any> ? O : never
 
     /**
      * Extract input type from a Flow.
      * @example
-     * type Input = Lite.Utils.FlowInput<typeof processFlow> // ProcessRequest
+     * type Input = Lite.Utils.FlowInput<typeof process> // ProcessRequest
      */
     export type FlowInput<F> = F extends Flow<unknown, infer I> ? I : never
 
     /**
      * Extract value type from a Tag.
      * @example
-     * type UserId = Lite.Utils.TagValue<typeof userIdTag> // string
+     * type UserId = Lite.Utils.TagValue<typeof userId> // string
      */
     export type TagValue<T> = T extends Tag<infer V, boolean> ? V : never
 
     /**
-     * Extract dependencies record from an Atom or Flow.
+     * Extract the deps record from an Atom or Flow declared with `AtomType<T, D>`.
+     * `atom()` erases `D`, so `DepsOf` on a plain `atom()` call returns the
+     * index-typed `Record<string, Dependency> | undefined`.
      * @example
-     * type Deps = Lite.Utils.DepsOf<typeof myAtom> // { db: DbAtom, cache: CacheAtom }
+     * type RepoAtom = Lite.Utils.AtomType<Repo, { db: Lite.Atom<Db>; cache: Lite.Atom<Cache> }>
+     * type RepoDeps = Lite.Utils.DepsOf<RepoAtom> // { db: Lite.Atom<Db>; cache: Lite.Atom<Cache> }
      */
     export type DepsOf<T> = T extends Atom<unknown>
       ? T['deps']

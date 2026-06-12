@@ -14,6 +14,7 @@ No:
   - Rule: precise type at the **call site** (`Options<T>`), `any` on the **stored field** only
 - Single-use variables declared then immediately returned (inline them)
 - Style inconsistent with surrounding code
+- Type suffixes on definition handles — `const store = atom(…)`, `const runCheck = flow(…)`, `const tx = resource(…)`, `const requestId = tag(…)`; never `storeAtom`/`runCheckFlow`/`txResource`/`requestIdTag`. The type system carries the kind; rely on inference (deps shorthand, factory params shadow handles)
 
 ## PR Checklist
 - `README.md` diagram reflects changes

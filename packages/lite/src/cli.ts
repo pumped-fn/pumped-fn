@@ -38,7 +38,7 @@ const categories: Record<string, { title: string; content: string | (() => strin
     Factory receives ExecutionContext: ctx.exec(), ctx.onClose(), ctx.input, ctx.parent, ctx.data.
 
   RESOURCE = execution-scoped singleton (shared within an exec chain)
-    Created fresh per root ctx.exec(). Shared across nested exec() calls via seek-up.
+    Created by the first (possibly nested) context that encounters it. Shared across nested exec() calls via seek-up.
     Think: per-request logger, transaction, trace span.
     Declared as a flow dep, NOT called directly.
 
@@ -69,9 +69,9 @@ atom({ factory, deps?, tags?, keepAlive? })
   Resolved via scope.resolve(atom). Cached — second resolve() returns same value.
 
   import { atom } from "@pumped-fn/lite"
-  const dbAtom = atom({ factory: () => createDbPool() })
-  const userAtom = atom({
-    deps: { db: dbAtom },
+  const db = atom({ factory: () => createDbPool(), keepAlive: true })
+  const user = atom({
+    deps: { db },
     factory: (ctx, { db }) => db.query("SELECT ..."),
   })
 
@@ -83,7 +83,7 @@ flow({ factory, parse?, deps?, tags? })
   import { flow, typed } from "@pumped-fn/lite"
   const getUser = flow({
     parse: typed<{ id: string }>(),
-    deps: { db: dbAtom },
+    deps: { db },
     factory: (ctx, { db }) => db.findUser(ctx.input.id),
   })
 
@@ -94,8 +94,8 @@ resource({ factory, deps?, name? })
   Resource cleanup via ctx.cleanup(fn); execution-boundary cleanup via ctx.onClose(fn).
 
   import { resource } from "@pumped-fn/lite"
-  const txResource = resource({
-    deps: { db: dbAtom },
+  const tx = resource({
+    deps: { db },
     factory: (ctx, { db }) => {
       const tx = db.beginTransaction()
       ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())
@@ -105,7 +105,7 @@ resource({ factory, deps?, name? })
   })
   // Used as a flow dep — NOT called directly
   const saveUser = flow({
-    deps: { tx: txResource },
+    deps: { tx },
     factory: (ctx, { tx }) => tx.insert("users", ctx.input),
   })
 
@@ -114,14 +114,14 @@ tag({ label, default?, parse? })
   Resolution order: exec tags > context tags > scope tags (nearest wins).
 
   import { tag } from "@pumped-fn/lite"
-  const tenantTag = tag<string>({ label: "tenant" })
+  const tenant = tag<string>({ label: "tenant" })
 
 preset(target, value)
   Override an atom or flow's resolved value. Used for testing and multi-tenant isolation.
-  value can be: a literal, another atom (redirect), or a function (flow only).
+  value can be: a literal, another atom/flow/resource (redirect), or a function (flows and resources).
 
   import { preset } from "@pumped-fn/lite"
-  const mockDb = preset(dbAtom, fakeDatabaseInstance)
+  const mockDb = preset(db, fakeDatabaseInstance)
 
 service({ factory, deps? })
   Convenience wrapper for atom whose value is an object of methods.
@@ -137,8 +137,8 @@ service({ factory, deps? })
   import { createScope } from "@pumped-fn/lite"
   const scope = createScope({
     extensions: [loggingExt],
-    presets: [preset(dbAtom, mockDb)],
-    tags: [tenantTag("acme")],
+    presets: [preset(db, mockDb)],
+    tags: [tenant("acme")],
     gc: { enabled: true, graceMs: 3000 },
   })
   await scope.ready
@@ -147,10 +147,10 @@ scope.resolve(atom)        → Promise<value>     resolve and cache an atom
 scope.controller(atom)     → Controller          get reactive handle
 scope.select(atom, fn, opts?) → SelectHandle     derived slice with equality check
 scope.on(event, atom, fn)  → unsubscribe         listen to atom events
-scope.release(atom)        → void                release atom, run cleanups
+scope.release(atom)        → Promise<void>       release atom, run cleanups
 scope.createContext(opts?)  → ExecutionContext    create execution boundary
 scope.flush()              → Promise<void>       wait all pending operations
-scope.dispose()            → void                release everything, run all cleanups`,
+scope.dispose()            → Promise<void>       release everything, run all cleanups`,
   },
 
   context: {
@@ -164,14 +164,17 @@ ResolveContext (received by atom factories):
   ctx.data              per-atom key-value store (persists across invalidations)
 
 ExecutionContext (received by flow factories and inline fns):
-  ctx.exec(...)         execute a nested flow or function (creates child context)
-  ctx.onClose(fn)       register cleanup (runs LIFO on close, receives CloseResult)
-  ctx.close(result?)    close this context, run all cleanups
-  ctx.input             parsed input (flows only)
-  ctx.parent            parent ExecutionContext (undefined for root)
-  ctx.name              exec name or flow name
-  ctx.scope             the owning Scope
-  ctx.data              per-context key-value store with tag support
+  ctx.exec(...)              execute a nested flow or function (creates child context)
+  ctx.onClose(fn)            register cleanup (runs LIFO on close, receives CloseResult)
+  ctx.close(result?)         close this context, run all cleanups
+  ctx.resolve(resource)      resolve a resource in this exec chain (seek-up before create)
+  ctx.release(resource)      owner-local reset of a resource
+  ctx.controller(resource)   get a ResourceController for a resource
+  ctx.input                  parsed input (flows only)
+  ctx.parent                 parent ExecutionContext (undefined for root)
+  ctx.name                   exec name or flow name
+  ctx.scope                  the owning Scope
+  ctx.data                   per-context key-value store with tag support
 
 ResourceContext (received by resource factories):
   all ExecutionContext fields/methods above, plus:
@@ -180,12 +183,13 @@ ResourceContext (received by resource factories):
 ctx = scope.createContext({ tags? })
   Creates a root ExecutionContext. Tags merge: exec tags > context tags > scope tags.
 
-ctx.exec({ flow, input?, rawInput?, tags? })  → Promise<output>
+ctx.exec({ flow, input?, rawInput?, name?, tags? })  → Promise<output>
   Execute a flow. Creates a child context with merged tags.
-  If flow has parse: rawInput goes through parse first, input skips parse.
+  If flow has a parse function: it runs on whichever channel is provided (input or rawInput).
+  typed<T>() is a no-op parse (erased at flow creation) — use it to declare input type only.
   Child context closes automatically after execution.
 
-ctx.exec({ fn, params?, name?, tags? })  → Promise<result>
+ctx.exec({ fn, params, name?, tags? })  → Promise<result>
   Execute an inline function: fn(childCtx, ...params).
   Same child-context lifecycle as flow execution.
 
@@ -208,30 +212,30 @@ Reactivity is opt-in via controllers. Two ways to get a controller:
 
 2. controller(atom, opts?) → ControllerDep (dep marker)
    Wrap an atom dep so the factory receives a Controller instead of the resolved value.
-   Used inside deps: { cfg: controller(configAtom, { resolve: true }) }
+   Used inside deps: { cfg: controller(config, { resolve: true }) }
    This is NOT the same as scope.controller() — it's a dep declaration.
 
 Controller API:
   ctrl.state                → 'idle' | 'resolving' | 'resolved' | 'failed'
-  ctrl.get()                → current value (throws if not resolved)
+  ctrl.get()                → current value (stale during re-resolve; throws during first resolve or if failed)
   ctrl.resolve()            → Promise<value> (resolve if not yet)
   ctrl.set(value)           → replace value, notify listeners, skip factory
   ctrl.update(fn)           → transform value via function, notify listeners
   ctrl.invalidate()         → re-run factory, notify listeners
   ctrl.release()            → release atom, run cleanups
   ctrl.on(event, listener)  → unsubscribe
-    events: 'resolving' | 'resolved' | 'failed' | '*'
+    events: 'resolving' | 'resolved' | '*'  (atom controllers have no 'failed' event; ResourceController does)
 
 Controller as dependency (opts):
   controller(atom)                          → dep receives Controller (idle, must manually resolve)
   controller(atom, { resolve: true })       → dep receives Controller (pre-resolved before factory runs)
   controller(atom, { resolve: true, watch: true })  → ALSO auto-invalidates parent when dep value changes
-  controller(atom, { resolve: true, watch: true, eq })  → custom equality gate (default: structural deep equal for plain objects, Object.is otherwise)
+  controller(atom, { resolve: true, watch: true, eq })  → custom equality gate (default: shallow equal — Object.is per top-level key for plain objects, Object.is otherwise)
 
   watch:true replaces the manual pattern:
     ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))
   With the declarative:
-    deps: { src: controller(srcAtom, { resolve: true, watch: true }) }
+    deps: { src: controller(src, { resolve: true, watch: true }) }
   The watch listener is auto-cleaned on re-resolve, release, and dispose.
 
 select(atom, selector, { eq? })  → SelectHandle
@@ -240,7 +244,7 @@ select(atom, selector, { eq? })  → SelectHandle
   handle.subscribe(fn)      → unsubscribe
   handle.dispose()          → clean up internal subscription
 
-scope.on('resolving' | 'resolved' | 'failed', atom, listener)  → unsubscribe
+scope.on('idle' | 'resolving' | 'resolved' | 'failed', atom, listener)  → unsubscribe
   Listen to atom state transitions at scope level.`,
   },
 
@@ -250,30 +254,30 @@ scope.on('resolving' | 'resolved' | 'failed', atom, listener)  → unsubscribe
 
 tag<T>({ label, default?, parse? })  → Tag<T>
   Define a tag type. The tag object is both a type definition and a factory:
-  const tenantTag = tag<string>({ label: "tenant" })
-  const tagged = tenantTag("acme")  // creates Tagged<string>
+  const tenant = tag<string>({ label: "tenant" })
+  const tagged = tenant("acme")  // creates Tagged<string>
 
 Resolution hierarchy (nearest wins):
-  1. exec tags:    ctx.exec({ flow, tags: [tenantTag("exec")] })
-  2. flow tags:    flow({ tags: [tenantTag("flow")] })
-  3. context tags: scope.createContext({ tags: [tenantTag("ctx")] })
-  4. ctx.data:     parent ctx.data.setTag(tenantTag, "middleware")  ← seekTag walks up
-  5. scope tags:   createScope({ tags: [tenantTag("scope")] })
+  1. exec tags:    ctx.exec({ flow, tags: [tenant("exec")] })
+  2. flow tags:    flow({ tags: [tenant("flow")] })
+  3. context tags: scope.createContext({ tags: [tenant("ctx")] })
+  4. ctx.data:     parent ctx.data.setTag(tenant, "middleware")  ← seekTag walks up
+  5. scope tags:   createScope({ tags: [tenant("scope")] })
   6. tag default:  tag({ label: "tenant", default: "default" })
 
 In atom deps: tags resolve from scope tags (atoms live at scope level).
 In flow deps: tags resolve from exec/context/scope hierarchy + ctx.data seek-up.
 
 Attaching tags:
-  atom({ tags: [tenantTag("acme")] })                  metadata on atom definition
-  flow({ tags: [roleTag("admin")] })                   applied to child context
-  scope.createContext({ tags: [userTag(currentUser)] }) on context creation
-  ctx.exec({ flow, tags: [localeTag("en")] })          on specific execution
-  ctx.data.setTag(tenantTag, "middleware-set")          programmatic, propagates to children
+  atom({ tags: [tenant("acme")] })                  metadata on atom definition
+  flow({ tags: [role("admin")] })                   applied to child context
+  scope.createContext({ tags: [user(currentUser)] }) on context creation
+  ctx.exec({ flow, tags: [locale("en")] })          on specific execution
+  ctx.data.setTag(tenant, "middleware-set")          programmatic, propagates to children
 
 Reading tags:
   tag.get(source)      → T              first match or throw
-  tag.find(source)     → T | undefined  first match or undefined
+  tag.find(source)     → T | undefined  first match, tag default if none, or undefined
   tag.collect(source)  → T[]            all matches
 
 Context data:
@@ -297,6 +301,7 @@ Introspection:
     content: `Extensions wrap atom resolution and flow execution (middleware pattern).
 
 interface Extension {
+  name: string
   init?(scope): void | Promise<void>
   dispose?(scope): void
   wrapResolve?(next, event: ResolveEvent): Promise<value>
@@ -318,6 +323,7 @@ Lifecycle:
 
 Example:
   const timingExt: Extension = {
+    name: "timing",
     wrapResolve: async (next, event) => {
       const start = Date.now()
       const value = await next()
@@ -335,38 +341,42 @@ import { createScope, preset } from "@pumped-fn/lite"
 
 const scope = createScope({
   presets: [
-    preset(dbAtom, mockDatabase),
-    preset(cacheAtom, inMemoryCache),
+    preset(db, mockDatabase),
+    preset(cache, inMemoryCache),
   ],
-  tags: [tenantTag("test-tenant")],
+  tags: [tenant("test-tenant")],
 })
 
-const db = await scope.resolve(dbAtom)  // → mockDatabase (not real db)
+await scope.resolve(db)  // → mockDatabase (not real db)
 
 Multi-tenant isolation:
   Each scope is fully isolated. Create one scope per tenant/test.
 
   const tenantScope = createScope({
-    tags: [tenantTag(tenantId)],
+    tags: [tenant(tenantId)],
     presets: tenantOverrides,
   })
 
 Cleanup:
-  scope.dispose() releases all atoms and runs all cleanup functions.
-  In tests: call scope.dispose() in afterEach.`,
+  await scope.dispose() releases all atoms and runs all cleanup functions.
+  In tests: await scope.dispose() in afterEach.`,
   },
 
   patterns: {
     title: "Common Patterns",
-    content: `Request lifecycle:
+    content: `Request lifecycle (one scope per app, one context per request):
   const scope = createScope()
-  const ctx = scope.createContext({ tags: [requestTag(req)] })
-  const result = await ctx.exec({ flow: handleRequest, input: req.body })
-  ctx.close()  // cleanup LIFO
+  // per-request:
+  const ctx = scope.createContext({ tags: [request(req)] })
+  try {
+    const result = await ctx.exec({ flow: handleRequest, rawInput: req.body })
+  } finally {
+    await ctx.close()
+  }
 
 Service pattern:
   const userService = service({
-    deps: { db: dbAtom },
+    deps: { db },
     factory: (ctx, { db }) => ({
       getUser: (ctx, id) => db.findUser(id),
       updateUser: (ctx, id, data) => db.updateUser(id, data),
@@ -386,17 +396,21 @@ Inline execution:
   })
 
 Atom with cleanup:
-  const serverAtom = atom({
+  const server = atom({
+    keepAlive: true,
     factory: (ctx) => {
       const server = createServer()
-      ctx.onClose(() => server.close())
+      ctx.cleanup(() => server.close())
       return server
     },
   })
 
 Atom retention / GC:
   createScope({ gc: { enabled: true, graceMs: 3000 } })
-  atom({ keepAlive: true })  // never GC'd`,
+  atom({ keepAlive: true })  // never GC'd
+  GC is churn-triggered: a single subscribe→unsubscribe cycle (React unmount, select
+  dispose, watch teardown) queues release after graceMs. Use keepAlive: true on any
+  atom that must persist for the lifetime of the scope (db pools, servers, singletons).`,
   },
 
   "tanstack-start": {
@@ -404,7 +418,7 @@ Atom retention / GC:
     content: `Singleton scope at server entry, per-request ExecutionContext via middleware.
 
 Server entry — one scope per process:
-  const scope = createScope({ extensions: [otel()], tags: [envTag(env)] })
+  const scope = createScope({ extensions: [otel()], tags: [env("production")] })
   export default createServerEntry({
     async fetch(request) {
       return handler.fetch(request, { context: { scope } })
@@ -427,40 +441,45 @@ Tag-seeding middleware — ambient data for downstream:
     .middleware([execCtxMiddleware])
     .server(async ({ next, context: { execContext } }) => {
       const user = await resolveCurrentUser()
-      execContext.data.setTag(currentUserTag, user)
+      execContext.data.setTag(currentUser, user)
       return next({ context: { user } })
     })
 
-  export const transactionMiddleware = createMiddleware()
-    .middleware([authMiddleware])
-    .server(async ({ next, context: { execContext } }) => {
-      const tx = await beginTransaction()
-      execContext.data.setTag(transactionTag, tx)
-      try {
-        const result = await next()
-        await tx.commit()
-        return result
-      } catch (e) {
-        await tx.rollback()
-        throw e
-      }
-    })
+Transaction resource — lazy begin, automatic commit/rollback:
+  const tx = resource({
+    deps: { db },
+    factory: (ctx, { db }) => {
+      const tx = db.beginTransaction()
+      ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())
+      ctx.cleanup(() => tx.release())
+      return tx
+    },
+  })
+
+  Note: no transactionMiddleware needed. Flows that write declare deps: { tx } and the
+  resource opens lazily on first use. Read-only flows never open a transaction.
+
+  const saveInvoice = flow({
+    deps: { tx },
+    factory: (ctx, { tx }) => tx.insert("invoices", ctx.input),
+  })
 
 Server functions — execute flows via context:
   export const listInvoices = createServerFn({ method: 'POST' })
-    .middleware([transactionMiddleware])
+    .middleware([authMiddleware])
     .handler(async ({ data, context: { execContext } }) => {
       return execContext.exec({ flow: invoiceFlows.list, rawInput: data })
     })
 
 Client hydration — preset loader data into client scope:
   const loaderData = Route.useLoaderData()
-  const scope = createScope({
+  const [scope] = useState(() => createScope({
     presets: [
-      preset(invoicesAtom, loaderData.invoices),
-      preset(userAtom, loaderData.user),
+      preset(invoices, loaderData.invoices),
+      preset(user, loaderData.user),
     ],
-  })
+  }))
+  useEffect(() => () => { void scope.dispose() }, [scope])
   return <ScopeProvider scope={scope}><Outlet /></ScopeProvider>
 
 Rules:
@@ -501,6 +520,7 @@ Don't:
 Type guards:
   isAtom(v)             → v is Atom
   isFlow(v)             → v is Flow
+  isResource(v)         → v is Resource
   isTag(v)              → v is Tag
   isTagged(v)           → v is Tagged
   isPreset(v)           → v is Preset
@@ -510,10 +530,11 @@ Type guards:
 Convenience types:
   AnyAtom               any atom regardless of value/deps
   AnyFlow               any flow regardless of output/input/deps
+  AnyResource           any resource regardless of value/deps
   AnyController         any controller regardless of value
 
 Symbols (advanced, for library authors):
-  atomSymbol, flowSymbol, tagSymbol, taggedSymbol,
+  atomSymbol, flowSymbol, resourceSymbol, tagSymbol, taggedSymbol,
   presetSymbol, controllerSymbol, controllerDepSymbol,
   tagExecutorSymbol, typedSymbol`,
   },

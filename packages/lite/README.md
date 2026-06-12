@@ -59,11 +59,11 @@ Resource controllers are execution-context handles:
 ```ts
 import { controller, resource } from "@pumped-fn/lite"
 
-const configResource = resource({ factory: () => ({ version: 1 }) })
+const config = resource({ factory: () => ({ version: 1 }) })
 
-const clientResource = resource({
+const client = resource({
   deps: {
-    config: controller(configResource, {
+    config: controller(config, {
       resolve: true,
       watch: true,
       eq: (a, b) => a.version === b.version,
@@ -95,6 +95,8 @@ const run = flow({
 const scope = createScope()
 const ctx = scope.createContext({ tags: [runId("run-1")] })
 await ctx.exec({ flow: run })
+await ctx.close()
+await scope.dispose()
 ```
 
 ## How It Works
@@ -162,7 +164,7 @@ sequenceDiagram
 
     %% ── Execution ──
     alt ctx.exec({ flow, input, tags })
-        Ctx->>Ctx: preset? → flow: re‑exec with replacement / fn: run as factory
+        Ctx->>Ctx: preset? → flow: re‑exec with replacement / fn: runs with ctx only (deps NOT resolved)
         Ctx->>Ctx: flow.parse(input) if defined
         Ctx->>Child: create child (parent = ctx, merged tags)
         Note right of Child: Tags are visible before deps; extensions wrap exec
@@ -214,10 +216,8 @@ sequenceDiagram
         Note right of Ctrl: ctrl.on listens to per‑atom entry events
 
         App->>Ctrl: ctrl.set(v) / ctrl.update(fn)
-        Ctrl->>Scope: scheduleInvalidation
-        Scope->>Scope: run atom cleanups (LIFO)
-        Scope->>Scope: ⚡ emit 'resolving' → scope.on + ctrl.on
-        Scope->>Atom: apply new value (skip factory)
+        Ctrl->>Scope: scheduleInvalidation(set)
+        Note right of Scope: apply value (skip factory, cleanups NOT run)
         Scope->>Scope: state → resolved
         Scope->>Scope: ⚡ emit 'resolved' → scope.on + ctrl.on
 
@@ -234,8 +234,8 @@ sequenceDiagram
 
         Note over App,Ctrl: Dependency reactivity — atom deps only
         Note right of Scope: watch:true replaces manual ctx.cleanup(ctx.scope.on('resolved', dep, () => ctx.invalidate()))
-        App->>Scope: resolve(derivedAtom)
-        Note right of Scope: deps: { src: controller(srcAtom, { resolve: true, watch: true, eq? }) }
+        App->>Scope: resolve(derived)
+        Note right of Scope: deps: { src: controller(src, { resolve: true, watch: true, eq? }) }
         Scope->>Scope: on dep 'resolved': eq(prev, next) → scheduleInvalidation if changed
         Note right of Scope: watch listener auto-cleaned on re-resolve / release / dispose
     end

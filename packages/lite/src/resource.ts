@@ -9,10 +9,12 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  *
  * @example
  * ```typescript
+ * const requestId = tag<string>({ label: "request.id" })
+ *
  * const requestLogger = resource({
- *   deps: { logService: logServiceAtom },
+ *   deps: { logService },
  *   factory: (ctx, { logService }) => {
- *     const logger = logService.child({ requestId: ctx.data.get("requestId") })
+ *     const logger = logService.child({ requestId: ctx.data.seekTag(requestId) })
  *     ctx.cleanup(() => logger.flush())
  *     return logger
  *   }

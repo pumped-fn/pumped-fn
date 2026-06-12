@@ -7,7 +7,7 @@ import { warmDepsGraph } from "./deps-graph"
  *
  * @example
  * ```typescript
- * const myFlow = flow({
+ * const shout = flow({
  *   parse: typed<{ name: string }>(),
  *   factory: (ctx) => {
  *     return ctx.input.name.toUpperCase()
@@ -40,6 +40,7 @@ export interface FlowConfig<
  * @example
  * ```typescript
  * const processUser = flow({
+ *   parse: typed<string>(),
  *   factory: async (ctx) => {
  *     const userId = ctx.input
  *     return await fetchUser(userId)
