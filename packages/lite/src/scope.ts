@@ -1914,16 +1914,16 @@ export function setControllerReadHook(fn: ((ctrl: Lite.Controller<unknown>) => v
  * @example
  * ```typescript
  * const scope = createScope({
- *   extensions: [loggingExtension],
- *   presets: [preset(dbAtom, testDb)]
+ *   extensions: [logging],
+ *   presets: [preset(db, testDb)]
  * })
  *
  * // Option 1: resolve() waits for ready internally
- * const db = await scope.resolve(dbAtom)
+ * const pool = await scope.resolve(db)
  *
  * // Option 2: explicit wait
  * await scope.ready
- * const db = await scope.resolve(dbAtom)
+ * const conn = await scope.resolve(db)
  * ```
  */
 export function createScope(options?: Lite.ScopeOptions): Lite.Scope {

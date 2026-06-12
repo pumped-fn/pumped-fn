@@ -65,7 +65,7 @@ const configExecutor = provide((ctrl) => {
 })
 
 // AFTER (lite)
-const configAtom = atom({
+const config = atom({
   factory: (ctx) => {
     ctx.cleanup(() => console.log('cleanup'))
     return { port: 3000 }
@@ -85,8 +85,8 @@ const serverExecutor = derive(
 )
 
 // AFTER (lite)
-const serverAtom = atom({
-  deps: { config: configAtom },
+const server = atom({
+  deps: { config },
   factory: (ctx, { config }) => {
     return createServer(config.port)
   }
@@ -105,8 +105,8 @@ const dbExecutor = derive(
 )
 
 // AFTER (lite)
-const dbAtom = atom({
-  deps: { config: controller(configAtom) },
+const db = atom({
+  deps: { config: controller(config, { resolve: true }) },
   factory: (ctx, { config }) => {
     return connectDb(config.get().connectionString)
   }
@@ -122,8 +122,8 @@ const myAccessor: Core.Accessor<Config> = scope.accessor(myExecutor)
 type MyOutput = Core.InferOutput<typeof myExecutor>
 
 // AFTER (lite)
-const myAtom: Lite.Atom<Config> = atom(...)
-const myController: Lite.Controller<Config> = scope.controller(myAtom)
+const config: Lite.Atom<Config> = atom(...)
+const ctrl: Lite.Controller<Config> = scope.controller(config)
 ```
 
 ### 4. Migrate Scope Usage
@@ -139,11 +139,11 @@ const accessor = scope.accessor(configExecutor)
 
 // AFTER (lite)
 const scope = createScope({
-  presets: [preset(configAtom, mockConfig)],
+  presets: [preset(config, mockConfig)],
   extensions: [loggingExtension],
 })
-const config = await scope.resolve(configAtom)
-const ctrl = scope.controller(configAtom)
+const cfg = await scope.resolve(config)
+const ctrl = scope.controller(config)
 ```
 
 ### 5. Migrate Flows
@@ -166,10 +166,12 @@ const handleRequest = flow(
 const result = await scope.exec(handleRequest, { userId: '123' })
 
 // AFTER (lite) - Optional parse validation
+const api = tag<string>({ label: "api" })
+
 const handleRequest = flow({
   name: 'handleRequest',
-  deps: { db: dbAtom },
-  tags: [apiTag('users')],
+  deps: { db },
+  tags: [api('users')],
   parse: (raw) => {
     const obj = raw as Record<string, unknown>
     if (typeof obj.userId !== 'string') throw new Error('userId required')
@@ -211,7 +213,7 @@ const userId = tag({
 userId('abc-123')  // OK - returns Tagged<string>
 userId(123)        // Throws ParseError
 
-const myAtom = atom({
+const audit = atom({
   deps: { tenant: tags.required(tenantId) },
   factory: (ctx, { tenant }) => {
     console.log('Tenant:', tenant)
@@ -261,16 +263,16 @@ const connectionPool = multi.provide({
 })
 const conn = await scope.resolve(connectionPool('db-primary'))
 
-// AFTER (lite) - Use Map pattern
-const connections = new Map<string, Connection>()
-const connectionAtom = atom({
-  factory: async (ctx) => {
-    const key = tags.required(connectionKeyTag).get(ctx.scope)
-    if (!connections.has(key)) {
-      connections.set(key, createConnection(key))
-    }
-    return connections.get(key)!
-  }
+// AFTER (lite) - per-scope atom keyed by tag
+const connectionKey = tag<string>({ label: "connectionKey" })
+
+const connection = atom({
+  deps: { key: tags.required(connectionKey) },
+  factory: (ctx, { key }): Connection => {
+    const conn = createConnection(key)
+    ctx.cleanup(() => conn.close())
+    return conn
+  },
 })
 ```
 
@@ -288,8 +290,8 @@ import { z } from 'zod'
 
 const userSchema = z.object({ id: z.string() })
 
-const userFlow = flow({
-  name: 'userFlow',
+const getUser = flow({
+  name: 'getUser',
   parse: (raw) => userSchema.parse(raw),  // Validates before factory
   factory: async (ctx) => {
     // ctx.input is typed as { id: string }
@@ -308,7 +310,7 @@ const result = await promised
 
 // AFTER (lite)
 const context = scope.createContext()
-const result = await context.exec({ flow: myFlow, input })
+const result = await context.exec({ flow: process, input })
   .finally(() => console.log('done'))
 await context.close()
 ```
@@ -324,10 +326,10 @@ const { config, db, cache } = await resolves(scope, {
 })
 
 // AFTER (lite) - Parallel resolution
-const [config, db, cache] = await Promise.all([
-  scope.resolve(configAtom),
-  scope.resolve(dbAtom),
-  scope.resolve(cacheAtom),
+const [cfg, pool, store] = await Promise.all([
+  scope.resolve(config),
+  scope.resolve(db),
+  scope.resolve(cache),
 ])
 ```
 
@@ -337,7 +339,7 @@ Lite has built-in reactivity via Controller that core-next lacks:
 
 ```typescript
 // lite-only feature: self-invalidation
-const configAtom = atom({
+const config = atom({
   factory: async (ctx) => {
     const config = await fetchConfig()
 
@@ -349,7 +351,7 @@ const configAtom = atom({
 })
 
 // lite-only: subscribe to changes with state filtering
-const ctrl = scope.controller(configAtom)
+const ctrl = scope.controller(config)
 
 // Subscribe to specific events
 ctrl.on('resolved', () => {
@@ -366,7 +368,9 @@ ctrl.on('*', () => {
 })
 
 // Fine-grained subscriptions with select()
-const portSelect = scope.select(configAtom, (config) => config.port)
+// atom must be resolved first — select() throws on unresolved atom
+await scope.resolve(config)
+const portSelect = scope.select(config, (config) => config.port)
 portSelect.subscribe(() => {
   console.log('Port changed:', portSelect.get())
 })
@@ -387,6 +391,7 @@ portSelect.subscribe(() => {
 - [ ] Replace `Promised` with native Promise
 - [ ] Replace `resolves()` with `Promise.all()`
 - [ ] Update extension `wrap()` to `wrapResolve()`/`wrapExec()`
+- [ ] Audit long-lived atoms for GC exposure: lite GC is enabled by default (`graceMs: 3000`). GC triggers when the last subscriber (from `ctrl.on`, `select.subscribe`) unsubscribes or the last dependent atom is released — **not** on bare `scope.resolve`. core-next had no GC. Any infra atom that React hooks, `select`, or `watch` ever subscribe to should be declared with `keepAlive: true` to prevent unexpected release and re-initialization.
 - [ ] Run type checker: `pnpm -F @pumped-fn/lite typecheck`
 - [ ] Run tests
 

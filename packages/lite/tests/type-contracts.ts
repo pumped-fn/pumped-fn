@@ -210,3 +210,37 @@ atom({
     return 1
   },
 })
+
+// D1: FlowOutput must extract output type, not collapse to never
+
+const typedInputFlow = flow({
+  parse: typed<string>(),
+  factory: (ctx) => ({ id: ctx.input }),
+})
+
+const noParseFlow = flow({
+  factory: (_ctx) => 42,
+})
+
+type TypedInputFlowOutput = Lite.Utils.FlowOutput<typeof typedInputFlow>
+type NoParseFlowOutput = Lite.Utils.FlowOutput<typeof noParseFlow>
+
+declare const _typedOut: TypedInputFlowOutput
+declare const _noParseOut: NoParseFlowOutput
+
+const _typedId: string = _typedOut.id
+const _noParseNum: number = _noParseOut
+
+void _typedId
+void _noParseNum
+
+// D1: DepsOf must extract deps from Atom and Flow
+const atomWithDeps = atom({
+  deps: { source: sourceAtom },
+  factory: (_ctx, { source }) => source,
+})
+
+type AtomDepsResult = Lite.Utils.DepsOf<typeof atomWithDeps>
+declare const _atomDeps: NonNullable<AtomDepsResult>
+const _atomSource: Lite.Atom<number> = _atomDeps['source'] as Lite.Atom<number>
+void _atomSource
