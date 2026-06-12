@@ -10,7 +10,7 @@ Build a service health monitor that tracks availability, stores check history, o
 |---|---|---|
 | SQLite datastore | `StorePort` interface plus in-memory driver atom | Deterministic and preset-swappable; persistence is orthogonal to the lite patterns. |
 | "Pod" per request | `ExecutionContext` per API call or scheduled check | The current lite boundary is the execution context. |
-| HTTP endpoints | `createApp` methods call boundary flows where the operation is command/query logic; watch-derived aggregate reads use `activeIncidentCount` | Transport is out of scope, but app methods must not bypass store logic directly. |
+| HTTP endpoints | boundary flows are the seam: `registerService`, `runCheck`, etc.; composition at the use site via `createScope` + `ctx.exec({ flow, input })`; watch-derived aggregates read atoms directly | Transport is out of scope; flows are the honest boundary — no wrapper facade. |
 | Plugin hooks | `Lite.Extension` for alerting and observability | Uses the actual extension API. |
 | 1000+ services perf | Covered by `benchmarks/lite-perf` pointer | Perf thresholds are not stable CI examples. |
 | API < 100ms | Latency recorded by extension; no threshold | Mechanism is deterministic, wall-clock threshold is not. |
@@ -22,23 +22,23 @@ Build a service health monitor that tracks availability, stores check history, o
 
 | Operation | Boundary |
 |---|---|
-| register service | `registerService` |
-| register raw input | `registerService` parse path |
-| update service | `updateService` |
-| deregister service | `deregisterService` |
-| list services | `listServices` |
-| get service detail + recent checks | `getService` |
-| run check | `runCheck` plus chain `tx` |
-| health history range | `healthHistory` |
-| current health | `currentHealth` |
-| detect incident transition | `detectTransition` plus chain `tx` |
-| list active incidents | `activeIncidents` |
-| incidents by service | `serviceIncidents` |
-| uptime | `uptime` |
-| MTTR | `meanTimeToRecovery` |
-| active incident count | `activeIncidentCount` derived aggregate |
-| scheduler start | `scheduler` lifecycle |
-| store reconnect | `store` release + `storeDriver` controller release, then re-resolve |
+| register service | `registerService` flow |
+| register raw input | `registerService` flow parse path |
+| update service | `updateService` flow |
+| deregister service | `deregisterService` flow |
+| list services | `listServices` flow |
+| get service detail + recent checks | `getService` flow |
+| run check | `runCheck` flow + chain `tx` resource |
+| health history range | `healthHistory` flow |
+| current health | `currentHealth` flow |
+| detect incident transition | `detectTransition` flow + chain `tx` resource |
+| list active incidents | `activeIncidents` flow |
+| incidents by service | `serviceIncidents` flow |
+| uptime | `uptime` flow |
+| MTTR | `meanTimeToRecovery` flow |
+| active incident count | `activeIncidentCount` atom (watch-derived aggregate) |
+| scheduler start | `scope.resolve(scheduler)` at use site |
+| store reconnect | `reconnectStore(scope)` exported from `infra/store.ts` |
 
 ## Data Model
 

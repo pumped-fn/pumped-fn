@@ -2,10 +2,6 @@ import { atom, controller, type Lite } from "@pumped-fn/lite"
 import { NotFoundError, type HealthCheck, type Incident, type Service } from "../domain"
 import type { StorePort, StoreTx } from "../ports"
 
-export interface MemoryStore extends StorePort {
-  readonly txEvents: string[]
-}
-
 async function retryStoreDriver(driver: Lite.Controller<StorePort>): Promise<StorePort> {
   try {
     return await driver.resolve()
@@ -15,11 +11,10 @@ async function retryStoreDriver(driver: Lite.Controller<StorePort>): Promise<Sto
   }
 }
 
-export function createMemoryStore(): MemoryStore {
+export function createMemoryStore(): StorePort {
   const services = new Map<string, Service>()
   const checks = new Map<string, HealthCheck[]>()
   const incidents = new Map<string, Incident>()
-  const txEvents: string[] = []
 
   const appendCheck = (check: HealthCheck) => {
     const items = checks.get(check.serviceId) ?? []
@@ -40,7 +35,6 @@ export function createMemoryStore(): MemoryStore {
   }
 
   return {
-    txEvents,
     services: {
       upsert(service) {
         services.set(service.id, service)
@@ -66,7 +60,6 @@ export function createMemoryStore(): MemoryStore {
       byService: (serviceId) => [...incidents.values()].filter((incident) => incident.serviceId === serviceId),
     },
     begin(): StoreTx {
-      txEvents.push("begin")
       const ops: Array<() => void> = []
       return {
         checks: {
@@ -84,11 +77,8 @@ export function createMemoryStore(): MemoryStore {
         },
         async commit() {
           for (const op of ops) op()
-          txEvents.push("commit")
         },
-        async rollback() {
-          txEvents.push("rollback")
-        },
+        async rollback() {},
       }
     },
   }
@@ -102,9 +92,9 @@ export const serviceRevision = atom({
   factory: () => 0,
 })
 
-export const storeDriver = atom<StorePort>({
+export const storeDriver = atom({
   keepAlive: true,
-  factory: () => createMemoryStore(),
+  factory: (): StorePort => createMemoryStore(),
 })
 
 export const store = atom({
@@ -170,3 +160,10 @@ export const store = atom({
     }
   },
 })
+
+export async function reconnectStore(scope: Lite.Scope): Promise<void> {
+  await scope.release(store)
+  await scope.controller(storeDriver).release()
+  await scope.flush()
+  await scope.resolve(store)
+}

@@ -92,7 +92,7 @@ export const transferFunds = flow({
   name: "transfer-funds",
   parse: typed<TransferInput>(),
   deps: { tx },
-  factory: async (ctx, { tx }): Promise<TransferResult> => {
+  factory: async (ctx, { tx }) => {
     await tx.write({ account: ctx.input.from, deltaCents: -ctx.input.cents })
     await tx.write({ account: ctx.input.to, deltaCents: ctx.input.cents })
     await ctx.exec({ flow: writeAuditEntry, input: { txId: tx.id } })

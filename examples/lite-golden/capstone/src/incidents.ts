@@ -24,7 +24,7 @@ export const detectTransition = flow({
     store,
     tx,
   },
-  factory: (ctx, { clock, ids, store, tx }): IncidentEvent => {
+  factory: (ctx, { clock, ids, store, tx }) => {
     const active = store.incidents.byService(ctx.input.service.id).find((incident) => incident.recoveredAt === null)
     if (ctx.input.check.status !== "healthy" && active === undefined) {
       const incident = {
@@ -60,14 +60,14 @@ export const detectTransition = flow({
 export const activeIncidents = flow({
   name: "active-incidents",
   deps: { store },
-  factory: (_ctx, { store }): Incident[] => store.incidents.active(),
+  factory: (_ctx, { store }) => store.incidents.active(),
 })
 
 export const serviceIncidents = flow({
   name: "service-incidents",
   parse: typed<{ serviceId: string }>(),
   deps: { store },
-  factory: (ctx, { store }): Incident[] => store.incidents.byService(ctx.input.serviceId),
+  factory: (ctx, { store }) => store.incidents.byService(ctx.input.serviceId),
 })
 
 export const meanTimeToRecovery = flow({

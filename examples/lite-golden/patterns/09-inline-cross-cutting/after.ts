@@ -4,20 +4,9 @@ export type QuoteInput = {
   readonly items: readonly number[]
 }
 
-export type Quote = {
-  readonly subtotalCents: number
-  readonly taxBasisPoints: number
-  readonly feeCents: number
-  readonly totalCents: number
-}
-
 export type ReceiptInput = {
   readonly itemCount: number
   readonly subtotalCents: number
-}
-
-export type Receipt = ReceiptInput & {
-  readonly persisted: true
 }
 
 export type ExecRecord = {
@@ -75,7 +64,7 @@ export const quote = flow({
   name: "quote-total",
   parse: typed<QuoteInput>(),
   deps: { taxRate, fee: requestFee },
-  factory: (ctx, { taxRate, fee }): Quote => {
+  factory: (ctx, { taxRate, fee }) => {
     const subtotalCents = priceItems(ctx, ctx.input.items)
     return {
       subtotalCents,
@@ -89,7 +78,7 @@ export const quote = flow({
 export const persistReceipt = flow({
   name: "persist-receipt",
   parse: typed<ReceiptInput>(),
-  factory: (ctx): Receipt => ({
+  factory: (ctx) => ({
     itemCount: ctx.input.itemCount,
     subtotalCents: ctx.input.subtotalCents,
     persisted: true,
@@ -99,7 +88,7 @@ export const persistReceipt = flow({
 export const checkout = flow({
   name: "checkout",
   parse: typed<QuoteInput>(),
-  factory: async (ctx): Promise<Receipt> => {
+  factory: async (ctx) => {
     return ctx.exec({
       flow: persistReceipt,
       input: {

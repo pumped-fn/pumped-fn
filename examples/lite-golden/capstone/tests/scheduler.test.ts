@@ -1,16 +1,16 @@
-import { preset } from "@pumped-fn/lite"
+import { createScope, preset } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
-import { createApp } from "../src/app"
 import { checkExecutors } from "../src/checker"
 import { clock } from "../src/infra/clock"
+import { registerService } from "../src/registry"
 import { scheduler } from "../src/scheduler"
-import { FakeClock } from "./fakes"
+import { exec, FakeClock } from "./fakes"
 
 describe("effect-managed", () => {
   test("E-SC2: fake clock 1h gives exact per-service tick count without drift", async () => {
     const fakeClock = new FakeClock()
     const counts = new Map<string, number>()
-    const app = createApp({
+    const scope = createScope({
       presets: [
         preset(clock, fakeClock),
         preset(checkExecutors, {
@@ -24,8 +24,8 @@ describe("effect-managed", () => {
       ],
     })
 
-    await app.api.startScheduler()
-    const fast = await app.api.registerService({
+    await scope.resolve(scheduler)
+    const fast = await exec(scope, registerService, {
       name: "fast",
       type: "http",
       endpoint: "https://fast.test",
@@ -33,7 +33,7 @@ describe("effect-managed", () => {
       timeout: 1000,
       criticality: "medium",
     })
-    const slow = await app.api.registerService({
+    const slow = await exec(scope, registerService, {
       name: "slow",
       type: "http",
       endpoint: "https://slow.test",
@@ -45,13 +45,13 @@ describe("effect-managed", () => {
     await fakeClock.advance(3_600_000)
     expect(counts.get(fast.id)).toBe(60)
     expect(counts.get(slow.id)).toBe(12)
-    expect((await app.scope.resolve(scheduler)).pending()).toBe(0)
-    await app.scope.dispose()
+    expect((await scope.resolve(scheduler)).pending()).toBe(0)
+    await scope.dispose()
   })
 
   test("E1: scheduled check failure closes its context and leaves scheduler alive", async () => {
     const fakeClock = new FakeClock()
-    const app = createApp({
+    const scope = createScope({
       presets: [
         preset(clock, fakeClock),
         preset(checkExecutors, {
@@ -64,8 +64,8 @@ describe("effect-managed", () => {
       ],
     })
 
-    await app.api.startScheduler()
-    await app.api.registerService({
+    await scope.resolve(scheduler)
+    await exec(scope, registerService, {
       name: "failing",
       type: "http",
       endpoint: "https://failing.test",
@@ -75,17 +75,17 @@ describe("effect-managed", () => {
     })
 
     await fakeClock.advance(60_000)
-    expect((await app.scope.resolve(scheduler)).pending()).toBe(0)
-    await app.scope.dispose()
+    expect((await scope.resolve(scheduler)).pending()).toBe(0)
+    await scope.dispose()
   })
 
   test("E2: service registry mutation uses one watch-driven scheduler resync", async () => {
     const fakeClock = new FakeClock()
-    const app = createApp({ presets: [preset(clock, fakeClock)] })
+    const scope = createScope({ presets: [preset(clock, fakeClock)] })
 
-    await app.api.startScheduler()
+    await scope.resolve(scheduler)
     expect(fakeClock.createdTimers()).toBe(0)
-    await app.api.registerService({
+    await exec(scope, registerService, {
       name: "api",
       type: "http",
       endpoint: "https://api.test",
@@ -95,6 +95,6 @@ describe("effect-managed", () => {
     })
 
     expect(fakeClock.createdTimers()).toBe(1)
-    await app.scope.dispose()
+    await scope.dispose()
   })
 })

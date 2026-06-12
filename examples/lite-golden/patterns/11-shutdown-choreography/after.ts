@@ -1,24 +1,10 @@
 import { atom, flow, tag, tags } from "@pumped-fn/lite"
 
-export interface ShutdownConfig {
-  readonly name: string
-}
-
-export interface PoolHandle {
-  readonly events: string[]
-  readonly name: string
-}
-
-export interface ServerHandle {
-  readonly events: string[]
-  readonly id: string
-}
-
 export const shutdownEvents = tag<string[]>({ label: "p11.shutdown.events" })
 
 export const config = atom({
   deps: { events: tags.required(shutdownEvents) },
-  factory: (ctx, { events }): ShutdownConfig => {
+  factory: (ctx, { events }) => {
     events.push("config:open")
     ctx.cleanup(() => {
       events.push("config:close")
@@ -32,7 +18,7 @@ export const pool = atom({
     config,
     events: tags.required(shutdownEvents),
   },
-  factory: (ctx, { config, events }): PoolHandle => {
+  factory: (ctx, { config, events }) => {
     events.push("pool:open")
     ctx.cleanup(() => {
       events.push("pool:close")
@@ -49,7 +35,7 @@ export const server = atom({
     events: tags.required(shutdownEvents),
     pool,
   },
-  factory: (ctx, { events, pool }): ServerHandle => {
+  factory: (ctx, { events, pool }) => {
     events.push("server:open")
     ctx.cleanup(() => {
       events.push("server:close")

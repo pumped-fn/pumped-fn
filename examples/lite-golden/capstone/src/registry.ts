@@ -1,5 +1,5 @@
 import { flow, tags, typed } from "@pumped-fn/lite"
-import { NotFoundError, type HealthCheck, type Service } from "./domain"
+import { NotFoundError, type Service } from "./domain"
 import { clock } from "./infra/clock"
 import { ids } from "./infra/ids"
 import { store } from "./infra/store"
@@ -10,14 +10,6 @@ export type UpdateServiceInput = {
   id: string
   patch: Partial<Omit<Service, "id" | "createdAt" | "updatedAt">>
 }
-export type ServiceStatus = Service & {
-  status: HealthCheck["status"]
-}
-export type ServiceDetail = {
-  service: Service
-  recentChecks: HealthCheck[]
-}
-
 function parseRegisterService(raw: unknown): RegisterServiceInput {
   if (typeof raw !== "object" || raw === null) throw new Error("service input must be an object")
   return raw as RegisterServiceInput
@@ -77,7 +69,7 @@ export const getService = flow({
   name: "get-service",
   parse: typed<{ id: string }>(),
   deps: { clock, store },
-  factory: (ctx, { clock, store }): ServiceDetail => {
+  factory: (ctx, { clock, store }) => {
     const service = store.services.get(ctx.input.id)
     if (service === undefined) throw new NotFoundError("service", ctx.input.id)
     return {
@@ -90,7 +82,7 @@ export const getService = flow({
 export const listServices = flow({
   name: "list-services",
   deps: { store },
-  factory: (_ctx, { store }): ServiceStatus[] => store.services.list().map((service) => ({
+  factory: (_ctx, { store }) => store.services.list().map((service) => ({
     ...service,
     status: store.checks.latest(service.id)?.status ?? "unknown",
   })),

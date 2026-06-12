@@ -14,11 +14,6 @@ export interface DbClient {
   readAccount(id: string): string
 }
 
-export interface AccountRepo {
-  readonly dsn: string
-  read(id: string): string
-}
-
 export const dbConfig = tag<DbConfig>({ label: "p01.db.config" })
 
 export const db = atom({
@@ -50,9 +45,9 @@ export const db = atom({
 
 export const accountRepo = atom({
   deps: { db },
-  factory: (_, { db }): AccountRepo => ({
+  factory: (_, { db }) => ({
     dsn: db.dsn,
-    read: (id) => db.readAccount(id),
+    read: (id: string) => db.readAccount(id),
   }),
 })
 

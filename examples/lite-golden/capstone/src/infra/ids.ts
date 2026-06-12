@@ -4,8 +4,8 @@ export interface IdsPort {
   next(prefix: string): string
 }
 
-export const ids = atom<IdsPort>({
-  factory: () => {
+export const ids = atom({
+  factory: (): IdsPort => {
     let nextId = 0
     return {
       next(prefix) {
