@@ -93,7 +93,7 @@ resource({ factory, deps?, name? })
   Factory receives (resourceCtx, resolvedDeps) → instance.
   Resource cleanup via ctx.cleanup(fn); execution-boundary cleanup via ctx.onClose(fn).
 
-  import { resource } from "@pumped-fn/lite"
+  import { resource, flow } from "@pumped-fn/lite"
   const tx = resource({
     deps: { db },
     factory: (ctx, { db }) => {
@@ -134,7 +134,7 @@ service({ factory, deps? })
     content: `createScope({ extensions?, presets?, tags?, gc? })
   Creates a scope that manages atom resolution, caching, extensions, and GC.
 
-  import { createScope } from "@pumped-fn/lite"
+  import { createScope, preset } from "@pumped-fn/lite"
   const scope = createScope({
     extensions: [loggingExt],
     presets: [preset(db, mockDb)],
