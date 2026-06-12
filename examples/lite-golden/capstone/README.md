@@ -4,19 +4,14 @@ This capstone combines the catalog patterns into one service health monitor: API
 
 ## Architecture
 
-Diagram: https://diashort.apps.quickable.co/d/10e7f4bf (previous version: https://diashort.apps.quickable.co/d/7697a75b)
+Diagram: https://diashort.apps.quickable.co/d/206cca4e (previous version: https://diashort.apps.quickable.co/d/10e7f4bf)
 
 ```mermaid
 flowchart TD
-  App[createApp API] --> Registry[registry flows]
-  App --> Reads[read flows: getService, healthHistory, currentHealth, serviceIncidents]
-  App --> Scheduler[scheduler atom]
-  App --> ActiveIncidents[activeIncidents flow]
-  Scheduler --> RunCheck[runCheck flow]
-  Registry --> Store[retrying store atom]
-  Reads --> Store
-  ActiveIncidents --> Store
-  RunCheck --> Store
+  Registry[registry flows] --> Store[retrying store atom]
+  Reads[read flows: getService, healthHistory, currentHealth, serviceIncidents] --> Store
+  ActiveIncidents[activeIncidents flow] --> Store
+  RunCheck[runCheck flow] --> Store
   RunCheck --> Tx[tx resource]
   RunCheck --> Executors[check executors atom]
   RunCheck --> Incidents[detectTransition flow]
@@ -25,7 +20,8 @@ flowchart TD
   Tx --> Store
   Store --> Driver[store driver atom]
   Metrics[metrics flows and atoms] --> Store
-  Observability[observability extension] --> App
+  Scheduler[scheduler atom] --> RunCheck
+  Observability[observability extension]
   Alerting[alerting extension] --> Incidents
   Clock[clock atom] --> Scheduler
   Ids[ids atom] --> Registry
@@ -45,9 +41,13 @@ Reads always see committed state — this is a unit-of-work design. A check chai
 
 `store` resolves the driver with at most 2 attempts: on the first failure it releases the driver controller and re-resolves once (store OI-SC6); a driver failing both attempts propagates the failure to the caller (store OI2).
 
+## Composition at the use site
+
+There is no `createApp` facade. Tests and consumers import the atoms and flows they need and compose via `createScope({ presets?, extensions?, tags? })` + direct `ctx.exec({ flow, input })`. The scheduler starts with `scope.resolve(scheduler)`. The reconnect sequence is an exported function in `infra/store.ts` because the store owns the concern.
+
 ## Reconnect mechanism
 
-`api.reconnectStore()` releases `store`, releases the `storeDriver` controller, and re-resolves — product atoms only, no preset introspection in the composition root.
+`reconnectStore(scope)` releases `store`, releases the `storeDriver` controller, and re-resolves — product atoms only, no preset introspection in the composition root.
 
 Pinned lite semantics (S11): an atom preset redirect (`preset(storeDriver, replacement)`) resolves and caches under the replacement atom — `scope.resolve` returns before creating an entry for the redirected target (`packages/lite/src/scope.ts`, `resolve()` preset branch), so `release`/`invalidate` on the target find no cache entry and are no-ops. lite has no test for release-on-a-redirected-target; store OI-SC6 is the pin: a preset-redirected driver survives `reconnectStore()` with its factory not re-run and its data intact, while the real driver (no preset) is released and rebuilt fresh (store OI1).
 
@@ -79,7 +79,7 @@ pnpm -F @pumped-fn/lite-golden typecheck
 
 | Module test file | Lenses present | Absent-lens justification |
 |---|---|---|
-| `registry.test.ts` | IO | OI runs through `createApp` in acceptance OI1/OI2; no E because registry owns no effects — writes delegate to the store atom. |
+| `registry.test.ts` | IO | OI runs through direct flow execs in acceptance OI1/OI2; no E because registry owns no effects — writes delegate to the store atom. |
 | `checker.test.ts` | IO | OI is the composed path in acceptance OI-SC3/OI-SC4; no E because executors are stateless and the chain tx lifecycle is owned by `tx.test.ts`. |
 | `incidents.test.ts` | IO | OI runs via acceptance and alerting OI-SC8; no E because incident writes ride the chain tx pinned in `tx.test.ts`. |
 | `metrics.test.ts` | IO | OI runs via acceptance OI1 (`uptime`); no E because the watch-derived atom owns no cleanup — watch lifecycle is pinned in pattern 08. |
@@ -88,4 +88,4 @@ pnpm -F @pumped-fn/lite-golden typecheck
 | `store.test.ts` | OI, E | No IO block because the in-memory driver's units are exercised by every module IO file that presets it and seeds it directly. |
 | `tx.test.ts` | IO, OI, E | All three lenses present. |
 | `alerting.test.ts` | IO, OI | No E because the extension holds only hook registrations — no owned resources or timers. |
-| `acceptance.test.ts` | OI | The outside-in suite for the composed app; IO lives in the module files, E in scheduler/lifecycle/tx. |
+| `acceptance.test.ts` | OI | The outside-in suite for the composed system; IO lives in the module files, E in scheduler/lifecycle/tx. |

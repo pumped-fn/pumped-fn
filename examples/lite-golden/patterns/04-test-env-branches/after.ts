@@ -11,13 +11,6 @@ export interface ReceiptStore {
   submit(receipt: ReceiptInput): Promise<string>
 }
 
-export interface ReceiptResult {
-  id: string
-  storedBy: string
-  confirmation: string
-  totalRecords: number
-}
-
 export function createMemoryReceiptStore(): ReceiptStore {
   const records: ReceiptInput[] = []
 
@@ -31,14 +24,14 @@ export function createMemoryReceiptStore(): ReceiptStore {
   }
 }
 
-export const deliveryStore = atom<ReceiptStore>({
+export const deliveryStore = atom({
   factory: () => createMemoryReceiptStore(),
 })
 
 export const submitReceipt = flow({
   parse: typed<ReceiptInput>(),
   deps: { store: deliveryStore },
-  factory: async (ctx, { store }): Promise<ReceiptResult> => {
+  factory: async (ctx, { store }) => {
     const confirmation = await store.submit(ctx.input)
 
     return {

@@ -1,8 +1,9 @@
 import { atom, createScope, preset } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
-import { createApp } from "../src/app"
-import { createMemoryStore, store, storeDriver } from "../src/infra/store"
+import { createMemoryStore, reconnectStore, store, storeDriver } from "../src/infra/store"
+import { listServices, registerService } from "../src/registry"
 import type { StorePort } from "../src/ports"
+import { exec } from "./fakes"
 
 const serviceInput = {
   name: "recovered",
@@ -23,44 +24,44 @@ describe("outside-in", () => {
         return createMemoryStore()
       },
     })
-    const app = createApp({ presets: [preset(storeDriver, flakyDriver)] })
+    const scope = createScope({ presets: [preset(storeDriver, flakyDriver)] })
 
-    expect(await app.api.listServices()).toEqual([])
+    expect(await exec(scope, listServices, undefined)).toEqual([])
     expect(attempts).toBe(2)
 
-    await app.api.registerService({ ...serviceInput, name: "kept" })
-    await app.api.reconnectStore()
+    await exec(scope, registerService, { ...serviceInput, name: "kept" })
+    await reconnectStore(scope)
 
     expect(attempts).toBe(2)
-    expect(await app.api.listServices()).toHaveLength(1)
-    await app.api.registerService(serviceInput)
-    expect(await app.api.listServices()).toHaveLength(2)
-    await app.scope.dispose()
+    expect(await exec(scope, listServices, undefined)).toHaveLength(1)
+    await exec(scope, registerService, serviceInput)
+    expect(await exec(scope, listServices, undefined)).toHaveLength(2)
+    await scope.dispose()
   })
 
   test("OI1: reconnect without a replacement driver atom resets the store", async () => {
-    const app = createApp()
-    await app.api.registerService({ ...serviceInput, name: "temporary", endpoint: "https://temporary.test" })
+    const scope = createScope()
+    await exec(scope, registerService, { ...serviceInput, name: "temporary", endpoint: "https://temporary.test" })
 
-    await app.api.reconnectStore()
+    await reconnectStore(scope)
 
-    expect(await app.api.listServices()).toEqual([])
-    await app.scope.dispose()
+    expect(await exec(scope, listServices, undefined)).toEqual([])
+    await scope.dispose()
   })
 
   test("OI2: a driver failing both attempts propagates the failure to the caller", async () => {
     let attempts = 0
-    const deadDriver = atom<StorePort>({
-      factory: () => {
+    const deadDriver = atom({
+      factory: (): StorePort => {
         attempts++
         throw new Error("driver offline")
       },
     })
-    const app = createApp({ presets: [preset(storeDriver, deadDriver)] })
+    const scope = createScope({ presets: [preset(storeDriver, deadDriver)] })
 
-    await expect(app.api.listServices()).rejects.toThrow("driver offline")
+    await expect(exec(scope, listServices, undefined)).rejects.toThrow("driver offline")
     expect(attempts).toBe(2)
-    await app.scope.dispose()
+    await scope.dispose()
   })
 })
 

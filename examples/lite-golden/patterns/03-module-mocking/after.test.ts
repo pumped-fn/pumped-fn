@@ -67,7 +67,7 @@ describe("inside-out", () => {
 
   test("IO2: preset(atom, otherAtom) redirect runs the redirected factory", async () => {
     let redirectedRuns = 0
-    const redirectedMailer = atom<Mailer>({
+    const redirectedMailer = atom({
       factory: () => {
         redirectedRuns += 1
         return createMailerDouble("redirected")

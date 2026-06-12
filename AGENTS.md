@@ -15,6 +15,8 @@ No:
 - Single-use variables declared then immediately returned (inline them)
 - Style inconsistent with surrounding code
 - Type suffixes on definition handles — `const store = atom(…)`, `const runCheck = flow(…)`, `const tx = resource(…)`, `const requestId = tag(…)`; never `storeAtom`/`runCheckFlow`/`txResource`/`requestIdTag`. The type system carries the kind; rely on inference (deps shorthand, factory params shadow handles)
+- Ceremony the graph already does — no `atom<Port>(…)` generics (atoms share their inferred type; substitutes conform via `satisfies`/`Lite.Utils.AtomValue`), no facade objects bundling flows behind methods (consumers import the flows they use and exec them directly), no hand-written interfaces restating inferable signatures (extract via `ReturnType`/`Lite.Utils.*` when a name is needed)
+- Shared scopes and glue types — never a pre-configured scope factory (every use site calls `createScope` with what it needs; shared builders reduce compositionality); named types only at data-transfer boundaries (flow inputs via `typed<T>()`, domain models, multi-implementor contracts) — wiring/output types nothing consumes must not exist
 
 ## PR Checklist
 - `README.md` diagram reflects changes

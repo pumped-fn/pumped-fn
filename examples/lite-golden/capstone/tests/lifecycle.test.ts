@@ -1,18 +1,18 @@
 import { atom, createScope, preset } from "@pumped-fn/lite"
 import { describe, expect, test, vi } from "vitest"
-import { createApp } from "../src/app"
 import { checkExecutors } from "../src/checker"
 import { clock } from "../src/infra/clock"
 import type { ClockPort } from "../src/ports"
+import { registerService } from "../src/registry"
 import { scheduler } from "../src/scheduler"
-import { FakeClock } from "./fakes"
+import { exec, FakeClock } from "./fakes"
 
 describe("effect-managed", () => {
   test("E-SC7: dispose tears down LIFO, clears timers, and waits for the in-flight check", async () => {
     const fakeClock = new FakeClock()
     const order: string[] = []
-    const recordingClock = atom<ClockPort>({
-      factory: (ctx) => {
+    const recordingClock = atom({
+      factory: (ctx): ClockPort => {
         ctx.cleanup(() => {
           order.push("clock")
         })
@@ -30,7 +30,7 @@ describe("effect-managed", () => {
     })
     const completed: string[] = []
     let releaseCheck = (): void => {}
-    const app = createApp({
+    const scope = createScope({
       presets: [
         preset(clock, recordingClock),
         preset(checkExecutors, {
@@ -47,8 +47,8 @@ describe("effect-managed", () => {
       ],
     })
 
-    await app.api.startScheduler()
-    const service = await app.api.registerService({
+    await scope.resolve(scheduler)
+    const service = await exec(scope, registerService, {
       name: "api",
       type: "http",
       endpoint: "https://api.test",
@@ -58,8 +58,8 @@ describe("effect-managed", () => {
     })
 
     await fakeClock.advance(60_000)
-    expect((await app.scope.resolve(scheduler)).pending()).toBe(1)
-    const dispose = app.scope.dispose()
+    expect((await scope.resolve(scheduler)).pending()).toBe(1)
+    const dispose = scope.dispose()
     await Promise.resolve()
     expect(fakeClock.liveTimers()).toBe(0)
     expect(completed).toEqual([])

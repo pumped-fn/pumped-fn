@@ -1,11 +1,13 @@
-import { preset, type Lite } from "@pumped-fn/lite"
+import { createScope, preset, type Lite } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
-import { createApp } from "../src/app"
 import { checkExecutors } from "../src/checker"
 import { alerting } from "../src/extensions/alerting"
 import { activeIncidents, detectTransition } from "../src/incidents"
 import { clock } from "../src/infra/clock"
-import { FakeClock } from "./fakes"
+import { activeIncidentCount } from "../src/metrics"
+import { registerService } from "../src/registry"
+import { scheduler } from "../src/scheduler"
+import { exec, FakeClock } from "./fakes"
 
 describe("outside-in", () => {
   test("OI-SC8: custom hook receives open and resolve incident events end-to-end", async () => {
@@ -20,7 +22,7 @@ describe("outside-in", () => {
     alerts.onIncident((event) => {
       events.push(`${event.type}:${event.incident.serviceId}`)
     })
-    const app = createApp({
+    const scope = createScope({
       extensions: [alerts.extension],
       presets: [
         preset(clock, fakeClock),
@@ -32,8 +34,8 @@ describe("outside-in", () => {
       ],
     })
 
-    await app.api.startScheduler()
-    const service = await app.api.registerService({
+    await scope.resolve(scheduler)
+    const service = await exec(scope, registerService, {
       name: "api",
       type: "http",
       endpoint: "https://api.test",
@@ -43,11 +45,11 @@ describe("outside-in", () => {
     })
 
     await fakeClock.advance(60_000)
-    expect(await app.api.activeIncidentCount()).toBe(1)
+    expect(await scope.resolve(activeIncidentCount)).toBe(1)
     await fakeClock.advance(60_000)
-    expect(await app.api.activeIncidentCount()).toBe(0)
+    expect(await scope.resolve(activeIncidentCount)).toBe(0)
     expect(events).toEqual([`open:${service.id}`, `resolve:${service.id}`])
-    await app.scope.dispose()
+    await scope.dispose()
   })
 })
 

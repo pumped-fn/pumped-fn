@@ -25,20 +25,14 @@ export interface WelcomeInput {
   userId: string
 }
 
-export interface WelcomeResult {
-  deliveredTo: string
-  greeting: string
-  receiptId: string
-}
-
-export const mailer = atom<Mailer>({
+export const mailer = atom({
   factory: () => {
     const outbox: SentMail[] = []
     let nextId = 0
 
     return {
       outbox,
-      async send(message) {
+      async send(message: Message) {
         const mail: SentMail = { ...message, id: `mail-${++nextId}` }
         outbox.push(mail)
         return mail
@@ -49,7 +43,7 @@ export const mailer = atom<Mailer>({
 
 export const userDirectory = atom({
   factory: () => ({
-    find: (userId: string): UserRecord => ({
+    find: (userId: string) => ({
       id: userId,
       email: `user-${userId}@example.test`,
       name: `User ${userId}`,
@@ -72,7 +66,7 @@ export const sendWelcome = flow({
     users: userDirectory,
     template: welcomeTemplate,
   },
-  factory: async (ctx, { mailer, users, template }): Promise<WelcomeResult> => {
+  factory: async (ctx, { mailer, users, template }) => {
     const user = users.find(ctx.input.userId)
     const greeting = template.subject(user)
     const mail = await mailer.send({

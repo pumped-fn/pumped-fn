@@ -8,51 +8,25 @@ export interface TenantScopeConfig {
   cleanupLog?: string[]
 }
 
-export interface TenantIdentity {
-  tenantId: string
-}
-
 export interface TenantStrategy {
   name: PlanTier
   limit: number
   format(tenantId: string, count: number): string
 }
 
-export interface TenantCounter {
-  tenantId: string
-  current(): number
-  increment(): number
-}
-
 export interface UsageInput {
   units: number
 }
 
-export interface UsageReceipt {
-  tenantId: string
-  plan: PlanTier
-  count: number
-  limit: number
-  units: number
-  receipt: string
-}
-
-export interface TenantSnapshot {
-  tenantId: string
-  plan: PlanTier
-  count: number
-  limit: number
-}
-
 export const tenant = tag<string>({ label: "tenant.id" })
 
-export const cleanupSink = atom<string[]>({
-  factory: () => [],
+export const cleanupSink = atom({
+  factory: () => [] as string[],
 })
 
 export const tenantIdentity = atom({
   deps: { tenantId: tags.required(tenant) },
-  factory: (_ctx, { tenantId }): TenantIdentity => ({ tenantId }),
+  factory: (_ctx, { tenantId }) => ({ tenantId }),
 })
 
 export const freeStrategy: TenantStrategy = {
@@ -67,7 +41,7 @@ export const proStrategy: TenantStrategy = {
   format: (tenantId, count) => `${tenantId}:pro:${count}`,
 }
 
-export const strategy = atom<TenantStrategy>({
+export const strategy = atom({
   factory: () => freeStrategy,
 })
 
@@ -76,7 +50,7 @@ export const tenantCounter = atom({
     tenantId: tags.required(tenant),
     cleanupLog: cleanupSink,
   },
-  factory: (ctx, { tenantId, cleanupLog }): TenantCounter => {
+  factory: (ctx, { tenantId, cleanupLog }) => {
     let count = 0
 
     ctx.cleanup(() => {
@@ -101,7 +75,7 @@ export const recordUsage = flow({
     strategy,
     counter: tenantCounter,
   },
-  factory: (ctx, { identity, strategy, counter }): UsageReceipt => {
+  factory: (ctx, { identity, strategy, counter }) => {
     const count = counter.increment()
 
     return {
@@ -121,7 +95,7 @@ export const tenantSnapshot = flow({
     strategy,
     counter: tenantCounter,
   },
-  factory: (_ctx, { identity, strategy, counter }): TenantSnapshot => ({
+  factory: (_ctx, { identity, strategy, counter }) => ({
     tenantId: identity.tenantId,
     plan: strategy.name,
     count: counter.current(),
