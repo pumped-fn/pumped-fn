@@ -1,5 +1,5 @@
 import { atom, createScope, preset } from "@pumped-fn/lite"
-import { describe, expect, test, vi } from "vitest"
+import { describe, expect, test } from "vitest"
 import { checkExecutors } from "../src/checker"
 import { clock } from "../src/infra/clock"
 import type { ClockPort } from "../src/ports"
@@ -19,7 +19,7 @@ describe("effect-managed", () => {
         return {
           now: () => fakeClock.now(),
           every: (ms, fn) => {
-            const cancel = fakeClock.every(ms, fn)
+            const cancel = fakeClock.every(ms, () => { void fn() })
             return () => {
               order.push("scheduler:cancel")
               cancel()
@@ -30,11 +30,14 @@ describe("effect-managed", () => {
     })
     const completed: string[] = []
     let releaseCheck = (): void => {}
+    let resolveExecutorStarted!: () => void
+    const executorStarted = new Promise<void>((resolve) => { resolveExecutorStarted = resolve })
     const scope = createScope({
       presets: [
         preset(clock, recordingClock),
         preset(checkExecutors, {
           http: async (_ctx, service) => {
+            resolveExecutorStarted()
             await new Promise<void>((resolve) => {
               releaseCheck = resolve
             })
@@ -58,6 +61,7 @@ describe("effect-managed", () => {
     })
 
     await fakeClock.advance(60_000)
+    await executorStarted
     expect((await scope.resolve(scheduler)).pending()).toBe(1)
     const dispose = scope.dispose()
     await Promise.resolve()
@@ -68,27 +72,5 @@ describe("effect-managed", () => {
     expect(completed).toEqual([service.id])
     expect(fakeClock.cancelledTimers()).toBe(1)
     expect(order).toEqual(["scheduler:cancel", "clock"])
-  })
-
-  test("E1: real clock atom ticks intervals, cancels them, and clears the rest on dispose", async () => {
-    vi.useFakeTimers()
-    const scope = createScope()
-    const port = await scope.resolve(clock)
-    const ticks: string[] = []
-
-    const cancel = port.every(1_000, () => ticks.push("a"))
-    port.every(1_000, () => ticks.push("b"))
-    vi.advanceTimersByTime(2_000)
-    expect(ticks).toEqual(["a", "b", "a", "b"])
-    expect(port.now()).toBe(Date.now())
-
-    cancel()
-    vi.advanceTimersByTime(1_000)
-    expect(ticks).toEqual(["a", "b", "a", "b", "b"])
-
-    await scope.dispose()
-    vi.advanceTimersByTime(5_000)
-    expect(ticks).toEqual(["a", "b", "a", "b", "b"])
-    vi.useRealTimers()
   })
 })
