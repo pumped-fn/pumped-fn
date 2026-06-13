@@ -25,7 +25,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
         cache-dependency-path: pumped-go/go.sum
@@ -61,7 +61,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: '1.23'
 
@@ -80,7 +80,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: '1.23'
 
