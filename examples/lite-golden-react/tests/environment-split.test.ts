@@ -12,10 +12,10 @@ const allowedStubGlobals = new Map([
   ["capstone/thin/tests/bff-client.test.ts", new Set(["fetch"])],
 ])
 const allowedSourceAmbientEffects = new Map([
-  ["capstone/fat/src/app.ts:bffClient", new Set(["fetch"])],
-  ["capstone/fat/src/auth.ts:authProvider", new Set(["fetch"])],
+  ["capstone/fat/src/app.ts:bffHttp", new Set(["fetch"])],
+  ["capstone/fat/src/auth.ts:authHttp", new Set(["fetch"])],
   ["capstone/fat/src/main.tsx:mountMain", new Set(["document"])],
-  ["capstone/thin/src/bff.ts:bffClient", new Set(["fetch"])],
+  ["capstone/thin/src/bff.ts:bffHttp", new Set(["fetch"])],
   ["capstone/thin/src/main.tsx:mountMain", new Set(["document"])],
   ["patterns/F13-main-bootstrap/main.tsx:mountMain", new Set(["document"])],
 ])
@@ -488,10 +488,10 @@ describe("inside-out", () => {
       "  factory: async () => fetch('/dashboard'),",
       "})",
     ].join("\n")
-    const allowedAdapter = [
+    const allowedTransport = [
       'import { atom, tag, tags } from "@pumped-fn/lite"',
       "const baseUrl = tag<string>({ label: 'baseUrl', default: 'http://localhost' })",
-      "export const bffClient = atom({",
+      "export const bffHttp = atom({",
       "  deps: { baseUrl: tags.required(baseUrl) },",
       "  factory: (_ctx, { baseUrl }) => ({ get: () => fetch(baseUrl) }),",
       "})",
@@ -507,7 +507,7 @@ describe("inside-out", () => {
         ({ declaration, effect }) => `${declaration}:${effect}`,
       ),
     ).toEqual(["dashboard:fetch"])
-    expect(sourceAmbientViolationsFromSource("capstone/thin/src/bff.ts", allowedAdapter)).toEqual([])
+    expect(sourceAmbientViolationsFromSource("capstone/thin/src/bff.ts", allowedTransport)).toEqual([])
     expect(sourceAmbientViolations()).toEqual([])
   })
 

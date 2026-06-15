@@ -10,10 +10,10 @@ This is one point on the logic-boundary spectrum: auth logic lives in frontend n
 
 The scope is the single seam.
 
-- `authProvider` and `bffClient` are raw adapter atoms. Their factories call `fetch`; no other declaration
-  in the file may call ambient browser/runtime APIs inline. In adapter-own tests (`auth-provider.test.ts`,
-  `bff-client.test.ts`), `vi.stubGlobal` fakes `fetch` below the seam — the sole sanctioned global-fake
-  site per module.
+- `authHttp` and `bffHttp` are transport atoms. Their factories call `fetch`; no other declaration in the
+  file may call ambient browser/runtime APIs inline. `authProvider` and `bffClient` are capability atoms
+  that depend on those transports. In transport-own tests (`auth-provider.test.ts`, `bff-client.test.ts`),
+  `vi.stubGlobal` fakes `fetch` below the seam — the sole sanctioned global-fake site per module.
 - `authedBffClient` is the auth-capable port. It composes `bffClient` with `session`, so feature atoms never depend on both raw transport and session storage or pass `session.token` into service calls.
 - `session` is preset directly only in tests that target auth gates such as `isAuthed`. Dashboard feature tests preset `authedBffClient`.
 - Components observe atoms via `useAtom` and execute flows through `useExecutionContext`; they do not accept
@@ -29,6 +29,6 @@ The scope is the single seam.
 | `LoginForm.tsx` | — (logic in graph) | `LoginForm.dom.test.tsx` (all branches: login, logout, error, fallback) | — |
 | `DashboardScreen.tsx` | — (logic in graph) | `DashboardScreen.dom.test.tsx` (unauthed, authed+data) | — |
 
-Adapter-own tests (below the seam, faking `fetch`):
-- `auth-provider.test.ts` — POST /login, ok parse, non-ok throw
-- `bff-client.test.ts` — GET /dashboard with Bearer header, ok parse, non-ok throw
+Transport-own tests (below the seam, faking `fetch`):
+- `auth-provider.test.ts` — `authHttp` POST /login, ok parse, non-ok throw; `authProvider` presets transport
+- `bff-client.test.ts` — `bffHttp` GET /dashboard, ok parse, non-ok throw; `bffClient` presets transport

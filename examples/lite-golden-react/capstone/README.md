@@ -41,10 +41,10 @@ flowchart LR
 | Slice | Test file | Test count |
 |---|---|---|
 | fat frontend | capstone/fat/tests/app.test.ts | 4 |
-| fat frontend | capstone/fat/tests/auth-provider.test.ts | 2 |
+| fat frontend | capstone/fat/tests/auth-provider.test.ts | 3 |
 | fat frontend | capstone/fat/tests/auth.test.ts | 10 |
-| fat frontend | capstone/fat/tests/bff-client.test.ts | 2 |
-| thin frontend | capstone/thin/tests/bff-client.test.ts | 4 |
+| fat frontend | capstone/fat/tests/bff-client.test.ts | 3 |
+| thin frontend | capstone/thin/tests/bff-client.test.ts | 5 |
 | thin frontend | capstone/thin/tests/dashboard.test.ts | 5 |
 | thin frontend | capstone/thin/tests/signIn.test.ts | 8 |
 
@@ -61,7 +61,8 @@ package-wide test-total claim; it documents where frontend node logic currently 
   execute requests through the `handleBffRequest` flow, return the scope for assertions, and close the
   process context before disposing the scope.
 - Ambient browser/runtime APIs (`fetch`, `document`, timers, storage, clock, random) enter only through
-  adapter atoms or composition-root adapters; feature graph nodes and observers do not call them inline.
+  transport atoms or composition-root adapters; capability atoms, feature graph nodes, and observers do not
+  call them inline.
 - Feature atoms depend on auth-capable ports such as `authedBffClient`; they do not combine raw HTTP
   clients with session/token storage or manually pass credentials into service calls.
 - No `vi.mock`, `vi.spyOn`, `msw`, or fetch-mock is needed above the seam.

@@ -371,13 +371,15 @@ dashboard capstone and F02-F12 React catalog are backlog. React `main.tsx` files
 adapter/composition roots and tested through the real `ScopeProvider`/`ExecutionContextProvider`
 boundary. React golden observers use `useExecutionContext` to execute flows and do not accept `scope` or
 hand-roll `createContext`/`close` wrappers. React golden source also guards ambient APIs by owning
-declaration: raw adapters may call `fetch`, composition roots may touch `document`, and feature graph
-nodes/observers may not hide inline browser IO. BFF `main.ts` is the lite composition root: it creates one
-scope and one process execution context, executes HTTP-shaped requests through the `handleBffRequest`
-flow, and owns disposal. BFF `http.ts` exports the route boundary as a flow; route handlers do not accept
-`scope` or manually recreate execution lifecycle. BFF raw `fetch` is isolated to transport atoms
-(`authHttp`, `capstoneHttp`); capability atoms (`authProvider`, `capstoneClient`) depend on those
-transports and are preset independently.
+declaration: transport atoms may call `fetch`, composition roots may touch `document`, and capability
+atoms, feature graph nodes, and observers may not hide inline browser IO. BFF `main.ts` is the lite
+composition root: it creates one scope and one process execution context, executes HTTP-shaped requests
+through the `handleBffRequest` flow, and owns disposal. BFF `http.ts` exports the route boundary as a
+flow; route handlers do not accept `scope` or manually recreate execution lifecycle. BFF raw `fetch` is
+isolated to transport atoms (`authHttp`, `capstoneHttp`); capability atoms (`authProvider`,
+`capstoneClient`) depend on those transports and are preset independently. React capstone raw `fetch` is
+also isolated to transport atoms (`authHttp`, `bffHttp`); `authProvider` and `bffClient` depend on those
+transports.
 
 Backend golden:
 

@@ -1,13 +1,13 @@
 import { describe, test, expect, vi, afterEach } from "vitest"
-import { createScope } from "@pumped-fn/lite"
-import { bffClient } from "../src/bff"
+import { createScope, preset } from "@pumped-fn/lite"
+import { bffClient, bffHttp, type BffHttp } from "../src/bff"
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe("inside-out", () => {
-  test("IO1: POST /login with email/password returns token", async () => {
+  test("IO1: bffHttp POST /login with email/password returns token", async () => {
     const calls: { url: string; method: string; body: string }[] = []
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
       calls.push({ url, method: init.method ?? "GET", body: init.body as string })
@@ -15,8 +15,8 @@ describe("inside-out", () => {
     })
 
     const scope = createScope()
-    const client = await scope.resolve(bffClient)
-    const result = await client.login("a@b.com", "pass")
+    const http = await scope.resolve(bffHttp)
+    const result = await http.post("/login", { email: "a@b.com", password: "pass" })
 
     expect(calls).toHaveLength(1)
     const call = calls[0]!
@@ -27,7 +27,7 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("IO2: GET /dashboard with Bearer token returns DashboardView", async () => {
+  test("IO2: bffHttp GET /dashboard with Bearer token returns DashboardView", async () => {
     const calls: { url: string; auth: string }[] = []
     const payload = {
       summary: { total: 1, healthy: 1, unhealthy: 0, unknown: 0, activeIncidents: 0 },
@@ -40,8 +40,8 @@ describe("inside-out", () => {
     })
 
     const scope = createScope()
-    const client = await scope.resolve(bffClient)
-    const result = await client.dashboard("my-token")
+    const http = await scope.resolve(bffHttp)
+    const result = await http.get("/dashboard", "my-token")
 
     expect(calls).toHaveLength(1)
     const call = calls[0]!
@@ -51,19 +51,48 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("IO3: non-ok response on login throws", async () => {
+  test("IO3: bffHttp non-ok response on login throws", async () => {
     vi.stubGlobal("fetch", async () => ({ ok: false, status: 401, json: async () => ({}) }))
     const scope = createScope()
-    const client = await scope.resolve(bffClient)
-    await expect(client.login("a@b.com", "bad")).rejects.toThrow()
+    const http = await scope.resolve(bffHttp)
+    await expect(http.post("/login", { email: "a@b.com", password: "bad" })).rejects.toThrow(
+      "bff /login failed: 401"
+    )
     await scope.dispose()
   })
 
-  test("IO4: non-ok response on dashboard throws", async () => {
+  test("IO4: bffHttp non-ok response on dashboard throws", async () => {
     vi.stubGlobal("fetch", async () => ({ ok: false, status: 403, json: async () => ({}) }))
     const scope = createScope()
+    const http = await scope.resolve(bffHttp)
+    await expect(http.get("/dashboard", "bad-token")).rejects.toThrow("bff /dashboard failed: 403")
+    await scope.dispose()
+  })
+
+  test("IO5: bffClient delegates login and dashboard to bffHttp", async () => {
+    const calls: Array<{ method: "post" | "get"; path: string; value: unknown }> = []
+    const dashboard = {
+      summary: { total: 1, healthy: 1, unhealthy: 0, unknown: 0, activeIncidents: 0 },
+      attention: [],
+    }
+    const http: BffHttp = {
+      post: async <T>(path: string, body: unknown) => {
+        calls.push({ method: "post", path, value: body })
+        return { token: "tok-bff" } as T
+      },
+      get: async <T>(path: string, token: string) => {
+        calls.push({ method: "get", path, value: token })
+        return dashboard as T
+      },
+    }
+    const scope = createScope({ presets: [preset(bffHttp, http)] })
     const client = await scope.resolve(bffClient)
-    await expect(client.dashboard("bad-token")).rejects.toThrow()
+    await expect(client.login("a@b.com", "pass")).resolves.toEqual({ token: "tok-bff" })
+    await expect(client.dashboard("tok-bff")).resolves.toEqual(dashboard)
+    expect(calls).toEqual([
+      { method: "post", path: "/login", value: { email: "a@b.com", password: "pass" } },
+      { method: "get", path: "/dashboard", value: "tok-bff" },
+    ])
     await scope.dispose()
   })
 })

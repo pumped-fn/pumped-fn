@@ -14,6 +14,10 @@ export interface AuthProvider {
   authenticate(email: string, password: string): Promise<Session>
 }
 
+export interface AuthHttp {
+  post<T>(path: string, body: unknown): Promise<T>
+}
+
 export interface LoginFormState {
   email: string
   password: string
@@ -22,22 +26,26 @@ export interface LoginFormState {
 
 export const authBaseUrl = tag<string>({ label: "auth.baseUrl", default: "http://localhost:4000" })
 
-export const authProvider = atom({
+export const authHttp = atom({
   deps: { baseUrl: tags.required(authBaseUrl) },
-  factory: (_ctx, { baseUrl }): AuthProvider => {
-    const post = async <T>(path: string, body: unknown): Promise<T> => {
-      const res = await fetch(`${baseUrl}${path}`, {
+  factory: (_ctx, { baseUrl }): AuthHttp => ({
+    post: async <T>(path: string, body: unknown) => {
+      const response = await fetch(`${baseUrl}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error("invalid credentials")
-      return (await res.json()) as T
-    }
-    return {
-      authenticate: (email, password) => post<Session>("/login", { email, password }),
-    }
-  },
+      if (!response.ok) throw new Error("invalid credentials")
+      return (await response.json()) as T
+    },
+  }),
+})
+
+export const authProvider = atom({
+  deps: { http: authHttp },
+  factory: (_ctx, { http }): AuthProvider => ({
+    authenticate: (email, password) => http.post<Session>("/login", { email, password }),
+  }),
 })
 
 export const session = atom({ factory: (): Session | null => null })
