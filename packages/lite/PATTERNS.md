@@ -364,11 +364,29 @@ sequenceDiagram
 
 Runnable examples live in `examples/lite-golden`. They cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
 
-Frontend and BFF examples live in `examples/lite-golden-react` and `examples/lite-golden-bff`. The tiered service-health dashboard comparison in `examples/lite-golden-react/capstone` shows the same scope seam across three logic-boundary choices: fattest frontend, fat frontend plus BFF, and thin frontend plus fat BFF. React `main.tsx` files are treated as adapter/composition roots and tested through the real `ScopeProvider` boundary.
+Frontend and BFF examples live in `examples/lite-golden-react` and `examples/lite-golden-bff`. The
+tiered service-health dashboard comparison in `examples/lite-golden-react/capstone` covers the
+implemented BFF package, fat frontend plus BFF, and thin frontend plus fat BFF slices. Fattest frontend
+dashboard capstone and F02-F12 React catalog are backlog. React `main.tsx` files are treated as
+adapter/composition roots and tested through the real `ScopeProvider` boundary.
 
-Run them with:
+Backend golden:
 
 ```bash
 pnpm -F @pumped-fn/lite-golden test
 pnpm -F @pumped-fn/lite-golden typecheck
+```
+
+React golden:
+
+```bash
+pnpm -F @pumped-fn/lite-golden-react test
+pnpm -F @pumped-fn/lite-golden-react typecheck
+```
+
+BFF golden:
+
+```bash
+pnpm -F @pumped-fn/lite-golden-bff test
+pnpm -F @pumped-fn/lite-golden-bff typecheck
 ```

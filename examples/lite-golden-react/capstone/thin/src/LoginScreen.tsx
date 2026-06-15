@@ -1,15 +1,23 @@
-import { useState } from "react"
+import type { Lite } from "@pumped-fn/lite"
 import { useAtom, useScope } from "@pumped-fn/lite-react"
 import { sessionToken } from "./session"
-import { signIn } from "./signIn"
+import { signInForm, submitSignIn, updateSignInEmail, updateSignInPassword } from "./signIn"
 import { Dashboard } from "./Dashboard"
 
 export function LoginScreen() {
   const { data: token } = useAtom(sessionToken, { suspense: false, resolve: true })
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const { data: form } = useAtom(signInForm, { suspense: false, resolve: true })
   const scope = useScope()
+
+  const run = async (exec: (ctx: Lite.ExecutionContext) => Promise<unknown>) => {
+    const ctx = scope.createContext()
+    try {
+      await exec(ctx)
+      await ctx.close({ ok: true })
+    } catch (error) {
+      await ctx.close({ ok: false, error })
+    }
+  }
 
   if (token !== null && token !== undefined) {
     return <Dashboard />
@@ -17,32 +25,34 @@ export function LoginScreen() {
 
   return (
     <form
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault()
-        setError(null)
-        try {
-          const ctx = scope.createContext()
-          await ctx.exec({ flow: signIn, input: { email, password } })
-          await ctx.close({ ok: true })
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "login failed")
-        }
+        void run((ctx) => ctx.exec({ flow: submitSignIn, input: undefined }))
       }}
     >
       <label>
         email
-        <input aria-label="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input
+          aria-label="email"
+          type="email"
+          value={form?.email ?? ""}
+          onChange={(e) => {
+            void run((ctx) => ctx.exec({ flow: updateSignInEmail, input: e.target.value }))
+          }}
+        />
       </label>
       <label>
         password
         <input
           aria-label="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={form?.password ?? ""}
+          onChange={(e) => {
+            void run((ctx) => ctx.exec({ flow: updateSignInPassword, input: e.target.value }))
+          }}
         />
       </label>
-      {error && <div role="alert">{error}</div>}
+      {form?.error && <div role="alert">{form.error}</div>}
       <button type="submit">sign in</button>
     </form>
   )

@@ -6,12 +6,14 @@ const aSession: Session = { token: "tok-1", user: { id: "u1", name: "Alice" } }
 
 const fakeAuth: AuthProvider = {
   authenticate: async (_email, _password) => aSession,
+  validate: async () => aSession,
 }
 
 const throwingAuth: AuthProvider = {
   authenticate: async () => {
     throw new Error("invalid credentials")
   },
+  validate: async () => aSession,
 }
 
 describe("inside-out", () => {

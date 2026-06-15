@@ -5,16 +5,29 @@ Diagram: https://diashort.apps.quickable.co/d/bcc445ff
 ## The smell
 
 `main.tsx` creates a React root and the first component immediately owns app state. Tests either skip the
-bootstrap entirely or patch the DOM/root APIs, so the real provider boundary is never exercised.
+bootstrap entirely or patch DOM/root APIs, so the real provider boundary is never exercised.
 
-## After
+## Harm
 
-`main.tsx` is a small adapter: it creates one `scope`, renders the observer under `ScopeProvider`, and
-disposes both the React root and scope on unmount. The app state remains in `after.ts`; the component in
-`view.tsx` only observes and execs public graph flows.
+The graph seam disappears at the one place every user path enters the app. State can drift into React
+bootstrap code, `ScopeProvider` wiring is assumed instead of tested, and disposal behavior is invisible.
 
-## Lens
+## Transformation
+
+Move state to `after.ts`, keep the component in `view.tsx` as an observer, and make `main.tsx` a small
+composition-root adapter. It creates one `scope`, renders through `ScopeProvider`, returns the mounted
+app with the returned `scope`, and disposes both React root and scope on unmount.
+
+## Lens coverage
 
 - **inside-out** (`after.test.ts`, node): bootstrap state and transitions are graph-owned.
 - **outside-in** (`main.dom.test.tsx`, jsdom): production bootstrap mounts through the real
-  `ScopeProvider` boundary and covers the missing-root adapter error.
+  `ScopeProvider` boundary, asserts `bootCount` through the returned `scope`, and covers the missing-root
+  adapter error.
+- **effect-managed** (`main.dom.test.tsx`, jsdom): unmount owns root and scope disposal.
+
+## Why 100%
+
+The node test covers graph state without a DOM, and the DOM test covers the actual composition-root
+adapter instead of replacing it. Nothing above the seam needs `vi.mock` or `vi.spyOn`; the returned
+`scope` is the assertion surface.

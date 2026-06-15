@@ -16,4 +16,7 @@ The BFF owns authentication and view-model shaping. The frontend holds a token s
 
 ## Contrast with fat
 
-The fat frontend (`capstone/fat`) owns auth entirely: `authProvider` adapter, `session` atom (token + user object), `login`/`logout` flows, `isAuthed` derived atom — 6 logic units and 9 node-logic tests. The thin frontend has none of that: no `User`, no `Session`, no `isAuthed`, no `authProvider`. Those 6 units live in the BFF now. The thin frontend has 2 node-logic test files (signIn + dashboard) with 5 logic tests total, down from 9 in fat. The reduction IS the lesson.
+The fat frontend (`capstone/fat`) owns `authProvider`, `session`, `login`/`logout`, `isAuthed`, and
+login form graph state. The thin frontend has none of that: no `User`, no `Session`, no `isAuthed`, no
+`authProvider`. Those ownership rules live in the BFF now. The current file-derived node test inventory
+is kept in `../README.md` so the comparison stays tied to actual test files instead of stale prose counts.

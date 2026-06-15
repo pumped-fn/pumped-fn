@@ -1,62 +1,61 @@
 # Service Health Dashboard Logic Spectrum
 
-Diagram: https://diashort.apps.quickable.co/d/14909a2e
+Diagram: https://diashort.apps.quickable.co/d/8c731a3d
 
 ```mermaid
 flowchart LR
   Backend[Backend capstone raw API]
-  BFF1[BFF v1 data shaping]
-  BFF2[BFF v2 auth + data shaping]
-  FatRaw[Fattest frontend\nraw backend\nshaping + auth + derivation]
-  FatBff[Fat frontend + BFF\nFE auth + app derivation\nBFF data shaping]
-  Thin[Thin frontend + fat BFF\ntoken projection only\nBFF auth + shaping]
+  BFF[BFF package\ncapstoneClient + authProvider + http.ts\nimplemented]
+  Fat[Fat frontend + BFF\nimplemented]
+  Thin[Thin frontend + fat BFF\nimplemented]
+  Raw[Fattest frontend dashboard\nraw backend\nBACKLOG]
+  F13[F13 main bootstrap\nimplemented]
+  Catalog[F02-F12 React catalog\nBACKLOG]
 
-  FatRaw --> Backend
-  FatBff --> BFF1 --> Backend
-  Thin --> BFF2 --> Backend
-
-  FatRaw -. logic tested .-> FELogic1[frontend node tests: most logic]
-  FatBff -. logic tested .-> FELogic2[frontend node tests: auth/app]
-  BFF1 -. logic tested .-> BFFLogic1[BFF node tests: shaping]
-  Thin -. logic tested .-> FELogic3[frontend node tests: minimal projection]
-  BFF2 -. logic tested .-> BFFLogic2[BFF node tests: auth + shaping]
+  Fat --> BFF --> Backend
+  Thin --> BFF
+  Raw -. backlog .-> Backend
+  F13 -. composition root .-> Fat
+  F13 -. composition root .-> Thin
+  Catalog -. backlog .-> Fat
 ```
-
-## Anchors
-
-| Anchor | Frontend talks to | Frontend owns | BFF owns | Where logic is tested |
-|---|---|---|---|---|
-| Fattest frontend | raw backend API | data shaping, auth, app derivation, optimistic interaction | nothing | frontend node tests |
-| Fat frontend + BFF | BFF data endpoints | auth, session atom, app graph derivation | dashboard/detail shaping | frontend node tests for auth/app; BFF node tests for shaping |
-| Thin frontend + fat BFF | auth-gated BFF endpoints | token storage and projection | auth, session shaping, dashboard/detail shaping | BFF node tests; minimal frontend node tests |
 
 ## Implemented Slices
 
-The BFF package proves the middle tier owns calculation without a browser:
-`examples/lite-golden-bff` has `dashboardView`, `serviceDetailView`, and auth adapter flows, all tested in
-node through `createScope` + `preset(capstoneClient, fake)` or `preset(authProvider, fake)`.
+| Slice | Source | Claim |
+|---|---|---|
+| BFF package | `examples/lite-golden-bff` | `capstoneClient` shapes backend data, `authProvider` authenticates and validates sessions, and `src/http.ts` maps HTTP-shaped requests through flows. |
+| Fat frontend + BFF | `capstone/fat` + `examples/lite-golden-bff` | Frontend owns auth/session/form state and app derivation; BFF owns dashboard/detail shaping. |
+| Thin frontend + fat BFF | `capstone/thin` + `examples/lite-golden-bff` | Frontend owns token/form projection; BFF owns auth/session validation and dashboard/detail shaping. |
+| F13 main bootstrap | `patterns/F13-main-bootstrap` | `main.tsx` is a tested composition-root adapter that returns the scope for assertions. |
 
-The fat frontend (`capstone/fat`) consumes BFF-shaped `DashboardView` data but owns frontend auth:
-`authProvider`, `session`, `login`, `logout`, `isAuthed`, and the `dashboard` atom. Components observe
-those graph nodes; they do not calculate the dashboard shape.
+## Backlog
 
-The thin frontend (`capstone/thin`) moves auth shaping behind the BFF. The browser graph holds only a
-token and asks the BFF for an auth-gated dashboard view-model.
+| Slice | Status |
+|---|---|
+| Fattest frontend dashboard against the raw backend | Backlog: there is no `capstone/raw` or `capstone/fattest` implementation in this PR. |
+| F02-F12 frontend catalog | Backlog: only F01 and F13 are implemented in the React pattern catalog. |
 
-## Test Delta
+## Current Node Test Inventory
 
-- fat frontend: 9 node-logic tests across auth/app/adapter ownership.
-- thin frontend: 5 node-logic tests across sign-in/token and dashboard projection.
+| Slice | Test file | Test count |
+|---|---|---|
+| fat frontend | capstone/fat/tests/app.test.ts | 3 |
+| fat frontend | capstone/fat/tests/auth-provider.test.ts | 2 |
+| fat frontend | capstone/fat/tests/auth.test.ts | 10 |
+| fat frontend | capstone/fat/tests/bff-client.test.ts | 2 |
+| thin frontend | capstone/thin/tests/bff-client.test.ts | 4 |
+| thin frontend | capstone/thin/tests/dashboard.test.ts | 3 |
+| thin frontend | capstone/thin/tests/signIn.test.ts | 8 |
 
-The drop is the point: moving auth/session rules down a tier reduces frontend logic without changing the
-testing seam. Both versions still use the same mechanism: construct a scope, preset the adapter atom, and
-exercise public flows/atoms. Observer tests stay in `*.dom.test.tsx` and assert rendering only.
+The inventory above is intentionally file-derived by `tests/capstone-comparison.test.ts`. It is not a
+package-wide test-total claim; it documents where frontend node logic currently lives.
 
-## Invariants
+## Boundary Rules
 
 - Components observe the graph through `ScopeProvider`, `useAtom`, and `useScope`.
-- `main.tsx` is a tested composition-root adapter: create one scope, render through `ScopeProvider`, and
-  dispose the root/scope together.
+- `main.tsx` is a tested composition-root adapter: create one scope, render through `ScopeProvider`, return
+  the scope for assertions, and dispose the root/scope together.
 - Browser APIs enter through adapter atoms; only adapter-owned tests fake `fetch`.
-- No `vi.mock`, `msw`, or fetch-mock is needed above the seam.
+- No `vi.mock`, `vi.spyOn`, `msw`, or fetch-mock is needed above the seam.
 - Packages stay independent and redeclare their wire/view-model types at the transfer boundary.

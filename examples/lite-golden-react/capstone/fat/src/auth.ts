@@ -14,6 +14,12 @@ export interface AuthProvider {
   authenticate(email: string, password: string): Promise<Session>
 }
 
+export interface LoginFormState {
+  email: string
+  password: string
+  error: string | null
+}
+
 export const authBaseUrl = tag<string>({ label: "auth.baseUrl", default: "http://localhost:4000" })
 
 export const authProvider = atom({
@@ -36,6 +42,36 @@ export const authProvider = atom({
 
 export const session = atom({ factory: (): Session | null => null })
 
+export const loginForm = atom({ factory: (): LoginFormState => ({ email: "", password: "", error: null }) })
+
+function loginErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "login failed"
+}
+
+function loginValidationError(form: LoginFormState): string | null {
+  if (!form.email.includes("@")) return "email must include @"
+  if (form.password.length === 0) return "password is required"
+  return null
+}
+
+export const updateLoginEmail = flow({
+  name: "updateLoginEmail",
+  parse: typed<string>(),
+  deps: { formControl: controller(loginForm, { resolve: true }) },
+  factory: (ctx, { formControl }) => {
+    formControl.update((form) => ({ ...form, email: ctx.input }))
+  },
+})
+
+export const updateLoginPassword = flow({
+  name: "updateLoginPassword",
+  parse: typed<string>(),
+  deps: { formControl: controller(loginForm, { resolve: true }) },
+  factory: (ctx, { formControl }) => {
+    formControl.update((form) => ({ ...form, password: ctx.input }))
+  },
+})
+
 export const login = flow({
   name: "login",
   parse: typed<{ email: string; password: string }>(),
@@ -44,6 +80,27 @@ export const login = flow({
     const s = await provider.authenticate(ctx.input.email, ctx.input.password)
     sessionControl.set(s)
     return s
+  },
+})
+
+export const submitLogin = flow({
+  name: "submitLogin",
+  parse: typed<undefined>(),
+  deps: { formControl: controller(loginForm, { resolve: true }) },
+  factory: async (ctx, { formControl }) => {
+    const form = formControl.get()
+    const validationError = loginValidationError(form)
+    if (validationError !== null) {
+      formControl.set({ ...form, error: validationError })
+      throw new Error(validationError)
+    }
+    formControl.set({ ...form, error: null })
+    try {
+      return await ctx.exec({ flow: login, input: { email: form.email, password: form.password } })
+    } catch (error) {
+      formControl.update((current) => ({ ...current, error: loginErrorMessage(error) }))
+      throw error
+    }
   },
 })
 

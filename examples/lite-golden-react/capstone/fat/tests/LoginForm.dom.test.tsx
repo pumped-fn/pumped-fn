@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, test, expect } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
-import { createScope, preset } from "@pumped-fn/lite"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { createScope, preset, type Lite } from "@pumped-fn/lite"
 import { ScopeProvider } from "@pumped-fn/lite-react"
-import { authProvider, type AuthProvider, type Session } from "../src/auth"
+import { authProvider, loginForm, session, submitLogin, type AuthProvider, type Session } from "../src/auth"
 import { LoginForm } from "../src/LoginForm"
 
 const aSession: Session = { token: "tok-1", user: { id: "u1", name: "Alice" } }
@@ -21,6 +21,20 @@ async function fillAndSubmit(email: string, password: string) {
   fireEvent.click(screen.getByRole("button", { name: "login" }))
 }
 
+function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
+  return {
+    name: "record-parent-close",
+    wrapExec: async (next, executed, ctx) => {
+      if (executed === target && ctx.parent) {
+        ctx.parent.onClose((result) => {
+          closes.push(result)
+        })
+      }
+      return next()
+    },
+  }
+}
+
 describe("outside-in", () => {
   test("OI1: renders email and password inputs when not authed", async () => {
     const scope = createScope({ presets: [preset(authProvider, successAuth)] })
@@ -36,7 +50,11 @@ describe("outside-in", () => {
   })
 
   test("OI2: successful login transitions to authed state (logout button appears)", async () => {
-    const scope = createScope({ presets: [preset(authProvider, successAuth)] })
+    const closes: Lite.CloseResult[] = []
+    const scope = createScope({
+      extensions: [recordParentClose(submitLogin, closes)],
+      presets: [preset(authProvider, successAuth)],
+    })
     render(
       <ScopeProvider scope={scope}>
         <LoginForm />
@@ -45,6 +63,11 @@ describe("outside-in", () => {
     await screen.findByLabelText("email")
     await fillAndSubmit("a@b.com", "pass")
     expect(await screen.findByRole("button", { name: "logout" })).toBeTruthy()
+    await waitFor(async () => {
+      expect(await scope.resolve(session)).toEqual(aSession)
+      expect(await scope.resolve(loginForm)).toEqual({ email: "a@b.com", password: "pass", error: null })
+      expect(closes.map((result) => result.ok)).toEqual([true])
+    })
     await scope.dispose()
   })
 
@@ -60,11 +83,18 @@ describe("outside-in", () => {
     const logoutBtn = await screen.findByRole("button", { name: "logout" })
     fireEvent.click(logoutBtn)
     expect(await screen.findByLabelText("email")).toBeTruthy()
+    await waitFor(async () => {
+      expect(await scope.resolve(session)).toBeNull()
+    })
     await scope.dispose()
   })
 
   test("OI4: failed login shows error message and stays on form (spec OI3)", async () => {
-    const scope = createScope({ presets: [preset(authProvider, failingAuth)] })
+    const closes: Lite.CloseResult[] = []
+    const scope = createScope({
+      extensions: [recordParentClose(submitLogin, closes)],
+      presets: [preset(authProvider, failingAuth)],
+    })
     render(
       <ScopeProvider scope={scope}>
         <LoginForm />
@@ -74,6 +104,17 @@ describe("outside-in", () => {
     await fillAndSubmit("x@y.com", "wrong")
     expect(await screen.findByRole("alert")).toBeTruthy()
     expect(screen.getByLabelText("email")).toBeTruthy()
+    await waitFor(async () => {
+      expect(await scope.resolve(session)).toBeNull()
+      expect(await scope.resolve(loginForm)).toEqual({
+        email: "x@y.com",
+        password: "wrong",
+        error: "invalid credentials",
+      })
+      expect(closes.map((result) => result.ok)).toEqual([false])
+    })
+    const [result] = closes
+    if (result?.ok === false) expect(result.error).toMatchObject({ message: "invalid credentials" })
     await scope.dispose()
   })
 
@@ -89,6 +130,14 @@ describe("outside-in", () => {
     await fillAndSubmit("x@y.com", "wrong")
     const alert = await screen.findByRole("alert")
     expect(alert.textContent).toBe("login failed")
+    await waitFor(async () => {
+      expect(await scope.resolve(session)).toBeNull()
+      expect(await scope.resolve(loginForm)).toEqual({
+        email: "x@y.com",
+        password: "wrong",
+        error: "login failed",
+      })
+    })
     await scope.dispose()
   })
 })

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { describe, test, expect } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
-import { createScope, preset } from "@pumped-fn/lite"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { createScope, preset, type Lite } from "@pumped-fn/lite"
 import { ScopeProvider } from "@pumped-fn/lite-react"
 import { bffClient, type BffClient, type DashboardView } from "../src/bff"
 import { sessionToken } from "../src/session"
+import { signInForm, submitSignIn } from "../src/signIn"
 import { LoginScreen } from "../src/LoginScreen"
 
 const fakeDash: DashboardView = {
@@ -28,6 +29,20 @@ async function fillAndSubmit(email: string, password: string) {
   fireEvent.click(screen.getByRole("button", { name: "sign in" }))
 }
 
+function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
+  return {
+    name: "record-parent-close",
+    wrapExec: async (next, executed, ctx) => {
+      if (executed === target && ctx.parent) {
+        ctx.parent.onClose((result) => {
+          closes.push(result)
+        })
+      }
+      return next()
+    },
+  }
+}
+
 describe("outside-in", () => {
   test("OI1: renders sign-in form when no token", async () => {
     const scope = createScope({ presets: [preset(bffClient, successClient)] })
@@ -43,7 +58,11 @@ describe("outside-in", () => {
   })
 
   test("OI2: successful sign-in transitions to dashboard view", async () => {
-    const scope = createScope({ presets: [preset(bffClient, successClient)] })
+    const closes: Lite.CloseResult[] = []
+    const scope = createScope({
+      extensions: [recordParentClose(submitSignIn, closes)],
+      presets: [preset(bffClient, successClient)],
+    })
     render(
       <ScopeProvider scope={scope}>
         <LoginScreen />
@@ -52,11 +71,20 @@ describe("outside-in", () => {
     await screen.findByLabelText("email")
     await fillAndSubmit("a@b.com", "pass")
     expect(await screen.findByLabelText("summary")).toBeTruthy()
+    await waitFor(async () => {
+      expect(await scope.resolve(sessionToken)).toBe("tok-dom")
+      expect(await scope.resolve(signInForm)).toEqual({ email: "a@b.com", password: "pass", error: null })
+      expect(closes.map((result) => result.ok)).toEqual([true])
+    })
     await scope.dispose()
   })
 
   test("OI3: failed sign-in shows error and stays on form", async () => {
-    const scope = createScope({ presets: [preset(bffClient, failingClient)] })
+    const closes: Lite.CloseResult[] = []
+    const scope = createScope({
+      extensions: [recordParentClose(submitSignIn, closes)],
+      presets: [preset(bffClient, failingClient)],
+    })
     render(
       <ScopeProvider scope={scope}>
         <LoginScreen />
@@ -66,6 +94,17 @@ describe("outside-in", () => {
     await fillAndSubmit("x@y.com", "wrong")
     expect(await screen.findByRole("alert")).toBeTruthy()
     expect(screen.getByLabelText("email")).toBeTruthy()
+    await waitFor(async () => {
+      expect(await scope.resolve(sessionToken)).toBeNull()
+      expect(await scope.resolve(signInForm)).toEqual({
+        email: "x@y.com",
+        password: "wrong",
+        error: "bff /login failed: 401",
+      })
+      expect(closes.map((result) => result.ok)).toEqual([false])
+    })
+    const [result] = closes
+    if (result?.ok === false) expect(result.error).toMatchObject({ message: "bff /login failed: 401" })
     await scope.dispose()
   })
 
@@ -84,6 +123,14 @@ describe("outside-in", () => {
     await fillAndSubmit("x@y.com", "wrong")
     const alert = await screen.findByRole("alert")
     expect(alert.textContent).toBe("login failed")
+    await waitFor(async () => {
+      expect(await scope.resolve(sessionToken)).toBeNull()
+      expect(await scope.resolve(signInForm)).toEqual({
+        email: "x@y.com",
+        password: "wrong",
+        error: "login failed",
+      })
+    })
     await scope.dispose()
   })
 })
