@@ -10,7 +10,10 @@ This is one point on the logic-boundary spectrum: auth logic lives in frontend n
 
 The scope is the single seam.
 
-- `authProvider` and `bffClient` are raw adapter atoms. Their factories call `fetch`. In adapter-own tests (`auth-provider.test.ts`, `bff-client.test.ts`), `vi.stubGlobal` fakes `fetch` below the seam — the sole sanctioned global-fake site per module.
+- `authProvider` and `bffClient` are raw adapter atoms. Their factories call `fetch`; no other declaration
+  in the file may call ambient browser/runtime APIs inline. In adapter-own tests (`auth-provider.test.ts`,
+  `bff-client.test.ts`), `vi.stubGlobal` fakes `fetch` below the seam — the sole sanctioned global-fake
+  site per module.
 - `authedBffClient` is the auth-capable port. It composes `bffClient` with `session`, so feature atoms never depend on both raw transport and session storage or pass `session.token` into service calls.
 - `session` is preset directly only in tests that target auth gates such as `isAuthed`. Dashboard feature tests preset `authedBffClient`.
 - Components observe atoms via `useAtom`/`useScope`; they exec flows on user interaction. The observer tests wrap components in `<ScopeProvider scope={scope}>` and interact via `fireEvent`.

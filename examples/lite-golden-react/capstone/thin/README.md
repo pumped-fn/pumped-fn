@@ -6,10 +6,10 @@ The BFF owns authentication and view-model shaping. The frontend holds a token s
 
 ## Seam
 
-`bffClient` is the raw adapter for login and explicit-token HTTP calls. `authedBffClient` composes that
-adapter with `sessionToken`, so dashboard feature tests preset one auth-capable port instead of coupling
-the feature atom to both raw transport and token storage. No auth provider, no session object, no derived
-auth flag — none exist in this package.
+`bffClient` is the raw adapter for login and explicit-token HTTP calls. It is the only thin declaration
+that may call `fetch` inline. `authedBffClient` composes that adapter with `sessionToken`, so dashboard
+feature tests preset one auth-capable port instead of coupling the feature atom to both raw transport and
+token storage. No auth provider, no session object, no derived auth flag — none exist in this package.
 
 ## Lens coverage
 

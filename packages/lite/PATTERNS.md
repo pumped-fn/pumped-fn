@@ -368,7 +368,9 @@ Frontend and BFF examples live in `examples/lite-golden-react` and `examples/lit
 tiered service-health dashboard comparison in `examples/lite-golden-react/capstone` covers the
 implemented BFF package, fat frontend plus BFF, and thin frontend plus fat BFF slices. Fattest frontend
 dashboard capstone and F02-F12 React catalog are backlog. React `main.tsx` files are treated as
-adapter/composition roots and tested through the real `ScopeProvider` boundary.
+adapter/composition roots and tested through the real `ScopeProvider` boundary. React golden source also
+guards ambient APIs by owning declaration: raw adapters may call `fetch`, composition roots may touch
+`document`, and feature graph nodes/observers may not hide inline browser IO.
 
 Backend golden:
 

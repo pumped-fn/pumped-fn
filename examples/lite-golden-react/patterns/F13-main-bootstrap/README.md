@@ -16,7 +16,8 @@ bootstrap code, `ScopeProvider` wiring is assumed instead of tested, and disposa
 
 Move state to `after.ts`, keep the component in `view.tsx` as an observer, and make `main.tsx` a small
 composition-root adapter. It creates one `scope`, renders through `ScopeProvider`, returns the mounted
-app with the returned `scope`, and disposes both React root and scope on unmount.
+app with the returned `scope`, and disposes both React root and scope on unmount. `main.tsx` is also the
+only declaration in the pattern that may touch `document`; observers and graph nodes stay ambient-free.
 
 ## Lens coverage
 

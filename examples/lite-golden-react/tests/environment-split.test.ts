@@ -11,6 +11,14 @@ const allowedStubGlobals = new Map([
   ["capstone/fat/tests/bff-client.test.ts", new Set(["fetch"])],
   ["capstone/thin/tests/bff-client.test.ts", new Set(["fetch"])],
 ])
+const allowedSourceAmbientEffects = new Map([
+  ["capstone/fat/src/app.ts:bffClient", new Set(["fetch"])],
+  ["capstone/fat/src/auth.ts:authProvider", new Set(["fetch"])],
+  ["capstone/fat/src/main.tsx:mountMain", new Set(["document"])],
+  ["capstone/thin/src/bff.ts:bffClient", new Set(["fetch"])],
+  ["capstone/thin/src/main.tsx:mountMain", new Set(["document"])],
+  ["patterns/F13-main-bootstrap/main.tsx:mountMain", new Set(["document"])],
+])
 
 type ConfigWithTestInclude = {
   test?: {
@@ -25,6 +33,13 @@ type GuardedCall = {
   global: string | undefined
 }
 
+type AmbientEffect = {
+  file: string
+  declaration: string
+  line: number
+  effect: string
+}
+
 function testFiles(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir).sort()) {
@@ -33,6 +48,25 @@ function testFiles(dir: string): string[] {
     if (statSync(full).isDirectory()) {
       out.push(...testFiles(full))
     } else if (entry.endsWith(".test.ts") || entry.endsWith(".test.tsx")) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+function sourceFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir).sort()) {
+    if (entry === "node_modules" || entry === "coverage" || entry.startsWith(".")) continue
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) {
+      out.push(...sourceFiles(full))
+    } else if (
+      (entry.endsWith(".ts") || entry.endsWith(".tsx")) &&
+      !entry.endsWith(".test.ts") &&
+      !entry.endsWith(".test.tsx") &&
+      !entry.startsWith("before.")
+    ) {
       out.push(full)
     }
   }
@@ -189,6 +223,109 @@ function guardedCalls(): GuardedCall[] {
   return testFiles(root).flatMap(viCalls)
 }
 
+function ambientEffectName(node: ts.Node): string | undefined {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+    if (
+      node.expression.text === "fetch" ||
+      node.expression.text === "Date" ||
+      node.expression.text === "setTimeout" ||
+      node.expression.text === "setInterval" ||
+      node.expression.text === "clearTimeout" ||
+      node.expression.text === "clearInterval"
+    ) {
+      return node.expression.text
+    }
+  }
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    const receiver = node.expression.expression
+    const property = node.expression.name.text
+    if (
+      ts.isIdentifier(receiver) &&
+      (receiver.text === "globalThis" || receiver.text === "window") &&
+      (property === "fetch" ||
+        property === "setTimeout" ||
+        property === "setInterval" ||
+        property === "clearTimeout" ||
+        property === "clearInterval")
+    ) {
+      return property
+    }
+    if (ts.isIdentifier(receiver) && receiver.text === "Date" && property === "now") return "Date.now"
+    if (ts.isIdentifier(receiver) && receiver.text === "Math" && property === "random") return "Math.random"
+    if (ts.isIdentifier(receiver) && receiver.text === "crypto" && property === "randomUUID") {
+      return "crypto.randomUUID"
+    }
+  }
+  if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Date") return "Date"
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+    if (
+      node.expression.text === "document" ||
+      node.expression.text === "window" ||
+      node.expression.text === "navigator" ||
+      node.expression.text === "localStorage" ||
+      node.expression.text === "sessionStorage"
+    ) {
+      return node.expression.text
+    }
+  }
+  if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+    if (
+      node.expression.text === "WebSocket" ||
+      node.expression.text === "EventSource" ||
+      node.expression.text === "XMLHttpRequest"
+    ) {
+      return node.expression.text
+    }
+  }
+  return undefined
+}
+
+function declarationName(statement: ts.Statement): string {
+  if (ts.isFunctionDeclaration(statement) && statement.name) return statement.name.text
+  if (ts.isVariableStatement(statement)) {
+    const [declaration] = statement.declarationList.declarations
+    if (declaration && ts.isIdentifier(declaration.name)) return declaration.name.text
+  }
+  return "<top-level>"
+}
+
+function ambientEffectsFromSource(file: string, source: string): AmbientEffect[] {
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  )
+  const effects: AmbientEffect[] = []
+
+  function visit(node: ts.Node, declaration: string): void {
+    const effect = ambientEffectName(node)
+    if (effect) {
+      const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+      effects.push({ file: packagePath(file), declaration, line: position.line + 1, effect })
+    }
+    ts.forEachChild(node, (child) => visit(child, declaration))
+  }
+
+  for (const statement of sourceFile.statements) visit(statement, declarationName(statement))
+  return effects
+}
+
+function sourceAmbientViolationsFromSource(file: string, source: string): AmbientEffect[] {
+  return ambientEffectsFromSource(file, source).filter(
+    ({ file, declaration, effect }) => !allowedSourceAmbientEffects.get(`${file}:${declaration}`)?.has(effect),
+  )
+}
+
+function sourceAmbientViolations(): AmbientEffect[] {
+  return [
+    ...sourceFiles(join(root, "capstone", "fat", "src")),
+    ...sourceFiles(join(root, "capstone", "thin", "src")),
+    ...sourceFiles(join(root, "patterns", "F13-main-bootstrap")),
+  ].flatMap((file) => sourceAmbientViolationsFromSource(file, readFileSync(file, "utf8")))
+}
+
 describe("inside-out", () => {
   test("Vitest only includes the .test.ts/.test.tsx surface — .spec files cannot bypass structural guards", () => {
     expect((config as ConfigWithTestInclude).test?.include).toEqual(allowedTestInclude)
@@ -244,5 +381,44 @@ describe("inside-out", () => {
       ["spyOn", undefined],
       ["stubGlobal", "fetch"],
     ])
+  })
+
+  test("source ambient APIs stay inside adapter and composition-root boundaries", () => {
+    const leakingFeature = [
+      'import { atom } from "@pumped-fn/lite"',
+      "export const dashboard = atom({",
+      "  factory: async () => fetch('/dashboard'),",
+      "})",
+      "export function Dashboard() {",
+      "  return document.body.textContent",
+      "}",
+    ].join("\n")
+    const sameFileFeatureLeak = [
+      'import { atom } from "@pumped-fn/lite"',
+      "export const dashboard = atom({",
+      "  factory: async () => fetch('/dashboard'),",
+      "})",
+    ].join("\n")
+    const allowedAdapter = [
+      'import { atom, tag, tags } from "@pumped-fn/lite"',
+      "const baseUrl = tag<string>({ label: 'baseUrl', default: 'http://localhost' })",
+      "export const bffClient = atom({",
+      "  deps: { baseUrl: tags.required(baseUrl) },",
+      "  factory: (_ctx, { baseUrl }) => ({ get: () => fetch(baseUrl) }),",
+      "})",
+    ].join("\n")
+
+    expect(
+      sourceAmbientViolationsFromSource("capstone/thin/src/dashboard.ts", leakingFeature).map(
+        ({ declaration, effect }) => `${declaration}:${effect}`,
+      ),
+    ).toEqual(["dashboard:fetch", "Dashboard:document"])
+    expect(
+      sourceAmbientViolationsFromSource("capstone/fat/src/app.ts", sameFileFeatureLeak).map(
+        ({ declaration, effect }) => `${declaration}:${effect}`,
+      ),
+    ).toEqual(["dashboard:fetch"])
+    expect(sourceAmbientViolationsFromSource("capstone/thin/src/bff.ts", allowedAdapter)).toEqual([])
+    expect(sourceAmbientViolations()).toEqual([])
   })
 })

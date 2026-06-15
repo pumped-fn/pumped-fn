@@ -19,9 +19,11 @@ the composition-root adapter that creates the scope once and renders through `Sc
 node-tested to 100%; components and bootstrap adapters are jsdom-tested to 100%. Coverage is gated at
 100/100/100/100 across all three — provable because the component holds no logic to leave uncovered.
 
-No `vi.mock` / `msw` / `fetch-mock`: browser APIs enter through adapter atoms and tests `preset` them —
-the frontend form of "no module mocks". An adapter's own unit test is the one sanctioned place to fake
-the global it wraps (below the seam).
+No `vi.mock` / `msw` / `fetch-mock`: browser APIs enter through adapter atoms or composition-root
+adapters and tests `preset` them — the frontend form of "no module mocks". `fetch`, DOM globals, timers,
+storage, clock, and random are structurally guarded by owning declaration, so a feature node cannot hide
+inline ambient IO in the same file as an adapter. An adapter's own unit test is the one sanctioned place
+to fake the global it wraps (below the seam).
 
 ## Run
 

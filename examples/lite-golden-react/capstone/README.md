@@ -56,7 +56,8 @@ package-wide test-total claim; it documents where frontend node logic currently 
 - Components observe the graph through `ScopeProvider`, `useAtom`, and `useScope`.
 - `main.tsx` is a tested composition-root adapter: create one scope, render through `ScopeProvider`, return
   the scope for assertions, and dispose the root/scope together.
-- Browser APIs enter through adapter atoms; only adapter-owned tests fake `fetch`.
+- Ambient browser/runtime APIs (`fetch`, `document`, timers, storage, clock, random) enter only through
+  adapter atoms or composition-root adapters; feature graph nodes and observers do not call them inline.
 - Feature atoms depend on auth-capable ports such as `authedBffClient`; they do not combine raw HTTP
   clients with session/token storage or manually pass credentials into service calls.
 - No `vi.mock`, `vi.spyOn`, `msw`, or fetch-mock is needed above the seam.
