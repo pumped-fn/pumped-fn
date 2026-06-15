@@ -4,6 +4,16 @@ React bindings for `@pumped-fn/lite` with Suspense, ErrorBoundary integration, a
 
 **Zero dependencies** · **<2KB bundle** · **React 18+**
 
+## Boundary Ownership
+
+React components are observers: graph owns logic and mutable state; components subscribe and dispatch. In feature code, components should not mirror graph state with `useState`, inline IO calls, validation branches, or local execution lifecycle when the graph can own the same behavior.
+
+ExecutionContextProvider owns UI execution by default. By default, components use `useExecutionContext` to execute flows from event handlers and use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` to observe graph state. Feature components should not call `scope.createContext()` or close contexts manually.
+
+`useScope` is an infrastructure hook. Use it for provider/bootstrap helpers and rare integration code that must inspect the current scope; normal feature components should depend on graph hooks or `useExecutionContext` instead.
+
+Frontend tests should split graph logic in node from DOM or browser observer tests. Node logic tests exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })`; DOM or browser observer tests render components under `ScopeProvider` and `ExecutionContextProvider`. Browser mode can be an observer-test backend, but it does not replace node logic tests.
+
 ## How It Works
 
 ```mermaid
@@ -77,7 +87,7 @@ await scope.resolve(userAtom)
 
 ### ExecutionContextProvider
 
-Provides an execution context to resource and scoped-value hooks. In tests or request boundaries, pass the context explicitly with `ctx`.
+Provides an execution context to resource, scoped-value, and event-handler hooks. In tests or request boundaries, pass the context explicitly with `ctx`.
 
 ```tsx
 import { createScope } from '@pumped-fn/lite'
@@ -103,6 +113,15 @@ Managed mode creates an execution context from the surrounding `ScopeProvider` s
     <App />
   </ExecutionContextProvider>
 </ScopeProvider>
+```
+
+### useExecutionContext
+
+Run UI-triggered graph work through the provider-owned execution context:
+
+```tsx
+const ctx = useExecutionContext()
+void ctx.exec({ flow: saveProfile, input })
 ```
 
 ### useResource
@@ -231,12 +250,13 @@ Components should not mirror scoped-value fields into `useState`. Use `form.snap
 
 ### useScope
 
-Access scope from context.
+Access scope from context for infrastructure and escape-hatch integrations.
 
 ```tsx
 const scope = useScope()
-await scope.resolve(someAtom)
 ```
+
+Most feature components should not use this hook. Prefer graph-specific hooks for observation and `useExecutionContext` for actions so the provider owns UI execution lifecycle.
 
 ### useController
 

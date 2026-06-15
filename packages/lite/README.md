@@ -1,7 +1,5 @@
 # @pumped-fn/lite
 
-![Coverage: 97%+ statements](https://img.shields.io/badge/coverage-97%25%2B_statements-brightgreen) ![Coverage: 100% functions](https://img.shields.io/badge/coverage-100%25_functions-brightgreen) ![Tests: 300 passed](https://img.shields.io/badge/tests-300_passed-brightgreen)
-
 **Scoped Ambient State** for TypeScript — a scope-local atom graph with explicit dependencies and opt-in reactivity.
 
 State lives in the scope, not in the component tree. Handlers and components observe — they don't own or construct dependencies. The same graph works across React, server handlers, background jobs, and tests.
@@ -10,13 +8,27 @@ State lives in the scope, not in the component tree. Handlers and components obs
 
 **Backend** — atoms are infrastructure singletons (db pool, cache). Runtime config enters the scope as tags; atoms consume it via `tags.required()`. Contexts bound per request carry tags (tenantId, traceId) without parameter drilling. Extensions wrap every resolve/exec for logging, tracing, auth. Cleanup is guaranteed.
 
-**Both** — presets swap any atom/flow for testing or multi-tenant isolation. Tags carry runtime config; presets replace implementations. No mocks, no test-only code paths.
+**Both** — presets swap any atom/flow for testing or multi-tenant isolation. Tags carry runtime config; presets replace implementations. No module mocks, no global patches above raw transport wrappers, no test-only product branches.
 
 ```
 npx @pumped-fn/lite              # CLI reference
 npx @pumped-fn/lite primitives   # API
 npx @pumped-fn/lite diagrams     # mermaid source
 ```
+
+## Boundary Ownership
+
+Scope is the composition and test seam. Composition roots, tests, and other boundary adapters call `createScope({ presets, tags, extensions })`; product code enters the graph through declared atoms, flows, resources, tags, controllers, and execution APIs.
+
+`scope` is not a product helper argument. A helper that accepts scope to fetch dependencies is acting like a service locator. Make it a graph node, call it from a graph node as a pure helper, or execute the target through flows, `ctx.exec`, resources, or providers.
+
+Presets choose test radius. Inside-out tests preset a unit's direct dependencies; outside-in tests preset only edge adapters. A test that needs module mocks, internal reaches, global patches above raw transport wrappers, or test-only product branches means the design leaked past the scope seam.
+
+Raw ambient IO belongs in transport atoms or composition-root adapters. Capability atoms depend on transports and expose domain/application capabilities. Feature atoms depend on capabilities, not raw transports plus auth/session/token plumbing.
+
+Composition roots are thin, tested adapters. They own scope creation, root execution context creation or receipt, provider or route mounting, and disposal. They should not grow facade objects that bundle business flows or shared preconfigured scope factories.
+
+Public examples with strong architectural claims should include structural guards. Counts, coverage, inventories, and implemented-slice claims should be derived or explicitly scoped so docs cannot drift ahead of the code.
 
 ## Execution-Scoped Resources
 

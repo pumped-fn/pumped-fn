@@ -2,6 +2,20 @@
 
 Usage patterns as sequences. For API details, see `packages/lite/dist/index.d.mts`.
 
+## Boundary Ownership Checklist
+
+Use this checklist before adding helpers around the graph.
+
+| Boundary | Owns | Guard |
+|----------|------|-------|
+| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, controllers, and `ctx.exec` |
+| Test radius | inside-out tests preset a unit's direct deps; outside-in tests preset only edge adapters | No module mocks, no global stubs above raw transport wrappers, no internal reaches, no test-only product branches |
+| transport atom | Raw ambient IO such as network, clock, storage, random, and process APIs | Transport-owned tests may fake the platform API below the seam |
+| capability atom | Domain/application operations built on transport atom deps | Capability atoms stay ambient-free and are presettable at a wider radius |
+| feature atom | User-facing state, derived data, and application decisions | Feature atoms depend on capability atom ports, not raw transports plus auth/session/token plumbing |
+| composition root | Scope, root execution context, providers, route/job mounting, and disposal | Keep it thin and tested; do not hide flows behind facade objects or shared preconfigured scope factories |
+| public docs | Architectural claims, inventories, run commands, and implemented slices | Strong claims need structural guards, and counts must be derived or explicitly scoped |
+
 ## A. Fundamental Usage
 
 ### Request Lifecycle
@@ -91,13 +105,21 @@ Resolve resource values from an `ExecutionContext` when the value should live fo
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
 
+const events: string[] = []
+
 const tx = resource({
   name: "tx",
   factory: (ctx) => {
     const tx = {
-      commit: async () => {},
-      rollback: async () => {},
-      release: async () => {},
+      commit: async () => {
+        events.push("commit")
+      },
+      rollback: async () => {
+        events.push("rollback")
+      },
+      release: async () => {
+        events.push("release")
+      },
     }
 
     ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
@@ -109,9 +131,17 @@ const tx = resource({
 const scope = createScope()
 const ctx = scope.createContext()
 await ctx.resolve(tx)
-
-// Normal flow: close the context — onClose fires commit/rollback, then cleanup fires release
 await ctx.close({ ok: true })
+
+if (events.join(",") !== "commit,release") throw new Error("expected commit then release")
+
+events.length = 0
+const failed = scope.createContext()
+await failed.resolve(tx)
+await failed.close({ ok: false, error: new Error("failed") })
+
+if (events.join(",") !== "rollback,release") throw new Error("expected rollback then release")
+
 await scope.dispose()
 ```
 
@@ -365,21 +395,18 @@ sequenceDiagram
 Runnable examples live in `examples/lite-golden`. They cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
 
 Frontend and BFF examples live in `examples/lite-golden-react` and `examples/lite-golden-bff`. The
-tiered service-health dashboard comparison in `examples/lite-golden-react/capstone` covers the
-implemented BFF package, fat frontend plus BFF, and thin frontend plus fat BFF slices. Fattest frontend
-dashboard capstone and F02-F12 React catalog are backlog. React `main.tsx` files are treated as
-adapter/composition roots and tested through the real `ScopeProvider`/`ExecutionContextProvider`
-boundary. React golden observers use `useExecutionContext` to execute flows and do not accept `scope` or
-hand-roll `createContext`/`close` wrappers. React golden source also guards ambient APIs by owning
-declaration: transport atoms may call `fetch`, composition roots may touch `document`, and capability
-atoms, feature graph nodes, and observers may not hide inline browser IO. BFF `main.ts` is the lite
-composition root: it creates one scope and one process execution context, executes HTTP-shaped requests
-through the `handleBffRequest` flow, and owns disposal. BFF `http.ts` exports the route boundary as a
-flow; route handlers do not accept `scope` or manually recreate execution lifecycle. BFF raw `fetch` is
-isolated to transport atoms (`authHttp`, `capstoneHttp`); capability atoms (`authProvider`,
-`capstoneClient`) depend on those transports and are preset independently. React capstone raw `fetch` is
-also isolated to transport atoms (`authHttp`, `bffHttp`); `authProvider` and `bffClient` depend on those
-transports.
+tiered comparison in `examples/lite-golden-react/capstone` shows logic moving across backend, BFF, and
+React tiers while tests keep the same scope seam. Some spectrum slices are intentionally backlog, and the
+comparison docs scope implemented claims to the slices that exist.
+
+The golden examples use the same boundary vocabulary as the package docs. React bootstrap files are
+adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring, and
+observers execute graph work through `useExecutionContext` instead of accepting `scope` or hand-rolling
+`createContext`/`close` wrappers. Backend and BFF entry points keep route/job work behind flows or
+`ctx.exec`, own root execution lifecycle at the composition root, and dispose scopes explicitly. Raw IO is
+kept in transport atoms or composition-root adapters; capability atoms depend on transports and remain
+presettable; feature atoms depend on capabilities. Public example claims are guarded by structural tests
+for ambient IO, test substitution, provider wiring, route boundaries, and derived inventories.
 
 Backend golden:
 

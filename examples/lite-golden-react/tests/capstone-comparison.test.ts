@@ -241,6 +241,18 @@ function workspaceCommand(packageName: string, script: "test" | "typecheck"): st
   return `pnpm -F ${packageName} ${script}`
 }
 
+function expectContainsAll(source: string, phrases: string[]): void {
+  for (const phrase of phrases) expect(source).toContain(phrase)
+}
+
+const stalePublicClaimPatterns = [
+  /!\[(?:Coverage|Tests):/,
+  /\bcoverage\b[^\n]{0,40}\b\d+(?:\.\d+)?%/i,
+  /\b\d+(?:\.\d+)?%[^\n]{0,40}\b(?:coverage|statements|branches|functions|lines)\b/i,
+  /\b\d+\s+(?:tests?\s+)?passed\b/i,
+  /\b\d+\s+(?:examples?|patterns?|slices?|files?|tests?)\b/i,
+]
+
 describe("inside-out", () => {
   test("B4: capstone comparison documents implemented slices and backlog honestly", () => {
     const source = read("capstone/README.md")
@@ -441,14 +453,107 @@ describe("inside-out", () => {
     expect(source).toContain(workspaceCommand(react, "typecheck"))
     expect(source).toContain(workspaceCommand(bff, "test"))
     expect(source).toContain(workspaceCommand(bff, "typecheck"))
-    expect(source).toMatch(/Fattest frontend\s+dashboard capstone and F02-F12 React catalog are backlog/)
-    expect(source).toMatch(/guards ambient APIs by owning\s+declaration/)
-    expect(source).toContain("transport atoms may call `fetch`")
-    expect(source).toContain("React capstone raw `fetch` is")
-    expect(source).toMatch(/BFF `main\.ts` is the lite\s+composition root/)
-    expect(source).toContain("ScopeProvider`/`ExecutionContextProvider")
+    expect(source).toContain("tiered comparison")
+    expect(source).toMatch(/logic moving across backend, BFF, and\s+React tiers/)
+    expect(source).toContain("scope implemented claims to the slices that exist")
+    expect(source).toContain("adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring")
     expect(source).toContain("useExecutionContext")
-    expect(source).toContain("do not accept `scope`")
-    expect(source).toMatch(/BFF `http\.ts` exports the route boundary as a\s+flow/)
+    expect(source).toContain("instead of accepting `scope`")
+    expect(source).toContain("hand-rolling")
+    expect(source).toContain("route/job work behind flows or")
+    expect(source).toMatch(/Raw IO is\s+kept in transport atoms or composition-root adapters/)
+    expect(source).toContain("capability atoms depend on transports")
+    expect(source).toContain("feature atoms depend on capabilities")
+    expect(source).toContain("structural tests")
+    expect(source).toContain("derived inventories")
+    expect(source).not.toContain("F02-F12")
+    expect(source).not.toContain("handleBffRequest")
+    expect(source).not.toContain("authHttp")
+    expect(source).not.toContain("capstoneHttp")
+    expect(source).not.toContain("capstoneClient")
+  })
+
+  test("FG2j: package docs share the boundary ownership vocabulary", () => {
+    const liteReadme = read("../../packages/lite/README.md")
+    const litePatterns = read("../../packages/lite/PATTERNS.md")
+    const reactReadme = read("../../packages/lite-react/README.md")
+    const reactPatterns = read("../../packages/lite-react/PATTERNS.md")
+
+    expectContainsAll(liteReadme, [
+      "Boundary Ownership",
+      "Scope is the composition and test seam",
+      "`createScope({ presets, tags, extensions })`",
+      "module mocks",
+      "test-only product branches",
+      "Raw ambient IO belongs in transport atoms or composition-root adapters",
+      "Capability atoms depend on transports",
+      "Feature atoms depend on capabilities",
+      "Composition roots are thin, tested adapters",
+      "`scope` is not a product helper argument",
+      "flows, `ctx.exec`, resources, or providers",
+      "structural guards",
+      "derived or explicitly scoped",
+    ])
+
+    expectContainsAll(litePatterns, [
+      "Boundary Ownership Checklist",
+      "Test radius",
+      "inside-out",
+      "outside-in",
+      "transport atom",
+      "capability atom",
+      "feature atom",
+      "composition root",
+      "Product helpers should not accept `scope`",
+      "module mocks",
+      "global stubs",
+      "derived or explicitly scoped",
+    ])
+
+    expectContainsAll(reactReadme, [
+      "React components are observers",
+      "graph owns logic and mutable state",
+      "ExecutionContextProvider owns UI execution by default",
+      "components use `useExecutionContext`",
+      "Feature components should not call `scope.createContext()` or close contexts manually",
+      "`useScope` is an infrastructure hook",
+      "node logic tests",
+      "DOM or browser observer tests",
+      "Browser mode can be an observer-test backend, but it does not replace node logic tests",
+      "components should not mirror graph state with `useState`",
+    ])
+
+    expectContainsAll(reactPatterns, [
+      "Observer Components",
+      "Provider-Owned UI Execution",
+      "Testing Split",
+      "graph logic in node",
+      "DOM or browser observer tests",
+      "ambient browser APIs",
+      "Browser mode can replace jsdom for observer tests",
+      "does not replace node logic tests",
+      "dispose()",
+      "Feature components stay under `ExecutionContextProvider`; they do not create or close contexts themselves",
+      "`useScope`",
+      "escape hatch",
+      "derived or explicitly scoped",
+    ])
+  })
+
+  test("FG2j: public package docs do not pin coverage or inventory counts without derived wording", () => {
+    const docs = [
+      ["lite README", read("../../packages/lite/README.md")],
+      ["lite PATTERNS", read("../../packages/lite/PATTERNS.md")],
+      ["lite-react README", read("../../packages/lite-react/README.md")],
+      ["lite-react PATTERNS", read("../../packages/lite-react/PATTERNS.md")],
+    ] as const
+
+    for (const [name, source] of docs) {
+      for (const pattern of stalePublicClaimPatterns) {
+        expect(source, name).not.toMatch(pattern)
+      }
+    }
+    expect(read("../../packages/lite/PATTERNS.md")).toContain("derived or explicitly scoped")
+    expect(read("../../packages/lite-react/PATTERNS.md")).toContain("derived or explicitly scoped")
   })
 })

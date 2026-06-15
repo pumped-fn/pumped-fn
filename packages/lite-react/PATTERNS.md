@@ -4,21 +4,61 @@ Architectural patterns for `@pumped-fn/lite-react`. For API reference, see [READ
 
 ---
 
+## Observer Components
+
+React components are observers of the Lite graph. The graph owns logic, mutable state, validation, async work, and dependency declarations; components render snapshots and dispatch graph actions.
+
+Use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` for observation. Use `useExecutionContext` for UI-triggered flows. Treat `useScope` as an infrastructure escape hatch for provider/bootstrap helpers, not the normal feature-component path.
+
+---
+
+## Provider-Owned UI Execution
+
+`ScopeProvider` supplies the composition boundary, and `ExecutionContextProvider` supplies the UI execution boundary. Feature components should not create contexts, close contexts, or pass `scope` into product helpers.
+
+```tsx
+<ScopeProvider scope={scope}>
+  <ExecutionContextProvider>
+    <App />
+  </ExecutionContextProvider>
+</ScopeProvider>
+```
+
+---
+
+## Testing Split
+
+Keep graph logic in node. Logic tests should exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })` and public APIs, without DOM, browser globals, module mocks, or product-only test branches.
+
+Use DOM or browser observer tests for rendered components, provider wiring, and bootstrap adapters. DOM/browser observer tests should prove that components observe graph state and dispatch graph actions, not that business logic only works when React or a browser is present.
+
+Browser mode can replace jsdom for observer tests after coverage merging and CI browser setup are proven, but it does not replace node logic tests. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
+
+Public examples that claim architectural quality should keep those claims derived or explicitly scoped: inventories come from files, implemented slices name backlog, and strong boundary rules get structural guards.
+
+---
+
 ## App Bootstrap
 
-Pre-resolve critical atoms before rendering to avoid loading flash:
+Bootstrap is a composition-root adapter. It creates the scope once, wires providers, mounts React, and owns disposal. Pre-resolve critical atoms before rendering when you want to avoid loading flash, but keep business logic in graph nodes instead of the bootstrap function.
 
 ```mermaid
 sequenceDiagram
     participant Main as main.tsx
     participant Scope
+    participant Ctx as ExecutionContextProvider
     participant React as React Tree
 
     Main->>Scope: createScope({ extensions })
-    Main->>Scope: resolve critical atoms
-    Main->>React: render with ScopeProvider
-    React->>React: useAtom → instant (pre-resolved)
+    Main->>Scope: resolve critical atoms when needed
+    Main->>React: render ScopeProvider
+    React->>Ctx: render ExecutionContextProvider
+    React->>React: observers subscribe and dispatch
+    Main->>React: unmount root
+    Main->>Scope: dispose()
 ```
+
+Tests can mount the same bootstrap adapter and assert through the returned scope or public graph APIs. Feature components stay under `ExecutionContextProvider`; they do not create or close contexts themselves.
 
 ---
 
