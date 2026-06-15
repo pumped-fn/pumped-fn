@@ -27,6 +27,10 @@ methods return 405; unknown paths return 404. Auth denials become 401, while pro
 still propagate. Its tests still use `createScope` with preset ports, so the boundary is verified without a
 server or browser.
 
+`src/main.ts` is the lite composition root for the BFF. It creates one scope for the mounted BFF, delegates
+requests to `handleBffRequest`, returns the scope for assertions, and disposes that scope when the mounted
+BFF shuts down. It is intentionally not a server wrapper; HTTP transport can sit outside this adapter.
+
 Because all logic lives in flows behind the seam, the package is node-tested at 100/100/100/100.
 
 ## Shape
@@ -39,6 +43,7 @@ Because all logic lives in flows behind the seam, the package is node-tested at 
   a criticality-sorted attention list.
 - `src/detail.ts` — `serviceDetailView`: formats uptime, maps recent checks, counts open incidents.
 - `src/http.ts` — HTTP-shaped request boundary over BFF flows.
+- `src/main.ts` — lite composition root that mounts one scope, delegates requests, and owns disposal.
 
 ## Run
 

@@ -370,7 +370,9 @@ implemented BFF package, fat frontend plus BFF, and thin frontend plus fat BFF s
 dashboard capstone and F02-F12 React catalog are backlog. React `main.tsx` files are treated as
 adapter/composition roots and tested through the real `ScopeProvider` boundary. React golden source also
 guards ambient APIs by owning declaration: raw adapters may call `fetch`, composition roots may touch
-`document`, and feature graph nodes/observers may not hide inline browser IO.
+`document`, and feature graph nodes/observers may not hide inline browser IO. BFF `main.ts` is the lite
+composition root: it creates one scope, delegates HTTP-shaped requests through `handleBffRequest`, and
+owns disposal.
 
 Backend golden:
 
