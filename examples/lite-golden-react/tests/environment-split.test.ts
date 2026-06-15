@@ -40,6 +40,13 @@ type AmbientEffect = {
   effect: string
 }
 
+type ReactExecutionBoundaryViolation = {
+  file: string
+  declaration: string
+  line: number
+  violation: "useScope" | "createContext" | "close" | "scopeArgument"
+}
+
 function testFiles(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir).sort()) {
@@ -326,6 +333,88 @@ function sourceAmbientViolations(): AmbientEffect[] {
   ].flatMap((file) => sourceAmbientViolationsFromSource(file, readFileSync(file, "utf8")))
 }
 
+function collectLiteReactScopeBindings(sourceFile: ts.SourceFile): {
+  useScopeNames: Set<string>
+  liteReactNamespaces: Set<string>
+} {
+  const useScopeNames = new Set<string>()
+  const liteReactNamespaces = new Set<string>()
+
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === "@pumped-fn/lite-react" &&
+      statement.importClause?.namedBindings
+    ) {
+      const bindings = statement.importClause.namedBindings
+      if (ts.isNamespaceImport(bindings)) {
+        liteReactNamespaces.add(bindings.name.text)
+      } else {
+        for (const specifier of bindings.elements) {
+          if ((specifier.propertyName ?? specifier.name).text === "useScope") {
+            useScopeNames.add(specifier.name.text)
+          }
+        }
+      }
+    }
+  }
+
+  return { useScopeNames, liteReactNamespaces }
+}
+
+function reactExecutionBoundaryViolationsFromSource(file: string, source: string): ReactExecutionBoundaryViolation[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const { useScopeNames, liteReactNamespaces } = collectLiteReactScopeBindings(sourceFile)
+  const violations: ReactExecutionBoundaryViolation[] = []
+
+  function push(node: ts.Node, declaration: string, violation: ReactExecutionBoundaryViolation["violation"]): void {
+    const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+    violations.push({ file: packagePath(file), declaration, line: position.line + 1, violation })
+  }
+
+  function visit(node: ts.Node, declaration: string): void {
+    if (ts.isCallExpression(node)) {
+      if (ts.isIdentifier(node.expression) && useScopeNames.has(node.expression.text)) {
+        push(node.expression, declaration, "useScope")
+      }
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        if (
+          ts.isIdentifier(node.expression.expression) &&
+          liteReactNamespaces.has(node.expression.expression.text) &&
+          node.expression.name.text === "useScope"
+        ) {
+          push(node.expression, declaration, "useScope")
+        }
+        if (node.expression.name.text === "createContext" || node.expression.name.text === "close") {
+          push(node.expression, declaration, node.expression.name.text)
+        }
+      }
+      if (node.arguments.some((argument) => ts.isIdentifier(argument) && argument.text === "scope")) {
+        push(node.expression, declaration, "scopeArgument")
+      }
+    }
+    ts.forEachChild(node, (child) => visit(child, declaration))
+  }
+
+  for (const statement of sourceFile.statements) visit(statement, declarationName(statement))
+  return violations
+}
+
+function reactObserverSourceFiles(): string[] {
+  return [
+    ...sourceFiles(join(root, "capstone", "fat", "src")),
+    ...sourceFiles(join(root, "capstone", "thin", "src")),
+    ...sourceFiles(join(root, "patterns", "F13-main-bootstrap")),
+  ].filter((file) => file.endsWith(".tsx"))
+}
+
+function reactExecutionBoundaryViolations(): ReactExecutionBoundaryViolation[] {
+  return reactObserverSourceFiles().flatMap((file) =>
+    reactExecutionBoundaryViolationsFromSource(file, readFileSync(file, "utf8")),
+  )
+}
+
 describe("inside-out", () => {
   test("Vitest only includes the .test.ts/.test.tsx surface — .spec files cannot bypass structural guards", () => {
     expect((config as ConfigWithTestInclude).test?.include).toEqual(allowedTestInclude)
@@ -420,5 +509,77 @@ describe("inside-out", () => {
     ).toEqual(["dashboard:fetch"])
     expect(sourceAmbientViolationsFromSource("capstone/thin/src/bff.ts", allowedAdapter)).toEqual([])
     expect(sourceAmbientViolations()).toEqual([])
+  })
+
+  test("React observers use the provided execution context instead of manually owning contexts", () => {
+    const manualObserver = [
+      'import { useScope } from "@pumped-fn/lite-react"',
+      "export function App() {",
+      "  const scope = useScope()",
+      "  const run = async () => {",
+      "    const ctx = scope.createContext()",
+      "    await ctx.close({ ok: true })",
+      "  }",
+      "  return null",
+      "}",
+    ].join("\n")
+    const aliasedObserver = [
+      'import { useScope as useLiteScope } from "@pumped-fn/lite-react"',
+      "export function App() {",
+      "  useLiteScope()",
+      "  return null",
+      "}",
+    ].join("\n")
+    const namespaceObserver = [
+      'import * as LiteReact from "@pumped-fn/lite-react"',
+      "export function App() {",
+      "  LiteReact.useScope()",
+      "  return null",
+      "}",
+    ].join("\n")
+    const scopeArgumentObserver = [
+      "export function App() {",
+      "  const scope = {}",
+      "  run(scope)",
+      "  return null",
+      "}",
+    ].join("\n")
+    const providerRoot = [
+      'import { createScope } from "@pumped-fn/lite"',
+      'import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"',
+      "export function mountMain() {",
+      "  const scope = createScope()",
+      "  return (",
+      "    <ScopeProvider scope={scope}>",
+      "      <ExecutionContextProvider>",
+      "        <div />",
+      "      </ExecutionContextProvider>",
+      "    </ScopeProvider>",
+      "  )",
+      "}",
+    ].join("\n")
+
+    expect(
+      reactExecutionBoundaryViolationsFromSource(join(root, "capstone/fat/src/LoginForm.tsx"), manualObserver).map(
+        ({ declaration, violation }) => `${declaration}:${violation}`,
+      ),
+    ).toEqual(["App:useScope", "App:createContext", "App:close"])
+    expect(
+      reactExecutionBoundaryViolationsFromSource(join(root, "capstone/thin/src/LoginScreen.tsx"), aliasedObserver).map(
+        ({ declaration, violation }) => `${declaration}:${violation}`,
+      ),
+    ).toEqual(["App:useScope"])
+    expect(
+      reactExecutionBoundaryViolationsFromSource(join(root, "patterns/F13-main-bootstrap/view.tsx"), namespaceObserver).map(
+        ({ declaration, violation }) => `${declaration}:${violation}`,
+      ),
+    ).toEqual(["App:useScope"])
+    expect(
+      reactExecutionBoundaryViolationsFromSource(join(root, "patterns/F13-main-bootstrap/view.tsx"), scopeArgumentObserver).map(
+        ({ declaration, violation }) => `${declaration}:${violation}`,
+      ),
+    ).toEqual(["App:scopeArgument"])
+    expect(reactExecutionBoundaryViolationsFromSource(join(root, "capstone/fat/src/main.tsx"), providerRoot)).toEqual([])
+    expect(reactExecutionBoundaryViolations()).toEqual([])
   })
 })

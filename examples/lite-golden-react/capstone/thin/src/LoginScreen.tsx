@@ -1,23 +1,14 @@
-import type { Lite } from "@pumped-fn/lite"
-import { useAtom, useScope } from "@pumped-fn/lite-react"
+import { useAtom, useExecutionContext } from "@pumped-fn/lite-react"
 import { sessionToken } from "./session"
 import { signInForm, submitSignIn, updateSignInEmail, updateSignInPassword } from "./signIn"
 import { Dashboard } from "./Dashboard"
 
+function ignoreFlowFailure(): void {}
+
 export function LoginScreen() {
   const { data: token } = useAtom(sessionToken, { suspense: false, resolve: true })
   const { data: form } = useAtom(signInForm, { suspense: false, resolve: true })
-  const scope = useScope()
-
-  const run = async (exec: (ctx: Lite.ExecutionContext) => Promise<unknown>) => {
-    const ctx = scope.createContext()
-    try {
-      await exec(ctx)
-      await ctx.close({ ok: true })
-    } catch (error) {
-      await ctx.close({ ok: false, error })
-    }
-  }
+  const ctx = useExecutionContext()
 
   if (token !== null && token !== undefined) {
     return <Dashboard />
@@ -27,7 +18,7 @@ export function LoginScreen() {
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        void run((ctx) => ctx.exec({ flow: submitSignIn, input: undefined }))
+        void ctx.exec({ flow: submitSignIn, input: undefined }).catch(ignoreFlowFailure)
       }}
     >
       <label>
@@ -37,7 +28,7 @@ export function LoginScreen() {
           type="email"
           value={form?.email ?? ""}
           onChange={(e) => {
-            void run((ctx) => ctx.exec({ flow: updateSignInEmail, input: e.target.value }))
+            void ctx.exec({ flow: updateSignInEmail, input: e.target.value }).catch(ignoreFlowFailure)
           }}
         />
       </label>
@@ -48,7 +39,7 @@ export function LoginScreen() {
           type="password"
           value={form?.password ?? ""}
           onChange={(e) => {
-            void run((ctx) => ctx.exec({ flow: updateSignInPassword, input: e.target.value }))
+            void ctx.exec({ flow: updateSignInPassword, input: e.target.value }).catch(ignoreFlowFailure)
           }}
         />
       </label>

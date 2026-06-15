@@ -1,5 +1,5 @@
 import { createScope, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { createRoot } from "react-dom/client"
 import { LoginScreen } from "./LoginScreen"
 
@@ -14,7 +14,9 @@ export function mountThinDashboard(container: Element): MountedThinDashboard {
 
   root.render(
     <ScopeProvider scope={scope}>
-      <LoginScreen />
+      <ExecutionContextProvider>
+        <LoginScreen />
+      </ExecutionContextProvider>
     </ScopeProvider>
   )
 

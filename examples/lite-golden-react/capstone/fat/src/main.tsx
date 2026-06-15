@@ -1,5 +1,5 @@
 import { createScope, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { createRoot } from "react-dom/client"
 import { DashboardScreen } from "./DashboardScreen"
 
@@ -14,7 +14,9 @@ export function mountFatDashboard(container: Element): MountedFatDashboard {
 
   root.render(
     <ScopeProvider scope={scope}>
-      <DashboardScreen />
+      <ExecutionContextProvider>
+        <DashboardScreen />
+      </ExecutionContextProvider>
     </ScopeProvider>
   )
 

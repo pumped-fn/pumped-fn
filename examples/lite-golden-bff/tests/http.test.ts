@@ -9,7 +9,7 @@ import {
   type Session,
 } from "../src/auth"
 import { capstoneClient, type CapstoneClient } from "../src/client"
-import { handleBffRequest } from "../src/http"
+import { handleBffRequest, type BffRequest, type BffResult } from "../src/http"
 import { dashboardView, type DashboardView } from "../src/dashboard"
 import type { Incident, ServiceStatus } from "../src/wire"
 
@@ -73,6 +73,10 @@ function recordParentContexts(targets: readonly Lite.AnyFlow[], parents: Lite.Ex
   }
 }
 
+function handle(ctx: Lite.ExecutionContext, request: BffRequest): Promise<BffResult> {
+  return ctx.exec({ flow: handleBffRequest, input: request })
+}
+
 describe("outside-in", () => {
   test("OI1: POST /login returns token JSON through the login flow", async () => {
     const calls: Array<{ email: string; password: string }> = []
@@ -86,8 +90,9 @@ describe("outside-in", () => {
       },
     }
     const scope = createScope({ presets: [preset(authProvider, auth)] })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "POST",
       path: "/login",
       body: { email: "a@b.com", password: "pass" },
@@ -95,6 +100,7 @@ describe("outside-in", () => {
 
     expect(response).toEqual({ status: 200, body: { token: session.token } })
     expect(calls).toEqual([{ email: "a@b.com", password: "pass" }])
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -108,14 +114,16 @@ describe("outside-in", () => {
       },
     }
     const scope = createScope({ presets: [preset(authProvider, auth)] })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "POST",
       path: "/login",
       body: { email: "a@b.com", password: "wrong" },
     })
 
     expect(response).toEqual({ status: 401, body: { error: "invalid credentials" } })
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -129,14 +137,16 @@ describe("outside-in", () => {
       },
     }
     const scope = createScope({ presets: [preset(authProvider, auth)] })
+    const ctx = scope.createContext()
 
     await expect(
-      handleBffRequest(scope, {
+      handle(ctx, {
         method: "POST",
         path: "/login",
         body: { email: "a@b.com", password: "pass" },
       })
     ).rejects.toThrow("auth provider unavailable")
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -150,16 +160,18 @@ describe("outside-in", () => {
       },
     }
     const scope = createScope({ presets: [preset(authProvider, auth)] })
+    const ctx = scope.createContext()
 
     await expect(
-      handleBffRequest(scope, { method: "GET", path: "/login" })
+      handle(ctx, { method: "GET", path: "/login" })
     ).resolves.toEqual({ status: 405, body: { error: "method not allowed" } })
     await expect(
-      handleBffRequest(scope, { method: "POST", path: "/dashboard" })
+      handle(ctx, { method: "POST", path: "/dashboard" })
     ).resolves.toEqual({ status: 405, body: { error: "method not allowed" } })
     await expect(
-      handleBffRequest(scope, { method: "GET", path: "/unknown" })
+      handle(ctx, { method: "GET", path: "/unknown" })
     ).resolves.toEqual({ status: 404, body: { error: "not found" } })
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -177,8 +189,9 @@ describe("outside-in", () => {
     const scope = createScope({
       presets: [preset(authProvider, auth), preset(capstoneClient, fakeClient())],
     })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
       headers: { Authorization: "Bearer tok-dashboard" },
@@ -186,6 +199,7 @@ describe("outside-in", () => {
 
     expect(response).toEqual({ status: 200, body: dashboard })
     expect(tokens).toEqual(["tok-dashboard"])
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -203,8 +217,9 @@ describe("outside-in", () => {
     const scope = createScope({
       presets: [preset(authProvider, auth), preset(capstoneClient, fakeClient())],
     })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
       headers: { authorization: "Bearer tok-lower" },
@@ -212,6 +227,7 @@ describe("outside-in", () => {
 
     expect(response).toEqual({ status: 200, body: dashboard })
     expect(tokens).toEqual(["tok-lower"])
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -232,13 +248,15 @@ describe("outside-in", () => {
     const scope = createScope({
       presets: [preset(authProvider, auth), preset(capstoneClient, client)],
     })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
     })
 
     expect(response).toEqual({ status: 401, body: { error: "unauthorized" } })
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -259,14 +277,16 @@ describe("outside-in", () => {
     const scope = createScope({
       presets: [preset(authProvider, auth), preset(capstoneClient, client)],
     })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
       headers: { Authorization: "Bearer bad-token" },
     })
 
     expect(response).toEqual({ status: 401, body: { error: "unauthorized" } })
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -282,14 +302,16 @@ describe("outside-in", () => {
     const scope = createScope({
       presets: [preset(authProvider, auth), preset(capstoneClient, fakeClient())],
     })
+    const ctx = scope.createContext()
 
     await expect(
-      handleBffRequest(scope, {
+      handle(ctx, {
         method: "GET",
         path: "/dashboard",
         headers: { Authorization: "Bearer tok-dashboard" },
       })
     ).rejects.toThrow("auth provider unavailable")
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -303,14 +325,16 @@ describe("outside-in", () => {
       },
     }
     const scope = createScope({ presets: [preset(authProvider, auth)] })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
       headers: { Authorization: "Basic tok-dashboard" },
     })
 
     expect(response).toEqual({ status: 401, body: { error: "unauthorized" } })
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -326,8 +350,9 @@ describe("outside-in", () => {
       extensions: [recordParentContexts([validateSession, dashboardView], parents)],
       presets: [preset(authProvider, auth), preset(capstoneClient, fakeClient())],
     })
+    const ctx = scope.createContext()
 
-    const response = await handleBffRequest(scope, {
+    const response = await handle(ctx, {
       method: "GET",
       path: "/dashboard",
       headers: { Authorization: "Bearer tok-dashboard" },
@@ -336,6 +361,7 @@ describe("outside-in", () => {
     expect(response).toEqual({ status: 200, body: dashboard })
     expect(parents).toHaveLength(2)
     expect(parents[0]).toBe(parents[1])
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 
@@ -356,14 +382,16 @@ describe("outside-in", () => {
         })),
       ],
     })
+    const ctx = scope.createContext()
 
     await expect(
-      handleBffRequest(scope, {
+      handle(ctx, {
         method: "GET",
         path: "/dashboard",
         headers: { Authorization: "Bearer tok-dashboard" },
       })
     ).rejects.toThrow("backend unavailable")
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 })

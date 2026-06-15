@@ -5,6 +5,7 @@ import ts from "typescript"
 
 const root = process.cwd()
 const fetchAllowlist = new Set(["src/auth.ts:authHttp", "src/client.ts:capstoneHttp"])
+const lifecycleAllowlist = new Set(["src/main.ts:mountBff:createContext", "src/main.ts:mountBff:close"])
 const allowedStubGlobals = new Map([
   [
     "tests/auth-provider.test.ts:IO4: authHttp POST /authenticate with correct path returns parsed Session on ok",
@@ -83,6 +84,90 @@ function forbiddenFetchDeclarationsFromSource(file: string, source: string): str
 function forbiddenFetchDeclarations(): string[] {
   return sourceFiles("src")
     .flatMap((file) => forbiddenFetchDeclarationsFromSource(file, read(file)))
+    .sort()
+}
+
+function hasScopeParameter(node: ts.Node): boolean {
+  if (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node)
+  ) {
+    return node.parameters.some((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === "scope")
+  }
+  return ts.forEachChild(node, hasScopeParameter) === true
+}
+
+function scopeParameterDeclarationsFromSource(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  return sourceFile.statements
+    .filter(hasScopeParameter)
+    .map((statement) => `${file}:${declarationName(statement)}`)
+}
+
+function scopeParameterDeclarations(): string[] {
+  return sourceFiles("src")
+    .flatMap((file) => scopeParameterDeclarationsFromSource(file, read(file)))
+    .sort()
+}
+
+function lifecycleCallName(node: ts.CallExpression): "createContext" | "close" | undefined {
+  if (!ts.isPropertyAccessExpression(node.expression)) return undefined
+  if (node.expression.name.text === "createContext") return "createContext"
+  return node.expression.name.text === "close" ? "close" : undefined
+}
+
+function lifecycleCallsFromSource(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const calls: string[] = []
+
+  for (const statement of sourceFile.statements) {
+    const name = declarationName(statement)
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const call = lifecycleCallName(node)
+        if (call) calls.push(`${file}:${name}:${call}`)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(statement)
+  }
+
+  return calls
+}
+
+function scopeArgumentCallsFromSource(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const calls: string[] = []
+
+  for (const statement of sourceFile.statements) {
+    const name = declarationName(statement)
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        node.arguments.some((argument) => ts.isIdentifier(argument) && argument.text === "scope")
+      ) {
+        calls.push(`${file}:${name}:scopeArgument`)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(statement)
+  }
+
+  return calls
+}
+
+function forbiddenLifecycleCallsFromSource(file: string, source: string): string[] {
+  return [
+    ...lifecycleCallsFromSource(file, source).filter((id) => !lifecycleAllowlist.has(id)),
+    ...scopeArgumentCallsFromSource(file, source),
+  ]
+}
+
+function forbiddenLifecycleCalls(): string[] {
+  return sourceFiles("src")
+    .flatMap((file) => forbiddenLifecycleCallsFromSource(file, read(file)))
     .sort()
 }
 
@@ -290,5 +375,49 @@ describe("inside-out", () => {
     ])
     expect(stubGlobalSites).toEqual([...allowedStubGlobals.keys()].sort())
     expect(violations).toEqual([])
+  })
+
+  test("IO3: BFF routes are flows, not functions that receive scope or reimplement lifecycle", () => {
+    const forbiddenScopeArg = [
+      "export async function handleBffRequest(scope: Lite.Scope, request: unknown) {",
+      "  return request",
+      "}",
+    ].join("\n")
+    const forbiddenLifecycle = [
+      "export function execRequest(scope: Lite.Scope, run: (ctx: Lite.ExecutionContext) => Promise<unknown>) {",
+      "  const ctx = scope.createContext()",
+      "  return run(ctx).finally(() => ctx.close({ ok: true }))",
+      "}",
+    ].join("\n")
+    const forbiddenScopeArgumentCall = [
+      "export function route(request: unknown) {",
+      "  const scope = createScope()",
+      "  return handleBffRequest(scope, request)",
+      "}",
+    ].join("\n")
+    const allowedMain = [
+      "export function mountBff() {",
+      "  const scope = createScope()",
+      "  const ctx = scope.createContext()",
+      "  return { dispose: () => ctx.close({ ok: true }) }",
+      "}",
+    ].join("\n")
+
+    expect(scopeParameterDeclarationsFromSource("src/http.ts", forbiddenScopeArg)).toEqual([
+      "src/http.ts:handleBffRequest",
+    ])
+    expect(scopeParameterDeclarationsFromSource("src/http.ts", forbiddenLifecycle)).toEqual([
+      "src/http.ts:execRequest",
+    ])
+    expect(forbiddenLifecycleCallsFromSource("src/http.ts", forbiddenLifecycle)).toEqual([
+      "src/http.ts:execRequest:createContext",
+      "src/http.ts:execRequest:close",
+    ])
+    expect(forbiddenLifecycleCallsFromSource("src/http.ts", forbiddenScopeArgumentCall)).toEqual([
+      "src/http.ts:route:scopeArgument",
+    ])
+    expect(forbiddenLifecycleCallsFromSource("src/main.ts", allowedMain)).toEqual([])
+    expect(scopeParameterDeclarations()).toEqual([])
+    expect(forbiddenLifecycleCalls()).toEqual([])
   })
 })

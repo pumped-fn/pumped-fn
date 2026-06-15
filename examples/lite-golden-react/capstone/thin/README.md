@@ -14,7 +14,8 @@ token storage. No auth provider, no session object, no derived auth flag — non
 ## Lens coverage
 
 - **inside-out**: signIn, dashboard logic, and `authedBffClient` token composition tested in node
-- **outside-in**: LoginScreen and Dashboard tested in jsdom via ScopeProvider + auth-capable port presets
+- **outside-in**: LoginScreen and Dashboard tested in jsdom via ScopeProvider + ExecutionContextProvider +
+  auth-capable port presets
 - **effect-managed**: not applicable — no resources or long-lived effects in this graph; the token atom is the sole mutable state
 
 ## Contrast with fat

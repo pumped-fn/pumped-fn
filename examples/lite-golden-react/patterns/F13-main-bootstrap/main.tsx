@@ -1,5 +1,5 @@
 import { createScope, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { createRoot } from "react-dom/client"
 import { CounterApp } from "./view"
 
@@ -14,7 +14,9 @@ export function mountCounterApp(container: Element): MountedCounterApp {
 
   root.render(
     <ScopeProvider scope={scope}>
-      <CounterApp />
+      <ExecutionContextProvider>
+        <CounterApp />
+      </ExecutionContextProvider>
     </ScopeProvider>
   )
 

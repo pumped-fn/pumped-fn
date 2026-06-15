@@ -21,16 +21,18 @@ view-model shaping and `preset(authProvider, fake)` for login/session rules. Ada
 preset `capstoneHttp` or `authHttp`. The only tests that fake `fetch` are the transport-atom tests below
 the seam, and a structural guard fails if `fetch` appears in capability atoms.
 
-`src/http.ts` is an HTTP boundary for the BFF package, not an in-process import path for frontend code. It
-accepts HTTP-shaped requests, maps `POST /login` to the `login` flow and returns token JSON, validates
-`GET /dashboard` Bearer auth through `validateSession`, and returns `dashboardView` JSON. Unsupported
-methods return 405; unknown paths return 404. Auth denials become 401, while provider or backend failures
-still propagate. Its tests still use `createScope` with preset ports, so the boundary is verified without a
-server or browser.
+`src/http.ts` is an HTTP boundary flow for the BFF package, not an in-process import path for frontend
+code. `handleBffRequest` accepts HTTP-shaped requests as flow input, maps `POST /login` to the `login`
+flow and returns token JSON, validates `GET /dashboard` Bearer auth through `validateSession`, and returns
+`dashboardView` JSON. Unsupported methods return 405; unknown paths return 404. Auth denials become 401,
+while provider or backend failures still propagate. Its tests execute the public flow through
+`createScope` with preset ports, so the boundary is verified without a server or browser.
 
-`src/main.ts` is the lite composition root for the BFF. It creates one scope for the mounted BFF, delegates
-requests to `handleBffRequest`, returns the scope for assertions, and disposes that scope when the mounted
-BFF shuts down. It is intentionally not a server wrapper; HTTP transport can sit outside this adapter.
+`src/main.ts` is the lite composition root for the BFF. It creates one scope and one process execution
+context for the mounted BFF, executes requests through the `handleBffRequest` flow, returns the scope for
+assertions, and closes the process context before disposing the scope. It is intentionally not a server
+wrapper; HTTP transport can sit outside this adapter. Source guards reject route functions that accept
+`scope` and helper wrappers that manually recreate request lifecycle outside this composition root.
 
 Because all logic lives in flows behind the seam, the package is node-tested at 100/100/100/100.
 
@@ -43,8 +45,8 @@ Because all logic lives in flows behind the seam, the package is node-tested at 
 - `src/dashboard.ts` — `dashboardView`: counts services by status, counts active incidents, and produces
   a criticality-sorted attention list.
 - `src/detail.ts` — `serviceDetailView`: formats uptime, maps recent checks, counts open incidents.
-- `src/http.ts` — HTTP-shaped request boundary over BFF flows.
-- `src/main.ts` — lite composition root that mounts one scope, delegates requests, and owns disposal.
+- `src/http.ts` — HTTP-shaped request flow over BFF flows.
+- `src/main.ts` — lite composition root that mounts one scope/context, executes requests, and owns disposal.
 
 ## Run
 

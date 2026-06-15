@@ -2,7 +2,7 @@
 import { describe, test, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { createScope, preset } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { authedBffClient, type AuthedBffClient, type DashboardView } from "../src/bff"
 import { Dashboard } from "../src/Dashboard"
 
@@ -23,7 +23,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(authedBffClient, null)] })
     render(
       <ScopeProvider scope={scope}>
-        <Dashboard />
+        <ExecutionContextProvider>
+          <Dashboard />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByText("loading")).toBeTruthy()
@@ -36,7 +38,9 @@ describe("outside-in", () => {
     })
     render(
       <ScopeProvider scope={scope}>
-        <Dashboard />
+        <ExecutionContextProvider>
+          <Dashboard />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByText(/total.*5/i)).toBeTruthy()

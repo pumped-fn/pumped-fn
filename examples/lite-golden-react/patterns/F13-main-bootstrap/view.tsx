@@ -1,24 +1,16 @@
-import { useAtom, useScope } from "@pumped-fn/lite-react"
+import { useAtom, useExecutionContext } from "@pumped-fn/lite-react"
 import { bootCount, increment } from "./after"
+
+function ignoreFlowFailure(): void {}
 
 export function CounterApp() {
   const { data: count } = useAtom(bootCount, { suspense: false, resolve: true })
-  const scope = useScope()
-
-  const runIncrement = async () => {
-    const ctx = scope.createContext()
-    try {
-      await ctx.exec({ flow: increment, input: undefined })
-      await ctx.close({ ok: true })
-    } catch (error) {
-      await ctx.close({ ok: false, error })
-    }
-  }
+  const ctx = useExecutionContext()
 
   return (
     <button
       onClick={() => {
-        void runIncrement()
+        void ctx.exec({ flow: increment, input: undefined }).catch(ignoreFlowFailure)
       }}
     >
       count {count ?? 0}

@@ -2,7 +2,7 @@
 import { describe, test, expect } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createScope, preset, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { authProvider, loginForm, session, submitLogin, type AuthProvider, type Session } from "../src/auth"
 import { LoginForm } from "../src/LoginForm"
 
@@ -21,12 +21,12 @@ async function fillAndSubmit(email: string, password: string) {
   fireEvent.click(screen.getByRole("button", { name: "login" }))
 }
 
-function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
+function recordFlowClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
   return {
-    name: "record-parent-close",
+    name: "record-flow-close",
     wrapExec: async (next, executed, ctx) => {
-      if (executed === target && ctx.parent) {
-        ctx.parent.onClose((result) => {
+      if (executed === target) {
+        ctx.onClose((result) => {
           closes.push(result)
         })
       }
@@ -40,7 +40,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(authProvider, successAuth)] })
     render(
       <ScopeProvider scope={scope}>
-        <LoginForm />
+        <ExecutionContextProvider>
+          <LoginForm />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByLabelText("email")).toBeTruthy()
@@ -52,12 +54,14 @@ describe("outside-in", () => {
   test("OI2: successful login transitions to authed state (logout button appears)", async () => {
     const closes: Lite.CloseResult[] = []
     const scope = createScope({
-      extensions: [recordParentClose(submitLogin, closes)],
+      extensions: [recordFlowClose(submitLogin, closes)],
       presets: [preset(authProvider, successAuth)],
     })
     render(
       <ScopeProvider scope={scope}>
-        <LoginForm />
+        <ExecutionContextProvider>
+          <LoginForm />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
@@ -75,7 +79,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(authProvider, successAuth)] })
     render(
       <ScopeProvider scope={scope}>
-        <LoginForm />
+        <ExecutionContextProvider>
+          <LoginForm />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
@@ -92,12 +98,14 @@ describe("outside-in", () => {
   test("OI4: failed login shows error message and stays on form (spec OI3)", async () => {
     const closes: Lite.CloseResult[] = []
     const scope = createScope({
-      extensions: [recordParentClose(submitLogin, closes)],
+      extensions: [recordFlowClose(submitLogin, closes)],
       presets: [preset(authProvider, failingAuth)],
     })
     render(
       <ScopeProvider scope={scope}>
-        <LoginForm />
+        <ExecutionContextProvider>
+          <LoginForm />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
@@ -123,7 +131,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(authProvider, stringThrowAuth)] })
     render(
       <ScopeProvider scope={scope}>
-        <LoginForm />
+        <ExecutionContextProvider>
+          <LoginForm />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")

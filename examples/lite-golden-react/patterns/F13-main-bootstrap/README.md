@@ -15,16 +15,18 @@ bootstrap code, `ScopeProvider` wiring is assumed instead of tested, and disposa
 ## Transformation
 
 Move state to `after.ts`, keep the component in `view.tsx` as an observer, and make `main.tsx` a small
-composition-root adapter. It creates one `scope`, renders through `ScopeProvider`, returns the mounted
-app with the returned `scope`, and disposes both React root and scope on unmount. `main.tsx` is also the
-only declaration in the pattern that may touch `document`; observers and graph nodes stay ambient-free.
+composition-root adapter. It creates one `scope`, renders through `ScopeProvider` and
+`ExecutionContextProvider`, returns the mounted app with the returned `scope`, and disposes both React root
+and scope on unmount. `main.tsx` is also the only declaration in the pattern that may touch `document`;
+observers and graph nodes stay ambient-free. The observer uses `useExecutionContext` to execute flows
+through the provider instead of accepting `scope` or hand-rolling `createContext`/`close` helpers.
 
 ## Lens coverage
 
 - **inside-out** (`after.test.ts`, node): bootstrap state and transitions are graph-owned.
 - **outside-in** (`main.dom.test.tsx`, jsdom): production bootstrap mounts through the real
-  `ScopeProvider` boundary, asserts `bootCount` through the returned `scope`, and covers the missing-root
-  adapter error.
+  `ScopeProvider`/`ExecutionContextProvider` boundary, asserts `bootCount` through the returned `scope`,
+  and covers the missing-root adapter error.
 - **effect-managed** (`main.dom.test.tsx`, jsdom): unmount owns root and scope disposal.
 
 ## Why 100%

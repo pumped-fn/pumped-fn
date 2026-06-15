@@ -2,7 +2,7 @@
 import { describe, test, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { createScope, preset } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { authProvider, session, type AuthProvider, type Session } from "../src/auth"
 import { authedBffClient, type AuthedBffClient, type DashboardView } from "../src/app"
 import { DashboardScreen } from "../src/DashboardScreen"
@@ -26,7 +26,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(authProvider, stubAuth)] })
     render(
       <ScopeProvider scope={scope}>
-        <DashboardScreen />
+        <ExecutionContextProvider>
+          <DashboardScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByLabelText("email")).toBeTruthy()
@@ -39,7 +41,9 @@ describe("outside-in", () => {
     })
     render(
       <ScopeProvider scope={scope}>
-        <DashboardScreen />
+        <ExecutionContextProvider>
+          <DashboardScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByText(/total.*5/i)).toBeTruthy()

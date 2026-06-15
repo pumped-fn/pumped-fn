@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 import { describe, expect, test } from "vitest"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createScope, preset, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { bootCount, increment } from "./after"
 import { mountMain } from "./main"
 import { CounterApp } from "./view"
 
-function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
+function recordFlowClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
   return {
-    name: "record-parent-close",
+    name: "record-flow-close",
     wrapExec: async (next, executed, ctx) => {
-      if (executed === target && ctx.parent) {
-        ctx.parent.onClose((result) => {
+      if (executed === target) {
+        ctx.onClose((result) => {
           closes.push(result)
         })
       }
@@ -24,14 +24,20 @@ function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Li
 describe("outside-in", () => {
   test("OI1: main creates the scope once and renders the observer under ScopeProvider", async () => {
     document.body.innerHTML = '<div id="root"></div>'
-    const app = mountMain()
+    let mounted: ReturnType<typeof mountMain>
+    await act(async () => {
+      mounted = mountMain()
+    })
+    const app = mounted!
 
     expect(await screen.findByRole("button", { name: "count 0" })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "count 0" }))
     expect(await screen.findByRole("button", { name: "count 1" })).toBeInTheDocument()
     expect(await app.scope.resolve(bootCount)).toBe(1)
 
-    await app.unmount()
+    await act(async () => {
+      await app.unmount()
+    })
     expect(document.getElementById("root")?.textContent).toBe("")
   })
 
@@ -40,10 +46,10 @@ describe("outside-in", () => {
     expect(() => mountMain()).toThrow("root container missing")
   })
 
-  test("OI3: failed UI exec closes the caller context with ok false", async () => {
+  test("OI3: failed UI exec closes the flow execution context with ok false", async () => {
     const closes: Lite.CloseResult[] = []
     const scope = createScope({
-      extensions: [recordParentClose(increment, closes)],
+      extensions: [recordFlowClose(increment, closes)],
       presets: [
         preset(increment, async () => {
           throw new Error("increment failed")
@@ -52,7 +58,9 @@ describe("outside-in", () => {
     })
     render(
       <ScopeProvider scope={scope}>
-        <CounterApp />
+        <ExecutionContextProvider>
+          <CounterApp />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
 

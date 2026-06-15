@@ -53,11 +53,13 @@ package-wide test-total claim; it documents where frontend node logic currently 
 
 ## Boundary Rules
 
-- Components observe the graph through `ScopeProvider`, `useAtom`, and `useScope`.
+- Components observe the graph through `ScopeProvider`, `ExecutionContextProvider`, `useAtom`, and
+  `useExecutionContext`; observers do not create or close execution contexts manually.
 - `main.tsx` is a tested composition-root adapter: create one scope, render through `ScopeProvider`, return
   the scope for assertions, and dispose the root/scope together.
-- BFF `main.ts` is a tested lite composition root: create one scope, delegate requests through
-  `handleBffRequest`, return the scope for assertions, and dispose the scope with the mounted BFF.
+- BFF `main.ts` is a tested lite composition root: create one scope and one process execution context,
+  execute requests through the `handleBffRequest` flow, return the scope for assertions, and close the
+  process context before disposing the scope.
 - Ambient browser/runtime APIs (`fetch`, `document`, timers, storage, clock, random) enter only through
   adapter atoms or composition-root adapters; feature graph nodes and observers do not call them inline.
 - Feature atoms depend on auth-capable ports such as `authedBffClient`; they do not combine raw HTTP

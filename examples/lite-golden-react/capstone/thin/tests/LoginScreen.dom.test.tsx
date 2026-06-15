@@ -2,7 +2,7 @@
 import { describe, test, expect } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createScope, preset, type Lite } from "@pumped-fn/lite"
-import { ScopeProvider } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 import { bffClient, type BffClient, type DashboardView } from "../src/bff"
 import { sessionToken } from "../src/session"
 import { signInForm, submitSignIn } from "../src/signIn"
@@ -29,12 +29,12 @@ async function fillAndSubmit(email: string, password: string) {
   fireEvent.click(screen.getByRole("button", { name: "sign in" }))
 }
 
-function recordParentClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
+function recordFlowClose(target: Lite.AnyFlow, closes: Lite.CloseResult[]): Lite.Extension {
   return {
-    name: "record-parent-close",
+    name: "record-flow-close",
     wrapExec: async (next, executed, ctx) => {
-      if (executed === target && ctx.parent) {
-        ctx.parent.onClose((result) => {
+      if (executed === target) {
+        ctx.onClose((result) => {
           closes.push(result)
         })
       }
@@ -48,7 +48,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(bffClient, successClient)] })
     render(
       <ScopeProvider scope={scope}>
-        <LoginScreen />
+        <ExecutionContextProvider>
+          <LoginScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(await screen.findByLabelText("email")).toBeTruthy()
@@ -60,12 +62,14 @@ describe("outside-in", () => {
   test("OI2: successful sign-in transitions to dashboard view", async () => {
     const closes: Lite.CloseResult[] = []
     const scope = createScope({
-      extensions: [recordParentClose(submitSignIn, closes)],
+      extensions: [recordFlowClose(submitSignIn, closes)],
       presets: [preset(bffClient, successClient)],
     })
     render(
       <ScopeProvider scope={scope}>
-        <LoginScreen />
+        <ExecutionContextProvider>
+          <LoginScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
@@ -82,12 +86,14 @@ describe("outside-in", () => {
   test("OI3: failed sign-in shows error and stays on form", async () => {
     const closes: Lite.CloseResult[] = []
     const scope = createScope({
-      extensions: [recordParentClose(submitSignIn, closes)],
+      extensions: [recordFlowClose(submitSignIn, closes)],
       presets: [preset(bffClient, failingClient)],
     })
     render(
       <ScopeProvider scope={scope}>
-        <LoginScreen />
+        <ExecutionContextProvider>
+          <LoginScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
@@ -116,7 +122,9 @@ describe("outside-in", () => {
     const scope = createScope({ presets: [preset(bffClient, stringThrowClient)] })
     render(
       <ScopeProvider scope={scope}>
-        <LoginScreen />
+        <ExecutionContextProvider>
+          <LoginScreen />
+        </ExecutionContextProvider>
       </ScopeProvider>
     )
     await screen.findByLabelText("email")
