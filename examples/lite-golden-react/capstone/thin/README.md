@@ -6,12 +6,15 @@ The BFF owns authentication and view-model shaping. The frontend holds a token s
 
 ## Seam
 
-`createScope({ presets: [preset(bffClient, fake), preset(sessionToken, "tok")] })` is the complete test seam. No auth provider, no session object, no derived auth flag — none exist in this package.
+`bffClient` is the raw adapter for login and explicit-token HTTP calls. `authedBffClient` composes that
+adapter with `sessionToken`, so dashboard feature tests preset one auth-capable port instead of coupling
+the feature atom to both raw transport and token storage. No auth provider, no session object, no derived
+auth flag — none exist in this package.
 
 ## Lens coverage
 
-- **inside-out**: signIn, dashboard logic tested in node (preset bffClient, preset sessionToken)
-- **outside-in**: LoginScreen and Dashboard tested in jsdom via ScopeProvider + preset
+- **inside-out**: signIn, dashboard logic, and `authedBffClient` token composition tested in node
+- **outside-in**: LoginScreen and Dashboard tested in jsdom via ScopeProvider + auth-capable port presets
 - **effect-managed**: not applicable — no resources or long-lived effects in this graph; the token atom is the sole mutable state
 
 ## Contrast with fat

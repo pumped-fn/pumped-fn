@@ -19,6 +19,10 @@ export interface BffClient {
   dashboard(token: string): Promise<DashboardView>
 }
 
+export interface AuthedBffClient {
+  dashboard(): Promise<DashboardView>
+}
+
 export const bffBaseUrl = tag<string>({ label: "bff.baseUrl", default: "http://localhost:4001" })
 
 export const bffClient = atom({
@@ -37,14 +41,24 @@ export const bffClient = atom({
   },
 })
 
-export const dashboard = atom({
+export const authedBffClient = atom({
   deps: {
     client: bffClient,
     sessionControl: controller(session, { resolve: true, watch: true }),
   },
-  factory: async (_ctx, { client, sessionControl }) => {
+  factory: (_ctx, { client, sessionControl }): AuthedBffClient | null => {
     const s = sessionControl.get()
     if (s === null) return null
-    return client.dashboard(s.token)
+    return {
+      dashboard: () => client.dashboard(s.token),
+    }
+  },
+})
+
+export const dashboard = atom({
+  deps: { client: authedBffClient },
+  factory: async (_ctx, { client }) => {
+    if (client === null) return null
+    return client.dashboard()
   },
 })

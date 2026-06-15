@@ -1,4 +1,5 @@
-import { atom, tag, tags } from "@pumped-fn/lite"
+import { atom, controller, tag, tags } from "@pumped-fn/lite"
+import { sessionToken } from "./session"
 
 export interface DashboardView {
   summary: {
@@ -14,6 +15,10 @@ export interface DashboardView {
 export interface BffClient {
   login(email: string, password: string): Promise<{ token: string }>
   dashboard(token: string): Promise<DashboardView>
+}
+
+export interface AuthedBffClient {
+  dashboard(): Promise<DashboardView>
 }
 
 export const bffBaseUrl = tag<string>({ label: "thin.bff.baseUrl", default: "http://localhost:4001" })
@@ -40,6 +45,20 @@ export const bffClient = atom({
     return {
       login: (email, password) => post<{ token: string }>("/login", { email, password }),
       dashboard: (token) => get<DashboardView>("/dashboard", token),
+    }
+  },
+})
+
+export const authedBffClient = atom({
+  deps: {
+    client: bffClient,
+    tokenControl: controller(sessionToken, { resolve: true, watch: true }),
+  },
+  factory: (_ctx, { client, tokenControl }): AuthedBffClient | null => {
+    const token = tokenControl.get()
+    if (token === null) return null
+    return {
+      dashboard: () => client.dashboard(token),
     }
   },
 })

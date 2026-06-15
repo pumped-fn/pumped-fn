@@ -3,8 +3,7 @@ import { describe, test, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { createScope, preset } from "@pumped-fn/lite"
 import { ScopeProvider } from "@pumped-fn/lite-react"
-import { bffClient, type BffClient, type DashboardView } from "../src/bff"
-import { sessionToken } from "../src/session"
+import { authedBffClient, type AuthedBffClient, type DashboardView } from "../src/bff"
 import { Dashboard } from "../src/Dashboard"
 
 const fakeDash: DashboardView = {
@@ -15,14 +14,13 @@ const fakeDash: DashboardView = {
   ],
 }
 
-const fakeClient: BffClient = {
-  login: async () => ({ token: "" }),
+const fakeClient: AuthedBffClient = {
   dashboard: async () => fakeDash,
 }
 
 describe("outside-in", () => {
   test("OI1: shows loading when no token", async () => {
-    const scope = createScope({ presets: [preset(bffClient, fakeClient)] })
+    const scope = createScope({ presets: [preset(authedBffClient, null)] })
     render(
       <ScopeProvider scope={scope}>
         <Dashboard />
@@ -34,7 +32,7 @@ describe("outside-in", () => {
 
   test("OI2: renders summary counts and attention rows when token present", async () => {
     const scope = createScope({
-      presets: [preset(sessionToken, "tok-render"), preset(bffClient, fakeClient)],
+      presets: [preset(authedBffClient, fakeClient)],
     })
     render(
       <ScopeProvider scope={scope}>

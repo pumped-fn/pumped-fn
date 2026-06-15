@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react"
 import { createScope, preset } from "@pumped-fn/lite"
 import { ScopeProvider } from "@pumped-fn/lite-react"
 import { authProvider, session, type AuthProvider, type Session } from "../src/auth"
-import { bffClient, type BffClient, type DashboardView } from "../src/app"
+import { authedBffClient, type AuthedBffClient, type DashboardView } from "../src/app"
 import { DashboardScreen } from "../src/DashboardScreen"
 
 const aSession: Session = { token: "tok-1", user: { id: "u1", name: "Alice" } }
@@ -19,7 +19,7 @@ const fakeDashboard: DashboardView = {
   ],
 }
 
-const fakeClient: BffClient = { dashboard: async () => fakeDashboard }
+const fakeClient: AuthedBffClient = { dashboard: async () => fakeDashboard }
 
 describe("outside-in", () => {
   test("OI1: not authed — login form visible", async () => {
@@ -35,7 +35,7 @@ describe("outside-in", () => {
 
   test("OI2: authed + dashboard loaded — summary counts and attention rows render", async () => {
     const scope = createScope({
-      presets: [preset(session, aSession), preset(bffClient, fakeClient)],
+      presets: [preset(session, aSession), preset(authedBffClient, fakeClient)],
     })
     render(
       <ScopeProvider scope={scope}>
