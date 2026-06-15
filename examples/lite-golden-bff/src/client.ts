@@ -10,21 +10,29 @@ export interface CapstoneClient {
   getService(id: string): Promise<ServiceDetail>
 }
 
+export interface CapstoneHttp {
+  get<T>(path: string): Promise<T>
+}
+
 export const capstoneBaseUrl = tag<string>({ label: "capstone.baseUrl", default: "http://localhost:3000" })
 
-export const capstoneClient = atom({
+export const capstoneHttp = atom({
   deps: { baseUrl: tags.required(capstoneBaseUrl) },
-  factory: (_ctx, { baseUrl }): CapstoneClient => {
-    const get = async <T>(path: string): Promise<T> => {
+  factory: (_ctx, { baseUrl }): CapstoneHttp => ({
+    get: async <T>(path: string): Promise<T> => {
       const res = await fetch(`${baseUrl}${path}`)
       if (!res.ok) throw new Error(`capstone ${path} failed: ${res.status}`)
       return (await res.json()) as T
-    }
-    return {
-      listServices: () => get<ServiceStatus[]>("/services"),
-      activeIncidents: () => get<Incident[]>("/incidents/active"),
-      uptime: (serviceId, period) => get<number>(`/metrics/uptime/${serviceId}?period=${period}`),
-      getService: (id) => get<ServiceDetail>(`/services/${id}`),
-    }
-  },
+    },
+  }),
+})
+
+export const capstoneClient = atom({
+  deps: { http: capstoneHttp },
+  factory: (_ctx, { http }): CapstoneClient => ({
+    listServices: () => http.get<ServiceStatus[]>("/services"),
+    activeIncidents: () => http.get<Incident[]>("/incidents/active"),
+    uptime: (serviceId, period) => http.get<number>(`/metrics/uptime/${serviceId}?period=${period}`),
+    getService: (id) => http.get<ServiceDetail>(`/services/${id}`),
+  }),
 })

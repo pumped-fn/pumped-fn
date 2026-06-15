@@ -9,16 +9,17 @@ frontend and owns auth/session validation for the thin frontend.
 
 ## The seam
 
-The BFF has two adapter seams:
+The BFF separates transport atoms from higher-level capability atoms:
 
-- `capstoneClient` wraps backend service-health fetches. `dashboardView` and `serviceDetailView` depend
-  on this port and never touch the network directly.
-- `authProvider` wraps authentication fetches. `login` calls `authenticate`; `validateSession` calls
-  `validate` before auth-gated dashboard work.
+- `capstoneHttp` wraps backend service-health fetches. `capstoneClient` depends on that transport atom and
+  exposes domain methods; `dashboardView` and `serviceDetailView` depend on `capstoneClient`.
+- `authHttp` wraps authentication fetches. `authProvider` depends on that transport atom and exposes
+  `authenticate`/`validate`; `login` and `validateSession` depend on `authProvider`.
 
 Logic tests drive both seams through `createScope` and `preset(...)`: `preset(capstoneClient, fake)` for
-view-model shaping and `preset(authProvider, fake)` for login/session rules. The only tests that fake
-`fetch` are the adapter-own tests below the seam.
+view-model shaping and `preset(authProvider, fake)` for login/session rules. Adapter-composition tests
+preset `capstoneHttp` or `authHttp`. The only tests that fake `fetch` are the transport-atom tests below
+the seam, and a structural guard fails if `fetch` appears in capability atoms.
 
 `src/http.ts` is an HTTP boundary for the BFF package, not an in-process import path for frontend code. It
 accepts HTTP-shaped requests, maps `POST /login` to the `login` flow and returns token JSON, validates
@@ -37,8 +38,8 @@ Because all logic lives in flows behind the seam, the package is node-tested at 
 
 - `src/wire.ts` — wire types mirroring the backend Data Model; the BFF re-declares them so packages stay
   independent.
-- `src/client.ts` — `CapstoneClient` port, `capstoneClient` fetch adapter, and `capstoneBaseUrl` tag.
-- `src/auth.ts` — `AuthProvider` port, `authProvider` fetch adapter, `login`, and `validateSession`.
+- `src/client.ts` — `CapstoneHttp` transport, `CapstoneClient` capability, and `capstoneBaseUrl` tag.
+- `src/auth.ts` — `AuthHttp` transport, `AuthProvider` capability, `login`, and `validateSession`.
 - `src/dashboard.ts` — `dashboardView`: counts services by status, counts active incidents, and produces
   a criticality-sorted attention list.
 - `src/detail.ts` — `serviceDetailView`: formats uptime, maps recent checks, counts open incidents.

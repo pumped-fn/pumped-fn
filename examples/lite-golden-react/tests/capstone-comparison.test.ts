@@ -376,7 +376,12 @@ describe("inside-out", () => {
     const source = readSiblingPackage("lite-golden-bff", "README.md")
 
     expect(source).toContain("capstoneClient")
+    expect(source).toContain("capstoneHttp")
     expect(source).toContain("authProvider")
+    expect(source).toContain("authHttp")
+    expect(source).toContain("transport atoms")
+    expect(source).toContain("capability atoms")
+    expect(source).toContain("structural guard fails if `fetch` appears in capability atoms")
     expect(source).toContain("authenticate")
     expect(source).toContain("validate")
     expect(source).toContain("src/http.ts")

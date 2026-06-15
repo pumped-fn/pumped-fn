@@ -372,7 +372,8 @@ adapter/composition roots and tested through the real `ScopeProvider` boundary. 
 guards ambient APIs by owning declaration: raw adapters may call `fetch`, composition roots may touch
 `document`, and feature graph nodes/observers may not hide inline browser IO. BFF `main.ts` is the lite
 composition root: it creates one scope, delegates HTTP-shaped requests through `handleBffRequest`, and
-owns disposal.
+owns disposal. BFF raw `fetch` is isolated to transport atoms (`authHttp`, `capstoneHttp`); capability
+atoms (`authProvider`, `capstoneClient`) depend on those transports and are preset independently.
 
 Backend golden:
 

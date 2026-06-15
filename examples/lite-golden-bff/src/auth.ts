@@ -27,12 +27,17 @@ export interface AuthProvider {
   validate(token: string): Promise<Session>
 }
 
+export interface AuthHttp {
+  post<T>(path: string, body: unknown): Promise<T>
+  get<T>(path: string, token: string): Promise<T>
+}
+
 export const authBaseUrl = tag<string>({ label: "auth.baseUrl", default: "http://localhost:4000" })
 
-export const authProvider = atom({
+export const authHttp = atom({
   deps: { baseUrl: tags.required(authBaseUrl) },
-  factory: (_ctx, { baseUrl }): AuthProvider => {
-    const post = async <T>(path: string, body: unknown): Promise<T> => {
+  factory: (_ctx, { baseUrl }): AuthHttp => ({
+    post: async <T>(path: string, body: unknown): Promise<T> => {
       const res = await fetch(`${baseUrl}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,19 +45,23 @@ export const authProvider = atom({
       })
       if (!res.ok) throw new InvalidCredentials()
       return (await res.json()) as T
-    }
-    const get = async <T>(path: string, token: string): Promise<T> => {
+    },
+    get: async <T>(path: string, token: string): Promise<T> => {
       const res = await fetch(`${baseUrl}${path}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new InvalidSession()
       return (await res.json()) as T
-    }
-    return {
-      authenticate: (email, password) => post<Session>("/authenticate", { email, password }),
-      validate: (token) => get<Session>("/session", token),
-    }
-  },
+    },
+  }),
+})
+
+export const authProvider = atom({
+  deps: { http: authHttp },
+  factory: (_ctx, { http }): AuthProvider => ({
+    authenticate: (email, password) => http.post<Session>("/authenticate", { email, password }),
+    validate: (token) => http.get<Session>("/session", token),
+  }),
 })
 
 export const login = flow({
