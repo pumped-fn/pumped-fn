@@ -14,9 +14,10 @@ opt into jsdom (via a `// @vitest-environment jsdom` docblock) to render and obs
 touch the DOM.
 
 Each pattern splits into the **graph** (`after.ts` — atoms, flows, adapters: the logic) and the
-**observer** (`view.tsx` — a thin component). Logic is node-tested to 100%; the component is
-jsdom-tested to 100%. Coverage is gated at 100/100/100/100 across both — provable because the component
-holds no logic to leave uncovered.
+**observer** (`view.tsx` — a thin component). Bootstrap patterns also include **main** (`main.tsx` —
+the composition-root adapter that creates the scope once and renders through `ScopeProvider`). Logic is
+node-tested to 100%; components and bootstrap adapters are jsdom-tested to 100%. Coverage is gated at
+100/100/100/100 across all three — provable because the component holds no logic to leave uncovered.
 
 No `vi.mock` / `msw` / `fetch-mock`: browser APIs enter through adapter atoms and tests `preset` them —
 the frontend form of "no module mocks". An adapter's own unit test is the one sanctioned place to fake
@@ -34,6 +35,7 @@ pnpm -F @pumped-fn/lite-golden-react typecheck
 | # | Smell | Transformation | Lenses |
 |---|---|---|---|
 | F01 | State / derived soup in a component | atoms + derived atom; component observes | IO, OI |
+| F13 | Untested `main.tsx` owning state/root setup | main as composition-root adapter; graph owns state | IO, OI |
 
 (More patterns and the Service Health Dashboard capstone land incrementally.)
 
