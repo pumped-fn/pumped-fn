@@ -7,7 +7,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.dom.ts"],
     coverage: {
       provider: "v8",
-      include: ["patterns/**/after.ts", "patterns/**/view.tsx", "capstone/src/**/*.ts", "capstone/src/**/*.tsx"],
+      include: ["patterns/**/after.ts", "patterns/**/view.tsx", "capstone/**/src/**/*.ts", "capstone/**/src/**/*.tsx"],
       thresholds: {
         statements: 100,
         branches: 100,
