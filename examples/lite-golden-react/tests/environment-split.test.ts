@@ -327,8 +327,7 @@ function sourceAmbientViolationsFromSource(file: string, source: string): Ambien
 
 function sourceAmbientViolations(): AmbientEffect[] {
   return [
-    ...sourceFiles(join(root, "capstone", "fat", "src")),
-    ...sourceFiles(join(root, "capstone", "thin", "src")),
+    ...sourceFiles(join(root, "capstone")),
     ...sourceFiles(join(root, "patterns", "F13-main-bootstrap")),
   ].flatMap((file) => sourceAmbientViolationsFromSource(file, readFileSync(file, "utf8")))
 }
@@ -403,8 +402,7 @@ function reactExecutionBoundaryViolationsFromSource(file: string, source: string
 
 function reactObserverSourceFiles(): string[] {
   return [
-    ...sourceFiles(join(root, "capstone", "fat", "src")),
-    ...sourceFiles(join(root, "capstone", "thin", "src")),
+    ...sourceFiles(join(root, "capstone")),
     ...sourceFiles(join(root, "patterns", "F13-main-bootstrap")),
   ].filter((file) => file.endsWith(".tsx"))
 }

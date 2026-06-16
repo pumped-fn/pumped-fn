@@ -37,8 +37,9 @@ const categories: Record<string, { title: string; content: string | (() => strin
     Runs once per ctx.exec() call. Think: HTTP handler, mutation, query.
     Factory receives ExecutionContext: ctx.exec(), ctx.onClose(), ctx.input, ctx.parent, ctx.data.
 
-  RESOURCE = execution-scoped singleton (shared within an exec chain)
-    Created by the first (possibly nested) context that encounters it. Shared across nested exec() calls via seek-up.
+  RESOURCE = execution-context-owned value
+    Default ownership:"boundary" shares across nested exec() calls under a boundary.
+    ownership:"current" creates on the current execution boundary and is shared by nested ctx.exec() children.
     Think: per-request logger, transaction, trace span.
     Declared as a flow dep, NOT called directly.
 
@@ -61,7 +62,7 @@ Key invariant: atoms are resolved from scope, flows are executed from context.
     content: `There are three primitives with distinct lifetimes:
   atom  — SINGLETON per scope. Created once, cached, reused everywhere. Think: db pool, config, service instance.
   flow  — EPHEMERAL per call. New execution each time ctx.exec() is called. Think: HTTP handler, mutation, query.
-  resource — EPHEMERAL per execution chain. Created once per ctx.exec() tree, shared across nested execs. Think: logger, transaction, trace span.
+  resource — EPHEMERAL per execution context owner. Think: logger, transaction, trace span.
 
 atom({ factory, deps?, tags?, keepAlive? })
   Factory receives (resolveCtx, resolvedDeps) → value.
@@ -87,9 +88,10 @@ flow({ factory, parse?, deps?, tags? })
     factory: (ctx, { db }) => db.findUser(ctx.input.id),
   })
 
-resource({ factory, deps?, name? })
+resource({ factory, deps?, name?, ownership? })
   Like a flow factory but resolved as a DEPENDENCY of flows, not called directly.
-  Created fresh per execution chain. Shared via seek-up: nested ctx.exec() reuses parent's instance.
+  ownership:"boundary" creates on the nearest execution boundary. ownership:"current" creates on the current
+  context boundary; nested ctx.exec() children can reuse it, but a nested createContext({ parent }) boundary cannot.
   Factory receives (resourceCtx, resolvedDeps) → instance.
   Resource cleanup via ctx.cleanup(fn); execution-boundary cleanup via ctx.onClose(fn).
 
@@ -167,7 +169,7 @@ ExecutionContext (received by flow factories and inline fns):
   ctx.exec(...)              execute a nested flow or function (creates child context)
   ctx.onClose(fn)            register cleanup (runs LIFO on close, receives CloseResult)
   ctx.close(result?)         close this context, run all cleanups
-  ctx.resolve(resource)      resolve a resource in this exec chain (seek-up before create)
+  ctx.resolve(resource)      resolve a resource from its owner context (seek-up before owner miss)
   ctx.release(resource)      owner-local reset of a resource
   ctx.controller(resource)   get a ResourceController for a resource
   ctx.input                  parsed input (flows only)
@@ -180,8 +182,9 @@ ResourceContext (received by resource factories):
   all ExecutionContext fields/methods above, plus:
   ctx.cleanup(fn)       register resource cleanup (runs LIFO on release/context close)
 
-ctx = scope.createContext({ tags? })
-  Creates a root ExecutionContext. Tags merge: exec tags > context tags > scope tags.
+ctx = scope.createContext({ tags?, parent? })
+  Creates an ExecutionContext. Parent data is inherited when a same-scope open parent is supplied.
+  Tags merge: exec tags > context tags > parent tags > scope tags.
 
 ctx.exec({ flow, input?, rawInput?, name?, tags? })  → Promise<output>
   Execute a flow. Creates a child context with merged tags.

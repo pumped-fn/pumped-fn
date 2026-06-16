@@ -47,6 +47,7 @@ export namespace Lite {
 
   export interface CreateContextOptions {
     tags?: Tagged<any>[]
+    parent?: ExecutionContext
   }
 
   export interface ScopeOptions {
@@ -85,8 +86,11 @@ export namespace Lite {
     readonly name?: string
     readonly deps?: D
     readonly tags?: Tagged<any>[]
+    readonly ownership?: ResourceOwnership
     readonly factory: ResourceFactory<T, D>
   }
+
+  export type ResourceOwnership = "boundary" | "current"
 
   /**
    * Unified context data storage with both raw Map operations and Tag-based DX.
@@ -370,8 +374,8 @@ export namespace Lite {
    * Discriminated context for `wrapResolve`.
    *
    * - `"atom"` — scope-level singleton. Cached after first resolve.
-   * - `"resource"` — execution-level. Fresh factory per first encounter,
-   *   seek-up on nested execs within the same chain.
+   * - `"resource"` — execution-context-owned. Fresh factory per owner miss,
+   *   with the owner selected by the resource ownership mode.
    */
   export type ResolveEvent =
     | {

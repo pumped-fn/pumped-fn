@@ -105,7 +105,7 @@ const ctx = scope.createContext()
 
 Create the scope and explicit context outside component bodies. Do not call `createScope()` or `scope.createContext()` inside a React component; that creates a new graph during render. Components should consume an existing boundary through `ExecutionContextProvider`.
 
-Managed mode creates an execution context from the surrounding `ScopeProvider` synchronously during render — so the subtree renders on the server — and closes it on unmount. Contexts created by renders that suspend before committing are reclaimed automatically once their in-flight work settles:
+Managed mode creates an execution context from the surrounding `ScopeProvider` synchronously during render — so the subtree renders on the server — and closes it on unmount. When a managed provider is nested under another provider for the same scope, the child context inherits the nearest execution context. Contexts created by renders that suspend before committing are reclaimed automatically once their in-flight work settles:
 
 ```tsx
 <ScopeProvider scope={scope}>
@@ -158,7 +158,7 @@ Do not load resources with `useEffect`. `useResource` observes the resource cont
 
 ### scopedValue
 
-Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is resource-backed, so it can be tested without React and is discarded when the execution context is released or closed.
+Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is backed by a current-owned resource, so it can be tested without React and is discarded when the owning execution context is released or closed.
 
 ```tsx
 import { createScope, resource } from '@pumped-fn/lite'

@@ -1174,7 +1174,12 @@ class ScopeImpl implements Lite.Scope {
       if (entry.promise) return entry.promise
     }
 
-    const ownerCtx = receiverCtx.resourceOwner()
+    const ownerCtx = receiverCtx.resourceOwner(resource)
+    try {
+      ownerCtx.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
     const entry = ownerCtx.createResourceEntry(resource)
     const nextPath = new Set(resourcePath)
     nextPath.add(resource as Lite.Resource<unknown>)
@@ -1483,6 +1488,13 @@ class ScopeImpl implements Lite.Scope {
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     if (this.disposed) throw new Error("Scope is disposed")
     assertCreateContextOptions(options)
+    if (options && "parent" in options && options.parent !== undefined) {
+      assertExecutionContextImpl(options.parent)
+      options.parent.assertOpen()
+      if (options.parent.scope !== this) {
+        throw new Error("createContext() parent must belong to the same scope")
+      }
+    }
     const ctx = new ExecutionContextImpl(this, options)
 
     const ctxTags = options?.tags
@@ -1494,7 +1506,7 @@ class ScopeImpl implements Lite.Scope {
 
     if (this.tags.length > 0) {
       for (let i = 0; i < this.tags.length; i++) {
-        if (!ctx.data.has(this.tags[i]!.key)) {
+        if (!ctx.data.seekHas(this.tags[i]!.key)) {
           ctx.data.set(this.tags[i]!.key, this.tags[i]!.value)
         }
       }
@@ -1507,16 +1519,16 @@ class ScopeImpl implements Lite.Scope {
 function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
   if (options === undefined) return
   if (options === null || typeof options !== "object" || Array.isArray(options)) {
-    throw new Error("createContext() expects { tags }")
+    throw new Error("createContext() expects { tags, parent }")
   }
 
   const record = options as Record<string, unknown>
-  const invalidKey = Object.keys(record).find((key) => key !== "tags")
+  const invalidKey = Object.keys(record).find((key) => key !== "tags" && key !== "parent")
   if (invalidKey) {
-    throw new Error(`createContext() expects { tags }; received "${invalidKey}"`)
+    throw new Error(`createContext() expects { tags, parent }; received "${invalidKey}"`)
   }
   if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
-    throw new Error("createContext() expects { tags }")
+    throw new Error("createContext() expects { tags, parent }")
   }
 }
 
@@ -1530,6 +1542,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private _data: ContextDataImpl | undefined
   private readonly _execName: string | undefined
   private readonly _flowName: string | undefined
+  private readonly boundary: boolean
   readonly parent: Lite.ExecutionContext | undefined
 
   constructor(
@@ -1539,12 +1552,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       input?: unknown
       execName?: string
       flowName?: string
+      boundary?: boolean
     }
   ) {
     this.parent = options?.parent
     this._input = options?.input
     this._execName = options?.execName
     this._flowName = options?.flowName
+    this.boundary = options?.boundary ?? true
   }
 
   get input(): unknown {
@@ -1568,8 +1583,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  resourceOwner(): ExecutionContextImpl {
-    if (!this.parent) return this
+  resourceOwner(resource?: Lite.Resource<unknown>): ExecutionContextImpl {
+    if (!this.parent || resource?.ownership === "current") return this
     assertExecutionContextImpl(this.parent)
     return this.parent
   }
@@ -1579,6 +1594,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     while (current) {
       const entry = current.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
       if (entry) return { owner: current, entry }
+      if (resource.ownership === "current" && current.boundary) return undefined
       if (!current.parent) return undefined
       assertExecutionContextImpl(current.parent)
       current = current.parent
@@ -1629,7 +1645,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     event: Lite.ResourceControllerEvent,
     listener: () => void
   ): () => void {
-    const owner = this.findResourceEntry(resource)?.owner ?? this.resourceOwner()
+    const owner = this.findResourceEntry(resource)?.owner ?? this.resourceOwner(resource)
     const listeners = owner.getResourceListeners(resource)
     const set = event === "*" ? listeners.all : listeners[event]
     set.add(listener)
@@ -1743,7 +1759,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         parent: this,
         input: parsedInput,
         execName,
-        flowName: flow.name
+        flowName: flow.name,
+        boundary: false
       })
 
       if (execTags && execTags.length > 0) {
@@ -1784,7 +1801,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         parent: this,
         execName: options.name,
         flowName: options.fn.name || undefined,
-        input: options.params
+        input: options.params,
+        boundary: false
       })
 
       const execTags = options.tags

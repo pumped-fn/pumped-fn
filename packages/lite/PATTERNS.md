@@ -100,7 +100,7 @@ sequenceDiagram
 
 ### Execution-Scoped Resource
 
-Resolve resource values from an `ExecutionContext` when the value should live for one request/span instead of the whole scope.
+Resolve resource values from an `ExecutionContext` when the value should live below the scope. Use the default `ownership: "boundary"` when a child execution should share the nearest boundary-owned value. Use `ownership: "current"` when a flow/action or explicit context boundary should own a fresh value that `ctx.exec()` children can reuse but sibling executions and nested explicit boundaries cannot.
 
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
@@ -109,6 +109,7 @@ const events: string[] = []
 
 const tx = resource({
   name: "tx",
+  ownership: "current",
   factory: (ctx) => {
     const tx = {
       commit: async () => {
@@ -145,7 +146,7 @@ if (events.join(",") !== "rollback,release") throw new Error("expected rollback 
 await scope.dispose()
 ```
 
-Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. Resource ownership stays local to the execution context that created it; child executions can read ancestor-owned resources, but they do not release them.
+Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. Boundary-owned resources keep the current behavior: child misses create on the surrounding execution boundary. Current-owned resources create on the current execution boundary and do not cross into a parent explicit boundary. Child executions can read ancestor-owned resources, but they do not release them.
 
 > **`ctx.release(tx)` vs `ctx.close()`**: `ctx.release(tx)` runs only the resource's `ctx.cleanup` handlers (owner-local reset for mid-request recycle), but `onClose` handlers registered by that resource still fire when `ctx.close()` is eventually called. Do not follow `ctx.release(tx)` with `ctx.close()` if the resource registered an `onClose` side effect (e.g., commit) — the released resource will be committed again. Use `ctx.release` only when you need a fresh resource instance within the same open context and the `onClose` side effect is safe to run regardless.
 

@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { tag, tags } from '@pumped-fn/lite'
-import { atom, createScope, flow, preset, resource, ExecutionContextProvider, ScopeProvider, useScope, useAtom, useSelect, useController, useResource } from '../src'
+import { atom, createScope, flow, preset, resource, scopedValue, ExecutionContextProvider, ScopeProvider, useScope, useExecutionContext, useAtom, useSelect, useController, useResource, useScopedValue } from '../src'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -320,6 +320,162 @@ describe('ExecutionContextProvider + useResource', () => {
     })
     expect(closed).toEqual(['acme'])
 
+    await scope.dispose()
+  })
+
+  it('nests managed execution contexts under the nearest execution provider', async () => {
+    const workspace = tag<string>({ label: 'managed-workspace' })
+    const board = tag<string>({ label: 'managed-board' })
+    const closes: string[] = []
+    let creates = 0
+    let outerCtx: Lite.ExecutionContext | null = null
+    let innerCtx: Lite.ExecutionContext | null = null
+    let outerValue: { id: number } | undefined
+    let innerValue: { id: number } | undefined
+    let outerDraft: unknown
+    let innerDraft: unknown
+    const scope = createScope()
+    const workspaceResource = resource({
+      name: 'managed-workspace-resource',
+      deps: { workspace: tags.required(workspace) },
+      factory: (ctx, { workspace }) => {
+        const id = ++creates
+        ctx.cleanup(() => {
+          closes.push(`workspace:${workspace}:${id}`)
+        })
+        return { id }
+      },
+    })
+    const cardDraft = scopedValue({
+      name: 'managed-card-draft',
+      initial: (ctx) => ({ title: ctx.data.seekTag(board) ?? 'outer' }),
+      onClose: (helpers, _deps, result) => {
+        closes.push(`draft:${helpers.get().title}:${result.ok}`)
+      },
+    })
+
+    function Outer() {
+      outerCtx = useExecutionContext()
+      const load = useResource(workspaceResource, { suspense: false })
+      const draft = useScopedValue(cardDraft, { suspense: false })
+      if (load.status === 'ready') outerValue = load.data
+      if (draft.status === 'ready') outerDraft = draft.data
+      return (
+        <ExecutionContextProvider tags={[board('b1')]}>
+          <Inner />
+        </ExecutionContextProvider>
+      )
+    }
+
+    function Inner() {
+      innerCtx = useExecutionContext()
+      const load = useResource(workspaceResource, { suspense: false })
+      const draft = useScopedValue(cardDraft, { suspense: false })
+      if (load.status === 'ready') innerValue = load.data
+      if (draft.status === 'ready') innerDraft = draft.data
+      return (
+        <div>
+          workspace:{innerCtx.data.seekTag(workspace) ?? 'none'};board:{innerCtx.data.seekTag(board) ?? 'none'};
+          resource:{load.status === 'ready' ? load.data.id : 'none'};draft:{draft.status}
+        </div>
+      )
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[workspace('w1')]}>
+          <Outer />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/workspace:w1;board:b1;\s*resource:1;draft:ready/)).toBeInTheDocument()
+    })
+
+    const capturedOuter = outerCtx as unknown as Lite.ExecutionContext
+    const capturedInner = innerCtx as unknown as Lite.ExecutionContext
+    expect(capturedInner.parent).toBe(capturedOuter)
+    expect(capturedOuter.data.seekTag(board)).toBeUndefined()
+    expect(innerValue).toBe(outerValue)
+    expect(creates).toBe(1)
+    expect(innerDraft).not.toBe(outerDraft)
+
+    await act(async () => {
+      view.rerender(
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[workspace('w1')]}>
+            <div>outer only</div>
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+      await Promise.resolve()
+    })
+
+    expect(closes).toEqual(['draft:b1:true'])
+
+    await act(async () => {
+      view.unmount()
+      await Promise.resolve()
+    })
+    expect(closes).toEqual(['draft:b1:true', 'draft:outer:true', 'workspace:w1:1'])
+
+    await scope.dispose()
+  })
+
+  it('keeps parent managed contexts alive for child-started boundary work before commit', async () => {
+    const scope = createScope()
+    const cleanups: string[] = []
+    let started = false
+    let resume!: () => void
+    const slowResource = resource({
+      name: 'nested-managed-boundary-resource',
+      factory: async (ctx) => {
+        started = true
+        ctx.cleanup(() => {
+          cleanups.push('resource')
+        })
+        await new Promise<void>((resolve) => {
+          resume = resolve
+        })
+        return 'nested-ready'
+      },
+    })
+
+    function TestComponent() {
+      const value = useResource(slowResource)
+      return <div>{value}</div>
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading nested managed...</div>}>
+          <ExecutionContextProvider>
+            <ExecutionContextProvider>
+              <TestComponent />
+            </ExecutionContextProvider>
+          </ExecutionContextProvider>
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(started).toBe(true)
+      expect(screen.getByText('Loading nested managed...')).toBeInTheDocument()
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(cleanups).toEqual([])
+
+    await act(async () => {
+      view.unmount()
+      resume()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(cleanups).toEqual(['resource'])
+    })
     await scope.dispose()
   })
 

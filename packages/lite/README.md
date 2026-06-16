@@ -34,11 +34,14 @@ Public examples with strong architectural claims should include structural guard
 
 Use `resource()` for values that belong to one `ExecutionContext`: request loggers, transactions, trace spans, per-request clients. The value is cached on the context that owns the miss, can be read by child executions through upward lookup, and is reset with `ctx.release(resource)` or `ctx.close()`.
 
+Resource `ownership` controls which execution context owns a miss. `ownership: "boundary"` is the default: a child execution reuses the nearest boundary-owned value or creates the value on that boundary. Use it for per-request clients and loggers shared by work inside the same request boundary. `ownership: "current"` creates the value on the current execution boundary; `ctx.exec()` children can reuse it, while sibling executions and nested explicit context boundaries get their own instance. Use it for transactions, trace spans, or action-scoped state.
+
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
 
 const auditLogger = resource({
   name: "audit-logger",
+  ownership: "boundary",
   factory: (ctx) => {
     const lines: string[] = []
     ctx.cleanup(() => {
@@ -50,6 +53,21 @@ const auditLogger = resource({
       },
       snapshot: () => [...lines],
     }
+  },
+})
+
+const tx = resource({
+  name: "tx",
+  ownership: "current",
+  factory: (ctx) => {
+    const tx = {
+      commit() {},
+      rollback() {},
+      release() {},
+    }
+    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
+    ctx.cleanup(() => tx.release())
+    return tx
   },
 })
 
@@ -199,9 +217,9 @@ sequenceDiagram
     %% ── Resource (execution‑scoped) ──
     rect rgb(245, 240, 255)
         Note over App,Ctrl: Resource (per‑execution middleware)
-        Note right of Scope: reusable factory resolved fresh per execution chain — logger, transaction, trace span
+        Note right of Scope: reusable factory resolved by execution-context ownership — logger, transaction, trace span
 
-        App->>App: resource({ deps, factory })
+        App->>App: resource({ deps, factory, ownership? })
         App-->>App: Resource definition (inert)
 
         Note right of Child: during dep resolution in ctx.exec():
@@ -210,9 +228,9 @@ sequenceDiagram
             Child->>Child: reuse instance from parent ✓
         else cache miss
             Child->>Ext: wrapResolve(next, { kind: "resource", target, ctx })
-            Ext->>Child: next() → factory(parentCtx, deps)
-            Note right of Child: parentCtx.onClose(result) → cleanup registered
-            Child-->>Ext: instance stored on parent context
+            Ext->>Child: next() → factory(ownerCtx, deps)
+            Note right of Child: ownerCtx chosen by boundary/current ownership
+            Child-->>Ext: instance stored on owner context
         end
     end
 

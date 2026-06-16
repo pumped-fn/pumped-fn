@@ -101,7 +101,7 @@ sequenceDiagram
 </ScopeProvider>
 ```
 
-Use explicit `ctx` for tests and request boundaries. Omit `ctx` only when you want managed mode from the surrounding `ScopeProvider`; managed mode creates the execution context after commit and closes it on unmount.
+Use explicit `ctx` for tests and request boundaries. Omit `ctx` only when you want managed mode from the surrounding `ScopeProvider`; managed mode creates the execution context for the provider, inherits the nearest execution context in the same scope, and closes it on unmount.
 
 `useResource(resource, { suspense: false })` returns a load union, not an atom-style controller state:
 
@@ -121,7 +121,7 @@ Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on
 
 ## Scoped Form State
 
-`scopedValue` is the form/draft primitive. Define dependencies and actions with the value, then let React subscribe at the boundary.
+`scopedValue` is the form/draft primitive. It is backed by a current-owned resource, so nested provider forms reset with their owning execution context instead of leaking into the parent boundary. Define dependencies and actions with the value, then let React subscribe at the boundary.
 Complete React modules should show the provider boundary too: `ScopeProvider` owns the scope, and `ExecutionContextProvider` owns the execution context where the scoped value lives.
 
 ```tsx

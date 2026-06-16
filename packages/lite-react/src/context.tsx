@@ -13,6 +13,7 @@ const ExecutionContextContext = createContext<Lite.ExecutionContext | null>(null
 
 type ManagedEntry = {
   ctx: Lite.ExecutionContext
+  parent: Lite.ExecutionContext | undefined
   tags: Lite.Tagged<any>[] | undefined
   commits: number
   closed: boolean
@@ -20,6 +21,8 @@ type ManagedEntry = {
 }
 
 const managedContexts = new WeakMap<Lite.Scope, Map<string, ManagedEntry>>()
+const managedParentIds = new WeakMap<Lite.ExecutionContext, number>()
+let nextManagedParentId = 1
 
 const ORPHAN_GRACE_MS = 50
 
@@ -30,6 +33,16 @@ function managedMapFor(scope: Lite.Scope): Map<string, ManagedEntry> {
     managedContexts.set(scope, map)
   }
   return map
+}
+
+function managedParentKey(parent: Lite.ExecutionContext | undefined): string {
+  if (!parent) return 'root'
+  let key = managedParentIds.get(parent)
+  if (!key) {
+    key = nextManagedParentId++
+    managedParentIds.set(parent, key)
+  }
+  return String(key)
 }
 
 function sameTags(a: Lite.Tagged<any>[] | undefined, b: Lite.Tagged<any>[] | undefined): boolean {
@@ -110,9 +123,12 @@ function ScopeProvider({ scope, children }: ScopeProviderProps) {
 
 function ExecutionContextProvider({ children, ...props }: ExecutionContextProviderProps) {
   const scope = useContext(ScopeContext)
+  const inheritedCtx = useContext(ExecutionContextContext)
   const id = useId()
   const explicitCtx = 'ctx' in props && props.ctx ? props.ctx : undefined
   const tags = explicitCtx ? undefined : props.tags
+  const parent = !explicitCtx && inheritedCtx?.scope === scope ? inheritedCtx : undefined
+  const entryId = !explicitCtx ? `${id}:${managedParentKey(parent)}` : id
 
   if (!explicitCtx && !scope) {
     throw new Error("ExecutionContextProvider managed mode requires a ScopeProvider")
@@ -126,20 +142,21 @@ function ExecutionContextProvider({ children, ...props }: ExecutionContextProvid
   let map: Map<string, ManagedEntry> | null = null
   if (!explicitCtx && scope) {
     map = managedMapFor(scope)
-    const existing = map.get(id)
-    if (existing && !existing.closed && sameTags(existing.tags, tags)) {
+    const existing = map.get(entryId)
+    if (existing && !existing.closed && existing.parent === parent && sameTags(existing.tags, tags)) {
       entry = existing
     } else {
       entry = {
-        ctx: scope.createContext({ tags }),
+        ctx: scope.createContext({ parent, tags }),
+        parent,
         tags,
         commits: 0,
         closed: false,
         orphanTimer: null,
       }
-      map.set(id, entry)
+      map.set(entryId, entry)
     }
-    if (entry.commits === 0) scheduleOrphanCheck(map, id, entry)
+    if (entry.commits === 0) scheduleOrphanCheck(map, entryId, entry)
   }
 
   useEffect(() => {
@@ -158,10 +175,10 @@ function ExecutionContextProvider({ children, ...props }: ExecutionContextProvid
       // Deferred so StrictMode's mount→cleanup→mount cycle can re-commit
       // before the context is closed.
       queueMicrotask(() => {
-        if (currentEntry.commits === 0) closeEntry(currentMap, id, currentEntry)
+        if (currentEntry.commits === 0) closeEntry(currentMap, entryId, currentEntry)
       })
     }
-  }, [entry, map, id])
+  }, [entry, map, entryId])
 
   const ctx = explicitCtx ?? entry?.ctx ?? null
   if (!ctx) return null

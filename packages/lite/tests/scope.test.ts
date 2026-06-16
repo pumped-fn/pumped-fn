@@ -674,16 +674,56 @@ describe("ExecutionContext", () => {
       })
 
       await expect(contextOnlyCtx.resolve(taggedAtom)).rejects.toThrow('Tag "ctx-resolve-request" not found')
-      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags }")
+      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags, parent }")
       expect(() => scope.createContext({ tag: [requestTag("typo")] } as never))
-        .toThrow('createContext() expects { tags }; received "tag"')
+        .toThrow('createContext() expects { tags, parent }; received "tag"')
       expect(() => scope.createContext({ tags: requestTag("bad") } as never))
-        .toThrow("createContext() expects { tags }")
+        .toThrow("createContext() expects { tags, parent }")
 
       await ctx.close()
       await contextOnlyCtx.close()
       await scope.dispose()
       await contextOnlyScope.dispose()
+    })
+
+    it("creates child contexts that inherit parent data and stay same-scope", async () => {
+      const tenant = tag<string>({ label: "ctx-parent-tenant" })
+      const role = tag<string>({ label: "ctx-parent-role" })
+      const region = tag<string>({ label: "ctx-parent-region" })
+      const readRoles = flow({
+        name: "read-parented-context-roles",
+        deps: { roles: tags.all(role) },
+        factory: (_ctx, { roles }) => roles,
+      })
+
+      const scope = createScope({
+        tags: [tenant("scope"), region("global")],
+      })
+      const parent = scope.createContext({
+        tags: [tenant("workspace"), role("parent")],
+      })
+      const child = scope.createContext({
+        parent,
+        tags: [role("child")],
+      })
+      const otherScope = createScope()
+      const otherParent = otherScope.createContext()
+
+      expect(child.parent).toBe(parent)
+      expect(child.data.seekTag(tenant)).toBe("workspace")
+      expect(child.data.seekTag(region)).toBe("global")
+      expect(child.data.seekTag(role)).toBe("child")
+      expect(parent.data.seekTag(role)).toBe("parent")
+      expect(await child.exec({ flow: readRoles })).toEqual(["child", "parent"])
+      expect(() => scope.createContext({ parent: otherParent })).toThrow("same scope")
+      expect(() => scope.createContext({ parent: null } as never)).toThrow("ExecutionContext")
+
+      await child.close()
+      await parent.close()
+      expect(() => scope.createContext({ parent })).toThrow("ExecutionContext is closed")
+      await otherParent.close()
+      await scope.dispose()
+      await otherScope.dispose()
     })
 
     it("rejects ctx.resolve() on closed contexts before resolving atoms or resources", async () => {
@@ -1104,6 +1144,151 @@ describe("ExecutionContext", () => {
 
       expect(childValue).toEqual({ request: "parent" })
       expect(parentValue).toBe(childValue)
+
+      await parentCtx.close()
+      await scope.dispose()
+    })
+
+    it("stores current-owned resource misses on the current execution context", async () => {
+      let creates = 0
+      const cleanups: string[] = []
+      const tx = resource({
+        name: "current-owned-tx",
+        ownership: "current",
+        factory: (ctx) => {
+          const id = ++creates
+          ctx.cleanup(() => {
+            cleanups.push(`${ctx.name}:${id}`)
+          })
+          return { id }
+        },
+      })
+      const readTx = flow({
+        name: "read-current-owned-tx",
+        factory: (ctx) => ctx.resolve(tx),
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext()
+
+      expect(await parentCtx.exec({ flow: readTx, name: "first" })).toEqual({ id: 1 })
+      expect(cleanups).toEqual(["first:1"])
+      expect(parentCtx.controller(tx).state).toBe("idle")
+
+      expect(await parentCtx.exec({ flow: readTx, name: "second" })).toEqual({ id: 2 })
+      expect(cleanups).toEqual(["first:1", "second:2"])
+      expect(creates).toBe(2)
+
+      await parentCtx.close()
+      await scope.dispose()
+    })
+
+    it("shares current-owned resources with nested executions only", async () => {
+      let creates = 0
+      const tx = resource({
+        name: "nested-current-owned-tx",
+        ownership: "current",
+        factory: () => ({ id: ++creates }),
+      })
+      const inner = flow({
+        name: "inner-current-owned-tx",
+        deps: { tx },
+        factory: (_ctx, { tx }) => tx.id,
+      })
+      const outer = flow({
+        name: "outer-current-owned-tx",
+        deps: { tx },
+        factory: async (ctx, { tx }) => [tx.id, await ctx.exec({ flow: inner })],
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext()
+
+      expect(await parentCtx.exec({ flow: outer })).toEqual([1, 1])
+      expect(await parentCtx.exec({ flow: outer })).toEqual([2, 2])
+      expect(creates).toBe(2)
+
+      await parentCtx.close()
+      await scope.dispose()
+    })
+
+    it("does not share current-owned resources across explicit context boundaries", async () => {
+      let creates = 0
+      const tx = resource({
+        name: "boundary-local-current-owned-tx",
+        ownership: "current",
+        factory: () => ({ id: ++creates }),
+      })
+      const readTx = flow({
+        name: "read-boundary-local-current-owned-tx",
+        deps: { tx },
+        factory: (_ctx, { tx }) => tx.id,
+      })
+
+      const scope = createScope()
+      const parent = scope.createContext()
+      const child = scope.createContext({ parent })
+
+      expect(await parent.resolve(tx)).toEqual({ id: 1 })
+      expect(await child.resolve(tx)).toEqual({ id: 2 })
+      expect(await child.exec({ flow: readTx })).toBe(2)
+      expect(creates).toBe(2)
+
+      await child.close()
+      await parent.close()
+      await scope.dispose()
+    })
+
+    it("rejects boundary-owned resource misses when the parent owner is closed", async () => {
+      let creates = 0
+      const sharedResource = resource({
+        name: "closed-parent-boundary-resource",
+        factory: () => {
+          creates++
+          return "shared"
+        },
+      })
+
+      const scope = createScope()
+      const parent = scope.createContext()
+      const child = scope.createContext({ parent })
+
+      await parent.close()
+
+      await expect(child.resolve(sharedResource)).rejects.toThrow("ExecutionContext is closed")
+      expect(creates).toBe(0)
+
+      await child.close()
+      await scope.dispose()
+    })
+
+    it("resolves current-owned resource deps from the current context tags", async () => {
+      const requestTag = tag<string>({ label: "current-request" })
+      const taggedResource = resource({
+        name: "current-tagged",
+        ownership: "current",
+        deps: { request: tags.required(requestTag) },
+        factory: (_ctx, { request }) => ({ request }),
+      })
+      const childFlow = flow({
+        name: "child-with-current-tag",
+        factory: (ctx) => ctx.resolve(taggedResource),
+      })
+
+      const scope = createScope()
+      const parentCtx = scope.createContext({
+        tags: [requestTag("parent")],
+      })
+
+      const childValue = await parentCtx.exec({
+        flow: childFlow,
+        tags: [requestTag("child")],
+      })
+      const parentValue = await parentCtx.resolve(taggedResource)
+
+      expect(childValue).toEqual({ request: "child" })
+      expect(parentValue).toEqual({ request: "parent" })
+      expect(parentValue).not.toBe(childValue)
 
       await parentCtx.close()
       await scope.dispose()

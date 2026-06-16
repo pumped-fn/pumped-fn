@@ -14,11 +14,13 @@ const contextTag = tag<string>({ label: "context" })
 const scope = createScope()
 
 scope.createContext({ tags: [contextTag("ok")] })
+const parentCtx = scope.createContext()
+scope.createContext({ parent: parentCtx, tags: [contextTag("child")] })
 
 // @ts-expect-error createContext takes an options object, not bare tags
 scope.createContext([contextTag("legacy")])
 
-// @ts-expect-error createContext options only accept tags
+// @ts-expect-error createContext options only accept tags and parent
 scope.createContext({ tag: [contextTag("typo")] })
 
 atom({
@@ -44,10 +46,22 @@ flow({
 })
 
 resource({
+  ownership: "current",
   deps: {
     source: controller(sourceAtom, { resolve: true }),
   },
   factory: (_ctx, { source }) => source.get(),
+})
+
+resource({
+  ownership: "boundary",
+  factory: () => 1,
+})
+
+resource({
+  // @ts-expect-error ownership only accepts boundary or current
+  ownership: "scope",
+  factory: () => 1,
 })
 
 // @ts-expect-error watch:true requires resolve:true

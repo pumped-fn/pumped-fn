@@ -234,6 +234,7 @@ function expectedNodeInventory(): string[][] {
   return [
     ...nodeTestFiles("capstone/fat/tests").map((file) => ["fat frontend", file, String(testCount(file))]),
     ...nodeTestFiles("capstone/thin/tests").map((file) => ["thin frontend", file, String(testCount(file))]),
+    ...nodeTestFiles("capstone/kanban/tests").map((file) => ["kanban frontend", file, String(testCount(file))]),
   ]
 }
 
@@ -264,6 +265,10 @@ describe("inside-out", () => {
     expect(implemented).toContain("BFF package")
     expect(source).toContain("Fat frontend + BFF")
     expect(source).toContain("Thin frontend + fat BFF")
+    expect(implemented).toContain("Complex Kanban React stress")
+    expect(implemented).toContain("current-owned action audit")
+    expect(implemented).toContain("nested scoped card drafts")
+    expect(implemented).toContain("without Kanban-specific helpers")
     expect(implemented).toContain("authedBffClient")
     expect(rules).toContain("Feature atoms depend on auth-capable ports")
     expect(rules).toContain("do not combine raw HTTP")
@@ -281,6 +286,7 @@ describe("inside-out", () => {
     expect(backlog).toContain("F02-F12 frontend catalog")
     expect(existsSync(resolve(root, "capstone/fat"))).toBe(true)
     expect(existsSync(resolve(root, "capstone/thin"))).toBe(true)
+    expect(existsSync(resolve(root, "capstone/kanban"))).toBe(true)
     expect(existsSync(resolve(root, "capstone/raw"))).toBe(false)
     expect(existsSync(resolve(root, "capstone/fattest"))).toBe(false)
   })
@@ -324,6 +330,26 @@ describe("inside-out", () => {
     expect(thin).toContain("only thin declaration")
     expect(thin).toContain("ExecutionContextProvider")
     expect(thin).not.toContain('preset(bffClient, fake), preset(sessionToken, "tok")')
+  })
+
+  test("K0: Kanban stress slice documents primitive coverage without helper APIs", () => {
+    const source = read("capstone/kanban/README.md")
+
+    expectContainsAll(source, [
+      "Map-backed graph state",
+      "`boardView` derives lane cards",
+      "Tags carry workspace",
+      "`createScope({ presets, tags, extensions })`",
+      "`boardSession` is a boundary-owned resource",
+      "`actionAudit` is a current-owned resource",
+      "`cardDraft` is a scoped value",
+      "nested `ExecutionContextProvider`",
+      "React components observe through `useAtom`, `useSelect`, `useResource`, `useScopedValue`, and",
+      "`useExecutionContext`",
+      "do not create or close contexts manually",
+    ])
+    expect(source).not.toContain("kanbanHelper")
+    expect(source).not.toContain("vi.mock")
   })
 
   test("B4: feature graph nodes use auth-capable clients instead of passing auth state to raw clients", () => {

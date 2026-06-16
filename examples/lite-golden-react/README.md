@@ -39,8 +39,9 @@ pnpm -F @pumped-fn/lite-golden-react typecheck
 |---|---|---|---|
 | F01 | State / derived soup in a component | atoms + derived atom; component observes | IO, OI |
 | F13 | Untested `main.tsx` owning state/root setup | main as composition-root adapter; graph owns state | IO, OI |
+| K | Complex Kanban workspace board | map-backed graph state + resources + scoped drafts; component observes | IO, OI |
 
-(More patterns and the Service Health Dashboard capstone land incrementally.)
+(More patterns and capstone slices land incrementally.)
 
 See [`lite-golden/PATTERNS` pointer](../../packages/lite/PATTERNS.md) and the backend
 [`lite-golden`](../lite-golden) for the shared doctrine.

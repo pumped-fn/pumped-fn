@@ -127,12 +127,14 @@ function scopedValue<
     ? resource({
         name: config.name,
         tags: config.tags,
+        ownership: 'current',
         deps: config.deps,
         factory: (ctx, deps) => createAccess(ctx, deps as Lite.InferDeps<Deps>),
       })
     : resource({
         name: config.name,
         tags: config.tags,
+        ownership: 'current',
         factory: (ctx) => createAccess(ctx, {} as Lite.InferDeps<Deps>),
   })
 
