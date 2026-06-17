@@ -5,7 +5,7 @@ import { clock } from "../src/infra/clock"
 import type { ClockPort } from "../src/ports"
 import { registerService } from "../src/registry"
 import { scheduler } from "../src/scheduler"
-import { exec, FakeClock } from "./fakes"
+import { FakeClock } from "./fakes"
 
 describe("effect-managed", () => {
   test("E-SC7: dispose tears down LIFO, clears timers, and waits for the in-flight check", async () => {
@@ -51,18 +51,24 @@ describe("effect-managed", () => {
     })
 
     await scope.resolve(scheduler)
-    const service = await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "high",
+    const ctx = scope.createContext()
+    const service = await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "high",
+      },
     })
+    await scope.flush()
 
     await fakeClock.advance(60_000)
     await executorStarted
     expect((await scope.resolve(scheduler)).pending()).toBe(1)
+    await ctx.close()
     const dispose = scope.dispose()
     await Promise.resolve()
     expect(fakeClock.liveTimers()).toBe(0)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { createScope, flow, preset, type Lite } from "@pumped-fn/lite"
+import { createScope, flow, preset } from "@pumped-fn/lite"
 import {
   actionAudit,
   activeProjectId,
@@ -19,16 +19,11 @@ import {
   type BoardSession,
 } from "../src/board"
 
-function kanbanScope(options?: { extensions?: Lite.Extension[] }) {
-  return createScope({
-    tags: [workspaceId("acme"), activeProjectId("p-web")],
-    extensions: options?.extensions,
-  })
-}
-
 describe("inside-out", () => {
   test("K1: board view derives lanes, blockers, workload, and warnings from map-backed state", async () => {
-    const scope = kanbanScope()
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
 
     const view = await scope.resolve(boardView)
 
@@ -76,7 +71,8 @@ describe("inside-out", () => {
 
   test("K2: moveCard uses current-owned audit across nested exec children", async () => {
     const executions: string[] = []
-    const scope = kanbanScope({
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
       extensions: [
         {
           name: "kanban-trace",
@@ -104,7 +100,9 @@ describe("inside-out", () => {
   })
 
   test("K3: moveCard reorders cards inside the active lane without losing membership", async () => {
-    const scope = kanbanScope()
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const ctx = scope.createContext({ tags: [actorId("u2")] })
 
     await ctx.exec({ flow: moveCard, input: { cardId: "c-perf", toLaneId: "doing", toIndex: 0 } })
@@ -137,11 +135,20 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("K5: scoped card drafts are isolated by nested explicit execution boundary", async () => {
-    const scope = kanbanScope()
+  test("K5: editing-card boundary tags compare recreated object values by card id", () => {
+    expect(editingCardId.same(editingCardId({ cardId: "c-login" }), editingCardId({ cardId: "c-login" })))
+      .toBe(true)
+    expect(editingCardId.same(editingCardId({ cardId: "c-login" }), editingCardId({ cardId: "c-api" })))
+      .toBe(false)
+  })
+
+  test("K6: scoped card drafts are isolated by nested explicit execution boundary", async () => {
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const root = scope.createContext({ tags: [actorId("u2")] })
-    const first = scope.createContext({ parent: root, tags: [editingCardId("c-login")] })
-    const second = scope.createContext({ parent: root, tags: [editingCardId("c-api")] })
+    const first = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "c-login" })] })
+    const second = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "c-api" })] })
 
     const firstDraft = await first.resolve(cardDraft)
     const secondDraft = await second.resolve(cardDraft)
@@ -171,10 +178,12 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("K6: failed draft save rolls back through the action resource", async () => {
-    const scope = kanbanScope()
+  test("K7: failed draft save rolls back through the action resource", async () => {
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const root = scope.createContext({ tags: [actorId("u2")] })
-    const card = scope.createContext({ parent: root, tags: [editingCardId("c-login")] })
+    const card = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "c-login" })] })
     const draft = await card.resolve(cardDraft)
     draft.actions.setTitle(" ")
 
@@ -196,10 +205,12 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("K7: graph actions stay inside the active project boundary", async () => {
-    const scope = kanbanScope()
+  test("K8: graph actions stay inside the active project boundary", async () => {
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const root = scope.createContext({ tags: [actorId("u2")] })
-    const mobileCard = scope.createContext({ parent: root, tags: [editingCardId("m-shell")] })
+    const mobileCard = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "m-shell" })] })
 
     await expect(root.exec({ flow: moveCard, input: { cardId: "m-shell", toLaneId: "done", toIndex: 0 } }))
       .rejects.toThrow("card m-shell is not in active project p-web")
@@ -210,10 +221,12 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("K8: draft saves validate referenced reviewer data before mutating board state", async () => {
-    const scope = kanbanScope()
+  test("K9: draft saves validate referenced reviewer data before mutating board state", async () => {
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const root = scope.createContext({ tags: [actorId("u2")] })
-    const card = scope.createContext({ parent: root, tags: [editingCardId("c-login")] })
+    const card = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "c-login" })] })
     const draft = await card.resolve(cardDraft)
 
     draft.actions.setReviewerId("missing")
@@ -227,7 +240,7 @@ describe("inside-out", () => {
     await scope.dispose()
   })
 
-  test("K9: invalid graph actions fail through the same execution seam", async () => {
+  test("K10: invalid graph actions fail through the same execution seam", async () => {
     const stringFailure = flow({
       name: "kanban.stringFailure",
       deps: { audit: actionAudit },
@@ -236,7 +249,9 @@ describe("inside-out", () => {
         throw "non-error failure"
       },
     })
-    const scope = kanbanScope()
+    const scope = createScope({
+      tags: [workspaceId("acme"), activeProjectId("p-web")],
+    })
     const root = scope.createContext({ tags: [actorId("u2")] })
 
     await expect(root.exec({ flow: moveCard, input: { cardId: "missing", toLaneId: "done", toIndex: 0 } }))
@@ -246,11 +261,11 @@ describe("inside-out", () => {
     await expect(root.exec({ flow: summarizeCard, input: { cardId: "missing" } }))
       .rejects.toThrow("card missing not found")
 
-    const missingDraft = scope.createContext({ parent: root, tags: [editingCardId("missing")] })
+    const missingDraft = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "missing" })] })
     await expect(missingDraft.resolve(cardDraft)).rejects.toThrow("card missing not found")
     await missingDraft.close()
 
-    const card = scope.createContext({ parent: root, tags: [editingCardId("c-login")] })
+    const card = scope.createContext({ parent: root, tags: [editingCardId({ cardId: "c-login" })] })
     await card.resolve(cardDraft)
     const stateControl = await scope.controller(boardState, { resolve: true })
 

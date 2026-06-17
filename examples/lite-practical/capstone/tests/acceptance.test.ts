@@ -8,26 +8,31 @@ import { observability } from "../src/extensions/observability"
 import type { ObservabilityRecord } from "../src/extensions/observability"
 import { activeIncidentCount } from "../src/metrics"
 import { listServices, registerService, updateService, deregisterService, getService } from "../src/registry"
-import { exec, FakeClock } from "./fakes"
+import { FakeClock } from "./fakes"
 
 describe("outside-in", () => {
   test("OI-SC1: register 100 services via api flow; list shows 100 with status", async () => {
     const scope = createScope()
+    const ctx = scope.createContext()
 
     for (let i = 0; i < 100; i++) {
-      await exec(scope, registerService, {
-        name: `service-${i}`,
-        type: "http",
-        endpoint: `https://service-${i}.test`,
-        checkInterval: 60,
-        timeout: 1000,
-        criticality: "medium",
+      await ctx.exec({
+        flow: registerService,
+        input: {
+          name: `service-${i}`,
+          type: "http",
+          endpoint: `https://service-${i}.test`,
+          checkInterval: 60,
+          timeout: 1000,
+          criticality: "medium",
+        },
       })
     }
 
-    const services = await exec(scope, listServices, undefined)
+    const services = await ctx.exec({ flow: listServices })
     expect(services).toHaveLength(100)
     expect(services.every((service) => service.status === "unknown")).toBe(true)
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -46,8 +51,10 @@ describe("outside-in", () => {
     await ctx.close({ ok: true })
     await scope.flush()
 
-    const updated = await exec(scope, updateService, { id: raw.id, patch: { criticality: "critical" } })
+    const updateCtx = scope.createContext()
+    const updated = await updateCtx.exec({ flow: updateService, input: { id: raw.id, patch: { criticality: "critical" } } })
     expect(updated.criticality).toBe("critical")
+    await updateCtx.close()
 
     const uptimeCtx = scope.createContext()
     const { uptime } = await import("../src/metrics")
@@ -55,7 +62,9 @@ describe("outside-in", () => {
     await uptimeCtx.close({ ok: true })
     await scope.flush()
 
-    expect(await exec(scope, deregisterService, { id: raw.id })).toBe(true)
+    const deregisterCtx = scope.createContext()
+    expect(await deregisterCtx.exec({ flow: deregisterService, input: { id: raw.id } })).toBe(true)
+    await deregisterCtx.close()
 
     const badCtx = scope.createContext()
     await expect(badCtx.exec({
@@ -82,27 +91,38 @@ describe("outside-in", () => {
         }),
       ],
     })
-    const service = await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "high",
+    const registerCtx = scope.createContext()
+    const service = await registerCtx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "high",
+      },
     })
+    await registerCtx.close()
+    await scope.flush()
     await fakeClock.advance(1_000)
-    await exec(scope, runCheck, { serviceId: service.id })
+    const checkCtx = scope.createContext()
+    await checkCtx.exec({ flow: runCheck, input: { serviceId: service.id } })
+    await checkCtx.close()
+    await scope.flush()
 
+    const readCtx = scope.createContext()
     const { healthHistory, currentHealth } = await import("../src/checker")
     const { serviceIncidents } = await import("../src/incidents")
-    const detail = await exec(scope, getService, { id: service.id })
+    const detail = await readCtx.exec({ flow: getService, input: { id: service.id } })
     expect(detail.service.id).toBe(service.id)
     expect(detail.recentChecks).toHaveLength(1)
-    expect(await exec(scope, currentHealth, { serviceId: service.id })).toBe("unhealthy")
-    expect(await exec(scope, healthHistory, { serviceId: service.id, from: 0, to: fakeClock.now() })).toHaveLength(1)
-    expect(await exec(scope, serviceIncidents, { serviceId: service.id })).toEqual([
+    expect(await readCtx.exec({ flow: currentHealth, input: { serviceId: service.id } })).toBe("unhealthy")
+    expect(await readCtx.exec({ flow: healthHistory, input: { serviceId: service.id, from: 0, to: fakeClock.now() } })).toHaveLength(1)
+    expect(await readCtx.exec({ flow: serviceIncidents, input: { serviceId: service.id } })).toEqual([
       expect.objectContaining({ serviceId: service.id, recoveredAt: null }),
     ])
+    await readCtx.close()
     await scope.dispose()
   })
 
@@ -115,16 +135,20 @@ describe("outside-in", () => {
       nextRequestId: () => `req-${++nextId}`,
     })
     const scope = createScope({ extensions: [extension], presets: [preset(clock, fakeClock)] })
+    const ctx = scope.createContext()
 
-    const service = await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "medium",
+    const service = await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "medium",
+      },
     })
-    await exec(scope, runCheck, { serviceId: service.id })
+    await ctx.exec({ flow: runCheck, input: { serviceId: service.id } })
 
     const execs = records.filter((record) => record.kind === "exec")
     expect(execs.map((record) => [record.name, record.requestId])).toEqual([
@@ -132,6 +156,7 @@ describe("outside-in", () => {
       ["detect-transition", "req-2"],
       ["run-check", "req-2"],
     ])
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -149,19 +174,26 @@ describe("outside-in", () => {
     })
 
     await scope.resolve(scheduler)
-    const service = await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "critical",
+    const ctx = scope.createContext()
+    const service = await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "critical",
+      },
     })
+    await scope.flush()
 
     await fakeClock.advance(60_000)
-    expect(await exec(scope, activeIncidents, undefined)).toEqual([
+    await scope.flush()
+    expect(await ctx.exec({ flow: activeIncidents })).toEqual([
       expect.objectContaining({ serviceId: service.id, recoveredAt: null }),
     ])
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -182,19 +214,26 @@ describe("outside-in", () => {
     })
 
     await scope.resolve(scheduler)
-    await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "high",
+    const ctx = scope.createContext()
+    await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "high",
+      },
     })
+    await scope.flush()
     await fakeClock.advance(60_000)
+    await scope.flush()
 
     const execs = records.filter((record) => record.kind === "exec")
     expect(execs.map((record) => record.name)).toEqual(["register-service", "detect-transition", "run-check"])
     expect(execs.every((record) => record.durationMs >= 0 && record.ok)).toBe(true)
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -206,12 +245,14 @@ describe("outside-in", () => {
       extensions: [extension],
       presets: [preset(clock, fakeClock)],
     })
+    const ctx = scope.createContext()
 
-    await expect(exec(scope, runCheck, { serviceId: "missing" })).rejects.toThrow("service not found: missing")
+    await expect(ctx.exec({ flow: runCheck, input: { serviceId: "missing" } })).rejects.toThrow("service not found: missing")
 
     expect(records.filter((record) => record.kind === "exec")).toEqual([
       expect.objectContaining({ name: "run-check", ok: false }),
     ])
+    await ctx.close()
     await scope.dispose()
   })
 })

@@ -4,7 +4,7 @@ import { checkExecutors } from "../src/checker"
 import { clock } from "../src/infra/clock"
 import { registerService } from "../src/registry"
 import { scheduler } from "../src/scheduler"
-import { exec, FakeClock } from "./fakes"
+import { FakeClock } from "./fakes"
 
 describe("effect-managed", () => {
   test("E-SC2: fake clock 1h gives exact per-service tick count without drift", async () => {
@@ -25,24 +25,37 @@ describe("effect-managed", () => {
     })
 
     await scope.resolve(scheduler)
-    const fast = await exec(scope, registerService, {
-      name: "fast",
-      type: "http",
-      endpoint: "https://fast.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "medium",
+    const fastCtx = scope.createContext()
+    const fast = await fastCtx.exec({
+      flow: registerService,
+      input: {
+        name: "fast",
+        type: "http",
+        endpoint: "https://fast.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "medium",
+      },
     })
-    const slow = await exec(scope, registerService, {
-      name: "slow",
-      type: "http",
-      endpoint: "https://slow.test",
-      checkInterval: 300,
-      timeout: 1000,
-      criticality: "medium",
+    await fastCtx.close()
+    await scope.flush()
+    const slowCtx = scope.createContext()
+    const slow = await slowCtx.exec({
+      flow: registerService,
+      input: {
+        name: "slow",
+        type: "http",
+        endpoint: "https://slow.test",
+        checkInterval: 300,
+        timeout: 1000,
+        criticality: "medium",
+      },
     })
+    await slowCtx.close()
+    await scope.flush()
 
     await fakeClock.advance(3_600_000)
+    await scope.flush()
     expect(counts.get(fast.id)).toBe(60)
     expect(counts.get(slow.id)).toBe(12)
     expect((await scope.resolve(scheduler)).pending()).toBe(0)
@@ -65,17 +78,24 @@ describe("effect-managed", () => {
     })
 
     await scope.resolve(scheduler)
-    await exec(scope, registerService, {
-      name: "failing",
-      type: "http",
-      endpoint: "https://failing.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "medium",
+    const ctx = scope.createContext()
+    await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "failing",
+        type: "http",
+        endpoint: "https://failing.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "medium",
+      },
     })
+    await scope.flush()
 
     await fakeClock.advance(60_000)
+    await scope.flush()
     expect((await scope.resolve(scheduler)).pending()).toBe(0)
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -85,16 +105,22 @@ describe("effect-managed", () => {
 
     await scope.resolve(scheduler)
     expect(fakeClock.createdTimers()).toBe(0)
-    await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "medium",
+    const ctx = scope.createContext()
+    await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "medium",
+      },
     })
+    await scope.flush()
 
     expect(fakeClock.createdTimers()).toBe(1)
+    await ctx.close()
     await scope.dispose()
   })
 })

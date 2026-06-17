@@ -272,7 +272,9 @@ export namespace Lite {
     readonly defaultValue: HasDefault extends true ? T : undefined
     readonly hasDefault: HasDefault
     readonly parse?: (raw: unknown) => T
+    eq(a: T, b: T): boolean
     (value: T): Tagged<T>
+    same(a: Tagged<any>, b: Tagged<any>): boolean
     get(source: TagSource): T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
     collect(source: TagSource): T[]

@@ -114,7 +114,10 @@ export interface BoardView {
 export const workspaceId = tag<string>({ label: "kanban.workspace" })
 export const activeProjectId = tag<string>({ label: "kanban.project" })
 export const actorId = tag<string>({ label: "kanban.actor" })
-export const editingCardId = tag<string>({ label: "kanban.editingCard" })
+export const editingCardId = tag<{ cardId: string }>({
+  label: "kanban.editingCard",
+  eq: (a, b) => a.cardId === b.cardId,
+})
 
 const laneTitles: Record<LaneId, string> = {
   backlog: "Backlog",
@@ -273,7 +276,7 @@ export const actionAudit = resource({
         return
       }
       const detail = result.error instanceof Error ? result.error.message : "action failed"
-      const cardId = ctx.data.seekTag(editingCardId) ?? "board"
+      const cardId = ctx.data.seekTag(editingCardId)?.cardId ?? "board"
       audit.update((current) => [...current, { type: "rollback", workspaceId: workspace, actorId: actor, cardId, detail }])
     })
     return {
@@ -471,10 +474,11 @@ export const cardDraft = scopedValue({
   name: "kanban.cardDraft",
   deps: {
     state: controller(boardState, { resolve: true }),
-    cardId: tags.required(editingCardId),
+    editing: tags.required(editingCardId),
     projectId: tags.required(activeProjectId),
   },
-  initial: (_ctx, { state, cardId, projectId }) => {
+  initial: (_ctx, { state, editing, projectId }) => {
+    const { cardId } = editing
     const card = state.get().cards.get(cardId)
     if (!card) throw new Error(`card ${cardId} not found`)
     if (card.projectId !== projectId) throw new Error(`card ${cardId} is not in active project ${projectId}`)
@@ -493,11 +497,12 @@ export const saveCardDraft = flow({
     state: controller(boardState, { resolve: true }),
     audit: actionAudit,
     draft: cardDraft,
-    cardId: tags.required(editingCardId),
+    editing: tags.required(editingCardId),
     actor: tags.required(actorId),
     projectId: tags.required(activeProjectId),
   },
-  factory: (_ctx, { state, audit, draft, cardId, actor, projectId }) => {
+  factory: (_ctx, { state, audit, draft, editing, actor, projectId }) => {
+    const { cardId } = editing
     const snapshot = draft.get()
     const title = snapshot.title.trim()
     if (title.length === 0) throw new Error("card title is required")

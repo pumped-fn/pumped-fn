@@ -5,7 +5,9 @@ public primitives directly:
 
 - Map-backed graph state holds projects, users, cards, and per-project lane arrays.
 - `boardView` derives lane cards, blocked status, WIP warnings, workload pressure, and recent audit output.
-- Tags carry workspace, active project, actor, and nested editing-card identity.
+- Tags carry workspace, active project, actor, and nested editing-card identity; the editing-card tag is
+  object-valued with `eq` so recreated provider tag values keep the same editor boundary when the card id is
+  unchanged.
 - Tests use `createScope({ presets, tags, extensions })` as the seam; no module mocks or product test branches.
 - `boardSession` is a boundary-owned resource for UI execution identity.
 - `actionAudit` is a current-owned resource shared by nested `ctx.exec()` children inside one action.

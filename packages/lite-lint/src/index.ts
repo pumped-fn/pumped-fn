@@ -8,10 +8,12 @@ export type RuleId =
   | "pumped/no-internal-example-label"
   | "pumped/no-jsdom-backend"
   | "pumped/no-module-mocks"
+  | "pumped/no-render-outside-browser-test"
   | "pumped/no-react-local-state"
   | "pumped/no-react-manual-execution-context"
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
+  | "pumped/no-shared-scope-factory"
   | "pumped/no-test-only-branches"
 
 export interface Diagnostic {
@@ -32,22 +34,28 @@ export interface ScanOptions {
 }
 
 type Imports = {
+  createScope: Set<string>
   creators: Set<string>
   liteNamespaces: Set<string>
   liteReactNamespaces: Set<string>
+  mockFns: Set<string>
   reactNamespaces: Set<string>
+  render: Set<string>
+  testLibraryNamespaces: Set<string>
   useScope: Set<string>
   useState: Set<string>
+  viObjects: Set<string>
 }
 
 const creatorNames = new Set(["atom", "flow", "resource", "tag", "scopedValue"])
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])
-const textExtensions = new Set([...sourceExtensions, ".md", ".mdx"])
+const textExtensions = new Set([...sourceExtensions, ".json", ".md", ".mdx"])
 const ignoredNames = new Set(["node_modules", ".git", "dist", "coverage", ".next", ".turbo"])
 const ignoredFiles = new Set(["pnpm-lock.yaml", "package-lock.json", "yarn.lock"])
 const suffixPattern = /(Atom|Flow|Resource|Tag|ScopedValue)$/
 const testBranchPattern = /(?:process\.env\.NODE_ENV|import\.meta\.env\.MODE)\s*={2,3}\s*["']test["']/g
 const jsdomPattern = /@vitest-environment\s+jsdom|setup\.dom|\.dom\.test/gi
+const jsdomPackagePattern = /"(?:global-)?jsdom"\s*:/g
 const internalExampleLabelPattern = new RegExp(`\\b${["gol", "den"].join("")}\\b`, "gi")
 const compositionPathPattern = /(?:^|\/)(?:main|bootstrap|wire|adapter|composition|http|transport|server)\.[cm]?[jt]sx?$/
 const beforePathPattern = /(?:^|\/)before\.[cm]?[jt]sx?$/
@@ -55,6 +63,7 @@ const testPathPattern = /(?:^|\/)(?:tests?|__tests__)\/|(?:\.|\/)(?:test|spec|br
 const ambientNamePattern = /(Http|Transport|Clock|Storage|Random|Timer|Poller|Route|Adapter|Boundary|Main|Root|Bootstrap|Wire|Env|Ids?)/i
 const ambientCalls = new Set(["fetch", "setTimeout", "setInterval", "clearTimeout", "clearInterval"])
 const ambientObjects = new Set(["window", "document", "localStorage", "sessionStorage", "crypto"])
+const mockCalls = new Set(["mock", "doMock", "spyOn"])
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -77,6 +86,10 @@ function isIgnoredPath(filePath: string): boolean {
 
 function isTestPath(filePath: string): boolean {
   return testPathPattern.test(normalizePath(filePath))
+}
+
+function isBrowserTestPath(filePath: string): boolean {
+  return /\.browser\.test\.[cm]?[jt]sx?$/.test(normalizePath(filePath))
 }
 
 function isCompositionPath(filePath: string): boolean {
@@ -156,6 +169,19 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
     )
   }
 
+  if (basename(filePath) === "package.json") {
+    for (const match of source.matchAll(jsdomPackagePattern)) {
+      pushTextDiagnostic(
+        diagnostics,
+        source,
+        filePath,
+        "pumped/no-jsdom-backend",
+        match.index ?? 0,
+        "Rendered observer tests should use Vitest Browser Mode, not JSDOM dependencies.",
+      )
+    }
+  }
+
   for (const match of source.matchAll(testBranchPattern)) {
     pushTextDiagnostic(
       diagnostics,
@@ -170,12 +196,17 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
 
 function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
+    createScope: new Set(),
     creators: new Set(),
     liteNamespaces: new Set(),
     liteReactNamespaces: new Set(),
+    mockFns: new Set(),
     reactNamespaces: new Set(),
+    render: new Set(),
+    testLibraryNamespaces: new Set(),
     useScope: new Set(),
     useState: new Set(),
+    viObjects: new Set(["jest", "vi"]),
   }
 
   for (const statement of sourceFile.statements) {
@@ -188,20 +219,33 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       if (moduleName === "@pumped-fn/lite") imports.liteNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@pumped-fn/lite-react") imports.liteReactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "react") imports.reactNamespaces.add(clause.namedBindings.name.text)
+      if (moduleName === "@testing-library/react") imports.testLibraryNamespaces.add(clause.namedBindings.name.text)
       continue
     }
 
     for (const specifier of clause.namedBindings.elements) {
       const imported = (specifier.propertyName ?? specifier.name).text
       const local = specifier.name.text
+      if (moduleName === "@pumped-fn/lite" && imported === "createScope") {
+        imports.createScope.add(local)
+      }
       if ((moduleName === "@pumped-fn/lite" || moduleName === "@pumped-fn/lite-react") && creatorNames.has(imported)) {
         imports.creators.add(local)
+      }
+      if (moduleName === "@testing-library/react" && imported === "render") {
+        imports.render.add(local)
       }
       if (moduleName === "@pumped-fn/lite-react" && imported === "useScope") {
         imports.useScope.add(local)
       }
       if (moduleName === "react" && imported === "useState") {
         imports.useState.add(local)
+      }
+      if (moduleName === "vitest" && imported === "vi") {
+        imports.viObjects.add(local)
+      }
+      if (moduleName === "@jest/globals" && imported === "jest") {
+        imports.viObjects.add(local)
       }
     }
   }
@@ -227,6 +271,23 @@ function isCreatorCall(expression: ts.Expression, imports: Imports): boolean {
   if (!ts.isPropertyAccessExpression(expression) || !creatorNames.has(expression.name.text)) return false
   if (!ts.isIdentifier(expression.expression)) return false
   return imports.liteNamespaces.has(expression.expression.text) || imports.liteReactNamespaces.has(expression.expression.text)
+}
+
+function isCreateScopeCall(expression: ts.Expression, imports: Imports): boolean {
+  if (ts.isIdentifier(expression)) return imports.createScope.has(expression.text)
+  return isNamespaceCall(expression, imports.liteNamespaces, "createScope")
+}
+
+function returnsCreateScope(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression, imports: Imports): boolean {
+  if (!node.body) return false
+  if (ts.isCallExpression(node.body)) return isCreateScopeCall(node.body.expression, imports)
+  if (!ts.isBlock(node.body)) return false
+  return node.body.statements.some((statement) =>
+    ts.isReturnStatement(statement)
+    && statement.expression !== undefined
+    && ts.isCallExpression(statement.expression)
+    && isCreateScopeCall(statement.expression.expression, imports)
+  )
 }
 
 function exported(node: ts.Node): boolean {
@@ -303,14 +364,16 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const imports = collectImports(sourceFile)
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
+  const allowScopeFactory = isCompositionPath(filePath)
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
       const name = calledName(node.expression)
       if (
         ts.isPropertyAccessExpression(node.expression)
-        && (node.expression.expression.getText(sourceFile) === "vi" || node.expression.expression.getText(sourceFile) === "jest")
-        && (node.expression.name.text === "mock" || node.expression.name.text === "doMock")
+        && ts.isIdentifier(node.expression.expression)
+        && imports.viObjects.has(node.expression.expression.text)
+        && mockCalls.has(node.expression.name.text)
       ) {
         pushNodeDiagnostic(
           diagnostics,
@@ -318,7 +381,36 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           filePath,
           "pumped/no-module-mocks",
           node.expression,
-          "Use scope presets at the test seam instead of module mocks.",
+          "Use scope presets at the test seam instead of module mocks or spies.",
+        )
+      }
+
+      if (ts.isIdentifier(node.expression) && name && imports.mockFns.has(name)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-module-mocks",
+          node.expression,
+          "Use scope presets at the test seam instead of module mocks or spies.",
+        )
+      }
+
+      if (
+        isTestPath(filePath)
+        && !isBrowserTestPath(filePath)
+        && (
+          (name && imports.render.has(name))
+          || isNamespaceCall(node.expression, imports.testLibraryNamespaces, "render")
+        )
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-render-outside-browser-test",
+          node.expression,
+          "Rendered observer tests should live in *.browser.test.tsx files.",
         )
       }
 
@@ -411,6 +503,52 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
     }
 
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      if (ts.isIdentifier(node.name)) {
+        if (ts.isIdentifier(node.initializer) && imports.viObjects.has(node.initializer.text)) {
+          imports.viObjects.add(node.name.text)
+        }
+        if (
+          ts.isPropertyAccessExpression(node.initializer)
+          && ts.isIdentifier(node.initializer.expression)
+          && imports.viObjects.has(node.initializer.expression.text)
+          && mockCalls.has(node.initializer.name.text)
+        ) {
+          imports.mockFns.add(node.name.text)
+        }
+      }
+      if (
+        ts.isObjectBindingPattern(node.name)
+        && ts.isIdentifier(node.initializer)
+        && imports.viObjects.has(node.initializer.text)
+      ) {
+        for (const element of node.name.elements) {
+          const property = element.propertyName ?? element.name
+          if (ts.isIdentifier(property) && mockCalls.has(property.text) && ts.isIdentifier(element.name)) {
+            imports.mockFns.add(element.name.text)
+          }
+        }
+      }
+    }
+
+    if (
+      basename(filePath).startsWith("vitest.config")
+      && ts.isPropertyAssignment(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === "environment"
+      && ts.isStringLiteral(node.initializer)
+      && node.initializer.text === "jsdom"
+    ) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-jsdom-backend",
+        node.initializer,
+        "Rendered observer tests should use Vitest Browser Mode, not JSDOM config.",
+      )
+    }
+
     if (
       ts.isVariableDeclaration(node)
       && ts.isIdentifier(node.name)
@@ -427,6 +565,36 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         node.name,
         "Definition handles should rely on inference instead of Atom/Flow/Resource/Tag suffixes.",
       )
+    }
+
+    if (!allowScopeFactory) {
+      if (ts.isFunctionDeclaration(node) && node.name && returnsCreateScope(node, imports)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-shared-scope-factory",
+          node.name,
+          "Every use site should call createScope with the presets, tags, and extensions it needs.",
+        )
+      }
+
+      if (
+        ts.isVariableDeclaration(node)
+        && ts.isIdentifier(node.name)
+        && node.initializer
+        && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+        && returnsCreateScope(node.initializer, imports)
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-shared-scope-factory",
+          node.name,
+          "Every use site should call createScope with the presets, tags, and extensions it needs.",
+        )
+      }
     }
 
     if (!allowScopeArgument) {

@@ -3676,11 +3676,32 @@ describe("public helper coverage", () => {
     expect(defaultTag.get({} as never)).toBe("fallback")
     expect(defaultTag.find([])).toBe("fallback")
     expect(defaultTag.find({})).toBe("fallback")
+    expect(parsedTag.eq(4, 4)).toBe(true)
+    expect(parsedTag.same(parsedTag(2), parsedTag(2))).toBe(true)
     expect(parsedTag.collect({})).toEqual([])
     expect(() => parsedTag.get([])).toThrow('Tag "parsed-tag" not found and has no default')
     expect(() => parsedTag("oops" as never)).toThrow(ParseError)
     expect(registryTag.atoms()).toEqual(expect.arrayContaining([taggedAtom, taggedAtom2]))
     expect(getAllTags()).toEqual(expect.arrayContaining([parsedTag, defaultTag, registryTag]))
+
+    const identityTag = tag<{ id: string; version: number }>({
+      label: "identity-tag",
+      eq: (a, b) => a.id === b.id,
+    })
+    expect(identityTag.eq({ id: "a", version: 1 }, { id: "a", version: 2 })).toBe(true)
+    expect(identityTag.same(
+      identityTag({ id: "a", version: 1 }),
+      identityTag({ id: "a", version: 2 })
+    )).toBe(true)
+    expect(identityTag.same(
+      identityTag({ id: "a", version: 1 }),
+      identityTag({ id: "b", version: 1 })
+    )).toBe(false)
+    expect(identityTag.same(identityTag({ id: "a", version: 1 }), taggedValue)).toBe(false)
+
+    const referenceTag = tag<{ id: string }>({ label: "reference-tag" })
+    expect(referenceTag.eq({ id: "a" }, { id: "a" })).toBe(false)
+    expect(referenceTag.same(referenceTag({ id: "a" }), referenceTag({ id: "a" }))).toBe(false)
 
     expect(shallowEqual({ a: 1 }, { a: 1 })).toBe(true)
     expect(shallowEqual({ a: 1 }, { a: 2 })).toBe(false)

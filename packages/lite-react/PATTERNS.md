@@ -107,6 +107,8 @@ sequenceDiagram
 
 Use explicit `ctx` for tests and request boundaries. Omit `ctx` only when you want managed mode from the surrounding `ScopeProvider`; managed mode creates the execution context for the provider, inherits the nearest execution context in the same scope, and closes it on unmount.
 
+Managed mode reuses the context when the parent and tag records compare the same. Object-valued boundary tags should define `eq` only when equal values are fully substitutable, because reuse keeps the existing execution context and its current-owned resources. This is a React boundary optimization, not tag lookup, dedupe, cache, or resource-sharing semantics.
+
 `useResource(resource, { suspense: false })` returns a load union, not an atom-style controller state:
 
 ```tsx

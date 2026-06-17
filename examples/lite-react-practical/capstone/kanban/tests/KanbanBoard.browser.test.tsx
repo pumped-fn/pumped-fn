@@ -76,19 +76,28 @@ describe("outside-in", () => {
       tags: [workspaceId("acme"), activeProjectId("p-web")],
     })
 
-    render(
-      <ScopeProvider scope={scope}>
-        <ExecutionContextProvider tags={[actorId("u2")]}>
-          <KanbanBoard />
-        </ExecutionContextProvider>
-      </ScopeProvider>,
-    )
+    function Shell({ marker }: { marker: string }) {
+      return (
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[actorId("u2")]}>
+            <span>{marker}</span>
+            <KanbanBoard />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+    }
+
+    const view = render(<Shell marker="one" />)
 
     expect(await screen.findByText("Web Experience")).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText("title c-login"), { target: { value: "Login draft" } })
     fireEvent.change(screen.getByLabelText("title c-api"), { target: { value: "API draft" } })
 
+    expect(screen.getByLabelText("title c-login")).toHaveValue("Login draft")
+    expect(screen.getByLabelText("title c-api")).toHaveValue("API draft")
+    view.rerender(<Shell marker="two" />)
+    expect(screen.getByText("two")).toBeInTheDocument()
     expect(screen.getByLabelText("title c-login")).toHaveValue("Login draft")
     expect(screen.getByLabelText("title c-api")).toHaveValue("API draft")
 

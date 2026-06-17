@@ -1,25 +1,27 @@
-import { createScope } from "@pumped-fn/lite"
+import { createScope, preset } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
 import {
-  createTenantScope,
+  cleanupSink,
   recordUsage,
   strategy,
+  tenant,
   tenantIdentity,
   tenantSnapshot,
+  tierPresets,
 } from "./after"
 
 describe("inside-out", () => {
   test("IO1: atom reads tags.required(tenant) -> per-scope identity", async () => {
-    const alpha = createTenantScope({ tenantId: "tenant-a", plan: "free" })
-    const beta = createTenantScope({ tenantId: "tenant-b", plan: "pro" })
+    const alpha = createScope({ tags: [tenant("tenant-a")], presets: tierPresets("free") })
+    const beta = createScope({ tags: [tenant("tenant-b")], presets: tierPresets("pro") })
 
     expect(await alpha.resolve(tenantIdentity)).toEqual({ tenantId: "tenant-a" })
     expect(await beta.resolve(tenantIdentity)).toEqual({ tenantId: "tenant-b" })
   })
 
   test("IO2: plan-tier preset swaps strategy atom (free vs pro) per tenant scope", async () => {
-    const free = createTenantScope({ tenantId: "tenant-free", plan: "free" })
-    const pro = createTenantScope({ tenantId: "tenant-pro", plan: "pro" })
+    const free = createScope({ tags: [tenant("tenant-free")], presets: tierPresets("free") })
+    const pro = createScope({ tags: [tenant("tenant-pro")], presets: tierPresets("pro") })
 
     expect(await createScope().resolve(strategy)).toMatchObject({
       name: "free",
@@ -38,8 +40,8 @@ describe("inside-out", () => {
 
 describe("outside-in", () => {
   test("OI1: same atoms, two scopes -> independent state (counter diverges)", async () => {
-    const alpha = createTenantScope({ tenantId: "tenant-a", plan: "free" })
-    const beta = createTenantScope({ tenantId: "tenant-b", plan: "free" })
+    const alpha = createScope({ tags: [tenant("tenant-a")], presets: tierPresets("free") })
+    const beta = createScope({ tags: [tenant("tenant-b")], presets: tierPresets("free") })
     const alphaCtx = alpha.createContext()
     const betaCtx = beta.createContext()
 
@@ -71,8 +73,8 @@ describe("outside-in", () => {
   })
 
   test("OI2: flows exec'd in tenant A's scope never observe B's values", async () => {
-    const alpha = createTenantScope({ tenantId: "tenant-a", plan: "pro" })
-    const beta = createTenantScope({ tenantId: "tenant-b", plan: "free" })
+    const alpha = createScope({ tags: [tenant("tenant-a")], presets: tierPresets("pro") })
+    const beta = createScope({ tags: [tenant("tenant-b")], presets: tierPresets("free") })
     const alphaCtx = alpha.createContext()
     const betaCtx = beta.createContext()
 
@@ -103,15 +105,13 @@ describe("outside-in", () => {
 describe("effect-managed", () => {
   test("E1: dispose tenant A -> A's cleanups all ran; B untouched and still serving", async () => {
     const cleanupLog: string[] = []
-    const alpha = createTenantScope({
-      tenantId: "tenant-a",
-      plan: "free",
-      cleanupLog,
+    const alpha = createScope({
+      tags: [tenant("tenant-a")],
+      presets: [...tierPresets("free"), preset(cleanupSink, cleanupLog)],
     })
-    const beta = createTenantScope({
-      tenantId: "tenant-b",
-      plan: "pro",
-      cleanupLog,
+    const beta = createScope({
+      tags: [tenant("tenant-b")],
+      presets: [...tierPresets("pro"), preset(cleanupSink, cleanupLog)],
     })
     const alphaCtx = alpha.createContext()
     const betaCtx = beta.createContext()

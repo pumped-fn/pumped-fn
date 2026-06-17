@@ -1,5 +1,15 @@
 # @pumped-fn/lite-react
 
+## 2.2.0
+
+### Minor Changes
+
+- Add tag-family value equality with `tag.eq()` and `tag.same()`, and use it for managed `ExecutionContextProvider` reuse so recreated object tag values can preserve current-owned scoped state when they are fully substitutable.
+
+### Patch Changes
+
+- e41d168: Fix managed `ExecutionContextProvider` identity so separate React roots using the same Lite scope do not share managed execution contexts. React observer tests now target Vitest Browser Mode while node graph tests remain the logic seam.
+
 ## 2.1.0
 
 ### Minor Changes

@@ -115,6 +115,8 @@ Managed mode creates an execution context from the surrounding `ScopeProvider` s
 </ScopeProvider>
 ```
 
+Managed providers reuse their execution context when the parent and tag records are the same. For object-valued tags, define `eq` on the tag family when recreated values are fully substitutable; `ExecutionContextProvider` uses `tag.same()` for reuse. This preserves current-owned `scopedValue` state across ordinary rerenders without changing tag lookup or resource ownership.
+
 ### useExecutionContext
 
 Run UI-triggered graph work through the provider-owned execution context:

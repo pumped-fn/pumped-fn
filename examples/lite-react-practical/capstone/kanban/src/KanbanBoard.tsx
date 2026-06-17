@@ -76,7 +76,7 @@ function CardRow({ card }: { card: CardView }) {
       >
         done
       </button>
-      <ExecutionContextProvider tags={[editingCardId(card.id)]}>
+      <ExecutionContextProvider tags={[editingCardId({ cardId: card.id })]}>
         <CardEditor card={card} />
       </ExecutionContextProvider>
     </article>

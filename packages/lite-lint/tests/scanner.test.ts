@@ -53,6 +53,52 @@ describe("lite lint scanner", () => {
     ])
   })
 
+  it("finds shared scope factories in tests", () => {
+    expect(ids(`
+      import { createScope } from "@pumped-fn/lite"
+
+      function makeScope() {
+        return createScope({ tags: [] })
+      }
+
+      const buildScope = () => createScope()
+    `, "tests/example.test.ts")).toEqual([
+      "pumped/no-shared-scope-factory",
+      "pumped/no-shared-scope-factory",
+    ])
+  })
+
+  it("finds aliased module mocks and rendered node observer tests", () => {
+    expect(ids(`
+      import { render } from "@testing-library/react"
+      import { vi as vitestVi } from "vitest"
+
+      const v = vitestVi
+      const { mock, spyOn } = v
+      const mockAuth = v.mock
+
+      v.mock("./a")
+      mock("./b")
+      mockAuth("./c")
+      spyOn(Date, "now")
+      render(<div />)
+    `, "tests/view.test.tsx")).toEqual([
+      "pumped/no-module-mocks",
+      "pumped/no-module-mocks",
+      "pumped/no-module-mocks",
+      "pumped/no-module-mocks",
+      "pumped/no-render-outside-browser-test",
+    ])
+  })
+
+  it("allows rendered observer tests in browser-mode files", () => {
+    expect(ids(`
+      import { render } from "@testing-library/react"
+
+      render(<div />)
+    `, "tests/view.browser.test.tsx")).toEqual([])
+  })
+
   it("finds React observer anti-patterns", () => {
     expect(ids(`
       import { useState } from "react"
@@ -106,6 +152,19 @@ describe("lite lint scanner", () => {
       "pumped/no-jsdom-backend",
       "pumped/no-jsdom-backend",
     ])
+  })
+
+  it("finds JSDOM config and package dependencies", () => {
+    expect(ids(`
+      export default {
+        test: {
+          environment: "jsdom",
+        },
+      }
+    `, "vitest.config.ts")).toEqual(["pumped/no-jsdom-backend"])
+    expect(ids(`
+      { "devDependencies": { "jsdom": "catalog:" } }
+    `, "package.json")).toEqual(["pumped/no-jsdom-backend"])
   })
 
   it("walks paths while skipping before examples and generated directories", async () => {

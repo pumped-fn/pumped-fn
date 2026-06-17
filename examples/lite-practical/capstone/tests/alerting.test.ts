@@ -7,7 +7,7 @@ import { clock } from "../src/infra/clock"
 import { activeIncidentCount } from "../src/metrics"
 import { registerService } from "../src/registry"
 import { scheduler } from "../src/scheduler"
-import { exec, FakeClock } from "./fakes"
+import { FakeClock } from "./fakes"
 
 describe("outside-in", () => {
   test("OI-SC8: custom hook receives open and resolve incident events end-to-end", async () => {
@@ -35,20 +35,28 @@ describe("outside-in", () => {
     })
 
     await scope.resolve(scheduler)
-    const service = await exec(scope, registerService, {
-      name: "api",
-      type: "http",
-      endpoint: "https://api.test",
-      checkInterval: 60,
-      timeout: 1000,
-      criticality: "critical",
+    const ctx = scope.createContext()
+    const service = await ctx.exec({
+      flow: registerService,
+      input: {
+        name: "api",
+        type: "http",
+        endpoint: "https://api.test",
+        checkInterval: 60,
+        timeout: 1000,
+        criticality: "critical",
+      },
     })
+    await scope.flush()
 
     await fakeClock.advance(60_000)
+    await scope.flush()
     expect(await scope.resolve(activeIncidentCount)).toBe(1)
     await fakeClock.advance(60_000)
+    await scope.flush()
     expect(await scope.resolve(activeIncidentCount)).toBe(0)
     expect(events).toEqual([`open:${service.id}`, `resolve:${service.id}`])
+    await ctx.close()
     await scope.dispose()
   })
 })

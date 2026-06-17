@@ -3,7 +3,6 @@ import { describe, expect, test } from "vitest"
 import { createMemoryStore, reconnectStore, store, storeDriver } from "../src/infra/store"
 import { listServices, registerService } from "../src/registry"
 import type { StorePort } from "../src/ports"
-import { exec } from "./fakes"
 
 const serviceInput = {
   name: "recovered",
@@ -25,27 +24,34 @@ describe("outside-in", () => {
       },
     })
     const scope = createScope({ presets: [preset(storeDriver, flakyDriver)] })
+    const ctx = scope.createContext()
 
-    expect(await exec(scope, listServices, undefined)).toEqual([])
+    expect(await ctx.exec({ flow: listServices })).toEqual([])
     expect(attempts).toBe(2)
 
-    await exec(scope, registerService, { ...serviceInput, name: "kept" })
-    await exec(scope, reconnectStore, undefined)
+    await ctx.exec({ flow: registerService, input: { ...serviceInput, name: "kept" } })
+    await ctx.exec({ flow: reconnectStore })
 
     expect(attempts).toBe(2)
-    expect(await exec(scope, listServices, undefined)).toHaveLength(1)
-    await exec(scope, registerService, serviceInput)
-    expect(await exec(scope, listServices, undefined)).toHaveLength(2)
+    expect(await ctx.exec({ flow: listServices })).toHaveLength(1)
+    await ctx.exec({ flow: registerService, input: serviceInput })
+    expect(await ctx.exec({ flow: listServices })).toHaveLength(2)
+    await ctx.close()
     await scope.dispose()
   })
 
   test("OI1: reconnect without a replacement driver atom resets the store", async () => {
     const scope = createScope()
-    await exec(scope, registerService, { ...serviceInput, name: "temporary", endpoint: "https://temporary.test" })
+    const ctx = scope.createContext()
+    await ctx.exec({
+      flow: registerService,
+      input: { ...serviceInput, name: "temporary", endpoint: "https://temporary.test" },
+    })
 
-    await exec(scope, reconnectStore, undefined)
+    await ctx.exec({ flow: reconnectStore })
 
-    expect(await exec(scope, listServices, undefined)).toEqual([])
+    expect(await ctx.exec({ flow: listServices })).toEqual([])
+    await ctx.close()
     await scope.dispose()
   })
 
@@ -58,9 +64,11 @@ describe("outside-in", () => {
       },
     })
     const scope = createScope({ presets: [preset(storeDriver, deadDriver)] })
+    const ctx = scope.createContext()
 
-    await expect(exec(scope, listServices, undefined)).rejects.toThrow("driver offline")
+    await expect(ctx.exec({ flow: listServices })).rejects.toThrow("driver offline")
     expect(attempts).toBe(2)
+    await ctx.close()
     await scope.dispose()
   })
 })

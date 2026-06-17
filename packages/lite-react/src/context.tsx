@@ -61,7 +61,7 @@ function sameTags(a: Lite.Tagged<any>[] | undefined, b: Lite.Tagged<any>[] | und
   if (a === b) return true
   if (!a || !b || a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) {
-    if (a[i]!.key !== b[i]!.key || !Object.is(a[i]!.value, b[i]!.value)) return false
+    if (!a[i]!.tag.same(a[i]!, b[i]!)) return false
   }
   return true
 }

@@ -386,6 +386,67 @@ describe('ExecutionContextProvider + useResource', () => {
     await scope.dispose()
   })
 
+  it('reuses managed contexts when recreated object tag values compare equal', async () => {
+    const boundary = tag<{ id: string; version: number }>({
+      label: 'managed-object-boundary',
+      eq: (a, b) => a.id === b.id && a.version === b.version,
+    })
+    const scope = createScope()
+    const closes: number[] = []
+    let creates = 0
+    const draft = scopedValue({
+      name: 'managed-object-draft',
+      deps: { boundary: tags.required(boundary) },
+      initial: (_ctx, { boundary }) => ({
+        id: boundary.id,
+        version: boundary.version,
+        created: ++creates,
+      }),
+      onClose: (helpers) => {
+        closes.push(helpers.get().created)
+      },
+    })
+
+    function Editor() {
+      const load = useScopedValue(draft, { suspense: false })
+      return (
+        <div>
+          draft:{load.status === 'ready' ? load.data.snapshot.created : 'loading'}
+        </div>
+      )
+    }
+
+    function App() {
+      return (
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[boundary({ id: 'card-1', version: 1 })]}>
+            <Editor />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+    }
+
+    const view = render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('draft:1')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      view.rerender(<App />)
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('draft:1')).toBeInTheDocument()
+    })
+    expect(creates).toBe(1)
+    expect(closes).toEqual([])
+
+    view.unmount()
+    await scope.dispose()
+  })
+
   it('nests managed execution contexts under the nearest execution provider', async () => {
     const workspace = tag<string>({ label: 'managed-workspace' })
     const board = tag<string>({ label: 'managed-board' })

@@ -1,12 +1,6 @@
-import { atom, createScope, flow, preset, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { atom, flow, preset, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 
 export type PlanTier = "free" | "pro"
-
-export interface TenantScopeConfig {
-  tenantId: string
-  plan: PlanTier
-  cleanupLog?: string[]
-}
 
 export interface TenantStrategy {
   name: PlanTier
@@ -105,13 +99,4 @@ export const tenantSnapshot = flow({
 
 export function tierPresets(plan: PlanTier): Lite.Preset<TenantStrategy>[] {
   return [preset(strategy, plan === "pro" ? proStrategy : freeStrategy)]
-}
-
-export function createTenantScope(config: TenantScopeConfig): Lite.Scope {
-  return createScope({
-    tags: [tenant(config.tenantId)],
-    presets: config.cleanupLog
-      ? [...tierPresets(config.plan), preset(cleanupSink, config.cleanupLog)]
-      : tierPresets(config.plan),
-  })
 }

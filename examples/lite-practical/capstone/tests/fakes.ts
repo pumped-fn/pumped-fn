@@ -1,18 +1,4 @@
-import type { Lite } from "@pumped-fn/lite"
 import type { ClockPort } from "../src/ports"
-
-export async function exec<O, I>(scope: Lite.Scope, flow: Lite.Flow<O, I>, input: NoInfer<I>): Promise<O> {
-  const ctx = scope.createContext()
-  try {
-    const output = await ctx.exec({ flow, input } as Lite.ExecFlowOptions<O, I>)
-    await ctx.close({ ok: true })
-    await scope.flush()
-    return output
-  } catch (error) {
-    await ctx.close({ ok: false, error })
-    throw error
-  }
-}
 
 type Timer = {
   ms: number

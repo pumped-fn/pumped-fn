@@ -97,10 +97,18 @@ Resource controllers are infrastructure handles. They observe resource state vis
 
 Use tags for primitive metadata, context config, and typed injection contracts. Use extensions for scope behavior that wraps resolve/exec. Extensions can set typed runtime tags before dependencies resolve; flows then request those contracts with `tags.required()`.
 
+Tags may define `eq` for value equality inside that tag family. `tag.eq(a, b)` compares raw values, and `tag.same(left, right)` first checks both tagged records belong to that family, then uses `eq`. Equality does not affect `tags.required()`, `tags.optional()`, `tags.all()`, `get`, `find`, `collect`, defaults, parsing, cache keys, or tag identity.
+
 ```ts
 import { createScope, flow, tag, tags } from "@pumped-fn/lite"
 
 const runId = tag<string>({ label: "run.id" })
+const account = tag<{ id: string; version: number }>({
+  label: "account",
+  eq: (a, b) => a.id === b.id,
+})
+
+account.same(account({ id: "acct_1", version: 1 }), account({ id: "acct_1", version: 2 }))
 
 const run = flow({
   deps: { runId: tags.required(runId) },

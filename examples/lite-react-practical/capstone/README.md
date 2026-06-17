@@ -49,7 +49,7 @@ flowchart LR
 | thin frontend | capstone/thin/tests/bff-client.test.ts | 5 |
 | thin frontend | capstone/thin/tests/dashboard.test.ts | 5 |
 | thin frontend | capstone/thin/tests/signIn.test.ts | 8 |
-| kanban frontend | capstone/kanban/tests/board.test.ts | 9 |
+| kanban frontend | capstone/kanban/tests/board.test.ts | 10 |
 
 The inventory above is intentionally file-derived by `tests/capstone-comparison.test.ts`. It is not a
 package-wide test-total claim; it documents where frontend node logic currently lives.

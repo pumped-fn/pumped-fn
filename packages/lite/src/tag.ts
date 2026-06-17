@@ -4,6 +4,7 @@ export interface TagOptions<T, HasDefault extends boolean> {
   label: string
   default?: HasDefault extends true ? T : never
   parse?: (raw: unknown) => T
+  eq?: (a: T, b: T) => boolean
 }
 
 const registry = new WeakMap<Lite.Tag<unknown, boolean>, WeakRef<Lite.Atom<unknown>>[]>()
@@ -90,25 +91,32 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
  * })
  * ```
  */
-export function tag<T>(options: { label: string }): Lite.Tag<T, false>
+export function tag<T>(options: {
+  label: string
+  eq?: (a: T, b: T) => boolean
+}): Lite.Tag<T, false>
 export function tag<T>(options: {
   label: string
   default: T
+  eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, true>
 export function tag<T>(options: {
   label: string
   parse: (raw: unknown) => T
+  eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, false>
 export function tag<T>(options: {
   label: string
   parse: (raw: unknown) => T
   default: T
+  eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, true>
 export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   const key = Symbol(`@pumped-fn/lite/tag/${options.label}`)
   const hasDefault = "default" in options
   const defaultValue = hasDefault ? options.default : undefined
   const parse = options.parse
+  const eq = options.eq ?? Object.is
 
   let tagInstance: Lite.Tag<T, boolean>
 
@@ -161,6 +169,10 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     return result
   }
 
+  function same(a: Lite.Tagged<any>, b: Lite.Tagged<any>): boolean {
+    return a.key === key && b.key === key && eq(a.value as T, b.value as T)
+  }
+
   /**
    * Returns all atoms that have been created with this tag.
    *
@@ -184,6 +196,8 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     hasDefault,
     defaultValue,
     parse,
+    eq,
+    same,
     get,
     find,
     collect,
