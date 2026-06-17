@@ -36,6 +36,10 @@ Browser mode does not replace node logic tests. Guard ambient browser APIs so ra
 
 Public examples that claim architectural quality should keep those claims derived or explicitly scoped: inventories come from files, implemented slices name backlog, and strong boundary rules get structural guards.
 
+`@pumped-fn/lite-lint` codifies the React-facing guardrails in a lint-like scanner: feature components
+should not call `useScope`, mirror graph state with `useState`, create or close execution contexts
+manually, or rely on JSDOM instead of Vitest Browser Mode observer tests.
+
 ---
 
 ## App Bootstrap

@@ -84,6 +84,7 @@ minimumReleaseAgeExclude:
   - '@babel/runtime@7.29.7'
   - '@types/node@25.9.1'
   - '@vitest/coverage-v8@4.1.7'
+  - playwright@1.61.0
   - esbuild@0.27.7
   - '@rolldown/binding-android-arm64@1.0.2'
   - '@rolldown/binding-darwin-arm64@1.0.2'

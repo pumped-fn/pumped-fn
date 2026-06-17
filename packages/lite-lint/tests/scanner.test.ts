@@ -1,0 +1,136 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { describe, expect, it } from "vitest"
+import { scanPaths, scanText } from "../src/index"
+
+function ids(source: string, filePath = "src/example.ts") {
+  return scanText(source, filePath).map((diagnostic) => diagnostic.ruleId)
+}
+
+describe("lite lint scanner", () => {
+  it("accepts graph code that enters through definitions and public exec APIs", () => {
+    expect(ids(`
+      import { atom, flow, resource, typed } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: () => new Map<string, string>() })
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: (ctx) => {
+          ctx.cleanup(() => {})
+          return { save: (key: string, value: string) => store.name + key + value }
+        },
+      })
+      export const save = flow({
+        name: "save",
+        parse: typed<{ key: string; value: string }>(),
+        deps: { tx },
+        factory: (ctx, { tx }) => tx.save(ctx.input.key, ctx.input.value),
+      })
+    `)).toEqual([])
+  })
+
+  it("finds backend and test anti-patterns", () => {
+    expect(ids(`
+      import { atom, flow } from "@pumped-fn/lite"
+      import { vi } from "vitest"
+
+      vi.mock("./transport")
+      const profileAtom = atom({ name: "profile", factory: () => fetch("/api/profile") })
+      export function runProfile(scope: Lite.Scope) {
+        if (process.env.NODE_ENV === "test") return "fake"
+        return scope.createContext()
+      }
+      export const saveFlow = flow({ name: "save", factory: () => "ok" })
+    `)).toEqual([
+      "pumped/no-test-only-branches",
+      "pumped/no-module-mocks",
+      "pumped/no-definition-handle-suffix",
+      "pumped/no-ambient-io-outside-boundary",
+      "pumped/no-scope-argument",
+      "pumped/no-definition-handle-suffix",
+    ])
+  })
+
+  it("finds React observer anti-patterns", () => {
+    expect(ids(`
+      import { useState } from "react"
+      import { useScope } from "@pumped-fn/lite-react"
+
+      export function LoginForm() {
+        const scope = useScope()
+        const [email, setEmail] = useState("")
+        const ctx = scope.createContext()
+        void ctx.close()
+        return <button onClick={() => setEmail(email)}>Save</button>
+      }
+    `, "src/LoginForm.tsx")).toEqual([
+      "pumped/no-react-use-scope",
+      "pumped/no-react-local-state",
+      "pumped/no-react-manual-execution-context",
+      "pumped/no-react-manual-execution-context",
+    ])
+  })
+
+  it("allows composition roots and transport declarations to own integration points", () => {
+    expect(ids(`
+      import { createScope, atom } from "@pumped-fn/lite"
+      import { createRoot } from "react-dom/client"
+
+      const bffHttp = atom({ name: "bff-http", factory: () => fetch("/api") })
+
+      export function mountMain(container: Element) {
+        const scope = createScope()
+        const root = createRoot(container)
+        document.body.dataset.ready = "true"
+        return {
+          scope,
+          unmount: async () => {
+            root.unmount()
+            await scope.dispose()
+          },
+        }
+      }
+    `, "src/main.tsx")).toEqual([])
+  })
+
+  it("finds stale public vocabulary and JSDOM backend markers in text files", () => {
+    expect(ids(`
+      # ${["Gol", "den"].join("")} example
+
+      Use @vitest-environment jsdom with setup.dom.ts and User.dom.test.tsx.
+    `, "README.md")).toEqual([
+      "pumped/no-internal-example-label",
+      "pumped/no-jsdom-backend",
+      "pumped/no-jsdom-backend",
+      "pumped/no-jsdom-backend",
+    ])
+  })
+
+  it("walks paths while skipping before examples and generated directories", async () => {
+    const root = mkdtempSync(join(tmpdir(), "lite-lint-"))
+    try {
+      writeFileSync(join(root, "bad.ts"), `
+        import { atom } from "@pumped-fn/lite"
+        const badAtom = atom({ name: "bad", factory: () => "bad" })
+      `)
+      writeFileSync(join(root, "before.tsx"), `
+        import { useState } from "react"
+        export function Before() {
+          const [value] = useState("")
+          return value
+        }
+      `)
+
+      const result = await scanPaths([root])
+
+      expect(result.diagnostics.map((diagnostic) => diagnostic.filePath)).toEqual([join(root, "bad.ts")])
+      expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId)).toEqual([
+        "pumped/no-definition-handle-suffix",
+      ])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})

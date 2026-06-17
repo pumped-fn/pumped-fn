@@ -415,6 +415,11 @@ kept in transport atoms or composition-root adapters; capability atoms depend on
 presettable; feature atoms depend on capabilities. Public example claims are guarded by structural tests
 for ambient IO, test substitution, provider wiring, route boundaries, and derived inventories.
 
+`@pumped-fn/lite-lint` turns those boundary rules into a lint-like scanner. It catches module mocks,
+test-only product branches, definition-handle suffixes, product helpers that accept `scope`, raw ambient IO
+outside transport/root declarations, stale example vocabulary, and React observer violations from
+`@pumped-fn/lite-react`.
+
 Backend practical examples:
 
 ```bash
