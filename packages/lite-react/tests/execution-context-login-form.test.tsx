@@ -22,7 +22,7 @@ function initialLoginSnapshot(): LoginSnapshot {
   }
 }
 
-const authResource = resource({
+const auth = resource({
   name: 'auth',
   factory: () => ({
     login(input: { email: string; password: string }): Promise<LoginResult | { error: string }> {
@@ -35,7 +35,7 @@ const authResource = resource({
 
 const loginForm = scopedValue({
   name: 'login-form',
-  deps: { auth: authResource },
+  deps: { auth },
   initial: () => initialLoginSnapshot(),
   actions: ({ get, patch }, { auth }) => ({
     setEmail(email: string) {
@@ -74,7 +74,7 @@ const loginForm = scopedValue({
   }),
 })
 
-const readLoginFormFlow = flow({
+const readLoginForm = flow({
   name: 'login-form-read',
   deps: { form: loginForm },
   factory: (_ctx, { form }) => form,
@@ -123,7 +123,7 @@ describe('scopedValue login form', () => {
     await expect(form.actions.submit()).resolves.toEqual({ email: 'a@example.com' })
     expect(form.getSnapshot()).toMatchObject({ status: 'submitted', error: null })
     await expect(loginForm.resolve(ctx)).resolves.toBe(form)
-    await expect(ctx.exec({ flow: readLoginFormFlow })).resolves.toBe(form)
+    await expect(ctx.exec({ flow: readLoginForm })).resolves.toBe(form)
 
     await ctx.close()
 

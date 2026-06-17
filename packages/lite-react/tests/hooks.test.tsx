@@ -300,12 +300,12 @@ describe('ExecutionContextProvider + useResource', () => {
   })
 
   it('can create and close a managed execution context from the surrounding scope', async () => {
-    const tenantTag = tag<string>({ label: 'tenant' })
+    const tenant = tag<string>({ label: 'tenant' })
     const closed: string[] = []
     const scope = createScope()
     const currentTenant = resource({
       name: 'current-tenant',
-      deps: { tenant: tags.required(tenantTag) },
+      deps: { tenant: tags.required(tenant) },
       factory: (ctx, { tenant }) => {
         ctx.onClose(() => { closed.push(tenant) })
         return { tenant }
@@ -319,7 +319,7 @@ describe('ExecutionContextProvider + useResource', () => {
 
     const view = render(
       <ScopeProvider scope={scope}>
-        <ExecutionContextProvider tags={[tenantTag('acme')]}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
           <TestComponent />
         </ExecutionContextProvider>
       </ScopeProvider>
