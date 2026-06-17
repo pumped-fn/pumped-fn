@@ -1,7 +1,7 @@
 'use client'
 'use no memo'
 
-import { createContext, useContext, useEffect, useId, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useId, useMemo, type ReactNode } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { pendingCtxWork } from './pending-work'
 
@@ -10,6 +10,7 @@ import { pendingCtxWork } from './pending-work'
  */
 const ScopeContext = createContext<Lite.Scope | null>(null)
 const ExecutionContextContext = createContext<Lite.ExecutionContext | null>(null)
+const ManagedRootContext = createContext<object | null>(null)
 
 type ManagedEntry = {
   ctx: Lite.ExecutionContext
@@ -22,7 +23,9 @@ type ManagedEntry = {
 
 const managedContexts = new WeakMap<Lite.Scope, Map<string, ManagedEntry>>()
 const managedParentIds = new WeakMap<Lite.ExecutionContext, number>()
+const managedRootIds = new WeakMap<object, number>()
 let nextManagedParentId = 1
+let nextManagedRootId = 1
 
 const ORPHAN_GRACE_MS = 50
 
@@ -41,6 +44,15 @@ function managedParentKey(parent: Lite.ExecutionContext | undefined): string {
   if (!key) {
     key = nextManagedParentId++
     managedParentIds.set(parent, key)
+  }
+  return String(key)
+}
+
+function managedRootKey(root: object): string {
+  let key = managedRootIds.get(root)
+  if (!key) {
+    key = nextManagedRootId++
+    managedRootIds.set(root, key)
   }
   return String(key)
 }
@@ -65,9 +77,6 @@ function closeEntry(map: Map<string, ManagedEntry>, id: string, entry: ManagedEn
   void entry.ctx.close()
 }
 
-// Renders that suspend before commit never get effects, so entries created
-// during render are reclaimed by a grace timer once their in-flight resource
-// work settles without a retry committing the provider.
 function scheduleOrphanCheck(map: Map<string, ManagedEntry>, id: string, entry: ManagedEntry): void {
   if (entry.orphanTimer) clearTimeout(entry.orphanTimer)
   entry.orphanTimer = setTimeout(() => {
@@ -114,30 +123,30 @@ type ExecutionContextProviderProps =
  * ```
  */
 function ScopeProvider({ scope, children }: ScopeProviderProps) {
+  const root = useMemo(() => ({}), [])
   return (
     <ScopeContext.Provider value={scope}>
-      {children}
+      <ManagedRootContext.Provider value={root}>
+        {children}
+      </ManagedRootContext.Provider>
     </ScopeContext.Provider>
   )
 }
 
 function ExecutionContextProvider({ children, ...props }: ExecutionContextProviderProps) {
   const scope = useContext(ScopeContext)
+  const root = useContext(ManagedRootContext)
   const inheritedCtx = useContext(ExecutionContextContext)
   const id = useId()
   const explicitCtx = 'ctx' in props && props.ctx ? props.ctx : undefined
   const tags = explicitCtx ? undefined : props.tags
   const parent = !explicitCtx && inheritedCtx?.scope === scope ? inheritedCtx : undefined
-  const entryId = !explicitCtx ? `${id}:${managedParentKey(parent)}` : id
+  const entryId = !explicitCtx && root ? `${managedRootKey(root)}:${id}:${managedParentKey(parent)}` : id
 
-  if (!explicitCtx && !scope) {
+  if (!explicitCtx && (!scope || !root)) {
     throw new Error("ExecutionContextProvider managed mode requires a ScopeProvider")
   }
 
-  // Managed contexts are created synchronously during render so the subtree
-  // renders on the server, where effects never run. The useId-keyed cache
-  // makes creation idempotent across StrictMode double-renders and Suspense
-  // retries.
   let entry: ManagedEntry | null = null
   let map: Map<string, ManagedEntry> | null = null
   if (!explicitCtx && scope) {
@@ -163,8 +172,6 @@ function ExecutionContextProvider({ children, ...props }: ExecutionContextProvid
     if (!entry || !map) return
     const currentEntry = entry
     const currentMap = map
-    // A count, not a flag: useId values repeat across React roots, so two
-    // providers sharing a scope can land on the same entry.
     currentEntry.commits++
     if (currentEntry.orphanTimer) {
       clearTimeout(currentEntry.orphanTimer)
@@ -172,8 +179,6 @@ function ExecutionContextProvider({ children, ...props }: ExecutionContextProvid
     }
     return () => {
       currentEntry.commits--
-      // Deferred so StrictMode's mount→cleanup→mount cycle can re-commit
-      // before the context is closed.
       queueMicrotask(() => {
         if (currentEntry.commits === 0) closeEntry(currentMap, entryId, currentEntry)
       })

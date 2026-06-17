@@ -12,7 +12,7 @@ ExecutionContextProvider owns UI execution by default. By default, components us
 
 `useScope` is an infrastructure hook. Use it for provider/bootstrap helpers and rare integration code that must inspect the current scope; normal feature components should depend on graph hooks or `useExecutionContext` instead.
 
-Frontend tests should split graph logic in node from DOM or browser observer tests. Node logic tests exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })`; DOM or browser observer tests render components under `ScopeProvider` and `ExecutionContextProvider`. Browser mode can be an observer-test backend, but it does not replace node logic tests.
+Frontend tests should split graph logic in node from browser observer tests. Node logic tests exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })`; browser observer tests render components under `ScopeProvider` and `ExecutionContextProvider`. Browser mode does not replace node logic tests.
 
 ## How It Works
 
@@ -154,11 +154,11 @@ type Load<T> =
   | { status: 'error'; data: undefined; error: Error }
 ```
 
-Do not load resources with `useEffect`. `useResource` observes the resource controller, starts work at the right React boundary, and stays reset-aware when the owner context releases the resource.
+Do not load resources with `useEffect`. `useResource` observes provider-owned resource state, starts work at the right React boundary, and stays reset-aware when the owner context releases the resource.
 
 ### scopedValue
 
-Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is backed by a current-owned resource, so it can be tested without React and is discarded when the owning execution context is released or closed.
+Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is backed by a current-owned resource, so it can be tested without React and is discarded when the owning execution context is released or closed. React receives `snapshot + actions`; resource controllers stay internal infrastructure.
 
 ```tsx
 import { createScope, resource } from '@pumped-fn/lite'
@@ -260,7 +260,7 @@ Most feature components should not use this hook. Prefer graph-specific hooks fo
 
 ### useController
 
-Get memoized controller for imperative operations.
+Get a memoized atom controller for low-level reactive atom operations.
 
 ```tsx
 const ctrl = useController(counterAtom)
@@ -268,6 +268,8 @@ ctrl.set(10)
 ctrl.update(n => n + 1)
 ctrl.invalidate()
 ```
+
+Do not use controllers as the form/resource state API. Use `useScopedValue` for drafts and `useResource` for execution-scoped resources.
 
 With `{ resolve: true }` option, triggers Suspense if atom not resolved:
 

@@ -4,7 +4,7 @@
 
 State lives in the scope, not in the component tree. Handlers and components observe — they don't own or construct dependencies. The same graph works across React, server handlers, background jobs, and tests.
 
-**Frontend** — atoms form a reactive dependency graph (`homeData <- auth`). UI subscribes via controllers; auth changes cascade to dependents automatically. Components are projections of state, not owners.
+**Frontend** — atoms form a reactive dependency graph (`homeData <- auth`). UI subscribes through React bindings or atom controllers; auth changes cascade to dependents automatically. Components are projections of state, not owners.
 
 **Backend** — atoms are infrastructure singletons (db pool, cache). Runtime config enters the scope as tags; atoms consume it via `tags.required()`. Contexts bound per request carry tags (tenantId, traceId) without parameter drilling. Extensions wrap every resolve/exec for logging, tracing, auth. Cleanup is guaranteed.
 
@@ -18,7 +18,7 @@ npx @pumped-fn/lite diagrams     # mermaid source
 
 ## Boundary Ownership
 
-Scope is the composition and test seam. Composition roots, tests, and other boundary adapters call `createScope({ presets, tags, extensions })`; product code enters the graph through declared atoms, flows, resources, tags, controllers, and execution APIs.
+Scope is the composition and test seam. Composition roots, tests, and other boundary adapters call `createScope({ presets, tags, extensions })`; product code enters the graph through declared atoms, flows, resources, tags, execution APIs, and atom controllers when reactive state is intentional.
 
 `scope` is not a product helper argument. A helper that accepts scope to fetch dependencies is acting like a service locator. Make it a graph node, call it from a graph node as a pure helper, or execute the target through flows, `ctx.exec`, resources, or providers.
 
@@ -32,9 +32,16 @@ Public examples with strong architectural claims should include structural guard
 
 ## Execution-Scoped Resources
 
-Use `resource()` for values that belong to one `ExecutionContext`: request loggers, transactions, trace spans, per-request clients. The value is cached on the context that owns the miss, can be read by child executions through upward lookup, and is reset with `ctx.release(resource)` or `ctx.close()`.
+Use `resource()` for values that belong below the scope: request loggers, transactions, trace spans, per-request clients, action buffers, and draft state.
 
-Resource `ownership` controls which execution context owns a miss. `ownership: "boundary"` is the default: a child execution reuses the nearest boundary-owned value or creates the value on that boundary. Use it for per-request clients and loggers shared by work inside the same request boundary. `ownership: "current"` creates the value on the current execution boundary; `ctx.exec()` children can reuse it, while sibling executions and nested explicit context boundaries get their own instance. Use it for transactions, trace spans, or action-scoped state.
+Choose ownership by user expectation:
+
+| Ownership | Expectation | Use for |
+|---|---|---|
+| `boundary` | Work inside one request, job, or UI boundary sees the same value and closes it together. | request loggers, trace data, per-request clients, UI sessions |
+| `current` | A local action or editor gets a private pocket. Nested `ctx.exec()` children can use it; sibling actions and nested explicit boundaries reset. | transactions, action audit buffers, form drafts, modal/editor state |
+
+The resolved value is stored on the owning `ExecutionContext`, not in `ctx.data` and not in a controller. Children can read visible resources through upward lookup. `ctx.release(resource)` is owner-local; use it for controlled reset, not as a broad child-to-parent invalidation tool.
 
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
@@ -84,29 +91,7 @@ await scope.dispose()
 
 Resource factories receive a `ResourceContext`: all normal execution-context APIs plus `ctx.cleanup(fn)` for resource-local cleanup. Use `ctx.onClose(result => ...)` for execution-boundary commit/rollback decisions, and `ctx.cleanup(fn)` for releasing the resource itself.
 
-Resource controllers are execution-context handles:
-
-```ts
-import { controller, resource } from "@pumped-fn/lite"
-
-const config = resource({ factory: () => ({ version: 1 }) })
-
-const client = resource({
-  deps: {
-    config: controller(config, {
-      resolve: true,
-      watch: true,
-      eq: (a, b) => a.version === b.version,
-    }),
-  },
-  factory: (_ctx, { config }) => {
-    const cfg = config.get()
-    return { version: cfg.version }
-  },
-})
-```
-
-`watch: true` for resource controllers is valid only inside resource deps. It listens for resolved value changes and releases the dependent resource lazily. Atom deps cannot depend on resources, and flow deps cannot use watched resource controllers.
+Resource controllers are infrastructure handles. They observe resource state visible from one execution context; they do not own the resolved value. `watch: true` for resource controllers is valid only inside resource deps, where it releases the dependent resource lazily after a watched value changes. Flows do not get reactive resource-controller deps. In product APIs, prefer direct resource deps, flows, or domain actions over exposing resource controllers.
 
 ## Tags And Extensions
 

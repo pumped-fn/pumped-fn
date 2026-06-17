@@ -8,7 +8,7 @@ Use this checklist before adding helpers around the graph.
 
 | Boundary | Owns | Guard |
 |----------|------|-------|
-| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, controllers, and `ctx.exec` |
+| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, atom controllers when reactivity is intentional, and `ctx.exec` |
 | Test radius | inside-out tests preset a unit's direct deps; outside-in tests preset only edge adapters | No module mocks, no global stubs above raw transport wrappers, no internal reaches, no test-only product branches |
 | transport atom | Raw ambient IO such as network, clock, storage, random, and process APIs | Transport-owned tests may fake the platform API below the seam |
 | capability atom | Domain/application operations built on transport atom deps | Capability atoms stay ambient-free and are presettable at a wider radius |
@@ -100,7 +100,14 @@ sequenceDiagram
 
 ### Execution-Scoped Resource
 
-Resolve resource values from an `ExecutionContext` when the value should live below the scope. Use the default `ownership: "boundary"` when a child execution should share the nearest boundary-owned value. Use `ownership: "current"` when a flow/action or explicit context boundary should own a fresh value that `ctx.exec()` children can reuse but sibling executions and nested explicit boundaries cannot.
+Resolve resource values from an `ExecutionContext` when the value should live below the scope.
+
+Choose ownership by use case:
+
+| Ownership | Expectation | Use for |
+|---|---|---|
+| `boundary` | One request, job, or UI boundary shares the value and closes it together. | request loggers, trace data, per-request clients, UI sessions |
+| `current` | One action or editor gets a private pocket. Nested `ctx.exec()` children can use it; sibling actions and nested explicit boundaries reset. | transactions, action audit buffers, form drafts, modal/editor state |
 
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
@@ -146,13 +153,13 @@ if (events.join(",") !== "rollback,release") throw new Error("expected rollback 
 await scope.dispose()
 ```
 
-Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. Boundary-owned resources keep the current behavior: child misses create on the surrounding execution boundary. Current-owned resources create on the current execution boundary and do not cross into a parent explicit boundary. Child executions can read ancestor-owned resources, but they do not release them.
+Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. The resolved value is stored on the owning execution context. Child executions can read visible resources, but `ctx.release(resource)` is owner-local.
 
 > **`ctx.release(tx)` vs `ctx.close()`**: `ctx.release(tx)` runs only the resource's `ctx.cleanup` handlers (owner-local reset for mid-request recycle), but `onClose` handlers registered by that resource still fire when `ctx.close()` is eventually called. Do not follow `ctx.release(tx)` with `ctx.close()` if the resource registered an `onClose` side effect (e.g., commit) — the released resource will be committed again. Use `ctx.release` only when you need a fresh resource instance within the same open context and the `onClose` side effect is safe to run regardless.
 
 ### Resource Controller Dependency
 
-Use `controller(resource)` when a resource should decide whether or when to load another resource. Use `watch: true` only in resource deps, never in atom or flow deps.
+Use `controller(resource)` only when a resource needs an infrastructure handle for another resource. Use `watch: true` only in resource deps, never in atom or flow deps. Product APIs should usually expose direct resource deps, flows, or domain actions instead of resource controllers.
 
 ```ts
 import { controller, resource } from "@pumped-fn/lite"
@@ -391,16 +398,15 @@ sequenceDiagram
     Note over Scope: await invalidation chain only
 ```
 
-## Golden Examples
+## Practical Examples
 
-Runnable examples live in `examples/lite-golden`. They cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
+Runnable practical examples under `examples/` cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
 
-Frontend and BFF examples live in `examples/lite-golden-react` and `examples/lite-golden-bff`. The
-tiered comparison in `examples/lite-golden-react/capstone` shows logic moving across backend, BFF, and
-React tiers while tests keep the same scope seam. Some spectrum slices are intentionally backlog, and the
-comparison docs scope implemented claims to the slices that exist.
+Frontend and BFF practical examples show logic moving across backend, BFF, and React tiers while tests
+keep the same scope seam. Some spectrum slices are intentionally backlog, and the comparison docs scope
+implemented claims to the slices that exist.
 
-The golden examples use the same boundary vocabulary as the package docs. React bootstrap files are
+The practical examples use the same boundary vocabulary as the package docs. React bootstrap files are
 adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring, and
 observers execute graph work through `useExecutionContext` instead of accepting `scope` or hand-rolling
 `createContext`/`close` wrappers. Backend and BFF entry points keep route/job work behind flows or
@@ -409,23 +415,23 @@ kept in transport atoms or composition-root adapters; capability atoms depend on
 presettable; feature atoms depend on capabilities. Public example claims are guarded by structural tests
 for ambient IO, test substitution, provider wiring, route boundaries, and derived inventories.
 
-Backend golden:
+Backend practical examples:
 
 ```bash
-pnpm -F @pumped-fn/lite-golden test
-pnpm -F @pumped-fn/lite-golden typecheck
+pnpm test
+pnpm typecheck
 ```
 
-React golden:
+React practical examples:
 
 ```bash
-pnpm -F @pumped-fn/lite-golden-react test
-pnpm -F @pumped-fn/lite-golden-react typecheck
+pnpm test
+pnpm typecheck
 ```
 
-BFF golden:
+BFF practical examples:
 
 ```bash
-pnpm -F @pumped-fn/lite-golden-bff test
-pnpm -F @pumped-fn/lite-golden-bff typecheck
+pnpm test
+pnpm typecheck
 ```

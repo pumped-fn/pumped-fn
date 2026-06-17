@@ -7,14 +7,15 @@
     "bench": "vitest bench --run",
     "bench:lite": "vitest bench --run bench/lite",
     "bench:react": "vitest bench --run bench/react",
-    "test": "vitest run"
+    "test": "vitest run tests"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-react": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "jsdom": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",

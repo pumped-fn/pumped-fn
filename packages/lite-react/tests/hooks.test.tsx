@@ -26,6 +26,21 @@ class ErrorBoundary extends Component<
   }
 }
 
+function recordUnhandledRejections() {
+  const unhandled: unknown[] = []
+  const onUnhandled = (event: PromiseRejectionEvent) => {
+    unhandled.push(event.reason)
+    event.preventDefault()
+  }
+  window.addEventListener('unhandledrejection', onUnhandled)
+  return {
+    unhandled,
+    dispose: () => {
+      window.removeEventListener('unhandledrejection', onUnhandled)
+    },
+  }
+}
+
 describe('ScopeProvider + useScope', () => {
   it('provides scope, nests, and throws outside provider', () => {
     const scope = createScope()
@@ -320,6 +335,54 @@ describe('ExecutionContextProvider + useResource', () => {
     })
     expect(closed).toEqual(['acme'])
 
+    await scope.dispose()
+  })
+
+  it('does not share managed execution contexts across React roots using the same scope', async () => {
+    const tenant = tag<string>({ label: 'multi-root-tenant' })
+    const scope = createScope()
+    const captured: Record<string, Lite.ExecutionContext | null> = { first: null, second: null }
+    let creates = 0
+    const currentTenant = resource({
+      name: 'multi-root-current-tenant',
+      deps: { tenant: tags.required(tenant) },
+      factory: (_ctx, { tenant }) => ({ tenant, id: ++creates }),
+    })
+
+    function Root({ label }: { label: 'first' | 'second' }) {
+      const ctx = useExecutionContext()
+      const current = useResource(currentTenant, { suspense: false })
+      captured[label] = ctx
+      return (
+        <div>
+          {label}:{ctx.data.seekTag(tenant) ?? 'none'}:{current.status === 'ready' ? current.data.id : 'loading'}
+        </div>
+      )
+    }
+
+    const first = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
+          <Root label="first" />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+    const second = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
+          <Root label="second" />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('first:acme:1')).toBeInTheDocument()
+      expect(screen.getByText('second:acme:2')).toBeInTheDocument()
+    })
+    expect(captured["first"]).not.toBe(captured["second"])
+
+    first.unmount()
+    second.unmount()
     await scope.dispose()
   })
 
@@ -1475,12 +1538,7 @@ describe('useAtom - non-Suspense mode', () => {
     })
 
     const scope = createScope()
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => {
-      unhandled.push(reason)
-    }
-
-    process.on('unhandledRejection', onUnhandled)
+    const rejections = recordUnhandledRejections()
 
     try {
       function TestComponent() {
@@ -1508,9 +1566,9 @@ describe('useAtom - non-Suspense mode', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(unhandled).toHaveLength(0)
+      expect(rejections.unhandled).toHaveLength(0)
     } finally {
-      process.removeListener('unhandledRejection', onUnhandled)
+      rejections.dispose()
     }
   })
 
@@ -1528,12 +1586,7 @@ describe('useAtom - non-Suspense mode', () => {
 
     const scope = createScope()
     await scope.resolve(testAtom)
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => {
-      unhandled.push(reason)
-    }
-
-    process.on('unhandledRejection', onUnhandled)
+    const rejections = recordUnhandledRejections()
 
     try {
       function TestComponent() {
@@ -1572,9 +1625,9 @@ describe('useAtom - non-Suspense mode', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(unhandled).toHaveLength(0)
+      expect(rejections.unhandled).toHaveLength(0)
     } finally {
-      process.removeListener('unhandledRejection', onUnhandled)
+      rejections.dispose()
     }
   })
 

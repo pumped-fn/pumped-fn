@@ -30,9 +30,9 @@ Use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` for observation.
 
 Keep graph logic in node. Logic tests should exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })` and public APIs, without DOM, browser globals, module mocks, or product-only test branches.
 
-Use DOM or browser observer tests for rendered components, provider wiring, and bootstrap adapters. DOM/browser observer tests should prove that components observe graph state and dispatch graph actions, not that business logic only works when React or a browser is present.
+Use browser observer tests for rendered components, provider wiring, and bootstrap adapters. Browser observer tests should prove that components observe graph state and dispatch graph actions, not that business logic only works when React or a browser is present.
 
-Browser mode can replace jsdom for observer tests after coverage merging and CI browser setup are proven, but it does not replace node logic tests. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
+Browser mode does not replace node logic tests. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
 
 Public examples that claim architectural quality should keep those claims derived or explicitly scoped: inventories come from files, implemented slices name backlog, and strong boundary rules get structural guards.
 
@@ -115,13 +115,14 @@ function CurrentUser() {
 }
 ```
 
-Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on the return value. Resource reset is owned by `ctx.release(resource)`.
+Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on the return value. Resource controllers are internal observation handles here; product components should use the load union, Suspense value, or domain actions. Resource reset is owned by `ctx.release(resource)`.
 
 ---
 
 ## Scoped Form State
 
 `scopedValue` is the form/draft primitive. It is backed by a current-owned resource, so nested provider forms reset with their owning execution context instead of leaking into the parent boundary. Define dependencies and actions with the value, then let React subscribe at the boundary.
+React receives `snapshot + actions`, not a resource controller.
 Complete React modules should show the provider boundary too: `ScopeProvider` owns the scope, and `ExecutionContextProvider` owns the execution context where the scoped value lives.
 
 ```tsx

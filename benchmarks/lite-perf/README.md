@@ -5,7 +5,7 @@ Micro-benchmarks for `@pumped-fn/lite` and `@pumped-fn/lite-react`. Runs against
 ```bash
 pnpm bench          # everything
 pnpm bench:lite     # core: resolve, warm paths, updates, cascades, select, flow
-pnpm bench:react    # jsdom: re-render fan-out, selector gating, mount churn
+pnpm bench:react    # browser mode: re-render fan-out, selector gating, mount churn
 pnpm test           # behavior probes: re-render counts, listener-churn regression
 ```
 
@@ -17,12 +17,12 @@ pnpm test           # behavior probes: re-render counts, listener-churn regressi
 - `bench/lite/update.bench.ts` — `set` dispatch by listener count, watch-cascade chains and fan-outs, eq-suppressed cascades.
 - `bench/lite/select-events.bench.ts` — `scope.select` hit/miss gating at 100 handles, subscription churn.
 - `bench/lite/flow.bench.ts` — execution context lifecycle, flow/fn exec, nesting, `onClose` churn.
-- `bench/react/react.bench.tsx` — update propagation through `useAtom`/`useSelect` at 100 consumers, mount/unmount.
+- `bench/react/react.browser.bench.tsx` — update propagation through `useAtom`/`useSelect` at 100 consumers, mount/unmount.
 - `tests/` — behavior probes that document re-render semantics and guard against the equal-count listener-replacement bug returning (the removed size-validated `listenerSnapshotCache`).
 
 ## Reading the numbers
 
-- jsdom React numbers are relative, not absolute — compare rows, not browsers.
+- browser-mode React numbers are relative, not absolute — compare rows, not browsers.
 - Cold-resolve means are skewed by GC pauses from per-iteration scope creation (rme ±15% typical); prefer p75.
 - Listener callbacks must be distinct closures — identical function references dedupe in the listener `Set` and silently measure the single-listener fast path.
 - Cascade rows measure `set` + `scope.flush()`: the dominant cost is per-atom factory re-resolution (~2µs/node), not notification dispatch.
