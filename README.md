@@ -2,186 +2,273 @@
 
 [![npm version](https://img.shields.io/npm/v/@pumped-fn/lite)](https://www.npmjs.com/package/@pumped-fn/lite)
 
-A lightweight effect system for TypeScript with managed lifecycles and minimal reactivity.
+`pumped-fn` is a TypeScript package family for building application systems around explicit boundaries.
+It gives you a small core runtime for dependency graphs, execution-scoped work, lifecycle cleanup,
+reactive state, and test seams, plus React bindings and structural guardrails for larger codebases.
 
-## What is an Effect System?
-
-An effect system manages **how** and **when** computations run:
-- **Resource lifecycle** - acquire, use, release
-- **Computation ordering** - dependency resolution
-- **Side effect isolation** - controlled execution boundaries
+The main idea is simple: put the system behind a scope. Product code declares atoms, flows, resources,
+tags, and extensions. Composition roots create scopes. Tests create scopes with different presets. UI
+components observe the graph instead of owning business logic.
 
 ## Install
 
 ```bash
 npm install @pumped-fn/lite
+npm install @pumped-fn/lite-react
 ```
 
-## Goal
+Use only `@pumped-fn/lite` for backend, workers, command-line tools, and framework-neutral graph logic.
+Add `@pumped-fn/lite-react` when React should observe that graph.
 
-Describe application state, execution-scoped work, and cross-cutting behavior as explicit dataflow instead of ad hoc globals or framework-owned stores.
+## Why This Exists
 
-## Containers
+Most application code has the same hidden problems in different forms:
+
+- Import-time singletons connect early and close late.
+- Request state leaks through globals or parameter drilling.
+- Frontend components grow validation, async work, derived state, and IO.
+- Tests patch modules or browser globals because there is no honest seam.
+- Cross-cutting behavior like tracing, auth, logging, and transactions is repeated by hand.
+
+`pumped-fn` makes those concerns explicit without turning the app into a framework. A scope owns the graph.
+An execution context owns one request, job, action, or UI boundary. Presets change the radius of a test.
+Extensions wrap execution. React is an observer layer.
+
+## Package Map
 
 | Package | Role |
-|---------|------|
-| `@pumped-fn/lite` | Core runtime: atoms, flows, resources, tags, presets, controllers |
-| `@pumped-fn/lite-react` | React bindings over Lite controllers and subscriptions |
-| `@pumped-fn/lite-devtools` | Observability extension and transports |
-| `@pumped-fn/lite-hmr` | HMR helpers for atom state preservation |
+| --- | --- |
+| `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
+| `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
+| `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
+| `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
+| `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
+| `@pumped-fn/lite-extension-suspense` | Suspense-oriented extension support |
+| `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
-## Abstract Constraints
+## Mental Model
 
-- Lifecycle and cache ownership stay in Lite scopes and controllers.
-- Cross-cutting behavior goes through extensions and tags rather than hidden globals.
-- Framework integrations should stay thin and adapt to the host rendering model instead of redefining Lite semantics.
-- Long-lived state belongs in atoms; execution/request-local work belongs in `ExecutionContext` and `resource()`.
-
-## Core Concepts
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Scope                               │
-│  (long-lived execution boundary)                            │
-│                                                             │
-│   ┌─────────┐      ┌─────────┐      ┌─────────┐            │
-│   │  Atom   │ ──── │  Atom   │ ──── │  Atom   │            │
-│   │ (effect)│      │ (effect)│      │ (effect)│            │
-│   └─────────┘      └─────────┘      └─────────┘            │
-│        │                                  │                 │
-│        └──────────────┬───────────────────┘                 │
-│                       ▼                                     │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │              ExecutionContext                       │   │
-│   │  (short-lived operation with input, tags, cleanup)  │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+```text
+composition root
+  createScope({ presets, tags, extensions })
+        |
+        v
+scope
+  long-lived graph boundary
+  atoms: cached capabilities, state, derived data, infrastructure
+  controllers/select: opt-in reactivity
+        |
+        v
+execution context
+  request, job, action, route, or UI boundary
+  flows: input/output work
+  resources: transactions, request loggers, form drafts, spans
+  tags: tenant, locale, trace id, runtime config
 ```
 
-| Concept | Purpose |
-|---------|---------|
-| **Scope** | Long-lived boundary that manages atom lifecycles |
-| **Atom** | A managed effect with lifecycle (create, cache, cleanup, recreate) |
-| **ExecutionContext** | Short-lived context for running operations |
-| **Controller** | Handle for observing and controlling an atom's state |
-| **Tag** | Contextual value passed through execution |
+The same seam works for backend and frontend:
 
-## Effect Lifecycle
+- Backend handlers create or receive an execution context and run flows.
+- Workers create scopes for process lifetime and contexts per job.
+- React roots render `ScopeProvider` and `ExecutionContextProvider`.
+- Tests use `createScope({ presets, tags, extensions })` and public APIs.
 
-```mermaid
-stateDiagram-v2
-    [*] --> idle
-    idle --> resolving: resolve()
-    resolving --> resolved: success
-    resolving --> failed: error
-    resolved --> resolving: invalidate()
-    failed --> resolving: invalidate()
-    resolved --> idle: release()
-    failed --> idle: release()
-```
+## Core Primitives
 
-## API Reference
+| Primitive | Owns | Use it for |
+| --- | --- | --- |
+| `createScope` | The composition and test boundary | App roots, server mounts, worker processes, isolated tests |
+| `atom` | Scope-owned values | Transports, capabilities, state, derived data, caches |
+| `flow` | Short-lived execution | Commands, request handlers, actions with typed input |
+| `resource` | Execution-context-owned values | Transactions, request loggers, spans, per-action buffers, form drafts |
+| `tag` | Typed ambient values | Tenant, request id, locale, runtime config, equality-aware boundary identity |
+| `preset` | Replacement at the seam | Unit radius tests, outside-in adapter tests, tenant-specific implementation swaps |
+| `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
+| `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |
 
-| Function | Description |
-|----------|-------------|
-| `createScope(options?)` | Create execution boundary |
-| `atom(config)` | Define managed effect (long-lived) |
-| `flow(config)` | Define operation template |
-| `tag(config)` | Define contextual value |
-| `controller(atom)` | Wrap atom for deferred resolution |
-| `preset(atom, value)` | Override atom value in scope |
+## Architectural Shape
 
-## Example: Snake Game
+`pumped-fn` code usually falls into four layers:
 
-```typescript
-import { atom, tag, tags, controller, createScope } from '@pumped-fn/lite'
+| Layer | Responsibility | Rule of thumb |
+| --- | --- | --- |
+| Transport atom | Wrap raw ambient IO such as fetch, storage, timers, clock, random, process APIs | Its own unit test may fake the platform below the seam |
+| Capability atom | Expose domain/application operations over transports | No raw IO, no token/session plumbing in feature nodes |
+| Feature atom or flow | Own application state, decisions, derived data, and use-case execution | Depends on capabilities and resources |
+| Composition root | Create scopes, root contexts, providers, route/job mounts, and disposal | Thin, tested adapter; no service-locator helper that accepts `scope` |
 
-type Point = { x: number; y: number }
-type Dir = 'up' | 'down' | 'left' | 'right'
-type GameState = { snake: Point[]; food: Point; dir: Dir; score: number; hi: number; dead: boolean; size: number }
+That shape lets you test inside-out or outside-in without changing product code. Inside-out tests preset a
+unit's direct dependencies. Outside-in tests preset only edge adapters. Needing module mocks, product
+branches for test mode, or global patches above a raw transport wrapper is a design smell.
 
-const gridSize = tag<number>({ label: 'gridSize', default: 20 })
-const tickMs = tag<number>({ label: 'tickMs', default: 100 })
-const stateTag = tag<GameState>({ label: 'state' })
+## Backend, BFF, Worker
 
-const gameAtom = atom({
-  deps: { size: tags.required(gridSize) },
-  factory: (ctx, { size }): GameState => {
-    let state = ctx.data.get(stateTag)  // GameState | undefined - type safe!
-    if (!state) {
-      state = {
-        snake: [{ x: Math.floor(size/2), y: Math.floor(size/2) }],
-        food: { x: Math.floor(size/4), y: Math.floor(size/4) },
-        dir: 'right', score: 0, hi: 0, dead: false, size
-      }
-      ctx.data.set(stateTag, state)  // Type checked
+Use `@pumped-fn/lite` directly when there is no UI.
+
+```ts
+import { atom, createScope, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
+
+const tenantId = tag<string>({ label: "tenant.id" })
+
+const http = atom({
+  factory: () => ({
+    get: async (path: string) => ({ path, ok: true }),
+  }),
+})
+
+const audit = resource({
+  name: "audit",
+  ownership: "boundary",
+  factory: (ctx) => {
+    const events: string[] = []
+    ctx.cleanup(() => {
+      events.length = 0
+    })
+    return {
+      record(event: string) {
+        events.push(event)
+      },
+      snapshot: () => [...events],
     }
-    return state
-  }
+  },
 })
 
-const tickerAtom = atom({
-  deps: { ms: tags.required(tickMs), game: controller(gameAtom) },
-  factory: (ctx, { ms, game }) => {
-    const id = setInterval(() => {
-      const state = game.get()
-      if (!state.dead) {
-        tick(state)
-        game.invalidate()
-      }
-    }, ms)
-    ctx.cleanup(() => clearInterval(id))
-  }
+const loadDashboard = flow({
+  parse: typed<{ userId: string }>(),
+  deps: { http, audit, tenantId: tags.required(tenantId) },
+  factory: async (ctx, deps) => {
+    deps.audit.record(`dashboard:${ctx.input.userId}`)
+    return deps.http.get(`/tenants/${deps.tenantId}/users/${ctx.input.userId}/dashboard`)
+  },
 })
 
-function tick(s: GameState) { /* move snake, check collisions, update score */ }
+const scope = createScope({ tags: [tenantId("acme")] })
+const ctx = scope.createContext()
+const dashboard = await ctx.exec({ flow: loadDashboard, input: { userId: "u1" } })
+await ctx.close()
+await scope.dispose()
+```
 
-async function createSnakeGame(size = 20, tickInterval = 100) {
-  const scope = createScope({ tags: [gridSize(size), tickMs(tickInterval)] })
-  const gameCtrl = scope.controller(gameAtom)
-  const tickerCtrl = scope.controller(tickerAtom)
-  await gameCtrl.resolve()
+The same structure works for HTTP handlers, BFF endpoints, scheduled jobs, command handlers, and CLIs.
+Adapters translate the outside world into flow input and tags; the graph owns application behavior.
 
-  const turn = (dir: Dir) => {
-    const state = gameCtrl.get()
-    const opposite: Record<Dir, Dir> = { up: 'down', down: 'up', left: 'right', right: 'left' }
-    if (opposite[dir] !== state.dir && !state.dead) state.dir = dir
-  }
+## React
 
-  return {
-    state: gameCtrl,
-    up: () => turn('up'),
-    down: () => turn('down'),
-    left: () => turn('left'),
-    right: () => turn('right'),
-    step: () => { tick(gameCtrl.get()); gameCtrl.invalidate() },
-    start: () => tickerCtrl.resolve(),
-    pause: () => tickerCtrl.release(),
-    dispose: () => scope.dispose()
-  }
+React components should observe and dispatch. They should not create dependencies, mirror graph state, or
+own execution lifecycles.
+
+```tsx
+import { atom, createScope, flow } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider, useAtom, useExecutionContext } from "@pumped-fn/lite-react"
+
+const dashboardState = atom({
+  factory: () => ({ title: "Dashboard" }),
+})
+
+const refreshDashboard = flow({
+  factory: () => undefined,
+})
+
+const scope = createScope()
+
+function App() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <Dashboard />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
 }
 
-const game = await createSnakeGame(15, 100)
-game.state.on('resolved', () => render(game.state.get()))
-await game.start()
-game.down()
+function Dashboard() {
+  const dashboard = useAtom(dashboardState)
+  const ctx = useExecutionContext()
+
+  return (
+    <button onClick={() => void ctx.exec({ flow: refreshDashboard })}>
+      {dashboard.title}
+    </button>
+  )
+}
 ```
 
-**What's demonstrated:**
-- **`tag`** - `gridSize`, `tickMs` configure game per-instance; `stateTag` provides typed storage key
-- **`ctx.data`** - State persists across `invalidate()` calls with type-safe tag-based API
-- **`controller()`** - Ticker gets `Controller<GameState>`, calls `.get()` and `.invalidate()`
-- **`invalidate()`** - Re-runs factory, notifies subscribers
-- **`cleanup()`** - Ticker interval cleared on `pause()`
-- **`ctrl.on('resolved')`** - UI subscribes to state changes
+For forms, modals, editors, and nested UI boundaries, `@pumped-fn/lite-react` provides `scopedValue`.
+That state is backed by a current-owned resource, so it is testable without React and resets when the
+owning execution context unmounts or is released.
 
-## Design Principles
+## Tests
 
-1. **Minimal API** - Every export is expensive to learn
-2. **Zero dependencies** - No runtime dependencies
-3. **Explicit lifecycle** - No magic, clear state transitions
-4. **Composable** - Effects compose through deps
+The scope is the single seam:
+
+```ts
+import { atom, createScope, preset } from "@pumped-fn/lite"
+
+const clock = atom({
+  factory: () => ({ now: () => Date.now() }),
+})
+
+const timestamp = atom({
+  deps: { clock },
+  factory: (_ctx, deps) => deps.clock.now(),
+})
+
+const scope = createScope({
+  presets: [preset(clock, { now: () => 42 })],
+})
+
+const value = await scope.resolve(timestamp)
+if (value !== 42) throw new Error("expected preset clock")
+
+await scope.dispose()
+```
+
+Frontend tests split by responsibility. Graph logic stays in node tests and uses the same scope seam.
+Rendered observer tests run in Vitest Browser Mode under `ScopeProvider` and `ExecutionContextProvider`.
+Browser mode proves React wiring; it does not replace node logic tests.
+
+`@pumped-fn/lite-lint` codifies the common mistakes: module mocks, stale browser-emulator markers,
+definition-handle suffixes, scope-as-argument helpers, shared scope factories, inline ambient IO, React
+feature components using scope directly, and local state mirrors.
+
+## Practical Examples
+
+The examples are part of the public contract for how code should be shaped:
+
+| Path | What it shows |
+| --- | --- |
+| `examples/lite-practical` | Backend and service-style patterns, plus a service health capstone |
+| `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, complex Kanban |
+| `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
+| `benchmarks/lite-perf` | Runtime and React observer performance checks |
+
+## Local Development
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm verify
+```
+
+Useful package commands:
+
+```bash
+pnpm -F @pumped-fn/lite test
+pnpm -F @pumped-fn/lite-react test
+pnpm -F @pumped-fn/lite-lint test
+```
+
+## Documentation
+
+- Core runtime: [`packages/lite/README.md`](packages/lite/README.md)
+- Core patterns: [`packages/lite/PATTERNS.md`](packages/lite/PATTERNS.md)
+- React runtime: [`packages/lite-react/README.md`](packages/lite-react/README.md)
+- React patterns: [`packages/lite-react/PATTERNS.md`](packages/lite-react/PATTERNS.md)
+- Anti-pattern scanner: [`packages/lite-lint/README.md`](packages/lite-lint/README.md)
 
 ## License
 
