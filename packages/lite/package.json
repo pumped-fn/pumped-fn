@@ -7,7 +7,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "bin": {
-    "pumped-lite": "./bin/pumped-lite.mjs"
+    "pumped-lite": "bin/pumped-lite.mjs"
   },
   "exports": {
     ".": {
