@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { tag, tags } from '@pumped-fn/lite'
-import { atom, createScope, flow, preset, resource, ExecutionContextProvider, ScopeProvider, useScope, useAtom, useSelect, useController, useResource } from '../src'
+import { atom, createScope, flow, preset, resource, scopedValue, ExecutionContextProvider, ScopeProvider, useScope, useExecutionContext, useAtom, useSelect, useController, useResource, useScopedValue } from '../src'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -23,6 +23,21 @@ class ErrorBoundary extends Component<
       return this.props.fallback
     }
     return this.props.children
+  }
+}
+
+function recordUnhandledRejections() {
+  const unhandled: unknown[] = []
+  const onUnhandled = (event: PromiseRejectionEvent) => {
+    unhandled.push(event.reason)
+    event.preventDefault()
+  }
+  window.addEventListener('unhandledrejection', onUnhandled)
+  return {
+    unhandled,
+    dispose: () => {
+      window.removeEventListener('unhandledrejection', onUnhandled)
+    },
   }
 }
 
@@ -285,12 +300,12 @@ describe('ExecutionContextProvider + useResource', () => {
   })
 
   it('can create and close a managed execution context from the surrounding scope', async () => {
-    const tenantTag = tag<string>({ label: 'tenant' })
+    const tenant = tag<string>({ label: 'tenant' })
     const closed: string[] = []
     const scope = createScope()
     const currentTenant = resource({
       name: 'current-tenant',
-      deps: { tenant: tags.required(tenantTag) },
+      deps: { tenant: tags.required(tenant) },
       factory: (ctx, { tenant }) => {
         ctx.onClose(() => { closed.push(tenant) })
         return { tenant }
@@ -304,7 +319,7 @@ describe('ExecutionContextProvider + useResource', () => {
 
     const view = render(
       <ScopeProvider scope={scope}>
-        <ExecutionContextProvider tags={[tenantTag('acme')]}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
           <TestComponent />
         </ExecutionContextProvider>
       </ScopeProvider>
@@ -320,6 +335,271 @@ describe('ExecutionContextProvider + useResource', () => {
     })
     expect(closed).toEqual(['acme'])
 
+    await scope.dispose()
+  })
+
+  it('does not share managed execution contexts across React roots using the same scope', async () => {
+    const tenant = tag<string>({ label: 'multi-root-tenant' })
+    const scope = createScope()
+    const captured: Record<string, Lite.ExecutionContext | null> = { first: null, second: null }
+    let creates = 0
+    const currentTenant = resource({
+      name: 'multi-root-current-tenant',
+      deps: { tenant: tags.required(tenant) },
+      factory: (_ctx, { tenant }) => ({ tenant, id: ++creates }),
+    })
+
+    function Root({ label }: { label: 'first' | 'second' }) {
+      const ctx = useExecutionContext()
+      const current = useResource(currentTenant, { suspense: false })
+      captured[label] = ctx
+      return (
+        <div>
+          {label}:{ctx.data.seekTag(tenant) ?? 'none'}:{current.status === 'ready' ? current.data.id : 'loading'}
+        </div>
+      )
+    }
+
+    const first = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
+          <Root label="first" />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+    const second = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[tenant('acme')]}>
+          <Root label="second" />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('first:acme:1')).toBeInTheDocument()
+      expect(screen.getByText('second:acme:2')).toBeInTheDocument()
+    })
+    expect(captured["first"]).not.toBe(captured["second"])
+
+    first.unmount()
+    second.unmount()
+    await scope.dispose()
+  })
+
+  it('reuses managed contexts when recreated object tag values compare equal', async () => {
+    const boundary = tag<{ id: string; version: number }>({
+      label: 'managed-object-boundary',
+      eq: (a, b) => a.id === b.id && a.version === b.version,
+    })
+    const scope = createScope()
+    const closes: number[] = []
+    let creates = 0
+    const draft = scopedValue({
+      name: 'managed-object-draft',
+      deps: { boundary: tags.required(boundary) },
+      initial: (_ctx, { boundary }) => ({
+        id: boundary.id,
+        version: boundary.version,
+        created: ++creates,
+      }),
+      onClose: (helpers) => {
+        closes.push(helpers.get().created)
+      },
+    })
+
+    function Editor() {
+      const load = useScopedValue(draft, { suspense: false })
+      return (
+        <div>
+          draft:{load.status === 'ready' ? load.data.snapshot.created : 'loading'}
+        </div>
+      )
+    }
+
+    function App() {
+      return (
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[boundary({ id: 'card-1', version: 1 })]}>
+            <Editor />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+    }
+
+    const view = render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('draft:1')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      view.rerender(<App />)
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('draft:1')).toBeInTheDocument()
+    })
+    expect(creates).toBe(1)
+    expect(closes).toEqual([])
+
+    view.unmount()
+    await scope.dispose()
+  })
+
+  it('nests managed execution contexts under the nearest execution provider', async () => {
+    const workspace = tag<string>({ label: 'managed-workspace' })
+    const board = tag<string>({ label: 'managed-board' })
+    const closes: string[] = []
+    let creates = 0
+    let outerCtx: Lite.ExecutionContext | null = null
+    let innerCtx: Lite.ExecutionContext | null = null
+    let outerValue: { id: number } | undefined
+    let innerValue: { id: number } | undefined
+    let outerDraft: unknown
+    let innerDraft: unknown
+    const scope = createScope()
+    const workspaceResource = resource({
+      name: 'managed-workspace-resource',
+      deps: { workspace: tags.required(workspace) },
+      factory: (ctx, { workspace }) => {
+        const id = ++creates
+        ctx.cleanup(() => {
+          closes.push(`workspace:${workspace}:${id}`)
+        })
+        return { id }
+      },
+    })
+    const cardDraft = scopedValue({
+      name: 'managed-card-draft',
+      initial: (ctx) => ({ title: ctx.data.seekTag(board) ?? 'outer' }),
+      onClose: (helpers, _deps, result) => {
+        closes.push(`draft:${helpers.get().title}:${result.ok}`)
+      },
+    })
+
+    function Outer() {
+      outerCtx = useExecutionContext()
+      const load = useResource(workspaceResource, { suspense: false })
+      const draft = useScopedValue(cardDraft, { suspense: false })
+      if (load.status === 'ready') outerValue = load.data
+      if (draft.status === 'ready') outerDraft = draft.data
+      return (
+        <ExecutionContextProvider tags={[board('b1')]}>
+          <Inner />
+        </ExecutionContextProvider>
+      )
+    }
+
+    function Inner() {
+      innerCtx = useExecutionContext()
+      const load = useResource(workspaceResource, { suspense: false })
+      const draft = useScopedValue(cardDraft, { suspense: false })
+      if (load.status === 'ready') innerValue = load.data
+      if (draft.status === 'ready') innerDraft = draft.data
+      return (
+        <div>
+          workspace:{innerCtx.data.seekTag(workspace) ?? 'none'};board:{innerCtx.data.seekTag(board) ?? 'none'};
+          resource:{load.status === 'ready' ? load.data.id : 'none'};draft:{draft.status}
+        </div>
+      )
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider tags={[workspace('w1')]}>
+          <Outer />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/workspace:w1;board:b1;\s*resource:1;draft:ready/)).toBeInTheDocument()
+    })
+
+    const capturedOuter = outerCtx as unknown as Lite.ExecutionContext
+    const capturedInner = innerCtx as unknown as Lite.ExecutionContext
+    expect(capturedInner.parent).toBe(capturedOuter)
+    expect(capturedOuter.data.seekTag(board)).toBeUndefined()
+    expect(innerValue).toBe(outerValue)
+    expect(creates).toBe(1)
+    expect(innerDraft).not.toBe(outerDraft)
+
+    await act(async () => {
+      view.rerender(
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[workspace('w1')]}>
+            <div>outer only</div>
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+      await Promise.resolve()
+    })
+
+    expect(closes).toEqual(['draft:b1:true'])
+
+    await act(async () => {
+      view.unmount()
+      await Promise.resolve()
+    })
+    expect(closes).toEqual(['draft:b1:true', 'draft:outer:true', 'workspace:w1:1'])
+
+    await scope.dispose()
+  })
+
+  it('keeps parent managed contexts alive for child-started boundary work before commit', async () => {
+    const scope = createScope()
+    const cleanups: string[] = []
+    let started = false
+    let resume!: () => void
+    const slowResource = resource({
+      name: 'nested-managed-boundary-resource',
+      factory: async (ctx) => {
+        started = true
+        ctx.cleanup(() => {
+          cleanups.push('resource')
+        })
+        await new Promise<void>((resolve) => {
+          resume = resolve
+        })
+        return 'nested-ready'
+      },
+    })
+
+    function TestComponent() {
+      const value = useResource(slowResource)
+      return <div>{value}</div>
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <Suspense fallback={<div>Loading nested managed...</div>}>
+          <ExecutionContextProvider>
+            <ExecutionContextProvider>
+              <TestComponent />
+            </ExecutionContextProvider>
+          </ExecutionContextProvider>
+        </Suspense>
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(started).toBe(true)
+      expect(screen.getByText('Loading nested managed...')).toBeInTheDocument()
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(cleanups).toEqual([])
+
+    await act(async () => {
+      view.unmount()
+      resume()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(cleanups).toEqual(['resource'])
+    })
     await scope.dispose()
   })
 
@@ -1319,12 +1599,7 @@ describe('useAtom - non-Suspense mode', () => {
     })
 
     const scope = createScope()
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => {
-      unhandled.push(reason)
-    }
-
-    process.on('unhandledRejection', onUnhandled)
+    const rejections = recordUnhandledRejections()
 
     try {
       function TestComponent() {
@@ -1352,9 +1627,9 @@ describe('useAtom - non-Suspense mode', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(unhandled).toHaveLength(0)
+      expect(rejections.unhandled).toHaveLength(0)
     } finally {
-      process.removeListener('unhandledRejection', onUnhandled)
+      rejections.dispose()
     }
   })
 
@@ -1372,12 +1647,7 @@ describe('useAtom - non-Suspense mode', () => {
 
     const scope = createScope()
     await scope.resolve(testAtom)
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => {
-      unhandled.push(reason)
-    }
-
-    process.on('unhandledRejection', onUnhandled)
+    const rejections = recordUnhandledRejections()
 
     try {
       function TestComponent() {
@@ -1416,9 +1686,9 @@ describe('useAtom - non-Suspense mode', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(unhandled).toHaveLength(0)
+      expect(rejections.unhandled).toHaveLength(0)
     } finally {
-      process.removeListener('unhandledRejection', onUnhandled)
+      rejections.dispose()
     }
   })
 

@@ -1,13 +1,13 @@
 {
   "name": "@pumped-fn/lite",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Lightweight dependency injection with minimal reactivity",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "bin": {
-    "pumped-lite": "./bin/pumped-lite.mjs"
+    "pumped-lite": "bin/pumped-lite.mjs"
   },
   "exports": {
     ".": {

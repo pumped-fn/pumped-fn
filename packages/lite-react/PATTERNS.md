@@ -4,21 +4,65 @@ Architectural patterns for `@pumped-fn/lite-react`. For API reference, see [READ
 
 ---
 
+## Observer Components
+
+React components are observers of the Lite graph. The graph owns logic, mutable state, validation, async work, and dependency declarations; components render snapshots and dispatch graph actions.
+
+Use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` for observation. Use `useExecutionContext` for UI-triggered flows. Treat `useScope` as an infrastructure escape hatch for provider/bootstrap helpers, not the normal feature-component path.
+
+---
+
+## Provider-Owned UI Execution
+
+`ScopeProvider` supplies the composition boundary, and `ExecutionContextProvider` supplies the UI execution boundary. Feature components should not create contexts, close contexts, or pass `scope` into product helpers.
+
+```tsx
+<ScopeProvider scope={scope}>
+  <ExecutionContextProvider>
+    <App />
+  </ExecutionContextProvider>
+</ScopeProvider>
+```
+
+---
+
+## Testing Split
+
+Keep graph logic in node. Logic tests should exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })` and public APIs, without DOM, browser globals, module mocks, or product-only test branches.
+
+Use browser observer tests for rendered components, provider wiring, and bootstrap adapters. Browser observer tests should prove that components observe graph state and dispatch graph actions, not that business logic only works when React or a browser is present.
+
+Browser mode does not replace node logic tests. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
+
+Public examples that claim architectural quality should keep those claims derived or explicitly scoped: inventories come from files, implemented slices name backlog, and strong boundary rules get structural guards.
+
+`@pumped-fn/lite-lint` codifies the React-facing guardrails in a lint-like scanner: feature components
+should not call `useScope`, mirror graph state with `useState`, create or close execution contexts
+manually, or rely on JSDOM instead of Vitest Browser Mode observer tests.
+
+---
+
 ## App Bootstrap
 
-Pre-resolve critical atoms before rendering to avoid loading flash:
+Bootstrap is a composition-root adapter. It creates the scope once, wires providers, mounts React, and owns disposal. Pre-resolve critical atoms before rendering when you want to avoid loading flash, but keep business logic in graph nodes instead of the bootstrap function.
 
 ```mermaid
 sequenceDiagram
     participant Main as main.tsx
     participant Scope
+    participant Ctx as ExecutionContextProvider
     participant React as React Tree
 
     Main->>Scope: createScope({ extensions })
-    Main->>Scope: resolve critical atoms
-    Main->>React: render with ScopeProvider
-    React->>React: useAtom → instant (pre-resolved)
+    Main->>Scope: resolve critical atoms when needed
+    Main->>React: render ScopeProvider
+    React->>Ctx: render ExecutionContextProvider
+    React->>React: observers subscribe and dispatch
+    Main->>React: unmount root
+    Main->>Scope: dispose()
 ```
+
+Tests can mount the same bootstrap adapter and assert through the returned scope or public graph APIs. Feature components stay under `ExecutionContextProvider`; they do not create or close contexts themselves.
 
 ---
 
@@ -61,7 +105,9 @@ sequenceDiagram
 </ScopeProvider>
 ```
 
-Use explicit `ctx` for tests and request boundaries. Omit `ctx` only when you want managed mode from the surrounding `ScopeProvider`; managed mode creates the execution context after commit and closes it on unmount.
+Use explicit `ctx` for tests and request boundaries. Omit `ctx` only when you want managed mode from the surrounding `ScopeProvider`; managed mode creates the execution context for the provider, inherits the nearest execution context in the same scope, and closes it on unmount.
+
+Managed mode reuses the context when the parent and tag records compare the same. Object-valued boundary tags should define `eq` only when equal values are fully substitutable, because reuse keeps the existing execution context and its current-owned resources. This is a React boundary optimization, not tag lookup, dedupe, cache, or resource-sharing semantics.
 
 `useResource(resource, { suspense: false })` returns a load union, not an atom-style controller state:
 
@@ -75,13 +121,14 @@ function CurrentUser() {
 }
 ```
 
-Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on the return value. Resource reset is owned by `ctx.release(resource)`.
+Do not add `resolve: true`, read `loading`, or call `controller.invalidate()` on the return value. Resource controllers are internal observation handles here; product components should use the load union, Suspense value, or domain actions. Resource reset is owned by `ctx.release(resource)`.
 
 ---
 
 ## Scoped Form State
 
-`scopedValue` is the form/draft primitive. Define dependencies and actions with the value, then let React subscribe at the boundary.
+`scopedValue` is the form/draft primitive. It is backed by a current-owned resource, so nested provider forms reset with their owning execution context instead of leaking into the parent boundary. Define dependencies and actions with the value, then let React subscribe at the boundary.
+React receives `snapshot + actions`, not a resource controller.
 Complete React modules should show the provider boundary too: `ScopeProvider` owns the scope, and `ExecutionContextProvider` owns the execution context where the scoped value lives.
 
 ```tsx

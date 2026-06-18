@@ -1,8 +1,9 @@
 import { resourceSymbol, type Lite, type MaybePromise } from "./types"
 
 /**
- * Creates an execution-scoped dependency that is resolved per execution chain.
- * Fresh instance on first encounter, seek-up on nested execs within the same chain.
+ * Creates an execution-context-owned dependency.
+ * Boundary-owned resources create on the nearest execution boundary. Current-owned resources
+ * create on the current execution boundary while `ctx.exec()` children can reuse them.
  *
  * @param config - Configuration object containing factory function and optional dependencies
  * @returns A Resource instance that can be declared as a dependency in flows and other resources
@@ -24,6 +25,7 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
 export function resource<T>(config: {
   name?: string
   tags?: Lite.Tagged<any>[]
+  ownership?: Lite.ResourceOwnership
   deps?: undefined
   factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
 }): Lite.Resource<T>
@@ -34,6 +36,7 @@ export function resource<
 >(config: {
   name?: string
   tags?: Lite.Tagged<any>[]
+  ownership?: Lite.ResourceOwnership
   deps: D
   factory: (ctx: Lite.ResourceContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
 }): Lite.Resource<T>
@@ -43,6 +46,7 @@ export function resource(config: any): Lite.Resource<any> {
     [resourceSymbol]: true,
     name: config.name,
     tags: config.tags,
+    ownership: config.ownership,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     factory: config.factory as unknown as Lite.ResourceFactory<any, Record<string, Lite.Dependency>>,
   }) as Lite.Resource<any>

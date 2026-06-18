@@ -6,13 +6,21 @@ import { type Lite } from '@pumped-fn/lite'
 const pendingWork = new WeakMap<Lite.ExecutionContext, Set<Promise<unknown>>>()
 
 export function trackPendingWork(ctx: Lite.ExecutionContext, promise: Promise<unknown>): void {
-  let set = pendingWork.get(ctx)
-  if (!set) {
-    set = new Set()
-    pendingWork.set(ctx, set)
+  const tracked = new Set<Set<Promise<unknown>>>()
+  let current: Lite.ExecutionContext | undefined = ctx
+  while (current) {
+    let set = pendingWork.get(current)
+    if (!set) {
+      set = new Set()
+      pendingWork.set(current, set)
+    }
+    set.add(promise)
+    tracked.add(set)
+    current = current.parent
   }
-  set.add(promise)
-  const remove = () => set!.delete(promise)
+  const remove = () => {
+    for (const set of tracked) set.delete(promise)
+  }
   promise.then(remove, remove)
 }
 

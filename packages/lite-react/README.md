@@ -1,184 +1,273 @@
 # @pumped-fn/lite-react
 
-React bindings for `@pumped-fn/lite` with Suspense, ErrorBoundary integration, and stale-while-revalidate refreshes.
+React bindings for `@pumped-fn/lite`.
 
-**Zero dependencies** · **<2KB bundle** · **React 18+**
+`@pumped-fn/lite-react` lets React observe a Lite graph without making React own the graph. Components
+subscribe to atoms, selected slices, resources, and scoped values. Event handlers execute flows through a
+provider-owned execution context. Forms and nested UI state can live in execution-scoped resources instead
+of local component mirrors.
 
-## How It Works
+## Install
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant ScopeProvider
-    participant useAtom
-    participant Controller
-
-    App->>App: scope.resolve(atom)
-    App->>ScopeProvider: <ScopeProvider scope={scope}>
-
-    useAtom->>Controller: check ctrl.state
-    alt resolved
-        Controller-->>useAtom: value
-        useAtom->>Controller: subscribe to changes
-    else resolving with stale value
-        Controller-->>useAtom: stale value
-    else resolving without value
-        useAtom-->>App: throw Promise (Suspense)
-    else failed
-        useAtom-->>App: throw Error (ErrorBoundary)
-    else idle
-        useAtom-->>App: throw Promise (Suspense)
-    end
+```bash
+npm install @pumped-fn/lite @pumped-fn/lite-react
 ```
 
-## State Handling
+The package supports React 18 and React 19.
 
-```mermaid
-flowchart TD
-    Hook[useAtom/useSelect]
-    Hook --> State{ctrl.state?}
+## The Rule
 
-    State -->|idle| AutoResolve[Auto-resolve + Throw Promise]
-    State -->|resolving + stale value| Stale[Return stale value]
-    State -->|resolving + no value| Promise[Throw cached Promise]
-    State -->|resolved| Value[Return value]
-    State -->|failed| Stored[Throw stored error]
+React components are observers.
+The graph owns logic and mutable state; components subscribe and dispatch.
+ExecutionContextProvider owns UI execution by default.
 
-    AutoResolve --> Suspense[Suspense catches]
-    Promise --> Suspense
-    Stale --> Render[Keep current UI]
-    Stored --> ErrorBoundary[ErrorBoundary catches]
-```
+The Lite graph owns:
 
-| State | Hook Behavior |
-|-------|---------------|
-| `idle` | Auto-resolves and suspends — Suspense shows fallback |
-| `resolving` | Returns stale value if available, otherwise throws cached promise |
-| `resolved` | Returns value, subscribes to changes |
-| `failed` | Throws stored error — ErrorBoundary catches |
+- Dependencies
+- Async work
+- Validation and application decisions
+- Mutable state and derived state
+- Resources and cleanup
+- Execution boundaries
 
-## API
+React owns:
 
-### ScopeProvider
+- Rendering
+- Browser events
+- Provider wiring
+- Subscriptions to graph state
 
-Provides scope to component tree.
+Feature components should not call `createScope`, call `scope.createContext`, close execution contexts,
+mirror graph-owned state with local state, or perform inline IO when the graph can own that behavior.
+Feature components should not call `scope.createContext()` or close contexts manually. Components use
+`useExecutionContext` for event-triggered graph work. In short, components use `useExecutionContext`, and
+components should not mirror graph state with `useState`.
+
+`useScope` is an infrastructure hook. Use it for provider/bootstrap helpers and rare integration code that
+must inspect the current scope, not as the normal feature-component pattern.
+
+## Providers
+
+`ScopeProvider` supplies the graph boundary. `ExecutionContextProvider` supplies the UI execution boundary.
 
 ```tsx
-import { createScope } from '@pumped-fn/lite'
-import { ScopeProvider } from '@pumped-fn/lite-react'
+import { createScope } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 
 const scope = createScope()
-await scope.resolve(userAtom)
 
-<ScopeProvider scope={scope}>
-  <App />
-</ScopeProvider>
+export function AppRoot() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <App />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
 ```
 
-### ExecutionContextProvider
-
-Provides an execution context to resource and scoped-value hooks. In tests or request boundaries, pass the context explicitly with `ctx`.
+Create scopes outside component bodies. Create explicit contexts outside component bodies when a route,
+request, test, or integration boundary already owns the context:
 
 ```tsx
-import { createScope } from '@pumped-fn/lite'
-import { ExecutionContextProvider, ScopeProvider } from '@pumped-fn/lite-react'
+import { createScope } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
 
 const scope = createScope()
 const ctx = scope.createContext()
 
-<ScopeProvider scope={scope}>
-  <ExecutionContextProvider ctx={ctx}>
-    <App />
-  </ExecutionContextProvider>
-</ScopeProvider>
+export function MountedApp() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider ctx={ctx}>
+        <App />
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
 ```
 
-Create the scope and explicit context outside component bodies. Do not call `createScope()` or `scope.createContext()` inside a React component; that creates a new graph during render. Components should consume an existing boundary through `ExecutionContextProvider`.
+When `ctx` is omitted, managed mode creates a context from the surrounding scope, inherits the nearest
+execution context for the same scope, and closes the managed context on unmount. Managed mode also works
+during server render. Contexts created by renders that suspend before commit are reclaimed after their
+in-flight work settles.
 
-Managed mode creates an execution context from the surrounding `ScopeProvider` synchronously during render — so the subtree renders on the server — and closes it on unmount. Contexts created by renders that suspend before committing are reclaimed automatically once their in-flight work settles:
+Managed providers reuse their execution context when the parent and tag records are the same. For
+object-valued boundary tags, define `eq` on the tag family only when equal values are fully substitutable.
+`ExecutionContextProvider` uses `tag.same()` for this reuse decision. That preserves current-owned UI
+state across ordinary rerenders without changing tag lookup, resource ownership, or cache identity.
+
+## React APIs
+
+| API | Use it for |
+| --- | --- |
+| `ScopeProvider` | Provide a Lite scope to a React subtree |
+| `ExecutionContextProvider` | Provide or create the UI execution context |
+| `useExecutionContext` | Execute flows or context functions from event handlers |
+| `useAtom` | Read atom state with Suspense/ErrorBoundary integration or manual load state |
+| `useSelect` | Read a derived atom slice and avoid rerenders when the slice is equal |
+| `useResource` | Read execution-scoped resources from the current provider context |
+| `scopedValue` | Define execution-scoped frontend state, actions, and dependencies |
+| `useScopedValue` | Render and dispatch against a `scopedValue` |
+| `useController` | Low-level atom controller access |
+| `useScope` | Infrastructure escape hatch for provider/bootstrap integrations |
+
+Most feature components should use `useAtom`, `useSelect`, `useResource`, `useScopedValue`, and
+`useExecutionContext`. Treat `useScope` and raw controllers as integration tools.
+
+## Atom Observation
+
+`useAtom` subscribes to an atom controller. In Suspense mode, idle and first resolving states suspend,
+failed state throws to an ErrorBoundary, and refreshes keep rendering the stale value until the new value
+settles.
 
 ```tsx
-<ScopeProvider scope={scope}>
-  <ExecutionContextProvider>
-    <App />
-  </ExecutionContextProvider>
-</ScopeProvider>
+import { Suspense } from "react"
+import { createScope } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider, useAtom } from "@pumped-fn/lite-react"
+
+const scope = createScope()
+
+function Dashboard() {
+  const dashboard = useAtom(dashboardState)
+  return <h1>{dashboard.title}</h1>
+}
+
+export function AppRoot() {
+  return (
+    <ScopeProvider scope={scope}>
+      <ExecutionContextProvider>
+        <Suspense fallback={<p>Loading</p>}>
+          <Dashboard />
+        </Suspense>
+      </ExecutionContextProvider>
+    </ScopeProvider>
+  )
+}
 ```
 
-### useResource
-
-Read execution-scoped resources at the React boundary. Suspense mode is the default:
+Manual mode returns load state instead of throwing:
 
 ```tsx
-const user = useResource(currentUserResource)
+import { useAtom } from "@pumped-fn/lite-react"
+
+function Profile() {
+  const profile = useAtom(profileState, { suspense: false, resolve: true })
+
+  if (profile.loading && !profile.data) return <p>Loading</p>
+  if (profile.error) return <p role="alert">{profile.error.message}</p>
+  if (!profile.data) return <p>No profile</p>
+
+  return <p>{profile.data.name}</p>
+}
 ```
 
-Without Suspense, the hook returns a stable load union:
+`useSelect` observes only a slice:
 
 ```tsx
+import { useSelect } from "@pumped-fn/lite-react"
+
+function InboxBadge() {
+  const unread = useSelect(inboxState, (inbox) => inbox.unreadCount)
+  return <span>{unread}</span>
+}
+```
+
+## UI Actions
+
+Use `useExecutionContext` for event-triggered graph work. The provider owns the context lifecycle.
+
+```tsx
+import { useExecutionContext } from "@pumped-fn/lite-react"
+
+function SaveButton() {
+  const ctx = useExecutionContext()
+
+  return (
+    <button onClick={() => void ctx.exec({ flow: saveProfile, input: { source: "toolbar" } })}>
+      Save
+    </button>
+  )
+}
+```
+
+This keeps extensions, resources, tags, `onClose`, and cleanup attached to the same UI boundary.
+
+## Execution-Scoped Resources
+
+`useResource` reads resources visible from the current execution context. Use it for request/session
+data, per-boundary clients, feature sessions, and other values whose lifetime is below the scope.
+
+```tsx
+import { useResource } from "@pumped-fn/lite-react"
+
 function CurrentUser() {
-  const user = useResource(currentUserResource, { suspense: false })
+  const user = useResource(currentUser)
+  return <p>{user.name}</p>
+}
+```
 
-  if (user.status === 'loading') return <p>Loading...</p>
-  if (user.status === 'error') return <p role="alert">{user.error.message}</p>
+Without Suspense, `useResource` returns a stable load union:
+
+```tsx
+import { useResource } from "@pumped-fn/lite-react"
+
+function CurrentUserManual() {
+  const user = useResource(currentUser, { suspense: false })
+
+  if (user.status === "loading") return <p>Loading</p>
+  if (user.status === "error") return <p role="alert">{user.error.message}</p>
 
   return <p>{user.data.name}</p>
 }
 ```
 
-The non-Suspense union is:
+Do not load resources with effects. `useResource` starts and observes resource work at the provider
+boundary and stays reset-aware when the owner context releases or closes the resource.
 
-```ts
-type Load<T> =
-  | { status: 'loading'; data: undefined; error: undefined }
-  | { status: 'ready'; data: T; error: undefined }
-  | { status: 'error'; data: undefined; error: Error }
-```
+## Scoped Frontend State
 
-Do not load resources with `useEffect`. `useResource` observes the resource controller, starts work at the right React boundary, and stays reset-aware when the owner context releases the resource.
-
-### scopedValue
-
-Use `scopedValue` for execution-scoped frontend state such as form drafts. The state is resource-backed, so it can be tested without React and is discarded when the execution context is released or closed.
+Use `scopedValue` for forms, drafts, modal state, editors, optimistic action buffers, and nested UI
+state. It is backed by a current-owned resource, so it resets with the owning execution context and can be
+tested without React.
 
 ```tsx
-import { createScope, resource } from '@pumped-fn/lite'
-import { ExecutionContextProvider, ScopeProvider, scopedValue, useScopedValue } from '@pumped-fn/lite-react'
+import { createScope, resource } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider, scopedValue, useScopedValue } from "@pumped-fn/lite-react"
 
-const authResource = resource({
+const auth = resource({
   factory: () => ({
-    login: async (email: string, password: string) => ({ email }),
+    login: async (email: string, password: string) => ({ email, password }),
   }),
 })
 
 const loginForm = scopedValue({
-  name: 'login-form',
-  deps: { auth: authResource },
-  initial: () => ({ email: '', password: '', status: 'editing' as const, error: undefined as string | undefined }),
-  actions: ({ get, patch }, { auth }) => ({
+  name: "login-form",
+  deps: { auth },
+  initial: () => ({
+    email: "",
+    password: "",
+    status: "editing" as const,
+    error: undefined as string | undefined,
+  }),
+  actions: ({ get, patch }, deps) => ({
     setEmail(email: string) {
-      patch({ email, status: 'editing', error: undefined })
+      patch({ email, status: "editing", error: undefined })
     },
     setPassword(password: string) {
-      patch({ password, status: 'editing', error: undefined })
+      patch({ password, status: "editing", error: undefined })
     },
-    submit() {
+    async submit() {
       const snapshot = get()
-      if (!snapshot.email.includes('@')) {
-        patch({ status: 'editing', error: 'Enter a valid email' })
-        return Promise.resolve(undefined)
+      if (!snapshot.email.includes("@")) {
+        patch({ status: "editing", error: "Enter a valid email" })
+        return undefined
       }
-      patch({ status: 'submitting', error: undefined })
-      return auth.login(snapshot.email, snapshot.password).then(
-        (user) => {
-          patch({ status: 'submitted', error: undefined })
-          return user
-        },
-        (error: Error) => {
-          patch({ status: 'editing', error: error.message })
-          return undefined
-        },
-      )
+      patch({ status: "submitting", error: undefined })
+      const user = await deps.auth.login(snapshot.email, snapshot.password)
+      patch({ status: "submitted" })
+      return user
     },
   }),
 })
@@ -203,199 +292,138 @@ function LoginForm() {
       <input value={form.snapshot.email} onChange={(event) => form.actions.setEmail(event.currentTarget.value)} />
       <input value={form.snapshot.password} onChange={(event) => form.actions.setPassword(event.currentTarget.value)} />
       {form.snapshot.error ? <p role="alert">{form.snapshot.error}</p> : null}
-      <button disabled={form.snapshot.status === 'submitting'}>Sign in</button>
+      <button disabled={form.snapshot.status === "submitting"}>Sign in</button>
     </form>
   )
 }
 ```
 
-Test the same graph without React:
+React receives `snapshot + actions`. Outside React, resolved access uses `getSnapshot()` or `get()`:
 
 ```ts
+import { createScope } from "@pumped-fn/lite"
+
 const scope = createScope()
 const ctx = scope.createContext()
 const form = await loginForm.resolve(ctx)
 
-form.actions.setEmail('a@example.com')
-if (form.getSnapshot().email !== 'a@example.com') throw new Error('expected updated email')
-await form.actions.submit()
+form.actions.setEmail("a@example.com")
+if (form.getSnapshot().email !== "a@example.com") throw new Error("expected updated email")
 
 await ctx.release(loginForm)
 await ctx.close()
 await scope.dispose()
 ```
 
-Resolved scoped-value access does not have a `snapshot` property. Outside React, read current state with `form.getSnapshot()` or `form.get()`. The `snapshot` property is only added by `useScopedValue` for React rendering.
+Components should render from `form.snapshot` and mutate through `form.actions`. Do not mirror scoped
+fields into local component state. Do not use controllers as the form/resource state API.
 
-Components should not mirror scoped-value fields into `useState`. Use `form.snapshot` for render state and `form.actions` for mutations.
+## Nested Boundaries
 
-### useScope
+Nested `ExecutionContextProvider` instances are useful for modals, editors, side panels, and per-card
+forms. Current-owned scoped values reset with the nested boundary. Boundary-owned resources can be shared
+across the broader provider when that is the user expectation.
 
-Access scope from context.
-
-```tsx
-const scope = useScope()
-await scope.resolve(someAtom)
-```
-
-### useController
-
-Get memoized controller for imperative operations.
+Use boundary tags to describe the nested owner:
 
 ```tsx
-const ctrl = useController(counterAtom)
-ctrl.set(10)
-ctrl.update(n => n + 1)
-ctrl.invalidate()
-```
+import { tag } from "@pumped-fn/lite"
+import { ExecutionContextProvider } from "@pumped-fn/lite-react"
 
-With `{ resolve: true }` option, triggers Suspense if atom not resolved:
+const card = tag<{ cardId: string }>({
+  label: "card",
+  eq: (a, b) => a.cardId === b.cardId,
+})
 
-```tsx
-// Suspense ensures controller is resolved before render
-const ctrl = useController(configAtom, { resolve: true })
-ctrl.get() // safe - Suspense guarantees resolved state
-```
-
-While a controller is re-resolving, `{ resolve: true }` keeps suspending until the controller settles.
-
-### useAtom
-
-Subscribe to atom value with Suspense integration.
-
-```tsx
-function UserProfile() {
-  const user = useAtom(userAtom)
-  return <div>{user.name}</div>
-}
-
-// Wrap with Suspense + ErrorBoundary
-<ErrorBoundary fallback={<Error />}>
-  <Suspense fallback={<Loading />}>
-    <UserProfile />
-  </Suspense>
-</ErrorBoundary>
-```
-
-#### Non-Suspense Mode
-
-For manual loading/error state handling without Suspense:
-
-```tsx
-function UserProfile() {
-  const { data, loading, error, controller } = useAtom(userAtom, { suspense: false })
-
-  if (loading && data) return <div>Refreshing {data.name}...</div>
-  if (loading) return <div>Loading...</div>
-  if (error) return <div>Error: {error.message}</div>
-  if (!data) return <div>Not loaded</div>
-
+function CardEditor(props: { cardId: string }) {
   return (
-    <div>
-      <h1>{data.name}</h1>
-      <button onClick={() => controller.invalidate()}>Refresh</button>
-    </div>
+    <ExecutionContextProvider tags={[card({ cardId: props.cardId })]}>
+      <EditorForm />
+    </ExecutionContextProvider>
   )
 }
 ```
 
-With `{ resolve: true }`, auto-resolves on mount:
-
-```tsx
-// Starts resolution automatically when component mounts
-const { data, loading, error } = useAtom(userAtom, { suspense: false, resolve: true })
-```
-
-| Option | Effect |
-|--------|--------|
-| `{ suspense: false }` | Returns state object, no auto-resolve |
-| `{ suspense: false, resolve: true }` | Returns state object, auto-resolves on mount |
-
-While `loading` is `true`, `data` may still contain the last resolved value during a refresh.
-
-### useSelect
-
-Fine-grained selection — only re-renders when selected value changes.
-
-```tsx
-const name = useSelect(userAtom, user => user.name)
-const count = useSelect(todosAtom, todos => todos.length, (a, b) => a === b)
-```
-
-## Invalidation
-
-When an atom is invalidated, `useAtom` and `useSelect` keep rendering the last value while re-resolving:
-
-```mermaid
-sequenceDiagram
-    participant Component
-    participant useAtom
-    participant Controller
-
-    Note over Controller: state = resolved
-    Component->>useAtom: render (value)
-
-    Note over Controller: ctrl.invalidate()
-    Controller->>Controller: state = resolving
-    useAtom-->>Component: stale value
-    Note over Component: current UI stays visible
-
-    Controller->>Controller: factory runs
-    Controller->>Controller: state = resolved
-    useAtom->>Component: re-render (new value)
-```
-
-`useController(atom, { resolve: true })` is different: it suspends until the controller settles again.
+The `eq` function lets rerenders recreate the tag object without resetting the current-owned form for the
+same card.
 
 ## Testing
 
-Use presets for test isolation:
+Split tests by responsibility:
+
+- Node logic tests exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })`.
+- Browser observer tests render components under `ScopeProvider` and `ExecutionContextProvider`; browser observer tests cover provider wiring and dispatch.
+- Browser mode proves that React observes and dispatches correctly. Browser mode does not replace node logic tests.
 
 ```tsx
-import { createScope, preset } from '@pumped-fn/lite'
-import { ScopeProvider } from '@pumped-fn/lite-react'
+import { createScope, preset } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
+import { render } from "@testing-library/react"
 
 const scope = createScope({
-  presets: [preset(userAtom, { name: 'Test User' })]
+  presets: [preset(profileState, { name: "Test User" })],
 })
-await scope.resolve(userAtom)
+
+await scope.resolve(profileState)
 
 render(
   <ScopeProvider scope={scope}>
-    <UserProfile />
-  </ScopeProvider>
+    <ExecutionContextProvider>
+      <Profile />
+    </ExecutionContextProvider>
+  </ScopeProvider>,
 )
 ```
 
+Use `@pumped-fn/lite-lint` to enforce the React-facing guardrails: feature components should not call
+`useScope`, create or close execution contexts manually, mirror graph-owned state with local state, or put
+rendered observer tests outside browser test files.
+
 ## SSR
 
-Fully SSR-compatible — `'use client'` ships in the build output, all hooks provide server snapshots, and managed `ExecutionContextProvider` renders its subtree on the server:
+The package is SSR-compatible:
 
-- No side effects on import
-- Scope passed as prop (no global state); module caches are keyed per controller/context, so concurrent requests stay isolated
-- Suspense resolution starts during the server render — `renderToPipeableStream`/`renderToReadableStream` stream final content; `renderToString` emits fallbacks for unresolved atoms
+- The build output includes the client directive.
+- Hooks provide server snapshots.
+- Managed `ExecutionContextProvider` renders its subtree on the server.
+- Scopes are passed through providers rather than hidden globals.
+- Module caches are keyed by controller and context, so concurrent requests stay isolated.
 
-```tsx
-// Server — pre-resolve for renderToString, or let Suspense stream
-const scope = createScope()
-await scope.resolve(dataAtom)
-const html = renderToString(<ScopeProvider scope={scope}><App /></ScopeProvider>)
-
-// Client
-const clientScope = createScope({
-  presets: [preset(dataAtom, window.__DATA__)]
-})
-await clientScope.resolve(dataAtom)
-hydrateRoot(root, <ScopeProvider scope={clientScope}><App /></ScopeProvider>)
-```
+Pre-resolve atoms for `renderToString`, or let streaming Suspense resolve during render.
 
 ## React Compiler
 
-Compatible with apps compiled by the React Compiler — hooks return referentially stable values for unchanged state, and compiler-memoized inline selectors make `useSelect` cheaper, not broken. The library itself ships `'use no memo'` so source-compiling setups (Metro, monorepos) never auto-memoize hook internals that read live controller state during render.
+The bindings are compatible with React Compiler setups. Hook outputs are stable when observed state is
+unchanged, and compiler-memoized inline selectors make `useSelect` cheaper instead of incorrect. The
+library build prevents compiler memoization of hook internals that read live controller state during
+render.
 
-## Full API
+## Exports
 
-See [`dist/index.d.mts`](./dist/index.d.mts) for complete type definitions.
+`@pumped-fn/lite-react` re-exports the common Lite constructors for convenience:
+
+```ts
+export { createScope, atom, flow, preset, resource } from "@pumped-fn/lite"
+```
+
+It also exports:
+
+- `ScopeProvider`
+- `ExecutionContextProvider`
+- `scopedValue`
+- `useScope`
+- `useExecutionContext`
+- `useController`
+- `useAtom`
+- `useSelect`
+- `useResource`
+- `useScopedValue`
+
+Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
+
+Patterns and guardrails: [`PATTERNS.md`](./PATTERNS.md)
+
+Core runtime: [`@pumped-fn/lite`](../lite/README.md)
 
 ## License
 
