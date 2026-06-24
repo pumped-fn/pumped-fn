@@ -1,7 +1,7 @@
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
   SuspendSignal,
-  agent as agentRuntime,
+  runtime,
   workflowRun,
   step,
   workflow as workflowRuntime,
@@ -11,7 +11,7 @@ import {
 } from "@pumped-fn/agent-sdk"
 import {
   MemoryWorkflowLog,
-  agent as testAgent,
+  kit,
 } from "../src/index"
 
 export interface DevRequest {
@@ -109,12 +109,12 @@ export async function runDevWorkflow(
     ],
     deps: {
       workflow: tags.required(workflowRuntime),
-      agent: tags.required(agentRuntime),
+      runtime: tags.required(runtime),
       runFeatureTests,
       waitForProductReview,
     },
-    factory: async (ctx, { workflow, agent, runFeatureTests, waitForProductReview }): Promise<DevResult> => {
-      const patch = await agent.delegate<Patch, DevRequest>("implement-feature", ctx.input)
+    factory: async (ctx, { workflow, runtime, runFeatureTests, waitForProductReview }): Promise<DevResult> => {
+      const patch = await runtime.delegate<Patch, DevRequest>("implement-feature", ctx.input)
       const tests = await runFeatureTests.exec({ input: { patch } })
       const approval = await waitForProductReview.exec()
       return {
@@ -130,7 +130,7 @@ export async function runDevWorkflow(
   })
 
   const log = new MemoryWorkflowLog()
-  const { extensions } = testAgent({ log })
+  const { extensions } = kit({ log })
   const scope = createScope({ extensions })
   await scope.ready
 

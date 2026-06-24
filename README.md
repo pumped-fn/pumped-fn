@@ -44,7 +44,9 @@ Extensions wrap execution. React is an observer layer.
 | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
 | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
-| `@pumped-fn/lite-extension-suspense` | Suspense-oriented extension support |
+| `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
+| `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
+| `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
 | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
 ## Mental Model
@@ -65,6 +67,12 @@ execution context
   flows: input/output work
   resources: transactions, request loggers, form drafts, spans
   tags: tenant, locale, trace id, runtime config
+        |
+        v
+agent workflow
+  model provider atom/service
+  tools and subagents as ctx.exec flow steps
+  events as a boundary resource
 ```
 
 The same seam works for backend and frontend:

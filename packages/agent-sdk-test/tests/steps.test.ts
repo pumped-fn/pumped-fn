@@ -9,12 +9,12 @@ import {
 } from "@pumped-fn/agent-sdk"
 import {
   MemoryWorkflowLog,
-  agent,
+  kit,
 } from "../src/index"
 
 describe("workflow steps", () => {
   it("memoizes completed workflow execution", async () => {
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     let calls = 0
@@ -51,7 +51,7 @@ describe("workflow steps", () => {
 
   it("replays completed flow before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.replay.gate" })
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     let calls = 0
@@ -79,7 +79,7 @@ describe("workflow steps", () => {
 
   it("suspends durable work and replays memoized steps on resolution", async () => {
     const log = new MemoryWorkflowLog()
-    const { extensions } = agent({ log })
+    const { extensions } = kit({ log })
     const scope = createScope({ extensions })
     await scope.ready
     let expensiveCalls = 0
@@ -123,7 +123,7 @@ describe("workflow steps", () => {
 
   it("suspends durable work before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.durable.gate" })
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     const approve = flow({
@@ -138,7 +138,7 @@ describe("workflow steps", () => {
   })
 
   it("aborts timed workflow steps cooperatively", async () => {
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     let aborted = false

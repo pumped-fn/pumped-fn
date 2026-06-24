@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "typeRoots": ["./node_modules/@types", "../../packages/lite/node_modules/@types"],
+    "paths": {
+      "@pumped-fn/agent-sdk": ["../../packages/agent-sdk/src/index.ts"],
+      "@pumped-fn/agent-sdk-test": ["../../packages/agent-sdk-test/src/index.ts"],
+      "@pumped-fn/lite-extension-suspense": ["../../packages/lite-extension-suspense/src/index.ts"],
+      "@pumped-fn/lite": ["../../packages/lite/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}
