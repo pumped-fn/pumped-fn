@@ -943,6 +943,12 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
+    for (let i = 0; i < graph.flows.length; i++) {
+      if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+      const [key, dep, options] = graph.flows[i]!
+      result[key] = this.createFlowHandle(dep, ctx, options)
+    }
+
     for (let i = 0; i < graph.controllers.length; i++) {
       const [key, dep] = graph.controllers[i]!
       if (!isAtomControllerDep(dep)) {
@@ -1043,6 +1049,62 @@ class ScopeImpl implements Lite.Scope {
     if (parallel.length === 0) return result
     if (parallel.length === 1) return parallel[0]!.then(() => result)
     return Promise.all(parallel).then(() => result)
+  }
+
+  private createFlowHandle<Output, Input>(
+    flow: Lite.Flow<Output, Input>,
+    ctx: Lite.ExecutionContext,
+    defaults?: Lite.FlowControllerOptions<Input>
+  ): Lite.FlowHandle<Output, Input> {
+    return {
+      flow,
+      exec: (...args: Lite.FlowExecArgs<Input>) => {
+        return this.execFlowHandle(flow, ctx, this.mergeFlowOptions(defaults, args[0] ?? {}))
+      },
+      prepare: (...args: Lite.FlowPrepareArgs<Input>) => {
+        const options = this.mergeFlowOptions(defaults, args[0] ?? {})
+        const ready = Promise.resolve()
+        return {
+          flow,
+          options: options as Lite.FlowPrepareOptions<Input>,
+          key: (options as Lite.FlowPrepareOptions<Input>).key,
+          ready,
+          exec: async () => {
+            await ready
+            return this.execFlowHandle(flow, ctx, options)
+          },
+        }
+      },
+    }
+  }
+
+  private mergeFlowOptions<Input>(
+    defaults: Lite.FlowControllerOptions<Input> | undefined,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
+  ): Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {} {
+    if (!defaults) return options
+    const callOptions = options as Lite.FlowPrepareOptions<Input>
+    const defaultTags = defaults.tags ?? []
+    const callTags = callOptions.tags ?? []
+    return {
+      ...defaults,
+      ...callOptions,
+      tags: defaultTags.length > 0 || callTags.length > 0
+        ? [...defaultTags, ...callTags]
+        : undefined,
+    }
+  }
+
+  private execFlowHandle<Output, Input>(
+    flow: Lite.Flow<Output, Input>,
+    ctx: Lite.ExecutionContext,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
+  ): Promise<Output> {
+    const { key: _key, ...execOptions } = options as Lite.FlowPrepareOptions<Input>
+    return ctx.exec({
+      flow,
+      ...execOptions,
+    } as Lite.ExecFlowOptions<Output, Input>)
   }
 
   private wireWatch(dep: Lite.AtomControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {

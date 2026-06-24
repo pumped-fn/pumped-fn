@@ -1,4 +1,4 @@
-import { flow, typed, type Lite } from "@pumped-fn/lite"
+import { flow, typed } from "@pumped-fn/lite"
 import { InvalidCredentials, InvalidSession, login, validateSession } from "./auth"
 import { dashboardView, type DashboardView } from "./dashboard"
 
@@ -48,52 +48,34 @@ export type BffResult = BffResponse<LoginResponse | DashboardView | BffError>
 export const handleBffRequest = flow({
   name: "handle-bff-request",
   parse: typed<BffRequest>(),
-  factory: async (ctx): Promise<BffResult> => {
+  deps: { dashboardView, login, validateSession },
+  factory: async (ctx, { dashboardView, login, validateSession }): Promise<BffResult> => {
     const request = ctx.input
     if (request.path === "/login") {
       if (request.method !== "POST") return { status: 405, body: { error: "method not allowed" } }
-      return handleLogin(ctx, request as LoginRequest)
+      try {
+        const session = await login.exec({ input: (request as LoginRequest).body })
+        return { status: 200, body: { token: session.token } }
+      } catch (error) {
+        if (error instanceof InvalidCredentials) return { status: 401, body: { error: "invalid credentials" } }
+        throw error
+      }
     }
     if (request.path === "/dashboard") {
       if (request.method !== "GET") return { status: 405, body: { error: "method not allowed" } }
-      return handleDashboard(ctx, request as DashboardRequest)
+      const token = bearerToken(request as DashboardRequest)
+      if (token === null) return { status: 401, body: { error: "unauthorized" } }
+      try {
+        await validateSession.exec({ input: { token } })
+      } catch (error) {
+        if (error instanceof InvalidSession) return { status: 401, body: { error: "unauthorized" } }
+        throw error
+      }
+      return { status: 200, body: await dashboardView.exec() }
     }
     return { status: 404, body: { error: "not found" } }
   },
 })
-
-async function handleLogin(
-  ctx: Lite.ExecutionContext,
-  request: LoginRequest
-): Promise<BffResponse<LoginResponse | BffError>> {
-  try {
-    const session = await ctx.exec({ flow: login, input: request.body })
-    return { status: 200, body: { token: session.token } }
-  } catch (error) {
-    if (error instanceof InvalidCredentials) return { status: 401, body: { error: "invalid credentials" } }
-    throw error
-  }
-}
-
-async function handleDashboard(
-  ctx: Lite.ExecutionContext,
-  request: DashboardRequest
-): Promise<BffResponse<DashboardView | BffError>> {
-  const token = bearerToken(request)
-  if (token === null) return { status: 401, body: { error: "unauthorized" } }
-  if (!(await validateDashboardToken(ctx, token))) return { status: 401, body: { error: "unauthorized" } }
-  return { status: 200, body: await ctx.exec({ flow: dashboardView }) }
-}
-
-async function validateDashboardToken(ctx: Lite.ExecutionContext, token: string): Promise<boolean> {
-  try {
-    await ctx.exec({ flow: validateSession, input: { token } })
-    return true
-  } catch (error) {
-    if (error instanceof InvalidSession) return false
-    throw error
-  }
-}
 
 function bearerToken(request: DashboardRequest): string | null {
   const value = request.headers?.Authorization ?? request.headers?.authorization

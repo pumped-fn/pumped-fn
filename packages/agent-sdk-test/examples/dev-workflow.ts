@@ -110,11 +110,13 @@ export async function runDevWorkflow(
     deps: {
       workflow: tags.required(workflowRuntime),
       agent: tags.required(agentRuntime),
+      runFeatureTests,
+      waitForProductReview,
     },
-    factory: async (ctx, { workflow, agent }): Promise<DevResult> => {
+    factory: async (ctx, { workflow, agent, runFeatureTests, waitForProductReview }): Promise<DevResult> => {
       const patch = await agent.delegate<Patch, DevRequest>("implement-feature", ctx.input)
-      const tests = await ctx.exec({ flow: runFeatureTests, input: { patch } })
-      const approval = await ctx.exec({ flow: waitForProductReview })
+      const tests = await runFeatureTests.exec({ input: { patch } })
+      const approval = await waitForProductReview.exec()
       return {
         taskId: workflow.taskId,
         runId: workflow.runId,

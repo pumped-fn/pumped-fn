@@ -456,8 +456,9 @@ export const moveCard = flow({
     audit: actionAudit,
     actor: tags.required(actorId),
     projectId: tags.required(activeProjectId),
+    summarizeCard,
   },
-  factory: async (ctx, { state, audit, actor, projectId }) => {
+  factory: async (ctx, { state, audit, actor, projectId, summarizeCard }) => {
     const before = state.get().cards.get(ctx.input.cardId)
     if (!before) throw new Error(`card ${ctx.input.cardId} not found`)
     state.set(moveCardInState(state.get(), ctx.input.cardId, projectId, ctx.input.toLaneId, ctx.input.toIndex))
@@ -466,7 +467,7 @@ export const moveCard = flow({
       cardId: ctx.input.cardId,
       detail: `${actor}:${before.laneId}->${ctx.input.toLaneId}`,
     })
-    return ctx.exec({ flow: summarizeCard, input: { cardId: ctx.input.cardId } })
+    return summarizeCard.exec({ input: { cardId: ctx.input.cardId } })
   },
 })
 

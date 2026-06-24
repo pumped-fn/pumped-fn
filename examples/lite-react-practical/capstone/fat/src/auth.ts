@@ -94,8 +94,8 @@ export const login = flow({
 export const submitLogin = flow({
   name: "submitLogin",
   parse: typed<undefined>(),
-  deps: { formControl: controller(loginForm, { resolve: true }) },
-  factory: async (ctx, { formControl }) => {
+  deps: { formControl: controller(loginForm, { resolve: true }), login },
+  factory: async (_ctx, { formControl, login }) => {
     const form = formControl.get()
     const validationError = loginValidationError(form)
     if (validationError !== null) {
@@ -104,7 +104,7 @@ export const submitLogin = flow({
     }
     formControl.set({ ...form, error: null })
     try {
-      return await ctx.exec({ flow: login, input: { email: form.email, password: form.password } })
+      return await login.exec({ input: { email: form.email, password: form.password } })
     } catch (error) {
       formControl.update((current) => ({ ...current, error: loginErrorMessage(error) }))
       throw error

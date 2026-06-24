@@ -30,7 +30,8 @@ Lite owns the application boundary below framework adapters:
 - `tag()` carries typed ambient values such as tenant, trace id, locale, config, and equality-aware boundary identity.
 - `preset()` swaps atoms, flows, and resources at the scope seam for tests or composition.
 - Extensions wrap resolve and exec for logging, tracing, auth, metrics, and transactional policy.
-- Controllers and selects add reactivity only where it is intentional.
+- Controllers and selects add reactivity where it is intentional. `controller(flow, defaults)` only
+  preconfigures child-flow execution; it is not reactive.
 
 ## Boundary Ownership
 
@@ -85,7 +86,7 @@ Feature nodes should depend on capabilities, not raw transports plus auth/sessio
 ## First Graph
 
 ```ts
-import { atom, createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 
 type User = { id: string; name: string }
 
@@ -130,6 +131,44 @@ What this demonstrates:
 - `users` is a capability atom. It exposes domain operations without exposing transport plumbing.
 - `loadUser` is a flow. It receives input through an execution context and uses declared dependencies.
 - The composition root chooses the tenant and owns cleanup.
+
+Flows compose through dependencies. The dependency value is a context-bound handle, so nested execution
+keeps the `ctx.exec` options shape, parsing, presets, extensions, tags, and resource cleanup while making
+the flow edge visible.
+
+```ts
+const auditUserLoad = flow({
+  parse: typed<{ id: string }>(),
+  factory: (ctx) => `audit:${ctx.input.id}`,
+})
+
+const auditedUsers = atom({
+  factory: () => ({
+    byId: (id: string) => ({ id, name: `user:${id}` }),
+  }),
+})
+
+const loadAuditedUser = flow({
+  parse: typed<{ id: string }>(),
+  deps: { auditUserLoad, users: auditedUsers },
+  factory: async (ctx, deps) => {
+    await deps.auditUserLoad.exec({ input: { id: ctx.input.id } })
+    return deps.users.byId(ctx.input.id)
+  },
+})
+
+const plannedAudit = flow({
+  parse: typed<{ id: string }>(),
+  deps: {
+    auditUserLoad: controller(auditUserLoad, { name: "audit-user-load" }),
+  },
+  factory: async (ctx, deps) => {
+    const step = deps.auditUserLoad.prepare({ key: `audit:${ctx.input.id}`, input: { id: ctx.input.id } })
+    await step.ready
+    return step.exec()
+  },
+})
+```
 
 ## Execution-Scoped Resources
 
@@ -190,7 +229,8 @@ need a fresh resource instance inside an open context.
 Resource controllers are infrastructure handles for observing a resource visible from one execution
 context. Prefer direct resource dependencies, flows, or domain actions in product APIs. `watch: true` for
 resource controllers is valid inside resource dependencies, where it releases the dependent resource after
-a watched value changes. Flows do not get reactive resource-controller deps.
+a watched value changes. Flows do not get reactive resource-controller deps; use `controller(flow, defaults)`
+only to preconfigure child-flow `exec()`/`prepare()` defaults.
 
 ## Tags
 
@@ -314,7 +354,7 @@ Extension hooks run around graph work, so they see the same seams as tests and c
 | `tag(config)` | Define typed ambient values and optional value equality |
 | `tags.required/optional/all` | Request tags as dependencies |
 | `preset(target, value)` | Replace an atom, flow, or resource in one scope |
-| `controller(target, options?)` | Request a controller dependency for an atom or resource |
+| `controller(target, options?)` | Request an atom/resource controller dependency, or preconfigure flow-handle defaults |
 | `scope.controller(atom)` | Observe and control atom state from the boundary |
 | `scope.select(atom, selector, options?)` | Subscribe to a derived slice |
 

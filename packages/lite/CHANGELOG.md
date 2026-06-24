@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 3.2.0
+
+### Minor Changes
+
+- Add lazy flow composition handles for flow deps and `controller(flow, defaults)`.
+
 ## 3.1.0
 
 ### Minor Changes

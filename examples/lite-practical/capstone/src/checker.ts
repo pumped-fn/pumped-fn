@@ -23,11 +23,12 @@ export const runCheck = flow({
   deps: {
     checkExecutors,
     clock,
+    detectTransition,
     ids,
     store,
     tx,
   },
-  factory: async (ctx, { checkExecutors, clock, ids, store, tx }) => {
+  factory: async (ctx, { checkExecutors, clock, detectTransition, ids, store, tx }) => {
     const service = store.services.get(ctx.input.serviceId)
     if (service === undefined) throw new NotFoundError("service", ctx.input.serviceId)
     const result = await checkExecutors[service.type](ctx, service)
@@ -40,7 +41,7 @@ export const runCheck = flow({
       timestamp: clock.now(),
     }
     tx.checks.append(check)
-    const transition = await ctx.exec({ flow: detectTransition, input: { service, check } })
+    const transition = await detectTransition.exec({ input: { service, check } })
     return {
       serviceId: service.id,
       status: check.status,

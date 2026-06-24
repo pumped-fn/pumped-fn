@@ -2268,6 +2268,114 @@ describe("ExecutionContext", () => {
       try { await ctx.exec({ flow: strictFlow as unknown as Lite.Flow<string, unknown>, rawInput: 123 }); expect.fail("Should have thrown") } catch (err) { expect(err).toBeInstanceOf(ParseError); expect((err as InstanceType<typeof ParseError>).label).toBe("strictFlow") }
       await ctx.close()
     })
+
+    it("composes flows through execution deps", async () => {
+      const requestId = tag<string>({ label: "request-id" })
+      const calls: string[] = []
+
+      const writeAuditEntry = flow({
+        name: "write-audit-entry",
+        parse: typed<{ txId: string }>(),
+        deps: { requestId: tags.required(requestId) },
+        factory: (ctx, { requestId }) => {
+          calls.push(`${ctx.name}:${requestId}:${ctx.input.txId}`)
+          return `${requestId}:${ctx.input.txId}`
+        },
+      })
+
+      const replacement = flow({
+        name: "replacement-audit-entry",
+        parse: typed<{ txId: string }>(),
+        deps: { requestId: tags.required(requestId) },
+        factory: (ctx, { requestId }) => {
+          calls.push(`${ctx.name}:${requestId}:${ctx.input.txId}:replacement`)
+          return `${requestId}:${ctx.input.txId}:replacement`
+        },
+      })
+
+      const transferFunds = flow({
+        name: "transfer-funds",
+        parse: typed<{ txId: string }>(),
+        deps: {
+          writeAuditEntry: controller(writeAuditEntry, { name: "audit-step" }),
+        },
+        factory: async (ctx, { writeAuditEntry }) => {
+          const result = await writeAuditEntry.exec({
+            input: { txId: ctx.input.txId },
+          })
+          return `transfer:${result}`
+        },
+      })
+
+      const scope = createScope({
+        presets: [preset(writeAuditEntry, replacement)],
+      })
+      const ctx = scope.createContext({
+        tags: [requestId("req-1")],
+      })
+
+      await expect(ctx.exec({ flow: transferFunds, input: { txId: "tx-1" } })).resolves.toBe("transfer:req-1:tx-1:replacement")
+      expect(calls).toEqual(["audit-step:req-1:tx-1:replacement"])
+
+      await ctx.close()
+    })
+
+    it("supports prepared raw and tagged flow handles without making extensions special-case them", async () => {
+      const marker = tag<string>({ label: "marker" })
+      const events: string[] = []
+      const ext = {
+        name: "flow-handle-ext",
+        wrapExec: async (next: () => Promise<unknown>, _target: Lite.ExecTarget, ctx: Lite.ExecutionContext) => {
+          events.push(`${ctx.parent?.name ?? "root"}>${ctx.name}:${ctx.data.seekTag(marker)}`)
+          return next()
+        },
+      } satisfies Lite.Extension
+
+      const normalize = flow({
+        name: "normalize",
+        parse: (raw: unknown): { name: string } => {
+          const record = raw as Record<string, unknown>
+          if (typeof record["name"] !== "string") throw new Error("name required")
+          return { name: record["name"].toUpperCase() }
+        },
+        factory: (ctx) => ctx.input.name,
+      })
+
+      const submit = flow({
+        name: "submit",
+        deps: {
+          normalize: controller(normalize, {
+            key: "normalize:ada",
+            name: "normalize-step",
+            tags: [marker("child")],
+          }),
+        },
+        factory: async (_ctx, { normalize }) => {
+          const step = normalize.prepare({
+            rawInput: { name: "ada" },
+          })
+          const beforeReady = [...events]
+          await step.ready
+          const afterReady = [...events]
+          const result = await step.exec()
+          return { afterReady, beforeReady, key: step.key, result }
+        },
+      })
+
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext({ tags: [marker("root")] })
+
+      await expect(ctx.exec({ flow: submit, name: "submit-step" })).resolves.toEqual({
+        afterReady: ["root>submit-step:root"],
+        beforeReady: ["root>submit-step:root"],
+        key: "normalize:ada",
+        result: "ADA",
+      })
+      expect(events).toEqual(["root>submit-step:root", "submit-step>normalize-step:child"])
+
+      await ctx.close()
+      await scope.dispose()
+    })
   })
 
   describe("ctx.data (ContextData with Tag support)", () => {

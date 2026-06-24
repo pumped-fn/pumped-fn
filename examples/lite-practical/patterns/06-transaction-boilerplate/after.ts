@@ -92,11 +92,11 @@ export const writeAuditEntry = flow({
 export const transferFunds = flow({
   name: "transfer-funds",
   parse: typed<TransferInput>(),
-  deps: { tx },
-  factory: async (ctx, { tx }) => {
+  deps: { tx, writeAuditEntry },
+  factory: async (ctx, { tx, writeAuditEntry }) => {
     await tx.write({ account: ctx.input.from, deltaCents: -ctx.input.cents })
     await tx.write({ account: ctx.input.to, deltaCents: ctx.input.cents })
-    await ctx.exec({ flow: writeAuditEntry, input: { txId: tx.id } })
+    await writeAuditEntry.exec({ input: { txId: tx.id } })
     return {
       from: ctx.input.from,
       to: ctx.input.to,

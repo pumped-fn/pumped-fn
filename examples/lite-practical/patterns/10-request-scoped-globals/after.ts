@@ -44,9 +44,10 @@ export const asyncSession = flow({
 
 export const nestedSession = flow({
   name: "p10.nested-session",
-  factory: async (ctx) => {
-    const first = await ctx.exec({ flow: asyncSession })
-    const second = await ctx.exec({ flow: asyncSession })
+  deps: { asyncSession },
+  factory: async (_ctx, { asyncSession }) => {
+    const first = await asyncSession.exec()
+    const second = await asyncSession.exec()
 
     return {
       firstUserId: first.userId,

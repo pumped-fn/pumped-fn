@@ -1,4 +1,4 @@
-import { atomSymbol, controllerDepSymbol, resourceSymbol, type Lite, type MaybePromise } from "./types"
+import { atomSymbol, controllerDepSymbol, flowSymbol, resourceSymbol, type Lite, type MaybePromise } from "./types"
 import { registerAtomToTags } from "./tag"
 import { warmDepsGraph } from "./deps-graph"
 
@@ -169,17 +169,38 @@ export function controller<T>(
   options: { resolve?: never; watch?: never; eq?: never }
 ): Lite.NonWatchResourceControllerDep<T>
 
+export function controller<TOutput, TInput>(
+  flow: Lite.Flow<TOutput, TInput>
+): Lite.FlowControllerDep<TOutput, TInput>
+
+export function controller<TOutput, TInput>(
+  flow: Lite.Flow<TOutput, TInput>,
+  options: Lite.FlowControllerOptions<TInput>
+): Lite.FlowControllerDep<TOutput, TInput>
+
 export function controller<T>(
-  target: Lite.Atom<T> | Lite.Resource<T>,
-  options?: Lite.ControllerDepOptions<T> | Lite.ResourceControllerDepOptions
+  target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any>,
+  options?: Lite.ControllerDepOptions<T> | Lite.ResourceControllerDepOptions | Lite.FlowControllerOptions<any>
 ): Lite.ControllerDep<T> {
+  if ((target as unknown as Record<symbol, unknown>)[flowSymbol] === true) {
+    const flowOptions = options as Lite.FlowControllerOptions<any> | undefined
+    return {
+      [controllerDepSymbol]: true,
+      flow: target as Lite.Flow<any, any>,
+      name: flowOptions?.name,
+      tags: flowOptions?.tags,
+      key: flowOptions?.key,
+    }
+  }
+
   if ((target as unknown as Record<symbol, unknown>)[resourceSymbol] === true) {
+    const resourceOptions = options as Lite.ResourceControllerDepOptions | undefined
     return {
       [controllerDepSymbol]: true,
       resource: target as Lite.Resource<T>,
-      resolve: options?.resolve,
-      watch: (options as Lite.ResourceControllerDepOptions | undefined)?.watch,
-      eq: (options as Lite.ResourceControllerDepOptions | undefined)?.eq,
+      resolve: resourceOptions?.resolve,
+      watch: resourceOptions?.watch,
+      eq: resourceOptions?.eq,
     }
   }
 
@@ -213,6 +234,10 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
     value !== null &&
     (value as Record<symbol, unknown>)[controllerDepSymbol] === true
   )
+}
+
+export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown> {
+  return isControllerDep(value) && "flow" in value
 }
 
 /** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */

@@ -21,17 +21,20 @@ export const metadata = flow({
 
 export const secondHop = flow({
   name: "p02.second-hop",
-  factory: (ctx) => ctx.exec({ flow: leaf }),
+  deps: { leaf },
+  factory: (_ctx, { leaf }) => leaf.exec(),
 })
 
 export const firstHop = flow({
   name: "p02.first-hop",
-  factory: (ctx) => ctx.exec({ flow: secondHop }),
+  deps: { secondHop },
+  factory: (_ctx, { secondHop }) => secondHop.exec(),
 })
 
 export const boundary = flow({
   name: "p02.boundary",
-  factory: (ctx) => ctx.exec({ flow: firstHop }),
+  deps: { firstHop },
+  factory: (_ctx, { firstHop }) => firstHop.exec(),
 })
 
 export const parentSeek = flow({

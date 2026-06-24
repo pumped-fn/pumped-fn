@@ -81,6 +81,48 @@ export namespace Lite {
     readonly tags?: Tagged<any>[]
   }
 
+  export interface FlowRunOptions {
+    name?: string
+    tags?: Tagged<any>[]
+  }
+
+  export interface FlowControllerOptions<Input> extends FlowRunOptions {
+    key?: string
+  }
+
+  export type FlowExecOptions<Input> = FlowRunOptions & (
+    | ([NoInfer<Input>] extends [void | undefined | null]
+        ? { input?: undefined | null; rawInput?: never }
+        : { input: NoInfer<Input>; rawInput?: never })
+    | { rawInput: unknown; input?: never }
+  )
+
+  export type FlowExecArgs<Input> = [Input] extends [void | undefined | null]
+    ? [] | [options: FlowExecOptions<Input>]
+    : [options: FlowExecOptions<Input>]
+
+  export type FlowPrepareOptions<Input> = FlowExecOptions<Input> & {
+    key?: string
+  }
+
+  export type FlowPrepareArgs<Input> = [Input] extends [void | undefined | null]
+    ? [] | [options: FlowPrepareOptions<Input>]
+    : [options: FlowPrepareOptions<Input>]
+
+  export interface FlowInvocation<Output, Input> {
+    readonly flow: Flow<Output, Input>
+    readonly options: FlowPrepareOptions<Input>
+    readonly key: string | undefined
+    readonly ready: Promise<void>
+    exec(): Promise<Output>
+  }
+
+  export interface FlowHandle<Output, Input> {
+    readonly flow: Flow<Output, Input>
+    exec(...args: FlowExecArgs<Input>): Promise<Output>
+    prepare(...args: FlowPrepareArgs<Input>): FlowInvocation<Output, Input>
+  }
+
   export interface Resource<T, D extends Record<string, Dependency> = Record<string, Dependency>> {
     readonly [resourceSymbol]: true
     readonly name?: string
@@ -314,7 +356,17 @@ export namespace Lite {
     readonly eq?: (a: any, b: any) => boolean
   }
 
-  export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T>
+  export interface FlowControllerDep<Output, Input> {
+    readonly [controllerDepSymbol]: true
+    readonly atom?: undefined
+    readonly resource?: undefined
+    readonly flow: Flow<Output, Input>
+    readonly name?: string
+    readonly tags?: Tagged<any>[]
+    readonly key?: string
+  }
+
+  export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T> | FlowControllerDep<any, any>
 
   export type WatchControllerDep<T> = AtomControllerDep<T> & {
     readonly resolve: true
@@ -424,6 +476,7 @@ export namespace Lite {
 
   export type Dependency =
     | Atom<unknown>
+    | Flow<any, any>
     | ControllerDep<unknown>
     | TagExecutor<any>
     | Resource<unknown>
@@ -432,6 +485,8 @@ export namespace Lite {
 
   export type ExecutionDependency =
     | Atom<unknown>
+    | Flow<any, any>
+    | FlowControllerDep<any, any>
     | NonWatchControllerDep<unknown>
     | NonWatchResourceControllerDep<unknown>
     | TagExecutor<any, any>
@@ -439,6 +494,8 @@ export namespace Lite {
 
   export type ResourceDependency =
     | Atom<unknown>
+    | Flow<any, any>
+    | FlowControllerDep<any, any>
     | NonWatchControllerDep<unknown>
     | ResourceControllerDep<unknown>
     | TagExecutor<any, any>
@@ -446,6 +503,10 @@ export namespace Lite {
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
+    : D extends Flow<infer TOutput, infer TInput>
+      ? FlowHandle<TOutput, TInput>
+    : D extends FlowControllerDep<infer TOutput, infer TInput>
+      ? FlowHandle<TOutput, TInput>
     : D extends AtomControllerDep<infer T>
       ? Controller<T>
       : D extends ResourceControllerDep<infer T>

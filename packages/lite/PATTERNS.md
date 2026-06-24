@@ -8,7 +8,7 @@ Use this checklist before adding helpers around the graph.
 
 | Boundary | Owns | Guard |
 |----------|------|-------|
-| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, atom controllers when reactivity is intentional, and `ctx.exec` |
+| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, atom controllers when reactivity is intentional, flow handles for child flow composition, and `ctx.exec` at execution boundaries |
 | Test radius | inside-out tests preset a unit's direct deps; outside-in tests preset only edge adapters | No module mocks, no global stubs above raw transport wrappers, no internal reaches, no test-only product branches |
 | transport atom | Raw ambient IO such as network, clock, storage, random, and process APIs | Transport-owned tests may fake the platform API below the seam |
 | capability atom | Domain/application operations built on transport atom deps | Capability atoms stay ambient-free and are presettable at a wider radius |
@@ -79,6 +79,84 @@ sequenceDiagram
     App->>Scope: dispose()
     Scope->>Ext: ext.dispose(scope)
 ```
+
+### Flow Composition Handles
+
+Use `ctx.exec({ flow, input, tags })` at a boundary: route handler, job, CLI command, scheduler tick, UI
+action, or test. Inside a flow or resource, compose child flows through `deps` so the graph edge is
+visible and presettable.
+
+Direct flow deps are lazy. Resolving the parent deps binds a handle to the current execution context; it
+does not parse input, resolve child deps, call the child factory, create a child context, or trigger
+`wrapExec`.
+
+```ts
+import { controller, flow, tag, tags, typed } from "@pumped-fn/lite"
+
+const requestId = tag<string>({ label: "request.id" })
+
+const writeAuditEntry = flow({
+  name: "write-audit-entry",
+  parse: typed<{ txId: string }>(),
+  deps: { requestId: tags.required(requestId) },
+  factory: (ctx, { requestId }) => `${requestId}:${ctx.input.txId}`,
+})
+
+const transferFunds = flow({
+  name: "transfer-funds",
+  parse: typed<{ txId: string }>(),
+  deps: {
+    writeAuditEntry: controller(writeAuditEntry, { name: "audit-step" }),
+  },
+  factory: async (ctx, { writeAuditEntry }) => {
+    return writeAuditEntry.exec({ input: { txId: ctx.input.txId } })
+  },
+})
+
+const settlePayment = flow({
+  name: "settle-payment",
+  parse: typed<{ paymentId: string }>(),
+  deps: {
+    writeAuditEntry: controller(writeAuditEntry, { name: "settle-audit", key: "settle-audit" }),
+  },
+  factory: async (ctx, { writeAuditEntry }) => {
+    const step = writeAuditEntry.prepare({ input: { txId: ctx.input.paymentId } })
+    return step.exec()
+  },
+})
+```
+
+Use `controller(flow, { name, tags, key })` only to preconfigure child-flow execution defaults. Do not mix
+flow controller options with atom/resource controller options: flows never accept `resolve`, `watch`, or
+`eq`; atoms and resources never accept flow execution defaults.
+
+`prepare()` creates an invocation object for resumability, loops, fanout, policy checks, or retries.
+`step.ready` is an optional prep point; `step.exec()` awaits readiness internally, then delegates to the
+captured parent `ctx.exec({ flow, ...options })`.
+
+```mermaid
+sequenceDiagram
+    participant Parent as parent flow
+    participant Handle as child handle
+    participant Ctx as parent ctx
+    participant Ext as Extension
+    participant Child as child ctx
+    participant Flow as child flow
+
+    Parent->>Handle: prepare({ key, input })
+    Handle-->>Parent: invocation
+    Note over Handle,Ext: no child ctx, no parse, no wrapExec, no OTEL span
+    Parent->>Handle: invocation.exec()
+    Handle->>Ctx: ctx.exec({ flow, input, name, tags })
+    Ctx->>Child: create child context
+    Child->>Ext: wrapExec(next, flow, childCtx)
+    Ext->>Flow: next() resolves deps + factory
+    Flow-->>Parent: output
+```
+
+Extension authors should not need a second hook or wrapper-specific span logic. Normal `wrapExec` must
+still see one child execution per child-flow `exec()` call; sequential and parallel child flow work should
+remain visible through ordinary child span parentage and timing.
 
 ### Scoped Isolation + Testing
 
