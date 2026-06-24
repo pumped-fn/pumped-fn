@@ -274,7 +274,7 @@ describe("inside-out", () => {
     expect(rules).toContain("transport atoms")
     expect(rules).toContain("capability atoms, feature graph nodes, and observers do not")
     expect(rules).toContain("ExecutionContextProvider")
-    expect(rules).toContain("useExecutionContext")
+    expect(rules).toContain("useFlow")
     expect(rules).toContain("observers do not create or close execution contexts manually")
     expect(rules).not.toContain("useScope")
     expect(implemented).not.toContain("Fattest frontend")
@@ -317,7 +317,7 @@ describe("inside-out", () => {
     expect(fat).toContain("bffHttp")
     expect(fat).toContain("capability atoms")
     expect(fat).toContain("no other declaration")
-    expect(fat).toContain("useExecutionContext")
+    expect(fat).toContain("useFlow")
     expect(fat).toContain("ExecutionContextProvider")
     expect(fat).not.toContain("useAtom`/`useScope")
     expect(thin).toContain("authedBffClient")
@@ -342,7 +342,7 @@ describe("inside-out", () => {
       "`cardDraft` is a scoped value",
       "nested `ExecutionContextProvider`",
       "React components observe through `useAtom`, `useSelect`, `useResource`, `useScopedValue`, and",
-      "`useExecutionContext`",
+      "`useFlow`",
       "do not create or close contexts manually",
     ])
     expect(source).not.toContain("kanbanHelper")
@@ -456,7 +456,7 @@ describe("inside-out", () => {
     expect(source).toContain("composition-root adapter")
     expect(source).toContain("returned `scope`")
     expect(source).toContain("ExecutionContextProvider")
-    expect(source).toContain("useExecutionContext")
+    expect(source).toContain("useFlow")
     expect(source).toContain("hand-rolling `createContext`/`close` helpers")
   })
 
@@ -472,7 +472,7 @@ describe("inside-out", () => {
     expect(source).toMatch(/logic moving across backend, BFF, and\s+React tiers/)
     expect(source).toMatch(/scope\s+implemented claims to the slices that exist/)
     expect(source).toContain("adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring")
-    expect(source).toContain("useExecutionContext")
+    expect(source).toContain("useFlow")
     expect(source).toContain("instead of accepting `scope`")
     expect(source).toContain("hand-rolling")
     expect(source).toContain("route/job work behind flows or")
@@ -535,7 +535,7 @@ describe("inside-out", () => {
       "React components are observers",
       "graph owns logic and mutable state",
       "ExecutionContextProvider owns UI execution by default",
-      "components use `useExecutionContext`",
+      "components use `useFlow`",
       "Feature components should not call `scope.createContext()` or close contexts manually",
       "`useScope` is an infrastructure hook",
       "node logic tests",
@@ -555,7 +555,7 @@ describe("inside-out", () => {
       "ambient browser APIs",
       "Browser mode does not replace node logic tests",
       "dispose()",
-      "Feature components stay under `ExecutionContextProvider`; they do not create or close contexts themselves",
+      "Feature components stay under `ExecutionContextProvider`; they dispatch with `useFlow` and do not create or close contexts themselves",
       "`useScope`",
       "escape hatch",
       "derived or explicitly scoped",

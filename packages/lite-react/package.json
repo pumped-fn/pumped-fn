@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-react",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "React integration for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:full": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
+    "test:browser:lightpanda": "vitest run --config vitest.lightpanda.config.ts",
     "test:watch": "vitest"
   },
   "peerDependencies": {

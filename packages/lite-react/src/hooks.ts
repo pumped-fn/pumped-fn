@@ -95,6 +95,70 @@ type UseScopedValueOptions<State, Selected = never> =
   | UseScopedValueSelectSuspenseOptions<State, Selected>
   | UseScopedValueSelectManualOptions<State, Selected>
 
+type FlowInput<F> = F extends Lite.Flow<any, infer Input> ? Input : never
+type FlowOutput<F> = F extends Lite.Flow<infer Output, any> ? Output : never
+type ExecuteArgs<Input> = [Input] extends [void | undefined | null] ? [] | [input: Input] : [input: Input]
+type MaybePromise<T> = T | Promise<T>
+
+type UseFlowSettle<Data, Input> =
+  | { status: 'success'; data: Data; error: undefined; input: Input }
+  | { status: 'error'; data: undefined; error: Error; input: Input | undefined }
+
+interface UseFlowOptions<Data, Input> {
+  onSuccess?: (data: Data, input: Input) => MaybePromise<void>
+  onError?: (error: Error, input: Input | undefined) => MaybePromise<void>
+  onSettle?: (result: UseFlowSettle<Data, Input>) => MaybePromise<void>
+}
+
+type UseFlowSnapshot<Data> =
+  | {
+      status: 'idle'
+      isIdle: true
+      isExecuting: false
+      isSuccess: false
+      isError: false
+      data: undefined
+      error: undefined
+    }
+  | {
+      status: 'executing'
+      isIdle: false
+      isExecuting: true
+      isSuccess: false
+      isError: false
+      data: undefined
+      error: undefined
+    }
+  | {
+      status: 'success'
+      isIdle: false
+      isExecuting: false
+      isSuccess: true
+      isError: false
+      data: Data
+      error: undefined
+    }
+  | {
+      status: 'error'
+      isIdle: false
+      isExecuting: false
+      isSuccess: false
+      isError: true
+      data: undefined
+      error: Error
+    }
+
+type UseFlowAction<Data> =
+  | { type: 'reset' }
+  | { type: 'executing' }
+  | { type: 'success'; data: Data }
+  | { type: 'error'; error: Error }
+
+type UseFlowState<Data, Args extends unknown[]> = UseFlowSnapshot<Data> & {
+  execute(...args: Args): void
+  reset(): void
+}
+
 const pendingPromises = new WeakMap<Lite.Controller<unknown>, Promise<unknown>>()
 const retriedControllers = new WeakSet<Lite.Controller<unknown>>()
 type ResourceRecord = {
@@ -109,6 +173,68 @@ const resourceRecords = new WeakMap<Lite.ExecutionContext, WeakMap<Lite.Resource
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
+}
+
+function idleFlowSnapshot<Data>(): UseFlowSnapshot<Data> {
+  return {
+    status: 'idle',
+    isIdle: true,
+    isExecuting: false,
+    isSuccess: false,
+    isError: false,
+    data: undefined,
+    error: undefined,
+  }
+}
+
+function flowSnapshotReducer<Data>(_state: UseFlowSnapshot<Data>, action: UseFlowAction<Data>): UseFlowSnapshot<Data> {
+  if (action.type === 'reset') return idleFlowSnapshot()
+  if (action.type === 'executing') {
+    return {
+      status: 'executing',
+      isIdle: false,
+      isExecuting: true,
+      isSuccess: false,
+      isError: false,
+      data: undefined,
+      error: undefined,
+    }
+  }
+  if (action.type === 'success') {
+    return {
+      status: 'success',
+      isIdle: false,
+      isExecuting: false,
+      isSuccess: true,
+      isError: false,
+      data: action.data,
+      error: undefined,
+    }
+  }
+  return {
+    status: 'error',
+    isIdle: false,
+    isExecuting: false,
+    isSuccess: false,
+    isError: true,
+    data: undefined,
+    error: action.error,
+  }
+}
+
+function runFlowCallbacks<Data, Input>(
+  options: UseFlowOptions<Data, Input> | undefined,
+  result: UseFlowSettle<Data, Input>,
+): void {
+  if (!options) return
+  void Promise.resolve().then(async () => {
+    if (result.status === 'success') {
+      await options.onSuccess?.(result.data, result.input)
+    } else {
+      await options.onError?.(result.error, result.input)
+    }
+    await options.onSettle?.(result)
+  }).catch(() => {})
 }
 
 function getResourceLoad<T>(record: ResourceRecord): Load<T> {
@@ -347,6 +473,64 @@ function useExecutionContext(): Lite.ExecutionContext {
     throw new Error("useExecutionContext must be used within an ExecutionContextProvider")
   }
   return ctx
+}
+
+function useFlow<F extends Lite.Flow<any, any>>(
+  target: F,
+  options?: UseFlowOptions<FlowOutput<F>, FlowInput<F>>,
+): UseFlowState<FlowOutput<F>, ExecuteArgs<FlowInput<F>>> {
+  const ctx = useExecutionContext()
+  const optionsRef = useRef(options)
+  const ownerRef = useRef(0)
+  const sourceRef = useRef<{ ctx: Lite.ExecutionContext; target: F } | null>(null)
+  const [snapshot, dispatch] = useReducer(
+    flowSnapshotReducer<FlowOutput<F>>,
+    undefined,
+    idleFlowSnapshot<FlowOutput<F>>,
+  )
+  optionsRef.current = options
+
+  useIsomorphicLayoutEffect(() => {
+    const previous = sourceRef.current
+    sourceRef.current = { ctx, target }
+    if (previous !== null && (previous.ctx !== ctx || previous.target !== target)) {
+      ownerRef.current++
+      dispatch({ type: 'reset' })
+    }
+    return () => {
+      ownerRef.current++
+    }
+  }, [ctx, target])
+
+  const reset = useCallback(() => {
+    ownerRef.current++
+    dispatch({ type: 'reset' })
+  }, [])
+
+  const execute = useCallback((...args: ExecuteArgs<FlowInput<F>>) => {
+    const owner = ++ownerRef.current
+    const input = args[0] as FlowInput<F>
+    dispatch({ type: 'executing' })
+    void ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<FlowOutput<F>, FlowInput<F>>).then(
+      (data) => {
+        if (owner !== ownerRef.current) return
+        dispatch({ type: 'success', data })
+        runFlowCallbacks(optionsRef.current, { status: 'success', data, error: undefined, input })
+      },
+      (cause) => {
+        if (owner !== ownerRef.current) return
+        const error = normalizeError(cause)
+        dispatch({ type: 'error', error })
+        runFlowCallbacks(optionsRef.current, { status: 'error', data: undefined, error, input })
+      },
+    )
+  }, [ctx, target])
+
+  return useMemo(() => ({
+    ...snapshot,
+    execute,
+    reset,
+  }), [execute, reset, snapshot])
 }
 
 function useResource<T>(resource: Lite.Resource<T>): T
@@ -777,5 +961,5 @@ function useSelect<T, S>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export { useScope, useExecutionContext, useController, useAtom, useSelect, useResource, useScopedValue }
-export type { Load, UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState, UseResourceSuspenseOptions, UseResourceManualOptions, UseResourceOptions, UseScopedValueSuspenseOptions, UseScopedValueManualOptions, UseScopedValueSelectSuspenseOptions, UseScopedValueSelectManualOptions, UseScopedValueOptions }
+export { useScope, useExecutionContext, useFlow, useController, useAtom, useSelect, useResource, useScopedValue }
+export type { Load, UseAtomSuspenseOptions, UseAtomManualOptions, UseAtomOptions, UseAtomState, UseControllerOptions, UseFlowOptions, UseFlowSettle, UseFlowState, UseSelectSuspenseOptions, UseSelectManualOptions, UseSelectOptions, UseSelectState, UseResourceSuspenseOptions, UseResourceManualOptions, UseResourceOptions, UseScopedValueSuspenseOptions, UseScopedValueManualOptions, UseScopedValueSelectSuspenseOptions, UseScopedValueSelectManualOptions, UseScopedValueOptions }

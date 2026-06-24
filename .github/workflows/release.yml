@@ -43,8 +43,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright browser
+        run: pnpm -F @pumped-fn/lite-react exec playwright install --with-deps chromium
+
+      - name: Install Lightpanda browser
+        run: |
+          curl -fsSL -o /tmp/lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux
+          chmod +x /tmp/lightpanda
+          echo "LIGHTPANDA_EXECUTABLE_PATH=/tmp/lightpanda" >> "$GITHUB_ENV"
+
+      - name: Check Lightpanda browser
+        run: ${LIGHTPANDA_EXECUTABLE_PATH:-$HOME/.cache/lightpanda-node/lightpanda} version
+
       - name: Build packages
         run: pnpm -r build
+
+      - name: Run tests
+        run: pnpm test --passWithNoTests
+
+      - name: Run Lightpanda browser tests
+        run: pnpm -F @pumped-fn/lite-react test:browser:lightpanda
 
       - name: Generate release title
         id: release_title

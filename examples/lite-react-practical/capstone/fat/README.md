@@ -16,7 +16,7 @@ The scope is the single seam.
   `vi.stubGlobal` fakes `fetch` below the seam — the sole sanctioned global-fake site per module.
 - `authedBffClient` is the auth-capable port. It composes `bffClient` with `session`, so feature atoms never depend on both raw transport and session storage or pass `session.token` into service calls.
 - `session` is preset directly only in tests that target auth gates such as `isAuthed`. Dashboard feature tests preset `authedBffClient`.
-- Components observe atoms via `useAtom` and execute flows through `useExecutionContext`; they do not accept
+- Components observe atoms via `useAtom` and execute flows through `useFlow`; they do not accept
   `scope` or manually create/close execution contexts. The observer tests wrap components in
   `<ScopeProvider scope={scope}>` plus `<ExecutionContextProvider>` and interact via `fireEvent`.
 

@@ -2,7 +2,7 @@ import {
   ExecutionContextProvider,
   useAtom,
   useController,
-  useExecutionContext,
+  useFlow,
   useResource,
   useScopedValue,
   useSelect,
@@ -18,10 +18,8 @@ import {
   type CardView,
 } from "./board"
 
-function ignoreFlowFailure(): void {}
-
 function CardEditor({ card }: { card: CardView }) {
-  const ctx = useExecutionContext()
+  const saveDraft = useFlow(saveCardDraft)
   const draft = useScopedValue(cardDraft, { suspense: false })
 
   if (draft.status !== "ready") return <div>draft {card.id}</div>
@@ -48,7 +46,7 @@ function CardEditor({ card }: { card: CardView }) {
       <button
         aria-label={`save ${card.id}`}
         onClick={() => {
-          void ctx.exec({ flow: saveCardDraft }).catch(ignoreFlowFailure)
+          saveDraft.execute()
         }}
       >
         save
@@ -58,7 +56,7 @@ function CardEditor({ card }: { card: CardView }) {
 }
 
 function CardRow({ card }: { card: CardView }) {
-  const ctx = useExecutionContext()
+  const move = useFlow(moveCard)
 
   return (
     <article>
@@ -71,7 +69,7 @@ function CardRow({ card }: { card: CardView }) {
       <button
         aria-label={`move ${card.id} to done`}
         onClick={() => {
-          void ctx.exec({ flow: moveCard, input: { cardId: card.id, toLaneId: "done", toIndex: 99 } }).catch(ignoreFlowFailure)
+          move.execute({ cardId: card.id, toLaneId: "done", toIndex: 99 })
         }}
       >
         done

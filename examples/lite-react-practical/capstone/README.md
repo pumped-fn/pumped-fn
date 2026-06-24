@@ -57,7 +57,7 @@ package-wide test-total claim; it documents where frontend node logic currently 
 ## Boundary Rules
 
 - Components observe the graph through `ScopeProvider`, `ExecutionContextProvider`, `useAtom`, and
-  `useExecutionContext`; observers do not create or close execution contexts manually.
+  `useFlow`; observers do not create or close execution contexts manually.
 - `main.tsx` is a tested composition-root adapter: create one scope, render through `ScopeProvider`, return
   the scope for assertions, and dispose the root/scope together.
 - BFF `main.ts` is a tested lite composition root: create one scope and one process execution context,

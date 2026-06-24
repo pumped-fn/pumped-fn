@@ -8,7 +8,7 @@ Architectural patterns for `@pumped-fn/lite-react`. For API reference, see [READ
 
 React components are observers of the Lite graph. The graph owns logic, mutable state, validation, async work, and dependency declarations; components render snapshots and dispatch graph actions.
 
-Use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` for observation. Use `useExecutionContext` for UI-triggered flows. Treat `useScope` as an infrastructure escape hatch for provider/bootstrap helpers, not the normal feature-component path.
+Use `useAtom`, `useSelect`, `useResource`, and `useScopedValue` for observation. Use `useFlow` for UI-triggered flows. Treat `useExecutionContext` and `useScope` as infrastructure escape hatches for provider/bootstrap helpers, not the normal feature-component path.
 
 ---
 
@@ -32,12 +32,12 @@ Keep graph logic in node. Logic tests should exercise atoms, flows, resources, a
 
 Use browser observer tests for rendered components, provider wiring, and bootstrap adapters. Browser observer tests should prove that components observe graph state and dispatch graph actions, not that business logic only works when React or a browser is present.
 
-Browser mode does not replace node logic tests. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
+Browser mode does not replace node logic tests. CI also runs a Lightpanda smoke against a Vite-served `useFlow` page. Guard ambient browser APIs so raw IO stays in transport atoms or composition-root adapters.
 
 Public examples that claim architectural quality should keep those claims derived or explicitly scoped: inventories come from files, implemented slices name backlog, and strong boundary rules get structural guards.
 
 `@pumped-fn/lite-lint` codifies the React-facing guardrails in a lint-like scanner: feature components
-should not call `useScope`, mirror graph state with `useState`, create or close execution contexts
+should not call `useScope` or `useExecutionContext`, mirror graph state with `useState`, create or close execution contexts
 manually, or rely on JSDOM instead of Vitest Browser Mode observer tests.
 
 ---
@@ -62,7 +62,7 @@ sequenceDiagram
     Main->>Scope: dispose()
 ```
 
-Tests can mount the same bootstrap adapter and assert through the returned scope or public graph APIs. Feature components stay under `ExecutionContextProvider`; they do not create or close contexts themselves.
+Tests can mount the same bootstrap adapter and assert through the returned scope or public graph APIs. Feature components stay under `ExecutionContextProvider`; they dispatch with `useFlow` and do not create or close contexts themselves.
 
 ---
 

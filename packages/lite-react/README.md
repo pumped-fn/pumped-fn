@@ -3,8 +3,8 @@
 React bindings for `@pumped-fn/lite`.
 
 `@pumped-fn/lite-react` lets React observe a Lite graph without making React own the graph. Components
-subscribe to atoms, selected slices, resources, and scoped values. Event handlers execute flows through a
-provider-owned execution context. Forms and nested UI state can live in execution-scoped resources instead
+subscribe to atoms, selected slices, resources, and scoped values. Event handlers execute flows with
+`useFlow`, through the provider-owned execution context. Forms and nested UI state can live in execution-scoped resources instead
 of local component mirrors.
 
 ## Install
@@ -12,8 +12,6 @@ of local component mirrors.
 ```bash
 npm install @pumped-fn/lite @pumped-fn/lite-react
 ```
-
-The package supports React 18 and React 19.
 
 ## The Rule
 
@@ -40,7 +38,7 @@ React owns:
 Feature components should not call `createScope`, call `scope.createContext`, close execution contexts,
 mirror graph-owned state with local state, or perform inline IO when the graph can own that behavior.
 Feature components should not call `scope.createContext()` or close contexts manually. Components use
-`useExecutionContext` for event-triggered graph work. In short, components use `useExecutionContext`, and
+`useFlow` for event-triggered graph work. In short, components use `useFlow`, and
 components should not mirror graph state with `useState`.
 
 `useScope` is an infrastructure hook. Use it for provider/bootstrap helpers and rare integration code that
@@ -104,7 +102,8 @@ state across ordinary rerenders without changing tag lookup, resource ownership,
 | --- | --- |
 | `ScopeProvider` | Provide a Lite scope to a React subtree |
 | `ExecutionContextProvider` | Provide or create the UI execution context |
-| `useExecutionContext` | Execute flows or context functions from event handlers |
+| `useFlow` | Execute flows from event handlers and observe action lifecycle |
+| `useExecutionContext` | Infrastructure escape hatch for provider/context integrations |
 | `useAtom` | Read atom state with Suspense/ErrorBoundary integration or manual load state |
 | `useSelect` | Read a derived atom slice and avoid rerenders when the slice is equal |
 | `useResource` | Read execution-scoped resources from the current provider context |
@@ -114,7 +113,7 @@ state across ordinary rerenders without changing tag lookup, resource ownership,
 | `useScope` | Infrastructure escape hatch for provider/bootstrap integrations |
 
 Most feature components should use `useAtom`, `useSelect`, `useResource`, `useScopedValue`, and
-`useExecutionContext`. Treat `useScope` and raw controllers as integration tools.
+`useFlow`. Treat `useExecutionContext`, `useScope`, and raw controllers as integration tools.
 
 ## Atom Observation
 
@@ -176,16 +175,17 @@ function InboxBadge() {
 
 ## UI Actions
 
-Use `useExecutionContext` for event-triggered graph work. The provider owns the context lifecycle.
+Use `useFlow` for event-triggered graph work. The provider owns the context lifecycle, and the hook
+tracks the action lifecycle without adding a Suspense mode.
 
 ```tsx
-import { useExecutionContext } from "@pumped-fn/lite-react"
+import { useFlow } from "@pumped-fn/lite-react"
 
 function SaveButton() {
-  const ctx = useExecutionContext()
+  const save = useFlow(saveProfile)
 
   return (
-    <button onClick={() => void ctx.exec({ flow: saveProfile, input: { source: "toolbar" } })}>
+    <button onClick={() => save.execute({ source: "toolbar" })}>
       Save
     </button>
   )
@@ -193,6 +193,19 @@ function SaveButton() {
 ```
 
 This keeps extensions, resources, tags, `onClose`, and cleanup attached to the same UI boundary.
+`reset()` clears the hook state and ignores stale completions; it does not cancel the underlying flow.
+When a newer execution starts, the older completion cannot update hook state or call lifecycle callbacks.
+
+Submit flows should compose graph state inside the graph instead of mapping browser events in React:
+
+```tsx
+const submit = useFlow(submitLogin)
+
+<form onSubmit={(event) => {
+  event.preventDefault()
+  submit.execute()
+}} />
+```
 
 ## Execution-Scoped Resources
 
@@ -354,6 +367,7 @@ Split tests by responsibility:
 - Node logic tests exercise atoms, flows, resources, and scoped values through `createScope({ presets, tags, extensions })`.
 - Browser observer tests render components under `ScopeProvider` and `ExecutionContextProvider`; browser observer tests cover provider wiring and dispatch.
 - Browser mode proves that React observes and dispatches correctly. Browser mode does not replace node logic tests.
+- The Lightpanda smoke runs a Vite-served `useFlow` page through a real CDP browser and catches browser-runtime drift before release.
 
 ```tsx
 import { createScope, preset } from "@pumped-fn/lite"
@@ -376,8 +390,8 @@ render(
 ```
 
 Use `@pumped-fn/lite-lint` to enforce the React-facing guardrails: feature components should not call
-`useScope`, create or close execution contexts manually, mirror graph-owned state with local state, or put
-rendered observer tests outside browser test files.
+`useScope` or `useExecutionContext`, create or close execution contexts manually, mirror graph-owned state
+with local state, or put rendered observer tests outside browser test files.
 
 ## SSR
 
@@ -413,6 +427,7 @@ It also exports:
 - `scopedValue`
 - `useScope`
 - `useExecutionContext`
+- `useFlow`
 - `useController`
 - `useAtom`
 - `useSelect`

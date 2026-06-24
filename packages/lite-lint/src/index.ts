@@ -11,6 +11,7 @@ export type RuleId =
   | "pumped/no-render-outside-browser-test"
   | "pumped/no-react-local-state"
   | "pumped/no-react-manual-execution-context"
+  | "pumped/no-react-use-execution-context"
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
   | "pumped/no-shared-scope-factory"
@@ -42,6 +43,7 @@ type Imports = {
   reactNamespaces: Set<string>
   render: Set<string>
   testLibraryNamespaces: Set<string>
+  useExecutionContext: Set<string>
   useScope: Set<string>
   useState: Set<string>
   viObjects: Set<string>
@@ -204,6 +206,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     reactNamespaces: new Set(),
     render: new Set(),
     testLibraryNamespaces: new Set(),
+    useExecutionContext: new Set(),
     useScope: new Set(),
     useState: new Set(),
     viObjects: new Set(["jest", "vi"]),
@@ -237,6 +240,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@pumped-fn/lite-react" && imported === "useScope") {
         imports.useScope.add(local)
+      }
+      if (moduleName === "@pumped-fn/lite-react" && imported === "useExecutionContext") {
+        imports.useExecutionContext.add(local)
       }
       if (moduleName === "react" && imported === "useState") {
         imports.useState.add(local)
@@ -421,7 +427,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           filePath,
           "pumped/no-react-use-scope",
           node.expression,
-          "Feature components should use graph hooks and useExecutionContext instead of useScope.",
+          "Feature components should use graph hooks and useFlow instead of useScope.",
         )
       }
 
@@ -432,7 +438,29 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           filePath,
           "pumped/no-react-use-scope",
           node.expression,
-          "Feature components should use graph hooks and useExecutionContext instead of useScope.",
+          "Feature components should use graph hooks and useFlow instead of useScope.",
+        )
+      }
+
+      if (reactFeature && name && imports.useExecutionContext.has(name)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-react-use-execution-context",
+          node.expression,
+          "Feature components should use useFlow for UI-triggered flows instead of useExecutionContext.",
+        )
+      }
+
+      if (reactFeature && isNamespaceCall(node.expression, imports.liteReactNamespaces, "useExecutionContext")) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-react-use-execution-context",
+          node.expression,
+          "Feature components should use useFlow for UI-triggered flows instead of useExecutionContext.",
         )
       }
 

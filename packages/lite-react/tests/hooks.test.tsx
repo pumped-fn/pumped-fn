@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { Component, type ReactNode, Suspense } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { tag, tags } from '@pumped-fn/lite'
-import { atom, createScope, flow, preset, resource, scopedValue, ExecutionContextProvider, ScopeProvider, useScope, useExecutionContext, useAtom, useSelect, useController, useResource, useScopedValue } from '../src'
+import { atom, createScope, flow, preset, resource, scopedValue, ExecutionContextProvider, ScopeProvider, useScope, useExecutionContext, useFlow, useAtom, useSelect, useController, useResource, useScopedValue } from '../src'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -66,6 +66,291 @@ describe('ScopeProvider + useScope', () => {
 
     function NoProvider() { useScope(); return <div>test</div> }
     expect(() => { render(<NoProvider />) }).toThrow('useScope must be used within a ScopeProvider')
+  })
+})
+
+describe('ExecutionContextProvider + useFlow', () => {
+  it('executes flows and exposes success state with callbacks', async () => {
+    const scope = createScope()
+    const calls: string[] = []
+    const save = flow({
+      name: 'save-profile',
+      parse: (raw: unknown) => String(raw),
+      factory: (ctx) => `saved:${ctx.input}`,
+    })
+
+    function TestComponent() {
+      const run = useFlow(save, {
+        onSuccess: (data, input) => {
+          calls.push(`success:${data}:${input}`)
+        },
+        onSettle: (result) => {
+          calls.push(`settle:${result.status}`)
+        },
+      })
+      return (
+        <div>
+          <button onClick={() => run.execute('toolbar')}>save</button>
+          <span>{run.status}:{run.data ?? run.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider>
+          <TestComponent />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    expect(screen.getByText('idle:none')).toBeInTheDocument()
+    await act(async () => {
+      screen.getByRole('button', { name: 'save' }).click()
+    })
+    await waitFor(() => {
+      expect(screen.getByText('success:saved:toolbar')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(calls).toEqual(['success:saved:toolbar:toolbar', 'settle:success'])
+    })
+
+    await scope.dispose()
+  })
+
+  it('normalizes thrown values into error state', async () => {
+    const scope = createScope()
+    const calls: string[] = []
+    const fail = flow({
+      name: 'fail-profile',
+      parse: (raw: unknown) => String(raw),
+      factory: () => {
+        throw 'bad-profile'
+      },
+    })
+
+    function TestComponent() {
+      const run = useFlow(fail, {
+        onError: (error, input) => {
+          calls.push(`error:${error.message}:${input}`)
+        },
+        onSettle: (result) => {
+          calls.push(`settle:${result.status}`)
+        },
+      })
+      return (
+        <div>
+          <button onClick={() => run.execute('form')}>save</button>
+          <span>{run.status}:{run.data ?? run.error?.message ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider>
+          <TestComponent />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'save' }).click()
+    })
+    await waitFor(() => {
+      expect(screen.getByText('error:bad-profile')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(calls).toEqual(['error:bad-profile:form', 'settle:error'])
+    })
+
+    await scope.dispose()
+  })
+
+  it('keeps only the latest execution visible', async () => {
+    const scope = createScope()
+    const calls: string[] = []
+    const resolvers = new Map<number, (value: string) => void>()
+    const save = flow({
+      name: 'latest-save',
+      parse: (raw: unknown) => Number(raw),
+      factory: (ctx) => new Promise<string>((resolve) => {
+        resolvers.set(ctx.input, resolve)
+      }),
+    })
+
+    function TestComponent() {
+      const run = useFlow(save, {
+        onSuccess: (data) => {
+          calls.push(data)
+        },
+      })
+      return (
+        <div>
+          <button onClick={() => run.execute(1)}>one</button>
+          <button onClick={() => run.execute(2)}>two</button>
+          <span>{run.status}:{run.data ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider>
+          <TestComponent />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'one' }).click()
+      screen.getByRole('button', { name: 'two' }).click()
+    })
+    await waitFor(() => {
+      expect(screen.getByText('executing:none')).toBeInTheDocument()
+    })
+    await act(async () => {
+      resolvers.get(2)?.('second')
+    })
+    await waitFor(() => {
+      expect(screen.getByText('success:second')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(calls).toEqual(['second'])
+    })
+    await act(async () => {
+      resolvers.get(1)?.('first')
+    })
+    await Promise.resolve()
+    expect(screen.getByText('success:second')).toBeInTheDocument()
+    expect(calls).toEqual(['second'])
+
+    await scope.dispose()
+  })
+
+  it('reset and unmount drop stale callbacks without cancelling the flow', async () => {
+    const scope = createScope()
+    const calls: string[] = []
+    let resolveSave!: (value: string) => void
+    const save = flow({
+      name: 'reset-save',
+      factory: () => new Promise<string>((resolve) => {
+        resolveSave = resolve
+      }),
+    })
+
+    function TestComponent() {
+      const run = useFlow(save, {
+        onSuccess: (data) => {
+          calls.push(data)
+        },
+      })
+      return (
+        <div>
+          <button onClick={() => run.execute()}>save</button>
+          <button onClick={() => run.reset()}>reset</button>
+          <span>{run.status}:{run.data ?? 'none'}</span>
+        </div>
+      )
+    }
+
+    const view = render(
+      <ScopeProvider scope={scope}>
+        <ExecutionContextProvider>
+          <TestComponent />
+        </ExecutionContextProvider>
+      </ScopeProvider>
+    )
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'save' }).click()
+    })
+    expect(screen.getByText('executing:none')).toBeInTheDocument()
+    await act(async () => {
+      screen.getByRole('button', { name: 'reset' }).click()
+    })
+    expect(screen.getByText('idle:none')).toBeInTheDocument()
+    await act(async () => {
+      resolveSave('after-reset')
+    })
+    await Promise.resolve()
+    expect(screen.getByText('idle:none')).toBeInTheDocument()
+    expect(calls).toEqual([])
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'save' }).click()
+    })
+    view.unmount()
+    await act(async () => {
+      resolveSave('after-unmount')
+    })
+    await Promise.resolve()
+    expect(calls).toEqual([])
+
+    await scope.dispose()
+  })
+
+  it('drops stale callbacks after provider context replacement', async () => {
+    const tenant = tag<string>({ label: 'use-flow-tenant' })
+    const scope = createScope()
+    const calls: string[] = []
+    const resolvers = new Map<string, (value: string) => void>()
+    const save = flow({
+      name: 'tenant-save',
+      factory: (ctx) => new Promise<string>((resolve) => {
+        resolvers.set(ctx.data.seekTag(tenant) ?? 'none', resolve)
+      }),
+    })
+
+    function TestComponent() {
+      const run = useFlow(save, {
+        onSuccess: (data) => {
+          calls.push(data)
+        },
+      })
+      return <button onClick={() => run.execute()}>{run.status}:{run.data ?? 'none'}</button>
+    }
+
+    function Tree({ value }: { value: string }) {
+      return (
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider tags={[tenant(value)]}>
+            <TestComponent />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+    }
+
+    const view = render(<Tree value="first" />)
+
+    await act(async () => {
+      screen.getByRole('button').click()
+    })
+    expect(screen.getByText('executing:none')).toBeInTheDocument()
+    view.rerender(<Tree value="second" />)
+    await waitFor(() => {
+      expect(screen.getByText('idle:none')).toBeInTheDocument()
+    })
+    await act(async () => {
+      resolvers.get('first')?.('first-done')
+    })
+    await Promise.resolve()
+    expect(calls).toEqual([])
+
+    await act(async () => {
+      screen.getByRole('button').click()
+    })
+    await act(async () => {
+      resolvers.get('second')?.('second-done')
+    })
+    await waitFor(() => {
+      expect(screen.getByText('success:second-done')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(calls).toEqual(['second-done'])
+    })
+
+    await scope.dispose()
   })
 })
 

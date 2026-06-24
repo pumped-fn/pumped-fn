@@ -160,7 +160,7 @@ own execution lifecycles.
 
 ```tsx
 import { atom, createScope, flow } from "@pumped-fn/lite"
-import { ExecutionContextProvider, ScopeProvider, useAtom, useExecutionContext } from "@pumped-fn/lite-react"
+import { ExecutionContextProvider, ScopeProvider, useAtom, useFlow } from "@pumped-fn/lite-react"
 
 const dashboardState = atom({
   factory: () => ({ title: "Dashboard" }),
@@ -184,10 +184,10 @@ function App() {
 
 function Dashboard() {
   const dashboard = useAtom(dashboardState)
-  const ctx = useExecutionContext()
+  const refresh = useFlow(refreshDashboard)
 
   return (
-    <button onClick={() => void ctx.exec({ flow: refreshDashboard })}>
+    <button onClick={() => refresh.execute()}>
       {dashboard.title}
     </button>
   )
@@ -226,7 +226,8 @@ await scope.dispose()
 
 Frontend tests split by responsibility. Graph logic stays in node tests and uses the same scope seam.
 Rendered observer tests run in Vitest Browser Mode under `ScopeProvider` and `ExecutionContextProvider`.
-Browser mode proves React wiring; it does not replace node logic tests.
+Browser mode proves React wiring; it does not replace node logic tests. CI also runs a Lightpanda
+smoke against a Vite-served `useFlow` page so browser-runtime drift is caught before release.
 
 `@pumped-fn/lite-lint` codifies the common mistakes: module mocks, stale browser-emulator markers,
 definition-handle suffixes, scope-as-argument helpers, shared scope factories, inline ambient IO, React

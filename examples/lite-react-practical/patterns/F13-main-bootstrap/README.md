@@ -18,7 +18,7 @@ Move state to `after.ts`, keep the component in `view.tsx` as an observer, and m
 composition-root adapter. It creates one `scope`, renders through `ScopeProvider` and
 `ExecutionContextProvider`, returns the mounted app with the returned `scope`, and disposes both React root
 and scope on unmount. `main.tsx` is also the only declaration in the pattern that may touch `document`;
-observers and graph nodes stay ambient-free. The observer uses `useExecutionContext` to execute flows
+observers and graph nodes stay ambient-free. The observer uses `useFlow` to execute flows
 through the provider instead of accepting `scope` or hand-rolling `createContext`/`close` helpers.
 
 ## Lens coverage

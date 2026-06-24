@@ -30,7 +30,8 @@ pnpm lint
 | `pumped/no-scope-argument` | Exported product helpers accepting `scope`; composition roots and tests own scope. |
 | `pumped/no-render-outside-browser-test` | Testing Library `render` outside `*.browser.test.tsx`; DOM observer tests run in browser mode. |
 | `pumped/no-ambient-io-outside-boundary` | Raw `fetch`, timers, DOM/storage, random, and clock access outside transport/root declarations. |
-| `pumped/no-react-use-scope` | Feature components calling `useScope`; use graph hooks and `useExecutionContext`. |
+| `pumped/no-react-use-scope` | Feature components calling `useScope`; use graph hooks and `useFlow`. |
+| `pumped/no-react-use-execution-context` | Feature components calling `useExecutionContext`; use `useFlow` for UI-triggered flows. |
 | `pumped/no-react-local-state` | Feature components mirroring graph-owned state with `useState`. |
 | `pumped/no-react-manual-execution-context` | Feature components creating or closing execution contexts manually. |
 | `pumped/no-internal-example-label` | Stale internal example vocabulary in public docs/source. |

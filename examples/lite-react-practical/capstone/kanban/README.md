@@ -14,7 +14,7 @@ public primitives directly:
 - `cardDraft` is a scoped value under nested `ExecutionContextProvider` boundaries, so sibling card editors do
   not share draft state.
 - React components observe through `useAtom`, `useSelect`, `useResource`, `useScopedValue`, and
-  `useExecutionContext`; they dispatch flows and do not create or close contexts manually.
+  `useFlow`; they dispatch flows and do not create or close contexts manually.
 
 ## Why This Exists
 

@@ -410,7 +410,7 @@ implemented claims to the slices that exist.
 
 The practical examples use the same boundary vocabulary as the package docs. React bootstrap files are
 adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring, and
-observers execute graph work through `useExecutionContext` instead of accepting `scope` or hand-rolling
+observers execute graph work through `useFlow` instead of accepting `scope` or hand-rolling
 `createContext`/`close` wrappers. Backend and BFF entry points keep route/job work behind flows or
 `ctx.exec`, own root execution lifecycle at the composition root, and dispose scopes explicitly. Raw IO is
 kept in transport atoms or composition-root adapters; capability atoms depend on transports and remain

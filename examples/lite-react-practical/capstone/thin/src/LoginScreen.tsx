@@ -1,14 +1,14 @@
-import { useAtom, useExecutionContext } from "@pumped-fn/lite-react"
+import { useAtom, useFlow } from "@pumped-fn/lite-react"
 import { sessionToken } from "./session"
 import { signInForm, submitSignIn, updateSignInEmail, updateSignInPassword } from "./signIn"
 import { Dashboard } from "./Dashboard"
 
-function ignoreFlowFailure(): void {}
-
 export function LoginScreen() {
   const { data: token } = useAtom(sessionToken, { suspense: false, resolve: true })
   const { data: form } = useAtom(signInForm, { suspense: false, resolve: true })
-  const ctx = useExecutionContext()
+  const submit = useFlow(submitSignIn)
+  const updateEmail = useFlow(updateSignInEmail)
+  const updatePassword = useFlow(updateSignInPassword)
 
   if (token !== null && token !== undefined) {
     return <Dashboard />
@@ -18,7 +18,7 @@ export function LoginScreen() {
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        void ctx.exec({ flow: submitSignIn, input: undefined }).catch(ignoreFlowFailure)
+        submit.execute()
       }}
     >
       <label>
@@ -28,7 +28,7 @@ export function LoginScreen() {
           type="email"
           value={form?.email ?? ""}
           onChange={(e) => {
-            void ctx.exec({ flow: updateSignInEmail, input: e.target.value }).catch(ignoreFlowFailure)
+            updateEmail.execute(e.target.value)
           }}
         />
       </label>
@@ -39,7 +39,7 @@ export function LoginScreen() {
           type="password"
           value={form?.password ?? ""}
           onChange={(e) => {
-            void ctx.exec({ flow: updateSignInPassword, input: e.target.value }).catch(ignoreFlowFailure)
+            updatePassword.execute(e.target.value)
           }}
         />
       </label>

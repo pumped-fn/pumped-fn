@@ -102,21 +102,56 @@ describe("lite lint scanner", () => {
   it("finds React observer anti-patterns", () => {
     expect(ids(`
       import { useState } from "react"
-      import { useScope } from "@pumped-fn/lite-react"
+      import { useExecutionContext, useScope } from "@pumped-fn/lite-react"
 
       export function LoginForm() {
         const scope = useScope()
+        const run = useExecutionContext()
         const [email, setEmail] = useState("")
         const ctx = scope.createContext()
+        void run.exec
         void ctx.close()
         return <button onClick={() => setEmail(email)}>Save</button>
       }
     `, "src/LoginForm.tsx")).toEqual([
       "pumped/no-react-use-scope",
+      "pumped/no-react-use-execution-context",
       "pumped/no-react-local-state",
       "pumped/no-react-manual-execution-context",
       "pumped/no-react-manual-execution-context",
     ])
+  })
+
+  it("finds namespaced feature use of execution context", () => {
+    expect(ids(`
+      import * as LiteReact from "@pumped-fn/lite-react"
+
+      export function SaveButton() {
+        const ctx = LiteReact.useExecutionContext()
+        return <button onClick={() => void ctx.exec}>Save</button>
+      }
+    `, "src/SaveButton.tsx")).toEqual([
+      "pumped/no-react-use-execution-context",
+    ])
+  })
+
+  it("allows execution context access in tests and composition roots", () => {
+    expect(ids(`
+      import { useExecutionContext } from "@pumped-fn/lite-react"
+
+      export function Probe() {
+        useExecutionContext()
+        return null
+      }
+    `, "tests/Probe.test.tsx")).toEqual([])
+    expect(ids(`
+      import { useExecutionContext } from "@pumped-fn/lite-react"
+
+      export function MainProbe() {
+        useExecutionContext()
+        return null
+      }
+    `, "src/main.tsx")).toEqual([])
   })
 
   it("allows composition roots and transport declarations to own integration points", () => {

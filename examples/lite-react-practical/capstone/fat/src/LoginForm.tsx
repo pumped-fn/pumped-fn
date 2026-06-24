@@ -1,18 +1,19 @@
-import { useAtom, useExecutionContext } from "@pumped-fn/lite-react"
+import { useAtom, useFlow } from "@pumped-fn/lite-react"
 import { isAuthed, loginForm, submitLogin, updateLoginEmail, updateLoginPassword, logout } from "./auth"
-
-function ignoreFlowFailure(): void {}
 
 export function LoginForm() {
   const { data: authed } = useAtom(isAuthed, { suspense: false, resolve: true })
   const { data: form } = useAtom(loginForm, { suspense: false, resolve: true })
-  const ctx = useExecutionContext()
+  const runLogout = useFlow(logout)
+  const submit = useFlow(submitLogin)
+  const updateEmail = useFlow(updateLoginEmail)
+  const updatePassword = useFlow(updateLoginPassword)
 
   if (authed) {
     return (
       <button
         onClick={() => {
-          void ctx.exec({ flow: logout, input: undefined }).catch(ignoreFlowFailure)
+          runLogout.execute()
         }}
       >
         logout
@@ -24,7 +25,7 @@ export function LoginForm() {
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        void ctx.exec({ flow: submitLogin, input: undefined }).catch(ignoreFlowFailure)
+        submit.execute()
       }}
     >
       <label>
@@ -34,7 +35,7 @@ export function LoginForm() {
           type="email"
           value={form?.email ?? ""}
           onChange={(e) => {
-            void ctx.exec({ flow: updateLoginEmail, input: e.target.value }).catch(ignoreFlowFailure)
+            updateEmail.execute(e.target.value)
           }}
         />
       </label>
@@ -45,7 +46,7 @@ export function LoginForm() {
           type="password"
           value={form?.password ?? ""}
           onChange={(e) => {
-            void ctx.exec({ flow: updateLoginPassword, input: e.target.value }).catch(ignoreFlowFailure)
+            updatePassword.execute(e.target.value)
           }}
         />
       </label>

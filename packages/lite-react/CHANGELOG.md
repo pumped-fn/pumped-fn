@@ -1,5 +1,13 @@
 # @pumped-fn/lite-react
 
+## 2.3.0
+
+### Minor Changes
+
+- Add `useFlow` for React feature components, update examples to dispatch flows through the hook, and add a Lightpanda browser smoke gate for the `useFlow` integration.
+
+  Add a lite-lint rule that blocks feature components from calling `useExecutionContext` directly.
+
 ## 2.2.0
 
 ### Minor Changes
