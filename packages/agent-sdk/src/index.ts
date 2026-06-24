@@ -486,6 +486,23 @@ function clone<T>(value: T): T {
 
 type Resolvable<Input, T> = T | ((input: Input, ctx: Lite.ExecutionContext) => T)
 
+export interface CliBind {
+  source: string
+  target?: string
+  mode?: "ro" | "rw"
+}
+
+export interface CliIsolateOptions {
+  bwrap?: string
+  workdir?: string
+  home?: string
+  codexHome?: string
+  writable?: boolean
+  network?: boolean
+  bind?: readonly CliBind[]
+  env?: Record<string, string | undefined>
+}
+
 export interface CliResult {
   stdout: string
   stderr: string
@@ -501,6 +518,7 @@ export interface CliWorkerOptions<Input, Output> {
   stdin?: Resolvable<Input, string | undefined>
   cwd?: Resolvable<Input, string | undefined>
   env?: Resolvable<Input, Record<string, string | undefined> | undefined>
+  isolate?: Resolvable<Input, boolean | CliIsolateOptions | undefined>
   timeoutMs?: number
   kind?: WorkerKind
   parseOutput?: (result: CliResult, input: Input) => Output
@@ -532,6 +550,7 @@ export function cliWorker<Input = { prompt: string }, Output = string>(
       stdin: resolveValue(options.stdin, input, ctx),
       cwd: resolveValue(options.cwd, input, ctx),
       env: resolveValue(options.env, input, ctx),
+      isolate: resolveValue(options.isolate, input, ctx),
       timeoutMs: options.timeoutMs,
       signal: ctx.data.seekTag(abortSignal),
     })
@@ -555,19 +574,22 @@ export interface RunCliOptions {
   stdin?: string
   cwd?: string
   env?: Record<string, string | undefined>
+  isolate?: boolean | CliIsolateOptions
   timeoutMs?: number
   signal?: AbortSignal
 }
 
 export async function runCli(options: RunCliOptions): Promise<CliResult> {
   const { execFile } = await import("node:child_process")
+  const prepared = await prepareCli(options)
   return new Promise((resolve, reject) => {
-    const child = execFile(options.command, [...(options.args ?? [])], {
-      cwd: options.cwd,
-      env: { ...process.env, ...options.env },
+    const child = execFile(prepared.command, [...prepared.args], {
+      cwd: prepared.cwd,
+      env: prepared.env,
       timeout: options.timeoutMs,
       signal: options.signal,
-    }, (error, stdout, stderr) => {
+    }, async (error, stdout, stderr) => {
+      await prepared.cleanup()
       const execError = error as ExecFileError | null
       const exitCode = typeof execError?.code === "number" ? execError.code : error ? null : 0
       const signal = execError?.signal ?? null
@@ -590,6 +612,165 @@ export async function runCli(options: RunCliOptions): Promise<CliResult> {
 
     child.stdin?.end(options.stdin)
   })
+}
+
+interface PreparedCli {
+  command: string
+  args: readonly string[]
+  cwd?: string
+  env: Record<string, string | undefined>
+  cleanup(): Promise<void>
+}
+
+interface PreparedBind {
+  source: string
+  target: string
+  mode: "ro" | "rw"
+}
+
+async function prepareCli(options: RunCliOptions): Promise<PreparedCli> {
+  if (!options.isolate) {
+    return {
+      command: options.command,
+      args: options.args ?? [],
+      cwd: options.cwd,
+      env: { ...process.env, ...options.env },
+      cleanup: async () => undefined,
+    }
+  }
+  return prepareIsolatedCli(options, typeof options.isolate === "boolean" ? {} : options.isolate)
+}
+
+async function prepareIsolatedCli(options: RunCliOptions, isolate: CliIsolateOptions): Promise<PreparedCli> {
+  const { mkdtemp, rm, realpath } = await import("node:fs/promises")
+  const { existsSync } = await import("node:fs")
+  const { dirname, join, resolve } = await import("node:path")
+  const { tmpdir } = await import("node:os")
+  const hostCwd = resolve(options.cwd ?? process.cwd())
+  const workdir = isolate.workdir ?? "/workspace"
+  const tempDirs: string[] = []
+  const home = isolate.home ?? await mkdtemp(join(tmpdir(), "pumped-fn-home-"))
+  if (!isolate.home) tempDirs.push(home)
+  const binds = new Map<string, PreparedBind>()
+  addBind(binds, hostCwd, workdir, isolate.writable === true ? "rw" : "ro")
+  addBind(binds, home, "/home/agent", "rw")
+  if (isolate.codexHome) addBind(binds, isolate.codexHome, "/codex-home", "rw")
+  const commandPath = await commandPathOf(options.command, process.env["PATH"] ?? "", existsSync, realpath)
+  const nodePath = await realpath(process.execPath)
+  for (const dir of defaultCliDirs(existsSync)) addBind(binds, dir, dir, "ro")
+  for (const dir of defaultCliCertDirs(existsSync)) addBind(binds, dir, dir, "ro")
+  for (const file of defaultCliFiles(existsSync)) addBind(binds, file, file, "ro")
+  if (commandPath) {
+    addBind(binds, dirname(commandPath), dirname(commandPath), "ro")
+    addBind(binds, dirname(dirname(commandPath)), dirname(dirname(commandPath)), "ro")
+  }
+  addBind(binds, dirname(nodePath), dirname(nodePath), "ro")
+  addBind(binds, dirname(dirname(nodePath)), dirname(dirname(nodePath)), "ro")
+  for (const bind of isolate.bind ?? []) addBind(binds, bind.source, bind.target ?? bind.source, bind.mode ?? "ro")
+  const env = {
+    PATH: isolatedPathEnv(commandPath, nodePath, dirname),
+    HOME: "/home/agent",
+    TMPDIR: "/tmp",
+    ...(isolate.codexHome ? { CODEX_HOME: "/codex-home" } : {}),
+    ...options.env,
+    ...isolate.env,
+  }
+  return {
+    command: isolate.bwrap ?? "bwrap",
+    args: [
+      "--die-with-parent",
+      "--unshare-all",
+      ...(isolate.network === true ? ["--share-net"] : []),
+      "--proc",
+      "/proc",
+      "--dev",
+      "/dev",
+      "--tmpfs",
+      "/tmp",
+      "--dir",
+      "/etc",
+      "--dir",
+      "/home",
+      ...Object.entries(env).flatMap(([key, value]) => value === undefined ? [] : ["--setenv", key, value]),
+      ...[...binds.values()].flatMap((bind) => [bind.mode === "rw" ? "--bind" : "--ro-bind", bind.source, bind.target]),
+      "--chdir",
+      workdir,
+      "--",
+      commandPath ?? options.command,
+      ...(options.args ?? []),
+    ],
+    env: { PATH: process.env["PATH"] },
+    cleanup: async () => {
+      await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
+    },
+  }
+}
+
+function addBind(
+  binds: Map<string, PreparedBind>,
+  source: string,
+  target: string,
+  mode: "ro" | "rw"
+): void {
+  binds.set(`${source}\u0000${target}`, { source, target, mode })
+}
+
+function defaultCliDirs(exists: (path: string) => boolean): string[] {
+  return [
+    "/usr/bin",
+    "/bin",
+    "/usr/lib",
+    "/usr/lib64",
+    "/lib",
+    "/lib64",
+  ].filter((path, index, items) => items.indexOf(path) === index && exists(path))
+}
+
+function defaultCliCertDirs(exists: (path: string) => boolean): string[] {
+  return [
+    "/etc/ssl",
+    "/etc/pki",
+    "/etc/ca-certificates",
+    "/usr/share/ca-certificates",
+    "/usr/local/share/ca-certificates",
+  ].filter((path, index, items) => items.indexOf(path) === index && exists(path))
+}
+
+function defaultCliFiles(exists: (path: string) => boolean): string[] {
+  return [
+    "/etc/hosts",
+    "/etc/resolv.conf",
+  ].filter((path, index, items) => items.indexOf(path) === index && exists(path))
+}
+
+function isolatedPathEnv(
+  commandPath: string | undefined,
+  nodePath: string,
+  dirname: (path: string) => string
+): string {
+  return [
+    commandPath ? dirname(commandPath) : undefined,
+    dirname(nodePath),
+    "/usr/bin",
+    "/bin",
+  ].filter((path, index, items): path is string =>
+    path !== undefined && items.indexOf(path) === index
+  ).join(":")
+}
+
+async function commandPathOf(
+  command: string,
+  pathEnv: string,
+  exists: (path: string) => boolean,
+  realpath: (path: string) => Promise<string>
+): Promise<string | undefined> {
+  if (command.includes("/")) return realpath(command)
+  const found = pathEnv
+    .split(":")
+    .filter(Boolean)
+    .map((dir) => `${dir}/${command}`)
+    .find((path) => exists(path))
+  return found ? realpath(found) : undefined
 }
 
 type ExecFileError = Error & {
@@ -620,19 +801,33 @@ export interface PromptInput {
   prompt: string
 }
 
+export interface GuardState {
+  text: string
+}
+
+export function guard(name: string, text = ""): Lite.Atom<MaterialState<GuardState>> {
+  return material(name, {
+    kind: "json",
+    initialState: { text },
+  })
+}
+
 export interface ClaudeCliWorkerOptions {
   name?: string
   command?: string
   extraArgs?: readonly string[]
+  isolate?: boolean | CliIsolateOptions
   timeoutMs?: number
   tags?: Lite.Tagged<any>[]
 }
 
 export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
+  assertNoClaudeBare(options.extraArgs ?? [])
   return cliWorker({
     name: options.name ?? "claude",
     command: options.command ?? "claude",
     args: (input) => cliPromptArgs(["-p", ...(options.extraArgs ?? [])], input.prompt),
+    isolate: options.isolate,
     timeoutMs: options.timeoutMs,
     kind: "llm",
     tags: options.tags,
@@ -644,6 +839,7 @@ export interface CodexCliWorkerOptions {
   command?: string
   sandbox?: "read-only" | "workspace-write" | "danger-full-access"
   extraArgs?: readonly string[]
+  isolate?: boolean | CliIsolateOptions
   timeoutMs?: number
   tags?: Lite.Tagged<any>[]
 }
@@ -658,10 +854,214 @@ export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<s
       options.sandbox ?? "read-only",
       ...(options.extraArgs ?? []),
     ], input.prompt),
+    isolate: options.isolate,
     timeoutMs: options.timeoutMs,
     kind: "llm",
     tags: options.tags,
   })
+}
+
+export interface CliHarnessOptions {
+  name?: string
+  command?: string
+  extraArgs?: readonly string[]
+  isolate?: boolean | CliIsolateOptions
+  timeoutMs?: number
+  guard?: Lite.Atom<MaterialState<GuardState>> | false
+  prompt?: (request: ModelRequest, guard: GuardState) => string
+  parse?: (output: string) => ModelResponse
+  tags?: Lite.Tagged<any>[]
+}
+
+export interface CodexHarnessOptions extends CliHarnessOptions {
+  sandbox?: "read-only" | "workspace-write" | "danger-full-access"
+}
+
+export function claudeHarness(options: CliHarnessOptions = {}): Model {
+  const worker = claudeCliWorker({
+    name: options.name ?? "claude-harness",
+    command: options.command,
+    extraArgs: ["--no-session-persistence", ...(options.extraArgs ?? [])],
+    isolate: options.isolate ?? { network: true },
+    timeoutMs: options.timeoutMs,
+    tags: options.tags,
+  })
+  return cliHarnessModel(worker, {
+    guard: options.guard === undefined ? guard(`${options.name ?? "claude-harness"}-guard`) : options.guard,
+    prompt: options.prompt,
+    parse: options.parse,
+  })
+}
+
+export function codexHarness(options: CodexHarnessOptions = {}): Model {
+  const worker = codexCliWorker({
+    name: options.name ?? "codex-harness",
+    command: options.command,
+    sandbox: options.sandbox,
+    extraArgs: ["--ephemeral", "--ignore-user-config", ...(options.extraArgs ?? [])],
+    isolate: options.isolate ?? { network: true },
+    timeoutMs: options.timeoutMs,
+    tags: options.tags,
+  })
+  return cliHarnessModel(worker, {
+    guard: options.guard === undefined ? guard(`${options.name ?? "codex-harness"}-guard`) : options.guard,
+    prompt: options.prompt,
+    parse: options.parse,
+  })
+}
+
+interface CliHarnessConfig {
+  guard: Lite.Atom<MaterialState<GuardState>> | false
+  prompt?: (request: ModelRequest, guard: GuardState) => string
+  parse?: (output: string) => ModelResponse
+}
+
+function cliHarnessModel(
+  worker: Lite.Flow<string, PromptInput>,
+  config: CliHarnessConfig
+): Model {
+  return {
+    complete: async (ctx, request) => {
+      const current = config.guard ? await ctx.resolve(config.guard) : undefined
+      const state = current?.state ?? { text: "" }
+      const output = await ctx.exec({
+        flow: worker,
+        input: { prompt: config.prompt ? config.prompt(request, state) : modelPrompt(request, state) },
+      })
+      const response = config.parse ? config.parse(output) : parseModelOutput(output)
+      if (config.guard && current) await collectGuard(ctx, config.guard, current, response)
+      return response
+    },
+  }
+}
+
+async function collectGuard(
+  ctx: Lite.ExecutionContext,
+  store: Lite.Atom<MaterialState<GuardState>>,
+  current: MaterialState<GuardState>,
+  response: ModelResponse
+): Promise<void> {
+  const text = guardTextOf(response.guard)
+  if (!text || current.state.text) return
+  await patchMaterial(ctx, store, [
+    { op: "replace", path: "/text", value: text },
+  ], { expectedRevision: current.revision })
+}
+
+function modelPrompt(request: ModelRequest, guard: GuardState): string {
+  return [
+    "Return JSON only.",
+    "Schema: {\"content\":string,\"stop\"?:boolean,\"guard\"?:string,\"skillCalls\"?:array,\"toolCalls\"?:array,\"subagentCalls\"?:array}.",
+    guard.text
+      ? `Guard:\n${guard.text}`
+      : "First run only: set guard to the anti-goal that should prevent this agent from drifting.",
+    `Agent: ${request.agentName}`,
+    request.instructions ? `Instructions:\n${request.instructions}` : undefined,
+    request.skills.length ? `Available skills:\n${request.skills.map(formatCapability).join("\n")}` : undefined,
+    request.loadedSkills.length ? `Loaded skills:\n${request.loadedSkills.map(formatLoadedSkill).join("\n\n")}` : undefined,
+    request.tools.length ? `Available tools:\n${request.tools.map(formatCapability).join("\n")}` : undefined,
+    request.subagents.length ? `Available subagents:\n${request.subagents.map(formatCapability).join("\n")}` : undefined,
+    `Round: ${request.round}`,
+    `Messages:\n${request.messages.map(formatMessage).join("\n")}`,
+  ].filter((item) => item !== undefined).join("\n\n")
+}
+
+function parseModelOutput(output: string): ModelResponse {
+  const value = readJson(output)
+  if (!isRecord(value)) return { content: output, stop: true }
+  const response: ModelResponse = {
+    content: typeof value["content"] === "string" ? value["content"] : output,
+    stop: typeof value["stop"] === "boolean" ? value["stop"] : true,
+  }
+  const guard = guardTextOf(value["guard"] ?? value["antiGoal"])
+  const skillCalls = skillCallsOf(value["skillCalls"])
+  const toolCalls = toolCallsOf(value["toolCalls"])
+  const subagentCalls = subagentCallsOf(value["subagentCalls"])
+  if (guard) response.guard = guard
+  if (skillCalls) response.skillCalls = skillCalls
+  if (toolCalls) response.toolCalls = toolCalls
+  if (subagentCalls) response.subagentCalls = subagentCalls
+  return response
+}
+
+function readJson(output: string): unknown {
+  const trimmed = output.trim()
+  if (!trimmed) return undefined
+  try {
+    return JSON.parse(trimmed) as unknown
+  } catch {
+    const start = trimmed.indexOf("{")
+    const end = trimmed.lastIndexOf("}")
+    if (start === -1 || end <= start) return undefined
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1)) as unknown
+    } catch {
+      return undefined
+    }
+  }
+}
+
+function skillCallsOf(value: unknown): SkillCall[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const calls = value.flatMap((item) => {
+    if (!isRecord(item) || typeof item["name"] !== "string") return []
+    return [{
+      name: item["name"],
+      ...(typeof item["id"] === "string" ? { id: item["id"] } : {}),
+    }]
+  })
+  return calls.length ? calls : undefined
+}
+
+function toolCallsOf(value: unknown): ToolCall[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const calls = value.flatMap((item) => {
+    if (!isRecord(item) || typeof item["name"] !== "string") return []
+    return [{
+      name: item["name"],
+      input: item["input"],
+      ...(typeof item["id"] === "string" ? { id: item["id"] } : {}),
+    }]
+  })
+  return calls.length ? calls : undefined
+}
+
+function subagentCallsOf(value: unknown): SubCall[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const calls = value.flatMap((item) => {
+    if (!isRecord(item) || typeof item["name"] !== "string") return []
+    return [{
+      name: item["name"],
+      input: turnInputOf(item["input"]),
+      ...(typeof item["id"] === "string" ? { id: item["id"] } : {}),
+    }]
+  })
+  return calls.length ? calls : undefined
+}
+
+function turnInputOf(value: unknown): TurnInput {
+  if (isRecord(value)) return value as TurnInput
+  return { prompt: stringifyAgentValue(value) }
+}
+
+function guardTextOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function formatCapability(capability: Capability): string {
+  return `- ${capability.name}: ${capability.description}`
+}
+
+function formatLoadedSkill(skill: LoadedSkill): string {
+  return `## ${skill.name}\n${skill.content}`
+}
+
+function formatMessage(message: Message): string {
+  return message.name ? `${message.role}(${message.name}): ${message.content}` : `${message.role}: ${message.content}`
+}
+
+function assertNoClaudeBare(args: readonly string[]): void {
+  if (args.some((arg) => arg === "--bare" || arg.startsWith("--bare="))) throw new Error("Claude harness must not use --bare")
 }
 
 function cliPromptArgs(args: readonly string[], prompt: string): string[] {
@@ -698,6 +1098,7 @@ export interface SkillCall {
 
 export interface ModelResponse {
   content: string
+  guard?: string
   skillCalls?: readonly SkillCall[]
   toolCalls?: readonly ToolCall[]
   subagentCalls?: readonly SubCall[]

@@ -26,7 +26,9 @@ flowchart TD
   Config --> Remote["remote? hand to worker runner"]
   Config --> Local["otherwise run next()"]
   Local --> Tool["tool/subagent/model provider flow"]
+  Tool --> CLI["optional Codex/Claude CLI harness"]
   Tool --> Events["events resource"]
+  CLI --> Events
   Events --> Log["write completed"]
   Remote --> Log
 ```
@@ -47,6 +49,7 @@ flowchart TD
 - `session()` and `send()` for continuing message history backed by materials.
 - `events` for per-boundary run inspection.
 - `sandbox` for swappable command/file execution capabilities.
+- `guard()` for harness anti-goal state collected from the first model run.
 - `channel()` and `schedule()` for inbound and clock-driven adapter flows.
 - `suite()`, `runEval()`, deterministic checks, and judge quorum helpers.
 - `inspect()` for workflow-log run inspection.
@@ -54,6 +57,7 @@ flowchart TD
 - `http()` for Fetch request adapters.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
+- `claudeHarness()` and `codexHarness()` for non-interactive CLI model adapters with optional bwrap isolation.
 
 `step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
@@ -415,16 +419,38 @@ const testScope = createScope({
 })
 ```
 
-The CLI helpers are convenience adapters:
+The CLI helpers are convenience adapters. Harnesses turn the popular local CLIs into `Model` providers for `agent()`.
 
 ```ts
-import { claudeCliWorker, codexCliWorker } from "@pumped-fn/agent-sdk"
+import { claudeHarness, claudeCliWorker, codexHarness, codexCliWorker, guard } from "@pumped-fn/agent-sdk"
 
 const codex = codexCliWorker({ name: "codex-review", sandbox: "workspace-write" })
 const claude = claudeCliWorker({ name: "claude-plan" })
+const shared = guard("review-guard")
+
+const reviewer = agent({
+  name: "reviewer",
+  model: codexHarness({
+    sandbox: "read-only",
+    guard: shared,
+    timeoutMs: 120_000,
+  }),
+})
+
+const planner = agent({
+  name: "planner",
+  model: claudeHarness({
+    guard: shared,
+    timeoutMs: 120_000,
+  }),
+})
 ```
 
-Use them when the backend should invoke the real CLI. For stable tests, prefer provider state plus presets.
+`codexHarness()` uses `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` uses `claude -p --no-session-persistence` and rejects `--bare`; pass explicit `extraArgs` for other CLI flags. The default prompt asks for JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first non-empty value is stored in material state and injected into later prompts. Pass a shared `guard("name")` atom when multiple harnesses should see the same anti-goal.
+
+Harnesses default to bwrap isolation with network enabled because the CLIs need provider access. The sandbox mounts the workspace read-only by default, a temporary home, minimal runtime/cert/DNS paths, and only explicit credential directories such as `isolate: { network: true, codexHome: process.env.CODEX_HOME }`. Use `isolate: false` only when another trusted boundary already isolates the process.
+
+For stable tests, prefer provider state plus presets.
 
 ## Replay Contract
 

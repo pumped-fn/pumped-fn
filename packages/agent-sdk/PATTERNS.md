@@ -314,22 +314,38 @@ const scope = createScope({
 
 ## 10. CLI Worker Adapter
 
-Use CLI helpers when the runtime must call real local tools like Claude or Codex.
+Use CLI helpers when the runtime must call real local tools like Claude or Codex. Use harnesses when those tools should act as the agent model provider.
 
 ```ts
 const review = codexCliWorker({
   name: "codex-review",
   sandbox: "workspace-write",
+  isolate: { network: true },
   timeoutMs: 120_000,
 })
 
 const plan = claudeCliWorker({
   name: "claude-plan",
+  isolate: { network: true },
   timeoutMs: 120_000,
+})
+
+const shared = guard("review-guard")
+
+const reviewer = agent({
+  name: "reviewer",
+  model: codexHarness({ sandbox: "read-only", guard: shared }),
+})
+
+const planner = agent({
+  name: "planner",
+  model: claudeHarness({ guard: shared }),
 })
 ```
 
-Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
+`codexHarness()` runs `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` runs `claude -p --no-session-persistence` and rejects `--bare`. Harness prompts request JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first value collected from a run is kept in material state and injected into later prompts.
+
+Harnesses default to bwrap isolation with network enabled. The default sandbox mounts only the workspace, temporary home, minimal runtime/cert/DNS paths, and explicit credential directories such as `codexHome`. Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
 
 ## 11. Durable Step
 
