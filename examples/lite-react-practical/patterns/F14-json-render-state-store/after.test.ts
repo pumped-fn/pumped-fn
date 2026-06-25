@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { createScope } from "@pumped-fn/lite"
-import { flowAction, flowActionHandlers, scopedValueStateStore } from "@pumped-fn/lite-react-json-render"
+import { flowAction, flowHandlers, scopedValueStateStore } from "@pumped-fn/lite-react-json-render"
 import { currentOrderDraft, orderDraft, submitOrder } from "./after"
 
 describe("inside-out", () => {
@@ -32,7 +32,7 @@ describe("inside-out", () => {
     const scope = createScope()
     const ctx = scope.createContext()
     const draft = await orderDraft.resolve(ctx)
-    const handlers = flowActionHandlers({
+    const handlers = flowHandlers({
       ctx,
       actions: {
         submitOrder: flowAction({

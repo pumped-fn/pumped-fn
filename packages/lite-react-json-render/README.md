@@ -31,7 +31,7 @@ npm install @json-render/core @json-render/react zod
 import { JSONUIProvider, type ComponentRegistry } from "@json-render/react"
 import { flow, tag } from "@pumped-fn/lite"
 import { scopedValue, type ScopedValueAccess, useResource } from "@pumped-fn/lite-react"
-import { flowAction, scopedValueStateStore, useFlowActionHandlers } from "@pumped-fn/lite-react-json-render"
+import { flowAction, scopedValueStateStore, useFlowHandlers } from "@pumped-fn/lite-react-json-render"
 import { useMemo } from "react"
 import { z } from "zod"
 
@@ -79,13 +79,13 @@ function GeneratedOrder(
   const draft = useResource(orderDraft)
 
   return (
-    <GeneratedOrderReady registry={registry} draft={draft}>
+    <OrderBridge registry={registry} draft={draft}>
       {children}
-    </GeneratedOrderReady>
+    </OrderBridge>
   )
 }
 
-function GeneratedOrderReady(
+function OrderBridge(
   { registry, draft, children }: {
     registry: ComponentRegistry
     draft: ScopedValueAccess<OrderState>
@@ -99,7 +99,7 @@ function GeneratedOrderReady(
       tags: [currentOrderDraft(draft)],
     }),
   }), [draft])
-  const handlers = useFlowActionHandlers(actions)
+  const handlers = useFlowHandlers(actions)
 
   return (
     <JSONUIProvider registry={registry} store={store} handlers={handlers}>
@@ -112,11 +112,11 @@ function GeneratedOrderReady(
 The adapter exposes json-render's `StateStore` shape: JSON Pointer `get`, `set`, batched `update`,
 `getSnapshot`, server snapshot, and `subscribe`.
 
-`flowActionHandlers` returns json-render `ActionHandler` functions. Bare flows receive resolved
+`flowHandlers` returns json-render `ActionHandler` functions. Bare flows receive resolved
 json-render params as `rawInput`, so a flow parser can validate generated params. Use `flowAction` when
 the boundary needs to map input, set an execution name, or pass tags.
 
-`useFlowActionHandlers` returns stable proxy handlers that read the latest Lite context and action
+`useFlowHandlers` returns stable proxy handlers that read the latest Lite context and action
 configuration. That matches json-render's action provider, which registers the handler map at provider mount.
 
 ## Behavior Surface

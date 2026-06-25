@@ -1,4 +1,4 @@
-# F14 - json-render external store points at component state
+# F14 - json-render bridge points at Lite graph
 
 ## The smell
 
@@ -19,7 +19,7 @@ scoped value with `@pumped-fn/lite-react-json-render` `scopedValueStateStore` an
 store to `@json-render/react` `JSONUIProvider`. json-render still uses its normal `$bindState` and
 `$state` expressions; the source of truth is the Lite graph.
 
-The example also adapts json-render action handlers with `useFlowActionHandlers`. The generated spec emits
+The example also adapts json-render action handlers with `useFlowHandlers`. The generated spec emits
 a `submitOrder` action through its normal `on.press` binding, json-render resolves params from `$state`,
 and the adapter executes the Lite `submitOrder` flow. Because scoped values are current-owned resources, the
 integration boundary passes the resolved draft access through a tag so the flow mutates the actual draft

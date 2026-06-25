@@ -5,7 +5,7 @@ import { JSONUIProvider, Renderer, defineRegistry } from "@json-render/react"
 import { schema } from "@json-render/react/schema"
 import { createScope, flow, tag, typed } from "@pumped-fn/lite"
 import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
-import { flowAction, useFlowActionHandlers } from "@pumped-fn/lite-react-json-render"
+import { flowAction, useFlowHandlers } from "@pumped-fn/lite-react-json-render"
 import { useMemo } from "react"
 import { z } from "zod"
 import { orderDraft } from "./after"
@@ -13,7 +13,7 @@ import { JsonRenderOrder } from "./view"
 
 const actionSink = tag<{ records: string[] }>({ label: "json-render.action-sink" })
 
-const recordAction = flow({
+const record = flow({
   name: "json-render-record-action",
   parse: typed<{ label: string }>(),
   factory: (ctx) => {
@@ -66,11 +66,11 @@ const actionSpec = {
 function ActionHarness({ sink }: { sink: { records: string[] } }) {
   const actions = useMemo(() => ({
     record: flowAction({
-      flow: recordAction,
+      flow: record,
       tags: [actionSink(sink)],
     }),
   }), [sink])
-  const handlers = useFlowActionHandlers(actions)
+  const handlers = useFlowHandlers(actions)
 
   return (
     <JSONUIProvider registry={actionRegistry} handlers={handlers} initialState={{}}>

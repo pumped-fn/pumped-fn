@@ -3,7 +3,7 @@ import { JSONUIProvider, Renderer, defineRegistry, useBoundProp } from "@json-re
 import { schema } from "@json-render/react/schema"
 import { useResource } from "@pumped-fn/lite-react"
 import type { ScopedValueAccess } from "@pumped-fn/lite-react"
-import { flowAction, scopedValueStateStore, useFlowActionHandlers } from "@pumped-fn/lite-react-json-render"
+import { flowAction, scopedValueStateStore, useFlowHandlers } from "@pumped-fn/lite-react-json-render"
 import { useMemo } from "react"
 import { z } from "zod"
 import { currentOrderDraft, type OrderState, orderDraft, submitOrder } from "./after"
@@ -122,10 +122,10 @@ export function JsonRenderOrder() {
 
   if (draft.status !== "ready") return null
 
-  return <JsonRenderOrderReady draft={draft.data} />
+  return <OrderBridge draft={draft.data} />
 }
 
-function JsonRenderOrderReady({ draft }: { draft: ScopedValueAccess<OrderState> }) {
+function OrderBridge({ draft }: { draft: ScopedValueAccess<OrderState> }) {
   const store = useMemo(() => scopedValueStateStore({ value: draft }), [draft])
   const actions = useMemo(() => ({
     submitOrder: flowAction({
@@ -133,7 +133,7 @@ function JsonRenderOrderReady({ draft }: { draft: ScopedValueAccess<OrderState> 
       tags: [currentOrderDraft(draft)],
     }),
   }), [draft])
-  const handlers = useFlowActionHandlers(actions)
+  const handlers = useFlowHandlers(actions)
 
   return (
     <JSONUIProvider registry={registry} store={store} handlers={handlers}>

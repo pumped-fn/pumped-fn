@@ -12,7 +12,7 @@ type FlowActionHandlerResult<Target> =
     : Target extends FlowActionOptions<infer Flow>
       ? Lite.Utils.FlowOutput<Flow>
       : never
-type FlowActionHandlers<Actions extends FlowActionTargets> = {
+type FlowHandlers<Actions extends FlowActionTargets> = {
   [Name in keyof Actions]: ActionHandler<JsonRenderActionParams, FlowActionHandlerResult<Actions[Name]>>
 }
 type FlowActionTargets = Record<string, FlowActionTarget<Lite.Flow<any, any>>>
@@ -48,7 +48,7 @@ type FlowActionOptions<Flow extends Lite.Flow<any, any>> =
   | FlowActionInputOptions<Flow>
   | FlowActionRawInputOptions<Flow>
 
-interface FlowActionHandlersOptions<Actions extends FlowActionTargets> {
+interface FlowHandlersOptions<Actions extends FlowActionTargets> {
   ctx: Lite.ExecutionContext
   actions: Actions
 }
@@ -58,7 +58,7 @@ interface FlowActionHandlerCell {
   target: FlowActionTarget<Lite.Flow<any, any>>
 }
 
-interface FlowActionHandlersRef {
+interface FlowHandlersRef {
   handlers: Record<string, ActionHandler<JsonRenderActionParams, unknown>>
   cells: Map<string, FlowActionHandlerCell>
 }
@@ -101,22 +101,22 @@ function flowAction<Flow extends Lite.Flow<any, any>>(options: FlowActionOptions
   return options
 }
 
-function flowActionHandlers<const Actions extends FlowActionTargets>(
-  options: FlowActionHandlersOptions<Actions>
-): FlowActionHandlers<Actions> {
+function flowHandlers<const Actions extends FlowActionTargets>(
+  options: FlowHandlersOptions<Actions>
+): FlowHandlers<Actions> {
   return Object.fromEntries(
     Object.entries(options.actions).map(([name, target]) => [
       name,
       flowActionHandler(options.ctx, target),
     ])
-  ) as FlowActionHandlers<Actions>
+  ) as FlowHandlers<Actions>
 }
 
-function useFlowActionHandlers<const Actions extends FlowActionTargets>(
+function useFlowHandlers<const Actions extends FlowActionTargets>(
   actions: Actions
-): FlowActionHandlers<Actions> {
+): FlowHandlers<Actions> {
   const ctx = useExecutionContext()
-  const ref = useRef<FlowActionHandlersRef | null>(null)
+  const ref = useRef<FlowHandlersRef | null>(null)
   if (!ref.current) {
     ref.current = {
       handlers: {},
@@ -146,7 +146,7 @@ function useFlowActionHandlers<const Actions extends FlowActionTargets>(
     cell.target = target
   }
 
-  return handlers as FlowActionHandlers<Actions>
+  return handlers as FlowHandlers<Actions>
 }
 
 function flowActionHandler<Flow extends Lite.Flow<any, any>>(
@@ -179,10 +179,10 @@ function flowActionHandler<Flow extends Lite.Flow<any, any>>(
   })
 }
 
-export { flowAction, flowActionHandlers, scopedValueStateStore, useFlowActionHandlers }
+export { flowAction, flowHandlers, scopedValueStateStore, useFlowHandlers }
 export type {
-  FlowActionHandlers,
-  FlowActionHandlersOptions,
+  FlowHandlers,
+  FlowHandlersOptions,
   FlowActionInputOptions,
   FlowActionOptions,
   FlowActionRawInputOptions,

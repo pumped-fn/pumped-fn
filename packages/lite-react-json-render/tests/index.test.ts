@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createScope, flow, tag, typed } from '@pumped-fn/lite'
 import { scopedValue } from '@pumped-fn/lite-react'
 import type { StateStore } from '@json-render/core'
-import { flowAction, flowActionHandlers, scopedValueStateStore } from '../src'
+import { flowAction, flowHandlers, scopedValueStateStore } from '../src'
 
 interface FormState {
   user: {
@@ -121,7 +121,7 @@ describe('scopedValueStateStore', () => {
   })
 })
 
-describe('flowActionHandlers', () => {
+describe('flowHandlers', () => {
   it('runs a flow with json-render params as raw input', async () => {
     const submit = flow({
       name: 'submit-json-render-order',
@@ -138,7 +138,7 @@ describe('flowActionHandlers', () => {
     })
     const scope = createScope()
     const ctx = scope.createContext()
-    const handlers = flowActionHandlers({ ctx, actions: { submit } })
+    const handlers = flowHandlers({ ctx, actions: { submit } })
 
     await expect(handlers.submit({ item: 'Coffee', quantity: 2 })).resolves.toBe('2x Coffee')
     await expect(handlers.submit({ item: 'Coffee', quantity: '2' })).rejects.toThrow(
@@ -161,7 +161,7 @@ describe('flowActionHandlers', () => {
     })
     const scope = createScope()
     const ctx = scope.createContext()
-    const handlers = flowActionHandlers({
+    const handlers = flowHandlers({
       ctx,
       actions: {
         record: flowAction({
@@ -195,7 +195,7 @@ describe('flowActionHandlers', () => {
     })
     const scope = createScope()
     const ctx = scope.createContext()
-    const handlers = flowActionHandlers({ ctx, actions: { fail } })
+    const handlers = flowHandlers({ ctx, actions: { fail } })
 
     await expect(handlers.fail({ message: 'rejected by Lite' })).rejects.toThrow('rejected by Lite')
 
