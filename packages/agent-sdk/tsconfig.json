@@ -19,6 +19,7 @@
     "typeRoots": ["./node_modules/@types", "../lite/node_modules/@types"],
     "paths": {
       "@pumped-fn/lite-extension-suspense": ["../lite-extension-suspense/src/index.ts"],
+      "@pumped-fn/lite-extension-workflow": ["../lite-extension-workflow/src/index.ts"],
       "@pumped-fn/lite": ["../lite/src/index.ts"]
     }
   },

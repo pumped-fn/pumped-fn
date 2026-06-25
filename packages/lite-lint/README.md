@@ -25,7 +25,7 @@ pnpm lint
 | `pumped/no-module-mocks` | `vi.mock`, `jest.mock`, and `vi.spyOn`; use scope presets at the test seam. |
 | `pumped/no-jsdom-backend` | Browser-emulator test markers and DOM-suffixed observer tests; rendered observer tests use Vitest Browser Mode. |
 | `pumped/no-test-only-branches` | Product branches keyed on test mode; use presets instead. |
-| `pumped/no-definition-handle-suffix` | `fooAtom`, `runFlow`, `txResource`, `requestTag`; rely on inference. |
+| `pumped/no-definition-handle-suffix` | `fooAtom`, `atomFoo`, `runFlow`, `flowRun`, `txResource`, `resourceTx`, `requestTag`, `tagRequest`; rely on inference. |
 | `pumped/no-shared-scope-factory` | Helpers that return preconfigured `createScope(...)`; each use site should own tags, presets, and extensions. |
 | `pumped/no-scope-argument` | Exported product helpers accepting `scope`; composition roots and tests own scope. |
 | `pumped/no-render-outside-browser-test` | Testing Library `render` outside `*.browser.test.tsx`; DOM observer tests run in browser mode. |

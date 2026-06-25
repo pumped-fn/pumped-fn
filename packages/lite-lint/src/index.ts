@@ -54,7 +54,7 @@ const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", 
 const textExtensions = new Set([...sourceExtensions, ".json", ".md", ".mdx"])
 const ignoredNames = new Set(["node_modules", ".git", "dist", "coverage", ".next", ".turbo"])
 const ignoredFiles = new Set(["pnpm-lock.yaml", "package-lock.json", "yarn.lock"])
-const suffixPattern = /(Atom|Flow|Resource|Tag|ScopedValue)$/
+const definitionHandleAffixPattern = /^(?:atom|flow|resource|tag|scopedValue)[A-Z_]|(?:Atom|Flow|Resource|Tag|ScopedValue)$/
 const testBranchPattern = /(?:process\.env\.NODE_ENV|import\.meta\.env\.MODE)\s*={2,3}\s*["']test["']/g
 const jsdomPattern = /@vitest-environment\s+jsdom|setup\.dom|\.dom\.test/gi
 const jsdomPackagePattern = /"(?:global-)?jsdom"\s*:/g
@@ -580,7 +580,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (
       ts.isVariableDeclaration(node)
       && ts.isIdentifier(node.name)
-      && suffixPattern.test(node.name.text)
+      && definitionHandleAffixPattern.test(node.name.text)
       && node.initializer
       && ts.isCallExpression(node.initializer)
       && isCreatorCall(node.initializer.expression, imports)
@@ -591,7 +591,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         filePath,
         "pumped/no-definition-handle-suffix",
         node.name,
-        "Definition handles should rely on inference instead of Atom/Flow/Resource/Tag suffixes.",
+        "Definition handles should rely on inference instead of Atom/Flow/Resource/Tag prefixes or suffixes.",
       )
     }
 

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest"
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
   SuspendSignal,
+  eventLog,
   extension,
   formatSuspenseStepKey,
   replay,
   run,
   suspend,
   type SuspenseEventLog,
+  type SuspenseStepListFilter,
   type SuspenseStepEntry,
   type SuspenseStepKey,
 } from "../src"
@@ -27,6 +29,10 @@ class InMemorySuspenseEventLog implements SuspenseEventLog {
     this.store.set(formatSuspenseStepKey(entry.key), entry)
   }
 
+  async putFailed(entry: Extract<SuspenseStepEntry, { status: "failed" }>): Promise<void> {
+    this.store.set(formatSuspenseStepKey(entry.key), entry)
+  }
+
   async resolve(key: SuspenseStepKey, value: unknown): Promise<void> {
     const current = this.store.get(formatSuspenseStepKey(key))
     if (!current || current.status !== "pending") throw new Error(`Pending step "${formatSuspenseStepKey(key)}" not found`)
@@ -41,6 +47,13 @@ class InMemorySuspenseEventLog implements SuspenseEventLog {
   entries(): SuspenseStepEntry[] {
     return [...this.store.values()]
   }
+
+  async list(filter: SuspenseStepListFilter = {}): Promise<readonly SuspenseStepEntry[]> {
+    return this.entries().filter((entry) =>
+      (filter.taskId === undefined || entry.key.taskId === filter.taskId) &&
+      (filter.runId === undefined || entry.key.runId === filter.runId)
+    )
+  }
 }
 
 describe("suspense extension", () => {
@@ -49,9 +62,22 @@ describe("suspense extension", () => {
     expect(suspend.label).toBe("suspense.suspend")
   })
 
+  it("does not require an event log for unmarked steps", async () => {
+    const scope = createScope({ extensions: [extension()] })
+    await scope.ready
+    const unmarked = flow({
+      name: "unmarked",
+      factory: () => "ok",
+    })
+
+    const ctx = scope.createContext()
+    expect(await ctx.exec({ flow: unmarked })).toBe("ok")
+    await ctx.close()
+  })
+
   it("replays completed marked steps", async () => {
     const log = new InMemorySuspenseEventLog()
-    const scope = createScope({ extensions: [extension({ log })] })
+    const scope = createScope({ tags: [eventLog(log)], extensions: [extension()] })
     await scope.ready
     let calls = 0
     const step = flow({
@@ -134,5 +160,40 @@ describe("suspense extension", () => {
     const ctx2 = scope.createContext(run({ taskId: "sync-b", runId: "run-b" }))
     expect(await ctx2.exec({ flow: externalSync })).toBe("synced")
     await ctx2.close()
+  })
+
+  it("observes lifecycle and records failures when the log supports it", async () => {
+    const log = new InMemorySuspenseEventLog()
+    const events: string[] = []
+    const scope = createScope({
+      extensions: [extension({
+        log,
+        observe: (event) => {
+          events.push(`${event.status}:${event.targetName}`)
+        },
+      })],
+    })
+    await scope.ready
+    const failed = flow({
+      name: "failed-step",
+      tags: [replay(true)],
+      factory: () => {
+        throw new Error("boom")
+      },
+    })
+
+    const ctx = scope.createContext(run({ taskId: "sync-failed", runId: "run-failed" }))
+    await expect(ctx.exec({ flow: failed })).rejects.toThrow("boom")
+    await ctx.close({ ok: false, error: new Error("expected") })
+
+    expect(events).toEqual(["started:failed-step", "failed:failed-step"])
+    await expect(log.list({ taskId: "sync-failed" })).resolves.toContainEqual(expect.objectContaining({
+      status: "failed",
+      targetName: "failed-step",
+      error: {
+        name: "Error",
+        message: "boom",
+      },
+    }))
   })
 })

@@ -31,6 +31,25 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("finds definition handle prefixes and suffixes", () => {
+    expect(ids(`
+      import { atom, flow, resource, tag } from "@pumped-fn/lite"
+      import { scopedValue } from "@pumped-fn/lite-react"
+
+      const atomStore = atom({ factory: () => new Map<string, string>() })
+      const saveFlow = flow({ factory: () => "ok" })
+      const resourceTx = resource({ factory: () => ({}) })
+      const requestTag = tag<string>({ label: "request.id" })
+      const scopedValueForm = scopedValue({ initialValue: { name: "" } })
+    `, "src/example.tsx")).toEqual([
+      "pumped/no-definition-handle-suffix",
+      "pumped/no-definition-handle-suffix",
+      "pumped/no-definition-handle-suffix",
+      "pumped/no-definition-handle-suffix",
+      "pumped/no-definition-handle-suffix",
+    ])
+  })
+
   it("finds backend and test anti-patterns", () => {
     expect(ids(`
       import { atom, flow } from "@pumped-fn/lite"

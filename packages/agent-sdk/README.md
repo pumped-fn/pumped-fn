@@ -1,8 +1,8 @@
 # @pumped-fn/agent-sdk
 
-Agent workflow substrate helpers for `@pumped-fn/lite`.
+Agent helpers for `@pumped-fn/lite` workflows.
 
-This package does not add an agent runtime. It gives names and conventions to the primitives lite already has:
+This package adds agent worker, material, and CLI conventions on top of `@pumped-fn/lite-extension-workflow`. Workflow primitives are re-exported for compatibility.
 
 | Lite primitive | Agent SDK use |
 |---|---|
@@ -10,8 +10,8 @@ This package does not add an agent runtime. It gives names and conventions to th
 | `flow()` | Worker, durable step, CLI-backed LLM call |
 | state/service | Provider, config, registry, model client, material state |
 | typed tag | Routing config and ambient run data |
-| `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
-| `workflowExtension()` | Replay, suspend, timeout, and event-log policy |
+| `ctx.exec()` | Step boundary for replay, remote routing, timeout, suspend, and stable keys |
+| `workflowExtension()` | Re-exported workflow replay, suspend, timeout, failure, observation, and event-log policy |
 | `extension()` | Agent remote-routing policy |
 
 The core idea: author orchestration as normal TypeScript `flow()` code. Put every side effect behind `ctx.exec()`. Then an extension can replay, memoize, route, or suspend those steps without changing workflow code.
@@ -20,22 +20,24 @@ The core idea: author orchestration as normal TypeScript `flow()` code. Put ever
 flowchart TD
   Root["workflow flow"] --> Exec["ctx.exec"]
   Exec --> Config["read step config"]
+  Config --> Identity["require workflowRun or defaults"]
   Config --> Replay["completed? return cached"]
   Config --> Durable["durable? write pending + suspend"]
   Config --> Remote["remote? hand to worker runner"]
   Config --> Local["otherwise run next()"]
-  Local --> Log["write completed"]
-  Remote --> Log
+  Local --> Complete["write completed"]
+  Remote --> Complete
+  Complete --> Log["event log"]
+  Complete --> Observe["observe lifecycle"]
+  Config --> Failed["failed? write failed when supported"]
+  Failed --> Log
 ```
 
 ## What Is In This Package
 
-- `workflow` runtime tag for workflow-scoped deps.
-- `workflowExtension()` for replay, suspend, timeout, and event-log policy.
+- Re-exports from `@pumped-fn/lite-extension-workflow`: `workflow`, `workflowRun()`, `workflowExtension()`, `workflowExtensionUnits()`, `step()`, `eventLog()`, `observer()`, `units()`, `runDefaults()`, `abortSignal`, and workflow event-log types.
 - `extension()` for agent remote dispatch.
-- `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
-- `workflowRun()` context tag for workflow-scoped run data.
-- `abortSignal` tag for cooperative timeout cancellation.
+- `remoteRunner()` tag for the agent remote transport seam.
 - `agent` runtime tag for named worker delegation.
 - `WorkerRegistry` for named worker calls through `agent.delegate()`.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
@@ -43,7 +45,9 @@ flowchart TD
 
 `step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
-Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `WorkflowEventLog` and `AgentRemoteRunner` contracts.
+Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `WorkflowEventLog` and `AgentRemoteRunner` contracts. Production logs can optionally add `putFailed()` and `list()` for operator views; workflow code does not depend on those capabilities.
+
+`workflowExtension()` is a preset over composable suspense units from `@pumped-fn/lite-extension-workflow`. Use `workflowExtensionUnits()` directly with `@pumped-fn/lite-extension-suspense` when another package or runtime wants to assemble the workflow policy itself.
 
 ## Standalone Suspense
 
@@ -52,6 +56,7 @@ Suspense is the reusable substrate under the workflow extension. It only knows a
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import {
+  eventLog,
   extension,
   suspend,
   taskId,
@@ -67,7 +72,8 @@ const externalSync = flow({
 
 const log = makeEventLog()
 const scope = createScope({
-  extensions: [extension({ log })],
+  tags: [eventLog(log)],
+  extensions: [extension()],
 })
 
 const ctx = scope.createContext({
@@ -89,7 +95,9 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
   agent as agentRuntime,
+  eventLog,
   extension,
+  remoteRunner,
   workflowRun,
   workflow as workflowRuntime,
   workflowExtension,
@@ -124,10 +132,15 @@ const processIssue = flow({
   },
 })
 
-const eventLog = makeEventLog()
+const log = makeEventLog()
+const runner = makeRemoteRunner()
 const scope = createScope({
+  tags: [
+    eventLog(log),
+    remoteRunner(runner),
+  ],
   extensions: [
-    workflowExtension({ log: eventLog }),
+    workflowExtension(),
     extension(),
   ],
 })
@@ -142,7 +155,7 @@ const ctx = scope.createContext({
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. `agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
+`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. A workflow step must have `workflowRun()` or a `runDefaults()` tag/explicit extension defaults; otherwise the extension rejects the run instead of silently sharing a default log key. `agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
 
 ## AI Is Just A Provider
 
@@ -195,15 +208,56 @@ Use them when the backend should invoke the real CLI. For stable tests, prefer p
 
 ## Replay Contract
 
-`ctx.exec()` is the durable step boundary. On first execution, the workflow extension assigns `(taskId, runId, step)` and writes the result. On replay, the same code runs from the top, but completed steps return cached values before dependencies or factory code run.
+`ctx.exec()` is the durable step boundary. On first execution, the workflow extension assigns `(taskId, runId, step)` and writes the result. `step({ key: "stable-name" })` uses that string instead of the positional counter when a branch needs a stable idempotency key. On replay, the same code runs from the top, but completed steps return cached values before dependencies or factory code run.
 
 That means workflow bodies must be deterministic between `ctx.exec()` calls:
 
 - Use `ctx.exec({ flow })` for side effects.
+- Put `workflowRun()` on every workflow context unless the extension has explicit defaults.
 - Use provider state/services for swappable integrations.
 - Do not read time, random, network, filesystem, or process state directly in workflow orchestration code.
 - Keep dependency factories pure enough that replay skipping them is valid.
 - `timeoutMs` rejects the step promise and aborts the `abortSignal` tag. Work must observe the signal to stop cooperatively.
+
+Remote workers are journaled too. If a remote worker completes and a later durable step suspends, resume replays the remote result from the event log instead of dispatching the worker again.
+
+## Composable Workflow Units
+
+```ts
+import { createScope, flow } from "@pumped-fn/lite"
+import { extension as suspenseExtension } from "@pumped-fn/lite-extension-suspense"
+import {
+  eventLog,
+  step,
+  units,
+  workflowExtensionUnits,
+  workflowRun,
+} from "@pumped-fn/lite-extension-workflow"
+
+const runTask = flow({
+  name: "run-task",
+  tags: [step({ workflow: true, key: "run-task" })],
+  factory: () => "done",
+})
+
+const scope = createScope({
+  tags: [
+    eventLog(log),
+    units(workflowExtensionUnits()),
+  ],
+  extensions: [suspenseExtension({
+    name: "workflow",
+  })],
+})
+
+const ctx = scope.createContext({
+  tags: [workflowRun({ taskId: "task-1", runId: "run-1" })],
+})
+
+await ctx.exec({ flow: runTask })
+```
+
+The unit path is for runtimes that want workflow mechanics without taking agent-sdk. It still uses `flow()`, `tag()`, `ctx.exec()`, and the suspense event log; no separate workflow runtime is introduced.
 
 ## Materials
 
@@ -233,11 +287,11 @@ Use `@pumped-fn/agent-sdk-test` for in-memory replay and fake remote routing:
 ```ts
 import { agent } from "@pumped-fn/agent-sdk-test"
 
-const { extensions, log } = agent({
+const { extensions, tags, log } = agent({
   remoteRunner: {
     run: async (event) => ({ routed: event.targetName }),
   },
 })
 ```
 
-Use `extensions` in `createScope({ extensions })`. This keeps tests fast and proves the same extension contract a NATS-backed runtime will use.
+Use `tags` and `extensions` in `createScope({ tags, extensions })`. This keeps tests fast and proves the same extension contract a NATS-backed runtime will use.

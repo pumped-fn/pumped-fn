@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
+  eventLog,
   workflowRun,
   step,
   workflow as workflowRuntime,
@@ -11,8 +12,8 @@ import { MemoryWorkflowLog } from "../src/index"
 describe("agent runtime tags", () => {
   it("memoizes workflow runtime tag with workflow extension", async () => {
     const log = new MemoryWorkflowLog()
-    const extension = workflowExtension({ log })
-    const scope = createScope({ extensions: [extension] })
+    const extension = workflowExtension()
+    const scope = createScope({ tags: [eventLog(log)], extensions: [extension] })
     await scope.ready
     let calls = 0
     const root = flow({
@@ -50,10 +51,25 @@ describe("agent runtime tags", () => {
     await scope.dispose()
   })
 
+  it("rejects workflow execution without run identity or extension defaults", async () => {
+    const root = flow({
+      name: "workflow-missing-run",
+      tags: [step({ workflow: true })],
+      deps: { workflow: tags.required(workflowRuntime) },
+      factory: (_ctx, { workflow }) => workflow.taskId,
+    })
+    const scope = createScope({ tags: [eventLog(new MemoryWorkflowLog())], extensions: [workflowExtension()] })
+    await scope.ready
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: root })).rejects.toThrow("workflowRun tag or workflowExtension defaults required")
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
+  })
+
   it("provides workflow runtime deps without workflow memoization", async () => {
     const log = new MemoryWorkflowLog()
-    const extension = workflowExtension({ log })
-    const scope = createScope({ extensions: [extension] })
+    const extension = workflowExtension()
+    const scope = createScope({ tags: [eventLog(log)], extensions: [extension] })
     await scope.ready
     let calls = 0
     const root = flow({

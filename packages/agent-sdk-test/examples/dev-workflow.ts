@@ -130,8 +130,8 @@ export async function runDevWorkflow(
   })
 
   const log = new MemoryWorkflowLog()
-  const { extensions } = testAgent({ log })
-  const scope = createScope({ extensions })
+  const { extensions, tags: scopeTags } = testAgent({ log })
+  const scope = createScope({ tags: scopeTags, extensions })
   await scope.ready
 
   let suspended = false

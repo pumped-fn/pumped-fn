@@ -1,5 +1,8 @@
 import {
+  eventLog,
   extension as agentExtension,
+  remoteRunner,
+  runDefaults,
   workflowExtension,
   type AgentExtensionOptions,
   type AgentRemoteRunner,
@@ -11,6 +14,7 @@ import {
   formatSuspenseStepKey,
   type SuspenseEventLog,
   type SuspenseExtensionOptions,
+  type SuspenseStepListFilter,
   type SuspenseStepEntry,
   type SuspenseStepKey,
 } from "@pumped-fn/lite-extension-suspense"
@@ -31,6 +35,10 @@ export class MemorySuspenseLog implements SuspenseEventLog {
     this.store.set(formatSuspenseStepKey(entry.key), entry)
   }
 
+  async putFailed(entry: Extract<SuspenseStepEntry, { status: "failed" }>): Promise<void> {
+    this.store.set(formatSuspenseStepKey(entry.key), entry)
+  }
+
   async resolve(key: SuspenseStepKey, value: unknown): Promise<void> {
     const current = this.store.get(formatSuspenseStepKey(key))
     if (!current || current.status !== "pending") throw new Error(`Pending step "${formatSuspenseStepKey(key)}" not found`)
@@ -45,43 +53,56 @@ export class MemorySuspenseLog implements SuspenseEventLog {
   entries(): SuspenseStepEntry[] {
     return [...this.store.values()]
   }
+
+  async list(filter: SuspenseStepListFilter = {}): Promise<readonly SuspenseStepEntry[]> {
+    return this.entries().filter((entry) =>
+      (filter.taskId === undefined || entry.key.taskId === filter.taskId) &&
+      (filter.runId === undefined || entry.key.runId === filter.runId)
+    )
+  }
 }
 
 export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog {}
 
-/** Test runner that executes remote-tagged steps in-process. */
 export const localRemoteRunner: AgentRemoteRunner = {
   run: (_event, next) => next(),
 }
 
 export function suspense(
   options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}
-): { extension: Lite.Extension; log: SuspenseEventLog } {
-  const log = options.log ?? new MemorySuspenseLog()
+): { extension: Lite.Extension; tags: Lite.Tagged<any>[]; log: SuspenseEventLog } {
+  const { log: provided, ...rest } = options
+  const log = provided ?? new MemorySuspenseLog()
   return {
     log,
-    extension: suspenseExtension({
-      ...options,
-      log,
-    }),
+    tags: [eventLog(log)],
+    extension: suspenseExtension(rest),
   }
 }
 
 export function agent(
   options: AgentExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: WorkflowEventLog } = {}
-): { extensions: Lite.Extension[]; log: WorkflowEventLog } {
+): { extensions: Lite.Extension[]; tags: Lite.Tagged<any>[]; log: WorkflowEventLog } {
   const log = options.log ?? new MemoryWorkflowLog()
+  const tags: Lite.Tagged<any>[] = [
+    eventLog(log),
+    remoteRunner(options.remoteRunner ?? localRemoteRunner),
+  ]
+  if (options.defaultTaskId || options.defaultRunId) {
+    tags.push(runDefaults({
+      defaultTaskId: options.defaultTaskId,
+      defaultRunId: options.defaultRunId,
+    }))
+  }
   return {
     log,
+    tags,
     extensions: [
       workflowExtension({
-        log,
-        defaultTaskId: options.defaultTaskId,
-        defaultRunId: options.defaultRunId,
+        observe: options.observe,
+        units: options.units,
       }),
-      agentExtension({
-        remoteRunner: options.remoteRunner ?? localRemoteRunner,
-      }),
+      agentExtension(),
     ],
   }
 }

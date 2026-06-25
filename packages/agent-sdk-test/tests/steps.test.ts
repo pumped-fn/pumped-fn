@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest"
 import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   abortSignal,
+  eventLog,
   workflowRun,
   step,
   SuspendSignal,
+  units,
+  workflowExtensionUnits,
   workflow as workflowRuntime,
 } from "@pumped-fn/agent-sdk"
+import { extension as suspenseExtension } from "@pumped-fn/lite-extension-suspense"
 import {
   MemoryWorkflowLog,
   agent,
@@ -14,8 +18,8 @@ import {
 
 describe("workflow steps", () => {
   it("memoizes completed workflow execution", async () => {
-    const { extensions } = agent()
-    const scope = createScope({ extensions })
+    const { extensions, tags: scopeTags } = agent()
+    const scope = createScope({ tags: scopeTags, extensions })
     await scope.ready
     let calls = 0
     const worker = flow({
@@ -51,8 +55,8 @@ describe("workflow steps", () => {
 
   it("replays completed flow before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.replay.gate" })
-    const { extensions } = agent()
-    const scope = createScope({ extensions })
+    const { extensions, tags: scopeTags } = agent()
+    const scope = createScope({ tags: scopeTags, extensions })
     await scope.ready
     let calls = 0
     const worker = flow({
@@ -77,10 +81,86 @@ describe("workflow steps", () => {
     expect(calls).toBe(1)
   })
 
+  it("uses explicit step keys without shifting positional steps", async () => {
+    const log = new MemoryWorkflowLog()
+    const { extensions, tags: scopeTags } = agent({ log })
+    const scope = createScope({ tags: scopeTags, extensions })
+    await scope.ready
+    let stableCalls = 0
+    let positionalCalls = 0
+    const stable = flow({
+      name: "stable-step",
+      tags: [step({ workflow: true, key: "stable" })],
+      factory: () => {
+        stableCalls++
+        return "stable"
+      },
+    })
+    const positional = flow({
+      name: "positional-step",
+      tags: [step({ workflow: true })],
+      factory: () => {
+        positionalCalls++
+        return "positional"
+      },
+    })
+
+    const ctx1 = scope.createContext({ tags: [workflowRun({ taskId: "task-key", runId: "run-key" })] })
+    expect(await ctx1.exec({ flow: stable })).toBe("stable")
+    await ctx1.close()
+
+    const ctx2 = scope.createContext({ tags: [workflowRun({ taskId: "task-key", runId: "run-key" })] })
+    expect(await ctx2.exec({ flow: positional })).toBe("positional")
+    expect(await ctx2.exec({ flow: stable })).toBe("stable")
+    await ctx2.close()
+
+    expect(stableCalls).toBe(1)
+    expect(positionalCalls).toBe(1)
+    expect(log.entries().map((entry) => entry.key.step)).toEqual(["stable", 0])
+  })
+
+  it("can compose workflow behavior as suspense extension units", async () => {
+    const log = new MemoryWorkflowLog()
+    const scope = createScope({
+      tags: [
+        eventLog(log),
+        units(workflowExtensionUnits()),
+      ],
+      extensions: [suspenseExtension({
+        name: "workflow-units",
+      })],
+    })
+    await scope.ready
+    let calls = 0
+    const worker = flow({
+      name: "unit-worker",
+      tags: [step({ workflow: true, key: "unit-worker" })],
+      factory: () => {
+        calls++
+        return "ok"
+      },
+    })
+
+    const ctx1 = scope.createContext({ tags: [workflowRun({ taskId: "task-unit", runId: "run-unit" })] })
+    expect(await ctx1.exec({ flow: worker })).toBe("ok")
+    await ctx1.close()
+
+    const ctx2 = scope.createContext({ tags: [workflowRun({ taskId: "task-unit", runId: "run-unit" })] })
+    expect(await ctx2.exec({ flow: worker })).toBe("ok")
+    await ctx2.close()
+
+    expect(calls).toBe(1)
+    expect(log.entries()).toContainEqual(expect.objectContaining({
+      status: "completed",
+      key: { taskId: "task-unit", runId: "run-unit", step: "unit-worker" },
+      targetName: "unit-worker",
+    }))
+  })
+
   it("suspends durable work and replays memoized steps on resolution", async () => {
     const log = new MemoryWorkflowLog()
-    const { extensions } = agent({ log })
-    const scope = createScope({ extensions })
+    const { extensions, tags: scopeTags } = agent({ log })
+    const scope = createScope({ tags: scopeTags, extensions })
     await scope.ready
     let expensiveCalls = 0
     const expensive = flow({
@@ -123,8 +203,8 @@ describe("workflow steps", () => {
 
   it("suspends durable work before resolving deps", async () => {
     const gate = tag<string>({ label: "agent.durable.gate" })
-    const { extensions } = agent()
-    const scope = createScope({ extensions })
+    const { extensions, tags: scopeTags } = agent()
+    const scope = createScope({ tags: scopeTags, extensions })
     await scope.ready
     const approve = flow({
       name: "durable-before-deps",
@@ -138,8 +218,8 @@ describe("workflow steps", () => {
   })
 
   it("aborts timed workflow steps cooperatively", async () => {
-    const { extensions } = agent()
-    const scope = createScope({ extensions })
+    const { extensions, tags: scopeTags } = agent()
+    const scope = createScope({ tags: scopeTags, extensions })
     await scope.ready
     let aborted = false
     const timed = flow({

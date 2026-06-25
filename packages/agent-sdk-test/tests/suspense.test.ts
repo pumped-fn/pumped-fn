@@ -9,8 +9,8 @@ import {
 describe("suspense test helpers", () => {
   it("replays standalone suspense steps without agent config", async () => {
     const log = new MemorySuspenseLog()
-    const { extension } = suspense({ log })
-    const scope = createScope({ extensions: [extension] })
+    const { extension, tags } = suspense({ log })
+    const scope = createScope({ tags, extensions: [extension] })
     await scope.ready
     let calls = 0
     const step = flow({
@@ -35,8 +35,8 @@ describe("suspense test helpers", () => {
 
   it("suspends standalone suspense steps and resumes from resolved value", async () => {
     const log = new MemorySuspenseLog()
-    const { extension } = suspense({ log })
-    const scope = createScope({ extensions: [extension] })
+    const { extension, tags } = suspense({ log })
+    const scope = createScope({ tags, extensions: [extension] })
     await scope.ready
     const externalSync = flow({
       name: "external-sync",
