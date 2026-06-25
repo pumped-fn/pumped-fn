@@ -47,7 +47,7 @@ flowchart TD
 - `WorkerRegistry` for named worker calls through `runtime.delegate()`.
 - `agent()`, `tool()`, `skill()`, and `sub()` for an agent application surface over lite.
 - `skillCalls` and `loadedSkills` for on-demand skill content.
-- `turn()` for model rounds that execute tools and subagents through `ctx.exec()`.
+- `agent.turn` flow for model rounds that execute tools and subagents through `ctx.exec()`.
 - `session()` and `send()` for continuing message history backed by materials.
 - `events` for per-boundary run inspection.
 - `model` and `sandbox` for swappable provider and execution capabilities.
@@ -78,7 +78,6 @@ import {
   skill,
   sub,
   tool,
-  turn,
   type Model,
 } from "@pumped-fn/agent-sdk"
 
@@ -144,7 +143,10 @@ const triage = agent({
 
 const scope = createScope()
 const ctx = scope.createContext()
-const result = await turn(ctx, triage, { prompt: "triage FEAT-42" })
+const result = await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage FEAT-42" },
+})
 const trace = await ctx.resolve(events)
 await ctx.close()
 await scope.dispose()
@@ -218,7 +220,10 @@ const ctx = scope.createContext({
   tags: [workflowRun({ taskId: "triage-42", runId: "run-1" })],
 })
 
-await turn(ctx, triage, { prompt: "triage FEAT-42" })
+await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage FEAT-42" },
+})
 const run = await inspect(log, { taskId: "triage-42", runId: "run-1" })
 ```
 

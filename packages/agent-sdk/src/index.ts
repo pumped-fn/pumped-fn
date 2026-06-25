@@ -1381,14 +1381,6 @@ export function agent(options: AgentOptions): Agent {
   return agent
 }
 
-export function turn(
-  ctx: Lite.ExecutionContext,
-  agent: Agent,
-  input: TurnInput
-): Promise<TurnResult> {
-  return execTurn(ctx, agent, input)
-}
-
 function execTurn(
   ctx: Lite.ExecutionContext,
   agent: Agent,
@@ -1410,7 +1402,7 @@ export async function send(
   input: TurnInput
 ): Promise<TurnResult> {
   const current = await ctx.resolve(session)
-  const result = await turn(ctx, agent, {
+  const result = await execTurn(ctx, agent, {
     ...input,
     messages: [
       ...current.state.messages,
@@ -1428,7 +1420,7 @@ export function channel<Input>(options: ChannelOptions<Input>): Lite.Flow<TurnRe
     name: options.name,
     tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
     factory: async (ctx: Lite.ExecutionContext & { readonly input: Input }) =>
-      turn(ctx, options.agent, await options.input(ctx)),
+      execTurn(ctx, options.agent, await options.input(ctx)),
   }
   return typeof options.parse === "function"
     ? flow<TurnResult, Input>({ ...flowOptions, parse: options.parse })
@@ -1439,7 +1431,7 @@ export function schedule(options: ScheduleOptions): Lite.Flow<TurnResult, void> 
   return flow({
     name: options.name,
     tags: agentStepTags({ workflow: true, kind: "schedule" }, options.tags),
-    factory: async (ctx) => turn(ctx, options.agent, await options.input(ctx)),
+    factory: async (ctx) => execTurn(ctx, options.agent, await options.input(ctx)),
   })
 }
 
@@ -1576,7 +1568,7 @@ export async function runEval(ctx: Lite.ExecutionContext, target: Suite): Promis
   assertJudgeQuorum(target.judges)
   const cases: EvalCaseReport[] = []
   for (const item of target.cases) {
-    const result = await turn(ctx, target.agent, item.input)
+    const result = await execTurn(ctx, target.agent, item.input)
     const checks = await runEvalChecks(result, item.checks ?? [])
     const judges = await runEvalJudges(ctx, result, target.judges)
     cases.push({

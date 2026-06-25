@@ -17,7 +17,6 @@ import {
   model as agentModel,
   runEval,
   summary,
-  turn,
   send,
   sandbox,
   loaded,
@@ -87,7 +86,10 @@ describe("agent application runtime", () => {
     const scope = createScope({ extensions })
     const ctx = scope.createContext()
 
-    const result = await turn(ctx, triage, { prompt: "triage FEAT-42" })
+    const result = await ctx.exec({
+      flow: triage.turn,
+      input: { prompt: "triage FEAT-42" },
+    })
     const buffer = await ctx.resolve(events)
 
     expect(result.content).toContain("ready:")
@@ -152,7 +154,10 @@ describe("agent application runtime", () => {
     const scope = createScope()
     const ctx = scope.createContext()
 
-    await expect(turn(ctx, target, { prompt: "default" })).resolves.toMatchObject({
+    await expect(ctx.exec({
+      flow: target.turn,
+      input: { prompt: "default" },
+    })).resolves.toMatchObject({
       content: "tagged:default",
     })
     await expect(ctx.exec({
@@ -279,7 +284,10 @@ describe("agent application runtime", () => {
     const scope = createScope({ extensions })
     const ctx = scope.createContext()
 
-    const result = await turn(ctx, target, { prompt: "route" })
+    const result = await ctx.exec({
+      flow: target.turn,
+      input: { prompt: "route" },
+    })
 
     expect(result.content).toBe("policy:route to support")
     expect(result.skillResults).toEqual([{ name: "policy", content: "route to support" }])
@@ -332,7 +340,10 @@ describe("agent application runtime", () => {
     const scope = createScope({ extensions })
     const ctx = scope.createContext()
 
-    await expect(turn(ctx, target, { prompt: "route" }))
+    await expect(ctx.exec({
+      flow: target.turn,
+      input: { prompt: "route" },
+    }))
       .resolves.toMatchObject({
         content: 'done:{"route":"remote-tool"}',
         toolResults: [{ output: { route: "remote-tool" } }],
@@ -390,7 +401,10 @@ describe("agent application runtime", () => {
     const scope = createScope()
     const ctx = scope.createContext()
 
-    await expect(turn(ctx, target, { prompt: "collect" }))
+    await expect(ctx.exec({
+      flow: target.turn,
+      input: { prompt: "collect" },
+    }))
       .resolves.toMatchObject({
         content: 'done:undefined|{"count":"1","self":"[Circular]"}',
       })
@@ -590,7 +604,10 @@ describe("agent application runtime", () => {
     })
     const ctx = scope.createContext()
 
-    await expect(turn(ctx, target, { prompt: "read" }))
+    await expect(ctx.exec({
+      flow: target.turn,
+      input: { prompt: "read" },
+    }))
       .resolves.toMatchObject({
         content: "read:file:README.md",
         toolResults: [{ output: "file:README.md" }],

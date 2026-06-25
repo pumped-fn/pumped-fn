@@ -17,12 +17,10 @@ import {
   suite,
   summary,
   tool,
-  turn,
   used,
   workflowRun,
   type Model,
   type RunLog,
-  type Sandbox,
 } from "@pumped-fn/agent-sdk"
 import { kit } from "@pumped-fn/agent-sdk-test"
 
@@ -100,7 +98,7 @@ export const model: Model = {
       },
 }
 
-export const box: Sandbox = {
+export const box = sandbox({
   readFile: (path) => `file:${path}`,
   writeFile: () => undefined,
   exec: (command, args = []) => ({
@@ -108,19 +106,22 @@ export const box: Sandbox = {
     stderr: "",
     exitCode: 0,
   }),
-}
+})
 
 export async function runLocal() {
   const target = triage(model)
   const { extensions, log } = kit()
   const scope = createScope({
     extensions,
-    tags: [sandbox(box)],
+    tags: [box],
   })
   const ctx = scope.createContext({
     tags: [workflowRun({ taskId: "ticket-42", runId: "run-1" })],
   })
-  const result = await turn(ctx, target, { prompt: "triage ticket 42" })
+  const result = await ctx.exec({
+    flow: target.turn,
+    input: { prompt: "triage ticket 42" },
+  })
   const trace = await ctx.resolve(events)
   const run = await inspect(log, { taskId: "ticket-42", runId: "run-1" })
   await ctx.close()
@@ -130,7 +131,7 @@ export async function runLocal() {
 
 export async function runThread() {
   const target = triage(model)
-  const scope = createScope({ tags: [sandbox(box)] })
+  const scope = createScope({ tags: [box] })
   const ctx = scope.createContext()
   const thread = session("support-thread")
   await send(ctx, thread, target, { prompt: "one" })
@@ -142,7 +143,7 @@ export async function runThread() {
 }
 
 export async function runHttp() {
-  const scope = createScope({ tags: [sandbox(box)] })
+  const scope = createScope({ tags: [box] })
   const ctx = scope.createContext()
   const handle = http({ agent: triage(model) })
   const response = await ctx.exec({
@@ -181,7 +182,7 @@ export async function runSuite(targetLog?: RunLog) {
     judges: [accepts, grounded],
   })
   const { extensions } = kit({ log: targetLog })
-  const scope = createScope({ extensions, tags: [sandbox(box)] })
+  const scope = createScope({ extensions, tags: [box] })
   const ctx = scope.createContext()
   const report = await runEval(ctx, evaluation)
   await ctx.close()

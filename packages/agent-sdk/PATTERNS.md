@@ -195,7 +195,10 @@ const triage = agent({
   tools: [loadTicket],
 })
 
-const result = await turn(ctx, triage, { prompt: "triage ticket 42" })
+const result = await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage ticket 42" },
+})
 ```
 
 Why: tools and subagent turns still run through `ctx.exec()`, so the same workflow extension can replay, suspend, route, or time out the work. `events` is a boundary resource, so run inspection is testable without a global observer.
