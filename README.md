@@ -41,6 +41,7 @@ Extensions wrap execution. React is an observer layer.
 | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
+| `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
 | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
 | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
@@ -72,6 +73,7 @@ The same seam works for backend and frontend:
 - Backend handlers create or receive an execution context and run flows.
 - Workers create scopes for process lifetime and contexts per job.
 - React roots render `ScopeProvider` and `ExecutionContextProvider`.
+- Edge renderers such as json-render can bind to Lite-owned scoped values and emit actions into Lite flows.
 - Tests use `createScope({ presets, tags, extensions })` and public APIs.
 
 ## Core Primitives
@@ -198,6 +200,13 @@ For forms, modals, editors, and nested UI boundaries, `@pumped-fn/lite-react` pr
 That state is backed by a current-owned resource, so it is testable without React and resets when the
 owning execution context unmounts or is released.
 
+When generated UI needs json-render controlled state, `@pumped-fn/lite-react-json-render` adapts a
+`scopedValue` access object to json-render's external `StateStore` shape and adapts json-render action
+handlers to Lite flows. The graph still owns state and behavior; json-render observes, writes, and emits
+through its normal `JSONUIProvider` contracts. Use it at genuine json-render boundaries such as generated
+specs, server-authored forms, or schema-driven editors; hand-authored React should keep using the normal
+Lite React hooks directly.
+
 ## Tests
 
 The scope is the single seam:
@@ -240,7 +249,7 @@ The examples are part of the public contract for how code should be shaped:
 | Path | What it shows |
 | --- | --- |
 | `examples/lite-practical` | Backend and service-style patterns, plus a service health capstone |
-| `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, complex Kanban |
+| `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
 | `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
 
@@ -269,6 +278,7 @@ pnpm -F @pumped-fn/lite-lint test
 - Core patterns: [`packages/lite/PATTERNS.md`](packages/lite/PATTERNS.md)
 - React runtime: [`packages/lite-react/README.md`](packages/lite-react/README.md)
 - React patterns: [`packages/lite-react/PATTERNS.md`](packages/lite-react/PATTERNS.md)
+- json-render adapter: [`packages/lite-react-json-render/README.md`](packages/lite-react-json-render/README.md)
 - Anti-pattern scanner: [`packages/lite-lint/README.md`](packages/lite-lint/README.md)
 
 ## License
