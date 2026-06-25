@@ -50,7 +50,6 @@ export type MaterialKind = "json" | "text" | "binary" | "reference"
 export interface ExecEvent {
   readonly key?: WorkflowStepKey
   readonly target: Lite.ExecTarget
-  readonly ctx: Lite.ExecutionContext
   readonly targetName: string
   readonly input: unknown
 }
@@ -113,11 +112,11 @@ function registryOf(ctx: Lite.ExecutionContext): WorkerRegistry | undefined {
 
 function execEvent(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): ExecEvent {
   const workflowEvent = ctx.data.seekTag(activeWorkflowEvent)
-  return workflowEvent ?? {
+  return {
+    key: workflowEvent?.key,
     target,
-    ctx,
-    targetName: targetNameOf(target, ctx),
-    input: ctx.input,
+    targetName: workflowEvent?.targetName ?? targetNameOf(target, ctx),
+    input: workflowEvent?.input ?? ctx.input,
   }
 }
 
