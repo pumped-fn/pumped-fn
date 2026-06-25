@@ -98,7 +98,7 @@ export const model: Model = {
       },
 }
 
-export const box = sandbox({
+export const local = sandbox({
   readFile: (path) => `file:${path}`,
   writeFile: () => undefined,
   exec: (command, args = []) => ({
@@ -113,7 +113,7 @@ export async function runLocal() {
   const { extensions, log } = kit()
   const scope = createScope({
     extensions,
-    tags: [box],
+    tags: [local],
   })
   const ctx = scope.createContext({
     tags: [workflowRun({ taskId: "ticket-42", runId: "run-1" })],
@@ -131,7 +131,7 @@ export async function runLocal() {
 
 export async function runThread() {
   const target = triage(model)
-  const scope = createScope({ tags: [box] })
+  const scope = createScope({ tags: [local] })
   const ctx = scope.createContext()
   const thread = session("support-thread")
   await send(ctx, thread, target, { prompt: "one" })
@@ -143,7 +143,7 @@ export async function runThread() {
 }
 
 export async function runHttp() {
-  const scope = createScope({ tags: [box] })
+  const scope = createScope({ tags: [local] })
   const ctx = scope.createContext()
   const handle = http({ agent: triage(model) })
   const response = await ctx.exec({
@@ -182,7 +182,7 @@ export async function runSuite(targetLog?: RunLog) {
     judges: [accepts, grounded],
   })
   const { extensions } = kit({ log: targetLog })
-  const scope = createScope({ extensions, tags: [box] })
+  const scope = createScope({ extensions, tags: [local] })
   const ctx = scope.createContext()
   const report = await runEval(ctx, evaluation)
   await ctx.close()

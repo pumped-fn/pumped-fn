@@ -1,6 +1,6 @@
 import { createScope } from "@pumped-fn/lite"
 import { expect, it } from "vitest"
-import { box, daily, runHttp, runLocal, runSuite, runThread } from "../src/agent"
+import { daily, local, runHttp, runLocal, runSuite, runThread } from "../src/agent"
 
 it("runs locally with trace and run inspection", async () => {
   const run = await runLocal()
@@ -51,7 +51,7 @@ it("writes json-safe eval reports", async () => {
 })
 
 it("runs schedule adapters through the same scope seam", async () => {
-  const scope = createScope({ tags: [box] })
+  const scope = createScope({ tags: [local] })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({ flow: daily })).resolves.toMatchObject({
