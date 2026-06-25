@@ -42,6 +42,7 @@ pnpm typecheck
 |---|---|---|---|
 | F01 | State / derived soup in a component | atoms + derived atom; component observes | IO, OI |
 | F13 | Untested `main.tsx` owning state/root setup | main as composition-root adapter; graph owns state | IO, OI |
+| F14 | json-render external store beside the graph | scopedValue-backed StateStore; json-render observes | IO, OI |
 | K | Complex Kanban workspace board | map-backed graph state + resources + scoped drafts; component observes | IO, OI |
 
 (More patterns and capstone slices land incrementally.)

@@ -12,6 +12,12 @@ catalogs:
     '@changesets/cli':
       specifier: 2.31.0
       version: 2.31.0
+    '@json-render/core':
+      specifier: 0.19.0
+      version: 0.19.0
+    '@json-render/react':
+      specifier: 0.19.0
+      version: 0.19.0
     '@opentelemetry/api':
       specifier: 1.9.1
       version: 1.9.1
@@ -87,6 +93,9 @@ catalogs:
     vitest:
       specifier: 4.1.7
       version: 4.1.7
+    zod:
+      specifier: 4.3.6
+      version: 4.3.6
 
 overrides:
   esbuild: 0.27.7
@@ -201,12 +210,24 @@ importers:
 
   examples/lite-react-practical:
     dependencies:
+      '@json-render/core':
+        specifier: 'catalog:'
+        version: 0.19.0(zod@4.3.6)
+      '@json-render/react':
+        specifier: 'catalog:'
+        version: 0.19.0(react@19.2.6)(zod@4.3.6)
       '@pumped-fn/lite':
         specifier: workspace:*
         version: link:../../packages/lite
       '@pumped-fn/lite-react':
         specifier: workspace:*
         version: link:../../packages/lite-react
+      '@pumped-fn/lite-react-json-render':
+        specifier: workspace:*
+        version: link:../../packages/lite-react-json-render
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 'catalog:'
@@ -478,6 +499,31 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.7)(@vitest/coverage-v8@4.1.7)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.27.7)(tsx@4.22.3))
+
+  packages/lite-react-json-render:
+    dependencies:
+      '@json-render/core':
+        specifier: 'catalog:'
+        version: 0.19.0(zod@4.3.6)
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../lite
+      '@pumped-fn/lite-react':
+        specifier: workspace:*
+        version: link:../lite-react
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.14(@types/node@25.9.1)(esbuild@0.27.7)(tsx@4.22.3)
       vitest:
         specifier: 'catalog:'
         version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.7)(@vitest/coverage-v8@4.1.7)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.27.7)(tsx@4.22.3))
@@ -1064,6 +1110,16 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@json-render/core@0.19.0':
+    resolution: {integrity: sha512-vvcyZ+10EDZKbEyB1J2kXOGfDaiZR2LurZGSqi2r5STHyKr+Te85DWaBxTwRGgM7U1LtIvNx85BzzjElRKoAIg==}
+    peerDependencies:
+      zod: ^4.0.0
+
+  '@json-render/react@0.19.0':
+    resolution: {integrity: sha512-kTW6b6cSNRrlEfCUf/69SLoLn+CufC968ruge9tnQlp9pDTGG/SK8pgM541FdgwMFA4zm3s5mpM3G8rdODKc/A==}
+    peerDependencies:
+      react: ^19.2.3
 
   '@manypkg/find-root@1.1.0':
     resolution: {integrity: sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA==}
@@ -2555,6 +2611,9 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@adobe/css-tools@4.5.0': {}
@@ -3174,6 +3233,15 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@json-render/core@0.19.0(zod@4.3.6)':
+    dependencies:
+      zod: 4.3.6
+
+  '@json-render/react@0.19.0(react@19.2.6)(zod@4.3.6)':
+    dependencies:
+      '@json-render/core': 0.19.0(zod@4.3.6)
+      react: 19.2.6
 
   '@manypkg/find-root@1.1.0':
     dependencies:
@@ -4504,5 +4572,7 @@ snapshots:
     optional: true
 
   yallist@3.1.1: {}
+
+  zod@4.3.6: {}
 
 time: {}

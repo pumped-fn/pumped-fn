@@ -8,12 +8,16 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@json-render/core": "catalog:",
+    "@json-render/react": "catalog:",
     "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-react": "workspace:*"
+    "@pumped-fn/lite-react": "workspace:*",
+    "@pumped-fn/lite-react-json-render": "workspace:*",
+    "zod": "catalog:"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "catalog:",
