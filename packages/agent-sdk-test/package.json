@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/agent-sdk-test",
   "version": "1.0.0",
-  "private": true,
+  "private": false,
   "description": "In-memory test helpers for @pumped-fn/agent-sdk",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -20,7 +20,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,10 +35,10 @@
   },
   "peerDependencies": {
     "@pumped-fn/agent-sdk": "^1.0.0",
-    "@pumped-fn/lite": "^3.0.0"
+    "@pumped-fn/lite": "^3.1.0"
   },
   "dependencies": {
-    "@pumped-fn/lite-extension-suspense": "workspace:*"
+    "@pumped-fn/lite-extension-suspense": "workspace:^"
   },
   "devDependencies": {
     "@pumped-fn/agent-sdk": "workspace:*",

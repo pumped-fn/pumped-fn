@@ -36,7 +36,9 @@ overrides:
   yaml@>=2 <3: 2.9.0
 
 allowBuilds:
+  "@mongodb-js/zstd": false
   esbuild: true
+  node-liblzma: false
   sharp: true
   protobufjs: false
   puppeteer: false
@@ -72,6 +74,7 @@ catalog:
   acorn: 8.16.0
   estree-walker: 3.0.3
   jscodeshift: 17.3.0
+  just-bash: 3.0.2
   magic-string: 0.30.21
   playwright: 1.61.0
   react: 19.2.6

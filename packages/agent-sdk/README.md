@@ -1,15 +1,16 @@
 # @pumped-fn/agent-sdk
 
-Agent workflow substrate helpers for `@pumped-fn/lite`.
+Agent workflow and application helpers for `@pumped-fn/lite`.
 
-This package does not add an agent runtime. It gives names and conventions to the primitives lite already has:
+This package does not add a hosted runtime or filesystem framework. It gives names and conventions to the primitives lite already has:
 
 | Lite primitive | Agent SDK use |
 |---|---|
 | `flow()` + `step({ workflow: true })` | Workflow boundary |
-| `flow()` | Worker, durable step, CLI-backed LLM call |
-| state/service | Provider, config, registry, model client, material state |
-| typed tag | Routing config and ambient run data |
+| `flow()` | Worker, tool, subagent turn, durable step, CLI-backed LLM call |
+| state/service/atom | Provider, config, registry, material state |
+| `resource()` | Per-run agent event capture |
+| typed tag | Routing config, ambient run data, model and sandbox capabilities |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
 | `workflowExtension()` | Replay, suspend, timeout, and event-log policy |
 | `extension()` | Agent remote-routing policy |
@@ -18,13 +19,19 @@ The core idea: author orchestration as normal TypeScript `flow()` code. Put ever
 
 ```mermaid
 flowchart TD
-  Root["workflow flow"] --> Exec["ctx.exec"]
+  Root["workflow flow or agent turn"] --> Exec["ctx.exec"]
   Exec --> Config["read step config"]
   Config --> Replay["completed? return cached"]
   Config --> Durable["durable? write pending + suspend"]
   Config --> Remote["remote? hand to worker runner"]
   Config --> Local["otherwise run next()"]
-  Local --> Log["write completed"]
+  Local --> Tool["tool or subagent flow"]
+  Local --> Model["model tag provider"]
+  Model --> CLI["optional Codex/Claude CLI worker"]
+  Tool --> Events["events resource"]
+  Model --> Events
+  CLI --> Events
+  Events --> Log["write completed"]
   Remote --> Log
 ```
 
@@ -36,14 +43,255 @@ flowchart TD
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
 - `workflowRun()` context tag for workflow-scoped run data.
 - `abortSignal` tag for cooperative timeout cancellation.
-- `agent` runtime tag for named worker delegation.
-- `WorkerRegistry` for named worker calls through `agent.delegate()`.
+- `runtime` tag for named worker delegation.
+- `WorkerRegistry` for named worker calls through `runtime.delegate()`.
+- `agent()`, `tool()`, `skill()`, and `sub()` for an agent application surface over lite.
+- `skillCalls` and `loadedSkills` for on-demand skill content.
+- `agent.turn` flow for model rounds that execute tools and subagents through `ctx.exec()`.
+- `session()` and `send()` for continuing message history backed by materials.
+- `events` for per-boundary run inspection.
+- `model` and `sandbox` for swappable provider and execution capabilities.
+- `guard()` for harness anti-goal state collected from the first model run.
+- `channel()` and `schedule()` for inbound and clock-driven adapter flows.
+- `suite()`, `runEval()`, deterministic checks, and judge quorum helpers.
+- `inspect()` for workflow-log run inspection.
+- `summary()` for JSON-safe eval reports.
+- `http()` for Fetch request adapters.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
 - `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
+- `claudeHarness()` and `codexHarness()` for non-interactive CLI model adapters with optional bwrap isolation.
 
 `step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
-Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS package can implement the same `WorkflowEventLog` and `AgentRemoteRunner` contracts.
+Transport is outside this core package. Tests use `@pumped-fn/agent-sdk-test` with an in-memory event log. A NATS, HTTP, or queue package can implement the same `WorkflowEventLog` and `RemoteRunner` contracts.
+
+## Agent Application
+
+Use `agent()` when a model should choose tools or delegate to subagents, but keep every executable capability as a lite flow. A model is just a swappable provider. Tools and subagent turns run through `ctx.exec()`, so workflow replay, remote routing, timeouts, and event capture still apply at the same seam as the rest of the graph.
+
+```ts
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import {
+  events,
+  agent,
+  model,
+  skill,
+  sub,
+  tool,
+  type Model,
+} from "@pumped-fn/agent-sdk"
+
+const lookupTicket = tool({
+  description: "Load a ticket by id.",
+  flow: flow({
+    name: "lookup-ticket",
+    parse: typed<{ id: string }>(),
+    factory: (ctx) => ({ id: ctx.input.id, title: `ticket:${ctx.input.id}` }),
+  }),
+})
+
+const summarizeModel: Model = {
+  complete: (_ctx, request) => ({
+    content: `summary:${request.messages.at(-1)?.content ?? ""}`,
+    stop: true,
+  }),
+}
+
+const summarize = agent({
+  name: "summarize-ticket",
+  tags: [model(summarizeModel)],
+  instructions: "Summarize the ticket context.",
+})
+
+const triageModel: Model = {
+  complete: (_ctx, request) => request.loadedSkills.length === 0
+    ? {
+        content: "need policy",
+        skillCalls: [{ name: "triage-policy" }],
+      }
+    : request.round === 1
+    ? {
+        content: "checking",
+        toolCalls: [{ name: "lookup-ticket", input: { id: "42" } }],
+        subagentCalls: [{ name: "summarize-ticket", input: { prompt: "ticket 42" } }],
+      }
+    : {
+        content: `ready:${request.messages.map((message) => message.content).join("|")}`,
+        stop: true,
+      },
+}
+
+const triage = agent({
+  name: "triage-ticket",
+  tags: [model(triageModel)],
+  instructions: "Triage tickets with tools and delegated summaries.",
+  skills: [
+    skill({
+      name: "triage-policy",
+      description: "Ticket triage policy.",
+      content: "Escalate unclear incidents.",
+    }),
+  ],
+  tools: [lookupTicket],
+  subagents: [
+    sub({
+      description: "Summarizes ticket context.",
+      agent: summarize,
+    }),
+  ],
+})
+
+const scope = createScope()
+const ctx = scope.createContext()
+const result = await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage FEAT-42" },
+})
+const trace = await ctx.resolve(events)
+await ctx.close()
+await scope.dispose()
+```
+
+`result.toolResults`, `result.subagentResults`, and `trace.events` are deterministic inspection surfaces. Tests can set a default model with scope tags, define one on the agent flow, or override one turn with exec tags without module mocks.
+
+## Sessions
+
+Use `session()` when a continuing agent needs message history. The session is a material, so history is ordinary scope state with revisioned patches.
+
+```ts
+import { session, send } from "@pumped-fn/agent-sdk"
+
+const thread = session("triage-session")
+
+await send(ctx, thread, triage, { prompt: "triage FEAT-42" })
+await send(ctx, thread, triage, { prompt: "summarize the decision" })
+```
+
+For persistent durability, pair the session material with a workflow event-log adapter. The core session API stays storage-agnostic.
+
+## Evals
+
+`suite()` accepts deterministic checks and zero or at least two judges. One judge is rejected because a subjective gate should not rest on a single model answer.
+
+```ts
+import {
+  suite,
+  judge,
+  includes,
+  runEval,
+  summary,
+} from "@pumped-fn/agent-sdk"
+
+const accepts = judge({
+  name: "accepts",
+  evaluate: () => ({ name: "accepts", passed: true, score: 1 }),
+})
+
+const grounded = judge({
+  name: "grounded",
+  evaluate: () => ({ name: "grounded", passed: true, score: 1 }),
+})
+
+const evaluation = suite({
+  name: "triage-quality",
+  agent: triage,
+  cases: [
+    {
+      name: "answers with readiness",
+      input: { prompt: "triage FEAT-42" },
+      checks: [includes("ready")],
+    },
+  ],
+  judges: [accepts, grounded],
+})
+
+const report = await runEval(ctx, evaluation)
+const artifact = summary(report)
+```
+
+## Runs And HTTP
+
+Use `inspect()` with any log that implements `RunLog`. `@pumped-fn/agent-sdk-test` provides an in-memory log; production packages can back the same contract with SQL, NATS, object storage, or a trace backend.
+
+```ts
+import { inspect, workflowRun } from "@pumped-fn/agent-sdk"
+
+const ctx = scope.createContext({
+  tags: [workflowRun({ taskId: "triage-42", runId: "run-1" })],
+})
+
+await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage FEAT-42" },
+})
+const run = await inspect(log, { taskId: "triage-42", runId: "run-1" })
+```
+
+Use `http()` when an existing Fetch-compatible server should expose an agent turn. Auth, routing, and provider request verification stay outside the core package.
+
+```ts
+import { http } from "@pumped-fn/agent-sdk"
+
+const handle = http({ agent: triage })
+const response = await ctx.exec({
+  flow: handle,
+  input: new Request("https://agent.local/run", {
+    method: "POST",
+    body: JSON.stringify({ prompt: "triage FEAT-42" }),
+  }),
+})
+```
+
+## Channels, Schedules, and Sandboxes
+
+Channels and schedules are flow adapters. They translate an external event or clock tick into an agent turn input, then execute that turn through `ctx.exec()`.
+
+```ts
+import { createScope, flow, tags, typed } from "@pumped-fn/lite"
+import {
+  channel,
+  schedule,
+  tool,
+  sandbox,
+} from "@pumped-fn/agent-sdk"
+
+const readWorkspace = tool({
+  description: "Read a file from the agent workspace.",
+  flow: flow({
+    name: "read-workspace",
+    parse: typed<{ path: string }>(),
+    deps: { sandbox: tags.required(sandbox) },
+    factory: (ctx, deps) => deps.sandbox.readFile(ctx.input.path),
+  }),
+})
+
+const slack = channel({
+  name: "slack-message",
+  parse: typed<{ text: string }>(),
+  agent: triage,
+  input: (ctx) => ({ prompt: ctx.input.text }),
+})
+
+const daily = schedule({
+  name: "daily-digest",
+  agent: triage,
+  input: () => ({ prompt: "daily digest" }),
+})
+
+const scope = createScope({
+  tags: [
+    sandbox({
+      readFile: (path) => `file:${path}`,
+      writeFile: () => undefined,
+      exec: (command, args = []) => ({
+        stdout: [command, ...args].join(" "),
+        stderr: "",
+        exitCode: 0,
+      }),
+    }),
+  ],
+})
+```
 
 ## Standalone Suspense
 
@@ -88,7 +336,7 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ```ts
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
-  agent as agentRuntime,
+  runtime,
   extension,
   workflowRun,
   workflow as workflowRuntime,
@@ -114,10 +362,10 @@ const processIssue = flow({
   ],
   deps: {
     workflow: tags.required(workflowRuntime),
-    agent: tags.required(agentRuntime),
+    runtime: tags.required(runtime),
   },
-  factory: async (ctx, { workflow, agent }) => {
-    const summary = await agent.delegate<string, { text: string }>("summarize", {
+  factory: async (ctx, { workflow, runtime }) => {
+    const summary = await runtime.delegate<string, { text: string }>("summarize", {
       text: ctx.input.body,
     })
     return { taskId: workflow.taskId, summary }
@@ -142,7 +390,7 @@ const ctx = scope.createContext({
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. `agent.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `agent` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
+`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. `runtime.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `runtime` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
 
 ## AI Is Just A Provider
 
@@ -182,16 +430,40 @@ const testScope = createScope({
 })
 ```
 
-The CLI helpers are convenience adapters:
+The CLI helpers are convenience adapters. Harnesses turn popular local CLIs into `Model` providers for `agent()`. Application composition should usually use the provider packages so the core SDK stays transport-neutral and the model is swappable at the scope seam.
 
 ```ts
-import { claudeCliWorker, codexCliWorker } from "@pumped-fn/agent-sdk"
+import { createScope } from "@pumped-fn/lite"
+import { agent, guard } from "@pumped-fn/agent-sdk"
+import { claude } from "@pumped-fn/agent-sdk-claude"
+import { codex } from "@pumped-fn/agent-sdk-codex"
 
-const codex = codexCliWorker({ name: "codex-review", sandbox: "workspace-write" })
-const claude = claudeCliWorker({ name: "claude-plan" })
+const shared = guard("review-guard")
+
+const reviewer = agent({
+  name: "reviewer",
+})
+
+const scope = createScope({
+  tags: [
+    codex({
+      sandbox: "read-only",
+      guard: shared,
+      timeoutMs: 120_000,
+    }),
+  ],
+})
+
+const otherScope = createScope({ tags: [claude({ guard: shared })] })
 ```
 
-Use them when the backend should invoke the real CLI. For stable tests, prefer provider state plus presets.
+`@pumped-fn/agent-sdk-codex` and `@pumped-fn/agent-sdk-claude` return lazy `model` tags. Tagging a scope does not create the CLI harness; first model use does. Replace them with each other or `model(fake)` at `createScope` or `createContext` without changing the agent graph.
+
+`codexHarness()` uses `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` uses `claude -p --no-session-persistence` and rejects `--bare`; pass explicit `extraArgs` for other CLI flags. The default prompt asks for JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first non-empty value is stored in material state and injected into later prompts. Pass a shared `guard("name")` atom when multiple harnesses should see the same anti-goal.
+
+Harnesses default to bwrap isolation with network enabled because the CLIs need provider access. The sandbox mounts the workspace read-only by default, a temporary home, minimal runtime/cert/DNS paths, and only explicit credential directories such as `isolate: { network: true, codexHome: process.env.CODEX_HOME }`. Use `isolate: false` only when another trusted boundary already isolates the process.
+
+For stable tests, prefer provider state plus presets.
 
 ## Replay Contract
 
@@ -231,9 +503,9 @@ const html = derivedMaterial("status-html", status, renderStatus, { kind: "text"
 Use `@pumped-fn/agent-sdk-test` for in-memory replay and fake remote routing:
 
 ```ts
-import { agent } from "@pumped-fn/agent-sdk-test"
+import { kit } from "@pumped-fn/agent-sdk-test"
 
-const { extensions, log } = agent({
+const { extensions, log } = kit({
   remoteRunner: {
     run: async (event) => ({ routed: event.targetName }),
   },

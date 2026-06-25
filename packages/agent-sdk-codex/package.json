@@ -1,8 +1,8 @@
 {
-  "name": "@pumped-fn/lite-extension-suspense",
+  "name": "@pumped-fn/agent-sdk-codex",
   "version": "1.0.0",
   "private": false,
-  "description": "Replay and suspend extension for @pumped-fn/lite",
+  "description": "Codex CLI model provider for @pumped-fn/agent-sdk",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -34,9 +34,11 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
+    "@pumped-fn/agent-sdk": "^1.0.0",
     "@pumped-fn/lite": "^3.1.0"
   },
   "devDependencies": {
+    "@pumped-fn/agent-sdk": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
@@ -45,16 +47,10 @@
     "vite": "catalog:",
     "vitest": "catalog:"
   },
-  "keywords": [
-    "pumped-fn",
-    "suspense",
-    "replay",
-    "workflow"
-  ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "directory": "packages/lite-extension-suspense",
+    "directory": "packages/agent-sdk-codex",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }

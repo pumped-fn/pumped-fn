@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  agent as agentRuntime,
+  runtime,
   extension as agentExtension,
   workflowRun,
   step,
@@ -11,12 +11,12 @@ import {
 } from "@pumped-fn/agent-sdk"
 import {
   MemoryWorkflowLog,
-  agent,
+  kit,
 } from "../src/index"
 
 describe("worker delegation", () => {
   it("delegates by worker registry and routes remote workers", async () => {
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     const worker = flow({
@@ -30,8 +30,8 @@ describe("worker delegation", () => {
       name: "delegate-root",
       parse: typed<{ text: string }>(),
       tags: [step({ workflow: true }), workers(registry)],
-      deps: { agent: tags.required(agentRuntime) },
-      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("upper", ctx.input),
+      deps: { runtime: tags.required(runtime) },
+      factory: (ctx, { runtime }) => runtime.delegate<string, { text: string }>("upper", ctx.input),
     })
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "task-c", runId: "run-c" })] })
     expect(await ctx.exec({ flow: root, input: { text: "works" } })).toBe("WORKS")
@@ -39,7 +39,7 @@ describe("worker delegation", () => {
   })
 
   it("delegates by worker registry tag", async () => {
-    const { extensions } = agent()
+    const { extensions } = kit()
     const scope = createScope({ extensions })
     await scope.ready
     const worker = flow({
@@ -52,8 +52,8 @@ describe("worker delegation", () => {
       name: "delegate-root-tag",
       parse: typed<{ text: string }>(),
       tags: [step({ workflow: true })],
-      deps: { agent: tags.required(agentRuntime) },
-      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("reverse", ctx.input),
+      deps: { runtime: tags.required(runtime) },
+      factory: (ctx, { runtime }) => runtime.delegate<string, { text: string }>("reverse", ctx.input),
     })
     const ctx = scope.createContext({
       tags: [workflowRun({ taskId: "task-c-tag", runId: "run-c-tag" }), workers(registry)],
@@ -72,8 +72,8 @@ describe("worker delegation", () => {
       name: "unguarded-root",
       parse: typed<{ text: string }>(),
       tags: [step({ workflow: true }), workers(workerRegistry([worker]))],
-      deps: { agent: tags.required(agentRuntime) },
-      factory: (ctx, { agent }) => agent.delegate<string, { text: string }>("unguarded-worker", ctx.input),
+      deps: { runtime: tags.required(runtime) },
+      factory: (ctx, { runtime }) => runtime.delegate<string, { text: string }>("unguarded-worker", ctx.input),
     })
     const scope = createScope({ extensions: [workflowExtension({ log: new MemoryWorkflowLog() })] })
     await scope.ready
@@ -92,8 +92,8 @@ describe("worker delegation", () => {
     const root = flow({
       name: "agent-without-workflow",
       tags: [step({ workflow: true })],
-      deps: { agent: tags.required(agentRuntime) },
-      factory: (_ctx, { agent }) => agent.taskId,
+      deps: { runtime: tags.required(runtime) },
+      factory: (_ctx, { runtime }) => runtime.taskId,
     })
 
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "task-agent-only", runId: "run-agent-only" })] })
@@ -119,7 +119,7 @@ describe("worker delegation", () => {
 
   it("routes remote work before resolving deps when runner handles it", async () => {
     const gate = tag<string>({ label: "agent.remote.gate" })
-    const { extensions } = agent({
+    const { extensions } = kit({
       remoteRunner: {
         run: async (event) => {
           expect(event.targetName).toBe("remote-before-deps")

@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest"
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createScope } from "@pumped-fn/lite"
 import {
   CliWorkerError,
+  claudeHarness,
   claudeCliWorker,
   cliWorker,
+  codexHarness,
   codexCliWorker,
+  guard,
+  runCli,
   step,
+  type ModelRequest,
 } from "@pumped-fn/agent-sdk"
 
 describe("CLI workers", () => {
@@ -54,6 +62,140 @@ describe("CLI workers", () => {
     })).rejects.toThrow("CLI helper extraArgs cannot include --")
 
     await ctx.close({ ok: false, error: new Error("expected") })
+  })
+
+  it("rejects bare Claude harness args", () => {
+    expect(() => claudeCliWorker({ extraArgs: ["--bare"] })).toThrow("Claude harness must not use --bare")
+    expect(() => claudeCliWorker({ extraArgs: ["--bare=true"] })).toThrow("Claude harness must not use --bare")
+    expect(() => claudeHarness({ extraArgs: ["--bare"] })).toThrow("Claude harness must not use --bare")
+  })
+
+  it("wraps isolated CLI runs with bubblewrap args", async () => {
+    const isolated = await runCli({
+      command: "printf",
+      args: ["ok"],
+      isolate: {
+        bwrap: "echo",
+        workdir: "/work",
+        home: "/home/agent",
+        network: true,
+        bind: [{ source: "/source", target: "/target", mode: "rw" }],
+      },
+    })
+    expect(isolated.stdout).toContain("--share-net")
+    expect(isolated.stdout).not.toContain("--ro-bind /etc /etc")
+    expect(isolated.stdout).not.toContain("--ro-bind /opt /opt")
+    await expect(runCli({
+      command: "printf",
+      args: ["ok"],
+      isolate: {
+        bwrap: "echo",
+        workdir: "/work",
+        home: "/home/agent",
+        bind: [{ source: "/source", target: "/target", mode: "rw" }],
+      },
+    })).resolves.toMatchObject({
+      stdout: expect.stringContaining("--bind /source /target"),
+    })
+  })
+
+  it("collects the first harness guard into material state", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pumped-fn-model-"))
+    const command = join(dir, "model")
+    await writeFile(command, "#!/bin/sh\nprintf '%s' '{\"content\":\"ready\",\"guard\":\"Keep changes scoped\"}'\n")
+    await chmod(command, 0o755)
+    const store = guard("review-guard")
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const request = {
+      agentName: "review",
+      instructions: "Review the change.",
+      messages: [{ role: "user", content: "hello" }],
+      tools: [],
+      skills: [],
+      loadedSkills: [],
+      subagents: [],
+      round: 0,
+    } satisfies ModelRequest
+
+    await expect(codexHarness({ command, isolate: false, guard: store }).complete(ctx, request))
+      .resolves.toMatchObject({
+        content: "ready",
+        guard: "Keep changes scoped",
+        stop: true,
+      })
+    await expect(ctx.resolve(store)).resolves.toMatchObject({
+      state: { text: "Keep changes scoped" },
+    })
+
+    await ctx.close()
+    await scope.dispose()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it("passes collected guards to later harness prompts", async () => {
+    const store = guard("planner-guard")
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const seen: string[] = []
+    const request = {
+      agentName: "planner",
+      instructions: "Plan the work.",
+      messages: [{ role: "user", content: "hello" }],
+      tools: [],
+      skills: [],
+      loadedSkills: [],
+      subagents: [],
+      round: 0,
+    } satisfies ModelRequest
+    const model = claudeHarness({
+      command: "echo",
+      isolate: false,
+      guard: store,
+      prompt: (_request, guard) => {
+        seen.push(guard.text)
+        return `guard=${guard.text}`
+      },
+      parse: () => seen.length === 1
+        ? { content: "ready", guard: "Avoid single-model truth", stop: true }
+        : { content: "ready", stop: true },
+    })
+
+    await model.complete(ctx, request)
+    await model.complete(ctx, request)
+    expect(seen).toEqual(["", "Avoid single-model truth"])
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("adapts Codex and Claude CLI harnesses into models", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const request = {
+      agentName: "review",
+      instructions: "Review the change.",
+      messages: [{ role: "user", content: "hello" }],
+      tools: [],
+      skills: [],
+      loadedSkills: [],
+      subagents: [],
+      round: 0,
+    } satisfies ModelRequest
+
+    await expect(claudeHarness({ command: "echo", isolate: false }).complete(ctx, request))
+      .resolves.toMatchObject({
+        content: expect.stringContaining("-p --no-session-persistence -- Return JSON only."),
+        stop: true,
+      })
+    await expect(codexHarness({ command: "echo", isolate: false }).complete(ctx, request))
+      .resolves.toMatchObject({
+        content: expect.stringContaining("exec -s read-only --ephemeral --ignore-user-config -- Return JSON only."),
+        stop: true,
+      })
+
+    await ctx.close()
+    await scope.dispose()
   })
 
   it("reports CLI failures with captured stderr", async () => {

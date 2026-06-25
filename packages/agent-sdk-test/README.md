@@ -1,0 +1,16 @@
+# @pumped-fn/agent-sdk-test
+
+In-memory test helpers for `@pumped-fn/agent-sdk`.
+
+Use `kit()` to install the agent workflow extensions with a `MemoryWorkflowLog`. The helper keeps the normal pumped-fn seam: tests still exercise public APIs through `createScope({ presets, tags, extensions })`.
+
+```ts
+import { createScope } from "@pumped-fn/lite"
+import { kit } from "@pumped-fn/agent-sdk-test"
+
+const { extensions, log } = kit()
+const scope = createScope({ extensions })
+const ctx = scope.createContext()
+```
+
+`localRemoteRunner` executes remote-tagged steps in process for tests. `MemoryWorkflowLog` implements the same `RunLog` contract used by `inspect()`.

@@ -1,8 +1,10 @@
 import {
   extension as agentExtension,
   workflowExtension,
-  type AgentExtensionOptions,
-  type AgentRemoteRunner,
+  type ExtensionOptions,
+  type RemoteRunner,
+  type RunLog,
+  type RunQuery,
   type WorkflowEventLog,
   type WorkflowExtensionOptions,
 } from "@pumped-fn/agent-sdk"
@@ -42,15 +44,17 @@ export class MemorySuspenseLog implements SuspenseEventLog {
     })
   }
 
-  entries(): SuspenseStepEntry[] {
-    return [...this.store.values()]
+  entries(query: Partial<RunQuery> = {}): SuspenseStepEntry[] {
+    return [...this.store.values()].filter((entry) =>
+      (query.taskId === undefined || entry.key.taskId === query.taskId) &&
+      (query.runId === undefined || entry.key.runId === query.runId)
+    )
   }
 }
 
-export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog {}
+export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog, RunLog {}
 
-/** Test runner that executes remote-tagged steps in-process. */
-export const localRemoteRunner: AgentRemoteRunner = {
+export const localRemoteRunner: RemoteRunner = {
   run: (_event, next) => next(),
 }
 
@@ -67,9 +71,9 @@ export function suspense(
   }
 }
 
-export function agent(
-  options: AgentExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: WorkflowEventLog } = {}
-): { extensions: Lite.Extension[]; log: WorkflowEventLog } {
+export function kit(
+  options: ExtensionOptions & Omit<WorkflowExtensionOptions, "log"> & { log?: RunLog } = {}
+): { extensions: Lite.Extension[]; log: RunLog } {
   const log = options.log ?? new MemoryWorkflowLog()
   return {
     log,
