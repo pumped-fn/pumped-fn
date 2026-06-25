@@ -14,6 +14,7 @@ import {
   sub,
   tool,
   includes,
+  model as agentModel,
   runEval,
   summary,
   turn,
@@ -46,7 +47,7 @@ describe("agent application runtime", () => {
     const summarize = agent({
       name: "summarize-ticket",
       instructions: "Summarize ticket context.",
-      model: summarizeModel,
+      tags: [agentModel(summarizeModel)],
     })
     const triageModel: Model = {
       complete: (_ctx, request) => {
@@ -66,7 +67,7 @@ describe("agent application runtime", () => {
     const triage = agent({
       name: "triage-ticket",
       instructions: "Triage tickets with tools and delegated summaries.",
-      model: triageModel,
+      tags: [agentModel(triageModel)],
       tools: [lookup],
       skills: [
         skill({
@@ -131,6 +132,42 @@ describe("agent application runtime", () => {
     await scope.dispose()
   })
 
+  it("reads model providers from tags", async () => {
+    const taggedModel: Model = {
+      complete: (_ctx, request) => ({
+        content: `tagged:${request.messages.at(-1)?.content ?? ""}`,
+        stop: true,
+      }),
+    }
+    const overrideModel: Model = {
+      complete: (_ctx, request) => ({
+        content: `override:${request.messages.at(-1)?.content ?? ""}`,
+        stop: true,
+      }),
+    }
+    const target = agent({
+      name: "tagged-model-agent",
+      tags: [agentModel(taggedModel)],
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(turn(ctx, target, { prompt: "default" })).resolves.toMatchObject({
+      content: "tagged:default",
+    })
+    await expect(ctx.exec({
+      flow: target.turn,
+      input: { prompt: "local" },
+      name: target.name,
+      tags: [agentModel(overrideModel)],
+    })).resolves.toMatchObject({
+      content: "override:local",
+    })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("runs evals with deterministic checks and a judge quorum", async () => {
     const model: Model = {
       complete: () => ({
@@ -140,7 +177,7 @@ describe("agent application runtime", () => {
     }
     const reviewer = agent({
       name: "reviewer",
-      model,
+      tags: [agentModel(model)],
     })
     const accepts = judge({
       name: "accepts",
@@ -186,7 +223,10 @@ describe("agent application runtime", () => {
     const model: Model = {
       complete: () => ({ content: "ok", stop: true }),
     }
-    const target = agent({ name: "single-judge-target", model })
+    const target = agent({
+      name: "single-judge-target",
+      tags: [agentModel(model)],
+    })
     const single = judge({
       name: "single",
       evaluate: () => ({ name: "single", passed: true }),
@@ -226,7 +266,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "skill-agent",
-      model,
+      tags: [agentModel(model)],
       skills: [
         skill({
           name: "policy",
@@ -277,7 +317,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "remote-agent",
-      model,
+      tags: [agentModel(model)],
       tools: [remoteTool],
     })
     const routed: unknown[] = []
@@ -344,7 +384,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "string-safe-agent",
-      model,
+      tags: [agentModel(model)],
       tools: [returnsVoid, returnsCyclic],
     })
     const scope = createScope()
@@ -414,7 +454,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "channel-target",
-      model,
+      tags: [agentModel(model)],
     })
     const slack = channel({
       name: "slack-message",
@@ -455,7 +495,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "http-agent",
-      model,
+      tags: [agentModel(model)],
     })
     const scope = createScope()
     const ctx = scope.createContext()
@@ -532,7 +572,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "sandbox-agent",
-      model,
+      tags: [agentModel(model)],
       tools: [readWorkspace],
     })
     const scope = createScope({
@@ -569,7 +609,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "session-agent",
-      model,
+      tags: [agentModel(model)],
     })
     const thread = session("session")
     const scope = createScope()
@@ -605,7 +645,7 @@ describe("agent application runtime", () => {
     }
     const target = agent({
       name: "summary-agent",
-      model,
+      tags: [agentModel(model)],
     })
     const evaluation = suite({
       name: "summary-suite",

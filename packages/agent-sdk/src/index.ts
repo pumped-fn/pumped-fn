@@ -1,4 +1,4 @@
-import { atom, flow, isAtom, resource, tag, typed, type Lite } from "@pumped-fn/lite"
+import { atom, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -1170,7 +1170,6 @@ export interface Agent {
   name: string
   description?: string
   instructions: string
-  model: Lite.Atom<Model>
   tools: readonly AnyTool[]
   skills: readonly Skill[]
   subagents: readonly Sub[]
@@ -1182,7 +1181,6 @@ export interface AgentOptions {
   name: string
   description?: string
   instructions?: string
-  model: Lite.Atom<Model> | Model
   tools?: readonly AnyTool[]
   skills?: readonly Skill[]
   subagents?: readonly Sub[]
@@ -1292,6 +1290,7 @@ export const events = resource<EventBuffer>({
   },
 })
 
+export const model = tag<Model>({ label: "agent.model" })
 export const sandbox = tag<Sandbox>({ label: "agent.sandbox" })
 
 export function session(name: string, options: SessionOptions = {}): Lite.Atom<MaterialState<SessionState>> {
@@ -1357,7 +1356,6 @@ export function sub(options: SubOptions): Sub {
 }
 
 export function agent(options: AgentOptions): Agent {
-  const model = modelAtomOf(options.model)
   const tools = options.tools ?? []
   const skills = options.skills ?? []
   const subagents = options.subagents ?? []
@@ -1366,7 +1364,7 @@ export function agent(options: AgentOptions): Agent {
   const turn = flow({
     name: options.name,
     parse: typed<TurnInput>(),
-    deps: { model },
+    deps: { model: tags.required(model) },
     tags: agentStepTags({ workflow: true, kind: "agent" }, options.tags),
     factory: (ctx, deps) => executeAgentTurn(ctx, agent, deps.model),
   })
@@ -1374,7 +1372,6 @@ export function agent(options: AgentOptions): Agent {
     name: options.name,
     description: options.description,
     instructions: options.instructions ?? "",
-    model,
     tools,
     skills,
     subagents,
@@ -1863,12 +1860,6 @@ function initialMessages(input: TurnInput): Message[] {
     ...(input.messages ?? []),
     ...(input.prompt ? [{ role: "user" as const, content: input.prompt }] : []),
   ]
-}
-
-function modelAtomOf(model: Lite.Atom<Model> | Model): Lite.Atom<Model> {
-  return isAtom(model)
-    ? model as Lite.Atom<Model>
-    : atom({ factory: () => model })
 }
 
 function agentStepTags(defaults: Step, source: Lite.Tagged<any>[] = []): Lite.Tagged<any>[] {

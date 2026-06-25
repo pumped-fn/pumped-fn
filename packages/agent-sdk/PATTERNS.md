@@ -153,7 +153,7 @@ const scope = createScope({
 
 ## 4. Agent Application
 
-Use `agent()` when the model should choose tools or delegate to another role. Keep the executable work as flows, and keep the model as a provider that can be preset or faked.
+Use `agent()` when the model should choose tools or delegate to another role. Keep the executable work as flows, and keep the model as a provider that can be tagged or faked.
 
 ```ts
 const loadTicket = tool({
@@ -165,7 +165,7 @@ const loadTicket = tool({
   }),
 })
 
-const model: Model = {
+const provider: Model = {
   complete: (_ctx, request) => request.loadedSkills.length === 0
     ? {
         content: "need routing policy",
@@ -184,7 +184,7 @@ const model: Model = {
 
 const triage = agent({
   name: "triage",
-  model,
+  tags: [model(provider)],
   skills: [
     skill({
       name: "routing-policy",
@@ -337,12 +337,12 @@ const shared = guard("review-guard")
 
 const reviewer = agent({
   name: "reviewer",
-  model: codexHarness({ sandbox: "read-only", guard: shared }),
+  tags: [model(codexHarness({ sandbox: "read-only", guard: shared }))],
 })
 
 const planner = agent({
   name: "planner",
-  model: claudeHarness({ guard: shared }),
+  tags: [model(claudeHarness({ guard: shared }))],
 })
 ```
 

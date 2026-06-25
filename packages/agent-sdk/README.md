@@ -8,9 +8,9 @@ This package does not add a hosted runtime or filesystem framework. It gives nam
 |---|---|
 | `flow()` + `step({ workflow: true })` | Workflow boundary |
 | `flow()` | Worker, tool, subagent turn, durable step, CLI-backed LLM call |
-| state/service/atom | Provider, config, registry, model client, material state |
+| state/service/atom | Provider, config, registry, material state |
 | `resource()` | Per-run agent event capture |
-| typed tag | Routing config and ambient run data |
+| typed tag | Routing config, ambient run data, model and sandbox capabilities |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
 | `workflowExtension()` | Replay, suspend, timeout, and event-log policy |
 | `extension()` | Agent remote-routing policy |
@@ -25,9 +25,11 @@ flowchart TD
   Config --> Durable["durable? write pending + suspend"]
   Config --> Remote["remote? hand to worker runner"]
   Config --> Local["otherwise run next()"]
-  Local --> Tool["tool/subagent/model provider flow"]
-  Tool --> CLI["optional Codex/Claude CLI harness"]
+  Local --> Tool["tool or subagent flow"]
+  Local --> Model["model tag provider"]
+  Model --> CLI["optional Codex/Claude CLI worker"]
   Tool --> Events["events resource"]
+  Model --> Events
   CLI --> Events
   Events --> Log["write completed"]
   Remote --> Log
@@ -48,7 +50,7 @@ flowchart TD
 - `turn()` for model rounds that execute tools and subagents through `ctx.exec()`.
 - `session()` and `send()` for continuing message history backed by materials.
 - `events` for per-boundary run inspection.
-- `sandbox` for swappable command/file execution capabilities.
+- `model` and `sandbox` for swappable provider and execution capabilities.
 - `guard()` for harness anti-goal state collected from the first model run.
 - `channel()` and `schedule()` for inbound and clock-driven adapter flows.
 - `suite()`, `runEval()`, deterministic checks, and judge quorum helpers.
@@ -72,6 +74,7 @@ import { createScope, flow, typed } from "@pumped-fn/lite"
 import {
   events,
   agent,
+  model,
   skill,
   sub,
   tool,
@@ -97,7 +100,7 @@ const summarizeModel: Model = {
 
 const summarize = agent({
   name: "summarize-ticket",
-  model: summarizeModel,
+  tags: [model(summarizeModel)],
   instructions: "Summarize the ticket context.",
 })
 
@@ -121,7 +124,7 @@ const triageModel: Model = {
 
 const triage = agent({
   name: "triage-ticket",
-  model: triageModel,
+  tags: [model(triageModel)],
   instructions: "Triage tickets with tools and delegated summaries.",
   skills: [
     skill({
@@ -147,7 +150,7 @@ await ctx.close()
 await scope.dispose()
 ```
 
-`result.toolResults`, `result.subagentResults`, and `trace.events` are deterministic inspection surfaces. Tests can preset or fake the model provider without module mocks.
+`result.toolResults`, `result.subagentResults`, and `trace.events` are deterministic inspection surfaces. Tests can set a default model with scope tags, define one on the agent flow, or override one turn with exec tags without module mocks.
 
 ## Sessions
 
@@ -425,7 +428,7 @@ const testScope = createScope({
 The CLI helpers are convenience adapters. Harnesses turn the popular local CLIs into `Model` providers for `agent()`.
 
 ```ts
-import { claudeHarness, claudeCliWorker, codexHarness, codexCliWorker, guard } from "@pumped-fn/agent-sdk"
+import { claudeHarness, claudeCliWorker, codexHarness, codexCliWorker, guard, model } from "@pumped-fn/agent-sdk"
 
 const codex = codexCliWorker({ name: "codex-review", sandbox: "workspace-write" })
 const claude = claudeCliWorker({ name: "claude-plan" })
@@ -433,19 +436,23 @@ const shared = guard("review-guard")
 
 const reviewer = agent({
   name: "reviewer",
-  model: codexHarness({
-    sandbox: "read-only",
-    guard: shared,
-    timeoutMs: 120_000,
-  }),
+  tags: [
+    model(codexHarness({
+      sandbox: "read-only",
+      guard: shared,
+      timeoutMs: 120_000,
+    })),
+  ],
 })
 
 const planner = agent({
   name: "planner",
-  model: claudeHarness({
-    guard: shared,
-    timeoutMs: 120_000,
-  }),
+  tags: [
+    model(claudeHarness({
+      guard: shared,
+      timeoutMs: 120_000,
+    })),
+  ],
 })
 ```
 

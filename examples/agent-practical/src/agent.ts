@@ -6,6 +6,7 @@ import {
   includes,
   inspect,
   judge,
+  model as agentModel,
   runEval,
   sandbox,
   schedule,
@@ -53,13 +54,13 @@ const summarizeModel: Model = {
 
 const summarize = agent({
   name: "summarize",
-  model: summarizeModel,
+  tags: [agentModel(summarizeModel)],
 })
 
-export function triage(model: Model) {
+export function triage(provider: Model) {
   return agent({
     name: "triage",
-    model,
+    tags: [agentModel(provider)],
     instructions: "Triage support tickets with tools, skills, and delegated summaries.",
     skills: [
       skill({
