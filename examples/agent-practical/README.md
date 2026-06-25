@@ -10,6 +10,8 @@ It proves:
 - continuing `session()` material
 - eval `summary()` artifact with two judges
 - sandbox swap through the `sandbox` tag
+- lazy Codex and Claude provider packages swapped through the `model` tag
+- just-bash workspace sandbox swapped through the `sandbox` tag
 
 Run it:
 

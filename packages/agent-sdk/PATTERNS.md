@@ -320,34 +320,25 @@ const scope = createScope({
 
 ## 10. CLI Worker Adapter
 
-Use CLI helpers when the runtime must call real local tools like Claude or Codex. Use harnesses when those tools should act as the agent model provider.
+Use provider packages when the runtime must call real local tools like Claude or Codex as the agent model provider. Keep the agent graph provider-free and choose the provider with scope or context tags.
 
 ```ts
-const review = codexCliWorker({
-  name: "codex-review",
-  sandbox: "workspace-write",
-  isolate: { network: true },
-  timeoutMs: 120_000,
-})
-
-const plan = claudeCliWorker({
-  name: "claude-plan",
-  isolate: { network: true },
-  timeoutMs: 120_000,
-})
+import { createScope } from "@pumped-fn/lite"
+import { agent, guard, model } from "@pumped-fn/agent-sdk"
+import { claude } from "@pumped-fn/agent-sdk-claude"
+import { codex } from "@pumped-fn/agent-sdk-codex"
 
 const shared = guard("review-guard")
 
 const reviewer = agent({
   name: "reviewer",
-  tags: [model(codexHarness({ sandbox: "read-only", guard: shared }))],
 })
 
-const planner = agent({
-  name: "planner",
-  tags: [model(claudeHarness({ guard: shared }))],
-})
+const codexScope = createScope({ tags: [codex({ sandbox: "read-only", guard: shared })] })
+const claudeScope = createScope({ tags: [claude({ guard: shared })] })
 ```
+
+`codex()` and `claude()` are lazy `model` tags. Tagging a scope is configuration only; the CLI harness is built on first model use. Replace either provider with `model(fake)` at the same seam for tests.
 
 `codexHarness()` runs `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` runs `claude -p --no-session-persistence` and rejects `--bare`. Harness prompts request JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first value collected from a run is kept in material state and injected into later prompts.
 

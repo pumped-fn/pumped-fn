@@ -14,6 +14,9 @@
     "typeRoots": ["./node_modules/@types", "../../packages/lite/node_modules/@types"],
     "paths": {
       "@pumped-fn/agent-sdk": ["../../packages/agent-sdk/src/index.ts"],
+      "@pumped-fn/agent-sdk-claude": ["../../packages/agent-sdk-claude/src/index.ts"],
+      "@pumped-fn/agent-sdk-codex": ["../../packages/agent-sdk-codex/src/index.ts"],
+      "@pumped-fn/agent-sdk-just-bash": ["../../packages/agent-sdk-just-bash/src/index.ts"],
       "@pumped-fn/agent-sdk-test": ["../../packages/agent-sdk-test/src/index.ts"],
       "@pumped-fn/lite-extension-suspense": ["../../packages/lite-extension-suspense/src/index.ts"],
       "@pumped-fn/lite": ["../../packages/lite/src/index.ts"]

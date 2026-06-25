@@ -9,6 +9,9 @@
   },
   "dependencies": {
     "@pumped-fn/agent-sdk": "workspace:*",
+    "@pumped-fn/agent-sdk-claude": "workspace:*",
+    "@pumped-fn/agent-sdk-codex": "workspace:*",
+    "@pumped-fn/agent-sdk-just-bash": "workspace:*",
     "@pumped-fn/agent-sdk-test": "workspace:*",
     "@pumped-fn/lite": "workspace:*"
   },

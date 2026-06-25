@@ -430,36 +430,34 @@ const testScope = createScope({
 })
 ```
 
-The CLI helpers are convenience adapters. Harnesses turn the popular local CLIs into `Model` providers for `agent()`.
+The CLI helpers are convenience adapters. Harnesses turn popular local CLIs into `Model` providers for `agent()`. Application composition should usually use the provider packages so the core SDK stays transport-neutral and the model is swappable at the scope seam.
 
 ```ts
-import { claudeHarness, claudeCliWorker, codexHarness, codexCliWorker, guard, model } from "@pumped-fn/agent-sdk"
+import { createScope } from "@pumped-fn/lite"
+import { agent, guard } from "@pumped-fn/agent-sdk"
+import { claude } from "@pumped-fn/agent-sdk-claude"
+import { codex } from "@pumped-fn/agent-sdk-codex"
 
-const codex = codexCliWorker({ name: "codex-review", sandbox: "workspace-write" })
-const claude = claudeCliWorker({ name: "claude-plan" })
 const shared = guard("review-guard")
 
 const reviewer = agent({
   name: "reviewer",
+})
+
+const scope = createScope({
   tags: [
-    model(codexHarness({
+    codex({
       sandbox: "read-only",
       guard: shared,
       timeoutMs: 120_000,
-    })),
+    }),
   ],
 })
 
-const planner = agent({
-  name: "planner",
-  tags: [
-    model(claudeHarness({
-      guard: shared,
-      timeoutMs: 120_000,
-    })),
-  ],
-})
+const otherScope = createScope({ tags: [claude({ guard: shared })] })
 ```
+
+`@pumped-fn/agent-sdk-codex` and `@pumped-fn/agent-sdk-claude` return lazy `model` tags. Tagging a scope does not create the CLI harness; first model use does. Replace them with each other or `model(fake)` at `createScope` or `createContext` without changing the agent graph.
 
 `codexHarness()` uses `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` uses `claude -p --no-session-persistence` and rejects `--bare`; pass explicit `extraArgs` for other CLI flags. The default prompt asks for JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first non-empty value is stored in material state and injected into later prompts. Pass a shared `guard("name")` atom when multiple harnesses should see the same anti-goal.
 

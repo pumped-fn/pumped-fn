@@ -1,4 +1,7 @@
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
+import { claude, type ClaudeOptions } from "@pumped-fn/agent-sdk-claude"
+import { codex, type CodexOptions } from "@pumped-fn/agent-sdk-codex"
+import { sandbox as bash } from "@pumped-fn/agent-sdk-just-bash"
 import {
   agent,
   events,
@@ -43,42 +46,36 @@ const readWorkspace = tool({
   }),
 })
 
-const summarizeModel: Model = {
-  complete: (_ctx, request) => ({
-    content: `summary:${request.messages.at(-1)?.content ?? ""}`,
-    stop: true,
-  }),
-}
-
 const summarize = agent({
   name: "summarize",
-  tags: [agentModel(summarizeModel)],
 })
 
-export function triage(provider: Model) {
-  return agent({
-    name: "triage",
-    tags: [agentModel(provider)],
-    instructions: "Triage support tickets with tools, skills, and delegated summaries.",
-    skills: [
-      skill({
-        name: "policy",
-        description: "Ticket routing policy.",
-        content: "Escalate unclear incidents.",
-      }),
-    ],
-    tools: [loadTicket, readWorkspace],
-    subagents: [
-      sub({
-        description: "Summarizes ticket context.",
-        agent: summarize,
-      }),
-    ],
-  })
-}
+export const triage = agent({
+  name: "triage",
+  instructions: "Triage support tickets with tools, skills, and delegated summaries.",
+  skills: [
+    skill({
+      name: "policy",
+      description: "Ticket routing policy.",
+      content: "Escalate unclear incidents.",
+    }),
+  ],
+  tools: [loadTicket, readWorkspace],
+  subagents: [
+    sub({
+      description: "Summarizes ticket context.",
+      agent: summarize,
+    }),
+  ],
+})
 
 export const model: Model = {
-  complete: (_ctx, request) => request.loadedSkills.length === 0
+  complete: (_ctx, request) => request.agentName === "summarize"
+    ? {
+        content: `summary:${request.messages.at(-1)?.content ?? ""}`,
+        stop: true,
+      }
+    : request.loadedSkills.length === 0
     ? {
         content: "loading policy",
         skillCalls: [{ name: "policy" }],
@@ -108,18 +105,26 @@ export const local = sandbox({
   }),
 })
 
-export async function runLocal() {
-  const target = triage(model)
+export const workspace = bash({
+  options: {
+    files: {
+      "/workspace/README.md": "file:README.md",
+    },
+    cwd: "/workspace",
+  },
+})
+
+export async function runLocal(provider = agentModel(model), environment = local) {
   const { extensions, log } = kit()
   const scope = createScope({
     extensions,
-    tags: [local],
+    tags: [environment, provider],
   })
   const ctx = scope.createContext({
     tags: [workflowRun({ taskId: "ticket-42", runId: "run-1" })],
   })
   const result = await ctx.exec({
-    flow: target.turn,
+    flow: triage.turn,
     input: { prompt: "triage ticket 42" },
   })
   const trace = await ctx.resolve(events)
@@ -129,23 +134,30 @@ export async function runLocal() {
   return { result, trace: trace.events, run }
 }
 
-export async function runThread() {
-  const target = triage(model)
-  const scope = createScope({ tags: [local] })
+export function runCodex(options: CodexOptions = {}) {
+  return runLocal(codex(options), workspace)
+}
+
+export function runClaude(options: ClaudeOptions = {}) {
+  return runLocal(claude(options), workspace)
+}
+
+export async function runThread(provider = agentModel(model), environment = local) {
+  const scope = createScope({ tags: [environment, provider] })
   const ctx = scope.createContext()
   const thread = session("support-thread")
-  await send(ctx, thread, target, { prompt: "one" })
-  const result = await send(ctx, thread, target, { prompt: "two" })
+  await send(ctx, thread, triage, { prompt: "one" })
+  const result = await send(ctx, thread, triage, { prompt: "two" })
   const state = ctx.scope.controller(thread).get().state
   await ctx.close()
   await scope.dispose()
   return { result, state }
 }
 
-export async function runHttp() {
-  const scope = createScope({ tags: [local] })
+export async function runHttp(provider = agentModel(model), environment = local) {
+  const scope = createScope({ tags: [environment, provider] })
   const ctx = scope.createContext()
-  const handle = http({ agent: triage(model) })
+  const handle = http({ agent: triage })
   const response = await ctx.exec({
     flow: handle,
     input: new Request("https://agent.local/run", {
@@ -159,8 +171,7 @@ export async function runHttp() {
   return body
 }
 
-export async function runSuite(targetLog?: RunLog) {
-  const target = triage(model)
+export async function runSuite(targetLog?: RunLog, provider = agentModel(model), environment = local) {
   const accepts = judge({
     name: "accepts",
     evaluate: () => ({ name: "accepts", passed: true, score: 1 }),
@@ -171,7 +182,7 @@ export async function runSuite(targetLog?: RunLog) {
   })
   const evaluation = suite({
     name: "triage",
-    agent: target,
+    agent: triage,
     cases: [
       {
         name: "uses tools and answers",
@@ -182,7 +193,7 @@ export async function runSuite(targetLog?: RunLog) {
     judges: [accepts, grounded],
   })
   const { extensions } = kit({ log: targetLog })
-  const scope = createScope({ extensions, tags: [local] })
+  const scope = createScope({ extensions, tags: [environment, provider] })
   const ctx = scope.createContext()
   const report = await runEval(ctx, evaluation)
   await ctx.close()
@@ -192,6 +203,6 @@ export async function runSuite(targetLog?: RunLog) {
 
 export const daily = schedule({
   name: "daily-triage",
-  agent: triage(model),
+  agent: triage,
   input: () => ({ prompt: "triage daily queue" }),
 })

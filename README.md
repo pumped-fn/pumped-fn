@@ -46,6 +46,9 @@ Extensions wrap execution. React is an observer layer.
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
 | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
 | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
+| `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
+| `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
+| `@pumped-fn/agent-sdk-just-bash` | Lazy just-bash sandbox provider tag for agent-sdk |
 | `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
 | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
@@ -70,7 +73,7 @@ execution context
         |
         v
 agent workflow
-  model provider atom/service
+  model and sandbox providers as tags
   tools and subagents as ctx.exec flow steps
   events as a boundary resource
 ```
