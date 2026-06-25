@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-suspense",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": false,
   "description": "Replay and suspend extension for @pumped-fn/lite",
   "type": "module",
