@@ -42,7 +42,6 @@ import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
   eventLog,
   extension,
-  runtime,
   step,
   workflow as workflowRuntime,
   workflowExtension,
@@ -61,15 +60,18 @@ export const processPr = flow({
   ],
   deps: {
     workflow: tags.required(workflowRuntime),
-    runtime: tags.required(runtime),
+    workers: tags.required(workers),
   },
-  factory: async (ctx, { workflow, runtime }) => {
-    const lintResult = await runtime.delegate<{ failed: boolean }>("lint", { sha: ctx.input.sha })
+  factory: async (ctx, { workflow, workers }) => {
+    const lintResult = await ctx.exec({
+      flow: workers.get<{ failed: boolean }, { sha: string }>("lint"),
+      input: { sha: ctx.input.sha },
+    })
     if (lintResult.failed) return { taskId: workflow.taskId, status: "lint-failed" }
 
     const [tests, security] = await Promise.all([
-      runtime.delegate("test", { sha: ctx.input.sha }),
-      runtime.delegate("security", { sha: ctx.input.sha }),
+      ctx.exec({ flow: workers.get("test"), input: { sha: ctx.input.sha } }),
+      ctx.exec({ flow: workers.get("security"), input: { sha: ctx.input.sha } }),
     ])
 
     return { taskId: workflow.taskId, status: "ok", tests, security }
@@ -94,9 +96,9 @@ export async function runProcessPr(input: PrEvent, log: RunLog) {
 }
 ```
 
-Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `runtime.delegate()`.
+Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind explicit `ctx.exec()` calls.
 
-`step({ workflow: true })` marks the flow as workflow policy surface. `workflowRun()` is a context tag for run metadata, passed through `createContext({ tags: [...] })`. `workflow` and `runtime` tags are required deps, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition.
+`step({ workflow: true })` marks the flow as workflow policy surface. `workflowRun()` is a context tag for run metadata, passed through `createContext({ tags: [...] })`. `workflow` and `workers` tags are required deps, so missing run metadata or worker registration fails before the factory runs. Event-log policy and remote routing stay normal extension composition.
 
 ## 2. Worker Flow
 
@@ -280,7 +282,7 @@ const daily = schedule({
 })
 ```
 
-Why: Slack, HTTP, cron, queues, and CLIs stay adapters. The agent runtime still sees a flow input and a scoped execution context.
+Why: Slack, HTTP, cron, queues, and CLIs stay adapters. The agent turn still sees a flow input and a scoped execution context.
 
 ## 8. Sessions
 
@@ -326,7 +328,7 @@ const scope = createScope({
 
 ## 10. CLI Worker Adapter
 
-Use CLI helpers when the runtime must call real local tools like Claude or Codex. Use harnesses when those tools should act as the agent model provider.
+Use CLI helpers when the edge must call real local tools like Claude or Codex. Use harnesses when those tools should act as the agent model provider.
 
 ```ts
 const review = codexCliWorker({

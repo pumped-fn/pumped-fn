@@ -37,14 +37,14 @@ flowchart TD
 
 ## What Is In This Package
 
-- `workflow` runtime tag for workflow-scoped deps.
+- `workflow` tag for workflow-scoped deps.
 - `workflowExtension()` for replay, suspend, timeout, and event-log policy.
 - `extension()` for agent remote dispatch.
 - `step()` config: `workflow`, `remote`, `durable`, `kind`, `timeoutMs`.
 - `workflowRun()` context tag for workflow-scoped run data.
 - `abortSignal` tag for cooperative timeout cancellation.
-- `runtime` tag for named worker delegation.
-- `WorkerRegistry` for named worker calls through `runtime.delegate()`.
+- `workers` tag for named worker lookup.
+- `WorkerRegistry` for named worker calls executed through `ctx.exec()`.
 - `agent()`, `tool()`, `skill()`, and `sub()` for an agent application surface over lite.
 - `skillCalls` and `loadedSkills` for on-demand skill content.
 - `agent.turn` flow for model rounds that execute tools and subagents through `ctx.exec()`.
@@ -337,7 +337,6 @@ First run writes a pending entry and throws `SuspendSignal`. A resolver writes t
 ```ts
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
-  runtime,
   extension,
   workflowRun,
   workflow as workflowRuntime,
@@ -363,11 +362,12 @@ const processIssue = flow({
   ],
   deps: {
     workflow: tags.required(workflowRuntime),
-    runtime: tags.required(runtime),
+    workers: tags.required(workers),
   },
-  factory: async (ctx, { workflow, runtime }) => {
-    const summary = await runtime.delegate<string, { text: string }>("summarize", {
-      text: ctx.input.body,
+  factory: async (ctx, { workflow, workers }) => {
+    const summary = await ctx.exec({
+      flow: workers.get<string, { text: string }>("summarize"),
+      input: { text: ctx.input.body },
     })
     return { taskId: workflow.taskId, summary }
   },
@@ -391,7 +391,7 @@ const ctx = scope.createContext({
 const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 ```
 
-`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. `runtime.delegate()` is just `ctx.exec({ flow, input })` plus a registry lookup. Supply that registry through a `workers(registry)` flow or context tag. `workflow` and `runtime` are required deps; if the matching extension is missing, dependency resolution fails before the factory runs.
+`workflowRun()` is a tag and belongs in `createContext({ tags: [...] })`. Supply named workers through a `workers(registry)` flow or context tag, then execute the selected worker with `ctx.exec({ flow, input })`. `workflow` and `workers` are required deps, so missing run metadata or worker registration fails before the factory runs.
 
 ## AI Is Just A Provider
 
@@ -521,4 +521,4 @@ const scope = createScope({
 })
 ```
 
-Use `extensions` in `createScope({ extensions })`. This keeps tests fast and proves the same extension contract a NATS-backed runtime will use.
+Use `extensions` in `createScope({ extensions })`. This keeps tests fast and proves the same extension contract a NATS-backed adapter will use.

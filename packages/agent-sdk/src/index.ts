@@ -3,7 +3,6 @@ import {
   abortSignal,
   activeWorkflowEvent,
   step,
-  workflow,
   type Step,
   type WorkflowEventLog,
   type WorkflowStepEntry,
@@ -79,10 +78,10 @@ export class WorkerRegistry {
     return this
   }
 
-  get(name: string): WorkerFlow {
+  get<Output = unknown, Input = unknown>(name: string): Lite.Flow<Output, Input> {
     const found = this.flows.get(name)
     if (!found) throw new Error(`Worker "${name}" not registered`)
-    return found
+    return found as Lite.Flow<Output, Input>
   }
 
   list(): string[] {
@@ -96,35 +95,14 @@ export function workerRegistry(flows: readonly WorkerFlow[] = []): WorkerRegistr
   return registry
 }
 
-export interface Runtime {
-  readonly taskId: string
-  readonly runId: string
-  delegate<Output = unknown, Input = unknown>(name: string, input: Input): Promise<Output>
-}
-
-export const runtime = tag<Runtime>({ label: "agent.runtime" })
-
-async function delegateWorker<Output = unknown, Input = unknown>(
-  ctx: Lite.ExecutionContext,
-  name: string,
-  input: Input
-): Promise<Output> {
-  const registry = registryOf(ctx)
-  if (!registry) throw new Error("Worker registry not found")
-  const target = registry.get(name) as Lite.Flow<Output, Input>
-  return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
-}
-
 export function extension(options: ExtensionOptions = {}): Lite.Extension {
   return {
     name: "agent-sdk",
     async wrapExec(next, target, ctx) {
-      return withRuntimeTag(ctx, runtime, runtimeOf(ctx), async () => {
-        if (stepOf(target, ctx).remote !== true) return next()
-        const runner = ctx.data.seekTag(remoteRunner) ?? options.remoteRunner
-        if (!runner) throw new Error("Remote step requires remoteRunner")
-        return runner.run(execEvent(target, ctx), next)
-      })
+      if (stepOf(target, ctx).remote !== true) return next()
+      const runner = ctx.data.seekTag(remoteRunner) ?? options.remoteRunner
+      if (!runner) throw new Error("Remote step requires remoteRunner")
+      return runner.run(execEvent(target, ctx), next)
     },
   }
 }
@@ -141,32 +119,6 @@ function execEvent(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): ExecEve
     targetName: targetNameOf(target, ctx),
     input: ctx.input,
   }
-}
-
-function runtimeOf(ctx: Lite.ExecutionContext): Runtime {
-  const config = ctx.data.seekTag(workflow)
-  if (!config) throw new Error("agent extension requires workflow extension")
-  return {
-    taskId: config.taskId,
-    runId: config.runId,
-    delegate: <Output = unknown, Input = unknown>(name: string, input: Input) =>
-      delegateWorker<Output, Input>(ctx, name, input),
-  }
-}
-
-function withRuntimeTag<T, R>(
-  ctx: Lite.ExecutionContext,
-  runtimeTag: Lite.Tag<T, boolean>,
-  value: T,
-  next: () => Promise<R>
-): Promise<R> {
-  const hadPrevious = ctx.data.hasTag(runtimeTag)
-  const previous = ctx.data.getTag(runtimeTag)
-  ctx.data.setTag(runtimeTag, value)
-  return next().finally(() => {
-    if (hadPrevious) ctx.data.setTag(runtimeTag, previous as T)
-    else ctx.data.deleteTag(runtimeTag)
-  })
 }
 
 function targetNameOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): string {
