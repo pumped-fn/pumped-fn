@@ -1,13 +1,13 @@
 # Agent SDK Patterns
 
-Use this package as a small agent convention layer over `@pumped-fn/lite` and `@pumped-fn/lite-extension-workflow`. If a use case can be expressed with `flow`, state/service, tags, and `ctx.exec`, do that before adding another primitive.
+Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, state/service, tags, and `ctx.exec`, do that before adding another primitive.
 
 ## 0. Standalone Suspense
 
 Use suspense when the system needs deterministic replay or external resolution, but not agents, workers, or remote routing.
 
 ```ts
-import { eventLog, extension, runId, stepCounter, suspend, taskId } from "@pumped-fn/lite-extension-suspense"
+import { extension, runId, stepCounter, suspend, taskId } from "@pumped-fn/lite-extension-suspense"
 
 const waitForCommit = flow({
   name: "wait-for-commit",
@@ -19,8 +19,7 @@ const waitForCommit = flow({
 })
 
 const scope = createScope({
-  tags: [eventLog(log)],
-  extensions: [extension()],
+  extensions: [extension({ log })],
 })
 
 const ctx = scope.createContext({
@@ -32,7 +31,7 @@ const ctx = scope.createContext({
 })
 ```
 
-Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, records failed entries when the log supports `putFailed()`, and throws `SuspendSignal`. Reusable workflow policy lives in `@pumped-fn/lite-extension-workflow` units over this lower extension.
+Suspense has no agent knowledge. It sees tagged `ctx.exec` calls, assigns `(taskId, runId, step)`, returns completed/resolved log entries, writes pending entries for suspended steps, and throws `SuspendSignal`.
 
 ## 1. Workflow Flow
 
@@ -41,14 +40,17 @@ Use a workflow flow when code chooses order, branching, retries, and fan-out.
 ```ts
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
-  agent as agentRuntime,
+  eventLog,
+  extension,
+  runtime,
   step,
   workflow as workflowRuntime,
+  workflowExtension,
   workflowRun,
   workerRegistry,
   workers,
+  type RunLog,
 } from "@pumped-fn/agent-sdk"
-import { agent as testAgent } from "@pumped-fn/agent-sdk-test"
 
 export const processPr = flow({
   name: "process_pr",
@@ -59,24 +61,26 @@ export const processPr = flow({
   ],
   deps: {
     workflow: tags.required(workflowRuntime),
-    agent: tags.required(agentRuntime),
+    runtime: tags.required(runtime),
   },
-  factory: async (ctx, { workflow, agent }) => {
-    const lintResult = await agent.delegate<{ failed: boolean }>("lint", { sha: ctx.input.sha })
+  factory: async (ctx, { workflow, runtime }) => {
+    const lintResult = await runtime.delegate<{ failed: boolean }>("lint", { sha: ctx.input.sha })
     if (lintResult.failed) return { taskId: workflow.taskId, status: "lint-failed" }
 
     const [tests, security] = await Promise.all([
-      agent.delegate("test", { sha: ctx.input.sha }),
-      agent.delegate("security", { sha: ctx.input.sha }),
+      runtime.delegate("test", { sha: ctx.input.sha }),
+      runtime.delegate("security", { sha: ctx.input.sha }),
     ])
 
     return { taskId: workflow.taskId, status: "ok", tests, security }
   },
 })
 
-export async function runProcessPr(input: PrEvent) {
-  const { extensions, tags: scopeTags } = testAgent()
-  const scope = createScope({ tags: scopeTags, extensions })
+export async function runProcessPr(input: PrEvent, log: RunLog) {
+  const scope = createScope({
+    extensions: [workflowExtension(), extension()],
+    tags: [eventLog(log)],
+  })
   const ctx = scope.createContext({
     tags: [workflowRun({ taskId: input.sha, runId: "run-1" })],
   })
@@ -90,28 +94,9 @@ export async function runProcessPr(input: PrEvent) {
 }
 ```
 
-Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `agent.delegate()`.
+Why: normal TypeScript control flow stays visible. Replay still works because expensive work is behind `ctx.exec()` through `runtime.delegate()`.
 
-`step({ workflow: true })` marks the flow as workflow policy surface. `workflowRun()` is a context tag for run metadata, passed through `createContext({ tags: [...] })`. Workflow execution requires that tag or `runDefaults()`/explicit extension defaults; missing run identity is rejected before a default log key can collide across runs. `workflow` and `agent` runtime tags are required deps when using the full `workflowExtension()`, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition tags.
-
-When a runtime only needs the workflow mechanics, use the composable unit path instead of the full convenience extension:
-
-```ts
-import { extension as suspenseExtension } from "@pumped-fn/lite-extension-suspense"
-import { eventLog, units, workflowExtensionUnits } from "@pumped-fn/lite-extension-workflow"
-
-createScope({
-  tags: [
-    eventLog(log),
-    units(workflowExtensionUnits()),
-  ],
-  extensions: [suspenseExtension({
-    name: "workflow",
-  })],
-})
-```
-
-That path gives replay, stable keys, durable pending entries, and timer policy without installing agent runtime tags. `units()` entries are prepended to extension units; use the bare suspense extension for this composition path so the workflow unit stack is installed exactly once.
+`step({ workflow: true })` marks the flow as workflow policy surface. `workflowRun()` is a context tag for run metadata, passed through `createContext({ tags: [...] })`. `workflow` and `runtime` tags are required deps, so missing extensions fail before the factory runs. Event-log policy and remote routing stay normal extension composition.
 
 ## 2. Worker Flow
 
@@ -126,7 +111,7 @@ export const lint = flow({
 })
 ```
 
-`remote: true` means the extension may route it to a worker runner. Remote workers are still workflow steps, so a completed remote result is written before a later durable suspend can replay the parent flow. Without a remote runner, the default test helper runs it locally through `next()`.
+`remote: true` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
 
 ## 3. LLM Provider
 
@@ -171,26 +156,209 @@ const scope = createScope({
 })
 ```
 
-## 4. CLI Worker Adapter
+## 4. Agent Application
 
-Use CLI helpers when the runtime must call real local tools like Claude or Codex.
+Use `agent()` when the model should choose tools or delegate to another role. Keep the executable work as flows, and keep the model as a provider that can be tagged or faked.
+
+```ts
+const loadTicket = tool({
+  description: "Load ticket details.",
+  flow: flow({
+    name: "load-ticket",
+    parse: typed<{ id: string }>(),
+    factory: (ctx) => ({ id: ctx.input.id, title: `ticket:${ctx.input.id}` }),
+  }),
+})
+
+const provider: Model = {
+  complete: (_ctx, request) => request.loadedSkills.length === 0
+    ? {
+        content: "need routing policy",
+        skillCalls: [{ name: "routing-policy" }],
+      }
+    : request.round === 1
+    ? {
+        content: "loading",
+        toolCalls: [{ name: "load-ticket", input: { id: "42" } }],
+      }
+    : {
+        content: "ready",
+        stop: true,
+      },
+}
+
+const triage = agent({
+  name: "triage",
+  tags: [model(provider)],
+  skills: [
+    skill({
+      name: "routing-policy",
+      description: "Support routing rules.",
+      content: "Route billing tickets to support.",
+    }),
+  ],
+  tools: [loadTicket],
+})
+
+const result = await ctx.exec({
+  flow: triage.turn,
+  input: { prompt: "triage ticket 42" },
+})
+```
+
+Why: tools and subagent turns still run through `ctx.exec()`, so the same workflow extension can replay, suspend, route, or time out the work. `events` is a boundary resource, so run inspection is testable without a global observer.
+
+## 5. Agent Evals
+
+Use deterministic checks for exact requirements and judges for qualitative requirements. A subjective eval with exactly one judge is rejected.
+
+```ts
+const accepts = judge({
+  name: "accepts",
+  evaluate: () => ({ name: "accepts", passed: true }),
+})
+
+const grounded = judge({
+  name: "grounded",
+  evaluate: () => ({ name: "grounded", passed: true }),
+})
+
+const evaluation = suite({
+  name: "triage-quality",
+  agent: triage,
+  cases: [
+    {
+      name: "uses the loader",
+      input: { prompt: "triage ticket 42" },
+      checks: [used("load-ticket"), includes("ready")],
+    },
+  ],
+  judges: [accepts, grounded],
+})
+
+const report = await runEval(ctx, evaluation)
+const artifact = summary(report)
+```
+
+## 6. Run Inspection And HTTP
+
+Use `inspect()` against a `RunLog` to read workflow steps by `(taskId, runId)`.
+
+```ts
+const run = await inspect(log, { taskId: "triage-42", runId: "run-1" })
+```
+
+Use `http()` to adapt a Fetch request to an agent turn without adding a server framework dependency.
+
+```ts
+const handle = http({ agent: triage })
+const response = await ctx.exec({
+  flow: handle,
+  input: new Request("https://agent.local/run", {
+    method: "POST",
+    body: JSON.stringify({ prompt: "triage ticket 42" }),
+  }),
+})
+```
+
+## 7. Channels and Schedules
+
+Use channel and schedule flows at the boundary. They should translate external shape into `TurnInput`, then let the agent turn own model/tool/subagent execution.
+
+```ts
+const slack = channel({
+  name: "slack-message",
+  parse: typed<{ text: string }>(),
+  agent: triage,
+  input: (ctx) => ({ prompt: ctx.input.text }),
+})
+
+const daily = schedule({
+  name: "daily-digest",
+  agent: triage,
+  input: () => ({ prompt: "daily digest" }),
+})
+```
+
+Why: Slack, HTTP, cron, queues, and CLIs stay adapters. The agent runtime still sees a flow input and a scoped execution context.
+
+## 8. Sessions
+
+Use `session()` for continuing message history. It is a material, so it uses the same patch and revision behavior as other task state.
+
+```ts
+const thread = session("support-session")
+
+await send(ctx, thread, triage, { prompt: "triage ticket 42" })
+await send(ctx, thread, triage, { prompt: "summarize the route" })
+```
+
+## 9. Sandbox Capability
+
+Use `sandbox` as an injected capability, not as a global file or process API.
+
+```ts
+const readWorkspace = tool({
+  description: "Read a file from the workspace.",
+  flow: flow({
+    name: "read-workspace",
+    parse: typed<{ path: string }>(),
+    deps: { sandbox: tags.required(sandbox) },
+    factory: (ctx, deps) => deps.sandbox.readFile(ctx.input.path),
+  }),
+})
+
+const scope = createScope({
+  tags: [
+    sandbox({
+      readFile: (path) => `file:${path}`,
+      writeFile: () => undefined,
+      exec: (command, args = []) => ({
+        stdout: [command, ...args].join(" "),
+        stderr: "",
+        exitCode: 0,
+      }),
+    }),
+  ],
+})
+```
+
+## 10. CLI Worker Adapter
+
+Use CLI helpers when the runtime must call real local tools like Claude or Codex. Use harnesses when those tools should act as the agent model provider.
 
 ```ts
 const review = codexCliWorker({
   name: "codex-review",
   sandbox: "workspace-write",
+  isolate: { network: true },
   timeoutMs: 120_000,
 })
 
 const plan = claudeCliWorker({
   name: "claude-plan",
+  isolate: { network: true },
   timeoutMs: 120_000,
+})
+
+const shared = guard("review-guard")
+
+const reviewer = agent({
+  name: "reviewer",
+  tags: [model(codexHarness({ sandbox: "read-only", guard: shared }))],
+})
+
+const planner = agent({
+  name: "planner",
+  tags: [model(claudeHarness({ guard: shared }))],
 })
 ```
 
-Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
+`codexHarness()` runs `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` runs `claude -p --no-session-persistence` and rejects `--bare`. Harness prompts request JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first value collected from a run is kept in material state and injected into later prompts.
 
-## 5. Durable Step
+Harnesses default to bwrap isolation with network enabled. The default sandbox mounts only the workspace, temporary home, minimal runtime/cert/DNS paths, and explicit credential directories such as `codexHome`. Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
+
+## 11. Durable Step
 
 Use `step({ durable: true })` for a step that should suspend until another process resolves it.
 
@@ -205,33 +373,31 @@ const approve = flow({
 })
 ```
 
-First run writes a pending log entry and throws `SuspendSignal`. Replay returns the resolved value and continues. A propagated `SuspendSignal` is pending work, not a failed parent workflow.
+First run writes a pending log entry and throws `SuspendSignal`. Replay returns the resolved value and continues.
 
-## 6. Remote Runner
+## 12. Remote Runner
 
-Remote routing belongs in `AgentRemoteRunner`, not inside workflow code.
+Remote routing belongs in `RemoteRunner`, not inside workflow code.
 
 ```ts
 const scope = createScope({
-  tags: [
-    eventLog(log),
-    remoteRunner({
-      run: async (event, next) => {
-        if (canRoute(event.target)) return publishAndAwaitReply(event)
-        return next()
+  extensions: [
+    workflowExtension({ log }),
+    extension({
+      remoteRunner: {
+        run: async (event, next) => {
+          if (canRoute(event.target)) return publishAndAwaitReply(event)
+          return next()
+        },
       },
     }),
-  ],
-  extensions: [
-    workflowExtension(),
-    extension(),
   ],
 })
 ```
 
 The runner may short-circuit before worker dependencies resolve. If it calls `next()`, the worker runs locally.
 
-## 7. Materials
+## 13. Materials
 
 Use materials for task state the workflow or workers must patch.
 
@@ -254,14 +420,14 @@ const count = derivedMaterial("inventory-count", inventory, (state) => state.ite
 })
 ```
 
-## 8. Event Log Boundary
+## 14. Event Log Boundary
 
-The event log key is `(taskId, runId, step)`. The step increments in standalone suspense `wrapExec`; `workflowExtension()` from `@pumped-fn/lite-extension-workflow` composes that lower layer. Use `step({ key: "stable-name" })` for branches whose idempotency cannot depend on positional order.
+The event log key is `(taskId, runId, step)`. The step increments in standalone suspense `wrapExec`; `workflowExtension()` composes that lower layer.
 
 ```mermaid
 sequenceDiagram
   participant W as Workflow
-  participant E as Workflow extension
+  participant E as Agent extension
   participant L as Event log
 
   W->>E: ctx.exec(flow)
@@ -269,9 +435,6 @@ sequenceDiagram
   alt completed
     L-->>E: result
     E-->>W: cached result
-  else failed
-    L-->>E: error record
-    E--xW: SuspenseFailureSignal
   else absent local
     E->>W: next()
     W-->>E: result
@@ -282,7 +445,7 @@ sequenceDiagram
   end
 ```
 
-Because lite wraps the full executable step, cached replay and remote routing skip both dependency resolution and factory execution. Logs can optionally expose `list()` for dashboards and `observer()` can stream lifecycle events without changing workflow code.
+Because lite wraps the full executable step, cached replay and remote routing skip both dependency resolution and factory execution.
 
 ## 9. Failure Ownership
 
@@ -290,11 +453,9 @@ Because lite wraps the full executable step, cached replay and remote routing sk
 |---|---|
 | Parse error | Flow boundary |
 | Missing worker | `WorkerRegistry` / caller setup |
-| Missing workflow run identity | Workflow extension setup |
 | CLI exit or timeout | `cliWorker()` |
 | Material revision mismatch | Material writer |
 | Pending durable step | Resolver / event log |
-| Failed replayed step | Event log |
 | Replay mismatch | Workflow determinism and event log |
 
 Tests should prove the owning layer. Do not hide a missing dependency by adding a broad fake runner. Make the fake prove the exact behavior under test.

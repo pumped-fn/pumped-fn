@@ -1,8 +1,8 @@
 {
   "name": "@pumped-fn/agent-sdk",
   "version": "1.0.0",
-  "private": true,
-  "description": "Agent workflow substrate helpers for @pumped-fn/lite",
+  "private": false,
+  "description": "Agent workflow and app helpers for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -22,7 +22,8 @@
   "files": [
     "dist",
     "README.md",
-    "PATTERNS.md"
+    "PATTERNS.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
@@ -34,10 +35,10 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.0.0"
+    "@pumped-fn/lite": "^3.1.0"
   },
   "dependencies": {
-    "@pumped-fn/lite-extension-workflow": "workspace:*"
+    "@pumped-fn/lite-extension-workflow": "workspace:^"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

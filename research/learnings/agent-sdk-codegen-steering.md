@@ -44,6 +44,6 @@ Verification:
 - `node .autoresearch/sessions/agent-sdk-codegen-steering/scorers/antipatterns.mjs .autoresearch/sessions/agent-sdk-codegen-steering/fixtures/agent-clean.ts`
 - `node .autoresearch/sessions/agent-sdk-codegen-steering/scorers/antipatterns.mjs .autoresearch/sessions/agent-sdk-codegen-steering/fixtures/agent-dirty.ts`
 - `pnpm --filter @pumped-fn/agent-sdk typecheck`
-- `pnpm --filter @pumped-fn/agent-sdk-test typecheck`
-- `pnpm --filter @pumped-fn/agent-sdk-test test -- --run`
+- `pnpm --filter @pumped-fn/agent-practical typecheck`
+- `pnpm --filter @pumped-fn/agent-practical test -- --run`
 - `pnpm --filter @pumped-fn/agent-sdk build`

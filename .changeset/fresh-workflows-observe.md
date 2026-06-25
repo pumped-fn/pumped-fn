@@ -1,6 +1,6 @@
 ---
 "@pumped-fn/lite-extension-suspense": patch
-"@pumped-fn/lite-extension-workflow": patch
+"@pumped-fn/lite-extension-workflow": minor
 "@pumped-fn/agent-sdk": patch
 "@pumped-fn/lite-lint": patch
 ---

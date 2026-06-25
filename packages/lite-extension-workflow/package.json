@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/lite-extension-workflow",
   "version": "1.0.0",
-  "private": true,
+  "private": false,
   "description": "Workflow extension units for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,10 +34,10 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.0.0"
+    "@pumped-fn/lite": "^3.1.0"
   },
   "dependencies": {
-    "@pumped-fn/lite-extension-suspense": "workspace:*"
+    "@pumped-fn/lite-extension-suspense": "workspace:^"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

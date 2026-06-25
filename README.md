@@ -44,10 +44,9 @@ Extensions wrap execution. React is an observer layer.
 | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
 | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
-| `@pumped-fn/lite-extension-suspense` | Event-log replay, suspend/resume, failure records, and lifecycle observation |
-| `@pumped-fn/lite-extension-workflow` | Workflow extension units: run identity, stable keys, durable steps, timeout, active events, and replay policy |
-| `@pumped-fn/agent-sdk` | Agent conventions over lite workflow: worker routing, CLI workers, materials, and compatibility re-exports |
-| `@pumped-fn/agent-sdk-test` | In-memory workflow logs and local remote-runner helpers for workflow tests |
+| `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
+| `@pumped-fn/lite-extension-workflow` | Workflow run identity, durable steps, remote-step hooks, and replay units |
+| `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
 ## Mental Model
@@ -68,7 +67,12 @@ execution context
   flows: input/output work
   resources: transactions, request loggers, form drafts, spans
   tags: tenant, locale, trace id, runtime config
-  workflow extensions: replay, suspend/resume, remote routing, failure records
+        |
+        v
+agent workflow
+  model provider atom/service
+  tools and subagents as ctx.exec flow steps
+  events as a boundary resource
 ```
 
 The same seam works for backend and frontend:
@@ -234,7 +238,7 @@ Browser mode proves React wiring; it does not replace node logic tests. CI also 
 smoke against a Vite-served `useFlow` page so browser-runtime drift is caught before release.
 
 `@pumped-fn/lite-lint` codifies the common mistakes: module mocks, stale browser-emulator markers,
-definition-handle prefixes/suffixes, scope-as-argument helpers, shared scope factories, inline ambient IO, React
+definition-handle suffixes, scope-as-argument helpers, shared scope factories, inline ambient IO, React
 feature components using scope directly, and local state mirrors.
 
 ## Practical Examples
@@ -273,7 +277,6 @@ pnpm -F @pumped-fn/lite-lint test
 - Core patterns: [`packages/lite/PATTERNS.md`](packages/lite/PATTERNS.md)
 - React runtime: [`packages/lite-react/README.md`](packages/lite-react/README.md)
 - React patterns: [`packages/lite-react/PATTERNS.md`](packages/lite-react/PATTERNS.md)
-- Workflow extension: [`packages/lite-extension-workflow/README.md`](packages/lite-extension-workflow/README.md)
 - Anti-pattern scanner: [`packages/lite-lint/README.md`](packages/lite-lint/README.md)
 
 ## License

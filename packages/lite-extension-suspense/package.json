@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/lite-extension-suspense",
   "version": "1.0.0",
-  "private": true,
+  "private": false,
   "description": "Replay and suspend extension for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,7 +34,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.0.0"
+    "@pumped-fn/lite": "^3.1.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
