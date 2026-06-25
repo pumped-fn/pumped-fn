@@ -41,7 +41,7 @@ Extensions wrap execution. React is an observer layer.
 | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
-| `@pumped-fn/lite-react-json-render` | json-render StateStore adapter for Lite React scoped values |
+| `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
 | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
 | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
@@ -73,7 +73,7 @@ The same seam works for backend and frontend:
 - Backend handlers create or receive an execution context and run flows.
 - Workers create scopes for process lifetime and contexts per job.
 - React roots render `ScopeProvider` and `ExecutionContextProvider`.
-- Edge renderers such as json-render can bind to Lite-owned scoped values through external stores.
+- Edge renderers such as json-render can bind to Lite-owned scoped values and emit actions into Lite flows.
 - Tests use `createScope({ presets, tags, extensions })` and public APIs.
 
 ## Core Primitives
@@ -201,10 +201,11 @@ That state is backed by a current-owned resource, so it is testable without Reac
 owning execution context unmounts or is released.
 
 When generated UI needs json-render controlled state, `@pumped-fn/lite-react-json-render` adapts a
-`scopedValue` access object to json-render's external `StateStore` shape. The graph still owns the state;
-json-render observes and writes through its normal `StateProvider`. Use it at genuine json-render boundaries
-such as generated specs, server-authored forms, or schema-driven editors; hand-authored React should keep using
-the normal Lite React hooks directly.
+`scopedValue` access object to json-render's external `StateStore` shape and adapts json-render action
+handlers to Lite flows. The graph still owns state and behavior; json-render observes, writes, and emits
+through its normal `JSONUIProvider` contracts. Use it at genuine json-render boundaries such as generated
+specs, server-authored forms, or schema-driven editors; hand-authored React should keep using the normal
+Lite React hooks directly.
 
 ## Tests
 

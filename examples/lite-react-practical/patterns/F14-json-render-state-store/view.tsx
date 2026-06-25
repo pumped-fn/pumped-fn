@@ -2,10 +2,11 @@ import { defineCatalog } from "@json-render/core"
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp } from "@json-render/react"
 import { schema } from "@json-render/react/schema"
 import { useResource } from "@pumped-fn/lite-react"
-import { scopedValueStateStore } from "@pumped-fn/lite-react-json-render"
+import type { ScopedValueAccess } from "@pumped-fn/lite-react"
+import { flowAction, scopedValueStateStore, useFlowActionHandlers } from "@pumped-fn/lite-react-json-render"
 import { useMemo } from "react"
 import { z } from "zod"
-import { orderDraft } from "./after"
+import { currentOrderDraft, type OrderState, orderDraft, submitOrder } from "./after"
 
 const catalog = defineCatalog(schema, {
   components: {
@@ -19,6 +20,16 @@ const catalog = defineCatalog(schema, {
       props: z.object({
         item: z.string(),
         quantity: z.number(),
+      }),
+    },
+    SubmitButton: {
+      props: z.object({
+        label: z.string(),
+      }),
+    },
+    SubmissionStatus: {
+      props: z.object({
+        message: z.string().optional(),
       }),
     },
   },
@@ -48,6 +59,16 @@ const { registry } = defineRegistry(catalog, {
         {props.item}: {props.quantity}
       </output>
     ),
+    SubmitButton: ({ props, emit }) => (
+      <button type="button" onClick={() => emit("press")}>
+        {props.label}
+      </button>
+    ),
+    SubmissionStatus: ({ props }) => (
+      <output aria-label="submission status">
+        {props.message ?? "Not submitted"}
+      </output>
+    ),
   },
 })
 
@@ -60,7 +81,7 @@ const spec = {
         label: "Quantity",
         value: { $bindState: "/order/quantity" },
       },
-      children: ["summary"],
+      children: ["summary", "submit", "submitted"],
     },
     summary: {
       type: "QuantitySummary",
@@ -70,19 +91,52 @@ const spec = {
       },
       children: [],
     },
+    submit: {
+      type: "SubmitButton",
+      props: {
+        label: "Submit order",
+      },
+      on: {
+        press: {
+          action: "submitOrder",
+          params: {
+            item: { $state: "/order/item" },
+            quantity: { $state: "/order/quantity" },
+          },
+        },
+      },
+      children: [],
+    },
+    submitted: {
+      type: "SubmissionStatus",
+      props: {
+        message: { $state: "/submission/message" },
+      },
+      children: [],
+    },
   },
 }
 
 export function JsonRenderOrder() {
   const draft = useResource(orderDraft, { suspense: false })
-  const store = useMemo(() => (
-    draft.status === "ready" ? scopedValueStateStore({ value: draft.data }) : undefined
-  ), [draft.status, draft.data])
 
-  if (!store) return null
+  if (draft.status !== "ready") return null
+
+  return <JsonRenderOrderReady draft={draft.data} />
+}
+
+function JsonRenderOrderReady({ draft }: { draft: ScopedValueAccess<OrderState> }) {
+  const store = useMemo(() => scopedValueStateStore({ value: draft }), [draft])
+  const actions = useMemo(() => ({
+    submitOrder: flowAction({
+      flow: submitOrder,
+      tags: [currentOrderDraft(draft)],
+    }),
+  }), [draft])
+  const handlers = useFlowActionHandlers(actions)
 
   return (
-    <JSONUIProvider registry={registry} store={store}>
+    <JSONUIProvider registry={registry} store={store} handlers={handlers}>
       <Renderer spec={spec} registry={registry} />
     </JSONUIProvider>
   )

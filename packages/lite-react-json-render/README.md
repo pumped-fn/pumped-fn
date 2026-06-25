@@ -1,21 +1,22 @@
 # @pumped-fn/lite-react-json-render
 
-json-render `StateStore` adapter for `@pumped-fn/lite-react` scoped values.
+json-render state and action adapters for `@pumped-fn/lite-react`.
 
-Use this package when a json-render spec should bind to Lite-owned frontend state. `@pumped-fn/lite-react`
-still owns the scope, execution context, and scoped value; json-render reads and writes through its normal
-controlled `StateProvider` store prop.
+Use this package when a json-render spec should bind to Lite-owned frontend state and emit actions into
+Lite-owned flows. `@pumped-fn/lite-react` still owns the scope, execution context, scoped value, resources,
+tags, presets, and tests; json-render reads, writes, and emits through its normal provider contracts.
 
 ## When to Use
 
-Use this adapter when json-render is already the right UI boundary: generated specs, server-authored forms,
-schema-driven editors, or embedded surfaces that need json-render's `$state` and `$bindState` expressions.
-The timing is the integration edge, after the draft/form/editor state has a clear Lite owner.
+Use these adapters when json-render is already the right UI boundary: generated specs, server-authored
+forms, schema-driven editors, or embedded surfaces that need json-render's `$state`, `$bindState`, `on`,
+or `watch` contracts. The timing is the integration edge, after the draft/form/editor state and action
+flows have clear Lite owners.
 
 Do not use it to make ordinary React components more indirect. If the UI is hand-authored React, render forms
 and drafts from `useScopedValue` and mutate through scoped actions. Use `useResource` when an integration
 boundary needs the resolved access object. If json-render should own isolated state that never needs Lite
-flows, resources, resets, or tests, use json-render's own store instead.
+flows, resources, resets, or tests, use json-render's own store and handlers instead.
 
 ## Install
 
@@ -27,30 +28,108 @@ npm install @json-render/core @json-render/react zod
 ## Usage
 
 ```tsx
-import { StateProvider } from "@json-render/react"
-import { scopedValue, useResource } from "@pumped-fn/lite-react"
-import { scopedValueStateStore } from "@pumped-fn/lite-react-json-render"
+import { JSONUIProvider, type ComponentRegistry } from "@json-render/react"
+import { flow, tag } from "@pumped-fn/lite"
+import { scopedValue, type ScopedValueAccess, useResource } from "@pumped-fn/lite-react"
+import { flowAction, scopedValueStateStore, useFlowActionHandlers } from "@pumped-fn/lite-react-json-render"
 import { useMemo } from "react"
+import { z } from "zod"
+
+interface OrderState {
+  order: {
+    item: string
+    quantity: number
+  }
+  submission: {
+    message: string
+  } | null
+}
+
+const submitOrderInput = z.object({
+  item: z.string(),
+  quantity: z.number(),
+})
+
+const currentOrderDraft = tag<ScopedValueAccess<OrderState>>({
+  label: "current.order-draft",
+})
 
 const orderDraft = scopedValue({
   name: "order-draft",
-  initial: () => ({ order: { item: "Coffee", quantity: 1 } }),
+  initial: (): OrderState => ({
+    order: { item: "Coffee", quantity: 1 },
+    submission: null,
+  }),
 })
 
-function GeneratedOrder({ children }: { children: React.ReactNode }) {
+const submitOrder = flow({
+  name: "submit-order",
+  parse: submitOrderInput.parse,
+  factory: (ctx) => {
+    const draft = ctx.data.getTag(currentOrderDraft)!
+    const message = `Submitted ${ctx.input.item} x ${ctx.input.quantity}`
+    draft.patch({ submission: { message } })
+    return message
+  },
+})
+
+function GeneratedOrder(
+  { registry, children }: { registry: ComponentRegistry; children: React.ReactNode }
+) {
   const draft = useResource(orderDraft)
-  const store = useMemo(() => scopedValueStateStore({ value: draft }), [draft])
 
   return (
-    <StateProvider store={store}>
+    <GeneratedOrderReady registry={registry} draft={draft}>
       {children}
-    </StateProvider>
+    </GeneratedOrderReady>
+  )
+}
+
+function GeneratedOrderReady(
+  { registry, draft, children }: {
+    registry: ComponentRegistry
+    draft: ScopedValueAccess<OrderState>
+    children: React.ReactNode
+  }
+) {
+  const store = useMemo(() => scopedValueStateStore({ value: draft }), [draft])
+  const actions = useMemo(() => ({
+    submitOrder: flowAction({
+      flow: submitOrder,
+      tags: [currentOrderDraft(draft)],
+    }),
+  }), [draft])
+  const handlers = useFlowActionHandlers(actions)
+
+  return (
+    <JSONUIProvider registry={registry} store={store} handlers={handlers}>
+      {children}
+    </JSONUIProvider>
   )
 }
 ```
 
 The adapter exposes json-render's `StateStore` shape: JSON Pointer `get`, `set`, batched `update`,
 `getSnapshot`, server snapshot, and `subscribe`.
+
+`flowActionHandlers` returns json-render `ActionHandler` functions. Bare flows receive resolved
+json-render params as `rawInput`, so a flow parser can validate generated params. Use `flowAction` when
+the boundary needs to map input, set an execution name, or pass tags.
+
+`useFlowActionHandlers` returns stable proxy handlers that read the latest Lite context and action
+configuration. That matches json-render's action provider, which registers the handler map at provider mount.
+
+## Behavior Surface
+
+Pass the returned `handlers` to `JSONUIProvider` for json-render `on` and `watch` bindings. json-render
+continues to own event binding, action param resolution, confirmation, `onSuccess`, `onError`, and loading
+state; Lite owns the executed flows and their resources/tags/extensions.
+
+json-render also accepts `navigate`, `validationFunctions`, `functions`, and `directives`. Keep those as
+native `JSONUIProvider` props. Validation and computed functions are synchronous json-render contracts, so
+do not hide async Lite flows behind them. If they need Lite-owned data, adapt already-resolved graph values
+into sync functions at the integration boundary, or have action flows write derived results back into the
+scoped value.
 
 ## Nested Slices
 
@@ -69,9 +148,9 @@ json-render slice.
 
 ## Testing
 
-Logic tests can resolve the scoped value through `createScope`, adapt it, and assert `StateStore`
-behavior without React. Browser observer tests should render the real json-render provider under
-`ScopeProvider` and `ExecutionContextProvider`.
+Logic tests can resolve the scoped value through `createScope`, adapt it, call action handlers, and assert
+`StateStore` plus flow behavior without React. Browser observer tests should render the real json-render
+provider under `ScopeProvider` and `ExecutionContextProvider`.
 
 ## License
 

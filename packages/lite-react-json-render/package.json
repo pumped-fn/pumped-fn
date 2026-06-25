@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/lite-react-json-render",
   "version": "0.0.0",
-  "description": "json-render StateStore adapter for @pumped-fn/lite-react scoped values",
+  "description": "json-render state and action adapters for @pumped-fn/lite-react",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -34,11 +34,14 @@
     "@json-render/core": "catalog:"
   },
   "peerDependencies": {
-    "@pumped-fn/lite-react": "^2.3.0"
+    "@pumped-fn/lite-react": "^2.3.0",
+    "react": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-react": "workspace:*",
+    "@types/react": "catalog:",
+    "react": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

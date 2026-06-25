@@ -515,6 +515,12 @@ importers:
       '@pumped-fn/lite-react':
         specifier: workspace:*
         version: link:../lite-react
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)
