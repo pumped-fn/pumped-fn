@@ -6,6 +6,17 @@ Use this package when a json-render spec should bind to Lite-owned frontend stat
 still owns the scope, execution context, and scoped value; json-render reads and writes through its normal
 controlled `StateProvider` store prop.
 
+## When to Use
+
+Use this adapter when json-render is already the right UI boundary: generated specs, server-authored forms,
+schema-driven editors, or embedded surfaces that need json-render's `$state` and `$bindState` expressions.
+The timing is the integration edge, after the draft/form/editor state has a clear Lite owner.
+
+Do not use it to make ordinary React components more indirect. If the UI is hand-authored React, render forms
+and drafts from `useScopedValue` and mutate through scoped actions. Use `useResource` when an integration
+boundary needs the resolved access object. If json-render should own isolated state that never needs Lite
+flows, resources, resets, or tests, use json-render's own store instead.
+
 ## Install
 
 ```bash
@@ -19,6 +30,7 @@ npm install @json-render/core @json-render/react zod
 import { StateProvider } from "@json-render/react"
 import { scopedValue, useResource } from "@pumped-fn/lite-react"
 import { scopedValueStateStore } from "@pumped-fn/lite-react-json-render"
+import { useMemo } from "react"
 
 const orderDraft = scopedValue({
   name: "order-draft",
@@ -27,9 +39,10 @@ const orderDraft = scopedValue({
 
 function GeneratedOrder({ children }: { children: React.ReactNode }) {
   const draft = useResource(orderDraft)
+  const store = useMemo(() => scopedValueStateStore({ value: draft }), [draft])
 
   return (
-    <StateProvider store={scopedValueStateStore({ value: draft })}>
+    <StateProvider store={store}>
       {children}
     </StateProvider>
   )

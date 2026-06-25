@@ -1,11 +1,8 @@
 import { createStoreAdapter } from '@json-render/core/store-utils'
 import type { StateModel, StateStore } from '@json-render/core'
+import type { ScopedValueAccess } from '@pumped-fn/lite-react'
 
-interface ScopedValueStateSource<State extends object> {
-  getSnapshot(): State
-  set(value: State): void
-  subscribe(listener: () => void): () => void
-}
+type ScopedValueStateSource<State extends object> = Pick<ScopedValueAccess<State>, 'getSnapshot' | 'set' | 'subscribe'>
 
 interface ScopedValueStateStoreOptions<State extends object = StateModel> {
   value: ScopedValueStateSource<State>

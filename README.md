@@ -202,7 +202,9 @@ owning execution context unmounts or is released.
 
 When generated UI needs json-render controlled state, `@pumped-fn/lite-react-json-render` adapts a
 `scopedValue` access object to json-render's external `StateStore` shape. The graph still owns the state;
-json-render observes and writes through its normal `StateProvider`.
+json-render observes and writes through its normal `StateProvider`. Use it at genuine json-render boundaries
+such as generated specs, server-authored forms, or schema-driven editors; hand-authored React should keep using
+the normal Lite React hooks directly.
 
 ## Tests
 

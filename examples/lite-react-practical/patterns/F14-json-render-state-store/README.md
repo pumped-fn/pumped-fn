@@ -19,12 +19,22 @@ scoped value with `@pumped-fn/lite-react-json-render` `scopedValueStateStore` an
 store to `@json-render/react` `JSONUIProvider`. json-render still uses its normal `$bindState` and
 `$state` expressions; the source of truth is the Lite graph.
 
+## Timing
+
+Reach for this only when the rendering boundary is genuinely json-render: generated UI, remote specs,
+schema-driven editors, or a surface that must speak json-render state bindings. The adapter belongs at that
+edge after the state has a Lite owner.
+
+For ordinary React forms and drafts, stay with `useScopedValue`. Use `useResource` when an integration
+boundary needs the resolved access object. The adapter is not a new default state path; it is the bridge that
+prevents a real json-render boundary from creating a second owner.
+
 ## Lens coverage
 
 - **inside-out** (`after.test.ts`, node): resolve the scoped value through `createScope`, adapt it, and
   prove JSON Pointer writes update the scoped draft without React.
 - **outside-in** (`view.browser.test.tsx`, browser mode): render the real `@json-render/react`
-  `StateProvider` and `Renderer` under `ScopeProvider` and `ExecutionContextProvider`, then prove a
+  `JSONUIProvider` and `Renderer` under `ScopeProvider` and `ExecutionContextProvider`, then prove a
   `$bindState` input updates the DOM and the scoped value.
 
 ## Why 100%
