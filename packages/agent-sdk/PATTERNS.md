@@ -1,6 +1,6 @@
 # Agent SDK Patterns
 
-Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, state/service, tags, and `ctx.exec`, do that before adding another primitive.
+Use this package as a small convention layer over `@pumped-fn/lite`. If a use case can be expressed with `flow`, atoms, tags, and `ctx.exec`, do that before adding another primitive.
 
 ## 0. Standalone Suspense
 
@@ -111,25 +111,25 @@ export const lint = flow({
 })
 ```
 
-`remote: true` means the extension may route it to a worker runner. Without a remote runner, the default test helper runs it locally through `next()`.
+`remote: true` means the extension may route it to a worker runner. Without a `remoteRunner` tag or extension option, remote steps fail before execution.
 
 ## 3. LLM Provider
 
-Prefer AI provider as a service. The flow owns prompt shape and output parsing.
+Prefer AI provider as an atom or typed tag. The flow owns prompt shape and output parsing.
 
 ```ts
-import { service, type Lite } from "@pumped-fn/lite"
+import { atom, type Lite } from "@pumped-fn/lite"
 
 interface Model {
   complete(ctx: Lite.ExecutionContext, input: { system: string; prompt: string }): Promise<string>
 }
 
-export const model = service<Model>({
+export const model = atom({
   factory: () => {
     const client = new ClaudeModel()
     return {
       complete: async (_ctx, input) => client.complete(input),
-    }
+    } satisfies Model
   },
 })
 
@@ -236,7 +236,7 @@ const evaluation = suite({
   judges: [accepts, grounded],
 })
 
-const report = await runEval(ctx, evaluation)
+const report = await ctx.exec({ flow: runEval(evaluation) })
 const artifact = summary(report)
 ```
 
@@ -288,9 +288,10 @@ Use `session()` for continuing message history. It is a material, so it uses the
 
 ```ts
 const thread = session("support-session")
+const post = send(thread, triage)
 
-await send(ctx, thread, triage, { prompt: "triage ticket 42" })
-await send(ctx, thread, triage, { prompt: "summarize the route" })
+await ctx.exec({ flow: post, input: { prompt: "triage ticket 42" } })
+await ctx.exec({ flow: post, input: { prompt: "summarize the route" } })
 ```
 
 ## 9. Sandbox Capability
@@ -465,8 +466,8 @@ Tests should prove the owning layer. Do not hide a missing dependency by adding 
 Before adding an agent SDK primitive, ask:
 
 1. Can this be a tag on a `flow`?
-2. Can this be a state/service dependency?
-3. Can this be a `ctx.exec()` helper?
+2. Can this be an atom or tag dependency?
+3. Can this be a flow executed through `ctx.exec()`?
 4. Can this be an extension policy?
 
 Only add a primitive when all four answers are no and the new concept has its own lifecycle or type boundary.

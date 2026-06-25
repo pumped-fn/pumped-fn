@@ -8,7 +8,7 @@ This package does not add a hosted runtime or filesystem framework. It gives nam
 |---|---|
 | `flow()` + `step({ workflow: true })` | Workflow boundary |
 | `flow()` | Worker, tool, subagent turn, durable step, CLI-backed LLM call |
-| state/service/atom | Provider, config, registry, material state |
+| `atom()` | Provider, config, registry, material state |
 | `resource()` | Per-run agent event capture |
 | typed tag | Routing config, ambient run data, model and sandbox capabilities |
 | `ctx.exec()` | Step boundary for replay, remote routing, timeout, and suspend |
@@ -48,12 +48,12 @@ flowchart TD
 - `agent()`, `tool()`, `skill()`, and `sub()` for an agent application surface over lite.
 - `skillCalls` and `loadedSkills` for on-demand skill content.
 - `agent.turn` flow for model rounds that execute tools and subagents through `ctx.exec()`.
-- `session()` and `send()` for continuing message history backed by materials.
+- `session()` and `send()` flow factory for continuing message history backed by materials.
 - `events` for per-boundary run inspection.
 - `model` and `sandbox` for swappable provider and execution capabilities.
 - `guard()` for harness anti-goal state collected from the first model run.
 - `channel()` and `schedule()` for inbound and clock-driven adapter flows.
-- `suite()`, `runEval()`, deterministic checks, and judge quorum helpers.
+- `suite()`, `runEval()` flow factory, deterministic checks, and judge quorum helpers.
 - `inspect()` for workflow-log run inspection.
 - `summary()` for JSON-safe eval reports.
 - `http()` for Fetch request adapters.
@@ -162,9 +162,10 @@ Use `session()` when a continuing agent needs message history. The session is a 
 import { session, send } from "@pumped-fn/agent-sdk"
 
 const thread = session("triage-session")
+const post = send(thread, triage)
 
-await send(ctx, thread, triage, { prompt: "triage FEAT-42" })
-await send(ctx, thread, triage, { prompt: "summarize the decision" })
+await ctx.exec({ flow: post, input: { prompt: "triage FEAT-42" } })
+await ctx.exec({ flow: post, input: { prompt: "summarize the decision" } })
 ```
 
 For persistent durability, pair the session material with a workflow event-log adapter. The core session API stays storage-agnostic.
@@ -205,7 +206,7 @@ const evaluation = suite({
   judges: [accepts, grounded],
 })
 
-const report = await runEval(ctx, evaluation)
+const report = await ctx.exec({ flow: runEval(evaluation) })
 const artifact = summary(report)
 ```
 
@@ -397,17 +398,17 @@ const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all fit behind the same shape: a flow calls an injected provider or a CLI helper.
 
 ```ts
-import { createScope, flow, preset, service, typed, type Lite } from "@pumped-fn/lite"
+import { atom, createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
 import { step } from "@pumped-fn/agent-sdk"
 
 interface Model {
   complete(ctx: Lite.ExecutionContext, prompt: string): Promise<string>
 }
 
-const model = service<Model>({
+const model = atom({
   factory: () => ({
     complete: async (_ctx, prompt) => runRealModel(prompt),
-  }),
+  } satisfies Model),
 })
 
 export const classify = flow({
@@ -474,7 +475,7 @@ For stable tests, prefer provider state plus presets.
 That means workflow bodies must be deterministic between `ctx.exec()` calls:
 
 - Use `ctx.exec({ flow })` for side effects.
-- Use provider state/services for swappable integrations.
+- Use provider atoms and tags for swappable integrations.
 - Do not read time, random, network, filesystem, or process state directly in workflow orchestration code.
 - Keep dependency factories pure enough that replay skipping them is valid.
 - `timeoutMs` rejects the step promise and aborts the `abortSignal` tag. Work must observe the signal to stop cooperatively.

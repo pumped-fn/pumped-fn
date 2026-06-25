@@ -70,7 +70,7 @@ execution context
         |
         v
 agent workflow
-  model provider atom/service
+  model provider atom/tag
   tools and subagents as ctx.exec flow steps
   events as a boundary resource
 ```

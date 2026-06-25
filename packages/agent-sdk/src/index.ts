@@ -1126,6 +1126,11 @@ export interface SessionOptions {
   keepAlive?: boolean
 }
 
+export interface SendOptions {
+  name?: string
+  tags?: Lite.Tagged<any>[]
+}
+
 export type EventType =
   | "agent_start"
   | "agent_model_start"
@@ -1277,24 +1282,30 @@ function execTurn(
   })
 }
 
-export async function send(
-  ctx: Lite.ExecutionContext,
+export function send(
   session: Lite.Atom<MaterialState<SessionState>>,
   agent: Agent,
-  input: TurnInput
-): Promise<TurnResult> {
-  const current = await ctx.resolve(session)
-  const result = await execTurn(ctx, agent, {
-    ...input,
-    messages: [
-      ...current.state.messages,
-      ...(input.messages ?? []),
-    ],
+  options: SendOptions = {}
+): Lite.Flow<TurnResult, TurnInput> {
+  return flow({
+    name: options.name ?? `${agent.name}.send`,
+    parse: typed<TurnInput>(),
+    tags: options.tags,
+    factory: async (ctx) => {
+      const current = await ctx.resolve(session)
+      const result = await execTurn(ctx, agent, {
+        ...ctx.input,
+        messages: [
+          ...current.state.messages,
+          ...(ctx.input.messages ?? []),
+        ],
+      })
+      await patchMaterial(ctx, session, [
+        { op: "replace", path: "/messages", value: serializeMessages(result.messages) },
+      ], { expectedRevision: current.revision })
+      return result
+    },
   })
-  await patchMaterial(ctx, session, [
-    { op: "replace", path: "/messages", value: serializeMessages(result.messages) },
-  ], { expectedRevision: current.revision })
-  return result
 }
 
 export function channel<Input>(options: ChannelOptions<Input>): Lite.Flow<TurnResult, Input> {
@@ -1446,7 +1457,15 @@ export function delegated(name: string): EvalCheck {
   })
 }
 
-export async function runEval(ctx: Lite.ExecutionContext, target: Suite): Promise<EvalReport> {
+export function runEval(target: Suite): Lite.Flow<EvalReport, void> {
+  assertJudgeQuorum(target.judges)
+  return flow({
+    name: `${target.name}.eval`,
+    factory: (ctx) => executeEval(ctx, target),
+  })
+}
+
+async function executeEval(ctx: Lite.ExecutionContext, target: Suite): Promise<EvalReport> {
   assertJudgeQuorum(target.judges)
   const cases: EvalCaseReport[] = []
   for (const item of target.cases) {
