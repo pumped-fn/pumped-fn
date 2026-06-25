@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/agent-sdk-just-bash",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": false,
   "description": "just-bash sandbox provider for @pumped-fn/agent-sdk",
   "type": "module",

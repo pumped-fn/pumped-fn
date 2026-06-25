@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-react-json-render",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "json-render state and action adapters for @pumped-fn/lite-react",
   "type": "module",
   "main": "./dist/index.cjs",
