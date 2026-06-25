@@ -224,11 +224,14 @@ Use `http()` when an existing Fetch-compatible server should expose an agent tur
 ```ts
 import { http } from "@pumped-fn/agent-sdk"
 
-const handle = http({ scope, agent: triage })
-const response = await handle(new Request("https://agent.local/run", {
-  method: "POST",
-  body: JSON.stringify({ prompt: "triage FEAT-42" }),
-}))
+const handle = http({ agent: triage })
+const response = await ctx.exec({
+  flow: handle,
+  input: new Request("https://agent.local/run", {
+    method: "POST",
+    body: JSON.stringify({ prompt: "triage FEAT-42" }),
+  }),
+})
 ```
 
 ## Channels, Schedules, and Sandboxes

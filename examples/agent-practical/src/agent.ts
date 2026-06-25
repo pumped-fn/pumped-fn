@@ -142,12 +142,17 @@ export async function runThread() {
 
 export async function runHttp() {
   const scope = createScope({ tags: [sandbox(box)] })
-  const handle = http({ scope, agent: triage(model) })
-  const response = await handle(new Request("https://agent.local/run", {
-    method: "POST",
-    body: JSON.stringify({ prompt: "triage ticket 42" }),
-  }))
+  const ctx = scope.createContext()
+  const handle = http({ agent: triage(model) })
+  const response = await ctx.exec({
+    flow: handle,
+    input: new Request("https://agent.local/run", {
+      method: "POST",
+      body: JSON.stringify({ prompt: "triage ticket 42" }),
+    }),
+  })
   const body = await response.json()
+  await ctx.close()
   await scope.dispose()
   return body
 }

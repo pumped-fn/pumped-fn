@@ -243,11 +243,14 @@ const run = await inspect(log, { taskId: "triage-42", runId: "run-1" })
 Use `http()` to adapt a Fetch request to an agent turn without adding a server framework dependency.
 
 ```ts
-const handle = http({ scope, agent: triage })
-const response = await handle(new Request("https://agent.local/run", {
-  method: "POST",
-  body: JSON.stringify({ prompt: "triage ticket 42" }),
-}))
+const handle = http({ agent: triage })
+const response = await ctx.exec({
+  flow: handle,
+  input: new Request("https://agent.local/run", {
+    method: "POST",
+    body: JSON.stringify({ prompt: "triage ticket 42" }),
+  }),
+})
 ```
 
 ## 7. Channels and Schedules

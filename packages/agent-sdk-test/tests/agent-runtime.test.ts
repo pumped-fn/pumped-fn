@@ -458,17 +458,22 @@ describe("agent application runtime", () => {
       model,
     })
     const scope = createScope()
-    const handle = http({ scope, agent: target })
+    const ctx = scope.createContext()
+    const handle = http({ agent: target })
 
-    const response = await handle(new Request("https://agent.local/run", {
-      method: "POST",
-      body: JSON.stringify({ prompt: "ping" }),
-    }))
+    const response = await ctx.exec({
+      flow: handle,
+      input: new Request("https://agent.local/run", {
+        method: "POST",
+        body: JSON.stringify({ prompt: "ping" }),
+      }),
+    })
 
     await expect(response.json()).resolves.toMatchObject({
       agentName: "http-agent",
       content: "http:ping",
     })
+    await ctx.close()
     await scope.dispose()
   })
 

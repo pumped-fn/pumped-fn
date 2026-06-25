@@ -124,7 +124,7 @@ export function workflowExtension(options: WorkflowExtensionOptions): Lite.Exten
     name: "workflow",
     options,
     shouldHandle: shouldHandleWorkflowTarget,
-    run: (event, next) => runTimed(event.target, event.ctx, next),
+    run: (event, next) => runTimer(event.target, event.ctx, next),
   })
 
   return {
@@ -272,7 +272,7 @@ function targetNameOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): stri
   return name
 }
 
-function runTimed(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () => Promise<unknown>): Promise<unknown> {
+function runTimer(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () => Promise<unknown>): Promise<unknown> {
   const timeoutMs = stepOf(target, ctx).timeoutMs
   if (timeoutMs === undefined) return next()
   const controller = new AbortController()
@@ -346,7 +346,7 @@ export async function patchMaterial<T>(
   ops: JsonPatchOperation[],
   options: { expectedRevision?: number } = {}
 ): Promise<MaterialState<T>> {
-  return queueMaterialPatch(ctx.scope, target, async () => {
+  return queueMaterialPatch(ctx, target, async () => {
     const ctrl = ctx.scope.controller(target)
     if (ctrl.state === "idle") await ctrl.resolve()
     const current = ctrl.get()
@@ -383,14 +383,14 @@ export function derivedMaterial<TSource, TOutput>(
 }
 
 function queueMaterialPatch<T>(
-  scope: Lite.Scope,
+  ctx: Lite.ExecutionContext,
   target: Lite.Atom<MaterialState<T>>,
   run: () => Promise<MaterialState<T>>
 ): Promise<MaterialState<T>> {
-  let scopePatches = materialPatches.get(scope)
+  let scopePatches = materialPatches.get(ctx.scope)
   if (!scopePatches) {
     scopePatches = new WeakMap()
-    materialPatches.set(scope, scopePatches)
+    materialPatches.set(ctx.scope, scopePatches)
   }
   const previous = scopePatches.get(target) ?? Promise.resolve()
   const current = previous.catch(() => undefined).then(run)
@@ -1389,10 +1389,20 @@ export function turn(
   agent: Agent,
   input: TurnInput
 ): Promise<TurnResult> {
+  return execTurn(ctx, agent, input)
+}
+
+function execTurn(
+  ctx: Lite.ExecutionContext,
+  agent: Agent,
+  input: TurnInput,
+  tags: readonly Lite.Tagged<any>[] = []
+): Promise<TurnResult> {
   return ctx.exec({
     flow: agent.turn,
     input,
     name: agent.name,
+    tags: [...tags],
   })
 }
 
@@ -1516,7 +1526,7 @@ export interface RunLog extends WorkflowEventLog {
 }
 
 export interface HttpOptions {
-  scope: Lite.Scope
+  name?: string
   agent: Agent
   input?: (request: Request) => MaybePromise<TurnInput>
   tags?: (request: Request) => MaybePromise<Lite.Tagged<any>[]>
@@ -1625,22 +1635,18 @@ export function summary(report: EvalReport): Lite.JsonValue {
   })
 }
 
-export function http(options: HttpOptions): (request: Request) => Promise<Response> {
-  return async (request) => {
-    const input = options.input ? await options.input(request) : await request.json() as TurnInput
-    const tags = options.tags ? await options.tags(request) : []
-    const ctx = options.scope.createContext({ tags })
-    return turn(ctx, options.agent, input).then(
-      async (result) => {
-        await ctx.close()
-        return Response.json(jsonValue(result))
-      },
-      async (error) => {
-        await ctx.close({ ok: false, error })
-        throw error
-      }
-    )
-  }
+export function http(options: HttpOptions): Lite.Flow<Response, Request> {
+  return flow({
+    name: options.name ?? `${options.agent.name}-http`,
+    parse: typed<Request>(),
+    tags: agentStepTags({ workflow: true, kind: "channel" }),
+    factory: async (ctx: Lite.ExecutionContext & { readonly input: Request }) => {
+      const request = ctx.input
+      const input = options.input ? await options.input(request) : await request.json() as TurnInput
+      const tags = options.tags ? await options.tags(request) : []
+      return Response.json(jsonValue(await execTurn(ctx, options.agent, input, tags)))
+    },
+  })
 }
 
 async function executeAgentTurn(
