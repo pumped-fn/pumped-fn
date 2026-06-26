@@ -114,3 +114,36 @@ export const badAuthoredVisiblePath = author.node("Badge", {
   // @ts-expect-error /board/nope is not a schema-derived state path
   visible: { state: "/board/nope", eq: true },
 })
+
+export const badAuthoredDirectNestedRepeat = author.node("SortableList", {
+  props: { items: author.state("/board/cards") },
+  slots: {
+    // @ts-expect-error a repeating-slot component (SortableList) cannot be nested directly inside a repeating slot; the item builder accepts only Authored<false> subtrees
+    item: () => [
+      author.node("SortableList", {
+        props: { items: author.state("/board/cards") },
+        slots: { item: (inner) => [author.node("Card", { props: { title: inner("title"), done: inner("done") } })] },
+      }),
+    ],
+  },
+})
+
+export const badAuthoredTransitiveNestedRepeat = author.node("SortableList", {
+  props: { items: author.state("/board/cards") },
+  slots: {
+    // @ts-expect-error a repeating-slot component reached transitively (SortableList -> Stack -> SortableList) cannot appear inside a repeating slot; the inner repeat makes the Stack subtree carry Authored<true> the item builder rejects
+    item: () => [
+      author.node("Stack", {
+        props: { direction: "vertical" },
+        slots: {
+          children: [
+            author.node("SortableList", {
+              props: { items: author.state("/board/cards") },
+              slots: { item: (inner) => [author.node("Card", { props: { title: inner("title"), done: inner("done") } })] },
+            }),
+          ],
+        },
+      }),
+    ],
+  },
+})

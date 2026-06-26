@@ -12,6 +12,7 @@ import {
   summarySpec,
   verifySpec,
   visibilitySpec,
+  type JsonNode,
   type JsonSpec,
 } from "./contract"
 
@@ -196,6 +197,46 @@ describe("typed render contract template arg kind check", () => {
   })
 })
 
+describe("typed render contract nested-repeat restriction", () => {
+  function innerList(): JsonNode {
+    return {
+      type: "SortableList",
+      props: { items: { state: "/board/cards" } },
+      slots: { item: [{ type: "Card", props: { title: { item: "title" }, done: { item: "done" } } }] },
+    }
+  }
+
+  test("verifier rejects a repeating-slot component nested directly inside a repeating slot", () => {
+    const spec: JsonSpec = {
+      root: {
+        type: "SortableList",
+        props: { items: { state: "/board/cards" } },
+        slots: { item: [innerList()] },
+      },
+    }
+    expect(codes(spec)).toContain("nested_repeat_forbidden")
+  })
+
+  test("verifier rejects a repeating-slot component nested transitively (SortableList -> Stack -> SortableList)", () => {
+    const spec: JsonSpec = {
+      root: {
+        type: "SortableList",
+        props: { items: { state: "/board/cards" } },
+        slots: {
+          item: [
+            { type: "Stack", props: { direction: "vertical" }, slots: { children: [innerList()] } },
+          ],
+        },
+      },
+    }
+    expect(codes(spec)).toContain("nested_repeat_forbidden")
+  })
+
+  test("verifier still accepts a top-level repeating-slot component (a repeat not inside another repeat)", () => {
+    expect(verifySpec(boardSpec)).toEqual({ ok: true, spec: boardSpec })
+  })
+})
+
 describe("typed render contract mirror-agreement battery", () => {
   test("compile-acceptance and verifier-acceptance agree across the candidate binding battery", () => {
     const verdict = (spec: JsonSpec): "accept" | "reject" => (verifySpec(spec).ok ? "accept" : "reject")
@@ -356,11 +397,46 @@ describe("typed render contract mirror-agreement battery", () => {
     }))
     rows.push({ binding: "watch /board/nope (unknown path fork)", compile: "reject", verifier: verdict(watchPathForked) })
 
+    const nestedRepeatDirect = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      slots: {
+        // @ts-expect-error a repeating-slot component cannot be nested directly inside a repeating slot
+        item: () => [
+          author.node("SortableList", {
+            props: { items: author.state("/board/cards") },
+            slots: { item: (inner) => [author.node("Card", { props: { title: inner("title"), done: inner("done") } })] },
+          }),
+        ],
+      },
+    }))
+    rows.push({ binding: "nested repeat direct (SortableList in SortableList item)", compile: "reject", verifier: verdict(nestedRepeatDirect) })
+
+    const nestedRepeatTransitive = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      slots: {
+        // @ts-expect-error a repeating-slot component reached transitively (SortableList -> Stack -> SortableList) cannot appear inside a repeating slot
+        item: () => [
+          author.node("Stack", {
+            props: { direction: "vertical" },
+            slots: {
+              children: [
+                author.node("SortableList", {
+                  props: { items: author.state("/board/cards") },
+                  slots: { item: (inner) => [author.node("Card", { props: { title: inner("title"), done: inner("done") } })] },
+                }),
+              ],
+            },
+          }),
+        ],
+      },
+    }))
+    rows.push({ binding: "nested repeat transitive (SortableList -> Stack -> SortableList)", compile: "reject", verifier: verdict(nestedRepeatTransitive) })
+
     for (const row of rows) {
       expect(row.compile, `${row.binding}: compile=${row.compile} verifier=${row.verifier}`).toBe(row.verifier)
     }
     expect(rows.every((row) => row.compile === row.verifier)).toBe(true)
-    expect(rows).toHaveLength(19)
+    expect(rows).toHaveLength(21)
   })
 })
 

@@ -42,6 +42,7 @@ The verifier rejects detail-level drift:
 - unreferenced template arg
 - non-displayable template arg (an array/object state path interpolated into text)
 - repeat item field outside the item scope derived from the bound array prop
+- nested repeating slot (`nested_repeat_forbidden`: a repeating-slot component anywhere inside another repeating slot's subtree, directly or transitively)
 
 ## Repeat item derived from the bound array prop (by construction)
 
@@ -49,14 +50,25 @@ A repeating slot is no longer authored with a hand-passed item schema (`author.r
 
 Template args are kind-checked at both gates: `author.template` accepts only displayable binds (`DisplayArg`, excluding array/object kinds), and `verifySpec` reports `non_displayable_template_arg` when an arg resolves to `array`/`object`. Numbers and strings still interpolate (`summarySpec` interpolates `/board/metrics/done`).
 
+## Nested repeating slots forbidden by construction (transitively)
+
+A repeating slot replaces the item context at its boundary, so an outer repeat's `it` accessor used inside an inner repeat would silently resolve against the wrong array (or, on a same-kind field-name collision, render the wrong element — a hole the depth-less JSON cannot let the verifier catch). The catalog is therefore restricted so nested repeats are **unconstructible**, not merely error-flagged. The restriction is transitive: once inside a repeating slot, no descendant through any slot may be a component that itself has a repeating slot.
+
+One predicate drives both gates from the same catalog slot data — "a component has a repeating slot" — so the forbidden set is never hand-written twice:
+
+- **Author types**: every `author.node(...)` carries a phantom `Authored<HasRepeatInSubtree>` flag computed bottom-up — true if the component itself has a repeating slot (`HasRepeatSlot<C, T>` over `C[T]["slots"]`) or any plain-slot child's subtree carries the flag (`SlotsContainRepeat`). A repeating slot's `(it) => readonly Authored<false>[]` builder accepts only repeat-free subtrees, so placing a `SortableList` (or a `Stack` that transitively contains one) inside an `item` builder fails to compile (`Type '() => Authored<true>[]' is not assignable to ... readonly Authored<false>[]`). The flag is type-only and never serialized.
+- **Verifier**: `verifyNode` carries an `insideRepeat` flag (set true when recursing into a repeating slot, inherited through plain slots) and `hasRepeatingSlot(component)` reads the same catalog `slots` the author type reads; a repeating-slot component reached while `insideRepeat` is rejected with `nested_repeat_forbidden`.
+
+Because the silent-collision variant required an inner repeat to exist, it is unconstructible once nesting is forbidden. `fixtures.bad.ts` and the mirror-agreement battery prove both the direct (`SortableList` in `SortableList.item`) and transitive (`SortableList -> Stack -> SortableList`) cases fail to compile and verify as `nested_repeat_forbidden`. A top-level repeating-slot component (a repeat not inside another repeat, as in `boardSpec`) stays valid.
+
 ## Watch-triggered case
 
 `watchSpec` is a standalone spec authored through `createAuthor` whose root `watch` binds `/board/selectedCardId` to the `loadCardDetails` Lite flow. `TypedRenderWatch` wires watches generically (`useWatchEffects` diffs the watched path across renders and dispatches the verified action), and `view.browser.test.tsx` drives a Lite state change and asserts the derived `lastMove` text updates — the durable mutation stays inside the Lite flow.
 
 ## Compile-time gate
 
-`fixtures.bad.ts` holds `@ts-expect-error` fixtures that prove the typed authoring surface rejects a bad state path, an indexed array-element path, an array-kind template arg, a wrong action input schema, an unknown registry action, a wrong prop/visibility/event-field kind, a wrong derived `ValueKind`, a repeat item field outside the bound-array element schema, and a repeat item forked onto a different array prop. Removing any directive surfaces a real `tsc` error.
+`fixtures.bad.ts` holds `@ts-expect-error` fixtures that prove the typed authoring surface rejects a bad state path, an indexed array-element path, an array-kind template arg, a wrong action input schema, an unknown registry action, a wrong prop/visibility/event-field kind, a wrong derived `ValueKind`, a repeat item field outside the bound-array element schema, a repeat item forked onto a different array prop, and a repeating-slot component nested (directly and transitively) inside a repeating slot. Removing any directive surfaces a real `tsc` error.
 
-The mirror-agreement battery (`contract.test.ts`, 19 rows) now enumerates candidate bindings across all seven dimensions — state-path (whole-array, leaf string/number/nullable/boolean, indexed-element, unknown path), template-arg (string/number/array/object), repeat-item (aligned and forked-onto-another-array), event (aligned and field-kind fork), action-param (literal kind fork), visible (aligned and eq-literal kind fork), and watch (aligned and unknown-path fork) — and asserts compile-acceptance and verifier-acceptance agree on every row, so "no fork" is proven by a per-dimension battery rather than hand-picked fixtures. Most dimensions agree by construction (author types and verifier read the same catalog/registry/`Path`/element source); the battery is the regression net that fails if any dimension drifts.
+The mirror-agreement battery (`contract.test.ts`, 21 rows) now enumerates candidate bindings across all dimensions — state-path (whole-array, leaf string/number/nullable/boolean, indexed-element, unknown path), template-arg (string/number/array/object), repeat-item (aligned and forked-onto-another-array), event (aligned and field-kind fork), action-param (literal kind fork), visible (aligned and eq-literal kind fork), watch (aligned and unknown-path fork), and nested-repeat (direct and transitive) — and asserts compile-acceptance and verifier-acceptance agree on every row, so "no fork" is proven by a per-dimension battery rather than hand-picked fixtures. Most dimensions agree by construction (author types and verifier read the same catalog/registry/`Path`/element source); the battery is the regression net that fails if any dimension drifts.
 
 The accepted DKR checkpoint is not package promotion. Generalized runtime lowering, reusable event normalization, and renderer portability remain open package gates.

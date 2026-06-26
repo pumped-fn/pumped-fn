@@ -82,6 +82,16 @@ type RepeatSlots<C extends Catalog, T extends keyof C> =
   { [S in keyof C[T]["slots"]]-?: C[T]["slots"][S] extends { repeats: string } ? S : never }[keyof C[T]["slots"]]
 type PlainSlots<C extends Catalog, T extends keyof C> = Exclude<keyof C[T]["slots"], RepeatSlots<C, T>>
 
+type HasRepeatSlot<C extends Catalog, T extends keyof C> = [RepeatSlots<C, T>] extends [never] ? false : true
+
+type Authored<F extends boolean> = JsonNode & { readonly __hasRepeatInSubtree?: F }
+type ContainsTrue<U> = true extends U ? true : false
+type SlotsContainRepeat<S> = ContainsTrue<{
+  [K in keyof S]: S[K] extends readonly Authored<infer F>[] ? ContainsTrue<F> : false
+}[keyof S]>
+type NodeFlag<C extends Catalog, T extends keyof C, S> =
+  HasRepeatSlot<C, T> extends true ? true : SlotsContainRepeat<S>
+
 type ItemAccessorForSlot<
   C extends Catalog,
   Schema extends BaseSchema,
@@ -96,8 +106,8 @@ type ItemAccessorForSlot<
     : never
 
 type SlotConfig<C extends Catalog, Schema extends BaseSchema, T extends keyof C, P> =
-  & { [S in PlainSlots<C, T>]?: readonly JsonNode[] }
-  & { [S in RepeatSlots<C, T>]?: (it: ItemAccessorForSlot<C, Schema, T, S, P>) => readonly JsonNode[] }
+  & { [S in PlainSlots<C, T>]?: readonly Authored<boolean>[] }
+  & { [S in RepeatSlots<C, T>]?: (it: ItemAccessorForSlot<C, Schema, T, S, P>) => readonly Authored<false>[] }
 
 type NodeConfig<C extends Catalog, R extends Registry, Schema extends BaseSchema, T extends keyof C, P> = {
   readonly props: P
@@ -109,10 +119,14 @@ type NodeConfig<C extends Catalog, R extends Registry, Schema extends BaseSchema
 
 interface Author<C extends Catalog, R extends Registry, Schema extends BaseSchema> {
   spec(root: JsonNode): JsonSpec
-  node<T extends keyof C & string, const P extends PropsBind<C[T]["props"]>>(
+  node<
+    T extends keyof C & string,
+    const P extends PropsBind<C[T]["props"]>,
+    const S extends SlotConfig<C, Schema, T, P> = {},
+  >(
     type: T,
-    config: NodeConfig<C, R, Schema, T, P>
-  ): JsonNode
+    config: NodeConfig<C, R, Schema, T, P> & { readonly slots?: S }
+  ): Authored<NodeFlag<C, T, S>>
   state<P extends Path<Schema>>(path: P): StateBind<P, PathKind<Schema, P>>
   template(template: string, args: Record<string, DisplayArg>): TemplateBind
 }

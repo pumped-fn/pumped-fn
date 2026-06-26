@@ -605,9 +605,13 @@ const watchSpec: JsonSpec = author.spec(
   })
 )
 
+function hasRepeatingSlot(component: ComponentSchema): boolean {
+  return Object.values(component.slots).some((slot) => slot !== true)
+}
+
 function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
   const errors: VerificationError[] = []
-  verifyNode(spec.root, "$.root", ctx, undefined, errors)
+  verifyNode(spec.root, "$.root", ctx, undefined, false, errors)
   return errors.length === 0 ? { ok: true, spec } : { ok: false, errors }
 }
 
@@ -616,12 +620,16 @@ function verifyNode(
   location: string,
   ctx: VerifyContext,
   item: ItemContext | undefined,
+  insideRepeat: boolean,
   errors: VerificationError[]
 ): void {
   const component = ctx.components[node.type]
   if (!component) {
     errors.push({ code: "unknown_component", path: `${location}.type`, message: `Unknown component ${node.type}` })
     return
+  }
+  if (insideRepeat && hasRepeatingSlot(component)) {
+    errors.push({ code: "nested_repeat_forbidden", path: `${location}.type`, message: `${node.type} has a repeating slot and cannot appear inside another repeating slot` })
   }
   for (const capability of component.capabilities) {
     if (!ctx.rendererCapabilities.has(capability)) {
@@ -662,10 +670,12 @@ function verifyNode(
   if (node.visible) verifyCondition(node.visible, `${location}.visible`, ctx, errors)
   for (const [slot, children] of Object.entries(node.slots ?? {})) {
     const slotSpec = component.slots[slot]
-    const childItem = slotSpec && slotSpec !== true
-      ? repeatItemContext(node, slotSpec, ctx, errors, `${location}.slots.${slot}`)
+    const repeats = slotSpec !== undefined && slotSpec !== true ? slotSpec : undefined
+    const childItem = repeats
+      ? repeatItemContext(node, repeats, ctx, errors, `${location}.slots.${slot}`)
       : item
-    children.forEach((child, index) => verifyNode(child, `${location}.slots.${slot}.${index}`, ctx, childItem, errors))
+    const childInsideRepeat = insideRepeat || repeats !== undefined
+    children.forEach((child, index) => verifyNode(child, `${location}.slots.${slot}.${index}`, ctx, childItem, childInsideRepeat, errors))
   }
 }
 
