@@ -1,0 +1,21 @@
+{
+  "type": "independent_review",
+  "reviewer": "bypass the nesting ban (exploit)",
+  "subject": "DKR6 2fd1e5d3",
+  "verdict": "converge_accept_candidate",
+  "any_bypass_found": false,
+  "vectors_exhausted": [
+    "summary.items",
+    "stack.children transitive",
+    "raw-node",
+    "it:never",
+    "watch/visible/event",
+    "same-kind collision"
+  ],
+  "completeness_argument": "only SortableList has hasRepeatingSlot; insideRepeat OR-inherited never reset through any slot -> any nested repeat always flagged nested_repeat_forbidden regardless of authoring method; silent same-kind-collision NOT constructible",
+  "caveats": [
+    "both gates -> restate 'type-enforced via author.node + verifier-backstop for raw JSON'",
+    "watchSpec behavior-redundant: behavior-distinct count ~3 though count=4"
+  ],
+  "blocking_gaps": []
+}

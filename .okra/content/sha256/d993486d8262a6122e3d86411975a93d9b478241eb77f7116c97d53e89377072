@@ -1,0 +1,16 @@
+{
+  "type": "independent_review",
+  "reviewer": "structural soundness of nesting ban",
+  "subject": "DKR6 2fd1e5d3",
+  "verdict": "converge_accept_candidate",
+  "upheld": [
+    "SlotsContainRepeat maps keyof S \u2014 covers Summary.items/Stack.children, no blind spot",
+    "phantom flag optional+type-only, no brand leak, authoredBoardSpec deepEqual holds",
+    "it accessor still contextually typed",
+    "promoted specs compile",
+    "verifier insideRepeat propagates all slots, seeded false, hasRepeatingSlot correct",
+    "one-source/two-encoding agree, battery rows 20-21 catch drift"
+  ],
+  "raw_node_nuance": "NOTE not blocking: optional phantom prop means a RAW JsonNode literal evades the TYPE gate (assignable to Authored<false>), but the VERIFIER rejects it (nested_repeat_forbidden, proven by raw innerList() test). Accurate claim = 'unconstructible through author.node typed builder; verifier-rejected for raw specs' \u2014 consistent with existing raw-JsonSpec verifier-only design. Commit/README 'both gates' should be softened.",
+  "blocking_gaps": []
+}
