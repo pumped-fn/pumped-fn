@@ -1,0 +1,16 @@
+{
+  "committed_at": "2026-06-26T16:02:25Z",
+  "idempotency_key": "pkr1-core-a7bb856b",
+  "key_sha256": "5fcfd9600577bd825779341f27f197c19c5340d370477ebb6f5c3069c0b0fda7",
+  "payload": {
+    "acceptance_status": "deterministic confirmed (worktree); 2 reviews running; NOT accepted",
+    "commit": "a7bb856b",
+    "main_install": "blocked by minimumReleaseAge env policy (not the package); CI will install",
+    "move": "PKR1 core package committed on branch",
+    "no_release": true,
+    "package": "@pumped-fn/lite-render-core (22 files + lock)",
+    "single_llm_truth_acceptance_count": 0,
+    "verified_in_worktree": "typecheck rc=0; 34 tests; lint 0 diag; fork strip-proof exact"
+  },
+  "payload_sha256": "9c59f55b92914033e298484879c383ef3f1c9d3693dc33b5f2ab5deae7b37864"
+}
