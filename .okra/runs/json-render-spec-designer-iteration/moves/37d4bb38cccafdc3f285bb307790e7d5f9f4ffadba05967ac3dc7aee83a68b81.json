@@ -1,0 +1,13 @@
+{
+  "committed_at": "2026-06-26T14:47:57Z",
+  "idempotency_key": "dkr7-apply-743317bd",
+  "key_sha256": "37d4bb38cccafdc3f285bb307790e7d5f9f4ffadba05967ac3dc7aee83a68b81",
+  "payload": {
+    "acceptance_status": "deterministic confirmed; 2 regression reviews running; NOT accepted",
+    "commit": "743317bd",
+    "deterministic_checks": "typecheck 0; contract 27/27; browser 4/4; lint 157/0; diff-check clean; single-source structures confirmed",
+    "move": "apply DKR7-harden candidate",
+    "single_llm_truth_acceptance_count": 0
+  },
+  "payload_sha256": "6f68c27fb0bd94b09b59895cc88c86bd085dbc6d3b8705b0455296297eebf46b"
+}
