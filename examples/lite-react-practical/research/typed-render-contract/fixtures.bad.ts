@@ -32,6 +32,9 @@ export const badLeafLabel = leaf<number>("string")
 // @ts-expect-error /board/nope is not a schema-derived state path on the typed author surface
 export const badAuthoredStateExpr = author.state("/board/nope")
 
+// @ts-expect-error /board/cards/0/title is an indexed array-element path the verifier never tokenizes
+export const badAuthoredIndexedStatePath = author.state("/board/cards/0/title")
+
 export const badAuthoredPropKind = author.node("Stat", {
   props: {
     label: "Total",
@@ -76,6 +79,13 @@ export const badAuthoredRepeatField = author.node("SortableList", {
         },
       }),
     ]),
+  },
+})
+
+export const badAuthoredTemplateArrayArg = author.node("Text", {
+  props: {
+    // @ts-expect-error an array-kind state path is not displayable and cannot be a template arg
+    text: author.template("Cards: {cards}", { cards: author.state("/board/cards") }),
   },
 })
 

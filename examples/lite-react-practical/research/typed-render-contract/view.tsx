@@ -9,6 +9,7 @@ import {
   summarySpec,
   verifySpec,
   visibilitySpec,
+  watchSpec,
   type BoardState,
   type Card,
   type JsonAction,
@@ -37,20 +38,38 @@ function useExecute() {
   }, [runVerifiedAction])
 }
 
+function useWatchEffects(spec: JsonSpec, state: BoardState, execute: (action: JsonAction) => void) {
+  const previous = useRef<Map<string, unknown>>(new Map())
+  const watch = spec.root.watch
+  useEffect(() => {
+    if (!watch) return
+    for (const [watchedPath, action] of Object.entries(watch)) {
+      const current = readPath(state, watchedPath)
+      const seen = previous.current
+      if (!seen.has(watchedPath)) {
+        seen.set(watchedPath, current)
+        continue
+      }
+      if (seen.get(watchedPath) === current) continue
+      seen.set(watchedPath, current)
+      execute(action)
+    }
+  })
+}
+
 function TypedRenderBoard() {
   const spec = getVerifiedSpec(boardSpec)
   const access = useScopedValue(board)
   const execute = useExecute()
-  const selected = readPath(access.snapshot, "/board/selectedCardId")
-  const previousSelected = useRef(selected)
-  const selectedWatchAction = spec.root.watch?.["/board/selectedCardId"]
+  useWatchEffects(spec, access.snapshot, execute)
+  return <>{renderNode(spec.root, access.snapshot, execute)}</>
+}
 
-  useEffect(() => {
-    if (previousSelected.current === selected) return
-    previousSelected.current = selected
-    if (selectedWatchAction) execute(selectedWatchAction)
-  }, [execute, selected, selectedWatchAction])
-
+function TypedRenderWatch() {
+  const spec = getVerifiedSpec(watchSpec)
+  const access = useScopedValue(board)
+  const execute = useExecute()
+  useWatchEffects(spec, access.snapshot, execute)
   return <>{renderNode(spec.root, access.snapshot, execute)}</>
 }
 
@@ -153,4 +172,4 @@ function FragmentNode({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export { TypedRenderBoard, TypedRenderSummary, TypedRenderVisibility }
+export { TypedRenderBoard, TypedRenderSummary, TypedRenderVisibility, TypedRenderWatch }

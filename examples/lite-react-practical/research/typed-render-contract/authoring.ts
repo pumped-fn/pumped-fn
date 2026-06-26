@@ -30,6 +30,17 @@ type Bind<K extends ValueKind> =
   | EventBind<K>
   | (K extends "nullableString" ? TemplateBind : never)
 
+type DisplayKind = Exclude<ValueKind, "array" | "object">
+type DisplayArg =
+  | string
+  | number
+  | boolean
+  | null
+  | StateBind<DisplayKind>
+  | ItemBind<DisplayKind>
+  | EventBind<DisplayKind>
+  | TemplateBind
+
 type CondLiteral<K extends ValueKind> =
   K extends "string" ? string :
     K extends "number" ? number :
@@ -80,7 +91,7 @@ interface Author<C extends Catalog, R extends Registry, Schema extends BaseSchem
   spec(root: JsonNode): JsonSpec
   node<T extends keyof C & string>(type: T, config: NodeConfig<C, R, Schema, T>): JsonNode
   state<P extends Path<Schema>>(path: P): StateBind<PathKind<Schema, P>>
-  template(template: string, args: Record<string, JsonExpr>): TemplateBind
+  template(template: string, args: Record<string, DisplayArg>): TemplateBind
   repeat<Item extends BaseSchema>(
     item: Item,
     build: (it: ItemAccessor<Item>) => readonly JsonNode[]

@@ -53,6 +53,8 @@ const k = {
   object: <const F extends Record<string, BaseSchema>>(fields: F): ObjectSchema<F> => ({ node: "object", fields, _type: (value) => value }),
 }
 
+const displayableKinds: ReadonlySet<ValueKind> = new Set(["string", "number", "boolean", "nullableString"])
+
 type JsonValue = string | number | boolean | null
 type JsonExpr =
   | JsonValue
@@ -145,10 +147,10 @@ function collectTokens(schema: BaseSchema, prefix: string, tokens: Record<string
   tokens[prefix] = { path: prefix, kind: (schema as LeafSchema<unknown>).kind }
 }
 
-function buildStateTokens(schema: BaseSchema): Record<string, StateToken> {
+function buildStateTokens<S extends BaseSchema>(schema: S): StateTokenMap<S> {
   const tokens: Record<string, StateToken> = {}
   collectTokens(schema, "", tokens)
-  return tokens
+  return tokens as StateTokenMap<S>
 }
 
 type CatalogInput = Record<string, {
@@ -177,10 +179,11 @@ function defineCatalog<const C extends CatalogInput>(catalog: C): TypedCatalog<C
 
 type PathEntry<S extends BaseSchema, P extends string> =
   S extends LeafSchema<infer T> ? { key: P; value: T } :
-    S extends ArraySchema<infer I> ? { key: P; value: Infer<I>[] } | PathEntry<I, `${P}/${number}`> :
+    S extends ArraySchema<infer I> ? { key: P; value: Infer<I>[] } :
       S extends ObjectSchema<infer F> ? { [K in keyof F & string]: PathEntry<F[K], `${P}/${K}`> }[keyof F & string] :
         never
 type PathMap<S extends BaseSchema> = { [E in PathEntry<S, ""> as E["key"]]: E["value"] }
+type StateTokenMap<S extends BaseSchema> = { [P in keyof PathMap<S> & string]: StateToken }
 
 const cardSchema = k.object({
   id: k.string,
@@ -334,6 +337,10 @@ const runJsonAction = flow({
 })
 
 const stateTokens = buildStateTokens(boardSchema)
+
+type StateTokenKeysMirrorPathSet = Assert<Equal<keyof typeof stateTokens, Path>>
+type ObjectKindStatePaths = { [P in Path]: KindFor<PathValue<P>> extends "object" ? P : never }[Path]
+type NoObjectKindStatePath = Assert<Equal<ObjectKindStatePaths, never>>
 
 const components = defineCatalog({
   Stack: {
@@ -572,6 +579,27 @@ const authoredBoardSpec: JsonSpec = author.spec(
   })
 )
 
+const watchSpec: JsonSpec = author.spec(
+  author.node("Stack", {
+    props: { direction: "vertical" },
+    watch: {
+      "/board/selectedCardId": {
+        flow: "loadCardDetails",
+        params: { cardId: author.state("/board/selectedCardId") },
+      },
+    },
+    slots: {
+      children: [
+        author.node("Text", {
+          props: {
+            text: author.template("Watch: {lastMove}", { lastMove: author.state("/board/summary/lastMove") }),
+          },
+        }),
+      ],
+    },
+  })
+)
+
 function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
   const errors: VerificationError[] = []
   verifyNode(spec.root, "$.root", ctx, undefined, errors)
@@ -762,7 +790,10 @@ function exprKind(
     }
   }
   for (const [name, arg] of Object.entries(expr.args)) {
-    exprKind(arg, ctx, item, event, `${location}.args.${name}`, errors)
+    const argKind = exprKind(arg, ctx, item, event, `${location}.args.${name}`, errors)
+    if (argKind && !displayableKinds.has(argKind)) {
+      errors.push({ code: "non_displayable_template_arg", path: `${location}.args.${name}`, message: `${name} resolves to ${argKind}, which cannot be interpolated into text` })
+    }
   }
   return "nullableString"
 }
@@ -801,7 +832,8 @@ function actionParams(action: JsonAction, state: BoardState, item?: Card, event?
 
 type ShowDoneKindIsBoolean = Assert<Equal<KindFor<PathValue<"/board/showDone">>, "boolean">>
 type MissingPathRejected = Assert<Equal<"/board/missing" extends Path ? true : false, false>>
-type CardTitlePathIsString = Assert<Equal<PathValue<"/board/cards/0/title">, string>>
+type IndexedCardPathRejected = Assert<Equal<"/board/cards/0/title" extends Path ? true : false, false>>
+type CardsPathValueIsCardArray = Assert<Equal<PathValue<"/board/cards">, Card[]>>
 type ShowDoneIsNotString = Assert<Equal<PathValue<"/board/showDone"> extends string ? true : false, false>>
 type CardsPathKindIsArray = Assert<Equal<KindFor<PathValue<"/board/cards">>, "array">>
 type MetricsTotalKindIsNumber = Assert<Equal<KindFor<PathValue<"/board/metrics/total">>, "number">>
@@ -815,6 +847,7 @@ type SummaryNestedObjectKindIsObject = Assert<Equal<KindOfSchema<typeof columnSc
 
 export {
   board,
+  context,
   loadCardDetails,
   moveCard,
   moveCardInput,
@@ -835,6 +868,7 @@ export {
   summarySpec,
   visibilitySpec,
   authoredBoardSpec,
+  watchSpec,
   verifySpec,
 }
 export type {
@@ -866,7 +900,10 @@ export type {
   SummaryNestedObjectKindIsObject,
   ShowDoneKindIsBoolean,
   MissingPathRejected,
-  CardTitlePathIsString,
+  IndexedCardPathRejected,
+  CardsPathValueIsCardArray,
+  StateTokenKeysMirrorPathSet,
+  NoObjectKindStatePath,
   ShowDoneIsNotString,
   CardsPathKindIsArray,
   MetricsTotalKindIsNumber,

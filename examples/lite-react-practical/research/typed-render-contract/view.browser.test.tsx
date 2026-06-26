@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createScope } from "@pumped-fn/lite"
 import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
-import { TypedRenderBoard, TypedRenderSummary, TypedRenderVisibility } from "./view"
+import { TypedRenderBoard, TypedRenderSummary, TypedRenderVisibility, TypedRenderWatch } from "./view"
 import { board } from "./contract"
 
 describe("typed render contract React lowering", () => {
@@ -110,6 +110,39 @@ describe("typed render contract React lowering", () => {
 
     await waitFor(() => expect(screen.getByLabelText("board badge")).toHaveAttribute("data-tone", "muted"))
     expect(screen.getByLabelText("board badge")).not.toHaveTextContent("Done count")
+
+    view!.unmount()
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  test("renders the standalone watch spec and the watch-triggered Lite flow updates derived state", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const access = await board.resolve(ctx)
+    let view: ReturnType<typeof render>
+
+    await act(async () => {
+      view = render(
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider ctx={ctx}>
+            <TypedRenderWatch />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByLabelText("board status")).toHaveTextContent("Watch: None")
+
+    await act(async () => {
+      access.update((state) => ({ ...state, board: { ...state.board, selectedCardId: "card-1" } }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(screen.getByLabelText("board status")).toHaveTextContent("Watch: Loaded Write brief"))
 
     view!.unmount()
     await ctx.close()

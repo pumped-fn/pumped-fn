@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest"
 import { createScope } from "@pumped-fn/lite"
 import {
+  author,
   authoredBoardSpec,
   board,
   boardSchema,
   boardSpec,
+  context,
   kindOf,
   runJsonAction,
   summarySpec,
@@ -169,5 +171,109 @@ describe("typed render contract shared action registry", () => {
 
     await ctx.close()
     await scope.dispose()
+  })
+})
+
+describe("typed render contract template arg kind check", () => {
+  test("verifier rejects an array state path interpolated into a text template", () => {
+    const spec = clone(boardSpec)
+    spec.root.slots!["children"]![0]!.props["text"] = {
+      template: "Cards: {cards}",
+      args: { cards: { state: "/board/cards" } },
+    }
+
+    expect(codes(spec)).toContain("non_displayable_template_arg")
+  })
+
+  test("verifier still accepts a number state path interpolated into a text template", () => {
+    const spec = clone(boardSpec)
+    spec.root.slots!["children"]![0]!.props["text"] = {
+      template: "Total: {total}",
+      args: { total: { state: "/board/metrics/total" } },
+    }
+
+    expect(verifySpec(spec)).toEqual({ ok: true, spec })
+  })
+})
+
+describe("typed render contract mirror-agreement battery", () => {
+  test("compile-acceptance and verifier-acceptance agree across the candidate binding battery", () => {
+    const verdict = (spec: JsonSpec): "accept" | "reject" => (verifySpec(spec).ok ? "accept" : "reject")
+    const rows: { binding: string; compile: "accept" | "reject"; verifier: "accept" | "reject" }[] = []
+
+    const wholeArray = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      visible: { state: "/board/cards" },
+    }))
+    rows.push({ binding: "state /board/cards (whole array)", compile: "accept", verifier: verdict(wholeArray) })
+
+    const leafBoolean = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      visible: { state: "/board/showDone" },
+    }))
+    rows.push({ binding: "state /board/showDone (leaf boolean)", compile: "accept", verifier: verdict(leafBoolean) })
+
+    const leafNullable = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      visible: { state: "/board/summary/lastMove" },
+    }))
+    rows.push({ binding: "state /board/summary/lastMove (leaf nullableString)", compile: "accept", verifier: verdict(leafNullable) })
+
+    const leafNumber = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      visible: { state: "/board/metrics/total" },
+    }))
+    rows.push({ binding: "state /board/metrics/total (leaf number)", compile: "accept", verifier: verdict(leafNumber) })
+
+    const indexedElement = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      // @ts-expect-error indexed array-element paths are not on the typed author surface
+      visible: { state: "/board/cards/0/title" },
+    }))
+    rows.push({ binding: "state /board/cards/0/title (indexed element)", compile: "reject", verifier: verdict(indexedElement) })
+
+    const unknownPath = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      // @ts-expect-error /board/nope is not a schema-derived state path
+      visible: { state: "/board/nope" },
+    }))
+    rows.push({ binding: "state /board/nope (unknown)", compile: "reject", verifier: verdict(unknownPath) })
+
+    const stringArg = author.spec(author.node("Text", {
+      props: { text: author.template("v {a}", { a: author.state("/board/summary/lastMove") }) },
+    }))
+    rows.push({ binding: "template arg string (/board/summary/lastMove)", compile: "accept", verifier: verdict(stringArg) })
+
+    const numberArg = author.spec(author.node("Text", {
+      props: { text: author.template("v {a}", { a: author.state("/board/metrics/done") }) },
+    }))
+    rows.push({ binding: "template arg number (/board/metrics/done)", compile: "accept", verifier: verdict(numberArg) })
+
+    const arrayArg = author.spec(author.node("Text", {
+      props: {
+        // @ts-expect-error an array-kind state path is not a displayable template arg
+        text: author.template("v {a}", { a: author.state("/board/cards") }),
+      },
+    }))
+    rows.push({ binding: "template arg array (/board/cards)", compile: "reject", verifier: verdict(arrayArg) })
+
+    const objectArgSpec: JsonSpec = {
+      root: { type: "Text", props: { text: { template: "v {a}", args: { a: { state: "/synthetic/object" } } } } },
+    }
+    const objectCtx = {
+      ...context,
+      state: { ...context.state, "/synthetic/object": { path: "/synthetic/object", kind: "object" } as const },
+    }
+    rows.push({
+      binding: "template arg object (synthetic object token)",
+      compile: "reject",
+      verifier: verifySpec(objectArgSpec, objectCtx).ok ? "accept" : "reject",
+    })
+
+    for (const row of rows) {
+      expect(row.compile, `${row.binding}: compile=${row.compile} verifier=${row.verifier}`).toBe(row.verifier)
+    }
+    expect(rows.every((row) => row.compile === row.verifier)).toBe(true)
+    expect(rows).toHaveLength(10)
   })
 })
