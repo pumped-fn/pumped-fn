@@ -1,0 +1,16 @@
+{
+  "type": "independent_review",
+  "reviewer": "PKR1-core single-source structural",
+  "subject": "a7bb856b",
+  "verdict": "converge_accept_candidate",
+  "upheld": [
+    "ItemFieldsOf===fieldsKindOf all element shapes (single-source)",
+    "non-object mirror agrees (keyof {}=never === empty item context)",
+    "legit it(meta)->object prop accept/accept",
+    "no regression (nested ban, it:never, indexed-path, predicates, board 27)",
+    "clean API no board leak",
+    "28-row battery both-sided"
+  ],
+  "non_blocking_note": "ItemFieldsOf<never> hits keyof never (admits any field) \u2014 UNREACHABLE via k vocab (every array-kind path is ArraySchema), only forgeable via leaf<T[]>('array') which the verifier rejects (no item emitted). Recommend sealing ItemFieldsOf<never> -> {}.",
+  "blocking_gaps": []
+}

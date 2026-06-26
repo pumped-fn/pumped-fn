@@ -1,0 +1,14 @@
+{
+  "type": "independent_review",
+  "reviewer": "PKR1-core 5th-fork hunt",
+  "subject": "a7bb856b",
+  "verdict": "block",
+  "fork": "slash-named field: k.object({'a/b':k.array(k.string)}) -> author.state('/a/b') compiles (kind array) but SchemaWalk re-splits '/a/b' -> ElementSchemaAtPath=never -> ItemFieldsOf<never>=never (bare distributive) -> keyof never=string -> item accessor accepts ANY field as ItemBind<never> assignable to any prop; verifier reads flat token /a/b item.fields={} -> unknown_item_path. compile-accept/verifier-reject.",
+  "root_cause": "two path traversals disagree on '/': PathMap/collectTokens treat field name as ONE segment (join); SchemaWalk RE-SPLITS on '/'",
+  "fix": "guard ItemFieldsOf<never>->{} (non-distributive [E] extends [ObjectSchema] \u2014 closes the whole never-collapse class) AND forbid '/' in field keys at k.object source",
+  "battery_honest": "28 rows both-sided but never used a slash-named field",
+  "blocking_gaps": [
+    "slash-name fork",
+    "ItemFieldsOf<never> distributive collapse"
+  ]
+}
