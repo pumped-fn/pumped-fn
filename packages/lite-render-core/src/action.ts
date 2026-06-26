@@ -18,9 +18,13 @@ function action<F extends Lite.Flow<any, any>, const Fields extends Record<strin
   return { flow, params: fieldsKindOf(input) as { [K in keyof Fields]: KindOfSchema<Fields[K]> } }
 }
 
-/** The dispatcher input: a verified action plus an optional adapter-normalized event payload. */
-type RenderActionInput<Event extends Record<string, unknown> = Record<string, unknown>> = {
+/** The dispatcher input: a verified action plus the optional repeat item and adapter-normalized event payload. */
+type RenderActionInput<
+  Item extends Record<string, unknown> = Record<string, unknown>,
+  Event extends Record<string, unknown> = Record<string, unknown>,
+> = {
   action: JsonAction
+  item?: Item
   event?: Event
 }
 
@@ -43,7 +47,7 @@ function resolveExpr(
   if ("item" in expr) return item?.[expr.item]
   if ("event" in expr) return event?.[expr.event]
   return Object.entries(expr.args).reduce(
-    (text, [name, value]) => text.replace(`{${name}}`, String(resolveExpr(value, state, item, event) ?? "None")),
+    (text, [name, value]) => text.replaceAll(`{${name}}`, String(resolveExpr(value, state, item, event) ?? "None")),
     expr.template
   )
 }
@@ -61,19 +65,23 @@ function actionParams(
  * Builds the dispatcher flow for an arbitrary action registry and a state resource.
  * The same registry the verifier guards is the only set the dispatcher can execute; an unregistered flow throws.
  */
-function createRunJsonAction<State, Event extends Record<string, unknown> = Record<string, unknown>>(config: {
+function createRunJsonAction<
+  State,
+  Item extends Record<string, unknown> = Record<string, unknown>,
+  Event extends Record<string, unknown> = Record<string, unknown>,
+>(config: {
   registry: Record<string, ActionToken>
   state: Lite.Resource<{ get(): State }>
   name?: string
-}): Lite.Flow<unknown, RenderActionInput<Event>> {
+}): Lite.Flow<unknown, RenderActionInput<Item, Event>> {
   return flow({
     name: config.name ?? "lite-render-run-json-action",
-    parse: typed<RenderActionInput<Event>>(),
+    parse: typed<RenderActionInput<Item, Event>>(),
     deps: { access: config.state },
     factory: (ctx, { access }) => {
       const target = config.registry[ctx.input.action.flow]
       if (!target) throw new Error(`Unknown verified flow ${ctx.input.action.flow}`)
-      return ctx.exec({ flow: target.flow, rawInput: actionParams(ctx.input.action, access.get(), undefined, ctx.input.event) })
+      return ctx.exec({ flow: target.flow, rawInput: actionParams(ctx.input.action, access.get(), ctx.input.item, ctx.input.event) })
     },
   })
 }

@@ -42,7 +42,10 @@ agreement predicates `StateTokenKeysMirrorPathSet<S>`, `NoObjectKindStatePath<S>
 Catalog: `defineCatalog`; types `CatalogInput`, `TypedCatalog`.
 
 Actions: `action` (binds a `Lite.Flow` to its input schema), `createRunJsonAction` (the registry-driven
-dispatcher), `readPath`, `resolveExpr`, `actionParams`; type `RenderActionInput`.
+dispatcher), `readPath`, `resolveExpr`, `actionParams`; type `RenderActionInput<Item, Event>`. The dispatch
+input is `{ action, item?, event? }` — a host firing an `on`/`watch` action from inside a repeat passes the
+current repeat element as `item` and the normalized event payload as `event`, so `{item:…}` / `{event:…}`
+action params resolve against the live element instead of `undefined`.
 
 Verifier: `verifySpec`, `isRepeatingSlot`, `hasRepeatingSlot`; type `IsRepeatingSlotGuardsRepeatSlot`.
 
