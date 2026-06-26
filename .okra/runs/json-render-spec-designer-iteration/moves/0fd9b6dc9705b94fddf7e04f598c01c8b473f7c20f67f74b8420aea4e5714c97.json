@@ -1,0 +1,15 @@
+{
+  "committed_at": "2026-06-26T17:00:17Z",
+  "idempotency_key": "pkr2-react-f7f476ad",
+  "key_sha256": "0fd9b6dc9705b94fddf7e04f598c01c8b473f7c20f67f74b8420aea4e5714c97",
+  "payload": {
+    "acceptance_status": "deterministic confirmed (worktree); 2 reviews running (faithfulness + misrender hunt); NOT accepted",
+    "commit": "f7f476ad",
+    "move": "PKR2 react adapter committed on branch",
+    "no_release": true,
+    "package": "@pumped-fn/lite-render-react (14 files)",
+    "single_llm_truth_acceptance_count": 0,
+    "verified_in_worktree": "typecheck rc=0; 4 browser tests; component-map mirror strip-proof (done:number, toIndex:string fail compile); 0 board refs in src; imports only core public api"
+  },
+  "payload_sha256": "dabd753c24a345f6ebced9c88190e2479ea0990ef667a95ea88552275c80b6ea"
+}
