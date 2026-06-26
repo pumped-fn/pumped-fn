@@ -270,10 +270,110 @@ describe("typed render contract mirror-agreement battery", () => {
       verifier: verifySpec(objectArgSpec, objectCtx).ok ? "accept" : "reject",
     })
 
+    const repeatItemOnBoundArray = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      slots: { item: (it) => [author.node("Card", { props: { title: it("title"), done: it("done") } })] },
+    }))
+    rows.push({ binding: "repeat-item it(done) on bound /board/cards", compile: "accept", verifier: verdict(repeatItemOnBoundArray) })
+
+    const repeatItemForkedFromBoundArray = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/columns") },
+      slots: {
+        item: (it) => [author.node("Card", {
+          props: {
+            title: it("title"),
+            // @ts-expect-error /board/columns elements have no "done"; the item accessor derives from props[slot.repeats]
+            done: it("done"),
+          },
+        })],
+      },
+    }))
+    rows.push({ binding: "repeat-item it(done) forked onto /board/columns", compile: "reject", verifier: verdict(repeatItemForkedFromBoundArray) })
+
+    const eventMoveAligned = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      on: {
+        move: (ev) => ({
+          flow: "moveCard",
+          params: { cardId: ev("cardId"), fromColumnId: ev("fromColumnId"), toColumnId: ev("toColumnId"), toIndex: ev("toIndex") },
+        }),
+      },
+      slots: { item: (it) => [author.node("Card", { props: { title: it("title"), done: it("done") } })] },
+    }))
+    rows.push({ binding: "event move handler (aligned event fields)", compile: "accept", verifier: verdict(eventMoveAligned) })
+
+    const eventFieldKindForked = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      on: {
+        // @ts-expect-error toIndex is a number event field; the cardId param is string
+        move: (ev) => ({
+          flow: "moveCard",
+          params: { cardId: ev("toIndex"), fromColumnId: ev("fromColumnId"), toColumnId: ev("toColumnId"), toIndex: ev("toIndex") },
+        }),
+      },
+      slots: { item: (it) => [author.node("Card", { props: { title: it("title"), done: it("done") } })] },
+    }))
+    rows.push({ binding: "event move cardId<-toIndex (field kind fork)", compile: "reject", verifier: verdict(eventFieldKindForked) })
+
+    const actionParamKindForked = author.spec(author.node("SortableList", {
+      props: { items: author.state("/board/cards") },
+      on: {
+        // @ts-expect-error toIndex param is number; a string literal cannot fill it
+        move: (ev) => ({
+          flow: "moveCard",
+          params: { cardId: ev("cardId"), fromColumnId: ev("fromColumnId"), toColumnId: ev("toColumnId"), toIndex: "first" },
+        }),
+      },
+      slots: { item: (it) => [author.node("Card", { props: { title: it("title"), done: it("done") } })] },
+    }))
+    rows.push({ binding: "action-param toIndex<-string literal (kind fork)", compile: "reject", verifier: verdict(actionParamKindForked) })
+
+    const visibleEqAligned = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      visible: { state: "/board/showDone", eq: true },
+    }))
+    rows.push({ binding: "visible /board/showDone eq true (boolean literal)", compile: "accept", verifier: verdict(visibleEqAligned) })
+
+    const visibleEqKindForked = author.spec(author.node("Badge", {
+      props: { text: null, tone: "info" },
+      // @ts-expect-error showDone is boolean; the visibility literal must be boolean, not string
+      visible: { state: "/board/showDone", eq: "yes" },
+    }))
+    rows.push({ binding: "visible /board/showDone eq 'yes' (literal kind fork)", compile: "reject", verifier: verdict(visibleEqKindForked) })
+
+    const watchAligned = author.spec(author.node("Stack", {
+      props: { direction: "vertical" },
+      watch: { "/board/selectedCardId": { flow: "loadCardDetails", params: { cardId: author.state("/board/selectedCardId") } } },
+      slots: { children: [] },
+    }))
+    rows.push({ binding: "watch /board/selectedCardId -> loadCardDetails", compile: "accept", verifier: verdict(watchAligned) })
+
+    const watchPathForked = author.spec(author.node("Stack", {
+      props: { direction: "vertical" },
+      // @ts-expect-error /board/nope is not a schema-derived watch path
+      watch: { "/board/nope": { flow: "loadCardDetails", params: { cardId: author.state("/board/selectedCardId") } } },
+      slots: { children: [] },
+    }))
+    rows.push({ binding: "watch /board/nope (unknown path fork)", compile: "reject", verifier: verdict(watchPathForked) })
+
     for (const row of rows) {
       expect(row.compile, `${row.binding}: compile=${row.compile} verifier=${row.verifier}`).toBe(row.verifier)
     }
     expect(rows.every((row) => row.compile === row.verifier)).toBe(true)
-    expect(rows).toHaveLength(10)
+    expect(rows).toHaveLength(19)
+  })
+})
+
+describe("typed render contract state-token runtime mirror", () => {
+  test("the runtime state token table emits exactly the schema-derived path set (no extra, indexed, or object-node keys)", () => {
+    expect(Object.keys(context.state).sort()).toEqual([
+      "/board/cards",
+      "/board/columns",
+      "/board/metrics/done",
+      "/board/metrics/total",
+      "/board/selectedCardId",
+      "/board/showDone",
+      "/board/summary/lastMove",
+    ])
   })
 })

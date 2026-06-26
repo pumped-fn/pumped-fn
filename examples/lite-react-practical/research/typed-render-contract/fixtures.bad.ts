@@ -2,7 +2,6 @@ import {
   action,
   actionRegistry,
   author,
-  cardSchema,
   leaf,
   loadCardInput,
   moveCard,
@@ -70,15 +69,30 @@ export const badAuthoredFlowPayload = author.node("SortableList", {
 export const badAuthoredRepeatField = author.node("SortableList", {
   props: { items: author.state("/board/cards") },
   slots: {
-    item: author.repeat(cardSchema, (it) => [
+    item: (it) => [
       author.node("Card", {
         props: {
-          // @ts-expect-error "nope" is not a field of the repeat item schema
+          // @ts-expect-error "nope" is not a field of the /board/cards element schema
           title: it("nope"),
           done: it("done"),
         },
       }),
-    ]),
+    ],
+  },
+})
+
+export const badAuthoredRepeatItemForkedFromBoundProp = author.node("SortableList", {
+  props: { items: author.state("/board/columns") },
+  slots: {
+    item: (it) => [
+      author.node("Card", {
+        props: {
+          title: it("title"),
+          // @ts-expect-error /board/columns elements have no "done" field; the item accessor is derived from the array prop bound at props[slot.repeats], not a hand-passed schema
+          done: it("done"),
+        },
+      }),
+    ],
   },
 })
 

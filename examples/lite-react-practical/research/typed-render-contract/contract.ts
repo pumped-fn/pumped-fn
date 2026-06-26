@@ -20,6 +20,7 @@ type KindOfSchema<S extends BaseSchema> =
         never
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
 type Assert<T extends true> = T
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void ? I : never
 
 interface BaseSchema {
   readonly node: "leaf" | "array" | "object"
@@ -147,10 +148,15 @@ function collectTokens(schema: BaseSchema, prefix: string, tokens: Record<string
   tokens[prefix] = { path: prefix, kind: (schema as LeafSchema<unknown>).kind }
 }
 
-function buildStateTokens<S extends BaseSchema>(schema: S): StateTokenMap<S> {
+type CollectTokens<S extends BaseSchema, P extends string> =
+  S extends ObjectSchema<infer F>
+    ? UnionToIntersection<{ [K in keyof F & string]: CollectTokens<F[K], `${P}/${K}`> }[keyof F & string]>
+    : { [Q in P]: StateToken }
+
+function buildStateTokens<S extends BaseSchema>(schema: S): CollectTokens<S, ""> {
   const tokens: Record<string, StateToken> = {}
   collectTokens(schema, "", tokens)
-  return tokens as StateTokenMap<S>
+  return tokens as unknown as CollectTokens<S, "">
 }
 
 type CatalogInput = Record<string, {
@@ -183,7 +189,6 @@ type PathEntry<S extends BaseSchema, P extends string> =
       S extends ObjectSchema<infer F> ? { [K in keyof F & string]: PathEntry<F[K], `${P}/${K}`> }[keyof F & string] :
         never
 type PathMap<S extends BaseSchema> = { [E in PathEntry<S, ""> as E["key"]]: E["value"] }
-type StateTokenMap<S extends BaseSchema> = { [P in keyof PathMap<S> & string]: StateToken }
 
 const cardSchema = k.object({
   id: k.string,
@@ -566,12 +571,12 @@ const authoredBoardSpec: JsonSpec = author.spec(
             }),
           },
           slots: {
-            item: author.repeat(cardSchema, (it) => [
+            item: (it) => [
               author.node("Card", {
                 props: { title: it("title"), done: it("done") },
                 visible: { state: "/board/showDone", eq: true },
               }),
-            ]),
+            ],
           },
         }),
       ],
