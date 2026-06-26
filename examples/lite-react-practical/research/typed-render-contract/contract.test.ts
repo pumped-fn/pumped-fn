@@ -1,6 +1,17 @@
 import { describe, expect, test } from "vitest"
 import { createScope } from "@pumped-fn/lite"
-import { board, boardSpec, runJsonAction, summarySpec, verifySpec, type JsonSpec } from "./contract"
+import {
+  authoredBoardSpec,
+  board,
+  boardSchema,
+  boardSpec,
+  kindOf,
+  runJsonAction,
+  summarySpec,
+  verifySpec,
+  visibilitySpec,
+  type JsonSpec,
+} from "./contract"
 
 function clone(spec: JsonSpec): JsonSpec {
   return JSON.parse(JSON.stringify(spec)) as JsonSpec
@@ -114,6 +125,28 @@ describe("typed render contract second component family (summary)", () => {
     spec.root.slots!["items"]![1]!.props["value"] = { state: "/board/metrics/missing" }
 
     expect(codes(spec)).toContain("unknown_state_path")
+  })
+})
+
+describe("typed render contract schema kind soundness", () => {
+  test("classifies an object schema node as object, not array", () => {
+    expect(kindOf(boardSchema)).toBe("object")
+    expect(kindOf(boardSchema)).not.toBe("array")
+  })
+})
+
+describe("typed render contract compile-typed authoring surface", () => {
+  test("the authored conditional-visibility spec passes the runtime verifier", () => {
+    expect(verifySpec(visibilitySpec)).toEqual({ ok: true, spec: visibilitySpec })
+  })
+
+  test("the authored spec is portable JSON with no brand leakage", () => {
+    expect(JSON.parse(JSON.stringify(visibilitySpec))).toEqual(visibilitySpec)
+  })
+
+  test("the typed builder emits the exact JSON artifact the verifier consumes (no semantic fork)", () => {
+    expect(authoredBoardSpec).toEqual(boardSpec)
+    expect(verifySpec(authoredBoardSpec)).toEqual({ ok: true, spec: authoredBoardSpec })
   })
 })
 

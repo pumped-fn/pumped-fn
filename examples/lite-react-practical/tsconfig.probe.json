@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "tests/setup.browser.ts",
+    "research/typed-render-contract/contract.ts",
+    "research/typed-render-contract/authoring.ts",
+    "research/typed-render-contract/view.tsx",
+    "research/typed-render-contract/contract.test.ts",
+    "research/typed-render-contract/view.browser.test.tsx",
+    "research/typed-render-contract/fixtures.bad.ts"
+  ]
+}

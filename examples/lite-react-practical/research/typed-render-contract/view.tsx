@@ -8,6 +8,7 @@ import {
   runJsonAction,
   summarySpec,
   verifySpec,
+  visibilitySpec,
   type BoardState,
   type Card,
   type JsonAction,
@@ -55,6 +56,13 @@ function TypedRenderBoard() {
 
 function TypedRenderSummary() {
   const spec = getVerifiedSpec(summarySpec)
+  const access = useScopedValue(board)
+  const execute = useExecute()
+  return <>{renderNode(spec.root, access.snapshot, execute)}</>
+}
+
+function TypedRenderVisibility() {
+  const spec = getVerifiedSpec(visibilitySpec)
   const access = useScopedValue(board)
   const execute = useExecute()
   return <>{renderNode(spec.root, access.snapshot, execute)}</>
@@ -145,4 +153,4 @@ function FragmentNode({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export { TypedRenderBoard, TypedRenderSummary }
+export { TypedRenderBoard, TypedRenderSummary, TypedRenderVisibility }

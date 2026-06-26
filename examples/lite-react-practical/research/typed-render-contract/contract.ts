@@ -1,7 +1,8 @@
 import { flow, typed, type Lite } from "@pumped-fn/lite"
 import { scopedValue } from "@pumped-fn/lite-react"
+import { createAuthor } from "./authoring"
 
-type ValueKind = "string" | "number" | "boolean" | "nullableString" | "array"
+type ValueKind = "string" | "number" | "boolean" | "nullableString" | "array" | "object"
 type KindFor<T> =
   [T] extends [readonly unknown[]] ? "array" :
     [null] extends [T] ? "nullableString" :
@@ -12,6 +13,11 @@ type KindFor<T> =
 type FieldsKindOf<T> = {
   [K in keyof T]: KindFor<T[K]>
 }
+type KindOfSchema<S extends BaseSchema> =
+  S extends LeafSchema<infer T> ? KindFor<T> :
+    S extends { node: "array" } ? "array" :
+      S extends { node: "object" } ? "object" :
+        never
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
 type Assert<T extends true> = T
 
@@ -36,7 +42,7 @@ interface ObjectSchema<F extends Record<string, BaseSchema>> extends BaseSchema 
 }
 type Infer<S extends BaseSchema> = S extends { readonly _type: (value: infer T) => unknown } ? T : never
 
-const leaf = <T>(kind: ValueKind): LeafSchema<T> => ({ node: "leaf", kind, _type: (value) => value })
+const leaf = <T>(kind: KindFor<T>): LeafSchema<T> => ({ node: "leaf", kind, _type: (value) => value })
 
 const k = {
   string: leaf<string>("string"),
@@ -112,7 +118,9 @@ function objectFields(schema: BaseSchema): Record<string, BaseSchema> {
 }
 
 function kindOf(schema: BaseSchema): ValueKind {
-  return schema.node === "leaf" ? (schema as LeafSchema<unknown>).kind : "array"
+  if (schema.node === "leaf") return (schema as LeafSchema<unknown>).kind
+  if (schema.node === "object") return "object"
+  return "array"
 }
 
 function fieldsKindOf(schema: BaseSchema): Record<string, ValueKind> {
@@ -143,18 +151,28 @@ function buildStateTokens(schema: BaseSchema): Record<string, StateToken> {
   return tokens
 }
 
-function defineCatalog<const C extends Record<string, {
+type CatalogInput = Record<string, {
   props: Record<string, BaseSchema>
   slots: Record<string, SlotSpec>
   events: Record<string, Record<string, ValueKind>>
   capabilities: string[]
-}>>(catalog: C): Record<string, ComponentSchema> {
+}>
+type TypedCatalog<C extends CatalogInput> = {
+  [N in keyof C]: {
+    props: { [P in keyof C[N]["props"]]: KindOfSchema<C[N]["props"][P]> }
+    slots: C[N]["slots"]
+    events: C[N]["events"]
+    capabilities: string[]
+  }
+}
+
+function defineCatalog<const C extends CatalogInput>(catalog: C): TypedCatalog<C> {
   return Object.fromEntries(Object.entries(catalog).map(([name, entry]) => [name, {
     props: Object.fromEntries(Object.entries(entry.props).map(([prop, schema]) => [prop, kindOf(schema)])),
     slots: entry.slots,
     events: entry.events,
     capabilities: entry.capabilities,
-  }]))
+  }])) as TypedCatalog<C>
 }
 
 type PathEntry<S extends BaseSchema, P extends string> =
@@ -288,15 +306,15 @@ const loadCardDetails = flow({
   },
 })
 
-function action<F extends Lite.Flow<any, any>>(
+function action<F extends Lite.Flow<any, any>, const Fields extends Record<string, BaseSchema>>(
   flow: F,
   input: {
     readonly node: "object"
-    readonly fields: Record<string, BaseSchema>
+    readonly fields: Fields
     readonly _type: (value: Lite.Utils.FlowInput<F>) => Lite.Utils.FlowInput<F>
   }
-): ActionToken {
-  return { flow, params: fieldsKindOf(input) }
+): { flow: Lite.Flow<any, any>; params: { [K in keyof Fields]: KindOfSchema<Fields[K]> } } {
+  return { flow, params: fieldsKindOf(input) as { [K in keyof Fields]: KindOfSchema<Fields[K]> } }
 }
 
 const actionRegistry = {
@@ -484,6 +502,75 @@ const summarySpec: JsonSpec = {
     },
   },
 }
+
+const author = createAuthor({ catalog: components, registry: actionRegistry, schema: boardSchema })
+
+const visibilitySpec: JsonSpec = author.spec(
+  author.node("Stack", {
+    props: { direction: "vertical" },
+    slots: {
+      children: [
+        author.node("Badge", {
+          props: {
+            text: author.template("Done count: {count}", { count: author.state("/board/metrics/done") }),
+            tone: "info",
+          },
+          visible: { state: "/board/showDone", eq: true },
+        }),
+        author.node("Badge", {
+          props: {
+            text: author.state("/board/summary/lastMove"),
+            tone: "muted",
+          },
+          visible: { state: "/board/showDone", eq: false },
+        }),
+      ],
+    },
+  })
+)
+
+const authoredBoardSpec: JsonSpec = author.spec(
+  author.node("Stack", {
+    props: { direction: "vertical" },
+    watch: {
+      "/board/selectedCardId": {
+        flow: "loadCardDetails",
+        params: { cardId: author.state("/board/selectedCardId") },
+      },
+    },
+    slots: {
+      children: [
+        author.node("Text", {
+          props: {
+            text: author.template("Status: {lastMove}", { lastMove: author.state("/board/summary/lastMove") }),
+          },
+        }),
+        author.node("SortableList", {
+          props: { items: author.state("/board/cards") },
+          on: {
+            move: (ev) => ({
+              flow: "moveCard",
+              params: {
+                cardId: ev("cardId"),
+                fromColumnId: ev("fromColumnId"),
+                toColumnId: ev("toColumnId"),
+                toIndex: ev("toIndex"),
+              },
+            }),
+          },
+          slots: {
+            item: author.repeat(cardSchema, (it) => [
+              author.node("Card", {
+                props: { title: it("title"), done: it("done") },
+                visible: { state: "/board/showDone", eq: true },
+              }),
+            ]),
+          },
+        }),
+      ],
+    },
+  })
+)
 
 function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
   const errors: VerificationError[] = []
@@ -721,6 +808,10 @@ type MetricsTotalKindIsNumber = Assert<Equal<KindFor<PathValue<"/board/metrics/t
 type StateTypeMatchesSchema = Assert<Equal<BoardState["board"]["metrics"]["done"], number>>
 type MovePayloadColumnKindIsString = Assert<Equal<FieldsKindOf<MoveCardInput>["toColumnId"], "string">>
 type MoveInputDerivedFromSchema = Assert<Equal<MoveCardInput, Infer<typeof moveCardInput>>>
+type BoardSchemaKindIsObject = Assert<Equal<KindOfSchema<typeof boardSchema>, "object">>
+type CardSchemaKindIsObject = Assert<Equal<KindOfSchema<typeof cardSchema>, "object">>
+type ObjectSchemaIsNotArrayKind = Assert<Equal<KindOfSchema<typeof boardSchema> extends "array" ? true : false, false>>
+type SummaryNestedObjectKindIsObject = Assert<Equal<KindOfSchema<typeof columnSchema>, "object">>
 
 export {
   board,
@@ -731,6 +822,10 @@ export {
   action,
   actionRegistry,
   boardSchema,
+  cardSchema,
+  author,
+  leaf,
+  kindOf,
   path,
   runJsonAction,
   readPath,
@@ -738,6 +833,8 @@ export {
   actionParams,
   boardSpec,
   summarySpec,
+  visibilitySpec,
+  authoredBoardSpec,
   verifySpec,
 }
 export type {
@@ -751,10 +848,22 @@ export type {
   MoveCardInput,
   RenderActionInput,
   KindFor,
+  KindOfSchema,
   FieldsKindOf,
   Infer,
   Path,
   PathValue,
+  ValueKind,
+  BaseSchema,
+  LeafSchema,
+  ArraySchema,
+  ObjectSchema,
+  PathMap,
+  SlotSpec,
+  BoardSchemaKindIsObject,
+  CardSchemaKindIsObject,
+  ObjectSchemaIsNotArrayKind,
+  SummaryNestedObjectKindIsObject,
   ShowDoneKindIsBoolean,
   MissingPathRejected,
   CardTitlePathIsString,
