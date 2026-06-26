@@ -1,0 +1,14 @@
+{
+  "committed_at": "2026-06-26T12:04:23Z",
+  "idempotency_key": "dkr3-apply-13b0877b",
+  "key_sha256": "fa3f29a508528ab3682936c254e0bb511bba676cc68e21a442549e022d4c5419",
+  "payload": {
+    "acceptance_status": "deterministic_side_confirmed; awaiting 2 independent reviews before checkpoint acceptance",
+    "branch": "okra/json-render-spec-loop",
+    "commit": "13b0877b",
+    "deterministic_checks": "typecheck 0err; compile-gate strip-proof 12->13 errors; verifier 20/20; browser 3/3; lint 158/0; git diff --check clean",
+    "move": "apply DKR3-gate candidate commit",
+    "single_llm_truth_acceptance_count": 0
+  },
+  "payload_sha256": "55bccfae29af82dbe1e450e6b66a284c331e680cc88ff8cffb04a266e5e11d99"
+}
