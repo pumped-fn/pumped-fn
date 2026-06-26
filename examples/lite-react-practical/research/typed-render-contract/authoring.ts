@@ -1,10 +1,13 @@
 import type {
   BaseSchema,
+  CondLiteral,
+  DisplayKind,
   JsonExpr,
   JsonNode,
   JsonSpec,
   KindFor,
   PathMap,
+  RepeatSlot,
   SlotSpec,
   ValueKind,
 } from "./contract"
@@ -29,7 +32,6 @@ type Bind<K extends ValueKind> =
   | EventBind<K>
   | (K extends "nullableString" ? TemplateBind : never)
 
-type DisplayKind = Exclude<ValueKind, "array" | "object">
 type DisplayArg =
   | string
   | number
@@ -39,13 +41,6 @@ type DisplayArg =
   | ItemBind<DisplayKind>
   | EventBind<DisplayKind>
   | TemplateBind
-
-type CondLiteral<K extends ValueKind> =
-  K extends "string" ? string :
-    K extends "number" ? number :
-      K extends "boolean" ? boolean :
-        K extends "nullableString" ? string | null :
-          never
 
 type CatalogComponent = {
   props: Record<string, ValueKind>
@@ -79,7 +74,7 @@ type VisibleBind<Schema extends BaseSchema> = {
 }[Path<Schema>]
 
 type RepeatSlots<C extends Catalog, T extends keyof C> =
-  { [S in keyof C[T]["slots"]]-?: C[T]["slots"][S] extends { repeats: string } ? S : never }[keyof C[T]["slots"]]
+  { [S in keyof C[T]["slots"]]-?: C[T]["slots"][S] extends RepeatSlot ? S : never }[keyof C[T]["slots"]]
 type PlainSlots<C extends Catalog, T extends keyof C> = Exclude<keyof C[T]["slots"], RepeatSlots<C, T>>
 
 type HasRepeatSlot<C extends Catalog, T extends keyof C> = [RepeatSlots<C, T>] extends [never] ? false : true
@@ -99,15 +94,23 @@ type ItemAccessorForSlot<
   S extends keyof C[T]["slots"],
   P,
 > =
-  C[T]["slots"][S] extends { repeats: infer Prop extends string }
-    ? P[Prop & keyof P] extends StateBind<infer Pth extends string, ValueKind>
-      ? ItemAccessorFromPath<Schema, Pth>
+  C[T]["slots"][S] extends RepeatSlot
+    ? C[T]["slots"][S] extends { repeats: infer Prop extends string }
+      ? P[Prop & keyof P] extends StateBind<infer Pth extends string, "array">
+        ? ItemAccessorFromPath<Schema, Pth>
+        : never
       : never
     : never
 
+type RepeatBuilder<Acc> = [Acc] extends [never] ? never : (it: Acc) => readonly Authored<false>[]
+
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+type Assert<T extends true> = T
+type ItNeverEdgeUnconstructible = Assert<Equal<RepeatBuilder<never>, never>>
+
 type SlotConfig<C extends Catalog, Schema extends BaseSchema, T extends keyof C, P> =
   & { [S in PlainSlots<C, T>]?: readonly Authored<boolean>[] }
-  & { [S in RepeatSlots<C, T>]?: (it: ItemAccessorForSlot<C, Schema, T, S, P>) => readonly Authored<false>[] }
+  & { [S in RepeatSlots<C, T>]?: RepeatBuilder<ItemAccessorForSlot<C, Schema, T, S, P>> }
 
 type NodeConfig<C extends Catalog, R extends Registry, Schema extends BaseSchema, T extends keyof C, P> = {
   readonly props: P

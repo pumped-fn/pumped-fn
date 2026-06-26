@@ -2,7 +2,8 @@ import { flow, typed, type Lite } from "@pumped-fn/lite"
 import { scopedValue } from "@pumped-fn/lite-react"
 import { createAuthor } from "./authoring"
 
-type ValueKind = "string" | "number" | "boolean" | "nullableString" | "array" | "object"
+const valueKinds = ["string", "number", "boolean", "nullableString", "array", "object"] as const
+type ValueKind = (typeof valueKinds)[number]
 type KindFor<T> =
   [T] extends [readonly unknown[]] ? "array" :
     [null] extends [T] ? "nullableString" :
@@ -54,7 +55,10 @@ const k = {
   object: <const F extends Record<string, BaseSchema>>(fields: F): ObjectSchema<F> => ({ node: "object", fields, _type: (value) => value }),
 }
 
-const displayableKinds: ReadonlySet<ValueKind> = new Set(["string", "number", "boolean", "nullableString"])
+const nonDisplayableKinds = ["array", "object"] as const satisfies readonly ValueKind[]
+type DisplayKind = Exclude<ValueKind, (typeof nonDisplayableKinds)[number]>
+const nonDisplayableKindSet: ReadonlySet<ValueKind> = new Set(nonDisplayableKinds)
+const displayableKinds: ReadonlySet<ValueKind> = new Set(valueKinds.filter((kind) => !nonDisplayableKindSet.has(kind)))
 
 type JsonValue = string | number | boolean | null
 type JsonExpr =
@@ -82,7 +86,8 @@ type JsonNode = {
 type JsonSpec = {
   root: JsonNode
 }
-type SlotSpec = true | { repeats: string }
+type RepeatSlot = { repeats: string }
+type SlotSpec = true | RepeatSlot
 type ComponentSchema = {
   props: Record<string, ValueKind>
   slots: Record<string, SlotSpec>
@@ -605,9 +610,17 @@ const watchSpec: JsonSpec = author.spec(
   })
 )
 
-function hasRepeatingSlot(component: ComponentSchema): boolean {
-  return Object.values(component.slots).some((slot) => slot !== true)
+function isRepeatingSlot(slot: SlotSpec): slot is RepeatSlot {
+  return slot !== true && "repeats" in slot
 }
+
+function hasRepeatingSlot(component: ComponentSchema): boolean {
+  return Object.values(component.slots).some(isRepeatingSlot)
+}
+
+type SlotPredicate<G extends SlotSpec> = (slot: SlotSpec) => slot is G
+type RepeatingSlotGuard = typeof isRepeatingSlot extends SlotPredicate<infer G> ? G : never
+type IsRepeatingSlotGuardsRepeatSlot = Assert<Equal<RepeatingSlotGuard, RepeatSlot>>
 
 function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
   const errors: VerificationError[] = []
@@ -670,7 +683,7 @@ function verifyNode(
   if (node.visible) verifyCondition(node.visible, `${location}.visible`, ctx, errors)
   for (const [slot, children] of Object.entries(node.slots ?? {})) {
     const slotSpec = component.slots[slot]
-    const repeats = slotSpec !== undefined && slotSpec !== true ? slotSpec : undefined
+    const repeats = slotSpec !== undefined && isRepeatingSlot(slotSpec) ? slotSpec : undefined
     const childItem = repeats
       ? repeatItemContext(node, repeats, ctx, errors, `${location}.slots.${slot}`)
       : item
@@ -681,7 +694,7 @@ function verifyNode(
 
 function repeatItemContext(
   node: JsonNode,
-  slot: { repeats: string },
+  slot: RepeatSlot,
   ctx: VerifyContext,
   errors: VerificationError[],
   location: string
@@ -817,12 +830,21 @@ function templatePlaceholders(template: string): Set<string> {
   return new Set(Array.from(template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)).map((match) => match[1]!))
 }
 
+type CondGuard<T extends JsonValue> = { matches: (value: JsonValue) => value is T }
+const condLiterals = {
+  string: { matches: (value: JsonValue): value is string => typeof value === "string" },
+  number: { matches: (value: JsonValue): value is number => typeof value === "number" },
+  boolean: { matches: (value: JsonValue): value is boolean => typeof value === "boolean" },
+  nullableString: { matches: (value: JsonValue): value is string | null => value === null || typeof value === "string" },
+}
+type CondLiteral<K extends ValueKind> =
+  K extends keyof typeof condLiterals
+    ? (typeof condLiterals)[K] extends CondGuard<infer T> ? T : never
+    : never
+
 function literalMatches(value: JsonValue, kind: ValueKind): boolean {
-  if (kind === "string") return typeof value === "string"
-  if (kind === "number") return typeof value === "number"
-  if (kind === "boolean") return typeof value === "boolean"
-  if (kind === "nullableString") return value === null || typeof value === "string"
-  return false
+  const guard = condLiterals[kind as keyof typeof condLiterals]
+  return guard !== undefined && guard.matches(value)
 }
 
 function readPath(state: BoardState, path: string): unknown {
@@ -909,6 +931,9 @@ export type {
   ObjectSchema,
   PathMap,
   SlotSpec,
+  RepeatSlot,
+  DisplayKind,
+  CondLiteral,
   BoardSchemaKindIsObject,
   CardSchemaKindIsObject,
   ObjectSchemaIsNotArrayKind,
