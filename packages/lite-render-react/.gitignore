@@ -1,0 +1,5 @@
+node_modules
+dist
+__screenshots__/
+test-results/
+*.png
