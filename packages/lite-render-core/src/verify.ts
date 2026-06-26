@@ -85,7 +85,7 @@ function verifyNode(
     if (!ctx.state[watchedPath]) {
       errors.push({ code: "unknown_state_path", path: `${location}.watch.${watchedPath}`, message: `${watchedPath} is not a known state path` })
     }
-    verifyAction(action, `${location}.watch.${watchedPath}`, ctx, item, undefined, errors)
+    verifyAction(action, `${location}.watch.${watchedPath}`, ctx, undefined, undefined, errors)
   }
   if (node.visible) verifyCondition(node.visible, `${location}.visible`, ctx, errors)
   for (const [slot, children] of Object.entries(node.slots ?? {})) {

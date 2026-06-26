@@ -74,3 +74,21 @@ export const badArrayOfArraysOfObjectsItem = author.node("MatrixList", {
     ],
   },
 })
+
+export const badWatchItemParam = author.node("RowList", {
+  props: { rows: author.state("/dashboard/rows") },
+  slots: {
+    row: (it) => [
+      author.node("RowCard", {
+        props: { name: it("name"), active: it("active") },
+        watch: {
+          "/dashboard/filter": {
+            flow: "selectRow",
+            // @ts-expect-error a watch action param cannot bind to the repeat item; watches are global change-detection (one per authored node, fired on the absolute state path), not per-row
+            params: { rowId: it("name") },
+          },
+        },
+      }),
+    ],
+  },
+})

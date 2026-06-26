@@ -33,7 +33,7 @@ describe("BUG 1 — template placeholder reuse resolves in every position", () =
 })
 
 const itemSchema = k.object({ id: k.string, title: k.string })
-const listSchema = k.object({ items: k.array(itemSchema) })
+const listSchema = k.object({ items: k.array(itemSchema), focus: k.string })
 type ListState = Infer<typeof listSchema>
 
 const store = stateResource((): ListState => ({
@@ -41,6 +41,7 @@ const store = stateResource((): ListState => ({
     { id: "a", title: "Alpha" },
     { id: "b", title: "Beta" },
   ],
+  focus: "",
 }))
 
 const removeInput = k.object({ id: k.string })
@@ -49,7 +50,7 @@ const removeItem = flow({
   parse: typed<Infer<typeof removeInput>>(),
   deps: { access: store },
   factory: (ctx, { access }) => {
-    access.update((state) => ({ items: state.items.filter((entry) => entry.id !== ctx.input.id) }))
+    access.update((state) => ({ ...state, items: state.items.filter((entry) => entry.id !== ctx.input.id) }))
     return ctx.input.id
   },
 })
@@ -129,5 +130,43 @@ describe("BUG 3 — item-bound action params dispatch the supplied repeat item",
 
     await ctx.close()
     await scope.dispose()
+  })
+})
+
+describe("WATCH item-param — watches are global, so an item bind is rejected", () => {
+  function codes(spec: JsonSpec): string[] {
+    const result = verifySpec(spec, context)
+    return result.ok ? [] : result.errors.map((error) => error.code)
+  }
+
+  test("verifySpec REJECTS a watch action param bound to the repeat item (node inside a repeat)", () => {
+    const spec: JsonSpec = {
+      root: {
+        type: "List",
+        props: { items: { state: "/items" } },
+        slots: {
+          row: [
+            {
+              type: "Row",
+              props: { title: { item: "title" } },
+              watch: { "/items": { flow: "removeItem", params: { id: { item: "id" } } } },
+            },
+          ],
+        },
+      },
+    }
+    expect(codes(spec)).toContain("unknown_item_path")
+  })
+
+  test("verifySpec ACCEPTS a watch action param bound to a state path", () => {
+    const spec: JsonSpec = {
+      root: {
+        type: "List",
+        props: { items: { state: "/items" } },
+        watch: { "/focus": { flow: "removeItem", params: { id: { state: "/focus" } } } },
+        slots: { row: [{ type: "Row", props: { title: { item: "title" } } }] },
+      },
+    }
+    expect(verifySpec(spec, context)).toEqual({ ok: true, spec })
   })
 })

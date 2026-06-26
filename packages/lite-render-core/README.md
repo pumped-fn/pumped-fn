@@ -56,9 +56,19 @@ Author: `createAuthor`; types `Author`, `Authored`, `ItNeverEdgeUnconstructible`
 unknown component, unknown/missing prop, wrong prop value kind, unknown slot, unknown event, unknown flow,
 wrong flow payload kind, unbound template placeholder, unreferenced template arg, non-displayable template
 arg (array/object interpolated into text), repeat item field outside the catalog-derived item scope,
-unsupported renderer capability, invalid `visible.eq` literal kind, and a nested repeating slot
-(`nested_repeat_forbidden`: a repeating-slot component anywhere inside another repeating slot, directly or
-transitively).
+an `{item:…}` bind in a **watch** param (see below), unsupported renderer capability, invalid `visible.eq`
+literal kind, and a nested repeating slot (`nested_repeat_forbidden`: a repeating-slot component anywhere
+inside another repeating slot, directly or transitively).
+
+## `on` events vs `watch` (item scope)
+
+An `on` event fires per rendered instance, so inside a repeat its action params may bind `{item:…}` — the host
+passes the live repeat element as the dispatch `item`. A `watch` is **global** change-detection: it is
+collected once per authored node and fired on the absolute state path, not per row, so a per-row `item` is
+meaningless. The verifier therefore validates `watch` actions with **no item context** (a `{item:…}` watch
+param fails with `unknown_item_path`), and the typed `watch` builder accepts only literal / `{state:…}` /
+template binds — so the compile gate and the runtime gate mirror. `{item:…}` is valid only in `on` event
+params.
 
 ## Single-source predicates
 

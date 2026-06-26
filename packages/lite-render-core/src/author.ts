@@ -59,6 +59,15 @@ type EventHandler<R extends Registry> = {
   [FK in keyof R & string]: { readonly flow: FK; readonly params: PropsBind<R[FK]["params"]> }
 }[keyof R & string]
 
+type WatchBind<K extends ValueKind> =
+  | LiteralFor<K>
+  | StateBind<string, K>
+  | (K extends "nullableString" ? TemplateBind : never)
+type WatchPropsBind<P extends Record<string, ValueKind>> = { [K in keyof P]: WatchBind<P[K]> }
+type WatchHandler<R extends Registry> = {
+  [FK in keyof R & string]: { readonly flow: FK; readonly params: WatchPropsBind<R[FK]["params"]> }
+}[keyof R & string]
+
 type EventAccessor<Shape extends Record<string, ValueKind>> =
   <F extends keyof Shape & string>(field: F) => EventBind<Shape[F]>
 
@@ -132,7 +141,7 @@ type NodeConfig<C extends Catalog, R extends Registry, Schema extends BaseSchema
   readonly props: P
   readonly slots?: SlotConfig<C, Schema, T, P>
   readonly on?: { [E in keyof C[T]["events"]]?: (ev: EventAccessor<C[T]["events"][E]>) => EventHandler<R> }
-  readonly watch?: Partial<Record<Path<Schema>, EventHandler<R>>>
+  readonly watch?: Partial<Record<Path<Schema>, WatchHandler<R>>>
   readonly visible?: VisibleBind<Schema>
 }
 
