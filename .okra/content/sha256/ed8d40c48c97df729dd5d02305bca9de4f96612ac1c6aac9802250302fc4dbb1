@@ -1,0 +1,15 @@
+{
+  "type": "independent_review",
+  "reviewer": "next-fork+metric-honesty",
+  "subject": "DKR4 774b0b20",
+  "verdict": "block",
+  "fork": "REPEAT dimension: bind /board/columns to items + author.repeat(cardSchema) -> compile-accept, verifier-reject (unknown_item_path). author.repeat takes item schema manually, decoupled from bound array.",
+  "metric_honesty": {
+    "validated_spec_cases_passed": "4 count-correct BUT watchSpec is largely a RESKIN of boardSpec's watch (byte-identical binding, only template-prefix delta); 4 behaviors already covered by 3 specs; 4th added primarily to reach >=4",
+    "gate": "opt-in; raw JsonSpec bypasses builder"
+  },
+  "blocking_gaps": [
+    "repeat non-mirror",
+    "README 'exhaustive battery/no fork' over-claims (covers 2 of 6+ binding dimensions)"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "type": "independent_review",
+  "reviewer": "structural+cast",
+  "subject": "DKR4 774b0b20",
+  "verdict": "converge_accept_candidate",
+  "key": "claims 1-3 upheld; battery 9/10 genuine, object row one-sided; StateTokenKeysMirrorPathSet TAUTOLOGICAL (cast-defeated); mirror held by hand-aligned parallel code not tsc; walls clear (notes only)",
+  "blocking_gaps": []
+}
