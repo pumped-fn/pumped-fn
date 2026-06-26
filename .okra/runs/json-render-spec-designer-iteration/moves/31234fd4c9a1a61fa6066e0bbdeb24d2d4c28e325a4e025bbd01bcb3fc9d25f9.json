@@ -1,0 +1,14 @@
+{
+  "committed_at": "2026-06-26T12:39:30Z",
+  "idempotency_key": "dkr4-apply-774b0b20",
+  "key_sha256": "31234fd4c9a1a61fa6066e0bbdeb24d2d4c28e325a4e025bbd01bcb3fc9d25f9",
+  "payload": {
+    "acceptance_status": "deterministic confirmed; 2 independent reviews running (next-fork hunt); NOT accepted",
+    "commit": "774b0b20",
+    "deterministic_checks": "committed==verified: typecheck 0; verifier 23/23; browser 4/4; lint 157/0; diff-check clean",
+    "move": "apply DKR4-mirror candidate (recommitted after git-slip recovery)",
+    "single_llm_truth_acceptance_count": 0,
+    "supersedes_bad_commit": "c9d0fb07 (deletion-only)"
+  },
+  "payload_sha256": "a51b9682668a3c538f6ae1466f98fc64f89f81b94c94e979c16b0c87b607bb96"
+}
