@@ -1,0 +1,16 @@
+{
+  "type": "independent_review",
+  "reviewer": "structural construction claims",
+  "subject": "DKR5 a564d0c7",
+  "verdict": "converge_accept_candidate",
+  "scope": "PER-DIMENSION IN ISOLATION \u2014 did not test nesting/composition",
+  "upheld": [
+    "CollectTokens genuinely independent of PathMap (assert de-tautologised)",
+    "repeat by construction (it from props[slot.repeats])",
+    "event/action-param/watch-flow one-source (same components/actionRegistry)",
+    "runtime mirror test catches collectTokens emit-drift",
+    "no boundary-cast risk to the asserted type"
+  ],
+  "designer_facing_single_dim": "none on current board",
+  "latent": "empty-builder it:never with non-state array bind (unconstructible on this schema); DisplayKind/displayableKinds + CondLiteral/literalMatches battery-guarded parallels"
+}

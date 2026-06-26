@@ -1,0 +1,14 @@
+{
+  "type": "independent_review",
+  "reviewer": "8th-fork cross-dimension hunt",
+  "subject": "DKR5 a564d0c7",
+  "verdict": "block",
+  "fork": "nested-repeat (SortableList in SortableList item slot): outer itCard captured into inner repeat -> compile-accept, verifier-reject; same-kind collision -> both green, renders wrong",
+  "honesty": "validated_spec_cases_passed not honestly 4 (watchSpec reskin, no new render proof this pass); single-level construction real but compositional axis untested",
+  "fix": "brand ItemBind with originating-repeat scope token (forbid outer it in inner slot) OR verifier carries repeat-depth-qualified item path",
+  "blocking_gaps": [
+    "nested-repeat fork",
+    "silent-unsound same-kind collision",
+    "count honesty"
+  ]
+}
