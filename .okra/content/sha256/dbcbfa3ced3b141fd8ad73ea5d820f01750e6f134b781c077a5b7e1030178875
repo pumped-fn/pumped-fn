@@ -1,0 +1,31 @@
+{
+  "type": "independent_review",
+  "reviewer": "PKR2 misrender hunt",
+  "subject": "f7f476ad",
+  "verdict": "block",
+  "bugs_deterministically_confirmed": [
+    {
+      "id": "template-reuse",
+      "where": "core action.ts:46 resolveExpr",
+      "defect": "text.replace(`{name}`,...) replaces FIRST occurrence only; verifier accepts reuse (templatePlaceholders Set); reused placeholder leaks literal {name}",
+      "fix": ".replaceAll / global regex",
+      "scope": "in the ALREADY-ACCEPTED core (type-mirror reviews missed resolver runtime)"
+    },
+    {
+      "id": "sibling-watch",
+      "where": "react render.tsx:88-101 useWatchEffects",
+      "defect": "seen Map keyed by PATH only; two nodes watching same path -> first sets seen[path]=current, second sees ===current and is skipped -> second action dropped; verifier validates each watch independently",
+      "fix": "key change-detection per watch ENTRY (node/index,path) not per path"
+    }
+  ],
+  "faithful_paths_clear": [
+    "event-payload dispatch",
+    "visible",
+    "repeat-context",
+    "array-erasure (sound)",
+    "narrower-prop subtyping (sound)",
+    "lite-bypass clear",
+    "lazy clear"
+  ],
+  "note": "both are runtime verified-spec-renders-wrong bugs, not type-forks; small fixes; NOT product decisions"
+}

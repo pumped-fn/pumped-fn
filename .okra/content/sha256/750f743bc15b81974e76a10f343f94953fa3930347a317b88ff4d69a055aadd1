@@ -1,0 +1,32 @@
+{
+  "type": "independent_review",
+  "reviewer": "PKR2 faithfulness+mirror",
+  "subject": "f7f476ad",
+  "verdict": "block",
+  "corroborates": "sibling-watch collapse (independently confirmed = bug 2)",
+  "cleared": [
+    "type mirror genuine (components.bad.ts proves wrong-kind impl fails tsc)",
+    "narrower-prop subtyping + array-erasure sound",
+    "walls react/lite-bypass/lazy/semantic-fork held",
+    "deps core-public-only"
+  ],
+  "new_findings": [
+    {
+      "id": "item-action-param",
+      "severity": "real (A scoped non-blocking-for-PKR2; orchestrator treats as in-scope correctness)",
+      "where": "core createRunJsonAction + RenderActionInput; react event lowering",
+      "defect": "verifier ACCEPTS an on/watch action param bound to a repeat item (it('id')); createRunJsonAction dispatches with item=undefined -> param silently undefined. Per-item actions are a core list-UI pattern.",
+      "fix": "thread item context through dispatch (RenderActionInput item channel + react on-handler passes current repeat item)"
+    },
+    {
+      "id": "dep-declaration",
+      "severity": "minor",
+      "where": "react package.json",
+      "defect": "import type {Lite} from @pumped-fn/lite but only devDep -> published .d.ts references undeclared package",
+      "fix": "add @pumped-fn/lite as peerDependency"
+    }
+  ],
+  "blocking_gaps": [
+    "sibling-watch collapse"
+  ]
+}
