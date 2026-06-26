@@ -66,7 +66,7 @@ type ErasedNodeProps = {
 type RenderEnv = {
   components: Record<string, ComponentType<ErasedNodeProps>>
   catalog: VerifyContext["components"]
-  execute: (action: JsonAction, event?: Record<string, unknown>) => void
+  execute: (action: JsonAction, item?: Record<string, unknown>, event?: Record<string, unknown>) => void
 }
 
 const verifiedSpecs = new WeakMap<JsonSpec, JsonSpec>()
@@ -86,21 +86,23 @@ function collectWatches(node: JsonNode, out: [string, JsonAction][]): void {
 }
 
 function useWatchEffects(root: JsonNode, state: unknown, execute: (action: JsonAction) => void): void {
-  const previous = useRef<Map<string, unknown>>(new Map())
+  const previous = useRef<Map<number, unknown>>(new Map())
   useEffect(() => {
     const watches: [string, JsonAction][] = []
     collectWatches(root, watches)
+    const snapshot = new Map<string, unknown>()
+    for (const [path] of watches) if (!snapshot.has(path)) snapshot.set(path, readPath(state, path))
     const seen = previous.current
-    for (const [path, action] of watches) {
-      const current = readPath(state, path)
-      if (!seen.has(path)) {
-        seen.set(path, current)
-        continue
+    watches.forEach(([path, action], entry) => {
+      const current = snapshot.get(path)
+      if (!seen.has(entry)) {
+        seen.set(entry, current)
+        return
       }
-      if (seen.get(path) === current) continue
-      seen.set(path, current)
+      if (seen.get(entry) === current) return
+      seen.set(entry, current)
       execute(action)
-    }
+    })
   })
 }
 
@@ -141,7 +143,7 @@ function renderNode(
 
   const on: Record<string, (event?: Record<string, unknown>) => void> = {}
   for (const [eventName, action] of Object.entries(node.on ?? {})) {
-    on[eventName] = (event) => env.execute(action, event)
+    on[eventName] = (event) => env.execute(action, item, event)
   }
 
   return <Impl props={props} slots={slots} on={on} />
@@ -165,8 +167,12 @@ function JsonRender<const C extends RenderCatalog, State>(props: JsonRenderProps
   const view = useScopedValue(props.state)
   const { execute: runAction } = useFlow(props.dispatch)
   const execute = useCallback(
-    (action: JsonAction, event?: Record<string, unknown>) =>
-      runAction(event === undefined ? { action } : { action, event }),
+    (action: JsonAction, item?: Record<string, unknown>, event?: Record<string, unknown>) => {
+      const input: RenderActionInput = { action }
+      if (item !== undefined) input.item = item
+      if (event !== undefined) input.event = event
+      runAction(input)
+    },
     [runAction]
   )
   useWatchEffects(spec.root, view.snapshot, execute)

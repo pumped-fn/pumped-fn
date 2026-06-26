@@ -24,8 +24,8 @@ defineComponents(catalog, impls)               │  ComponentMap<Catalog>
 <JsonRender spec context components state dispatch />
   ├─ verifyCached(spec, ctx)        lazy, cached by spec identity — no import-time verify
   ├─ useScopedValue(state).snapshot reactive Lite state
-  ├─ useFlow(dispatch).execute      on/watch actions run as Lite flows
-  ├─ useWatchEffects(root, …)       watch lowering (diff watched paths -> dispatch)
+  ├─ useFlow(dispatch).execute      on/watch actions run as Lite flows ({action, item?, event?})
+  ├─ useWatchEffects(root, …)       watch lowering (per-entry diff of watched paths -> dispatch)
   └─ renderNode(...)                resolve props, render slots/repeats, apply visible, wire events
         └─> <Impl props slots on />  (the catalog component's React implementation)
 ```
@@ -49,7 +49,11 @@ hands every implementation three groups, all derived from the catalog:
   `string | null`, `readonly unknown[]`, `Record<string, unknown>`).
 - `slots` — each slot lowered to rendered children (`ReactNode[]`); a repeating slot is rendered once per
   resolved array element with that element bound as the item context.
-- `on` — each catalog event lowered to a dispatcher whose payload is the catalog event shape, kind-typed.
+- `on` — each catalog event lowered to a dispatcher whose payload is the catalog event shape, kind-typed. For
+  a node inside a repeating slot, the renderer threads the current element as the dispatch `item`, so
+  item-bound action params (`{ item: "id" }`) resolve through the core dispatcher; nodes outside any repeat
+  dispatch with no item. Two sibling nodes watching the same state path each fire their own action (the watch
+  diff is keyed per entry, not per path).
 
 Because React props are checked contravariantly, an implementation whose prop or event kind disagrees with
 the catalog fails to type-check at `defineComponents`. The renderer cannot drift from the catalog the
