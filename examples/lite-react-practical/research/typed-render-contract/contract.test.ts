@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
-import { validSpec, verifySpec, type JsonSpec } from "./contract"
+import { createScope } from "@pumped-fn/lite"
+import { board, boardSpec, runJsonAction, summarySpec, verifySpec, type JsonSpec } from "./contract"
 
 function clone(spec: JsonSpec): JsonSpec {
   return JSON.parse(JSON.stringify(spec)) as JsonSpec
@@ -11,54 +12,54 @@ function codes(spec: JsonSpec): string[] {
 }
 
 describe("typed render contract verifier", () => {
-  test("accepts the valid spec at detail level", () => {
-    expect(verifySpec(validSpec)).toEqual({ ok: true, spec: validSpec })
+  test("accepts the valid board spec at detail level", () => {
+    expect(verifySpec(boardSpec)).toEqual({ ok: true, spec: boardSpec })
   })
 
   test("rejects a bad state path", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![1]!.props["items"] = { state: "/board/missing" }
 
     expect(codes(spec)).toContain("unknown_state_path")
   })
 
   test("rejects a prop value with the wrong kind", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![0]!.props["text"] = 12
 
     expect(codes(spec)).toContain("kind_mismatch")
   })
 
   test("rejects an unknown slot", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["footer"] = []
 
     expect(codes(spec)).toContain("unknown_slot")
   })
 
   test("rejects an unknown event", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![1]!.on!["dragged"] = spec.root.slots!["children"]![1]!.on!["move"]!
 
     expect(codes(spec)).toContain("unknown_event")
   })
 
   test("rejects an unknown flow action", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![1]!.on!["move"]!.flow = "missingFlow"
 
     expect(codes(spec)).toContain("unknown_flow")
   })
 
   test("rejects a flow payload wired from the wrong event field kind", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![1]!.on!["move"]!.params["toColumnId"] = { event: "toIndex" }
 
     expect(codes(spec)).toContain("kind_mismatch")
   })
 
   test("rejects an unbound template placeholder", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![0]!.props["text"] = {
       template: "Status: {missing}",
       args: {
@@ -70,7 +71,7 @@ describe("typed render contract verifier", () => {
   })
 
   test("rejects an unreferenced template arg", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![0]!.props["text"] = {
       template: "Status",
       args: {
@@ -82,9 +83,58 @@ describe("typed render contract verifier", () => {
   })
 
   test("rejects repeat item fields outside the catalog-derived item scope", () => {
-    const spec = clone(validSpec)
+    const spec = clone(boardSpec)
     spec.root.slots!["children"]![1]!.slots!["item"]![0]!.props["title"] = { item: "missing" }
 
     expect(codes(spec)).toContain("unknown_item_path")
+  })
+})
+
+describe("typed render contract second component family (summary)", () => {
+  test("accepts the valid summary spec at detail level", () => {
+    expect(verifySpec(summarySpec)).toEqual({ ok: true, spec: summarySpec })
+  })
+
+  test("rejects a string state bound to the numeric Stat value prop", () => {
+    const spec = clone(summarySpec)
+    spec.root.slots!["items"]![0]!.props["value"] = { state: "/board/summary/lastMove" }
+
+    expect(codes(spec)).toContain("kind_mismatch")
+  })
+
+  test("rejects an unknown component in the summary family", () => {
+    const spec = clone(summarySpec)
+    spec.root.slots!["items"]![2]!.type = "Gauge"
+
+    expect(codes(spec)).toContain("unknown_component")
+  })
+
+  test("rejects a Stat bound to a non-existent state path", () => {
+    const spec = clone(summarySpec)
+    spec.root.slots!["items"]![1]!.props["value"] = { state: "/board/metrics/missing" }
+
+    expect(codes(spec)).toContain("unknown_state_path")
+  })
+})
+
+describe("typed render contract shared action registry", () => {
+  test("verifier rejects an action outside the shared registry", () => {
+    const spec = clone(summarySpec)
+    spec.root.on = { tapped: { flow: "missingFlow", params: {} } }
+
+    expect(codes(spec)).toContain("unknown_event")
+  })
+
+  test("dispatcher rejects an action outside the shared registry the verifier guards", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    await board.resolve(ctx)
+
+    await expect(
+      ctx.exec({ flow: runJsonAction, input: { action: { flow: "missingFlow", params: {} } } })
+    ).rejects.toThrow(/Unknown verified flow/)
+
+    await ctx.close()
+    await scope.dispose()
   })
 })

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, type ReactNode } from "react"
 import { useFlow, useScopedValue } from "@pumped-fn/lite-react"
 import {
   board,
+  boardSpec,
   readPath,
   resolveExpr,
   runJsonAction,
-  validSpec,
+  summarySpec,
   verifySpec,
   type BoardState,
   type Card,
@@ -15,29 +16,33 @@ import {
   type MoveCardInput,
 } from "./contract"
 
-let verifiedSpec: JsonSpec | undefined
+const verifiedSpecs = new Map<JsonSpec, JsonSpec>()
 
-function getVerifiedSpec(): JsonSpec {
-  if (verifiedSpec) return verifiedSpec
-  const result = verifySpec(validSpec)
+function getVerifiedSpec(spec: JsonSpec): JsonSpec {
+  const cached = verifiedSpecs.get(spec)
+  if (cached) return cached
+  const result = verifySpec(spec)
   if (!result.ok) {
     throw new Error(result.errors.map((error) => error.message).join("\n"))
   }
-  verifiedSpec = result.spec
-  return verifiedSpec
+  verifiedSpecs.set(spec, result.spec)
+  return result.spec
+}
+
+function useExecute() {
+  const { execute: runVerifiedAction } = useFlow(runJsonAction)
+  return useCallback((action: JsonAction, event?: MoveCardInput) => {
+    runVerifiedAction(event === undefined ? { action } : { action, event })
+  }, [runVerifiedAction])
 }
 
 function TypedRenderBoard() {
-  const spec = getVerifiedSpec()
+  const spec = getVerifiedSpec(boardSpec)
   const access = useScopedValue(board)
-  const { execute: runVerifiedAction } = useFlow(runJsonAction)
+  const execute = useExecute()
   const selected = readPath(access.snapshot, "/board/selectedCardId")
   const previousSelected = useRef(selected)
   const selectedWatchAction = spec.root.watch?.["/board/selectedCardId"]
-
-  const execute = useCallback((action: JsonAction, event?: MoveCardInput) => {
-    runVerifiedAction(event === undefined ? { action } : { action, event })
-  }, [runVerifiedAction])
 
   useEffect(() => {
     if (previousSelected.current === selected) return
@@ -45,6 +50,13 @@ function TypedRenderBoard() {
     if (selectedWatchAction) execute(selectedWatchAction)
   }, [execute, selected, selectedWatchAction])
 
+  return <>{renderNode(spec.root, access.snapshot, execute)}</>
+}
+
+function TypedRenderSummary() {
+  const spec = getVerifiedSpec(summarySpec)
+  const access = useScopedValue(board)
+  const execute = useExecute()
   return <>{renderNode(spec.root, access.snapshot, execute)}</>
 }
 
@@ -102,6 +114,30 @@ function renderNode(
     )
   }
 
+  if (node.type === "Summary") {
+    return (
+      <section aria-label="board summary" data-heading={String(resolveExpr(node.props["heading"]!, state, item))}>
+        {node.slots?.["items"]?.map((child, index) => <FragmentNode key={index}>{renderNode(child, state, execute, item)}</FragmentNode>)}
+      </section>
+    )
+  }
+
+  if (node.type === "Stat") {
+    return (
+      <div role="status" aria-label={String(resolveExpr(node.props["label"]!, state, item))}>
+        {String(resolveExpr(node.props["value"]!, state, item))}
+      </div>
+    )
+  }
+
+  if (node.type === "Badge") {
+    return (
+      <span aria-label="board badge" data-tone={String(resolveExpr(node.props["tone"]!, state, item))}>
+        {String(resolveExpr(node.props["text"]!, state, item) ?? "")}
+      </span>
+    )
+  }
+
   return null
 }
 
@@ -109,4 +145,4 @@ function FragmentNode({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export { TypedRenderBoard }
+export { TypedRenderBoard, TypedRenderSummary }

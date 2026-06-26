@@ -1,25 +1,52 @@
 import { flow, typed, type Lite } from "@pumped-fn/lite"
 import { scopedValue } from "@pumped-fn/lite-react"
 
-type Path<T> = T extends BoardState ? keyof BoardPaths & string : never
-type PathValue<T, P extends Path<T>> = T extends BoardState
-  ? P extends keyof BoardPaths
-    ? BoardPaths[P]
-    : never
-  : never
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
-type Assert<T extends true> = T
-
-type ValueKind = "string" | "number" | "boolean" | "nullableString" | "cardArray"
+type ValueKind = "string" | "number" | "boolean" | "nullableString" | "array"
 type KindFor<T> =
-  T extends readonly Card[] ? "cardArray" :
-    [T] extends [string | null] ? null extends T ? "nullableString" : "string" :
-        T extends number ? "number" :
-          T extends boolean ? "boolean" :
+  [T] extends [readonly unknown[]] ? "array" :
+    [null] extends [T] ? "nullableString" :
+      [T] extends [string] ? "string" :
+        [T] extends [number] ? "number" :
+          [T] extends [boolean] ? "boolean" :
             never
 type FieldsKindOf<T> = {
   [K in keyof T]: KindFor<T[K]>
 }
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+type Assert<T extends true> = T
+
+interface BaseSchema {
+  readonly node: "leaf" | "array" | "object"
+  readonly _type: (value: never) => unknown
+}
+interface LeafSchema<T> extends BaseSchema {
+  readonly node: "leaf"
+  readonly kind: ValueKind
+  readonly _type: (value: T) => T
+}
+interface ArraySchema<I extends BaseSchema> extends BaseSchema {
+  readonly node: "array"
+  readonly item: I
+  readonly _type: (value: Infer<I>[]) => Infer<I>[]
+}
+interface ObjectSchema<F extends Record<string, BaseSchema>> extends BaseSchema {
+  readonly node: "object"
+  readonly fields: F
+  readonly _type: (value: { [K in keyof F]: Infer<F[K]> }) => { [K in keyof F]: Infer<F[K]> }
+}
+type Infer<S extends BaseSchema> = S extends { readonly _type: (value: infer T) => unknown } ? T : never
+
+const leaf = <T>(kind: ValueKind): LeafSchema<T> => ({ node: "leaf", kind, _type: (value) => value })
+
+const k = {
+  string: leaf<string>("string"),
+  number: leaf<number>("number"),
+  boolean: leaf<boolean>("boolean"),
+  nullableString: leaf<string | null>("nullableString"),
+  array: <I extends BaseSchema>(item: I): ArraySchema<I> => ({ node: "array", item, _type: (value) => value }),
+  object: <const F extends Record<string, BaseSchema>>(fields: F): ObjectSchema<F> => ({ node: "object", fields, _type: (value) => value }),
+}
+
 type JsonValue = string | number | boolean | null
 type JsonExpr =
   | JsonValue
@@ -46,29 +73,30 @@ type JsonNode = {
 type JsonSpec = {
   root: JsonNode
 }
+type SlotSpec = true | { repeats: string }
 type ComponentSchema = {
   props: Record<string, ValueKind>
-  slots: Record<string, true | { repeats: string }>
+  slots: Record<string, SlotSpec>
   events: Record<string, Record<string, ValueKind>>
   capabilities: string[]
+}
+type ItemContext = {
+  fields: Record<string, ValueKind>
 }
 type StateToken = {
   path: string
   kind: ValueKind
   item?: ItemContext
 }
-type ItemContext = {
-  fields: Record<string, ValueKind>
+type ActionToken = {
+  flow: Lite.Flow<any, any>
+  params: Record<string, ValueKind>
 }
 type VerifyContext = {
   state: Record<string, StateToken>
   components: Record<string, ComponentSchema>
   actions: Record<string, ActionToken>
   rendererCapabilities: Set<string>
-}
-type ActionToken = {
-  flow: Lite.Flow<any, any>
-  params: Record<string, ValueKind>
 }
 type VerificationError = {
   code: string
@@ -78,55 +106,101 @@ type VerificationError = {
 type VerificationResult =
   | { ok: true; spec: JsonSpec }
   | { ok: false; errors: VerificationError[] }
-type Card = {
-  id: string
-  title: string
-  columnId: string
-  done: boolean
+
+function objectFields(schema: BaseSchema): Record<string, BaseSchema> {
+  return (schema as ObjectSchema<Record<string, BaseSchema>>).fields
 }
-type Column = {
-  id: string
-  title: string
+
+function kindOf(schema: BaseSchema): ValueKind {
+  return schema.node === "leaf" ? (schema as LeafSchema<unknown>).kind : "array"
 }
-type BoardState = {
-  board: {
-    columns: Column[]
-    cards: Card[]
-    selectedCardId: string | null
-    showDone: boolean
-    summary: {
-      lastMove: string | null
+
+function fieldsKindOf(schema: BaseSchema): Record<string, ValueKind> {
+  return Object.fromEntries(Object.entries(objectFields(schema)).map(([field, child]) => [field, kindOf(child)]))
+}
+
+function itemContextOf(item: BaseSchema): ItemContext {
+  return item.node === "object" ? { fields: fieldsKindOf(item) } : { fields: {} }
+}
+
+function collectTokens(schema: BaseSchema, prefix: string, tokens: Record<string, StateToken>): void {
+  if (schema.node === "object") {
+    for (const [field, child] of Object.entries(objectFields(schema))) {
+      collectTokens(child, `${prefix}/${field}`, tokens)
     }
+    return
   }
+  if (schema.node === "array") {
+    tokens[prefix] = { path: prefix, kind: "array", item: itemContextOf((schema as ArraySchema<BaseSchema>).item) }
+    return
+  }
+  tokens[prefix] = { path: prefix, kind: (schema as LeafSchema<unknown>).kind }
 }
-type BoardPaths = {
-  "/board/cards": Card[]
-  "/board/selectedCardId": string | null
-  "/board/showDone": boolean
-  "/board/summary/lastMove": string | null
-} & Record<`/board/cards/${number}/id`, string>
-  & Record<`/board/cards/${number}/title`, string>
-  & Record<`/board/cards/${number}/columnId`, string>
-  & Record<`/board/cards/${number}/done`, boolean>
-type MoveCardInput = {
-  cardId: string
-  fromColumnId: string
-  toColumnId: string
-  toIndex: number
+
+function buildStateTokens(schema: BaseSchema): Record<string, StateToken> {
+  const tokens: Record<string, StateToken> = {}
+  collectTokens(schema, "", tokens)
+  return tokens
 }
-type LoadCardInput = {
-  cardId: string | null
+
+function defineCatalog<const C extends Record<string, {
+  props: Record<string, BaseSchema>
+  slots: Record<string, SlotSpec>
+  events: Record<string, Record<string, ValueKind>>
+  capabilities: string[]
+}>>(catalog: C): Record<string, ComponentSchema> {
+  return Object.fromEntries(Object.entries(catalog).map(([name, entry]) => [name, {
+    props: Object.fromEntries(Object.entries(entry.props).map(([prop, schema]) => [prop, kindOf(schema)])),
+    slots: entry.slots,
+    events: entry.events,
+    capabilities: entry.capabilities,
+  }]))
 }
-type RenderActionInput = {
-  action: JsonAction
-  event?: MoveCardInput
+
+type PathEntry<S extends BaseSchema, P extends string> =
+  S extends LeafSchema<infer T> ? { key: P; value: T } :
+    S extends ArraySchema<infer I> ? { key: P; value: Infer<I>[] } | PathEntry<I, `${P}/${number}`> :
+      S extends ObjectSchema<infer F> ? { [K in keyof F & string]: PathEntry<F[K], `${P}/${K}`> }[keyof F & string] :
+        never
+type PathMap<S extends BaseSchema> = { [E in PathEntry<S, ""> as E["key"]]: E["value"] }
+
+const cardSchema = k.object({
+  id: k.string,
+  title: k.string,
+  columnId: k.string,
+  done: k.boolean,
+})
+const columnSchema = k.object({
+  id: k.string,
+  title: k.string,
+})
+const boardSchema = k.object({
+  board: k.object({
+    columns: k.array(columnSchema),
+    cards: k.array(cardSchema),
+    selectedCardId: k.nullableString,
+    showDone: k.boolean,
+    summary: k.object({
+      lastMove: k.nullableString,
+    }),
+    metrics: k.object({
+      total: k.number,
+      done: k.number,
+    }),
+  }),
+})
+
+type BoardState = Infer<typeof boardSchema>
+type Card = Infer<typeof cardSchema>
+type BoardPaths = PathMap<typeof boardSchema>
+type Path = keyof BoardPaths & string
+type PathValue<P extends Path> = BoardPaths[P]
+
+function statePath<S extends BaseSchema>() {
+  return <P extends keyof PathMap<S> & string>(path: P): P => path
 }
-type ShowDoneKindIsBoolean = Assert<Equal<KindFor<PathValue<BoardState, "/board/showDone">>, "boolean">>
-type MissingPathRejected = Assert<Equal<"/board/missing" extends Path<BoardState> ? true : false, false>>
-type CardTitlePathIsString = Assert<Equal<PathValue<BoardState, "/board/cards/0/title">, string>>
-type ShowDoneIsNotString = Assert<Equal<PathValue<BoardState, "/board/showDone"> extends string ? true : false, false>>
-type MovePayloadRequiresStringColumn = Assert<Equal<{ toColumnId: boolean } extends Pick<MoveCardInput, "toColumnId"> ? true : false, false>>
-type MovePayloadColumnKindIsString = Assert<Equal<FieldsKindOf<MoveCardInput>["toColumnId"], "string">>
+
+const path = statePath<typeof boardSchema>()
 
 const board = scopedValue({
   name: "typed-render-board",
@@ -145,9 +219,30 @@ const board = scopedValue({
       summary: {
         lastMove: null,
       },
+      metrics: {
+        total: 2,
+        done: 1,
+      },
     },
   }),
 })
+
+const moveCardInput = k.object({
+  cardId: k.string,
+  fromColumnId: k.string,
+  toColumnId: k.string,
+  toIndex: k.number,
+})
+const loadCardInput = k.object({
+  cardId: k.nullableString,
+})
+
+type MoveCardInput = Infer<typeof moveCardInput>
+type LoadCardInput = Infer<typeof loadCardInput>
+type RenderActionInput = {
+  action: JsonAction
+  event?: MoveCardInput
+}
 
 const moveCard = flow({
   name: "typed-render-move-card",
@@ -164,6 +259,10 @@ const moveCard = flow({
           ...state.board,
           cards,
           selectedCardId: ctx.input.cardId,
+          metrics: {
+            total: cards.length,
+            done: cards.filter((card) => card.done).length,
+          },
         },
       }
     })
@@ -189,98 +288,98 @@ const loadCardDetails = flow({
   },
 })
 
-function statePath<T>() {
-  return <P extends Path<T>>(path: P) => path
-}
-
-function pathToken<T, P extends Path<T>>(
-  path: P,
-  kind: KindFor<PathValue<T, P>>,
-  item?: PathValue<T, P> extends readonly (infer Item)[] ? ItemContext & { fields: FieldsKindOf<Item> } : never
-): StateToken {
-  return item ? { path, kind, item } : { path, kind }
-}
-
 function action<F extends Lite.Flow<any, any>>(
   flow: F,
-  params: FieldsKindOf<Lite.Utils.FlowInput<F>>
+  input: {
+    readonly node: "object"
+    readonly fields: Record<string, BaseSchema>
+    readonly _type: (value: Lite.Utils.FlowInput<F>) => Lite.Utils.FlowInput<F>
+  }
 ): ActionToken {
-  return { flow, params }
+  return { flow, params: fieldsKindOf(input) }
 }
 
-function defineActions<const R extends Record<string, ActionToken>>(actions: R): R & Record<string, ActionToken> {
-  return actions
-}
-
-const path = statePath<BoardState>()
-
-const stateTokens = {
-  cards: pathToken<BoardState, "/board/cards">(path("/board/cards"), "cardArray", {
-    fields: {
-      id: "string",
-      title: "string",
-      columnId: "string",
-      done: "boolean",
-    },
-  }),
-  selectedCardId: pathToken<BoardState, "/board/selectedCardId">(path("/board/selectedCardId"), "nullableString"),
-  showDone: pathToken<BoardState, "/board/showDone">(path("/board/showDone"), "boolean"),
-  lastMove: pathToken<BoardState, "/board/summary/lastMove">(path("/board/summary/lastMove"), "nullableString"),
-} satisfies Record<string, StateToken>
-
-const actions = defineActions({
-  moveCard: action(moveCard, {
-    cardId: "string",
-    fromColumnId: "string",
-    toColumnId: "string",
-    toIndex: "number",
-  }),
-  loadCardDetails: action(loadCardDetails, {
-    cardId: "nullableString",
-  }),
-})
+const actionRegistry = {
+  moveCard: action(moveCard, moveCardInput),
+  loadCardDetails: action(loadCardDetails, loadCardInput),
+} satisfies Record<string, ActionToken>
 
 const runJsonAction = flow({
   name: "typed-render-run-json-action",
   parse: typed<RenderActionInput>(),
   deps: { access: board },
   factory: (ctx, { access }) => {
-    const target = actions[ctx.input.action.flow]
+    const target = actionRegistry[ctx.input.action.flow as keyof typeof actionRegistry]
     if (!target) throw new Error(`Unknown verified flow ${ctx.input.action.flow}`)
     return ctx.exec({ flow: target.flow, rawInput: actionParams(ctx.input.action, access.get(), undefined, ctx.input.event) })
   },
 })
 
-const components = {
+const stateTokens = buildStateTokens(boardSchema)
+
+const components = defineCatalog({
   Stack: {
-    props: { direction: "string" },
+    props: { direction: k.string },
     slots: { children: true },
     events: {},
     capabilities: ["layout.stack"],
   },
   Text: {
-    props: { text: "nullableString" },
+    props: { text: k.nullableString },
     slots: {},
     events: {},
     capabilities: ["text"],
   },
   SortableList: {
-    props: { items: "cardArray" },
+    props: { items: k.array(cardSchema) },
     slots: { item: { repeats: "items" } },
     events: {
-      move: actions.moveCard.params,
+      move: actionRegistry.moveCard.params,
     },
     capabilities: ["interaction.sortable"],
   },
   Card: {
-    props: { title: "string", done: "boolean" },
+    props: { title: k.string, done: k.boolean },
     slots: {},
     events: {},
     capabilities: ["surface.card"],
   },
-} satisfies Record<string, ComponentSchema>
+  Summary: {
+    props: { heading: k.string },
+    slots: { items: true },
+    events: {},
+    capabilities: ["layout.summary"],
+  },
+  Stat: {
+    props: { label: k.string, value: k.number },
+    slots: {},
+    events: {},
+    capabilities: ["display.stat"],
+  },
+  Badge: {
+    props: { text: k.nullableString, tone: k.string },
+    slots: {},
+    events: {},
+    capabilities: ["display.badge"],
+  },
+})
 
-const validSpec: JsonSpec = {
+const context: VerifyContext = {
+  state: stateTokens,
+  components,
+  actions: actionRegistry,
+  rendererCapabilities: new Set([
+    "layout.stack",
+    "text",
+    "interaction.sortable",
+    "surface.card",
+    "layout.summary",
+    "display.stat",
+    "display.badge",
+  ]),
+}
+
+const boardSpec: JsonSpec = {
   root: {
     type: "Stack",
     props: {
@@ -344,11 +443,46 @@ const validSpec: JsonSpec = {
   },
 }
 
-const context: VerifyContext = {
-  state: Object.fromEntries(Object.values(stateTokens).map((token) => [token.path, token])),
-  components,
-  actions,
-  rendererCapabilities: new Set(["layout.stack", "text", "interaction.sortable", "surface.card"]),
+const summarySpec: JsonSpec = {
+  root: {
+    type: "Summary",
+    props: {
+      heading: "Board metrics",
+    },
+    slots: {
+      items: [
+        {
+          type: "Stat",
+          props: {
+            label: "Total",
+            value: { state: "/board/metrics/total" },
+          },
+        },
+        {
+          type: "Stat",
+          props: {
+            label: "Done",
+            value: { state: "/board/metrics/done" },
+          },
+        },
+        {
+          type: "Badge",
+          props: {
+            text: {
+              template: "Last move: {move}",
+              args: {
+                move: { state: "/board/summary/lastMove" },
+              },
+            },
+            tone: "info",
+          },
+          visible: {
+            state: "/board/summary/lastMove",
+          },
+        },
+      ],
+    },
+  },
 }
 
 function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
@@ -578,15 +712,32 @@ function actionParams(action: JsonAction, state: BoardState, item?: Card, event?
   return Object.fromEntries(Object.entries(action.params).map(([key, expr]) => [key, resolveExpr(expr, state, item, event)]))
 }
 
+type ShowDoneKindIsBoolean = Assert<Equal<KindFor<PathValue<"/board/showDone">>, "boolean">>
+type MissingPathRejected = Assert<Equal<"/board/missing" extends Path ? true : false, false>>
+type CardTitlePathIsString = Assert<Equal<PathValue<"/board/cards/0/title">, string>>
+type ShowDoneIsNotString = Assert<Equal<PathValue<"/board/showDone"> extends string ? true : false, false>>
+type CardsPathKindIsArray = Assert<Equal<KindFor<PathValue<"/board/cards">>, "array">>
+type MetricsTotalKindIsNumber = Assert<Equal<KindFor<PathValue<"/board/metrics/total">>, "number">>
+type StateTypeMatchesSchema = Assert<Equal<BoardState["board"]["metrics"]["done"], number>>
+type MovePayloadColumnKindIsString = Assert<Equal<FieldsKindOf<MoveCardInput>["toColumnId"], "string">>
+type MoveInputDerivedFromSchema = Assert<Equal<MoveCardInput, Infer<typeof moveCardInput>>>
+
 export {
   board,
   loadCardDetails,
   moveCard,
+  moveCardInput,
+  loadCardInput,
+  action,
+  actionRegistry,
+  boardSchema,
+  path,
   runJsonAction,
   readPath,
   resolveExpr,
   actionParams,
-  validSpec,
+  boardSpec,
+  summarySpec,
   verifySpec,
 }
 export type {
@@ -601,14 +752,16 @@ export type {
   RenderActionInput,
   KindFor,
   FieldsKindOf,
+  Infer,
   Path,
   PathValue,
-  VerificationError,
-  VerificationResult,
   ShowDoneKindIsBoolean,
   MissingPathRejected,
   CardTitlePathIsString,
   ShowDoneIsNotString,
-  MovePayloadRequiresStringColumn,
+  CardsPathKindIsArray,
+  MetricsTotalKindIsNumber,
+  StateTypeMatchesSchema,
   MovePayloadColumnKindIsString,
+  MoveInputDerivedFromSchema,
 }
