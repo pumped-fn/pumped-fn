@@ -1,0 +1,13 @@
+{
+  "committed_at": "2026-06-26T14:05:25Z",
+  "idempotency_key": "dkr6-apply-2fd1e5d3",
+  "key_sha256": "4cca6d92fc21e1269aa25b7cff0059716e3353728f7e5e94c0b713f1da072da6",
+  "payload": {
+    "acceptance_status": "deterministic confirmed; 2 reviews running (bypass hunt); NOT accepted",
+    "commit": "2fd1e5d3",
+    "deterministic_checks": "typecheck 0; contract 27/27; browser 4/4; lint 157/0; diff-check clean; nested-repeat unconstructible both gates",
+    "move": "apply DKR6-restrict candidate",
+    "single_llm_truth_acceptance_count": 0
+  },
+  "payload_sha256": "2f8b56b8e538b9646f982df5b8dc7b0244c009dbdba8cd722c888f34ceb8ab47"
+}
