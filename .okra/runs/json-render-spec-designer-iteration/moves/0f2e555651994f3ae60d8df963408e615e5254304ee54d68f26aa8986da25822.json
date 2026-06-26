@@ -1,0 +1,14 @@
+{
+  "committed_at": "2026-06-26T11:25:21Z",
+  "idempotency_key": "dkr2-apply-d89a4752",
+  "key_sha256": "0f2e555651994f3ae60d8df963408e615e5254304ee54d68f26aa8986da25822",
+  "payload": {
+    "acceptance_status": "deterministic_side_confirmed; awaiting independent reviewer before checkpoint acceptance",
+    "branch": "okra/json-render-spec-loop",
+    "commit": "d89a4752",
+    "deterministic_checks": "typecheck exit0 meaningful; verifier 16/16; browser 2/2; lint 156/0; git diff --check clean",
+    "move": "apply DKR2 candidate commit",
+    "single_llm_truth_acceptance_count": 0
+  },
+  "payload_sha256": "5115e2ad7075c364b022194312b216e8488d10e67a0333f9e99f139fad75c65f"
+}

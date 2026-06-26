@@ -1,0 +1,11 @@
+{
+  "type": "independent_review",
+  "reviewer": "independent-reviewer-2 (diverse lens: metric honesty + exploit construction)",
+  "subject": "DKR2 candidate commit d89a4752",
+  "verdict": "converge_accept_candidate",
+  "exploit_attempt": {"constructed_passing_unchecked_spec": false, "why": "repeat-item context derives from the BOUND array element schema not the catalog declared element; template always stringifies to nullableString props (display-only); kindOf object->array unreachable from JSON (no object node reaches kindOf today); leaf<T>(kind) labels are code-level not author-controllable"},
+  "metric_honesty": {"validated_spec_cases_passed": "2 correct, conservatively counted (boardSpec counted as 1 not 4)", "unchecked_zero_scope": "honestly scoped to 2-case runtime-verifier slice; not overclaimed as compile-time package gate"},
+  "fresh_eyes_walls": {"lite_bypass": "clear", "eager": "clear", "hidden_workflow": "clear"},
+  "blocking_gaps": [],
+  "note_for_next_pass": "kindOf object->array collapse (contract.ts:114) is the most pressing pre-promotion fix (real verifier UNSOUNDNESS once nested-object props/repeat-fields generalize); close second: leaf<T>(kind: KindFor<T>) to tie runtime label to type. Neither exploitable from current JSON surface; neither blocks this checkpoint."
+}

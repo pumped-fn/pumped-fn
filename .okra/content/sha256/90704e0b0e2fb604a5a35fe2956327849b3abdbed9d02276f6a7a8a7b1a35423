@@ -1,0 +1,16 @@
+{
+  "type": "independent_review",
+  "reviewer": "independent-reviewer-1 (adversarial, refute-by-default, second lens)",
+  "subject": "DKR2 candidate commit d89a4752",
+  "verdict": "converge_accept_candidate",
+  "blocking_gaps": [],
+  "claims_upheld": ["derived kinds (KindFor generic, cardArray removed)", "shared actionRegistry feeds verifier+dispatcher", "second family genuinely distinct (number state->prop binding)", "unchecked==0 for the 2-case slice"],
+  "non_blocking_findings": [
+    "mislabeled test: 'verifier rejects an action outside the shared registry' trips unknown_event not unknown_flow (registry consultation still proven by board test)",
+    "latent bug: kindOf returns 'array' for object nodes too (not exercised by any current catalog prop / nested object field)",
+    "redundant cardSchema element on SortableList.props.items not cross-checked against bound state array element schema (no unchecked binding results; item fields come from state token)",
+    "vocabulary kind labels hand-passed to leaf<T>(kind) without compile check matching T (single audited source of truth)"
+  ],
+  "promotion_recommendation": "blocked: only 2 of 4 cases; runtime renderer board-specific hand-written; no semantic-portability proof; watch/event-normalization/template-kind/hook-guard residuals remain. Accept as DKR learning checkpoint only.",
+  "single_llm_truth_acceptance_count": 0
+}
