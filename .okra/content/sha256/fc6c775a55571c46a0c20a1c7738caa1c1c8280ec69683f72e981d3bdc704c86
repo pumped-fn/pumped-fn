@@ -1,0 +1,17 @@
+{
+  "type": "independent_review",
+  "subject": "DKR7-harden 743317bd",
+  "reviewer_A_single_source": {
+    "verdict": "converge",
+    "blocking": 0,
+    "notes": [
+      "is-repeating body+field-name runtime-test-guarded (disclosed)",
+      "type-asserts enforced under tsc (which the gate runs)"
+    ]
+  },
+  "reviewer_B_regression": {
+    "verdict": "converge",
+    "any_new_fork_or_regression": false,
+    "proof": "behavior-preserving: each collapse extensionally equal to original; isRepeatingSlot == slot!==true over all SlotSpec; DisplayKind/CondLiteral identical; it:never guard tightens not reopens; all prior fork closures + deepEqual intact"
+  }
+}
