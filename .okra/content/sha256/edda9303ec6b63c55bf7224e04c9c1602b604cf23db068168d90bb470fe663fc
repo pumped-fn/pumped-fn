@@ -1,0 +1,21 @@
+{
+  "type": "independent_review",
+  "reviewer": "PKR2 fix re-review",
+  "subject": "f61e64b2",
+  "verdict": "block",
+  "fixes_confirmed_clean": [
+    "bug1 replaceAll literal, no over-replacement",
+    "bug2 sibling-watch fires, entry-index stable for constant spec, no new bug",
+    "bug3 on-item per-row correct, non-repeat unchanged, nested item correct (nested repeats forbidden so item unambiguous), no stale capture"
+  ],
+  "new_finding": {
+    "id": "watch-item-twin",
+    "where": "core verify.ts:88 (watch verifyAction gets item context) vs react useWatchEffects (dispatches with no item)",
+    "defect": "verifier ACCEPTS {item} in a WATCH action param inside a repeat; watches are GLOBAL (collected once per template node, fired on absolute path, not per-row) so useWatchEffects dispatches with no item -> {item} resolves undefined. Same verifier-accepts/runtime-undefined class as bug 3.",
+    "fix": "verifier REJECTS {item} in watch params (watches are global -> item context unsound there); verify watch actions WITHOUT item context. on-events keep item (per-instance, valid)."
+  },
+  "walls": "held",
+  "blocking_gaps": [
+    "watch-item twin"
+  ]
+}
