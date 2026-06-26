@@ -119,3 +119,19 @@ Human direction update:
 - The human likes the spec/catalog concept because it makes the app stricter than React or Vite, and that constraint is the value.
 - The needed work is a renderer based on that strict contract, supporting designer iteration while preserving integration points for frontend delivery and React Native without changing what is meant to be rendered.
 - Pumped-fn should not own rendering itself. Its value is composition and testability; the render contract must preserve that by using TypeScript/detail verification instead of unchecked JSON path access.
+
+## Run Close-Out (2026-06-26, delegated OKRA loop)
+
+Outcome: objective **met for the bounded authored surface**, stopped at the human-ratified PKR1 boundary. Store: `.okra/runs/json-render-spec-designer-iteration/` (branch `okra/json-render-spec-loop`).
+
+- Conjunct A `validated_spec_cases_passed = 4` (renders through React); behavior-distinct ≈ 3 (watchSpec is a near-reskin of board's watch — human did not elect to fix it).
+- Conjunct B `unchecked_path_or_binding_count == 0`: type-enforced via `createAuthor` on the bounded catalog, verifier sound + complete as backstop; nested-repeat fork class made unconstructible; 4 of 5 maintainer-facing two-encoding predicates collapsed to single-source (the state-token `CollectTokens` cast stays test+battery-guarded by design — cast-free single-source would trade away schema-derivation).
+- Anti-goals held throughout; `single_llm_truth_acceptance_count == 0` (every checkpoint = deterministic checks + 2 independent reviews).
+
+Probe arc: DKR1 typed authoring → DKR2 schema single-source + 2nd family → DKR3 compile gate (indexed-path fork, corrected) → DKR4 faithful mirror (repeat fork, corrected) → DKR5 structural by-construction (nested-repeat fork found) → **pointless flag** → human re-aim (strict + structural) → DKR6 restrict catalog (nested fork unconstructible; first **empty** bypass review) → human declines PKR1 → DKR7 harden residuals to single-source.
+
+OKRA learnings (traps / avoidances):
+- **Green deterministic checks + hand-built batteries miss compositional forks.** Three rounds each passed typecheck/tests/lint and were refuted by an adversarial *exploit* reviewer finding a compile↔verifier fork (indexed path → repeat → nested-repeat) on a dimension the flat battery never exercised. Avoidance that worked: a dedicated "find the next fork, go cross-dimension/nested" reviewer + requiring an *agreement battery across all dimensions* + the no-single-LLM-truth gate.
+- **Two parallel hand-written expressions of one contract drift by construction.** The author types (lexical/structural) and the verifier (context-replacement) diverged repeatedly. The durable fix is single-source derivation or unconstructibility (restrict the catalog), not fixture-by-fixture patching.
+- **A moving metric can be gameable** (watchSpec reskin moved the count without new behavior) — the pointless flag's deepest job is catching "narrowing toward a tip that won't move the goal."
+- Process trap hit and recovered: `git add <dir> <deleted-file>` fails atomically (staged nothing → deletion-only commit); never `git checkout` a worker's uncommitted file. See repo memory `git-add-atomic-and-checkout-traps`.
