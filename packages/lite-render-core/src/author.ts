@@ -78,7 +78,8 @@ type SchemaAtPath<S extends BaseSchema, P extends string> =
 type ElementSchemaAtPath<S extends BaseSchema, P extends string> =
   SchemaAtPath<S, P> extends ArraySchema<infer I> ? I : never
 type ItemFieldsOf<E extends BaseSchema> =
-  E extends ObjectSchema<infer F> ? { [K in keyof F & string]: KindOfSchema<F[K]> } : {}
+  [E] extends [never] ? {} :
+    [E] extends [ObjectSchema<infer F>] ? { [K in keyof F & string]: KindOfSchema<F[K]> } : {}
 type ItemAccessorFor<Fields extends Record<string, ValueKind>> =
   <Field extends keyof Fields & string>(field: Field) => ItemBind<Fields[Field]>
 type ItemAccessorFromPath<Schema extends BaseSchema, P extends string> =

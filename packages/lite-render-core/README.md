@@ -93,6 +93,12 @@ The nested-repeat ban (transitive, across all repeating-slot components), the `i
 of non-state repeat sources, and the single-source displayable/comparison/repeats predicates all hold
 generically.
 
+`/` is reserved as the path delimiter: `k.object` rejects a field key containing `/` at compile time, so a
+JSON-pointer path can never confuse a field literally named `a/b` with nesting `a` → `b`. This keeps the
+author's schema walk (`SchemaAtPath`) an exact inverse of the verifier's token walk (`collectTokens`).
+`ItemFieldsOf` is additionally non-distributive (`[E] extends [never] ? {} : …`), so any unresolved element
+yields an uncallable accessor rather than an over-permissive one.
+
 ## License
 
 MIT

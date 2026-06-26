@@ -59,7 +59,9 @@ const k = {
   boolean: leaf<boolean>("boolean"),
   nullableString: leaf<string | null>("nullableString"),
   array: <I extends BaseSchema>(item: I): ArraySchema<I> => ({ node: "array", item, _type: (value) => value }),
-  object: <const F extends Record<string, BaseSchema>>(fields: F): ObjectSchema<F> => ({ node: "object", fields, _type: (value) => value }),
+  object: <const F extends Record<string, BaseSchema>>(
+    fields: F & { readonly [K in keyof F]: K extends `${string}/${string}` ? never : unknown }
+  ): ObjectSchema<F> => ({ node: "object", fields, _type: (value) => value }),
 }
 
 const nonDisplayableKinds = ["array", "object"] as const satisfies readonly ValueKind[]

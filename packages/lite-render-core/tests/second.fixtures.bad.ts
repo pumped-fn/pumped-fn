@@ -1,4 +1,8 @@
+import { k } from "../src"
 import { author } from "./second.fixture"
+
+// @ts-expect-error a field key containing "/" is forbidden: the path delimiter cannot disambiguate a field named "a/b" from nesting a -> b
+export const badSlashFieldKey = k.object({ "a/b": k.string })
 
 export const badNestedObjectItemIntoScalar = author.node("RowList", {
   props: { rows: author.state("/dashboard/rows") },
