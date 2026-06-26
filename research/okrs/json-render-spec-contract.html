@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Json Render Spec Contract OKR</title>
+  <style>
+    :root { color-scheme: light; --ink: #17202a; --muted: #5f6874; --line: #d7dde5; --page: #f6f8fb; --panel: #ffffff; --green: #147d64; --blue: #255e91; --radius: 8px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--page); line-height: 1.45; }
+    main { width: min(1180px, calc(100vw - 28px)); margin: 0 auto; padding: 24px 0 48px; }
+    header { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding: 18px 0 22px; border-bottom: 1px solid var(--line); }
+    h1, p { margin: 0; }
+    h1 { font-size: clamp(1.75rem, 3vw, 3rem); letter-spacing: 0; line-height: 1.05; }
+    .status { display: grid; gap: 4px; min-width: 240px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: .9rem; }
+    .status b { color: var(--green); }
+    .subtitle { color: var(--muted); margin-top: 8px; max-width: 78ch; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 18px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88rem; line-height: 1.55; }
+    a { color: var(--blue); }
+    @media (max-width: 760px) { header { grid-template-columns: 1fr; } .status { min-width: 0; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Json Render Spec Contract OKR</h1>
+      <p class="subtitle">Rendered snapshot of <code>research/okrs/json-render-spec-contract.md</code>. The fuller code-review packet is <a href="./json-render-spec-code-review.html">json-render-spec-code-review.html</a>.</p>
+    </div>
+    <div class="status"><span><b>Status</b> DKR1 accepted as learning checkpoint</span><span>Not package promotion</span></div>
+  </header>
+  <pre># Json Render Spec Contract OKR
+
+Status: ratified working frame
+Created at: 2026-06-26T06:27:00Z
+
+## Objective
+
+Promote the strict spec/catalog renderer from DKR to package work only when it proves designer-owned JSON iteration without losing pumped-fn's type, DI, laziness, and testability value.
+
+Target metric: `validated_spec_cases_passed &gt;= 4` and `unchecked_path_or_binding_count == 0`.
+
+Promoted spec cases must cover:
+
+- conditional visibility
+- repeated data rendering
+- template or computed display
+- event or watch-triggered Lite flow action
+
+The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target: `validated_spec_cases_passed &gt;= 4` with `unchecked_path_or_binding_count == 0`, or a human/blocking flag stops the loop.
+
+Action envelope: allowed moves are contract extraction, verifier tests, React renderer proof, typed authoring/path-token proof, semantic renderer comparison, docs, and lint/test guard work; forbidden actions are broad component-vocabulary expansion, business logic in specs, bypassing Lite state/actions, eager import-time scope/render work, platform-specific spec forks, and package release; human ratification is required before changing objective metrics, anti-goal thresholds, or promoting release work.
+
+## Anti-Goals
+
+| Anti-goal | Type | Metric | Target |
+| --- | --- | --- | --- |
+| React remains a real integration point | binary tripwire | `promoted_spec_cases_render_through_react` | `== validated_spec_cases_passed` |
+| Pumped-fn is not a wrapper | binary tripwire | `bypassed_lite_state_or_action_paths` | `== 0` |
+| TypeScript value is preserved | binary tripwire | `unchecked_path_or_binding_count` | `== 0` |
+| Designer specs do not hide workflow logic | binary tripwire | `workflow_logic_inside_spec_count` | `== 0` |
+| Designer iteration does not create React cleanup debt | drift guard | `react_cleanup_diff_lines_per_spec_iteration` | `&lt;= 10` |
+| Platform meaning does not fork | binary tripwire | `spec_semantics_changed_between_renderers` | `== 0` |
+| Code stays lazy | binary tripwire | `import_time_verification_or_scope_creation_count` | `== 0` |
+| Hook quality is mechanically guarded | binary tripwire | `react_hook_dependency_violation_count` | `== 0` |
+| No single LLM owns DKR truth | binary tripwire | `single_llm_truth_acceptance_count` | `== 0` |
+
+Non-negotiable tripwires:
+
+- A promoted spec case has an unchecked state path, prop binding, event field, slot, component, or flow payload.
+- React rendering is not proven for a promoted case.
+- Durable state mutation or async/domain work bypasses Lite flows/resources/scoped values.
+- A spec contains branching business workflow rather than declared wiring to Lite actions.
+- A renderer creates scopes, verifies specs, or starts render work at import time.
+- React hook dependency correctness relies only on review.
+- A DKR checkpoint, CKR, PKR, or package-promotion decision is accepted from one LLM narrative without deterministic evidence and independent review.
+
+## Direct Reads
+
+Current baseline, corrected after deterministic checks plus independent Claude/Codex review:
+
+| Metric | Current | Target | Source |
+| --- | ---: | ---: | --- |
+| `validated_spec_cases_passed` | 1 | 4 | `examples/lite-react-practical/research/typed-render-contract` |
+| `unchecked_path_or_binding_count` | 0 for DKR1 binder slice; package gate unproven | 0 | typed path/action binders plus verifier tests; package promotion still needs generalized authoring/runtime proof |
+| `bypassed_lite_state_or_action_paths` | 0 | 0 | React lowering uses `useFlow(runJsonAction)` and Lite-owned scoped values/flows |
+| `promoted_spec_cases_render_through_react` | 1 | 4 | browser test for `TypedRenderBoard` |
+| `import_time_verification_or_scope_creation_count` | 0 | 0 | lazy cached `getVerifiedSpec()` plus provider-owned scope/context |
+| `react_hook_dependency_violation_count` | guard absent | 0 | current effect is manually corrected, but no mechanical guard catches dependency drift |
+| `single_llm_truth_acceptance_count` | 0 | 0 | DKR acceptance requires deterministic checks plus independent Claude/Codex review |
+| `independent_review_before_dkr_acceptance_count` | 2 | &gt;= 2 | Claude and Codex independently reviewed the changed DKR1 binder checkpoint |
+
+Freshness: observed_at=2026-06-26T09:17:23Z -&gt; status=fresh against max_age=7 days.
+
+No-single-LLM-truth review result:
+
+- Deterministic checks passed: typecheck, verifier tests, browser test, and `pnpm lint`.
+- Claude and Codex independently converged that the prototype proves the direction but not the package gate for `unchecked_path_or_binding_count == 0`.
+- Converged gaps: flow registry/runtime dispatch drift, `ValueKind` not derived from `PathValue` or flow input types, template placeholders unchecked, watch verification broader than React behavior, repeat item shape hardcoded outside the catalog, and browser event normalization overclaimed by a synthetic button event.
+- Claude design challenge proposed the next DKR shape: typed `defineTokens` and `action` binders as the only way kinds enter the system, one action registry consumed by both verifier and dispatcher, repeat slots derived from the bound array prop, scope-owned `mountWatches` instead of React effects, adapter-owned event normalization through `emit`, and `verifyDraft` versus `verifyStrict` so designer proposals can preview but never reach production.
+
+Next DKR anti-goal gate:
+
+- Candidate output: typed source-of-truth binder proof for state tokens, action tokens, template placeholders, and repeat item context.
+- Deterministic evidence now required before acceptance: `pnpm -F @pumped-fn/lite-react-practical typecheck`, verifier tests, browser tests, `pnpm lint`, and `git diff --check`.
+- Independent review now required before acceptance: Claude and Codex must review the changed code and either converge on acceptance or name blocking gaps.
+- Acceptance state: accepted as DKR1 learning checkpoint, not package promotion. `independent_review_before_dkr_acceptance_count = 2` and `single_llm_truth_acceptance_count = 0`.
+
+DKR1 checkpoint result:
+
+- Deterministic checks passed: `pnpm -F @pumped-fn/lite-react-practical typecheck`, `pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts`, `pnpm -F @pumped-fn/lite-react-practical exec vitest run --project browser research/typed-render-contract/view.browser.test.tsx`, `pnpm lint`, and `git diff --check`.
+- Claude verdict: `ACCEPT_CANDIDATE`; no blocking findings. Package-promotion gaps: React view still uses a fixed sortable button and root watch only, no second component family proves generalization, and runtime view honoring of the verified spec remains promotion-critical.
+- Codex verdict: `ACCEPT_CANDIDATE`; no blocking findings. Package-promotion gaps: raw `JsonSpec` authoring still needs a strict builder/generated fixture path, `BoardPaths`/`KindFor` remain hand-maintained and board-specific, repeat-slot `repeats` is still a catalog string, watch runtime is narrower than verification, event normalization is not reusable, and template rendering semantics need promotion-level hardening.
+- Steering decision: accept the DKR1 binder learning checkpoint; keep CKR/PKR package promotion blocked until renderer/runtime generalization and strict authoring proof close the package gaps.
+
+## CKRs
+
+CKR1: `validated_spec_cases_passed &gt;= 4` across conditional visibility, repeated data rendering, template or computed display, and event or watch-triggered Lite flow action.
+
+CKR-level discovery/delivery balance: discover the minimum spec grammar that covers four designer-facing behaviors without rebuilding React; deliver one fixture per behavior plus verifier and React-render evidence.
+
+CKR2: `unchecked_path_or_binding_count == 0` for every promoted spec path, prop binding, repeat item binding, event field, slot, component, and flow payload.
+
+CKR-level discovery/delivery balance: discover whether typed builders, generated path tokens, verifier-generated type fixtures, or a hybrid gives the cleanest authoring path; deliver a mechanically checked source-of-truth path for JSON artifacts.
+
+CKR3: `bypassed_lite_state_or_action_paths == 0` for durable state changes, async work, domain actions, and dependency injection.
+
+CKR-level discovery/delivery balance: discover the smallest render-action bridge that still feels natural for React and React Native hosts; deliver all action execution through Lite flows/resources/scoped values.
+
+CKR4: `spec_semantics_changed_between_renderers == 0` for the promoted spec cases.
+
+CKR-level discovery/delivery balance: discover whether the first portability proof should be a host-agnostic semantic tree or a React Native adapter stub; deliver a comparison test that fails on semantic drift.
+
+CKR5: `react_hook_dependency_violation_count == 0` and a mechanical guard exists for promoted React renderer code.
+
+CKR-level discovery/delivery balance: discover whether to extend `@pumped-fn/lite-lint`, add eslint only for React hooks, or add a targeted AST rule; deliver a check that catches missing hook dependency arrays.
+
+## DKRs
+
+DKR1: Typed authoring source of truth.
+
+Decision to unlock: choose builder, generated tokens, generated type fixtures, or hybrid before package extraction.
+
+Budget: one implementation pass.
+
+Risk reduced: losing TypeScript value through raw path strings.
+
+Expected output: learning checkpoint with probability update and at least one failing bad-path fixture.
+
+Acceptance gate: deterministic checks plus independent Claude/Codex review; `single_llm_truth_acceptance_count` must remain `0`.
+
+DKR2: Renderer portability proof.
+
+Decision to unlock: decide whether React Native package work is admissible or whether the semantic adapter must come first.
+
+Budget: one implementation pass.
+
+Risk reduced: platform meaning fork.
+
+Expected output: semantic comparison test for the four promoted cases.
+
+DKR3: Hook-quality guard.
+
+Decision to unlock: decide how React hook dependency correctness is enforced before package work.
+
+Budget: one focused lint/proof pass.
+
+Risk reduced: trust loss from review-only hook correctness.
+
+Expected output: a mechanical check that fails a missing-dependency fixture.
+
+## PKRs
+
+PKR1: Extract a narrow `@pumped-fn/lite-render-contract` candidate with spec types, catalog definition, path tokens or typed authoring helper, verifier, capability checks, and verifier test helpers.
+
+PKR2: Extract a narrow React renderer candidate that consumes verified specs, lowers catalog components to React components, dispatches actions through `useFlow`, and does not own state or async behavior.
+
+PKR3: Add four promoted spec fixtures and tests for the objective cases.
+
+PKR4: Add the portability comparison proof for the same spec semantics across React and a host-neutral target.
+
+PKR5: Add the hook-quality mechanical guard before promoting React renderer code.
+
+Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.
+
+## Eval Points
+
+**Admissibility before action**: before extracting packages or adding spec features, check the proposed move against every anti-goal. Veto any move that increases unchecked bindings, bypasses Lite state/actions, expands the component vocabulary before the four-case proof, creates import-time work, or relies on review-only hook correctness.
+
+**Direct read after action**: after each implementation pass, read the real metrics from typecheck, verifier tests, browser tests, lint/AST checks, and semantic comparison tests. Do not count completed files as progress unless the metric moved.
+
+**Paired goal/anti-goal eval**: success requires `validated_spec_cases_passed &gt;= 4` and every anti-goal threshold to hold. A renderer that passes four cases by bypassing Lite, forking semantics, or losing type checks fails the loop.
+
+## Flags
+
+Cannot opens when DKR budget is spent and no typed authoring/verifier path can keep `unchecked_path_or_binding_count == 0`.
+
+Breaking opens when any anti-goal metric crosses its threshold, especially unchecked bindings, Lite bypass, React non-proof, eager work, or hook dependency violations.
+
+Pointless opens when work finished or a CKR metric moved, but the objective metric stays flat / does not move after the lag window. For this goal, adding component APIs or docs while `validated_spec_cases_passed` stays below 4 is pointless and should stop/re-aim the branch.
+
+Authority drift opens when a move tries to change the objective, threshold, anti-goal, action envelope, or release boundary without human ratification.
+
+Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it.
+
+## Operating Loop
+
+Cadence: check at the end of each implementation pass and before promoting any CKR/PKR.
+
+Heartbeat cadence and next_check_at: default heartbeat is ten minutes for long-running worker passes; next_check_at is before the next package-extraction move.
+
+Metric freshness contract: metric reads come from local command output, changed-path inspection, and verifier/browser/lint tests; max_age is seven days or stale immediately after touching contract, renderer, or lint surfaces.
+
+Lag window: immediate for local tests and lint; no delayed product metric is claimed.
+
+Stale-data policy: do not dispatch package extraction or release-prep work on stale metric reads unless the human explicitly waives it.
+
+Steering value metric: `valuable_steering_decision_count &gt;= 1` per check-in, with the inbound signal, decision delta, affected CKR/DKR/PKR, and evidence command or file reference recorded in the learning checkpoint.
+
+Human-only frame: the loop raises evidence and options; the human owns goal switching, metric changes, thresholds, release decisions, and any change to the action envelope.
+</pre>
+</main>
+</body>
+</html>

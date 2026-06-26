@@ -1,0 +1,158 @@
+{
+  "action_envelope": {
+    "allowed_moves": [
+      "contract extraction",
+      "verifier tests",
+      "React renderer proof",
+      "typed authoring/path-token proof",
+      "semantic renderer comparison",
+      "docs",
+      "lint/test guard work"
+    ],
+    "approval_gates": "human ratification is required before changing objective metrics, anti-goal thresholds, or promoting release work",
+    "forbidden_actions": [
+      "broad component-vocabulary expansion",
+      "business logic in specs",
+      "bypassing Lite state/actions",
+      "eager import-time scope/render work",
+      "platform-specific spec forks",
+      "package release"
+    ],
+    "human_ratification_boundary": "Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it."
+  },
+  "anti_goals": [
+    {
+      "id": "react_real_integration",
+      "metric_id": "anti_goal.promoted_spec_cases_render_through_react",
+      "target": "== validated_spec_cases_passed",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "not_a_wrapper",
+      "metric_id": "anti_goal.bypassed_lite_state_or_action_paths",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "typescript_value_preserved",
+      "metric_id": "anti_goal.unchecked_path_or_binding_count",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "no_hidden_workflow",
+      "metric_id": "anti_goal.workflow_logic_inside_spec_count",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "no_react_cleanup_debt",
+      "metric_id": "anti_goal.react_cleanup_diff_lines_per_spec_iteration",
+      "target": "<= 10",
+      "type": "drift_guard"
+    },
+    {
+      "id": "no_semantic_fork",
+      "metric_id": "anti_goal.spec_semantics_changed_between_renderers",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "stays_lazy",
+      "metric_id": "anti_goal.import_time_verification_or_scope_creation_count",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "hook_quality_guarded",
+      "metric_id": "anti_goal.react_hook_dependency_violation_count",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "no_single_llm_truth",
+      "metric_id": "anti_goal.single_llm_truth_acceptance_count",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "no_ungoverned_read",
+      "metric_id": "anti_goal.ungoverned_direct_read",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    },
+    {
+      "id": "no_ungoverned_write",
+      "metric_id": "anti_goal.ungoverned_direct_write",
+      "target": "== 0",
+      "type": "binary_tripwire"
+    }
+  ],
+  "frame_hash": "674366d57b89de135a8e8de00f53cac968ee7686c7b618b8f2796db82b28ecb0",
+  "frame_version": "1",
+  "human_approval": {
+    "note": "Frame is a write-once mirror of the ratified working-frame markdown. The loop may not edit it; only the human re-ratifies.",
+    "ratified_at": "2026-06-26T06:27:00Z",
+    "ratified_by": "human (duke@silentium.io)",
+    "source_doc": "research/okrs/json-render-spec-contract.md",
+    "source_doc_sha256": "674366d57b89de135a8e8de00f53cac968ee7686c7b618b8f2796db82b28ecb0"
+  },
+  "metric_contracts": {
+    "anti_goal.*": {
+      "lag_window": "immediate",
+      "max_age": "7 days",
+      "missing_data_policy": "breaking flag pauses committing moves; cannot/pointless stop the branch",
+      "owner": "orchestrator",
+      "read_method": "typecheck, vitest, pnpm lint, git diff --check, second-agent review",
+      "source_of_truth": "local command output, changed-path inspection, verifier/browser/lint tests, independent Claude/Codex review"
+    },
+    "objective.unchecked_path_or_binding_count": {
+      "lag_window": "immediate",
+      "max_age": "stale immediately after touching contract/catalog surfaces",
+      "missing_data_policy": "package promotion blocked while package gate unproven",
+      "owner": "orchestrator",
+      "read_method": "pnpm -F @pumped-fn/lite-react-practical typecheck + verifier bad-path fixtures",
+      "source_of_truth": "typed path/action binders + verifier rejection tests + tsc"
+    },
+    "objective.validated_spec_cases_passed": {
+      "lag_window": "immediate (local tests)",
+      "max_age": "7 days or stale immediately after touching contract/renderer/lint surfaces",
+      "missing_data_policy": "do not dispatch package-extraction work on stale or missing reads unless human waives",
+      "owner": "orchestrator",
+      "read_method": "pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts and --project browser view.browser.test.tsx",
+      "source_of_truth": "examples/lite-react-practical/research/typed-render-contract verifier + contract.test.ts + view.browser.test.tsx"
+    }
+  },
+  "non_negotiable_tripwires": [
+    "A promoted spec case has an unchecked state path, prop binding, event field, slot, component, or flow payload.",
+    "React rendering is not proven for a promoted case.",
+    "Durable state mutation or async/domain work bypasses Lite flows/resources/scoped values.",
+    "A spec contains branching business workflow rather than declared wiring to Lite actions.",
+    "A renderer creates scopes, verifies specs, or starts render work at import time.",
+    "React hook dependency correctness relies only on review.",
+    "A DKR checkpoint, CKR, PKR, or package-promotion decision is accepted from one LLM narrative without deterministic evidence and independent review."
+  ],
+  "objective": {
+    "loop_ownership": "The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target: validated_spec_cases_passed >= 4 with unchecked_path_or_binding_count == 0, or a human/blocking flag stops the loop.",
+    "metrics": [
+      {
+        "baseline": 1,
+        "metric_id": "objective.validated_spec_cases_passed",
+        "target": ">= 4"
+      },
+      {
+        "baseline": "0 for DKR1 slice; package gate unproven",
+        "metric_id": "objective.unchecked_path_or_binding_count",
+        "target": "== 0"
+      }
+    ],
+    "spec_cases_required": [
+      "conditional visibility",
+      "repeated data rendering",
+      "template or computed display",
+      "event or watch-triggered Lite flow action"
+    ],
+    "statement": "Promote the strict spec/catalog renderer from DKR to package work only when it proves designer-owned JSON iteration without losing pumped-fn's type, DI, laziness, and testability value."
+  },
+  "ratified": true
+}

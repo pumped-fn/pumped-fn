@@ -348,3 +348,7 @@ benchmarks/**/prof/out/
 dist/skills/
 .claude/plugins/local/
 examples/reactivity-bench/
+
+# OKRA loop: keep transient scratch out, commit authoritative records
+.okra/runs/*/drafts/
+.okra/**/*.lock

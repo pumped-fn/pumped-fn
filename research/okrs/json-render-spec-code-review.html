@@ -1,0 +1,1365 @@
+<!doctype html>
+<html lang="en" id="top">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Json Render DKR Code Review</title>
+  <style>
+    :root { color-scheme: light; --ink: #121820; --muted: #586474; --line: #d7dde5; --page: #f5f7fa; --panel: #ffffff; --code: #0d1117; --code-ink: #d6deeb; --green: #147d64; --red: #b42318; --blue: #235f93; --yellow: #8a5a00; --radius: 8px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.46; }
+    main { width: min(1260px, calc(100vw - 24px)); margin: 0 auto; padding: 18px 0 48px; }
+    header { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) auto; align-items: end; border-bottom: 1px solid var(--line); padding: 16px 0 20px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(1.65rem, 3vw, 3rem); line-height: 1.05; letter-spacing: 0; }
+    h2 { font-size: 1.05rem; }
+    h3 { font-size: .98rem; }
+    a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    code:not(pre code) { background: #eef2f6; border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+    .subtitle { color: var(--muted); margin-top: 8px; max-width: 82ch; }
+    .status { display: grid; gap: 4px; min-width: 260px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 10px 12px; font-size: .9rem; }
+    .status b { color: var(--green); }
+    .grid { display: grid; gap: 12px; margin-top: 14px; }
+    .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+    .panel h2 { margin-bottom: 8px; }
+    .panel p, .panel li { color: var(--muted); }
+    .panel ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+    .objective { border-left: 5px solid var(--green); }
+    .wall { border-left: 5px solid var(--red); }
+    .review { border-left: 5px solid var(--blue); }
+    .truth { border-left: 5px solid var(--yellow); }
+    .metric-row { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+    .metric { border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfe; padding: 10px; }
+    .metric b { display: block; color: var(--green); font-size: 1.2rem; }
+    .toc { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; }
+    .toc a { display: block; min-height: 72px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; text-decoration: none; color: var(--ink); }
+    .toc span { display: block; color: var(--muted); font-size: .88rem; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: .94rem; }
+    th, td { text-align: left; vertical-align: top; border-top: 1px solid var(--line); padding: 8px; }
+    th { color: var(--ink); background: #f8fafc; }
+    td { color: var(--muted); }
+    .pill { display: inline-block; border-radius: 999px; padding: 3px 8px; font-size: .78rem; font-weight: 700; white-space: nowrap; color: #17446b; background: #dbeafe; }
+    .pass { color: #0f513f; background: #dff4ec; }
+    .risk { color: #842029; background: #f8d7da; }
+    .todo { color: #664d03; background: #fff3cd; }
+    .code-section { margin-top: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .code-head { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 14px; border-bottom: 1px solid var(--line); }
+    .code-head p { color: var(--muted); margin-top: 5px; overflow-wrap: anywhere; }
+    pre { margin: 0; padding: 14px; overflow: auto; background: var(--code); color: var(--code-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.5; tab-size: 2; max-height: 70vh; }
+    @media (max-width: 880px) { header, .two, .three, .metric-row, .toc { grid-template-columns: 1fr; } .status { min-width: 0; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Json Render DKR Code Review</h1>
+      <p class="subtitle">Single-file review packet for the typed render-contract DKR. Status: accepted as a learning checkpoint, not package promotion.</p>
+    </div>
+    <div class="status">
+      <span><b>Verdict</b> ACCEPT_CANDIDATE</span>
+      <span>Updated 2026-06-26T09:17:23Z</span>
+      <span>No package release gate opened</span>
+    </div>
+  </header>
+
+  <section class="grid two">
+    <div class="panel objective">
+      <h2>Objective</h2>
+      <p>Prove whether strict spec/catalog rendering can support designer-owned JSON iteration while keeping pumped-fn as the state, action, async DI, laziness, and test seam.</p>
+      <div class="metric-row">
+        <div class="metric"><b>1 / 4</b><span>validated spec cases promoted</span></div>
+        <div class="metric"><b>0</b><span>single-LLM truth acceptances</span></div>
+        <div class="metric"><b>2</b><span>independent reviews before DKR acceptance</span></div>
+      </div>
+    </div>
+    <div class="panel wall">
+      <h2>Anti-Goals</h2>
+      <ul>
+        <li><code>single_llm_truth_acceptance_count == 0</code></li>
+        <li><code>unchecked_path_or_binding_count == 0</code> remains package-gate unproven beyond this binder slice</li>
+        <li>React stays an integration point; package promotion still needs runtime/view generalization</li>
+        <li>Lite state/actions stay the durable mutation and async boundary</li>
+        <li>Import-time verification/scope creation remains <code>0</code></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="panel review">
+      <h2>Deterministic Evidence</h2>
+      <ul>
+        <li><code>pnpm -F @pumped-fn/lite-react-practical typecheck</code></li>
+        <li><code>pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts</code> = 10 tests</li>
+        <li><code>pnpm -F @pumped-fn/lite-react-practical exec vitest run --project browser research/typed-render-contract/view.browser.test.tsx</code> = 1 browser test</li>
+        <li><code>pnpm lint</code> = 155 files, 0 diagnostics</li>
+        <li><code>git diff --check</code></li>
+      </ul>
+    </div>
+    <div class="panel truth">
+      <h2>No Single LLM Truth</h2>
+      <table>
+        <thead><tr><th>Reviewer</th><th>Verdict</th><th>Blocking findings</th><th>Package-promotion gaps</th></tr></thead>
+        <tbody>
+          <tr><td>Claude</td><td><span class="pill pass">ACCEPT_CANDIDATE</span></td><td>None</td><td>Runtime view still hardcoded around one sortable event and one root watch; second component family and spec-honoring runtime check still missing.</td></tr>
+          <tr><td>Codex</td><td><span class="pill pass">ACCEPT_CANDIDATE</span></td><td>None</td><td>Raw <code>JsonSpec</code> authoring, hand-maintained paths/kinds, repeat-slot typing, watch/runtime mismatch, reusable event normalization, and template rendering hardening remain open.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <nav class="toc">
+    <a href="#examples-lite-react-practical-research-typed-render-contract-contract-ts">Contract prototype<span>examples/lite-react-practical/research/typed-render-contract/contract.ts</span></a>
+    <a href="#examples-lite-react-practical-research-typed-render-contract-contract-test-ts">Verifier tests<span>examples/lite-react-practical/research/typed-render-contract/contract.test.ts</span></a>
+    <a href="#examples-lite-react-practical-research-typed-render-contract-view-tsx">React lowering<span>examples/lite-react-practical/research/typed-render-contract/view.tsx</span></a>
+    <a href="#examples-lite-react-practical-research-typed-render-contract-view-browser-test-tsx">Browser proof<span>examples/lite-react-practical/research/typed-render-contract/view.browser.test.tsx</span></a>
+    <a href="#examples-lite-react-practical-research-typed-render-contract-README-md">DKR README<span>examples/lite-react-practical/research/typed-render-contract/README.md</span></a>
+    <a href="#research-okrs-json-render-spec-contract-md">OKR frame<span>research/okrs/json-render-spec-contract.md</span></a>
+    <a href="#research-learnings-json-render-spec-designer-iteration-md">Learning checkpoint<span>research/learnings/json-render-spec-designer-iteration.md</span></a>
+  </nav>
+
+  <section class="code-section" id="examples-lite-react-practical-research-typed-render-contract-contract-ts">
+  <div class="code-head">
+    <div><h2>Contract prototype</h2><p>examples/lite-react-practical/research/typed-render-contract/contract.ts</p></div>
+    <span class="pill">ts</span>
+  </div>
+  <pre><code>import { flow, typed, type Lite } from "@pumped-fn/lite"
+import { scopedValue } from "@pumped-fn/lite-react"
+
+type Path&lt;T&gt; = T extends BoardState ? keyof BoardPaths &amp; string : never
+type PathValue&lt;T, P extends Path&lt;T&gt;&gt; = T extends BoardState
+  ? P extends keyof BoardPaths
+    ? BoardPaths[P]
+    : never
+  : never
+type Equal&lt;A, B&gt; = (&lt;T&gt;() =&gt; T extends A ? 1 : 2) extends (&lt;T&gt;() =&gt; T extends B ? 1 : 2) ? true : false
+type Assert&lt;T extends true&gt; = T
+
+type ValueKind = "string" | "number" | "boolean" | "nullableString" | "cardArray"
+type KindFor&lt;T&gt; =
+  T extends readonly Card[] ? "cardArray" :
+    [T] extends [string | null] ? null extends T ? "nullableString" : "string" :
+        T extends number ? "number" :
+          T extends boolean ? "boolean" :
+            never
+type FieldsKindOf&lt;T&gt; = {
+  [K in keyof T]: KindFor&lt;T[K]&gt;
+}
+type JsonValue = string | number | boolean | null
+type JsonExpr =
+  | JsonValue
+  | { state: string }
+  | { item: string }
+  | { event: string }
+  | { template: string; args: Record&lt;string, JsonExpr&gt; }
+type JsonAction = {
+  flow: string
+  params: Record&lt;string, JsonExpr&gt;
+}
+type JsonCondition = {
+  state: string
+  eq?: JsonValue
+}
+type JsonNode = {
+  type: string
+  props: Record&lt;string, JsonExpr&gt;
+  slots?: Record&lt;string, JsonNode[]&gt;
+  on?: Record&lt;string, JsonAction&gt;
+  watch?: Record&lt;string, JsonAction&gt;
+  visible?: JsonCondition
+}
+type JsonSpec = {
+  root: JsonNode
+}
+type ComponentSchema = {
+  props: Record&lt;string, ValueKind&gt;
+  slots: Record&lt;string, true | { repeats: string }&gt;
+  events: Record&lt;string, Record&lt;string, ValueKind&gt;&gt;
+  capabilities: string[]
+}
+type StateToken = {
+  path: string
+  kind: ValueKind
+  item?: ItemContext
+}
+type ItemContext = {
+  fields: Record&lt;string, ValueKind&gt;
+}
+type VerifyContext = {
+  state: Record&lt;string, StateToken&gt;
+  components: Record&lt;string, ComponentSchema&gt;
+  actions: Record&lt;string, ActionToken&gt;
+  rendererCapabilities: Set&lt;string&gt;
+}
+type ActionToken = {
+  flow: Lite.Flow&lt;any, any&gt;
+  params: Record&lt;string, ValueKind&gt;
+}
+type VerificationError = {
+  code: string
+  path: string
+  message: string
+}
+type VerificationResult =
+  | { ok: true; spec: JsonSpec }
+  | { ok: false; errors: VerificationError[] }
+type Card = {
+  id: string
+  title: string
+  columnId: string
+  done: boolean
+}
+type Column = {
+  id: string
+  title: string
+}
+type BoardState = {
+  board: {
+    columns: Column[]
+    cards: Card[]
+    selectedCardId: string | null
+    showDone: boolean
+    summary: {
+      lastMove: string | null
+    }
+  }
+}
+type BoardPaths = {
+  "/board/cards": Card[]
+  "/board/selectedCardId": string | null
+  "/board/showDone": boolean
+  "/board/summary/lastMove": string | null
+} &amp; Record&lt;`/board/cards/${number}/id`, string&gt;
+  &amp; Record&lt;`/board/cards/${number}/title`, string&gt;
+  &amp; Record&lt;`/board/cards/${number}/columnId`, string&gt;
+  &amp; Record&lt;`/board/cards/${number}/done`, boolean&gt;
+type MoveCardInput = {
+  cardId: string
+  fromColumnId: string
+  toColumnId: string
+  toIndex: number
+}
+type LoadCardInput = {
+  cardId: string | null
+}
+type RenderActionInput = {
+  action: JsonAction
+  event?: MoveCardInput
+}
+type ShowDoneKindIsBoolean = Assert&lt;Equal&lt;KindFor&lt;PathValue&lt;BoardState, "/board/showDone"&gt;&gt;, "boolean"&gt;&gt;
+type MissingPathRejected = Assert&lt;Equal&lt;"/board/missing" extends Path&lt;BoardState&gt; ? true : false, false&gt;&gt;
+type CardTitlePathIsString = Assert&lt;Equal&lt;PathValue&lt;BoardState, "/board/cards/0/title"&gt;, string&gt;&gt;
+type ShowDoneIsNotString = Assert&lt;Equal&lt;PathValue&lt;BoardState, "/board/showDone"&gt; extends string ? true : false, false&gt;&gt;
+type MovePayloadRequiresStringColumn = Assert&lt;Equal&lt;{ toColumnId: boolean } extends Pick&lt;MoveCardInput, "toColumnId"&gt; ? true : false, false&gt;&gt;
+type MovePayloadColumnKindIsString = Assert&lt;Equal&lt;FieldsKindOf&lt;MoveCardInput&gt;["toColumnId"], "string"&gt;&gt;
+
+const board = scopedValue({
+  name: "typed-render-board",
+  initial: (): BoardState =&gt; ({
+    board: {
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "done", title: "Done" },
+      ],
+      cards: [
+        { id: "card-1", title: "Write brief", columnId: "todo", done: false },
+        { id: "card-2", title: "Review layout", columnId: "done", done: true },
+      ],
+      selectedCardId: null,
+      showDone: true,
+      summary: {
+        lastMove: null,
+      },
+    },
+  }),
+})
+
+const moveCard = flow({
+  name: "typed-render-move-card",
+  parse: typed&lt;MoveCardInput&gt;(),
+  deps: { access: board },
+  factory: (ctx, { access }) =&gt; {
+    access.update((state) =&gt; {
+      const cards = state.board.cards.map((card) =&gt; card.id === ctx.input.cardId
+        ? { ...card, columnId: ctx.input.toColumnId, done: ctx.input.toColumnId === "done" }
+        : card)
+      return {
+        ...state,
+        board: {
+          ...state.board,
+          cards,
+          selectedCardId: ctx.input.cardId,
+        },
+      }
+    })
+  },
+})
+
+const loadCardDetails = flow({
+  name: "typed-render-load-card-details",
+  parse: typed&lt;LoadCardInput&gt;(),
+  deps: { access: board },
+  factory: (ctx, { access }) =&gt; {
+    const card = access.get().board.cards.find((candidate) =&gt; candidate.id === ctx.input.cardId)
+    access.update((state) =&gt; ({
+      ...state,
+      board: {
+        ...state.board,
+        summary: {
+          ...state.board.summary,
+          lastMove: card ? `Loaded ${card.title}` : null,
+        },
+      },
+    }))
+  },
+})
+
+function statePath&lt;T&gt;() {
+  return &lt;P extends Path&lt;T&gt;&gt;(path: P) =&gt; path
+}
+
+function pathToken&lt;T, P extends Path&lt;T&gt;&gt;(
+  path: P,
+  kind: KindFor&lt;PathValue&lt;T, P&gt;&gt;,
+  item?: PathValue&lt;T, P&gt; extends readonly (infer Item)[] ? ItemContext &amp; { fields: FieldsKindOf&lt;Item&gt; } : never
+): StateToken {
+  return item ? { path, kind, item } : { path, kind }
+}
+
+function action&lt;F extends Lite.Flow&lt;any, any&gt;&gt;(
+  flow: F,
+  params: FieldsKindOf&lt;Lite.Utils.FlowInput&lt;F&gt;&gt;
+): ActionToken {
+  return { flow, params }
+}
+
+function defineActions&lt;const R extends Record&lt;string, ActionToken&gt;&gt;(actions: R): R &amp; Record&lt;string, ActionToken&gt; {
+  return actions
+}
+
+const path = statePath&lt;BoardState&gt;()
+
+const stateTokens = {
+  cards: pathToken&lt;BoardState, "/board/cards"&gt;(path("/board/cards"), "cardArray", {
+    fields: {
+      id: "string",
+      title: "string",
+      columnId: "string",
+      done: "boolean",
+    },
+  }),
+  selectedCardId: pathToken&lt;BoardState, "/board/selectedCardId"&gt;(path("/board/selectedCardId"), "nullableString"),
+  showDone: pathToken&lt;BoardState, "/board/showDone"&gt;(path("/board/showDone"), "boolean"),
+  lastMove: pathToken&lt;BoardState, "/board/summary/lastMove"&gt;(path("/board/summary/lastMove"), "nullableString"),
+} satisfies Record&lt;string, StateToken&gt;
+
+const actions = defineActions({
+  moveCard: action(moveCard, {
+    cardId: "string",
+    fromColumnId: "string",
+    toColumnId: "string",
+    toIndex: "number",
+  }),
+  loadCardDetails: action(loadCardDetails, {
+    cardId: "nullableString",
+  }),
+})
+
+const runJsonAction = flow({
+  name: "typed-render-run-json-action",
+  parse: typed&lt;RenderActionInput&gt;(),
+  deps: { access: board },
+  factory: (ctx, { access }) =&gt; {
+    const target = actions[ctx.input.action.flow]
+    if (!target) throw new Error(`Unknown verified flow ${ctx.input.action.flow}`)
+    return ctx.exec({ flow: target.flow, rawInput: actionParams(ctx.input.action, access.get(), undefined, ctx.input.event) })
+  },
+})
+
+const components = {
+  Stack: {
+    props: { direction: "string" },
+    slots: { children: true },
+    events: {},
+    capabilities: ["layout.stack"],
+  },
+  Text: {
+    props: { text: "nullableString" },
+    slots: {},
+    events: {},
+    capabilities: ["text"],
+  },
+  SortableList: {
+    props: { items: "cardArray" },
+    slots: { item: { repeats: "items" } },
+    events: {
+      move: actions.moveCard.params,
+    },
+    capabilities: ["interaction.sortable"],
+  },
+  Card: {
+    props: { title: "string", done: "boolean" },
+    slots: {},
+    events: {},
+    capabilities: ["surface.card"],
+  },
+} satisfies Record&lt;string, ComponentSchema&gt;
+
+const validSpec: JsonSpec = {
+  root: {
+    type: "Stack",
+    props: {
+      direction: "vertical",
+    },
+    watch: {
+      "/board/selectedCardId": {
+        flow: "loadCardDetails",
+        params: {
+          cardId: { state: "/board/selectedCardId" },
+        },
+      },
+    },
+    slots: {
+      children: [
+        {
+          type: "Text",
+          props: {
+            text: {
+              template: "Status: {lastMove}",
+              args: {
+                lastMove: { state: "/board/summary/lastMove" },
+              },
+            },
+          },
+        },
+        {
+          type: "SortableList",
+          props: {
+            items: { state: "/board/cards" },
+          },
+          on: {
+            move: {
+              flow: "moveCard",
+              params: {
+                cardId: { event: "cardId" },
+                fromColumnId: { event: "fromColumnId" },
+                toColumnId: { event: "toColumnId" },
+                toIndex: { event: "toIndex" },
+              },
+            },
+          },
+          slots: {
+            item: [
+              {
+                type: "Card",
+                props: {
+                  title: { item: "title" },
+                  done: { item: "done" },
+                },
+                visible: {
+                  state: "/board/showDone",
+                  eq: true,
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  },
+}
+
+const context: VerifyContext = {
+  state: Object.fromEntries(Object.values(stateTokens).map((token) =&gt; [token.path, token])),
+  components,
+  actions,
+  rendererCapabilities: new Set(["layout.stack", "text", "interaction.sortable", "surface.card"]),
+}
+
+function verifySpec(spec: JsonSpec, ctx: VerifyContext = context): VerificationResult {
+  const errors: VerificationError[] = []
+  verifyNode(spec.root, "$.root", ctx, undefined, errors)
+  return errors.length === 0 ? { ok: true, spec } : { ok: false, errors }
+}
+
+function verifyNode(
+  node: JsonNode,
+  location: string,
+  ctx: VerifyContext,
+  item: ItemContext | undefined,
+  errors: VerificationError[]
+): void {
+  const component = ctx.components[node.type]
+  if (!component) {
+    errors.push({ code: "unknown_component", path: `${location}.type`, message: `Unknown component ${node.type}` })
+    return
+  }
+  for (const capability of component.capabilities) {
+    if (!ctx.rendererCapabilities.has(capability)) {
+      errors.push({ code: "unsupported_capability", path: `${location}.type`, message: `${node.type} needs ${capability}` })
+    }
+  }
+  for (const prop of Object.keys(node.props)) {
+    if (!(prop in component.props)) {
+      errors.push({ code: "unknown_prop", path: `${location}.props.${prop}`, message: `${node.type}.${prop} is not in catalog` })
+    }
+  }
+  for (const [prop, kind] of Object.entries(component.props)) {
+    if (!(prop in node.props)) {
+      errors.push({ code: "missing_prop", path: `${location}.props.${prop}`, message: `${node.type}.${prop} is required` })
+      continue
+    }
+    verifyExpr(node.props[prop]!, kind, `${location}.props.${prop}`, ctx, item, undefined, errors)
+  }
+  for (const slot of Object.keys(node.slots ?? {})) {
+    if (!(slot in component.slots)) {
+      errors.push({ code: "unknown_slot", path: `${location}.slots.${slot}`, message: `${node.type}.${slot} is not in catalog` })
+    }
+  }
+  for (const event of Object.keys(node.on ?? {})) {
+    const eventShape = component.events[event]
+    if (!eventShape) {
+      errors.push({ code: "unknown_event", path: `${location}.on.${event}`, message: `${node.type}.${event} is not in catalog` })
+      continue
+    }
+    verifyAction(node.on![event]!, `${location}.on.${event}`, ctx, item, eventShape, errors)
+  }
+  for (const [watchedPath, action] of Object.entries(node.watch ?? {})) {
+    if (!ctx.state[watchedPath]) {
+      errors.push({ code: "unknown_state_path", path: `${location}.watch.${watchedPath}`, message: `${watchedPath} is not a known state path` })
+    }
+    verifyAction(action, `${location}.watch.${watchedPath}`, ctx, item, undefined, errors)
+  }
+  if (node.visible) verifyCondition(node.visible, `${location}.visible`, ctx, errors)
+  for (const [slot, children] of Object.entries(node.slots ?? {})) {
+    const slotSpec = component.slots[slot]
+    const childItem = slotSpec &amp;&amp; slotSpec !== true
+      ? repeatItemContext(node, slotSpec, ctx, errors, `${location}.slots.${slot}`)
+      : item
+    children.forEach((child, index) =&gt; verifyNode(child, `${location}.slots.${slot}.${index}`, ctx, childItem, errors))
+  }
+}
+
+function repeatItemContext(
+  node: JsonNode,
+  slot: { repeats: string },
+  ctx: VerifyContext,
+  errors: VerificationError[],
+  location: string
+): ItemContext | undefined {
+  const expr = node.props[slot.repeats]
+  if (!expr) {
+    errors.push({ code: "missing_repeat_source", path: location, message: `${slot.repeats} is required for repeated slot` })
+    return undefined
+  }
+  if (typeof expr === "object" &amp;&amp; expr !== null &amp;&amp; "state" in expr) {
+    const token = ctx.state[expr.state]
+    if (!token?.item) {
+      errors.push({ code: "missing_repeat_item_context", path: location, message: `${expr.state} does not expose repeat item fields` })
+      return undefined
+    }
+    return token.item
+  }
+  errors.push({ code: "unsupported_repeat_source", path: location, message: `${slot.repeats} must bind to a state array token` })
+  return undefined
+}
+
+function verifyAction(
+  action: JsonAction,
+  location: string,
+  ctx: VerifyContext,
+  item: ItemContext | undefined,
+  event: Record&lt;string, ValueKind&gt; | undefined,
+  errors: VerificationError[]
+): void {
+  const target = ctx.actions[action.flow]
+  if (!target) {
+    errors.push({ code: "unknown_flow", path: `${location}.flow`, message: `${action.flow} is not registered` })
+    return
+  }
+  const flowShape = target.params
+  for (const [field, kind] of Object.entries(flowShape)) {
+    if (!(field in action.params)) {
+      errors.push({ code: "missing_action_param", path: `${location}.params.${field}`, message: `${action.flow}.${field} is required` })
+      continue
+    }
+    verifyExpr(action.params[field]!, kind, `${location}.params.${field}`, ctx, item, event, errors)
+  }
+  for (const field of Object.keys(action.params)) {
+    if (!(field in flowShape)) {
+      errors.push({ code: "unknown_action_param", path: `${location}.params.${field}`, message: `${action.flow}.${field} is not in flow input` })
+    }
+  }
+}
+
+function verifyCondition(condition: JsonCondition, location: string, ctx: VerifyContext, errors: VerificationError[]): void {
+  const token = ctx.state[condition.state]
+  if (!token) {
+    errors.push({ code: "unknown_state_path", path: `${location}.state`, message: `${condition.state} is not a known state path` })
+    return
+  }
+  if (condition.eq !== undefined &amp;&amp; !literalMatches(condition.eq, token.kind)) {
+    errors.push({ code: "invalid_condition_value", path: `${location}.eq`, message: `${condition.state} cannot compare to ${typeof condition.eq}` })
+  }
+}
+
+function verifyExpr(
+  expr: JsonExpr,
+  expected: ValueKind,
+  location: string,
+  ctx: VerifyContext,
+  item: ItemContext | undefined,
+  event: Record&lt;string, ValueKind&gt; | undefined,
+  errors: VerificationError[]
+): void {
+  const actual = exprKind(expr, ctx, item, event, location, errors)
+  if (actual &amp;&amp; actual !== expected) {
+    errors.push({ code: "kind_mismatch", path: location, message: `Expected ${expected}, got ${actual}` })
+  }
+}
+
+function exprKind(
+  expr: JsonExpr,
+  ctx: VerifyContext,
+  item: ItemContext | undefined,
+  event: Record&lt;string, ValueKind&gt; | undefined,
+  location: string,
+  errors: VerificationError[]
+): ValueKind | undefined {
+  if (typeof expr === "string") return "string"
+  if (typeof expr === "number") return "number"
+  if (typeof expr === "boolean") return "boolean"
+  if (expr === null) return "nullableString"
+  if ("state" in expr) {
+    const token = ctx.state[expr.state]
+    if (!token) {
+      errors.push({ code: "unknown_state_path", path: location, message: `${expr.state} is not a known state path` })
+      return undefined
+    }
+    return token.kind
+  }
+  if ("item" in expr) {
+    const kind = item?.fields[expr.item]
+    if (!kind) {
+      errors.push({ code: "unknown_item_path", path: location, message: `${expr.item} is not available in this repeat item` })
+      return undefined
+    }
+    return kind
+  }
+  if ("event" in expr) {
+    const kind = event?.[expr.event]
+    if (!kind) {
+      errors.push({ code: "unknown_event_field", path: location, message: `${expr.event} is not available on this event` })
+      return undefined
+    }
+    return kind
+  }
+  const placeholders = templatePlaceholders(expr.template)
+  for (const name of placeholders) {
+    if (!(name in expr.args)) {
+      errors.push({ code: "unbound_template_placeholder", path: `${location}.args.${name}`, message: `${name} is referenced but not bound` })
+    }
+  }
+  for (const name of Object.keys(expr.args)) {
+    if (!placeholders.has(name)) {
+      errors.push({ code: "unreferenced_template_arg", path: `${location}.args.${name}`, message: `${name} is bound but not referenced` })
+    }
+  }
+  for (const [name, arg] of Object.entries(expr.args)) {
+    exprKind(arg, ctx, item, event, `${location}.args.${name}`, errors)
+  }
+  return "nullableString"
+}
+
+function templatePlaceholders(template: string): Set&lt;string&gt; {
+  return new Set(Array.from(template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)).map((match) =&gt; match[1]!))
+}
+
+function literalMatches(value: JsonValue, kind: ValueKind): boolean {
+  if (kind === "string") return typeof value === "string"
+  if (kind === "number") return typeof value === "number"
+  if (kind === "boolean") return typeof value === "boolean"
+  if (kind === "nullableString") return value === null || typeof value === "string"
+  return false
+}
+
+function readPath(state: BoardState, path: string): unknown {
+  return path.split("/").filter(Boolean).reduce&lt;unknown&gt;((value, segment) =&gt; {
+    if (value === undefined || value === null) return undefined
+    if (Array.isArray(value)) return value[Number(segment)]
+    return (value as Record&lt;string, unknown&gt;)[segment]
+  }, state)
+}
+
+function resolveExpr(expr: JsonExpr, state: BoardState, item?: Card, event?: MoveCardInput): unknown {
+  if (typeof expr !== "object" || expr === null) return expr
+  if ("state" in expr) return readPath(state, expr.state)
+  if ("item" in expr) return item?.[expr.item as keyof Card]
+  if ("event" in expr) return event?.[expr.event as keyof MoveCardInput]
+  return Object.entries(expr.args).reduce((text, [name, value]) =&gt; text.replace(`{${name}}`, String(resolveExpr(value, state, item, event) ?? "None")), expr.template)
+}
+
+function actionParams(action: JsonAction, state: BoardState, item?: Card, event?: MoveCardInput): Record&lt;string, unknown&gt; {
+  return Object.fromEntries(Object.entries(action.params).map(([key, expr]) =&gt; [key, resolveExpr(expr, state, item, event)]))
+}
+
+export {
+  board,
+  loadCardDetails,
+  moveCard,
+  runJsonAction,
+  readPath,
+  resolveExpr,
+  actionParams,
+  validSpec,
+  verifySpec,
+}
+export type {
+  BoardState,
+  Card,
+  JsonAction,
+  JsonExpr,
+  JsonNode,
+  JsonSpec,
+  LoadCardInput,
+  MoveCardInput,
+  RenderActionInput,
+  KindFor,
+  FieldsKindOf,
+  Path,
+  PathValue,
+  VerificationError,
+  VerificationResult,
+  ShowDoneKindIsBoolean,
+  MissingPathRejected,
+  CardTitlePathIsString,
+  ShowDoneIsNotString,
+  MovePayloadRequiresStringColumn,
+  MovePayloadColumnKindIsString,
+}
+</code></pre>
+</section>
+<section class="code-section" id="examples-lite-react-practical-research-typed-render-contract-contract-test-ts">
+  <div class="code-head">
+    <div><h2>Verifier tests</h2><p>examples/lite-react-practical/research/typed-render-contract/contract.test.ts</p></div>
+    <span class="pill">ts</span>
+  </div>
+  <pre><code>import { describe, expect, test } from "vitest"
+import { validSpec, verifySpec, type JsonSpec } from "./contract"
+
+function clone(spec: JsonSpec): JsonSpec {
+  return JSON.parse(JSON.stringify(spec)) as JsonSpec
+}
+
+function codes(spec: JsonSpec): string[] {
+  const result = verifySpec(spec)
+  return result.ok ? [] : result.errors.map((error) =&gt; error.code)
+}
+
+describe("typed render contract verifier", () =&gt; {
+  test("accepts the valid spec at detail level", () =&gt; {
+    expect(verifySpec(validSpec)).toEqual({ ok: true, spec: validSpec })
+  })
+
+  test("rejects a bad state path", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![1]!.props["items"] = { state: "/board/missing" }
+
+    expect(codes(spec)).toContain("unknown_state_path")
+  })
+
+  test("rejects a prop value with the wrong kind", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![0]!.props["text"] = 12
+
+    expect(codes(spec)).toContain("kind_mismatch")
+  })
+
+  test("rejects an unknown slot", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["footer"] = []
+
+    expect(codes(spec)).toContain("unknown_slot")
+  })
+
+  test("rejects an unknown event", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![1]!.on!["dragged"] = spec.root.slots!["children"]![1]!.on!["move"]!
+
+    expect(codes(spec)).toContain("unknown_event")
+  })
+
+  test("rejects an unknown flow action", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![1]!.on!["move"]!.flow = "missingFlow"
+
+    expect(codes(spec)).toContain("unknown_flow")
+  })
+
+  test("rejects a flow payload wired from the wrong event field kind", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![1]!.on!["move"]!.params["toColumnId"] = { event: "toIndex" }
+
+    expect(codes(spec)).toContain("kind_mismatch")
+  })
+
+  test("rejects an unbound template placeholder", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![0]!.props["text"] = {
+      template: "Status: {missing}",
+      args: {
+        lastMove: { state: "/board/summary/lastMove" },
+      },
+    }
+
+    expect(codes(spec)).toContain("unbound_template_placeholder")
+  })
+
+  test("rejects an unreferenced template arg", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![0]!.props["text"] = {
+      template: "Status",
+      args: {
+        lastMove: { state: "/board/summary/lastMove" },
+      },
+    }
+
+    expect(codes(spec)).toContain("unreferenced_template_arg")
+  })
+
+  test("rejects repeat item fields outside the catalog-derived item scope", () =&gt; {
+    const spec = clone(validSpec)
+    spec.root.slots!["children"]![1]!.slots!["item"]![0]!.props["title"] = { item: "missing" }
+
+    expect(codes(spec)).toContain("unknown_item_path")
+  })
+})
+</code></pre>
+</section>
+<section class="code-section" id="examples-lite-react-practical-research-typed-render-contract-view-tsx">
+  <div class="code-head">
+    <div><h2>React lowering</h2><p>examples/lite-react-practical/research/typed-render-contract/view.tsx</p></div>
+    <span class="pill">tsx</span>
+  </div>
+  <pre><code>import { useCallback, useEffect, useRef, type ReactNode } from "react"
+import { useFlow, useScopedValue } from "@pumped-fn/lite-react"
+import {
+  board,
+  readPath,
+  resolveExpr,
+  runJsonAction,
+  validSpec,
+  verifySpec,
+  type BoardState,
+  type Card,
+  type JsonAction,
+  type JsonNode,
+  type JsonSpec,
+  type MoveCardInput,
+} from "./contract"
+
+let verifiedSpec: JsonSpec | undefined
+
+function getVerifiedSpec(): JsonSpec {
+  if (verifiedSpec) return verifiedSpec
+  const result = verifySpec(validSpec)
+  if (!result.ok) {
+    throw new Error(result.errors.map((error) =&gt; error.message).join("\n"))
+  }
+  verifiedSpec = result.spec
+  return verifiedSpec
+}
+
+function TypedRenderBoard() {
+  const spec = getVerifiedSpec()
+  const access = useScopedValue(board)
+  const { execute: runVerifiedAction } = useFlow(runJsonAction)
+  const selected = readPath(access.snapshot, "/board/selectedCardId")
+  const previousSelected = useRef(selected)
+  const selectedWatchAction = spec.root.watch?.["/board/selectedCardId"]
+
+  const execute = useCallback((action: JsonAction, event?: MoveCardInput) =&gt; {
+    runVerifiedAction(event === undefined ? { action } : { action, event })
+  }, [runVerifiedAction])
+
+  useEffect(() =&gt; {
+    if (previousSelected.current === selected) return
+    previousSelected.current = selected
+    if (selectedWatchAction) execute(selectedWatchAction)
+  }, [execute, selected, selectedWatchAction])
+
+  return &lt;&gt;{renderNode(spec.root, access.snapshot, execute)}&lt;/&gt;
+}
+
+function renderNode(
+  node: JsonNode,
+  state: BoardState,
+  execute: (action: JsonAction, event?: MoveCardInput) =&gt; void,
+  item?: Card
+): ReactNode {
+  if (node.visible) {
+    const actual = readPath(state, node.visible.state)
+    if (node.visible.eq !== undefined &amp;&amp; actual !== node.visible.eq) return null
+    if (node.visible.eq === undefined &amp;&amp; !actual) return null
+  }
+
+  if (node.type === "Stack") {
+    return (
+      &lt;section aria-label="typed render board" data-direction={resolveExpr(node.props["direction"]!, state, item) as string}&gt;
+        {node.slots?.["children"]?.map((child, index) =&gt; &lt;FragmentNode key={index}&gt;{renderNode(child, state, execute, item)}&lt;/FragmentNode&gt;)}
+      &lt;/section&gt;
+    )
+  }
+
+  if (node.type === "Text") {
+    return &lt;output aria-label="board status"&gt;{String(resolveExpr(node.props["text"]!, state, item) ?? "")}&lt;/output&gt;
+  }
+
+  if (node.type === "SortableList") {
+    const cards = resolveExpr(node.props["items"]!, state, item) as Card[]
+    const action = node.on?.["move"]
+    return (
+      &lt;div&gt;
+        &lt;ul&gt;
+          {cards.map((card) =&gt; (
+            &lt;li key={card.id}&gt;
+              {node.slots?.["item"]?.map((child, index) =&gt; &lt;FragmentNode key={index}&gt;{renderNode(child, state, execute, card)}&lt;/FragmentNode&gt;)}
+            &lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+        &lt;button
+          type="button"
+          onClick={() =&gt; action &amp;&amp; execute(action, { cardId: "card-2", fromColumnId: "done", toColumnId: "todo", toIndex: 0 })}
+        &gt;
+          Move Review layout to Todo
+        &lt;/button&gt;
+      &lt;/div&gt;
+    )
+  }
+
+  if (node.type === "Card") {
+    return (
+      &lt;article aria-label={String(resolveExpr(node.props["title"]!, state, item))} data-done={String(resolveExpr(node.props["done"]!, state, item))}&gt;
+        {String(resolveExpr(node.props["title"]!, state, item))}
+      &lt;/article&gt;
+    )
+  }
+
+  return null
+}
+
+function FragmentNode({ children }: { children: ReactNode }) {
+  return &lt;&gt;{children}&lt;/&gt;
+}
+
+export { TypedRenderBoard }
+</code></pre>
+</section>
+<section class="code-section" id="examples-lite-react-practical-research-typed-render-contract-view-browser-test-tsx">
+  <div class="code-head">
+    <div><h2>Browser proof</h2><p>examples/lite-react-practical/research/typed-render-contract/view.browser.test.tsx</p></div>
+    <span class="pill">tsx</span>
+  </div>
+  <pre><code>import { describe, expect, test } from "vitest"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { createScope } from "@pumped-fn/lite"
+import { ExecutionContextProvider, ScopeProvider } from "@pumped-fn/lite-react"
+import { TypedRenderBoard } from "./view"
+import { board } from "./contract"
+
+describe("typed render contract React lowering", () =&gt; {
+  test("renders the verified spec and executes Lite flows from normalized component events", async () =&gt; {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    await board.resolve(ctx)
+    let view: ReturnType&lt;typeof render&gt;
+
+    await act(async () =&gt; {
+      view = render(
+        &lt;ScopeProvider scope={scope}&gt;
+          &lt;ExecutionContextProvider ctx={ctx}&gt;
+            &lt;TypedRenderBoard /&gt;
+          &lt;/ExecutionContextProvider&gt;
+        &lt;/ScopeProvider&gt;
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByLabelText("board status")).toHaveTextContent("Status: None")
+    expect(await screen.findByLabelText("Write brief")).toHaveAttribute("data-done", "false")
+    expect(await screen.findByLabelText("Review layout")).toHaveAttribute("data-done", "true")
+
+    await act(async () =&gt; {
+      fireEvent.click(screen.getByRole("button", { name: "Move Review layout to Todo" }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await waitFor(() =&gt; expect(screen.getByLabelText("board status")).toHaveTextContent("Status: Loaded Review layout"))
+    expect(screen.getByLabelText("Review layout")).toHaveAttribute("data-done", "false")
+
+    view!.unmount()
+    await ctx.close()
+    await scope.dispose()
+  })
+})
+</code></pre>
+</section>
+<section class="code-section" id="examples-lite-react-practical-research-typed-render-contract-README-md">
+  <div class="code-head">
+    <div><h2>DKR README</h2><p>examples/lite-react-practical/research/typed-render-contract/README.md</p></div>
+    <span class="pill">md</span>
+  </div>
+  <pre><code># Typed render contract DKR
+
+This spike checks whether a strict spec and catalog can keep designer iteration while preserving pumped-fn's TypeScript and testability value.
+
+The contract deliberately keeps React components as catalog implementations. The spec names catalog components, slots, props, bindings, events, and flows. React lowers that contract into host components, including headless behavior such as a normalized sortable move event.
+
+The verifier rejects detail-level drift:
+
+- unknown state path
+- wrong prop value kind
+- unknown slot
+- unknown event
+- unknown flow
+- wrong flow payload kind
+- unbound template placeholder
+- unreferenced template arg
+- repeat item field outside the catalog-derived item scope
+
+The TypeScript side checks state paths and flow payload shape before JSON exists. The JSON side stays portable but is verified from the same catalog, state path, and flow registry.
+
+The accepted DKR checkpoint is not package promotion. Raw `JsonSpec` authoring, generalized watch/runtime lowering, reusable event normalization, and renderer portability remain open package gates.
+</code></pre>
+</section>
+<section class="code-section" id="research-okrs-json-render-spec-contract-md">
+  <div class="code-head">
+    <div><h2>OKR frame</h2><p>research/okrs/json-render-spec-contract.md</p></div>
+    <span class="pill">md</span>
+  </div>
+  <pre><code># Json Render Spec Contract OKR
+
+Status: ratified working frame
+Created at: 2026-06-26T06:27:00Z
+
+## Objective
+
+Promote the strict spec/catalog renderer from DKR to package work only when it proves designer-owned JSON iteration without losing pumped-fn's type, DI, laziness, and testability value.
+
+Target metric: `validated_spec_cases_passed &gt;= 4` and `unchecked_path_or_binding_count == 0`.
+
+Promoted spec cases must cover:
+
+- conditional visibility
+- repeated data rendering
+- template or computed display
+- event or watch-triggered Lite flow action
+
+The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target: `validated_spec_cases_passed &gt;= 4` with `unchecked_path_or_binding_count == 0`, or a human/blocking flag stops the loop.
+
+Action envelope: allowed moves are contract extraction, verifier tests, React renderer proof, typed authoring/path-token proof, semantic renderer comparison, docs, and lint/test guard work; forbidden actions are broad component-vocabulary expansion, business logic in specs, bypassing Lite state/actions, eager import-time scope/render work, platform-specific spec forks, and package release; human ratification is required before changing objective metrics, anti-goal thresholds, or promoting release work.
+
+## Anti-Goals
+
+| Anti-goal | Type | Metric | Target |
+| --- | --- | --- | --- |
+| React remains a real integration point | binary tripwire | `promoted_spec_cases_render_through_react` | `== validated_spec_cases_passed` |
+| Pumped-fn is not a wrapper | binary tripwire | `bypassed_lite_state_or_action_paths` | `== 0` |
+| TypeScript value is preserved | binary tripwire | `unchecked_path_or_binding_count` | `== 0` |
+| Designer specs do not hide workflow logic | binary tripwire | `workflow_logic_inside_spec_count` | `== 0` |
+| Designer iteration does not create React cleanup debt | drift guard | `react_cleanup_diff_lines_per_spec_iteration` | `&lt;= 10` |
+| Platform meaning does not fork | binary tripwire | `spec_semantics_changed_between_renderers` | `== 0` |
+| Code stays lazy | binary tripwire | `import_time_verification_or_scope_creation_count` | `== 0` |
+| Hook quality is mechanically guarded | binary tripwire | `react_hook_dependency_violation_count` | `== 0` |
+| No single LLM owns DKR truth | binary tripwire | `single_llm_truth_acceptance_count` | `== 0` |
+
+Non-negotiable tripwires:
+
+- A promoted spec case has an unchecked state path, prop binding, event field, slot, component, or flow payload.
+- React rendering is not proven for a promoted case.
+- Durable state mutation or async/domain work bypasses Lite flows/resources/scoped values.
+- A spec contains branching business workflow rather than declared wiring to Lite actions.
+- A renderer creates scopes, verifies specs, or starts render work at import time.
+- React hook dependency correctness relies only on review.
+- A DKR checkpoint, CKR, PKR, or package-promotion decision is accepted from one LLM narrative without deterministic evidence and independent review.
+
+## Direct Reads
+
+Current baseline, corrected after deterministic checks plus independent Claude/Codex review:
+
+| Metric | Current | Target | Source |
+| --- | ---: | ---: | --- |
+| `validated_spec_cases_passed` | 1 | 4 | `examples/lite-react-practical/research/typed-render-contract` |
+| `unchecked_path_or_binding_count` | 0 for DKR1 binder slice; package gate unproven | 0 | typed path/action binders plus verifier tests; package promotion still needs generalized authoring/runtime proof |
+| `bypassed_lite_state_or_action_paths` | 0 | 0 | React lowering uses `useFlow(runJsonAction)` and Lite-owned scoped values/flows |
+| `promoted_spec_cases_render_through_react` | 1 | 4 | browser test for `TypedRenderBoard` |
+| `import_time_verification_or_scope_creation_count` | 0 | 0 | lazy cached `getVerifiedSpec()` plus provider-owned scope/context |
+| `react_hook_dependency_violation_count` | guard absent | 0 | current effect is manually corrected, but no mechanical guard catches dependency drift |
+| `single_llm_truth_acceptance_count` | 0 | 0 | DKR acceptance requires deterministic checks plus independent Claude/Codex review |
+| `independent_review_before_dkr_acceptance_count` | 2 | &gt;= 2 | Claude and Codex independently reviewed the changed DKR1 binder checkpoint |
+
+Freshness: observed_at=2026-06-26T09:17:23Z -&gt; status=fresh against max_age=7 days.
+
+No-single-LLM-truth review result:
+
+- Deterministic checks passed: typecheck, verifier tests, browser test, and `pnpm lint`.
+- Claude and Codex independently converged that the prototype proves the direction but not the package gate for `unchecked_path_or_binding_count == 0`.
+- Converged gaps: flow registry/runtime dispatch drift, `ValueKind` not derived from `PathValue` or flow input types, template placeholders unchecked, watch verification broader than React behavior, repeat item shape hardcoded outside the catalog, and browser event normalization overclaimed by a synthetic button event.
+- Claude design challenge proposed the next DKR shape: typed `defineTokens` and `action` binders as the only way kinds enter the system, one action registry consumed by both verifier and dispatcher, repeat slots derived from the bound array prop, scope-owned `mountWatches` instead of React effects, adapter-owned event normalization through `emit`, and `verifyDraft` versus `verifyStrict` so designer proposals can preview but never reach production.
+
+Next DKR anti-goal gate:
+
+- Candidate output: typed source-of-truth binder proof for state tokens, action tokens, template placeholders, and repeat item context.
+- Deterministic evidence now required before acceptance: `pnpm -F @pumped-fn/lite-react-practical typecheck`, verifier tests, browser tests, `pnpm lint`, and `git diff --check`.
+- Independent review now required before acceptance: Claude and Codex must review the changed code and either converge on acceptance or name blocking gaps.
+- Acceptance state: accepted as DKR1 learning checkpoint, not package promotion. `independent_review_before_dkr_acceptance_count = 2` and `single_llm_truth_acceptance_count = 0`.
+
+DKR1 checkpoint result:
+
+- Deterministic checks passed: `pnpm -F @pumped-fn/lite-react-practical typecheck`, `pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts`, `pnpm -F @pumped-fn/lite-react-practical exec vitest run --project browser research/typed-render-contract/view.browser.test.tsx`, `pnpm lint`, and `git diff --check`.
+- Claude verdict: `ACCEPT_CANDIDATE`; no blocking findings. Package-promotion gaps: React view still uses a fixed sortable button and root watch only, no second component family proves generalization, and runtime view honoring of the verified spec remains promotion-critical.
+- Codex verdict: `ACCEPT_CANDIDATE`; no blocking findings. Package-promotion gaps: raw `JsonSpec` authoring still needs a strict builder/generated fixture path, `BoardPaths`/`KindFor` remain hand-maintained and board-specific, repeat-slot `repeats` is still a catalog string, watch runtime is narrower than verification, event normalization is not reusable, and template rendering semantics need promotion-level hardening.
+- Steering decision: accept the DKR1 binder learning checkpoint; keep CKR/PKR package promotion blocked until renderer/runtime generalization and strict authoring proof close the package gaps.
+
+## CKRs
+
+CKR1: `validated_spec_cases_passed &gt;= 4` across conditional visibility, repeated data rendering, template or computed display, and event or watch-triggered Lite flow action.
+
+CKR-level discovery/delivery balance: discover the minimum spec grammar that covers four designer-facing behaviors without rebuilding React; deliver one fixture per behavior plus verifier and React-render evidence.
+
+CKR2: `unchecked_path_or_binding_count == 0` for every promoted spec path, prop binding, repeat item binding, event field, slot, component, and flow payload.
+
+CKR-level discovery/delivery balance: discover whether typed builders, generated path tokens, verifier-generated type fixtures, or a hybrid gives the cleanest authoring path; deliver a mechanically checked source-of-truth path for JSON artifacts.
+
+CKR3: `bypassed_lite_state_or_action_paths == 0` for durable state changes, async work, domain actions, and dependency injection.
+
+CKR-level discovery/delivery balance: discover the smallest render-action bridge that still feels natural for React and React Native hosts; deliver all action execution through Lite flows/resources/scoped values.
+
+CKR4: `spec_semantics_changed_between_renderers == 0` for the promoted spec cases.
+
+CKR-level discovery/delivery balance: discover whether the first portability proof should be a host-agnostic semantic tree or a React Native adapter stub; deliver a comparison test that fails on semantic drift.
+
+CKR5: `react_hook_dependency_violation_count == 0` and a mechanical guard exists for promoted React renderer code.
+
+CKR-level discovery/delivery balance: discover whether to extend `@pumped-fn/lite-lint`, add eslint only for React hooks, or add a targeted AST rule; deliver a check that catches missing hook dependency arrays.
+
+## DKRs
+
+DKR1: Typed authoring source of truth.
+
+Decision to unlock: choose builder, generated tokens, generated type fixtures, or hybrid before package extraction.
+
+Budget: one implementation pass.
+
+Risk reduced: losing TypeScript value through raw path strings.
+
+Expected output: learning checkpoint with probability update and at least one failing bad-path fixture.
+
+Acceptance gate: deterministic checks plus independent Claude/Codex review; `single_llm_truth_acceptance_count` must remain `0`.
+
+DKR2: Renderer portability proof.
+
+Decision to unlock: decide whether React Native package work is admissible or whether the semantic adapter must come first.
+
+Budget: one implementation pass.
+
+Risk reduced: platform meaning fork.
+
+Expected output: semantic comparison test for the four promoted cases.
+
+DKR3: Hook-quality guard.
+
+Decision to unlock: decide how React hook dependency correctness is enforced before package work.
+
+Budget: one focused lint/proof pass.
+
+Risk reduced: trust loss from review-only hook correctness.
+
+Expected output: a mechanical check that fails a missing-dependency fixture.
+
+## PKRs
+
+PKR1: Extract a narrow `@pumped-fn/lite-render-contract` candidate with spec types, catalog definition, path tokens or typed authoring helper, verifier, capability checks, and verifier test helpers.
+
+PKR2: Extract a narrow React renderer candidate that consumes verified specs, lowers catalog components to React components, dispatches actions through `useFlow`, and does not own state or async behavior.
+
+PKR3: Add four promoted spec fixtures and tests for the objective cases.
+
+PKR4: Add the portability comparison proof for the same spec semantics across React and a host-neutral target.
+
+PKR5: Add the hook-quality mechanical guard before promoting React renderer code.
+
+Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.
+
+## Eval Points
+
+**Admissibility before action**: before extracting packages or adding spec features, check the proposed move against every anti-goal. Veto any move that increases unchecked bindings, bypasses Lite state/actions, expands the component vocabulary before the four-case proof, creates import-time work, or relies on review-only hook correctness.
+
+**Direct read after action**: after each implementation pass, read the real metrics from typecheck, verifier tests, browser tests, lint/AST checks, and semantic comparison tests. Do not count completed files as progress unless the metric moved.
+
+**Paired goal/anti-goal eval**: success requires `validated_spec_cases_passed &gt;= 4` and every anti-goal threshold to hold. A renderer that passes four cases by bypassing Lite, forking semantics, or losing type checks fails the loop.
+
+## Flags
+
+Cannot opens when DKR budget is spent and no typed authoring/verifier path can keep `unchecked_path_or_binding_count == 0`.
+
+Breaking opens when any anti-goal metric crosses its threshold, especially unchecked bindings, Lite bypass, React non-proof, eager work, or hook dependency violations.
+
+Pointless opens when work finished or a CKR metric moved, but the objective metric stays flat / does not move after the lag window. For this goal, adding component APIs or docs while `validated_spec_cases_passed` stays below 4 is pointless and should stop/re-aim the branch.
+
+Authority drift opens when a move tries to change the objective, threshold, anti-goal, action envelope, or release boundary without human ratification.
+
+Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it.
+
+## Operating Loop
+
+Cadence: check at the end of each implementation pass and before promoting any CKR/PKR.
+
+Heartbeat cadence and next_check_at: default heartbeat is ten minutes for long-running worker passes; next_check_at is before the next package-extraction move.
+
+Metric freshness contract: metric reads come from local command output, changed-path inspection, and verifier/browser/lint tests; max_age is seven days or stale immediately after touching contract, renderer, or lint surfaces.
+
+Lag window: immediate for local tests and lint; no delayed product metric is claimed.
+
+Stale-data policy: do not dispatch package extraction or release-prep work on stale metric reads unless the human explicitly waives it.
+
+Steering value metric: `valuable_steering_decision_count &gt;= 1` per check-in, with the inbound signal, decision delta, affected CKR/DKR/PKR, and evidence command or file reference recorded in the learning checkpoint.
+
+Human-only frame: the loop raises evidence and options; the human owns goal switching, metric changes, thresholds, release decisions, and any change to the action envelope.
+</code></pre>
+</section>
+<section class="code-section" id="research-learnings-json-render-spec-designer-iteration-md">
+  <div class="code-head">
+    <div><h2>Learning checkpoint</h2><p>research/learnings/json-render-spec-designer-iteration.md</p></div>
+    <span class="pill">md</span>
+  </div>
+  <pre><code># Json Render Spec Designer Iteration
+
+Session: `json-render-spec-designer-iteration`
+
+Goal: use a strict spec/catalog render contract as a designer-owned iteration surface while keeping React useful and keeping pumped-fn as the state, action, scope, and test owner.
+
+Frame status: ratified working frame for package-promotion decisions. Active OKR artifact: `research/okrs/json-render-spec-contract.md`.
+
+Objective metric: `validated_spec_cases_passed &gt;= 4` and `unchecked_path_or_binding_count == 0`.
+
+Anti-goals:
+- React distance: `promoted_spec_cases_render_through_react == validated_spec_cases_passed`.
+- Pumped-fn wrapper drift: `bypassed_lite_state_or_action_paths == 0`.
+- Designer footgun drift: `react_cleanup_diff_lines_per_spec_iteration &lt;= 10`.
+- Platform drift: `spec_semantics_changed_between_renderers == 0`.
+- Typecheck loss: `unchecked_path_or_binding_count == 0`.
+- Hidden workflow drift: `workflow_logic_inside_spec_count == 0`.
+- Laziness drift: `import_time_verification_or_scope_creation_count == 0`.
+- Hook-quality drift: `react_hook_dependency_violation_count == 0`.
+- DKR truth drift: `single_llm_truth_acceptance_count == 0`; every accepted DKR checkpoint needs deterministic evidence plus independent review.
+
+Learning checkpoint:
+- Decision target: promote or reject concrete CKR/PKR work for proving json-render specs as a designer iteration layer.
+- Evidence collected:
+  - Workspace catalog pins `@json-render/core` and `@json-render/react` at `0.19.0`.
+  - Packed npm artifacts for `@json-render/core@0.19.0` and `@json-render/react@0.19.0` were inspected from `/tmp/json-render-core-0.19.0` and `/tmp/json-render-react-0.19.0`.
+  - `@json-render/react` controlled mode states that when `store` is provided, `initialState` and `onStateChange` are ignored and the store is the single source of truth.
+  - The exported json-render `StateStore` contract is JSON Pointer `get`, `set`, batched `update`, `getSnapshot`, optional `getServerSnapshot`, and `subscribe`.
+  - The exported json-render `UIElement` contract includes `props`, `children`, `visible`, `on`, `repeat`, and `watch`.
+  - The exported React provider contract includes `JSONUIProvider` with `store`, `handlers`, `navigate`, `validationFunctions`, `functions`, and `directives`.
+  - Current F14 proves `$bindState`, `$state`, `on.press`, Lite flow execution, stable handler retargeting, and real `JSONUIProvider` plus `Renderer`.
+  - Verification commands passed:
+    - `pnpm -F @pumped-fn/lite-react-json-render test -- --run`: 1 file, 5 tests.
+    - `pnpm -F lite-react-practical test -- --run examples/lite-react-practical/patterns/F14-json-render-state-store/after.test.ts`: 25 files, 103 tests, 100% coverage.
+    - `pnpm -F @pumped-fn/lite-react-practical typecheck`.
+    - `pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts`: 1 file, 6 tests.
+    - `pnpm -F @pumped-fn/lite-react-practical exec vitest run --project browser research/typed-render-contract/view.browser.test.tsx`: 1 file, 1 browser test.
+  - `pnpm lint`: 155 files, 0 diagnostics.
+  - Current next-DKR verification commands passed:
+    - `pnpm -F @pumped-fn/lite-react-practical typecheck`.
+    - `pnpm -F @pumped-fn/lite-react-practical exec vitest run research/typed-render-contract/contract.test.ts`: 1 file, 10 tests.
+    - `pnpm -F @pumped-fn/lite-react-practical exec vitest run --project browser research/typed-render-contract/view.browser.test.tsx`: 1 file, 1 browser test.
+    - `pnpm lint`: 155 files, 0 diagnostics.
+    - `git diff --check`.
+  - The DKR prototype in `examples/lite-react-practical/research/typed-render-contract` proves a catalog-backed path type, runtime detail verifier, valid JSON-like spec, and React lowering over Lite scoped values and flows.
+  - `research/okrs/json-render-spec-contract.md` now records the ratified working frame, action envelope, eval points, flags, cadence, CKRs, DKRs, and PKRs for package-promotion decisions.
+  - Independent Claude and Codex reviews converged that the prototype proves the direction but does not yet prove `unchecked_path_or_binding_count == 0` as a package gate.
+  - Independent Claude and Codex reviews accepted the next DKR as a candidate learning checkpoint with no blocking findings; `single_llm_truth_acceptance_count` stays `0` and `independent_review_before_dkr_acceptance_count = 2`.
+
+Questions answered:
+- Is a new adapter API required before learning can progress? No. Current `scopedValueStateStore`, `flowAction`, `flowHandlers`, and `useFlowHandlers` are enough to prove the next designer-iteration cases.
+- Is F14 already enough to satisfy the objective? No. It proves one integration shape, not four spec-only designer edits.
+- Which json-render spec axes are contractual enough to promote? `visible`, `$cond`, `$template`, `$computed`, `watch`, `repeat`, built-in state actions, and action lifecycle hooks are all visible in the package docs/types. For this repo, the best initial set is `visible`, computed/template props, `repeat`, and `watch` because they prove designer-owned behavior without requiring new async or navigation semantics first.
+- Is the current json-render bridge itself the desired product surface? No. The useful concept is the strict spec/catalog boundary. The current package is mostly an adapter to an external renderer, so it is only justified as prior art or compatibility unless the project owns a render contract that preserves spec semantics across React and React Native.
+- Can the spec rely on raw path-access strings and still preserve pumped-fn value? No. If paths, bindings, component props, slots, event names, and action payloads cannot be checked at detail level, the spec loses the TypeScript/testability value that pumped-fn is supposed to expose.
+- Is detail-level verification achievable? Yes, for the tested slice, but not yet as a package gate. The current prototype verifies a JSON artifact against a trusted catalog; independent review found that catalog-to-domain links are still manually maintained, so the zero-unchecked-binding claim is unproven until those links become mechanically checked.
+
+Probability updates:
+- `P(current adapter can support objective without new public API) = 0.45`.
+- `P(F14 can be extended into the main proof surface without drifting from React) = 0.55`.
+- `P(a pumped-fn-owned spec/catalog renderer is the right main surface) = 0.80`.
+- `P(watch-driven json-render actions expose a pumped-fn value difference over raw json-render) = 0.70`.
+- `P(built-in setState examples would weaken pumped-fn ownership if used as the primary path) = 0.80`.
+- `P(raw JSON Pointer strings are acceptable as the only spec authoring surface) = 0.10`.
+- `P(a typed spec builder plus generated/verifiable JSON artifact is required) = 0.95`.
+- `P(detail-level verification can preserve pumped-fn value for designer-owned JSON specs) = 0.70`.
+- `P(current prototype is sufficient for package extraction) = 0.25`.
+
+Risk and anti-goal implications:
+- Built-in `setState`, `pushState`, `removeState`, and `validateForm` are useful json-render primitives, but making them the happy path can make pumped-fn look optional. Use them as a contrast or limited spec feature, not as the primary ownership proof.
+- `$computed` and `functions` are synchronous json-render contracts. Keep async/domain work in Lite flows; adapt only already-resolved graph values or pure formatting functions to `functions`.
+- `watch` is the most valuable next probe because it lets designer-authored spec changes trigger Lite-owned flows from state changes. It is also the riskiest because it can become hidden workflow logic if overused.
+- `repeat` is a good designer iteration case for layout/data shape, but it should not own collection mutation. Collection mutation should remain a Lite flow.
+- A pumped-fn renderer should make the spec the stable semantic unit and put platform renderers behind it. React and React Native should be integration points for the same intended render tree, not reasons to fork the spec.
+- The renderer should be strict on purpose. React and Vite flexibility is the thing being constrained, so the catalog must narrow component vocabulary, prop schemas, event names, slots, and bindings enough that designer iteration cannot smuggle application logic into components.
+- The platform adapter boundary must not reinterpret meaning. A `Button`, `Field`, `Stack`, `Visible`, `Action`, or `Repeat` node should preserve catalog meaning across React and React Native even when host components differ.
+- The spec cannot be only a formula-level schema check. Verification must inspect each detail: component exists in catalog, prop names and values match prop schema, slots exist, child placement is valid, bindings point to existing typed state paths, bound state value type is compatible with the prop, events exist, event payload maps to a Lite flow input, repeat item paths are scoped correctly, and platform renderers support the node capability.
+- Designer-owned JSON can be the portable artifact, but the source of truth should have a typechecked path to produce or verify it. A TypeScript spec builder, generated path tokens, or generated typecheck harness should fail `tsc` when a spec references a missing state path, wrong value type, unknown action, or unsupported catalog slot.
+- The first proof should treat the path catalog as a generated contract, not as handwritten string discipline. The important property is that promoted specs have `unchecked_path_or_binding_count == 0`, regardless of whether the authoring surface is a builder, generated tokens, or a verifier-generated type fixture.
+- No-single-LLM review found six package-gating gaps: flow registry/runtime dispatch drift, `ValueKind` not derived from `PathValue` or flow input types, template placeholders unchecked, watch verification broader than React behavior, repeat item shape hardcoded outside the catalog, and browser event normalization overclaimed by a synthetic button event.
+- The accepted DKR1 binder checkpoint directly targets four of those gaps by using typed action binders, typed path tokens, catalog-derived repeat item scope, and verifier-checked template placeholders. Watch runtime semantics, browser event normalization, renderer portability, raw `JsonSpec` authoring, and hook dependency guarding remain separate gates.
+
+Candidate CKRs:
+- CKR1: `validated_spec_cases_passed &gt;= 4` across conditional visibility, computed/template display, repeated line items, and event or watch-triggered Lite flow action.
+- CKR2: `spec_semantics_changed_between_renderers == 0` between the React renderer and a React Native target model or adapter stub.
+- CKR3: `bypassed_lite_state_or_action_paths == 0` for durable state changes and domain actions in the proof.
+- CKR4: `catalog_escape_hatches_per_case == 0`; no arbitrary React component, render callback, Vite plugin, or platform-specific logic can be required to express the promoted spec cases.
+- CKR5: `unchecked_path_or_binding_count == 0`; every promoted spec path, binding, event, and action payload is checked by TypeScript or by a verifier generated from TypeScript catalog and state models.
+- CKR6: `react_hook_dependency_violation_count == 0`; React renderer work has a mechanical hook dependency guard before promotion.
+
+Candidate PKRs:
+- PKR1: Define the minimum pumped-fn-owned render spec and catalog vocabulary: elements, slots, props, bindings, events, actions, visibility, repeat, and computed display.
+- PKR2: Build a React renderer over that contract using Lite-owned scoped values and flows for state/action semantics.
+- PKR3: Build a React Native compatibility proof that consumes the same spec/catalog semantics, even if the first pass renders to a host-agnostic tree or adapter contract instead of a full app.
+- PKR4: Add spec fixtures for conditional visibility, computed/template summary, repeated line items, and state-change-triggered Lite flow.
+- PKR5: Add tests that compare the semantic render plan across renderers and prove React integration does not change what is meant to be rendered.
+- PKR6: Reclassify `@pumped-fn/lite-react-json-render` as compatibility/prior art unless the owned renderer deliberately supports json-render import/export.
+- PKR7: Prototype detail-level spec verification: a typed state path helper or generated path token set, catalog prop/slot/event inference, and a failing typecheck fixture for a bad path, bad prop type, unknown event, and wrong flow payload.
+
+Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.
+
+DKR result:
+- PKR7 has prototype evidence for one realistic board slice, but it is not sufficient for package extraction.
+- DKR1 is accepted as a learning checkpoint after deterministic checks plus independent Claude/Codex review. It is not accepted as package-promotion proof.
+- Promote CKR5 as the next measurement guardrail for any package work: `unchecked_path_or_binding_count == 0`.
+- Promote PKR1 and PKR2 only as narrow package candidates if they keep React as a renderer integration point and Lite as the state/action/test seam.
+- Promote the OKR gate in `research/okrs/json-render-spec-contract.md` as the package-promotion frame.
+
+Next unknowns:
+- How raw `JsonSpec` authoring becomes strict enough: typed builder, generated fixture, strict verifier pipeline, or hybrid.
+- How the runtime view proves it honors the verified spec instead of hardcoded host behavior.
+- How watch runtime semantics line up with what the verifier accepts without turning designer-owned spec into hidden workflow code.
+- How reusable adapter-owned event normalization replaces the current fixed sortable button proof.
+- What the minimum owned spec grammar should be without accidentally rebuilding all of React.
+- Whether the first React Native proof should be a real native renderer or a semantic adapter test that proves the same render intent can lower to React Native host primitives.
+- Whether json-render should remain as an import/export compatibility layer or be removed from the main narrative.
+
+Human direction update:
+- The human likes the spec/catalog concept because it makes the app stricter than React or Vite, and that constraint is the value.
+- The needed work is a renderer based on that strict contract, supporting designer iteration while preserving integration points for frontend delivery and React Native without changing what is meant to be rendered.
+- Pumped-fn should not own rendering itself. Its value is composition and testability; the render contract must preserve that by using TypeScript/detail verification instead of unchecked JSON path access.
+</code></pre>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,110 @@
+{
+  "ckrs": [
+    {
+      "discovery_delivery_balance": "discover the minimum spec grammar covering four designer behaviors without rebuilding React; deliver one fixture per behavior plus verifier and React-render evidence",
+      "id": "CKR1",
+      "metric": "validated_spec_cases_passed >= 4 across conditional visibility, repeated data rendering, template/computed display, and event/watch-triggered Lite flow action"
+    },
+    {
+      "discovery_delivery_balance": "discover whether typed builders, generated path tokens, verifier-generated type fixtures, or a hybrid gives the cleanest authoring path; deliver a mechanically checked source-of-truth path for JSON artifacts",
+      "id": "CKR2",
+      "metric": "unchecked_path_or_binding_count == 0 for every promoted path, prop binding, repeat item binding, event field, slot, component, and flow payload"
+    },
+    {
+      "discovery_delivery_balance": "discover the smallest render-action bridge natural for React and React Native hosts; deliver all action execution through Lite flows/resources/scoped values",
+      "id": "CKR3",
+      "metric": "bypassed_lite_state_or_action_paths == 0 for durable state changes, async work, domain actions, and DI"
+    },
+    {
+      "discovery_delivery_balance": "discover whether the first portability proof is a host-agnostic semantic tree or a React Native adapter stub; deliver a comparison test that fails on semantic drift",
+      "id": "CKR4",
+      "metric": "spec_semantics_changed_between_renderers == 0 for the promoted spec cases"
+    },
+    {
+      "discovery_delivery_balance": "discover whether to extend @pumped-fn/lite-lint, add eslint react-hooks, or add a targeted AST rule; deliver a check that catches missing hook dependency arrays",
+      "id": "CKR5",
+      "metric": "react_hook_dependency_violation_count == 0 with a mechanical guard for promoted React renderer code"
+    }
+  ],
+  "dkrs": [
+    {
+      "acceptance_gate": "deterministic checks (typecheck, verifier tests, browser test, pnpm lint, git diff --check) PLUS independent Claude/Codex review; single_llm_truth_acceptance_count must remain 0",
+      "budget": "one implementation pass",
+      "decision_to_unlock": "choose builder, generated tokens, generated type fixtures, or hybrid before package extraction",
+      "expected_output": "learning checkpoint with probability update and at least one failing bad-path fixture",
+      "id": "DKR1",
+      "result": "ACCEPT_CANDIDATE by both Claude and Codex; not package promotion. independent_review_before_dkr_acceptance_count=2, single_llm_truth_acceptance_count=0.",
+      "risk_or_anti_goal_uncertainty_reduced": "losing TypeScript value through raw path strings (anti_goal.unchecked_path_or_binding_count)",
+      "status": "accepted_as_learning_checkpoint_not_package_promotion",
+      "title": "Typed authoring source of truth"
+    },
+    {
+      "acceptance_gate": "deterministic checks PLUS independent Claude/Codex review; single_llm_truth_acceptance_count must remain 0",
+      "budget": "one implementation pass",
+      "decision_to_unlock": "whether raw JsonSpec authoring can become strict enough (typed defineTokens/action binders as the only way kinds enter the system, one action registry consumed by both verifier and dispatcher) to keep unchecked_path_or_binding_count == 0 as a package gate, and prove a second component family generalizes case 1 into case 2",
+      "expected_output": "learning checkpoint with probability update, a typed binder proof, a failing bad-path fixture, and at least one new validated spec case rendering through React",
+      "id": "DKR2",
+      "risk_or_anti_goal_uncertainty_reduced": "anti_goal.unchecked_path_or_binding_count and anti_goal.bypassed_lite_state_or_action_paths at package scope; closes the catalog-to-domain hand-maintenance gap independent review flagged",
+      "status": "candidate_unfired",
+      "title": "Strict JsonSpec authoring source-of-truth (next probe)"
+    },
+    {
+      "budget": "one implementation pass",
+      "decision_to_unlock": "whether React Native package work is admissible or whether the semantic adapter must come first",
+      "expected_output": "semantic comparison test for the four promoted cases that fails on semantic drift",
+      "id": "DKR3",
+      "risk_or_anti_goal_uncertainty_reduced": "anti_goal.spec_semantics_changed_between_renderers (platform meaning fork)",
+      "status": "candidate_unfired",
+      "title": "Renderer portability proof"
+    },
+    {
+      "budget": "one focused lint/proof pass",
+      "decision_to_unlock": "how React hook dependency correctness is enforced before package work (extend @pumped-fn/lite-lint, eslint react-hooks only, or targeted AST rule)",
+      "expected_output": "a mechanical check that fails a missing-dependency fixture",
+      "id": "DKR4",
+      "risk_or_anti_goal_uncertainty_reduced": "anti_goal.react_hook_dependency_violation_count (trust loss from review-only hook correctness)",
+      "status": "candidate_unfired",
+      "title": "Hook-quality guard"
+    }
+  ],
+  "frame_version": "1",
+  "orchestrator": {
+    "owns": "objective checks, check-ins, the OKR board, and subagent steering",
+    "promotion_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
+    "scope": "Holds the frame read-only. Runs objective checks and the three-point anti-goal eval (admissibility before dispatch, direct read after action, paired read at progress). Spawns and budgets discovery/progression workers, reads direct metrics from source, raises flags, owns the DKR learning gate, and is the only part that talks to the human. Never executes work itself and never edits the frame.",
+    "stop_condition": "Runs until objective metric reaches target (validated_spec_cases_passed >= 4 with unchecked_path_or_binding_count == 0), a human changes/stops the frame, or a blocking flag requires human resolution. Does not stop because the board, branch, or worker queue is complete."
+  },
+  "pkrs": [
+    {
+      "id": "PKR1",
+      "progress_signals": "off-track work, quality drift, churn, late discovery, stale metrics, scope/authority concerns",
+      "scope": "Extract a narrow @pumped-fn/lite-render-contract candidate with spec types, catalog definition, path tokens or typed authoring helper, verifier, capability checks, and verifier test helpers",
+      "status": "blocked_on_dkr_gate"
+    },
+    {
+      "id": "PKR2",
+      "progress_signals": "off-track work, quality drift, churn, late discovery, stale metrics, scope/authority concerns",
+      "scope": "Extract a narrow React renderer candidate that consumes verified specs, lowers catalog components to React, dispatches actions through useFlow, and owns no state or async behavior",
+      "status": "blocked_on_dkr_gate"
+    },
+    {
+      "id": "PKR3",
+      "progress_signals": "off-track work, quality drift, churn, late discovery, stale metrics, scope/authority concerns",
+      "scope": "Add four promoted spec fixtures and tests for the objective cases",
+      "status": "blocked_on_dkr_gate"
+    },
+    {
+      "id": "PKR4",
+      "progress_signals": "off-track work, quality drift, churn, late discovery, stale metrics, scope/authority concerns",
+      "scope": "Add the portability comparison proof for the same spec semantics across React and a host-neutral target",
+      "status": "blocked_on_dkr_gate"
+    },
+    {
+      "id": "PKR5",
+      "progress_signals": "off-track work, quality drift, churn, late discovery, stale metrics, scope/authority concerns",
+      "scope": "Add the hook-quality mechanical guard before promoting React renderer code",
+      "status": "blocked_on_dkr_gate"
+    }
+  ],
+  "tree_version": "1"
+}
