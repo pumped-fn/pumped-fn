@@ -1,0 +1,13 @@
+{
+  "committed_at": "2026-06-26T13:31:59Z",
+  "idempotency_key": "dkr5-apply-a564d0c7",
+  "key_sha256": "da4066e74bb129a9a7b3f46c9ea8124ce1d4661dd5fc8ac6e43283f588c8d9e0",
+  "payload": {
+    "acceptance_status": "deterministic confirmed; 2 reviews running (cross-dimension 8th-fork hunt); NOT accepted",
+    "commit": "a564d0c7",
+    "deterministic_checks": "typecheck 0; contract 24/24; browser 4/4; lint 157/0; diff-check clean; de-tautologised assert + repeat-by-construction confirmed",
+    "move": "apply DKR5-structural candidate",
+    "single_llm_truth_acceptance_count": 0
+  },
+  "payload_sha256": "1417efc24f4733989337b00f547f51d63268aebe2cdc7115381506697d5e1ee8"
+}
