@@ -1,5 +1,6 @@
-import type { ComponentMap } from "../src"
+import { defineView, type ComponentMap } from "../src"
 import { components } from "./board.fixture"
+import { render, BoardView } from "./view.fixture"
 
 // @ts-expect-error Card.done is boolean in the catalog; an impl whose props expect number cannot satisfy the mirror
 const badCardProp: ComponentMap<typeof components>["Card"] = (
@@ -15,4 +16,10 @@ const badSortableEvent: ComponentMap<typeof components>["SortableList"] = (
   }
 ) => null
 
-export { badCardProp, badSortableEvent }
+const badView = defineView(render, {
+  Board: BoardView,
+  // @ts-expect-error Card.done is boolean in the contract's catalog; a number-typed impl is rejected through defineView
+  Card: (_props: { props: { label: string; done: number }; slots: Record<string, never>; on: { toggle: (event: Record<string, never>) => void } }) => null,
+})
+
+export { badCardProp, badSortableEvent, badView }

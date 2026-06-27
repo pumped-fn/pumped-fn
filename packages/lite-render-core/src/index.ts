@@ -1,3 +1,5 @@
+export { defineRender } from "./render"
+
 export { k, leaf } from "./schema"
 export type {
   ValueKind,

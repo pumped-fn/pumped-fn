@@ -9,6 +9,50 @@ The contract is generic over an arbitrary state schema, component catalog, and a
 catalog components, slots, props, bindings, events, and flows; the verifier checks every detail against the
 trusted catalog/registry/state-token set, and the typed author surface rejects the same drift at compile time.
 
+## Usage — `defineRender`
+
+`defineRender` is the headline: pass one `{ schema, state, catalog, actions }` and get a fully inferred
+`{ author, verify, dispatch, context }`. Author, verifier, and dispatcher are wired from the same sources so
+they cannot drift; `rendererCapabilities` is auto-derived from the catalog. Authoring, verifying, and
+dispatching need **no type annotations**.
+
+```ts
+import { action, defineRender, k } from "@pumped-fn/lite-render-core"
+import { flow, typed } from "@pumped-fn/lite"
+
+const cardSchema = k.object({ id: k.string, label: k.string, done: k.boolean })
+const boardSchema = k.object({ board: k.object({ cards: k.array(cardSchema), heading: k.string }) })
+
+const toggle = flow({ name: "toggle", parse: typed<{ id: string }>(), deps: { access: store }, factory: (ctx) => ctx.input.id })
+const actions = { toggle: action(toggle, k.object({ id: k.string })) }
+
+const render = defineRender({
+  schema: boardSchema,
+  state: store, // a @pumped-fn/lite resource (or lite-react scopedValue) whose value is checked against Infer<schema>
+  catalog: {
+    Board: { props: { heading: k.string, cards: k.array(cardSchema) }, slots: { rows: { repeats: "cards" } }, events: {}, capabilities: ["layout.board"] },
+    Card: { props: { label: k.string, done: k.boolean }, slots: {}, events: { toggle: actions.toggle.params }, capabilities: ["surface.card"] },
+  },
+  actions,
+})
+
+const spec = render.author.spec(render.author.node("Board", {
+  props: { heading: "Tasks", cards: render.author.state("/board/cards") },
+  slots: { rows: (it) => [render.author.node("Card", {
+    props: { label: it("label"), done: it("done") },
+    on: { toggle: () => ({ flow: "toggle", params: { id: it("id") } }) },
+  })] },
+}))
+
+render.verify(spec) // { ok: true, spec }
+ctx.exec({ flow: render.dispatch, input: { action, item } }) // dispatch through the same registry
+```
+
+The manual path stays available (and `defineRender` is built on it): `buildStateTokens` + `defineCatalog` +
+`createAuthor` + `verifySpec` + `createRunJsonAction` + a hand-written `rendererCapabilities` `Set` — about
+nine names threaded with the schema/catalog/registry repeated at each. `defineRender` collapses that to one
+call with everything inferred.
+
 ## Pipeline
 
 ```
@@ -27,6 +71,9 @@ createRunJsonAction({ registry, state }) ─> dispatcher flow (executes only reg
 ```
 
 ## Public API
+
+Headline: `defineRender` — one inferred `{ author, verify, dispatch, context }` from `{ schema, state,
+catalog, actions }` (built on every primitive below; advanced users keep using them directly).
 
 Schema vocabulary and kinds: `k`, `leaf`, `kindOf`; types `ValueKind`, `KindFor`, `FieldsKindOf`,
 `KindOfSchema`, `Infer`, `BaseSchema`, `LeafSchema`, `ArraySchema`, `ObjectSchema`, `DisplayKind`,
