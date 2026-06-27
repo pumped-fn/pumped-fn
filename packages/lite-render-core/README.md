@@ -1,19 +1,39 @@
 # @pumped-fn/lite-render-core
 
-Platform-neutral strict spec/catalog render contract for `@pumped-fn/lite`. This is the **core** half of a
-core/react split (mirroring json-render): it owns the portable spec types, the schema vocabulary, the typed
-authoring surface, and the runtime verifier. It has **no React dependency** — a separate adapter package
-lowers a verified spec to host components.
+Platform-neutral strict spec/catalog render contract for `@pumped-fn/lite`.
 
-The contract is generic over an arbitrary state schema, component catalog, and action registry. A spec names
-catalog components, slots, props, bindings, events, and flows; the verifier checks every detail against the
-trusted catalog/registry/state-token set, and the typed author surface rejects the same drift at compile time.
+This is the **core** half of a core/react split (mirroring json-render): it owns the portable spec types, the
+schema vocabulary (`k`), the typed authoring surface, and the runtime verifier. It has **no React dependency** —
+`@pumped-fn/lite-render-react` lowers a verified spec to host components. The contract is generic over an
+arbitrary state schema, component catalog, and action registry; `@pumped-fn/lite` still owns state, flows,
+resources, tags, presets, and tests.
 
-## Usage — `defineRender`
+A spec names catalog components, slots, props, bindings, events, and flows. The verifier checks every detail
+against the trusted catalog / action registry / state-token set, and the typed authoring surface rejects the
+same drift at compile time — so a designer- or server-authored JSON spec keeps the TypeScript and testability
+guarantees pumped-fn is built on.
 
-`defineRender` is the headline: pass one `{ schema, state, catalog, actions }` and get a fully inferred
-`{ author, verify, dispatch, context }`. Author, verifier, and dispatcher are wired from the same sources so
-they cannot drift; `rendererCapabilities` is auto-derived from the catalog. Authoring, verifying, and
+## When to Use
+
+Use this when the *spec itself* is the thing you ship — generated specs, schema-driven editors, server-authored
+forms, embedded surfaces — and it must stay strict: the JSON is portable, but every binding is checked against
+your schema and catalog at both compile and run time. The timing is the integration edge, after the state model
+and action flows have clear Lite owners.
+
+Do not use it to make hand-authored React more indirect. If the UI is ordinary React, render from
+`useScopedValue` and mutate through scoped actions instead.
+
+## Install
+
+```bash
+npm install @pumped-fn/lite @pumped-fn/lite-render-core
+```
+
+## Usage
+
+`defineRender` is the entry point: pass one `{ schema, state, catalog, actions }` and get a fully inferred
+`{ author, verify, dispatch, context, state }`. Author, verifier, and dispatcher are wired from the same
+sources so they cannot drift; `rendererCapabilities` is derived from the catalog. Authoring, verifying, and
 dispatching need **no type annotations**.
 
 ```ts
@@ -23,15 +43,17 @@ import { flow, typed } from "@pumped-fn/lite"
 const cardSchema = k.object({ id: k.string, label: k.string, done: k.boolean })
 const boardSchema = k.object({ board: k.object({ cards: k.array(cardSchema), heading: k.string }) })
 
+// a @pumped-fn/lite resource (or lite-react scopedValue) whose value satisfies Infer<typeof boardSchema>
+const store = /* ... */
 const toggle = flow({ name: "toggle", parse: typed<{ id: string }>(), deps: { access: store }, factory: (ctx) => ctx.input.id })
 const actions = { toggle: action(toggle, k.object({ id: k.string })) }
 
 const render = defineRender({
   schema: boardSchema,
-  state: store, // a @pumped-fn/lite resource (or lite-react scopedValue) whose value is checked against Infer<schema>
+  state: store,
   catalog: {
     Board: { props: { heading: k.string, cards: k.array(cardSchema) }, slots: { rows: { repeats: "cards" } }, events: {}, capabilities: ["layout.board"] },
-    Card: { props: { label: k.string, done: k.boolean }, slots: {}, events: { toggle: actions.toggle.params }, capabilities: ["surface.card"] },
+    Card:  { props: { label: k.string, done: k.boolean }, slots: {}, events: { toggle: actions.toggle.params }, capabilities: ["surface.card"] },
   },
   actions,
 })
@@ -45,119 +67,50 @@ const spec = render.author.spec(render.author.node("Board", {
 }))
 
 render.verify(spec) // { ok: true, spec }
-ctx.exec({ flow: render.dispatch, input: { action, item } }) // dispatch through the same registry
 ```
 
-The manual path stays available (and `defineRender` is built on it): `buildStateTokens` + `defineCatalog` +
-`createAuthor` + `verifySpec` + `createRunJsonAction` + a hand-written `rendererCapabilities` `Set` — about
-nine names threaded with the schema/catalog/registry repeated at each. `defineRender` collapses that to one
-call with everything inferred.
+Write the `catalog` inline in the `defineRender` call. Extracting it to a `const` widens the `repeats` slot
+literal to `string` and breaks the typed repeat builder — the same inline-config pattern as Vite's
+`defineConfig`.
 
-## Pipeline
+The manual primitives stay available, and `defineRender` is built on them: `buildStateTokens`, `defineCatalog`,
+`createAuthor`, `verifySpec`, `createRunJsonAction`, plus a hand-written `rendererCapabilities`. Use them
+directly only when you need to assemble the pieces yourself.
 
-```
-k (schema vocab) ─┬─> Infer<S>            (TypeScript types)
-                  ├─> buildStateTokens(S) (runtime state tokens, per-leaf kind + per-array item context)
-                  └─> PathMap<S>          (schema-derived path set: whole-array + leaf paths only)
+## Behavior Surface
 
-defineCatalog(...) ─> TypedCatalog   (prop schemas reduced to ValueKind)
-action(flow, input) ─> ActionToken   (param kinds derived from the flow input schema)
+The verifier rejects — at run time, and through the typed author surface at compile time — unknown component;
+unknown / missing / wrong-kinded prop; unknown slot, event, or flow; wrong flow-payload kind; unbound or
+unreferenced template placeholder; a non-displayable (array/object) template arg; a repeat item field outside
+the catalog-derived item scope; an unsupported renderer capability; an invalid `visible.eq` literal kind; and a
+nested repeating slot (a repeating-slot component anywhere inside another, directly or transitively).
 
-createAuthor({ catalog, registry, schema }) ─> typed JSON  ──┐
-                                                              ├─> verifySpec(spec, ctx) ─> ok | errors
-raw JsonSpec ─────────────────────────────────────────────────┘
+**`on` events vs `watch`.** An `on` event fires per rendered instance, so inside a repeat its action params may
+bind `{ item: … }` — the host passes the live repeat element at dispatch. A `watch` is global change-detection
+(one per authored node, fired on the absolute state path, not per row), so `{ item: … }` is meaningless there
+and is rejected on both gates; watch params take literal / `{ state: … }` / template binds only.
 
-createRunJsonAction({ registry, state }) ─> dispatcher flow (executes only registered actions)
-```
+The compile gate and the runtime verifier stay in agreement by construction: the author's accepted bindings
+derive from the same schema/catalog/registry the verifier reads, across every element shape — so what
+type-checks is what verifies.
 
-## Public API
+## Exports
 
-Headline: `defineRender` — one inferred `{ author, verify, dispatch, context }` from `{ schema, state,
-catalog, actions }` (built on every primitive below; advanced users keep using them directly).
+- `defineRender` — one inferred `{ author, verify, dispatch, context, state }` from `{ schema, state, catalog, actions }`.
+- `k`, `leaf`, `kindOf` — the schema vocabulary and kind classification.
+- `action`, `createRunJsonAction`, `readPath`, `resolveExpr`, `actionParams` — action binding and the
+  registry-driven dispatcher; `RenderActionInput<Item, Event>` is `{ action, item?, event? }`.
+- `defineCatalog`, `buildStateTokens`, `statePath` — catalog and state-token / path derivation.
+- `createAuthor`, `verifySpec`, `isRepeatingSlot`, `hasRepeatingSlot` — authoring and verification.
+- Spec, kind, token, and agreement types: `JsonSpec`, `JsonNode`, `JsonExpr`, `JsonAction`, `VerifyContext`,
+  `VerificationResult`, `ValueKind`, `Infer`, `PathMap`, `TypedCatalog`, `Author`, and more — see `src/index.ts`.
 
-Schema vocabulary and kinds: `k`, `leaf`, `kindOf`; types `ValueKind`, `KindFor`, `FieldsKindOf`,
-`KindOfSchema`, `Infer`, `BaseSchema`, `LeafSchema`, `ArraySchema`, `ObjectSchema`, `DisplayKind`,
-`CondLiteral`, `JsonValue`.
+## Testing
 
-Spec and verification types: `JsonExpr`, `JsonAction`, `JsonCondition`, `JsonNode`, `JsonSpec`, `RepeatSlot`,
-`SlotSpec`, `ComponentSchema`, `ItemContext`, `StateToken`, `ActionToken`, `VerifyContext`,
-`VerificationError`, `VerificationResult`.
-
-Tokens and paths: `buildStateTokens`, `statePath`; types `CollectTokens`, `PathEntry`, `PathMap`, and the
-agreement predicates `StateTokenKeysMirrorPathSet<S>`, `NoObjectKindStatePath<S>`.
-
-Catalog: `defineCatalog`; types `CatalogInput`, `TypedCatalog`.
-
-Actions: `action` (binds a `Lite.Flow` to its input schema), `createRunJsonAction` (the registry-driven
-dispatcher), `readPath`, `resolveExpr`, `actionParams`; type `RenderActionInput<Item, Event>`. The dispatch
-input is `{ action, item?, event? }` — a host firing an `on`/`watch` action from inside a repeat passes the
-current repeat element as `item` and the normalized event payload as `event`, so `{item:…}` / `{event:…}`
-action params resolve against the live element instead of `undefined`.
-
-Verifier: `verifySpec`, `isRepeatingSlot`, `hasRepeatingSlot`; type `IsRepeatingSlotGuardsRepeatSlot`.
-
-Author: `createAuthor`; types `Author`, `Authored`, `ItNeverEdgeUnconstructible`.
-
-## What the verifier rejects
-
-unknown component, unknown/missing prop, wrong prop value kind, unknown slot, unknown event, unknown flow,
-wrong flow payload kind, unbound template placeholder, unreferenced template arg, non-displayable template
-arg (array/object interpolated into text), repeat item field outside the catalog-derived item scope,
-an `{item:…}` bind in a **watch** param (see below), unsupported renderer capability, invalid `visible.eq`
-literal kind, and a nested repeating slot (`nested_repeat_forbidden`: a repeating-slot component anywhere
-inside another repeating slot, directly or transitively).
-
-## `on` events vs `watch` (item scope)
-
-An `on` event fires per rendered instance, so inside a repeat its action params may bind `{item:…}` — the host
-passes the live repeat element as the dispatch `item`. A `watch` is **global** change-detection: it is
-collected once per authored node and fired on the absolute state path, not per row, so a per-row `item` is
-meaningless. The verifier therefore validates `watch` actions with **no item context** (a `{item:…}` watch
-param fails with `unknown_item_path`), and the typed `watch` builder accepts only literal / `{state:…}` /
-template binds — so the compile gate and the runtime gate mirror. `{item:…}` is valid only in `on` event
-params.
-
-## Single-source predicates
-
-- **Displayable kinds**: `nonDisplayableKinds` drives both the `DisplayKind` author type and the runtime
-  `displayableKinds` set.
-- **Comparison literals**: one `condLiterals` table drives `CondLiteral<K>` and the runtime `literalMatches`.
-- **Is-a-slot-repeating**: `isRepeatingSlot` (repeats-presence discriminant) drives both gates;
-  `IsRepeatingSlotGuardsRepeatSlot` pins its guarded type to `RepeatSlot`.
-- **One action registry** is read by the verifier and executed by `createRunJsonAction`; an unregistered
-  action fails verification and cannot be dispatched.
-
-## Repeat items mirror the verifier for every element shape
-
-A repeating slot's `it(field)` accessor is **single-sourced from the same element schema the verifier's
-`ItemContext` walks**, not from the inferred element value type. `ItemFieldsOf<ElementSchema>` keys `it` by
-the element `ObjectSchema`'s declared fields and types each by its schema-derived kind (mirroring
-`fieldsKindOf`/`itemContextOf`); a non-object element (`string[]`, `number[][]`, `rowSchema[][]`) exposes
-**no** named fields, mirroring the verifier returning an empty item context. So compile-acceptance and
-verifier-acceptance agree for every element shape:
-
-- **Object element**: `it("name")` resolves to the field's schema kind; `it("meta")` on a nested-object
-  field has kind `object` (not assignable to a scalar prop — matches `kind_mismatch`); `it("length")` is not
-  a declared field (compile error — matches `unknown_item_path`).
-- **Primitive / array-of-arrays / array-of-arrays-of-objects element**: no `it(...)` field is callable
-  (matches the verifier always rejecting an item binding there). Such a slot still repeats; its children just
-  cannot bind an element field (the spec grammar has no value-item form).
-
-`tests/second.fixture.ts` exercises five repeating-slot components over object, flat-object, primitive-array,
-array-of-arrays, and array-of-arrays-of-objects element shapes; `tests/second.test.ts` runs a 28-row
-mirror-agreement battery (every row compile-verdict === verifier-verdict) and `tests/second.fixtures.bad.ts`
-holds the compile-fail proofs. The bounded board fixture (`tests/board.fixture.ts`, `tests/contract.test.ts`,
-27 tests + the 21-row board battery + `tests/fixtures.bad.ts`) is unchanged and stays green.
-
-The nested-repeat ban (transitive, across all repeating-slot components), the `it:never` unconstructibility
-of non-state repeat sources, and the single-source displayable/comparison/repeats predicates all hold
-generically.
-
-`/` is reserved as the path delimiter: `k.object` rejects a field key containing `/` at compile time, so a
-JSON-pointer path can never confuse a field literally named `a/b` with nesting `a` → `b`. This keeps the
-author's schema walk (`SchemaAtPath`) an exact inverse of the verifier's token walk (`collectTokens`).
-`ItemFieldsOf` is additionally non-distributive (`[E] extends [never] ? {} : …`), so any unresolved element
-yields an uncallable accessor rather than an over-permissive one.
+The contract is plain data and synchronous functions: build a `defineRender(...)`, author a spec, and assert
+`render.verify(spec)` plus `render.dispatch` behavior. State and flows resolve through `createScope` from
+`@pumped-fn/lite` — no React and no module mocks. The runtime verifier is the source of truth for any raw
+`JsonSpec`; the typed author surface is its compile-time mirror.
 
 ## License
 
