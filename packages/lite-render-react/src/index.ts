@@ -3,8 +3,9 @@
  * @packageDocumentation
  */
 
-export { JsonRender, defineComponents } from "./render"
+export { defineView, JsonRender, defineComponents } from "./render"
 export type {
+  RenderContract,
   JsonRenderProps,
   ComponentMap,
   NodeRenderProps,

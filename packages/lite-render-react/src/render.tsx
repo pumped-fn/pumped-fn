@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, type ComponentType, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useRef, type ComponentType, type FC, type ReactNode } from "react"
 import type { Lite } from "@pumped-fn/lite"
 import { useFlow, useScopedValue, type ScopedValue } from "@pumped-fn/lite-react"
 import {
@@ -6,6 +6,7 @@ import {
   readPath,
   resolveExpr,
   verifySpec,
+  type Author,
   type JsonAction,
   type JsonNode,
   type JsonSpec,
@@ -184,9 +185,40 @@ function JsonRender<const C extends RenderCatalog, State>(props: JsonRenderProps
   return <Fragment>{renderNode(spec.root, env, view.snapshot, undefined)}</Fragment>
 }
 
-export { JsonRender, defineComponents }
+/** The slice of a `defineRender` contract the React view binds: its catalog (via `author`), context, dispatcher, and state. */
+type RenderContract<C extends RenderCatalog> = {
+  readonly author: Author<C, any, any>
+  readonly context: VerifyContext
+  readonly dispatch: Lite.Flow<unknown, RenderActionInput>
+  readonly state: ScopedValue<any>
+}
+
+/**
+ * Binds a `defineRender` contract and its catalog component implementations into a one-prop `<View spec={spec} />`.
+ * The catalog is recovered from the contract, so `impls` is type-checked against it with no annotations at the call
+ * site; context, dispatcher, and state are bound from the contract. A wrong-kinded implementation fails to compile.
+ */
+function defineView<const C extends RenderCatalog>(
+  contract: RenderContract<C>,
+  impls: ComponentMap<C>
+): FC<{ readonly spec: JsonSpec }> {
+  return function View({ spec }) {
+    return (
+      <JsonRender
+        spec={spec}
+        context={contract.context}
+        components={impls}
+        state={contract.state}
+        dispatch={contract.dispatch}
+      />
+    )
+  }
+}
+
+export { JsonRender, defineComponents, defineView }
 export type {
   JsonRenderProps,
+  RenderContract,
   ComponentMap,
   NodeRenderProps,
   EventPayload,

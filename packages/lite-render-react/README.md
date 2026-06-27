@@ -9,6 +9,26 @@ any other) domain in `src`.
 React is an observer here. Durable state and async stay in Lite flows; this adapter only reads state
 reactively and dispatches `on`/`watch` actions through the core dispatcher flow.
 
+## Quick start: `defineView`
+
+Pair a core `defineRender(...)` contract with your React implementations and get a one-prop `<View>`. The
+implementations are type-checked against the contract's catalog; the contract binds context, state, and the
+dispatcher — so the call site needs no type annotations.
+
+```tsx
+import { defineRender } from "@pumped-fn/lite-render-core"
+import { defineView } from "@pumped-fn/lite-render-react"
+
+const render = defineRender({ schema, state, catalog, actions })   // core: one inferred contract
+
+const View = defineView(render, { Board: BoardView, Card: CardView })  // react: one bound component
+
+// <View spec={spec} /> — only `spec`; context/state/dispatch/components all bound from the contract.
+```
+
+A `BoardView`/`CardView` whose prop or event kind disagrees with the contract's catalog fails to compile.
+`JsonRender` and `defineComponents` (below) remain exported for advanced/manual wiring.
+
 ## Pipeline
 
 ```
@@ -32,13 +52,16 @@ defineComponents(catalog, impls)               │  ComponentMap<Catalog>
 
 ## Public API
 
-- `JsonRender` — the generic renderer. Props: `spec` (a core `JsonSpec`), `context` (the core
-  `VerifyContext` it verifies against, lazily and cached), `components` (a `ComponentMap`), `state` (a
+- `defineView(contract, impls)` — the headline. Binds a core `defineRender(...)` contract and its catalog
+  implementations into a `React.FC<{ spec: JsonSpec }>`. The catalog is recovered from the contract, so
+  `impls` is type-checked against it with no call-site annotations.
+- `JsonRender` — the generic renderer (advanced/manual). Props: `spec` (a core `JsonSpec`), `context` (the
+  core `VerifyContext` it verifies against, lazily and cached), `components` (a `ComponentMap`), `state` (a
   `lite-react` `ScopedValue`), and `dispatch` (a `createRunJsonAction` flow).
 - `defineComponents(catalog, impls)` — binds a React implementation to every catalog component and
   type-checks each impl's props against the catalog's declared prop kinds.
-- Types: `JsonRenderProps`, `ComponentMap`, `NodeRenderProps`, `EventPayload`, `ValueForKind`,
-  `RenderCatalog`, `RenderCatalogComponent`.
+- Types: `RenderContract`, `JsonRenderProps`, `ComponentMap`, `NodeRenderProps`, `EventPayload`,
+  `ValueForKind`, `RenderCatalog`, `RenderCatalogComponent`.
 
 ## The component-implementation map mirrors the catalog
 
