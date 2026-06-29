@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-render-react",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "React adapter that lowers a verified @pumped-fn/lite-render-core spec to React over a Lite scope",
   "type": "module",
   "sideEffects": false,
