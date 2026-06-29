@@ -70,14 +70,19 @@ type RenderEnv = {
   execute: (action: JsonAction, item?: Record<string, unknown>, event?: Record<string, unknown>) => void
 }
 
-const verifiedSpecs = new WeakMap<JsonSpec, JsonSpec>()
+const verifiedSpecs = new WeakMap<VerifyContext, WeakMap<JsonSpec, JsonSpec>>()
 
 function verifyCached(spec: JsonSpec, context: VerifyContext): JsonSpec {
-  const cached = verifiedSpecs.get(spec)
+  let bySpec = verifiedSpecs.get(context)
+  if (!bySpec) {
+    bySpec = new WeakMap()
+    verifiedSpecs.set(context, bySpec)
+  }
+  const cached = bySpec.get(spec)
   if (cached) return cached
   const result = verifySpec(spec, context)
   if (!result.ok) throw new Error(result.errors.map((error) => error.message).join("\n"))
-  verifiedSpecs.set(spec, result.spec)
+  bySpec.set(spec, result.spec)
   return result.spec
 }
 
@@ -159,8 +164,9 @@ type JsonRenderProps<C extends RenderCatalog, State> = {
 }
 
 /**
- * Lowers a core-verified spec to React over a Lite scope. The spec is verified lazily at render time (cached by
- * identity); state is read reactively from the Lite resource; `on`/`watch` actions dispatch through the supplied
+ * Lowers a core-verified spec to React over a Lite scope. The spec is verified lazily at render time (cached per
+ * context+spec identity, so a spec re-verifies under a different context); state is read reactively from the Lite
+ * resource; `on`/`watch` actions dispatch through the supplied
  * Lite flow. All durable state and async stay in Lite; this component only observes and dispatches.
  */
 function JsonRender<const C extends RenderCatalog, State>(props: JsonRenderProps<C, State>): ReactNode {

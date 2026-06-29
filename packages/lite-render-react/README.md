@@ -79,7 +79,8 @@ hands each implementation three groups, all derived from the catalog:
 
 Because React props are checked contravariantly, an implementation whose prop or event kind disagrees with the
 catalog fails to type-check at the bind — the renderer cannot drift from the catalog the verifier guards.
-Verification runs lazily inside `<JsonRender>` (cached by spec identity), so there is no import-time work.
+Verification runs lazily inside `<JsonRender>` (cached per context+spec identity, so the same spec re-verifies
+under a different context), so there is no import-time work.
 
 **Honest boundary.** The mirror catches *wrong-kinded* props/events, not an implementation that accepts a
 *narrower* set of props — ignoring a declared prop is sound structural subtyping. The `"array"` prop kind

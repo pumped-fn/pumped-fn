@@ -66,6 +66,13 @@ const watchContext: VerifyContext = {
   rendererCapabilities: new Set(["group", "marker"]),
 }
 
+const watchContextNoMarker: VerifyContext = {
+  state: buildStateTokens(watchSchema),
+  components: watchCatalog,
+  actions: watchRegistry,
+  rendererCapabilities: new Set(["group"]),
+}
+
 const watchAuthor = createAuthor({ catalog: watchCatalog, registry: watchRegistry, schema: watchSchema })
 
 const siblingWatchSpec = watchAuthor.spec(
@@ -189,6 +196,7 @@ const listComponents = defineComponents(listCatalog, { RowList: RowListView, Row
 export {
   watchState,
   watchContext,
+  watchContextNoMarker,
   watchComponents,
   watchRunAction,
   siblingWatchSpec,

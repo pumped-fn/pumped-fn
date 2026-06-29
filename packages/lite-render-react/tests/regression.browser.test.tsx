@@ -6,6 +6,7 @@ import { JsonRender } from "../src"
 import {
   watchState,
   watchContext,
+  watchContextNoMarker,
   watchComponents,
   watchRunAction,
   siblingWatchSpec,
@@ -93,6 +94,52 @@ describe("lite-render-react regressions", () => {
 
     await waitFor(() => expect(screen.queryByLabelText("row-b")).toBeNull())
     expect(screen.getByLabelText("row-a")).toBeInTheDocument()
+
+    view!.unmount()
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  test("the same spec object re-verifies under a different context (verify cache is keyed by context, not spec alone)", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    await watchState.resolve(ctx)
+    let view: ReturnType<typeof render>
+
+    await act(async () => {
+      view = render(
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider ctx={ctx}>
+            <JsonRender
+              spec={siblingWatchSpec}
+              context={watchContext}
+              components={watchComponents}
+              state={watchState}
+              dispatch={watchRunAction}
+            />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(await screen.findByLabelText("out-a")).toBeInTheDocument()
+
+    expect(() =>
+      render(
+        <ScopeProvider scope={scope}>
+          <ExecutionContextProvider ctx={ctx}>
+            <JsonRender
+              spec={siblingWatchSpec}
+              context={watchContextNoMarker}
+              components={watchComponents}
+              state={watchState}
+              dispatch={watchRunAction}
+            />
+          </ExecutionContextProvider>
+        </ScopeProvider>
+      )
+    ).toThrow(/needs marker/i)
 
     view!.unmount()
     await ctx.close()
