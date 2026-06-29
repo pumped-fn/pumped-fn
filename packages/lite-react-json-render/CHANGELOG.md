@@ -1,5 +1,11 @@
 # @pumped-fn/lite-react-json-render
 
+## 0.1.1
+
+### Patch Changes
+
+- 8e8632f: Sunset: superseded by the owned strict render contract (`@pumped-fn/lite-render-core` + `@pumped-fn/lite-render-react`). Kept as json-render compatibility / prior art; no new features.
+
 ## 0.1.0
 
 ### Minor Changes
