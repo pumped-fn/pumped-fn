@@ -28,7 +28,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsdown --config-loader tsx",
+    "build": "tsdown",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run"
   },
