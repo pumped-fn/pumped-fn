@@ -1,5 +1,11 @@
 # @pumped-fn/lite-react-json-render
 
+> **Status: sunset.** This package bridges the external `@json-render/*` renderer to Lite-owned state and
+> actions. It is superseded by the owned, strict render contract — **`@pumped-fn/lite-render-core`** +
+> **`@pumped-fn/lite-render-react`** — which give you a typed authoring surface and a compile↔runtime verifier
+> instead of adapting an external renderer. Prefer the new packages for new work; this bridge remains only as
+> json-render compatibility / prior art and will not receive new features.
+
 json-render state and action adapters for `@pumped-fn/lite-react`.
 
 Use this package when a json-render spec should bind to Lite-owned frontend state and emit actions into
