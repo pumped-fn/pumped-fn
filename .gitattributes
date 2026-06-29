@@ -1,2 +1,5 @@
 *.* text=auto
 claude-skill/skills/pumped-fn-typescript/examples symlink
+
+# OKRA run store: keep tracked (historical learning) but suppress diffs (binary-treated + collapsed on GitHub)
+.okra/** -diff linguist-generated=true
