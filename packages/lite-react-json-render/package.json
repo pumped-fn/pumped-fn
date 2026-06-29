@@ -1,7 +1,7 @@
 {
   "name": "@pumped-fn/lite-react-json-render",
-  "version": "0.1.0",
-  "description": "[sunset] json-render state and action adapters for @pumped-fn/lite-react \u2014 superseded by @pumped-fn/lite-render-core + @pumped-fn/lite-render-react",
+  "version": "0.1.1",
+  "description": "[sunset] json-render state and action adapters for @pumped-fn/lite-react — superseded by @pumped-fn/lite-render-core + @pumped-fn/lite-render-react",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
