@@ -21,10 +21,10 @@ packageManagerStrict: true
 savePrefix: ""
 
 overrides:
-  esbuild: 0.27.7
+  esbuild: 0.28.1
   "@babel/runtime": 7.29.7
   "@babel/helpers": 7.29.7
-  js-yaml: 4.1.1
+  js-yaml: 4.2.0
   read-yaml-file: 2.1.0
   rolldown: 1.0.2
   brace-expansion@>=2 <3: 2.0.3
@@ -34,6 +34,11 @@ overrides:
   picomatch@>=4: 4.0.4
   protobufjs@>=7 <8: 7.5.5
   yaml@>=2 <3: 2.9.0
+  undici: 7.28.0
+  ws: 8.21.0
+  tmp: 0.2.7
+  "@opentelemetry/core": 2.8.0
+  "@vitest/browser": 4.1.8
 
 allowBuilds:
   "@mongodb-js/zstd": false
@@ -69,8 +74,8 @@ catalog:
   "@types/node": 25.9.1
   "@types/react": 19.2.15
   "@typescript/native-preview": 7.0.0-dev.20260526.1
-  "@vitest/browser-playwright": 4.1.7
-  "@vitest/coverage-v8": 4.1.7
+  "@vitest/browser-playwright": 4.1.8
+  "@vitest/coverage-v8": 4.1.8
   acorn: 8.16.0
   estree-walker: 3.0.3
   jscodeshift: 17.3.0
@@ -81,17 +86,45 @@ catalog:
   react-dom: 19.2.6
   tsdown: 0.22.0
   typescript: 6.0.3
-  vite: 8.0.14
-  vitest: 4.1.7
+  vite: 8.0.16
+  vitest: 4.1.8
   zod: 4.3.6
 
 minimumReleaseAgeExclude:
   - '@babel/helpers@7.29.7'
   - '@babel/runtime@7.29.7'
   - '@types/node@25.9.1'
-  - '@vitest/coverage-v8@4.1.7'
+  - '@vitest/coverage-v8@4.1.8'
+  - '@vitest/browser@4.1.8'
+  - '@vitest/browser-playwright@4.1.8'
   - playwright@1.61.0
-  - esbuild@0.27.7
+  - esbuild@0.28.1
+  - '@esbuild/aix-ppc64@0.28.1'
+  - '@esbuild/android-arm@0.28.1'
+  - '@esbuild/android-arm64@0.28.1'
+  - '@esbuild/android-x64@0.28.1'
+  - '@esbuild/darwin-arm64@0.28.1'
+  - '@esbuild/darwin-x64@0.28.1'
+  - '@esbuild/freebsd-arm64@0.28.1'
+  - '@esbuild/freebsd-x64@0.28.1'
+  - '@esbuild/linux-arm@0.28.1'
+  - '@esbuild/linux-arm64@0.28.1'
+  - '@esbuild/linux-ia32@0.28.1'
+  - '@esbuild/linux-loong64@0.28.1'
+  - '@esbuild/linux-mips64el@0.28.1'
+  - '@esbuild/linux-ppc64@0.28.1'
+  - '@esbuild/linux-riscv64@0.28.1'
+  - '@esbuild/linux-s390x@0.28.1'
+  - '@esbuild/linux-x64@0.28.1'
+  - '@esbuild/netbsd-arm64@0.28.1'
+  - '@esbuild/netbsd-x64@0.28.1'
+  - '@esbuild/openbsd-arm64@0.28.1'
+  - '@esbuild/openbsd-x64@0.28.1'
+  - '@esbuild/openharmony-arm64@0.28.1'
+  - '@esbuild/sunos-x64@0.28.1'
+  - '@esbuild/win32-arm64@0.28.1'
+  - '@esbuild/win32-ia32@0.28.1'
+  - '@esbuild/win32-x64@0.28.1'
   - '@rolldown/binding-android-arm64@1.0.2'
   - '@rolldown/binding-darwin-arm64@1.0.2'
   - '@rolldown/binding-darwin-x64@1.0.2'
@@ -118,7 +151,11 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview@7.0.0-dev.20260526.1'
-  - vite@8.0.14
-  - vitest@4.1.7
+  - vite@8.0.16
+  - vitest@4.1.8
   - electron-to-chromium@1.5.362
-  - tmp@0.2.6
+  - tmp@0.2.7
+  - undici@7.28.0
+  - ws@8.21.0
+  - 'js-yaml@4.2.0'
+  - '@opentelemetry/core@2.8.0'

@@ -1,9 +1,9 @@
 {
-  "name": "@pumped-fn/agent-sdk-claude",
-  "version": "1.1.0",
-  "private": false,
-  "description": "Claude CLI model provider for @pumped-fn/agent-sdk",
+  "name": "@pumped-fn/lite-render-core",
+  "version": "0.0.0",
+  "description": "Platform-neutral strict spec/catalog render contract for @pumped-fn/lite",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
@@ -22,35 +22,43 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/agent-sdk": "^1.0.0",
     "@pumped-fn/lite": "^3.1.0"
   },
   "devDependencies": {
-    "@pumped-fn/agent-sdk": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
-    "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
-  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
-    "directory": "packages/agent-sdk-claude",
+    "directory": "packages/lite-render-core",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
-  }
+  },
+  "keywords": [
+    "render-contract",
+    "json-spec",
+    "catalog",
+    "verifier",
+    "pumped-fn",
+    "lite"
+  ],
+  "license": "MIT"
 }
