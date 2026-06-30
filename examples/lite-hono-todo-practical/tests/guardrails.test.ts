@@ -13,8 +13,9 @@ describe("example guardrails", () => {
       "tests/http.test.ts",
     ].map((path) => [path, readFileSync(resolve(root, path), "utf8")] as const)
     const forbidden = [
+      ["exported scope", /\bexport\s+const\s+scope\b/],
       ["scope parameter helper", /\b(?:middleware|get|exec|handler)\s*\(\s*scope\b/],
-      ["context parameter helper", /\b(?:get|exec)\s*\(\s*context\b/],
+      ["context parameter helper", /\b(?:get|exec|tags)\s*\(\s*(?:parent|context)\b/],
       ["ambient tag read", new RegExp(`\\.data\\.${["seek", "Tag"].join("")}\\s*\\(`)],
       ["ambient data read", /\.data\.(?:get|seek)\s*\(/],
     ] as const

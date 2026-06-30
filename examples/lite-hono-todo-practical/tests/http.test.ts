@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest"
-import { createTodoBackend } from "../src/app"
+import { afterAll, describe, expect, it } from "vitest"
+import { app, dispose } from "../src/app"
 import type { Todo } from "../src/domain"
 
 describe("hono todo backend", () => {
+  afterAll(async () => {
+    await dispose()
+  })
+
   it("serves tenant-scoped todos through real Hono requests", async () => {
-    const backend = createTodoBackend()
-    const first = await backend.app.request("/todos", {
+    const first = await app.request("/todos", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -15,7 +18,7 @@ describe("hono todo backend", () => {
       },
       body: JSON.stringify({ title: " Ship backend example " }),
     })
-    const second = await backend.app.request("/todos", {
+    const second = await app.request("/todos", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -27,7 +30,7 @@ describe("hono todo backend", () => {
     })
     const created = (await first.json()) as Todo
     const other = (await second.json()) as Todo
-    const toggledResponse = await backend.app.request(`/todos/${created.id}/toggle`, {
+    const toggledResponse = await app.request(`/todos/${created.id}/toggle`, {
       method: "POST",
       headers: {
         "x-request-id": "req-c",
@@ -35,13 +38,13 @@ describe("hono todo backend", () => {
         "x-actor-id": "actor-c",
       },
     })
-    const tenantA = await backend.app.request("/todos", {
+    const tenantA = await app.request("/todos", {
       headers: { "x-tenant-id": "tenant-a" },
     })
-    const tenantB = await backend.app.request("/todos", {
+    const tenantB = await app.request("/todos", {
       headers: { "x-tenant-id": "tenant-b" },
     })
-    const deleted = await backend.app.request("/todos/completed", {
+    const deleted = await app.request("/todos/completed", {
       method: "DELETE",
       headers: {
         "x-request-id": "req-d",
@@ -49,7 +52,7 @@ describe("hono todo backend", () => {
         "x-actor-id": "actor-d",
       },
     })
-    const tenantAAfterDelete = await backend.app.request("/todos", {
+    const tenantAAfterDelete = await app.request("/todos", {
       headers: { "x-tenant-id": "tenant-a" },
     })
 
@@ -96,26 +99,24 @@ describe("hono todo backend", () => {
       ],
     })
     expect(await tenantAAfterDelete.json()).toEqual([])
-    await backend.dispose()
   })
 
   it("maps domain errors without route-level scope access", async () => {
-    const backend = createTodoBackend()
-    const invalid = await backend.app.request("/todos", {
+    const invalid = await app.request("/todos", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-request-id": "req-a",
-        "x-tenant-id": "tenant-a",
+        "x-tenant-id": "tenant-error",
         "x-actor-id": "actor-a",
       },
       body: JSON.stringify({ title: " " }),
     })
-    const missing = await backend.app.request("/todos/todo-missing/toggle", {
+    const missing = await app.request("/todos/todo-missing/toggle", {
       method: "POST",
       headers: {
         "x-request-id": "req-b",
-        "x-tenant-id": "tenant-a",
+        "x-tenant-id": "tenant-error",
         "x-actor-id": "actor-a",
       },
     })
@@ -124,6 +125,5 @@ describe("hono todo backend", () => {
     expect(await invalid.json()).toEqual({ error: "title is required" })
     expect(missing.status).toBe(404)
     expect(await missing.json()).toEqual({ error: "todo not found: todo-missing" })
-    await backend.dispose()
   })
 })

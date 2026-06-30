@@ -15,7 +15,7 @@ const req = lite.request()
 const serverFn = lite.call()
 const echoFn = createServerFn({ method: "POST" })
   .middleware([req, serverFn])
-  .validator((input: { message: string }) => input)
+  .inputValidator((input: { message: string }) => input)
   .handler(lite.handler(echo))
 
 const result: Promise<{ message: string }> = echoFn({ data: { message: "ok" } })

@@ -15,7 +15,7 @@ interface StartRequestOptions {
 }
 
 interface StartCallOptions {
-  tags?: (parent: Lite.ExecutionContext) => Lite.Tagged<any>[]
+  tags?: () => Lite.Tagged<any>[]
   close?: boolean
 }
 
@@ -86,7 +86,7 @@ function adapter<Key extends string = typeof contextKey>(
       const parent = (event.context as unknown as StartContext<Key>)[key]
       const execution = parent.scope.createContext({
         parent,
-        tags: callOptions?.tags?.(parent),
+        tags: callOptions?.tags?.(),
       })
 
       const result = await (async () => {

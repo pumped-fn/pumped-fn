@@ -172,8 +172,9 @@ describe("anti-pattern guardrails", () => {
     ].map((path) => [path, readFileSync(resolve(root, path), "utf8")] as const)
     const forbidden = [
       ["top-level generic export", /^export (?:const|function|interface|type) (?:contextKey|adapter|KeyOptions|Context|RequestOptions|CallOptions|HandlerEvent|Adapter)\b/m],
+      ["exported scope", /\bexport\s+const\s+scope\b/],
       ["scope parameter helper", /\b(?:request|call|get|exec|handler)\s*\(\s*scope\b/],
-      ["context parameter helper", /\b(?:get|exec)\s*\(\s*context\b/],
+      ["context parameter helper", /\b(?:get|exec|tags)\s*\(\s*(?:parent|context)\b/],
       ["ambient tag read", new RegExp(`\\.data\\.${["seek", "Tag"].join("")}\\s*\\(`)],
       ["ambient data read", /\.data\.(?:get|seek)\s*\(/],
     ] as const

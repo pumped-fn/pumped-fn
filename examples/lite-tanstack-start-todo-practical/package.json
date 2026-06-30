@@ -10,6 +10,7 @@
   "dependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-tanstack-start": "workspace:*",
+    "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

@@ -24,7 +24,7 @@ const serverFn = lite.call()
 
 export const echoMessage = createServerFn({ method: "POST" })
   .middleware([req, serverFn])
-  .validator((input: { message: string }) => input)
+  .inputValidator((input: { message: string }) => input)
   .handler(lite.handler(echo))
 ```
 

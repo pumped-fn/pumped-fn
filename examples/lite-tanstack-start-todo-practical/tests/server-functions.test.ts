@@ -4,10 +4,6 @@ import {
   createTodo,
   listTodos,
   toggleTodo,
-  type CreateTodoInput,
-  type Todo,
-  type TodoList,
-  type ToggleTodoInput,
 } from "../src/domain"
 import { clearCall, createCall, listCall, lite, request, toggleCall } from "../src/start"
 import { clearCompletedFn, createTodoFn, listTodosFn, toggleTodoFn } from "../src/functions"
@@ -26,11 +22,7 @@ describe("tanstack start todo functions", () => {
       },
       call: createCall,
       data: { title: " Ship fullstack example " },
-      run: (context) =>
-        lite.handler(createTodo)({
-          data: { title: " Ship fullstack example " },
-          context,
-        }),
+      handler: lite.handler(createTodo),
     })
     const listed = await invokeThroughStart({
       path: "/todos",
@@ -42,7 +34,7 @@ describe("tanstack start todo functions", () => {
       },
       call: listCall,
       data: undefined,
-      run: (context) => lite.handler(listTodos)({ data: undefined, context }),
+      handler: lite.handler(listTodos),
     })
     const toggled = await invokeThroughStart({
       path: `/todos/${created.id}/toggle`,
@@ -54,7 +46,7 @@ describe("tanstack start todo functions", () => {
       },
       call: toggleCall,
       data: { id: created.id },
-      run: (context) => lite.handler(toggleTodo)({ data: { id: created.id }, context }),
+      handler: lite.handler(toggleTodo),
     })
     const cleared = await invokeThroughStart({
       path: "/todos/completed",
@@ -66,7 +58,7 @@ describe("tanstack start todo functions", () => {
       },
       call: clearCall,
       data: undefined,
-      run: (context) => lite.handler(clearCompleted)({ data: undefined, context }),
+      handler: lite.handler(clearCompleted),
     })
 
     expect(created).toMatchObject({
@@ -101,13 +93,13 @@ describe("tanstack start todo functions", () => {
   })
 })
 
-async function invokeThroughStart<Output>(options: {
+async function invokeThroughStart<Output, Input>(options: {
   path: string
   method: "GET" | "POST"
   headers: Record<string, string>
   call: typeof listCall
-  data: unknown
-  run(context: tanstackStart.Context): Promise<Output>
+  data: Input
+  handler: (event: tanstackStart.HandlerEvent<Input>) => Promise<Output>
 }): Promise<Output> {
   const incoming = new Request(`https://todo.test${options.path}`, { headers: options.headers })
   const controller = new AbortController()
@@ -129,8 +121,11 @@ async function invokeThroughStart<Output>(options: {
         },
         signal: controller.signal,
         next: async (callOptions: { context: tanstackStart.Context }) => {
-          output = await options.run(callOptions.context)
-          return functionResult(callOptions.context)
+          output = await options.handler({
+            data: options.data,
+            context: callOptions.context,
+          })
+          return functionResult({ context: callOptions.context })
         },
       } as unknown as Parameters<NonNullable<typeof options.call.options.server>>[0])
 
@@ -147,14 +142,14 @@ async function invokeThroughStart<Output>(options: {
   return output
 }
 
-function functionResult(context: tanstackStart.Context) {
+function functionResult(options: { context: tanstackStart.Context }) {
   return {
     "use functions must return the result of next()": true,
     "~types": {
-      context,
+      context: options.context,
       sendContext: undefined,
     },
-    context,
+    context: options.context,
     sendContext: undefined,
   }
 }

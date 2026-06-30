@@ -7,22 +7,22 @@ import {
   type CreateTodoInput,
   type ToggleTodoInput,
 } from "./domain"
-import { clearCall, createCall, listCall, lite, request, toggleCall } from "./start"
+import { clearCall, createCall, listCall, lite, toggleCall } from "./start"
 
 export const listTodosFn = createServerFn({ method: "GET" })
-  .middleware([request, listCall])
+  .middleware([listCall])
   .handler(lite.handler(listTodos))
 
 export const createTodoFn = createServerFn({ method: "POST" })
-  .middleware([request, createCall])
-  .validator((input: CreateTodoInput) => input)
+  .middleware([createCall])
+  .inputValidator((input: CreateTodoInput) => input)
   .handler(lite.handler(createTodo))
 
 export const toggleTodoFn = createServerFn({ method: "POST" })
-  .middleware([request, toggleCall])
-  .validator((input: ToggleTodoInput) => input)
+  .middleware([toggleCall])
+  .inputValidator((input: ToggleTodoInput) => input)
   .handler(lite.handler(toggleTodo))
 
 export const clearCompletedFn = createServerFn({ method: "POST" })
-  .middleware([request, clearCall])
+  .middleware([clearCall])
   .handler(lite.handler(clearCompleted))

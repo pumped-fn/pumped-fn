@@ -21,6 +21,9 @@ catalogs:
     '@opentelemetry/api':
       specifier: 1.9.1
       version: 1.9.1
+    '@tanstack/react-router':
+      specifier: 1.170.16
+      version: 1.170.16
     '@tanstack/react-start':
       specifier: 1.168.26
       version: 1.168.26
@@ -364,6 +367,9 @@ importers:
       '@pumped-fn/lite-tanstack-start':
         specifier: workspace:*
         version: link:../../pkg/framework/tanstack-start
+      '@tanstack/react-router':
+        specifier: 'catalog:'
+        version: 1.170.16(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@tanstack/react-start':
         specifier: 'catalog:'
         version: 1.168.26(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
@@ -2476,8 +2482,8 @@ packages:
     resolution: {integrity: sha512-eXK1UInq2bPmjyX6e3VHIzMLobc4J94i4AWn+Hpq3OU5KkrRC96OAcR3PRJ/pGu6m8TRnBHP9dkXQVsT/COVIA==}
     engines: {node: '>=0.10.0'}
 
-  isbot@5.1.44:
-    resolution: {integrity: sha512-PGEHtwMnKbZpeSEXW2Utx+/JWed7dp6DiH0WWg33vGSDA7RUvpUeJSVlLrVkQ1RCpvDOUc/eH9ql7VsdbBZ8pA==}
+  isbot@5.1.43:
+    resolution: {integrity: sha512-drJhFmibra4LO6Wd7D3Oi6UICRK9244vSZkmxzhlZP0TTdwCA2ueK4PEkUkzPYeuqug9+cqqdWPgihjk5+83Cg==}
     engines: {node: '>=18'}
 
   isexe@2.0.0:
@@ -3126,6 +3132,11 @@ packages:
 
   sql.js@1.14.1:
     resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
+
+  srvx@0.11.16:
+    resolution: {integrity: sha512-bp07zRuycfTY43IjAvvTFnmnJi8ikW0VFiHwOhhYcVW/L4xQ1XY4PAd4Nuum1rsA17C39zL7x+CDhrn5AL32Rw==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
 
   srvx@0.11.17:
     resolution: {integrity: sha512-43yM4luKfCJamyCMhrUeHUPOrf8TdZe7kN8s5zayZCH5OeprYqi49Aso5ZvHXR4aB+DHaRNO/diNFgZSMNG8Xw==}
@@ -4329,7 +4340,7 @@ snapshots:
       '@tanstack/history': 1.162.0
       '@tanstack/react-store': 0.9.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@tanstack/router-core': 1.171.13
-      isbot: 5.1.44
+      isbot: 5.1.43
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
 
@@ -5095,7 +5106,7 @@ snapshots:
   h3@2.0.1-rc.20:
     dependencies:
       rou3: 0.8.1
-      srvx: 0.11.17
+      srvx: 0.11.16
 
   happy-dom@20.9.0:
     dependencies:
@@ -5172,7 +5183,7 @@ snapshots:
 
   is-windows@1.0.2: {}
 
-  isbot@5.1.44: {}
+  isbot@5.1.43: {}
 
   isexe@2.0.0: {}
 
@@ -5794,6 +5805,8 @@ snapshots:
   sprintf-js@1.1.3: {}
 
   sql.js@1.14.1: {}
+
+  srvx@0.11.16: {}
 
   srvx@0.11.17: {}
 

@@ -1,10 +1,11 @@
 import { createScope } from "@pumped-fn/lite"
 import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+import { createStart } from "@tanstack/react-start"
 import { actorId, operation, requestId, tenantId } from "./domain"
 
 export const lite = tanstackStart.adapter()
 
-export const scope = createScope({
+const scope = createScope({
   extensions: [lite],
 })
 
@@ -31,3 +32,8 @@ export const toggleCall = lite.call({
 export const clearCall = lite.call({
   tags: () => [operation("todo.clearCompleted")],
 })
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [request],
+  functionMiddleware: [],
+}))

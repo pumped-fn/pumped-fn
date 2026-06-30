@@ -1,3 +1,4 @@
+import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { useServerFn } from "@tanstack/react-start"
 import type { FormEvent } from "react"
 import {
@@ -5,23 +6,23 @@ import {
   createTodoFn,
   listTodosFn,
   toggleTodoFn,
-} from "./functions"
-import type { TodoList } from "./domain"
+} from "../functions"
+import type { TodoList } from "../domain"
 
-export interface TodoAppProps {
-  initial: TodoList
-  onChanged(): Promise<void> | void
-}
+export const Route = createFileRoute("/")({
+  loader: async (): Promise<TodoList> => listTodosFn(),
+  component: TodoRoute,
+})
 
-export function TodoApp({ initial, onChanged }: TodoAppProps) {
-  const list = useServerFn(listTodosFn)
+function TodoRoute() {
+  const router = useRouter()
+  const initial: TodoList = Route.useLoaderData()
   const create = useServerFn(createTodoFn)
   const toggle = useServerFn(toggleTodoFn)
   const clear = useServerFn(clearCompletedFn)
 
   async function refresh() {
-    await list()
-    await onChanged()
+    await router.invalidate()
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -29,17 +30,17 @@ export function TodoApp({ initial, onChanged }: TodoAppProps) {
     const form = event.currentTarget
     await create({ data: { title: String(new FormData(form).get("title") ?? "") } })
     form.reset()
-    await onChanged()
+    await router.invalidate()
   }
 
   async function toggleStatus(id: string) {
     await toggle({ data: { id } })
-    await onChanged()
+    await router.invalidate()
   }
 
   async function clearDone() {
     await clear()
-    await onChanged()
+    await router.invalidate()
   }
 
   return (
