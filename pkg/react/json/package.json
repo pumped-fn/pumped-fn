@@ -1,0 +1,70 @@
+{
+  "name": "@pumped-fn/lite-react-json-render",
+  "version": "0.1.1",
+  "description": "[sunset] json-render state and action adapters for @pumped-fn/lite-react — superseded by @pumped-fn/lite-render-core + @pumped-fn/lite-render-react",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@json-render/core": "catalog:"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite-react": "^2.3.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-react": "workspace:*",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "pkg/react/json",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
+  "keywords": [
+    "json-render",
+    "state-store",
+    "pumped-fn",
+    "lite-react",
+    "react",
+    "scoped-value"
+  ],
+  "license": "MIT"
+}

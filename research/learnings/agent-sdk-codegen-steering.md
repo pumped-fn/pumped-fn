@@ -6,7 +6,7 @@ Goal: add codegen eval coverage for the tag-first `@pumped-fn/agent-sdk` surface
 
 Harness extension:
 - Added three ignored `.autoresearch` tasks: `a1-workflow-run-tag`, `a2-runtime-tags`, `a3-named-worker-delegation`.
-- Prompt context reads `packages/lite/README.md`, `packages/lite/PATTERNS.md`, `packages/agent-sdk/README.md`, `packages/agent-sdk/PATTERNS.md`, and lite CLI categories needed for primitives/scope/context/testing/patterns.
+- Prompt context reads `pkg/core/lite/README.md`, `pkg/core/lite/PATTERNS.md`, `pkg/agent/core/README.md`, `pkg/agent/core/PATTERNS.md`, and lite CLI categories needed for primitives/scope/context/testing/patterns.
 - Added AP probes for removed extension `use:`, non-tag or missing `workflowRun()` context setup, and pre-change `wrapResolve(next, atom, scope)` / `event.atom` / `event.resource`.
 - Fixture smoke: `agent-clean.ts` scored AP=0; `agent-dirty.ts` scored AP=5.
 

@@ -9,21 +9,25 @@
     "verify": "pnpm build && pnpm test && pnpm typecheck",
     "format": "echo 'Formatting disabled'",
     "format:check": "echo 'Format check disabled'",
-    "lint": "pnpm -F @pumped-fn/lite-lint build && node packages/lite-lint/dist/cli.mjs packages/lite/README.md packages/lite/PATTERNS.md packages/lite-react/README.md packages/lite-react/PATTERNS.md examples/lite-practical examples/lite-react-practical examples/lite-bff-practical",
+    "lint": "pnpm -F @pumped-fn/lite-lint build && node pkg/tool/lint/dist/cli.mjs pkg/core/lite/README.md pkg/core/lite/PATTERNS.md pkg/react/lite-react/README.md pkg/react/lite-react/PATTERNS.md examples/lite-practical examples/lite-react-practical examples/lite-bff-practical",
     "lint:check": "pnpm lint",
+    "actionlint": "github-actionlint .github/workflows/*.yml",
+    "act": "node scripts/act.mjs",
+    "actions:check": "pnpm actionlint && pnpm act -l",
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:status": "changeset status --verbose",
     "release": "pnpm verify && pnpm changeset:publish",
-    "test:ci": "act -j test",
-    "test:release": "act -j release --secret-file .secrets"
+    "test:ci": "pnpm act -W .github/workflows/ci.yml -j test",
+    "test:release": "pnpm act -W .github/workflows/release.yml -j release --secret-file .secrets"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
     "@changesets/cli": "catalog:",
+    "github-actionlint": "catalog:",
     "typescript": "catalog:",
-    "unrun": "0.3.1"
+    "unrun": "catalog:"
   },
   "license": "MIT"
 }

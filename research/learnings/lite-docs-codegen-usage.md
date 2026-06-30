@@ -2,10 +2,10 @@
 
 Session: `lite-docs-codegen-usage`
 
-Goal: improve `packages/lite` and `packages/lite-react` docs so code generators apply execution-scoped resource and scoped-value patterns correctly from docs alone.
+Goal: improve `pkg/core/lite` and `pkg/react/lite-react` docs so code generators apply execution-scoped resource and scoped-value patterns correctly from docs alone.
 
 Harness:
-- prompts are generated from `packages/lite/README.md`, `packages/lite/PATTERNS.md`, `packages/lite-react/README.md`, `packages/lite-react/PATTERNS.md`, and `docs/index.md`
+- prompts are generated from `pkg/core/lite/README.md`, `pkg/core/lite/PATTERNS.md`, `pkg/react/lite-react/README.md`, `pkg/react/lite-react/PATTERNS.md`, and `docs/index.md`
 - runner sessions are managed through tmux
 - generated code is scored by output text only; no generated code is run or compiled
 - Claude and Codex are both configured as runners

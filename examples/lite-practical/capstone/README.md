@@ -49,7 +49,7 @@ There is no `createApp` facade. Tests and consumers import the atoms and flows t
 
 `reconnectStore` releases `store`, releases the `storeDriver` controller, and re-resolves — product atoms only, no preset introspection in the composition root.
 
-Pinned lite semantics (S11): an atom preset redirect (`preset(storeDriver, replacement)`) resolves and caches under the replacement atom — `scope.resolve` returns before creating an entry for the redirected target (`packages/lite/src/scope.ts`, `resolve()` preset branch), so `release`/`invalidate` on the target find no cache entry and are no-ops. lite has no test for release-on-a-redirected-target; store OI-SC6 is the pin: a preset-redirected driver survives `reconnectStore` with its factory not re-run and its data intact, while the real driver (no preset) is released and rebuilt fresh (store OI1).
+Pinned lite semantics (S11): an atom preset redirect (`preset(storeDriver, replacement)`) resolves and caches under the replacement atom — `scope.resolve` returns before creating an entry for the redirected target (`pkg/core/lite/src/scope.ts`, `resolve()` preset branch), so `release`/`invalidate` on the target find no cache entry and are no-ops. lite has no test for release-on-a-redirected-target; store OI-SC6 is the pin: a preset-redirected driver survives `reconnectStore` with its factory not re-run and its data intact, while the real driver (no preset) is released and rebuilt fresh (store OI1).
 
 ## Request identity
 

@@ -461,7 +461,7 @@ describe("inside-out", () => {
   })
 
   test("B4: lite PATTERNS points readers to the tiered frontend comparison", () => {
-    const source = read("../../packages/lite/PATTERNS.md")
+    const source = read("../../pkg/core/lite/PATTERNS.md")
 
     expect(source).toContain("Practical Examples")
     expect(source).toContain("Runnable practical examples under `examples/`")
@@ -489,10 +489,10 @@ describe("inside-out", () => {
   })
 
   test("FG2j: package docs share the boundary ownership vocabulary", () => {
-    const liteReadme = read("../../packages/lite/README.md")
-    const litePatterns = read("../../packages/lite/PATTERNS.md")
-    const reactReadme = read("../../packages/lite-react/README.md")
-    const reactPatterns = read("../../packages/lite-react/PATTERNS.md")
+    const liteReadme = read("../../pkg/core/lite/README.md")
+    const litePatterns = read("../../pkg/core/lite/PATTERNS.md")
+    const reactReadme = read("../../pkg/react/lite-react/README.md")
+    const reactPatterns = read("../../pkg/react/lite-react/PATTERNS.md")
 
     expectContainsAll(liteReadme, [
       "Boundary Ownership",
@@ -566,10 +566,10 @@ describe("inside-out", () => {
 
   test("FG2j: public package docs do not pin coverage or inventory counts without derived wording", () => {
     const docs = [
-      ["lite README", read("../../packages/lite/README.md")],
-      ["lite PATTERNS", read("../../packages/lite/PATTERNS.md")],
-      ["lite-react README", read("../../packages/lite-react/README.md")],
-      ["lite-react PATTERNS", read("../../packages/lite-react/PATTERNS.md")],
+      ["lite README", read("../../pkg/core/lite/README.md")],
+      ["lite PATTERNS", read("../../pkg/core/lite/PATTERNS.md")],
+      ["lite-react README", read("../../pkg/react/lite-react/README.md")],
+      ["lite-react PATTERNS", read("../../pkg/react/lite-react/PATTERNS.md")],
     ] as const
 
     for (const [name, source] of docs) {
@@ -577,7 +577,7 @@ describe("inside-out", () => {
         expect(source, name).not.toMatch(pattern)
       }
     }
-    expect(read("../../packages/lite/PATTERNS.md")).toContain("derived or explicitly scoped")
-    expect(read("../../packages/lite-react/PATTERNS.md")).toContain("derived or explicitly scoped")
+    expect(read("../../pkg/core/lite/PATTERNS.md")).toContain("derived or explicitly scoped")
+    expect(read("../../pkg/react/lite-react/PATTERNS.md")).toContain("derived or explicitly scoped")
   })
 })

@@ -5,8 +5,8 @@ import { configDefaults, defineConfig } from "vitest/config"
 export default defineConfig({
   resolve: {
     alias: {
-      "@pumped-fn/lite-react": fileURLToPath(new URL("../../packages/lite-react/src/index.ts", import.meta.url)),
-      "@pumped-fn/lite": fileURLToPath(new URL("../../packages/lite/src/index.ts", import.meta.url)),
+      "@pumped-fn/lite-react": fileURLToPath(new URL("../../pkg/react/lite-react/src/index.ts", import.meta.url)),
+      "@pumped-fn/lite": fileURLToPath(new URL("../../pkg/core/lite/src/index.ts", import.meta.url)),
     },
     dedupe: ["react", "react-dom"],
   },

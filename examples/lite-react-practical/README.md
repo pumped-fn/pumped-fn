@@ -47,4 +47,4 @@ pnpm typecheck
 
 (More patterns and capstone slices land incrementally.)
 
-See [`@pumped-fn/lite` patterns](../../packages/lite/PATTERNS.md) and the backend practical examples for the shared doctrine.
+See [`@pumped-fn/lite` patterns](../../pkg/core/lite/PATTERNS.md) and the backend practical examples for the shared doctrine.

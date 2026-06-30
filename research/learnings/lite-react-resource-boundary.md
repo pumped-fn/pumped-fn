@@ -2,7 +2,7 @@
 
 Session: `lite-react-resource-boundary`
 
-Scope: `packages/lite-react` resource and scoped-value paths introduced by the ExecutionContext resource work.
+Scope: `pkg/react/lite-react` resource and scoped-value paths introduced by the ExecutionContext resource work.
 
 Target metric: lower `total_ms`, the sum of:
 - `resource_rerender_ms`: average milliseconds per rerender for a component using `useResource(resource, { suspense: false })` after the resource is ready.

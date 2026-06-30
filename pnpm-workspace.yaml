@@ -1,5 +1,5 @@
 packages:
-  - packages/*
+  - pkg/*/*
   - examples/*
   - benchmarks/*
 
@@ -78,6 +78,7 @@ catalog:
   "@vitest/coverage-v8": 4.1.8
   acorn: 8.16.0
   estree-walker: 3.0.3
+  github-actionlint: 1.7.12
   jscodeshift: 17.3.0
   just-bash: 3.0.2
   magic-string: 0.30.21
@@ -86,6 +87,7 @@ catalog:
   react-dom: 19.2.6
   tsdown: 0.22.0
   typescript: 6.0.3
+  unrun: 0.3.1
   vite: 8.0.16
   vitest: 4.1.8
   zod: 4.3.6
@@ -94,6 +96,11 @@ minimumReleaseAgeExclude:
   - '@babel/helpers@7.29.7'
   - '@babel/runtime@7.29.7'
   - '@types/node@25.9.1'
+  - '@emnapi/core@1.10.0'
+  - '@emnapi/runtime@1.10.0'
+  - '@emnapi/wasi-threads@1.2.1'
+  - '@napi-rs/wasm-runtime@1.1.4'
+  - '@tybys/wasm-util@0.10.2'
   - '@vitest/coverage-v8@4.1.8'
   - '@vitest/browser@4.1.8'
   - '@vitest/browser-playwright@4.1.8'
@@ -151,6 +158,7 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20260526.1'
   - '@typescript/native-preview@7.0.0-dev.20260526.1'
+  - unrun@0.3.1
   - vite@8.0.16
   - vitest@4.1.8
   - electron-to-chromium@1.5.362

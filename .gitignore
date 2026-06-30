@@ -45,6 +45,7 @@ jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
+.tools/
 
 # TypeScript cache
 *.tsbuildinfo
@@ -331,6 +332,7 @@ docs/reports/
 docs/superpowers/
 .agents/
 .claude/
+.okra/
 .c3/
 troubleshooting.md
 skills-lock.json

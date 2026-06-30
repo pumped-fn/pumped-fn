@@ -66,6 +66,9 @@ catalogs:
     estree-walker:
       specifier: 3.0.3
       version: 3.0.3
+    github-actionlint:
+      specifier: 1.7.12
+      version: 1.7.12
     jscodeshift:
       specifier: 17.3.0
       version: 17.3.0
@@ -90,6 +93,9 @@ catalogs:
     typescript:
       specifier: 6.0.3
       version: 6.0.3
+    unrun:
+      specifier: 0.3.1
+      version: 0.3.1
     vite:
       specifier: 8.0.16
       version: 8.0.16
@@ -132,21 +138,24 @@ importers:
       '@changesets/cli':
         specifier: 'catalog:'
         version: 2.31.0(@types/node@25.9.1)
+      github-actionlint:
+        specifier: 'catalog:'
+        version: 1.7.12
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
       unrun:
-        specifier: 0.3.1
+        specifier: 'catalog:'
         version: 0.3.1
 
   benchmarks/lite-perf:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../../packages/lite
+        version: link:../../pkg/core/lite
       '@pumped-fn/lite-react':
         specifier: workspace:*
-        version: link:../../packages/lite-react
+        version: link:../../pkg/react/lite-react
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
@@ -155,7 +164,7 @@ importers:
         version: 19.2.15
       '@vitest/browser-playwright':
         specifier: 'catalog:'
-        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
       playwright:
         specifier: 'catalog:'
         version: 1.61.0
@@ -170,28 +179,28 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
   examples/agent-practical:
     dependencies:
       '@pumped-fn/agent-sdk':
         specifier: workspace:*
-        version: link:../../packages/agent-sdk
+        version: link:../../pkg/agent/core
       '@pumped-fn/agent-sdk-claude':
         specifier: workspace:*
-        version: link:../../packages/agent-sdk-claude
+        version: link:../../pkg/agent/claude
       '@pumped-fn/agent-sdk-codex':
         specifier: workspace:*
-        version: link:../../packages/agent-sdk-codex
+        version: link:../../pkg/agent/codex
       '@pumped-fn/agent-sdk-just-bash':
         specifier: workspace:*
-        version: link:../../packages/agent-sdk-just-bash
+        version: link:../../pkg/agent/bash
       '@pumped-fn/agent-sdk-test':
         specifier: workspace:*
-        version: link:../../packages/agent-sdk-test
+        version: link:../../pkg/agent/test
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../../packages/lite
+        version: link:../../pkg/core/lite
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -204,16 +213,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
   examples/lite-bff-practical:
     dependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../../packages/lite
+        version: link:../../pkg/core/lite
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -229,16 +238,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
   examples/lite-practical:
     dependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../../packages/lite
+        version: link:../../pkg/core/lite
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -254,7 +263,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
   examples/lite-react-practical:
     dependencies:
@@ -266,13 +275,13 @@ importers:
         version: 0.19.0(react@19.2.6)(zod@4.3.6)
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../../packages/lite
+        version: link:../../pkg/core/lite
       '@pumped-fn/lite-react':
         specifier: workspace:*
-        version: link:../../packages/lite-react
+        version: link:../../pkg/react/lite-react
       '@pumped-fn/lite-react-json-render':
         specifier: workspace:*
-        version: link:../../packages/lite-react-json-render
+        version: link:../../pkg/react/json
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -294,7 +303,7 @@ importers:
         version: 7.0.0-dev.20260526.1
       '@vitest/browser-playwright':
         specifier: 'catalog:'
-        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
@@ -312,94 +321,12 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/agent-sdk:
-    dependencies:
-      '@pumped-fn/lite-extension-suspense':
-        specifier: workspace:^
-        version: link:../lite-extension-suspense
-    devDependencies:
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../lite
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.9.1
-      '@typescript/native-preview':
-        specifier: 'catalog:'
-        version: 7.0.0-dev.20260526.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/agent-sdk-claude:
-    devDependencies:
-      '@pumped-fn/agent-sdk':
-        specifier: workspace:*
-        version: link:../agent-sdk
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../lite
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.9.1
-      '@typescript/native-preview':
-        specifier: 'catalog:'
-        version: 7.0.0-dev.20260526.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/agent-sdk-codex:
-    devDependencies:
-      '@pumped-fn/agent-sdk':
-        specifier: workspace:*
-        version: link:../agent-sdk
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../lite
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.9.1
-      '@typescript/native-preview':
-        specifier: 'catalog:'
-        version: 7.0.0-dev.20260526.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/agent-sdk-just-bash:
+  pkg/agent/bash:
     dependencies:
       just-bash:
         specifier: 'catalog:'
@@ -407,10 +334,10 @@ importers:
     devDependencies:
       '@pumped-fn/agent-sdk':
         specifier: workspace:*
-        version: link:../agent-sdk
+        version: link:../core
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
@@ -425,23 +352,19 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/agent-sdk-test:
-    dependencies:
-      '@pumped-fn/lite-extension-suspense':
-        specifier: workspace:^
-        version: link:../lite-extension-suspense
+  pkg/agent/claude:
     devDependencies:
       '@pumped-fn/agent-sdk':
         specifier: workspace:*
-        version: link:../agent-sdk
+        version: link:../core
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
@@ -456,23 +379,25 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/codemod:
-    dependencies:
-      jscodeshift:
-        specifier: 'catalog:'
-        version: 17.3.0
+  pkg/agent/codex:
     devDependencies:
-      '@types/jscodeshift':
-        specifier: 'catalog:'
-        version: 17.3.0
+      '@pumped-fn/agent-sdk':
+        specifier: workspace:*
+        version: link:../core
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
@@ -481,12 +406,71 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite:
+  pkg/agent/core:
+    dependencies:
+      '@pumped-fn/lite-extension-suspense':
+        specifier: workspace:^
+        version: link:../../ext/suspense
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/agent/test:
+    dependencies:
+      '@pumped-fn/lite-extension-suspense':
+        specifier: workspace:^
+        version: link:../../ext/suspense
+    devDependencies:
+      '@pumped-fn/agent-sdk':
+        specifier: workspace:*
+        version: link:../core
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/core/lite:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -505,16 +489,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-devtools:
+  pkg/ext/devtools:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
@@ -523,12 +507,43 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-extension-otel:
+  pkg/ext/hmr:
+    dependencies:
+      acorn:
+        specifier: 'catalog:'
+        version: 8.16.0
+      estree-walker:
+        specifier: 'catalog:'
+        version: 3.0.3
+      magic-string:
+        specifier: 'catalog:'
+        version: 0.30.21
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@types/estree':
+        specifier: 'catalog:'
+        version: 1.0.9
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/ext/otel:
     dependencies:
       '@opentelemetry/api':
         specifier: 'catalog:'
@@ -548,7 +563,7 @@ importers:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
@@ -557,16 +572,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-extension-suspense:
+  pkg/ext/suspense:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
@@ -581,29 +596,29 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-hmr:
+  pkg/react/json:
     dependencies:
-      acorn:
+      '@json-render/core':
         specifier: 'catalog:'
-        version: 8.16.0
-      estree-walker:
-        specifier: 'catalog:'
-        version: 3.0.3
-      magic-string:
-        specifier: 'catalog:'
-        version: 0.30.21
+        version: 0.19.0(zod@4.3.6)
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
-      '@types/estree':
+        version: link:../../core/lite
+      '@pumped-fn/lite-react':
+        specifier: workspace:*
+        version: link:../lite-react
+      '@types/react':
         specifier: 'catalog:'
-        version: 1.0.9
+        version: 19.2.15
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
@@ -612,35 +627,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-lint:
-    dependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.9.1
-      '@typescript/native-preview':
-        specifier: 'catalog:'
-        version: 7.0.0-dev.20260526.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/lite-react:
+  pkg/react/lite-react:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 6.9.1
@@ -655,7 +651,7 @@ importers:
         version: 19.2.15
       '@vitest/browser-playwright':
         specifier: 'catalog:'
-        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
@@ -676,29 +672,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-react-json-render:
-    dependencies:
-      '@json-render/core':
-        specifier: 'catalog:'
-        version: 0.19.0(zod@4.3.6)
+  pkg/render/core:
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
-      '@pumped-fn/lite-react':
-        specifier: workspace:*
-        version: link:../lite-react
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.15
-      react:
-        specifier: 'catalog:'
-        version: 19.2.6
+        version: link:../../core/lite
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
@@ -707,41 +690,23 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/lite-render-core:
-    devDependencies:
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../lite
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/lite-render-react:
+  pkg/render/react:
     dependencies:
       '@pumped-fn/lite-render-core':
         specifier: workspace:*
-        version: link:../lite-render-core
+        version: link:../core
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
-        version: link:../lite
+        version: link:../../core/lite
       '@pumped-fn/lite-react':
         specifier: workspace:*
-        version: link:../lite-react
+        version: link:../../react/lite-react
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 6.9.1
@@ -756,7 +721,7 @@ importers:
         version: 19.2.15
       '@vitest/browser-playwright':
         specifier: 'catalog:'
-        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+        version: 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
       playwright:
         specifier: 'catalog:'
         version: 1.61.0
@@ -774,10 +739,54 @@ importers:
         version: 6.0.3
       vite:
         specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/tool/codemod:
+    dependencies:
+      jscodeshift:
+        specifier: 'catalog:'
+        version: 17.3.0
+    devDependencies:
+      '@types/jscodeshift':
+        specifier: 'catalog:'
+        version: 17.3.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/tool/lint:
+    dependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
 
 packages:
 
@@ -1300,6 +1309,10 @@ packages:
       '@types/node':
         optional: true
 
+  '@isaacs/fs-minipass@4.0.1':
+    resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
+    engines: {node: '>=18.0.0'}
+
   '@jitl/quickjs-ffi-types@0.32.0':
     resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
 
@@ -1717,6 +1730,10 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  adm-zip@0.5.17:
+    resolution: {integrity: sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==}
+    engines: {node: '>=12.0'}
+
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
     engines: {node: '>=6'}
@@ -1825,6 +1842,10 @@ packages:
 
   chownr@1.1.4:
     resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
+
+  chownr@3.0.0:
+    resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
+    engines: {node: '>=18'}
 
   clone-deep@4.0.1:
     resolution: {integrity: sha512-neHB9xuzh/wk0dIHweyAXv2aPGZIVk3pLMe+/RNzINf17fe0OG96QroktYAUm7SM1PBnzTabaLboqqxDyMU+SQ==}
@@ -2051,6 +2072,11 @@ packages:
   get-tsconfig@5.0.0-beta.5:
     resolution: {integrity: sha512-/6gFNr0N04nob252sTQxyFLi3eKFRqIg1I87YcqAMT1i6SQrSF6KujUEQrtrjMV0H/eejTCltLdDSTEMzHbnsQ==}
     engines: {node: '>=20.20.0'}
+
+  github-actionlint@1.7.12:
+    resolution: {integrity: sha512-kSVz5clt9voatp2Tdh1BETKNooT358/nPChYseaDC4M6f9Hc/sBRMbhagx2FTu2F/WHzDoxlNPh2EqwBngTYQg==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   github-from-package@0.0.0:
     resolution: {integrity: sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw==}
@@ -2356,6 +2382,14 @@ packages:
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
 
+  minipass@7.1.3:
+    resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
+    engines: {node: '>=16 || 14 >=14.17'}
+
+  minizlib@3.1.0:
+    resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
+    engines: {node: '>= 18'}
+
   mkdirp-classic@0.5.3:
     resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
 
@@ -2524,7 +2558,6 @@ packages:
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
-    deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
 
   prettier@2.8.8:
@@ -2768,6 +2801,10 @@ packages:
   tar-stream@2.2.0:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
+
+  tar@7.5.16:
+    resolution: {integrity: sha512-56adEpPMouktRlBLXiaYFFzZ/3+JXa8P9n7WbR+ibIjtviN55mEaOkiysCnPnWm+7kkui1Dn8J9l+g6zV8731w==}
+    engines: {node: '>=18'}
 
   term-size@2.2.1:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
@@ -3076,6 +3113,10 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
+  yallist@5.0.0:
+    resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
+    engines: {node: '>=18'}
 
   yaml@2.9.0:
     resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
@@ -3686,6 +3727,10 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.9.1
 
+  '@isaacs/fs-minipass@4.0.1':
+    dependencies:
+      minipass: 7.1.3
+
   '@jitl/quickjs-ffi-types@0.32.0': {}
 
   '@jitl/quickjs-wasmfile-debug-asyncify@0.32.0':
@@ -4021,29 +4066,29 @@ snapshots:
       '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260526.1
       '@typescript/native-preview-win32-x64': 7.0.0-dev.20260526.1
 
-  '@vitest/browser-playwright@4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)':
+  '@vitest/browser-playwright@4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)':
     dependencies:
-      '@vitest/browser': 4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
-      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      '@vitest/browser': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
       playwright: 1.61.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
     transitivePeerDependencies:
       - bufferutil
       - msw
       - utf-8-validate
       - vite
 
-  '@vitest/browser@4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)':
+  '@vitest/browser@4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)':
     dependencies:
       '@blazediff/core': 1.9.1
-      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
       '@vitest/utils': 4.1.8
       magic-string: 0.30.21
       pngjs: 7.0.0
       sirv: 3.0.2
       tinyrainbow: 3.1.0
-      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
@@ -4063,9 +4108,9 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
     optionalDependencies:
-      '@vitest/browser': 4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+      '@vitest/browser': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
 
   '@vitest/expect@4.1.8':
     dependencies:
@@ -4076,13 +4121,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.8
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
 
   '@vitest/pretty-format@4.1.8':
     dependencies:
@@ -4109,6 +4154,8 @@ snapshots:
       tinyrainbow: 3.1.0
 
   acorn@8.16.0: {}
+
+  adm-zip@0.5.17: {}
 
   ansi-colors@4.1.3: {}
 
@@ -4207,6 +4254,8 @@ snapshots:
 
   chownr@1.1.4:
     optional: true
+
+  chownr@3.0.0: {}
 
   clone-deep@4.0.1:
     dependencies:
@@ -4436,6 +4485,11 @@ snapshots:
   get-tsconfig@5.0.0-beta.5:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  github-actionlint@1.7.12:
+    dependencies:
+      adm-zip: 0.5.17
+      tar: 7.5.16
 
   github-from-package@0.0.0:
     optional: true
@@ -4745,6 +4799,12 @@ snapshots:
 
   minimist@1.2.8:
     optional: true
+
+  minipass@7.1.3: {}
+
+  minizlib@3.1.0:
+    dependencies:
+      minipass: 7.1.3
 
   mkdirp-classic@0.5.3:
     optional: true
@@ -5143,6 +5203,14 @@ snapshots:
       readable-stream: 3.6.2
     optional: true
 
+  tar@7.5.16:
+    dependencies:
+      '@isaacs/fs-minipass': 4.0.1
+      chownr: 3.0.0
+      minipass: 7.1.3
+      minizlib: 3.1.0
+      yallist: 5.0.0
+
   term-size@2.2.1: {}
 
   tiny-invariant@1.3.3: {}
@@ -5273,7 +5341,7 @@ snapshots:
   util-deprecate@1.0.2:
     optional: true
 
-  vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0):
+  vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -5282,14 +5350,15 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 25.9.1
+      esbuild: 0.28.1
       fsevents: 2.3.3
       tsx: 4.22.3
       yaml: 2.9.0
 
-  vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)):
+  vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.8
-      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))
+      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))
       '@vitest/pretty-format': 4.1.8
       '@vitest/runner': 4.1.8
       '@vitest/snapshot': 4.1.8
@@ -5306,12 +5375,12 @@ snapshots:
       tinyexec: 1.1.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vite: 8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 25.9.1
-      '@vitest/browser-playwright': 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
+      '@vitest/browser-playwright': 4.1.8(playwright@1.61.0)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.3)(yaml@2.9.0))(vitest@4.1.8)
       '@vitest/coverage-v8': 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
       happy-dom: 20.9.0
       jsdom: 29.1.1
@@ -5376,6 +5445,8 @@ snapshots:
     optional: true
 
   yallist@3.1.1: {}
+
+  yallist@5.0.0: {}
 
   yaml@2.9.0: {}
 

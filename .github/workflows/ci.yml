@@ -105,15 +105,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check for changeset
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          # Skip changeset check for certain types of PRs
-          if [[ "${{ github.event.pull_request.title }}" == *"chore:"* ]] || \
-             [[ "${{ github.event.pull_request.title }}" == *"docs:"* ]] || \
-             [[ "${{ github.event.pull_request.title }}" == *"ci:"* ]] || \
-             [[ "${{ github.event.pull_request.title }}" == *"[skip-changeset]"* ]]; then
+          if [[ "$PR_TITLE" == *"chore:"* ]] || \
+             [[ "$PR_TITLE" == *"docs:"* ]] || \
+             [[ "$PR_TITLE" == *"ci:"* ]] || \
+             [[ "$PR_TITLE" == *"[skip-changeset]"* ]]; then
             echo "Skipping changeset check for this PR type"
             exit 0
           fi
-          
-          # Check if changeset exists
+
           pnpm changeset status --since=origin/main

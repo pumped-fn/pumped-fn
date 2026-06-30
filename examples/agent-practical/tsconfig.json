@@ -11,15 +11,15 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
-    "typeRoots": ["./node_modules/@types", "../../packages/lite/node_modules/@types"],
+    "typeRoots": ["./node_modules/@types", "../../pkg/core/lite/node_modules/@types"],
     "paths": {
-      "@pumped-fn/agent-sdk": ["../../packages/agent-sdk/src/index.ts"],
-      "@pumped-fn/agent-sdk-claude": ["../../packages/agent-sdk-claude/src/index.ts"],
-      "@pumped-fn/agent-sdk-codex": ["../../packages/agent-sdk-codex/src/index.ts"],
-      "@pumped-fn/agent-sdk-just-bash": ["../../packages/agent-sdk-just-bash/src/index.ts"],
-      "@pumped-fn/agent-sdk-test": ["../../packages/agent-sdk-test/src/index.ts"],
-      "@pumped-fn/lite-extension-suspense": ["../../packages/lite-extension-suspense/src/index.ts"],
-      "@pumped-fn/lite": ["../../packages/lite/src/index.ts"]
+      "@pumped-fn/agent-sdk": ["../../pkg/agent/core/src/index.ts"],
+      "@pumped-fn/agent-sdk-claude": ["../../pkg/agent/claude/src/index.ts"],
+      "@pumped-fn/agent-sdk-codex": ["../../pkg/agent/codex/src/index.ts"],
+      "@pumped-fn/agent-sdk-just-bash": ["../../pkg/agent/bash/src/index.ts"],
+      "@pumped-fn/agent-sdk-test": ["../../pkg/agent/test/src/index.ts"],
+      "@pumped-fn/lite-extension-suspense": ["../../pkg/ext/suspense/src/index.ts"],
+      "@pumped-fn/lite": ["../../pkg/core/lite/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]

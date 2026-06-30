@@ -36,22 +36,26 @@ Extensions wrap execution. React is an observer layer.
 
 ## Package Map
 
-| Package | Role |
-| --- | --- |
-| `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
-| `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
-| `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
-| `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
-| `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
-| `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
-| `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
-| `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
-| `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
-| `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
-| `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
-| `@pumped-fn/agent-sdk-just-bash` | Lazy just-bash sandbox provider tag for agent-sdk |
-| `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
-| `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
+Current source packages live under one-word lanes in `pkg/`.
+
+| Lane | Package | Role |
+| --- | --- | --- |
+| `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
+| `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
+| `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
+| `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
+| `pkg/render/react` | `@pumped-fn/lite-render-react` | React renderer for verified render specs over Lite scopes |
+| `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
+| `pkg/ext/otel` | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
+| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
+| `pkg/ext/devtools` | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
+| `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
+| `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
+| `pkg/agent/claude` | `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
+| `pkg/agent/bash` | `@pumped-fn/agent-sdk-just-bash` | Lazy just-bash sandbox provider tag for agent-sdk |
+| `pkg/agent/test` | `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
+| `pkg/tool/lint` | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
+| `pkg/tool/codemod` | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
 ## Mental Model
 
@@ -285,12 +289,12 @@ pnpm -F @pumped-fn/lite-lint test
 
 ## Documentation
 
-- Core runtime: [`packages/lite/README.md`](packages/lite/README.md)
-- Core patterns: [`packages/lite/PATTERNS.md`](packages/lite/PATTERNS.md)
-- React runtime: [`packages/lite-react/README.md`](packages/lite-react/README.md)
-- React patterns: [`packages/lite-react/PATTERNS.md`](packages/lite-react/PATTERNS.md)
-- json-render adapter: [`packages/lite-react-json-render/README.md`](packages/lite-react-json-render/README.md)
-- Anti-pattern scanner: [`packages/lite-lint/README.md`](packages/lite-lint/README.md)
+- Core runtime: [`pkg/core/lite/README.md`](pkg/core/lite/README.md)
+- Core patterns: [`pkg/core/lite/PATTERNS.md`](pkg/core/lite/PATTERNS.md)
+- React runtime: [`pkg/react/lite-react/README.md`](pkg/react/lite-react/README.md)
+- React patterns: [`pkg/react/lite-react/PATTERNS.md`](pkg/react/lite-react/PATTERNS.md)
+- json-render adapter: [`pkg/react/json/README.md`](pkg/react/json/README.md)
+- Anti-pattern scanner: [`pkg/tool/lint/README.md`](pkg/tool/lint/README.md)
 
 ## License
 

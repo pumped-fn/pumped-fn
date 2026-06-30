@@ -39,4 +39,4 @@ pnpm typecheck
 | 11 | Shutdown choreography | Manual close order rots | `atom`, `cleanup`, `scope.dispose` | OI, E |
 | 12 | Tenant instance maps | Eviction leaks and tenants bleed | `createScope`, `tag`, `preset` | IO, OI, E |
 
-See [lite patterns](../../packages/lite/PATTERNS.md) for the API pattern guide these examples exercise.
+See [lite patterns](../../pkg/core/lite/PATTERNS.md) for the API pattern guide these examples exercise.

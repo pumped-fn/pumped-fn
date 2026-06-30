@@ -1,0 +1,64 @@
+{
+  "name": "@pumped-fn/lite-render-core",
+  "version": "0.1.0",
+  "description": "Platform-neutral strict spec/catalog render contract for @pumped-fn/lite",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": "^3.1.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "pkg/render/core",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  },
+  "keywords": [
+    "render-contract",
+    "json-spec",
+    "catalog",
+    "verifier",
+    "pumped-fn",
+    "lite"
+  ],
+  "license": "MIT"
+}
