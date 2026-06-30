@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest"
+import { createTodoBackend } from "../src/app"
+import type { Todo } from "../src/domain"
+
+describe("hono todo backend", () => {
+  it("serves tenant-scoped todos through real Hono requests", async () => {
+    const backend = createTodoBackend()
+    const first = await backend.app.request("/todos", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-a",
+        "x-tenant-id": "tenant-a",
+        "x-actor-id": "actor-a",
+      },
+      body: JSON.stringify({ title: " Ship backend example " }),
+    })
+    const second = await backend.app.request("/todos", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-b",
+        "x-tenant-id": "tenant-b",
+        "x-actor-id": "actor-b",
+      },
+      body: JSON.stringify({ title: "Keep separate" }),
+    })
+    const created = (await first.json()) as Todo
+    const other = (await second.json()) as Todo
+    const toggledResponse = await backend.app.request(`/todos/${created.id}/toggle`, {
+      method: "POST",
+      headers: {
+        "x-request-id": "req-c",
+        "x-tenant-id": "tenant-a",
+        "x-actor-id": "actor-c",
+      },
+    })
+    const tenantA = await backend.app.request("/todos", {
+      headers: { "x-tenant-id": "tenant-a" },
+    })
+    const tenantB = await backend.app.request("/todos", {
+      headers: { "x-tenant-id": "tenant-b" },
+    })
+    const deleted = await backend.app.request("/todos/completed", {
+      method: "DELETE",
+      headers: {
+        "x-request-id": "req-d",
+        "x-tenant-id": "tenant-a",
+        "x-actor-id": "actor-d",
+      },
+    })
+    const tenantAAfterDelete = await backend.app.request("/todos", {
+      headers: { "x-tenant-id": "tenant-a" },
+    })
+
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(201)
+    expect(created).toMatchObject({
+      tenantId: "tenant-a",
+      title: "Ship backend example",
+      status: "open",
+      createdBy: "actor-a",
+      lastRequestId: "req-a",
+      lastOperation: "POST:/todos",
+    })
+    expect(other).toMatchObject({
+      tenantId: "tenant-b",
+      title: "Keep separate",
+    })
+    expect(await toggledResponse.json()).toMatchObject({
+      id: created.id,
+      status: "done",
+      updatedBy: "actor-c",
+      lastRequestId: "req-c",
+      lastOperation: `POST:/todos/${created.id}/toggle`,
+    })
+    expect(await tenantA.json()).toEqual([
+      {
+        ...created,
+        status: "done",
+        updatedBy: "actor-c",
+        lastRequestId: "req-c",
+        lastOperation: `POST:/todos/${created.id}/toggle`,
+      },
+    ])
+    expect(await tenantB.json()).toEqual([other])
+    expect(await deleted.json()).toEqual({
+      deleted: [
+        {
+          ...created,
+          status: "done",
+          updatedBy: "actor-c",
+          lastRequestId: "req-c",
+          lastOperation: `POST:/todos/${created.id}/toggle`,
+        },
+      ],
+    })
+    expect(await tenantAAfterDelete.json()).toEqual([])
+    await backend.dispose()
+  })
+
+  it("maps domain errors without route-level scope access", async () => {
+    const backend = createTodoBackend()
+    const invalid = await backend.app.request("/todos", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-a",
+        "x-tenant-id": "tenant-a",
+        "x-actor-id": "actor-a",
+      },
+      body: JSON.stringify({ title: " " }),
+    })
+    const missing = await backend.app.request("/todos/todo-missing/toggle", {
+      method: "POST",
+      headers: {
+        "x-request-id": "req-b",
+        "x-tenant-id": "tenant-a",
+        "x-actor-id": "actor-a",
+      },
+    })
+
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toEqual({ error: "title is required" })
+    expect(missing.status).toBe(404)
+    expect(await missing.json()).toEqual({ error: "todo not found: todo-missing" })
+    await backend.dispose()
+  })
+})

@@ -12,6 +12,8 @@ surfaces for documented patterns, not publishing targets.
 | `lite-practical/` | `@pumped-fn/lite-practical` | Backend and framework-neutral Lite patterns. |
 | `lite-react-practical/` | `@pumped-fn/lite-react-practical` | React patterns, capstones, and browser checks. |
 | `lite-bff-practical/` | `@pumped-fn/lite-bff-practical` | BFF-style composition examples. |
+| `lite-hono-todo-practical/` | `@pumped-fn/lite-hono-todo-practical` | Hono backend integration for a todo API. |
+| `lite-tanstack-start-todo-practical/` | `@pumped-fn/lite-tanstack-start-todo-practical` | TanStack Start fullstack integration for todos. |
 | `agent-practical/` | `@pumped-fn/agent-practical` | Agent workflow examples. |
 
 ## Naming
