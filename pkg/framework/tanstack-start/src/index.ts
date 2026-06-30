@@ -3,6 +3,10 @@ import type { Lite } from "@pumped-fn/lite"
 
 const contextKey = "lite"
 
+type StartMiddleware =
+  | import("@tanstack/react-start").AnyRequestMiddleware
+  | import("@tanstack/react-start").AnyFunctionMiddleware
+
 type StartContext<Key extends string = typeof contextKey> = Record<Key, Lite.ExecutionContext>
 
 interface StartKeyOptions<Key extends string = typeof contextKey> {
@@ -14,7 +18,8 @@ interface StartRequestOptions {
   close?: boolean
 }
 
-interface StartCallOptions {
+interface StartCallOptions<TMiddlewares extends readonly StartMiddleware[] = readonly []> {
+  middleware?: TMiddlewares
   tags?: () => Lite.Tagged<any>[]
   close?: boolean
 }
@@ -32,11 +37,11 @@ interface StartAdapter<Key extends string = typeof contextKey> {
   request(
     requestOptions?: StartRequestOptions
   ): import("@tanstack/react-start").RequestMiddlewareAfterServer<{}, undefined, StartContext<Key>>
-  call(
-    callOptions?: StartCallOptions
+  call<const TMiddlewares extends readonly StartMiddleware[] = readonly []>(
+    callOptions?: StartCallOptions<TMiddlewares>
   ): import("@tanstack/react-start").FunctionMiddlewareAfterServer<
     {},
-    unknown,
+    TMiddlewares,
     undefined,
     StartContext<Key>,
     undefined,
@@ -79,28 +84,32 @@ function adapter<Key extends string = typeof contextKey>(
     })
   }
 
-  function call(callOptions?: StartCallOptions) {
+  function call<const TMiddlewares extends readonly StartMiddleware[] = readonly []>(
+    callOptions?: StartCallOptions<TMiddlewares>
+  ) {
     const close = callOptions?.close ?? true
 
-    return createMiddleware({ type: "function" }).server(async (event) => {
-      const parent = (event.context as unknown as StartContext<Key>)[key]
-      const execution = parent.scope.createContext({
-        parent,
-        tags: callOptions?.tags?.(),
+    return createMiddleware({ type: "function" })
+      .middleware((callOptions?.middleware ?? []) as TMiddlewares)
+      .server(async (event) => {
+        const parent = (event.context as unknown as StartContext<Key>)[key]
+        const execution = parent.scope.createContext({
+          parent,
+          tags: callOptions?.tags?.(),
+        })
+
+        const result = await (async () => {
+          try {
+            return await event.next({ context: { [key]: execution } as StartContext<Key> })
+          } catch (error) {
+            if (close) await execution.close({ ok: false, error })
+            throw error
+          }
+        })()
+
+        if (close) await execution.close({ ok: true })
+        return result
       })
-
-      const result = await (async () => {
-        try {
-          return await event.next({ context: { [key]: execution } as StartContext<Key> })
-        } catch (error) {
-          if (close) await execution.close({ ok: false, error })
-          throw error
-        }
-      })()
-
-      if (close) await execution.close({ ok: true })
-      return result
-    })
   }
 
   function handler<
@@ -151,7 +160,8 @@ export namespace tanstackStart {
   export type Context<Key extends string = typeof contextKey> = StartContext<Key>
   export type KeyOptions<Key extends string = typeof contextKey> = StartKeyOptions<Key>
   export type RequestOptions = StartRequestOptions
-  export type CallOptions = StartCallOptions
+  export type CallOptions<TMiddlewares extends readonly StartMiddleware[] = readonly []> =
+    StartCallOptions<TMiddlewares>
   export type HandlerEvent<
     Input,
     Key extends string = typeof contextKey,

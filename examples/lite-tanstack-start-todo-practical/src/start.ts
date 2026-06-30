@@ -18,18 +18,22 @@ export const request = lite.request({
 })
 
 export const listCall = lite.call({
+  middleware: [request],
   tags: () => [operation("todo.list")],
 })
 
 export const createCall = lite.call({
+  middleware: [request],
   tags: () => [operation("todo.create")],
 })
 
 export const toggleCall = lite.call({
+  middleware: [request],
   tags: () => [operation("todo.toggle")],
 })
 
 export const clearCall = lite.call({
+  middleware: [request],
   tags: () => [operation("todo.clearCompleted")],
 })
 

@@ -15,12 +15,12 @@ export const listTodosFn = createServerFn({ method: "GET" })
 
 export const createTodoFn = createServerFn({ method: "POST" })
   .middleware([createCall])
-  .inputValidator((input: CreateTodoInput) => input)
+  .validator((input: CreateTodoInput) => input)
   .handler(lite.handler(createTodo))
 
 export const toggleTodoFn = createServerFn({ method: "POST" })
   .middleware([toggleCall])
-  .inputValidator((input: ToggleTodoInput) => input)
+  .validator((input: ToggleTodoInput) => input)
   .handler(lite.handler(toggleTodo))
 
 export const clearCompletedFn = createServerFn({ method: "POST" })

@@ -33,5 +33,6 @@ describe("example guardrails", () => {
       'createFileRoute("/")'
     )
     expect(readFileSync(resolve(root, "src/start.ts"), "utf8")).toContain("requestMiddleware")
+    expect(readFileSync(resolve(root, "src/start.ts"), "utf8")).toContain("middleware: [request]")
   })
 })

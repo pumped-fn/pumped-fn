@@ -20,11 +20,11 @@ const scope = createScope({ extensions: [lite] })
 const req = lite.request({
   tags: (request) => [requestId(request.headers.get("x-request-id") ?? "missing")],
 })
-const serverFn = lite.call()
+const serverFn = lite.call({ middleware: [req] })
 
 export const echoMessage = createServerFn({ method: "POST" })
-  .middleware([req, serverFn])
-  .inputValidator((input: { message: string }) => input)
+  .middleware([serverFn])
+  .validator((input: { message: string }) => input)
   .handler(lite.handler(echo))
 ```
 
@@ -37,9 +37,10 @@ Install the adapter object in `createScope({ extensions })`, then use `lite.requ
 `lite.request(options)` creates a TanStack Start request middleware. The middleware creates a request
 execution context and passes it to `next(...)` as `context.lite`.
 
-`lite.call(options)` creates a server-function middleware. It reads the request execution
-context from `context.lite`, creates a child execution context for the function call, and passes that
-child to `next(...)`.
+`lite.call(options)` creates a server-function middleware. Pass native TanStack middleware through
+`middleware` to let Start carry and dedupe context through its own middleware graph. The call
+middleware reads the request execution context from `context.lite`, creates a child execution context
+for the function call, and passes that child to `next(...)`.
 
 `lite.handler(flow, options)` converts a typed Lite flow into a TanStack Start handler. The handler
 uses the server function's validated `data` as the Lite flow input.

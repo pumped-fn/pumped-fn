@@ -12,10 +12,10 @@ const echo = flow({
 })
 
 const req = lite.request()
-const serverFn = lite.call()
+const serverFn = lite.call({ middleware: [req] })
 const echoFn = createServerFn({ method: "POST" })
-  .middleware([req, serverFn])
-  .inputValidator((input: { message: string }) => input)
+  .middleware([serverFn])
+  .validator((input: { message: string }) => input)
   .handler(lite.handler(echo))
 
 const result: Promise<{ message: string }> = echoFn({ data: { message: "ok" } })

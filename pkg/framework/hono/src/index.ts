@@ -1,5 +1,6 @@
 import type { Lite } from "@pumped-fn/lite"
 import type { Env as HonoEnv, MiddlewareHandler } from "hono"
+import { createMiddleware } from "hono/factory"
 
 type EnvVariables<E extends HonoEnv> = E extends { Variables: infer Variables extends object } ? Variables : {}
 
@@ -46,7 +47,7 @@ function adapter<Key extends string = typeof contextKey>(
     ): MiddlewareHandler<HonoEnvShape<E, Key>> {
       const close = middlewareOptions?.close ?? true
 
-      return async (context, next) => {
+      return createMiddleware<HonoEnvShape<E, Key>>(async (context, next) => {
         const execution = scope.createContext({ tags: middlewareOptions?.tags?.(context.req.raw) })
         const set = context.set as unknown as (key: Key, value: Lite.ExecutionContext) => void
         set(key, execution)
@@ -59,7 +60,7 @@ function adapter<Key extends string = typeof contextKey>(
         }
 
         if (close) await execution.close({ ok: true })
-      }
+      })
     },
   }
 

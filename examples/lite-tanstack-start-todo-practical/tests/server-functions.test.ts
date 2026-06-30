@@ -91,6 +91,13 @@ describe("tanstack start todo functions", () => {
     expect(typeof toggleTodoFn).toBe("function")
     expect(typeof clearCompletedFn).toBe("function")
   })
+
+  it("lets operation middleware carry request middleware through TanStack composition", () => {
+    expect(listCall.options.middleware).toEqual([request])
+    expect(createCall.options.middleware).toEqual([request])
+    expect(toggleCall.options.middleware).toEqual([request])
+    expect(clearCall.options.middleware).toEqual([request])
+  })
 })
 
 async function invokeThroughStart<Output, Input>(options: {

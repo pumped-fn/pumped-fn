@@ -107,6 +107,14 @@ describe("TanStack Start helpers", () => {
     await scope.dispose()
   })
 
+  it("lets function middleware carry request middleware through TanStack composition", async () => {
+    const lite = tanstackStart.adapter()
+    const withRequest = lite.request()
+    const withCall = lite.call({ middleware: [withRequest] })
+
+    expect(withCall.options.middleware).toEqual([withRequest])
+  })
+
   it("runs flows from server-function handlers and escape hatches", async () => {
     const lite = tanstackStart.adapter()
     const scope = createScope({ extensions: [lite] })
