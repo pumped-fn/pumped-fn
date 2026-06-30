@@ -8,7 +8,9 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/lite": "workspace:*"
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-logging": "workspace:*",
+    "@pumped-fn/lite-extension-observable": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

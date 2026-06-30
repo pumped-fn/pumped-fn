@@ -1,0 +1,62 @@
+{
+  "name": "@pumped-fn/lite-extension-logging-pino",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Pino sink adapter for @pumped-fn/lite-extension-logging",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite-extension-logging": "^0.1.0 || ^0.2.0",
+    "pino": "^10.0.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-logging": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
+    "pino": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "keywords": [
+    "pumped-fn",
+    "logging",
+    "pino",
+    "logger",
+    "extension"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/ext/logging-pino",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}

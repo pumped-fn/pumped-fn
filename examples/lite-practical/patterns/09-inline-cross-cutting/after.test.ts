@@ -1,4 +1,6 @@
 import { createScope } from "@pumped-fn/lite"
+import { logging } from "@pumped-fn/lite-extension-logging"
+import { observable } from "@pumped-fn/lite-extension-observable"
 import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { describe, expect, test } from "vitest"
@@ -143,6 +145,64 @@ describe("outside-in", () => {
     const ctx = scope.createContext()
 
     expect(await ctx.exec({ flow: traceReport })).toBe("trace-9")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  test("OI3: packaged observable and logging extensions compose with runtime tag sinks", async () => {
+    const events = observable.memory()
+    const logs = logging.memory()
+    const clock = steppedClock()
+    let next = 0
+    const scope = createScope({
+      extensions: [observable.extension(), logging.extension()],
+    })
+    await scope.ready
+    const ctx = scope.createContext({
+      tags: [
+        observable.runtime({
+          sinks: [events],
+          only: ["flow", "function"],
+          input: true,
+          output: true,
+          now: clock,
+          id: () => `event-${next += 1}`,
+        }),
+        logging.runtime({
+          sinks: [logs],
+          level: "debug",
+          flow: "all",
+          fields: { requestId: "req-1" },
+          now: clock,
+          id: () => `log-${next += 1}`,
+        }),
+      ],
+    })
+
+    expect(await ctx.exec({ flow: checkout, input: { items: [125, 75] } })).toEqual({
+      itemCount: 2,
+      subtotalCents: 200,
+      persisted: true,
+    })
+    expect(events.events().map((event) => `${event.kind}:${event.name}:${event.phase}`)).toEqual([
+      "flow:checkout:start",
+      "function:price-items:start",
+      "function:price-items:success",
+      "flow:persist-receipt:start",
+      "flow:persist-receipt:success",
+      "flow:checkout:success",
+    ])
+    expect(events.events()[0]?.input).toEqual({ items: [125, 75] })
+    expect(logs.records().map((record) => record.message)).toEqual([
+      "flow.start",
+      "flow.start",
+      "flow.success",
+      "flow.start",
+      "flow.success",
+      "flow.success",
+    ])
+    expect(logs.records().every((record) => record.fields?.["requestId"] === "req-1")).toBe(true)
 
     await ctx.close()
     await scope.dispose()

@@ -37,7 +37,6 @@ overrides:
   undici: 7.28.0
   ws: 8.21.0
   tmp: 0.2.7
-  "@opentelemetry/core": 2.8.0
   "@vitest/browser": 4.1.8
 
 allowBuilds:
@@ -63,10 +62,6 @@ catalog:
   "@json-render/core": 0.19.0
   "@json-render/react": 0.19.0
   "@opentelemetry/api": 1.9.1
-  "@opentelemetry/exporter-trace-otlp-http": 0.218.0
-  "@opentelemetry/resources": 2.7.1
-  "@opentelemetry/sdk-trace-base": 2.7.1
-  "@opentelemetry/semantic-conventions": 1.41.1
   "@testing-library/jest-dom": 6.9.1
   "@testing-library/react": 16.3.2
   "@types/estree": 1.0.9
@@ -82,6 +77,7 @@ catalog:
   jscodeshift: 17.3.0
   just-bash: 3.0.2
   magic-string: 0.30.21
+  pino: 10.3.1
   playwright: 1.61.0
   react: 19.2.6
   react-dom: 19.2.6
@@ -166,4 +162,3 @@ minimumReleaseAgeExclude:
   - undici@7.28.0
   - ws@8.21.0
   - 'js-yaml@4.2.0'
-  - '@opentelemetry/core@2.8.0'
