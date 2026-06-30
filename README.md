@@ -43,6 +43,8 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
+| `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
+| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |
 | `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
 | `pkg/render/react` | `@pumped-fn/lite-render-react` | React renderer for verified render specs over Lite scopes |
 | `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
@@ -336,6 +338,9 @@ pnpm -F @pumped-fn/lite-lint test
 - React runtime: [`pkg/react/lite-react/README.md`](pkg/react/lite-react/README.md)
 - React patterns: [`pkg/react/lite-react/PATTERNS.md`](pkg/react/lite-react/PATTERNS.md)
 - json-render adapter: [`pkg/react/json/README.md`](pkg/react/json/README.md)
+- Framework lane: [`pkg/framework/README.md`](pkg/framework/README.md)
+- Hono adapter: [`pkg/framework/hono/README.md`](pkg/framework/hono/README.md)
+- TanStack Start adapter: [`pkg/framework/tanstack-start/README.md`](pkg/framework/tanstack-start/README.md)
 - Anti-pattern scanner: [`pkg/tool/lint/README.md`](pkg/tool/lint/README.md)
 
 ## License

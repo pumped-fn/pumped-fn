@@ -1,0 +1,67 @@
+{
+  "name": "@pumped-fn/lite-hono",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Hono middleware helpers for @pumped-fn/lite request execution contexts",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": "^3.1.0",
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "hono": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "pumped-fn",
+    "lite",
+    "hono",
+    "middleware",
+    "dependency-injection"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/framework/hono",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}
