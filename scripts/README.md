@@ -1,0 +1,27 @@
+# Scripts
+
+## Purpose
+
+`scripts/` holds repository operations scripts that are used by package scripts or GitHub Actions.
+
+## Structure
+
+| File | Role |
+| --- | --- |
+| `act.mjs` | Repository wrapper for local GitHub Actions dry-runs with `act`. |
+| `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
+
+## Naming
+
+Use short verb or verb-object names. Use `.mjs` for Node scripts and `.sh` for shell scripts that
+are intentionally shell-native.
+
+## Content Rules
+
+Scripts should be deterministic, narrow, and called from `package.json` scripts or workflows. Keep
+workspace dependency versions catalog-managed; do not vendor tool binaries here.
+
+## Boundaries
+
+Do not place package build logic or application runtime code here. If a script only serves one
+package and is not a repo operation, keep it in that package.
