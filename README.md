@@ -46,9 +46,11 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
 | `pkg/render/react` | `@pumped-fn/lite-render-react` | React renderer for verified render specs over Lite scopes |
 | `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
-| `pkg/ext/otel` | `@pumped-fn/lite-extension-otel` | OpenTelemetry integration |
+| `pkg/ext/observable` | `@pumped-fn/lite-extension-observable` | Structured lifecycle events with tag-injected sinks |
+| `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` | OpenTelemetry sink adapter for observable events |
+| `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
+| `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
-| `pkg/ext/devtools` | `@pumped-fn/lite-devtools` | Devtools transports and observability helpers |
 | `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
 | `pkg/agent/claude` | `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
@@ -103,6 +105,46 @@ The same seam works for backend and frontend:
 | `preset` | Replacement at the seam | Unit radius tests, outside-in adapter tests, tenant-specific implementation swaps |
 | `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
 | `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |
+
+## Extension Runtime Options
+
+Extensions are static composition. Runtime backend choices are tags.
+
+Install cross-cutting behavior once at the composition root, then inject sinks and policy through
+tags at the scope, request context, or individual flow execution boundary.
+
+```ts
+import { createScope } from "@pumped-fn/lite"
+import { logging } from "@pumped-fn/lite-extension-logging"
+import { observable } from "@pumped-fn/lite-extension-observable"
+
+const events = observable.memory()
+const records = logging.memory()
+
+const scope = createScope({
+  extensions: [observable.extension(), logging.extension()],
+  tags: [
+    observable.runtime({ sinks: [events], only: ["flow", "resource"] }),
+    logging.runtime({ sinks: [records], level: "info", flow: "errors" }),
+  ],
+})
+
+const request = scope.createContext({
+  tags: [logging.runtime({ sinks: [records], fields: { requestId: "req-1" } })],
+})
+
+const logger = await request.resolve(logging.logger)
+logger.info("request.accepted")
+```
+
+This split keeps the package set small: backend integrations can live outside the core extension
+packages and pass a sink through a tag. Tests use the same seam by injecting memory sinks.
+OpenTelemetry and OTLP collectors are integration targets for those sinks, not dependencies of the
+core extension packages.
+Optional backend packages such as `@pumped-fn/lite-extension-observable-otel` and
+`@pumped-fn/lite-extension-logging-pino` prove the adapter shape without changing base package size.
+The OTEL adapter is standard OTLP-oriented; the same sink can feed Grafana, Victoria, and Jaeger
+setups when the application or Collector is configured for their OTLP endpoints.
 
 ## Architectural Shape
 

@@ -19,6 +19,7 @@
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:status": "changeset status --verbose",
     "release": "pnpm verify && pnpm changeset:publish",
+    "ci:changed-packages": "node scripts/check-changed-packages.mjs",
     "test:ci": "pnpm act -W .github/workflows/ci.yml -j test",
     "test:release": "pnpm act -W .github/workflows/release.yml -j release --secret-file .secrets"
   },

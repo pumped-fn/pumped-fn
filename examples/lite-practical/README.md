@@ -34,7 +34,7 @@ pnpm typecheck
 | 06 | Transaction boilerplate | Rollback and release logic duplicated | `resource`, `onClose`, `cleanup` | IO, OI, E |
 | 07 | Scattered env config | Defaults and validation drift | `tag`, `parse`, `ParseError` | IO, OI |
 | 08 | Stale derived cache | Dirty flags miss invalidations | `controller`, `watch:true`, `flush` | IO, E |
-| 09 | Inline cross-cutting | Logging/timing holes are unanswerable | `extension`, `wrapExec`, `wrapResolve` | IO, OI, E |
+| 09 | Inline cross-cutting | Logging/timing holes are unanswerable | `extension`, `wrapExec`, `wrapResolve`, `logging`, `observable` | IO, OI, E |
 | 10 | Request-scoped globals | Concurrent requests corrupt state | `resource`, `ExecutionContext` | IO, OI, E |
 | 11 | Shutdown choreography | Manual close order rots | `atom`, `cleanup`, `scope.dispose` | OI, E |
 | 12 | Tenant instance maps | Eviction leaks and tenants bleed | `createScope`, `tag`, `preset` | IO, OI, E |

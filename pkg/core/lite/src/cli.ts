@@ -421,7 +421,14 @@ Atom retention / GC:
     content: `Singleton scope at server entry, per-request ExecutionContext via middleware.
 
 Server entry — one scope per process:
-  const scope = createScope({ extensions: [otel()], tags: [env("production")] })
+  const scope = createScope({
+    extensions: [observable.extension(), logging.extension()],
+    tags: [
+      env("production"),
+      observable.runtime({ sinks: [eventSink] }),
+      logging.runtime({ sinks: [logSink], flow: "errors" }),
+    ],
+  })
   export default createServerEntry({
     async fetch(request) {
       return handler.fetch(request, { context: { scope } })
