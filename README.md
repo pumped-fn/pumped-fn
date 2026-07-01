@@ -52,6 +52,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` | OpenTelemetry sink adapter for observable events |
 | `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
+| `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |

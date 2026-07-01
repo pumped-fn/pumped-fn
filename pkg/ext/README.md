@@ -14,6 +14,7 @@ runtime.
 | `observable-otel/` | `@pumped-fn/lite-extension-observable-otel` | OpenTelemetry sink adapter for observable events. |
 | `logging/` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks. |
 | `logging-pino/` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records. |
+| `sync/` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports. |
 | `hmr/` | `@pumped-fn/lite-hmr` | Development-time HMR state preservation helpers. |
 
 ## Naming
