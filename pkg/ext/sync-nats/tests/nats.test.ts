@@ -195,7 +195,7 @@ describe("nats sync transport", () => {
   it("reports watch iterator failures through adapter options", async () => {
     const store = fake()
     const errors: unknown[] = []
-    const transport = nats.kv(store, { prefix: "p", onError: (error) => errors.push(error) })
+    const transport = nats.kv(store, { prefix: "p", retry: false, onError: (error) => errors.push(error) })
     const off = await transport.subscribe("draft", () => {})
     const error = new Error("watch failed")
 
@@ -204,6 +204,211 @@ describe("nats sync transport", () => {
     off()
 
     expect(errors).toEqual([error])
+  })
+
+  it("resubscribes watched keys from the last delivered revision after iterator failures", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const messages: unknown[] = []
+    const transport = nats.kv(store, { prefix: "p", retry: { attempts: 1, delayMs: 1 }, onError: (error) => errors.push(error) })
+    const off = await transport.subscribe("draft", (message) => messages.push(message))
+
+    store.push("p.ZHJhZnQ", "PUT", {
+      peer: "remote",
+      value: { title: "first" },
+    })
+    await until(() => messages.length === 1)
+    store.fail(new Error("watch failed"))
+    await until(() => errors.length === 1 && store.watches.length === 2)
+    store.push("p.ZHJhZnQ", "PUT", {
+      peer: "remote",
+      value: { title: "second" },
+    })
+    await until(() => messages.length === 2)
+    off()
+
+    expect(store.watches).toEqual([
+      { key: "p.ZHJhZnQ" },
+      { key: "p.ZHJhZnQ", resumeFromRevision: 2 },
+    ])
+    expect(messages).toEqual([
+      {
+        key: "draft",
+        peer: "remote",
+        version: 1,
+        value: { title: "first" },
+      },
+      {
+        key: "draft",
+        peer: "remote",
+        version: 2,
+        value: { title: "second" },
+      },
+    ])
+  })
+
+  it("reports natural watch closure and stops when retry attempts are exhausted", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const events: Nats.WatchError[] = []
+    const transport = nats.kv(store, {
+      prefix: "p",
+      retry: { attempts: 0 },
+      onError(error, event) {
+        errors.push(error)
+        events.push(event)
+      },
+    })
+    const off = await transport.subscribe("draft", () => {})
+
+    store.end()
+    await until(() => errors.length === 1)
+    off()
+
+    expect(errors).toEqual([new Error("NATS KV watch closed")])
+    expect(events).toEqual([{ attempts: 1, terminal: true }])
+    expect(store.watches).toEqual([{ key: "p.ZHJhZnQ" }])
+  })
+
+  it("retries watches without resume when no revision was delivered", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const transport = nats.kv(store, { prefix: "p", retry: { attempts: 1, delayMs: 0 }, onError: (error) => errors.push(error) })
+    const off = await transport.subscribe("draft", () => {})
+
+    store.fail(new Error("watch failed"))
+    await until(() => errors.length === 1 && store.watches.length === 2)
+    off()
+
+    expect(store.watches).toEqual([{ key: "p.ZHJhZnQ" }, { key: "p.ZHJhZnQ" }])
+  })
+
+  it("retries initial watch failures before any subscription is open", async () => {
+    const stream = queue<KvEntry>()
+    const error = new Error("initial watch failed")
+    const errors: unknown[] = []
+    const events: Nats.WatchError[] = []
+    let watches = 0
+    const store = {
+      get: async () => null,
+      create: async () => 0,
+      update: async () => 0,
+      async watch() {
+        watches += 1
+        if (watches === 1) throw error
+        return stream
+      },
+    } satisfies Nats.Store
+    const transport = nats.kv(store, {
+      retry: { attempts: 1, delayMs: 0 },
+      onError(found, event) {
+        errors.push(found)
+        events.push(event)
+      },
+    })
+    const off = await transport.subscribe("draft", () => {})
+
+    await until(() => watches === 2)
+    off()
+
+    expect(errors).toEqual([error])
+    expect(events).toEqual([{ attempts: 1, terminal: false }])
+  })
+
+  it("resets retry attempts after a successful resumed delivery", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const messages: unknown[] = []
+    const transport = nats.kv(store, { prefix: "p", retry: { attempts: 1, delayMs: 0 }, onError: (error) => errors.push(error) })
+    const off = await transport.subscribe("draft", (message) => messages.push(message))
+
+    store.push("p.ZHJhZnQ", "PUT", {
+      peer: "remote",
+      value: { title: "first" },
+    })
+    await until(() => messages.length === 1)
+    store.fail(new Error("first watch failed"))
+    await until(() => errors.length === 1 && store.watches.length === 2)
+    store.push("p.ZHJhZnQ", "PUT", {
+      peer: "remote",
+      value: { title: "second" },
+    })
+    await until(() => messages.length === 2)
+    store.fail(new Error("second watch failed"))
+    await until(() => errors.length === 2 && store.watches.length === 3)
+    off()
+
+    expect(store.watches).toEqual([
+      { key: "p.ZHJhZnQ" },
+      { key: "p.ZHJhZnQ", resumeFromRevision: 2 },
+      { key: "p.ZHJhZnQ", resumeFromRevision: 3 },
+    ])
+  })
+
+  it("cleans pending retry timers when subscriptions are disposed", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const transport = nats.kv(store, { prefix: "p", retry: { attempts: 1, delayMs: 50 }, onError: (error) => errors.push(error) })
+    const off = await transport.subscribe("draft", () => {})
+
+    store.fail(new Error("watch failed"))
+    await until(() => errors.length === 1)
+    off()
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    expect(store.watches).toEqual([{ key: "p.ZHJhZnQ" }])
+  })
+
+  it("ignores iterator failures after subscription cleanup", async () => {
+    const errors: unknown[] = []
+    const error = new Error("late failure")
+    const watch = {
+      stop() {},
+      async *[Symbol.asyncIterator]() {
+        await new Promise((resolve) => setTimeout(resolve, 1))
+        throw error
+      },
+    } satisfies Nats.Watch
+    const store = {
+      get: async () => null,
+      create: async () => 0,
+      update: async () => 0,
+      watch: async () => watch,
+    } satisfies Nats.Store
+    const transport = nats.kv(store, { onError: (found) => errors.push(found) })
+    const off = await transport.subscribe("draft", () => {})
+
+    off()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(errors).toEqual([])
+  })
+
+  it("stops watches that open after subscription cleanup", async () => {
+    let stopped = false
+    let open: ((watch: Nats.Watch) => void) | undefined
+    const watch = {
+      stop() {
+        stopped = true
+      },
+      async *[Symbol.asyncIterator]() {},
+    } satisfies Nats.Watch
+    const store = {
+      get: async () => null,
+      create: async () => 0,
+      update: async () => 0,
+      watch: () => new Promise<Nats.Watch>((resolve) => {
+        open = resolve
+      }),
+    } satisfies Nats.Store
+    const transport = nats.kv(store)
+    const off = await transport.subscribe("draft", () => {})
+
+    off()
+    open!(watch)
+    await Promise.resolve()
+
+    expect(stopped).toBe(true)
   })
 })
 
@@ -216,6 +421,7 @@ function fake(): Nats.Store & {
   push(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
   pushRaw(key: string, operation: KvEntry["operation"], value: Uint8Array): void
   race(key: string, wire: Nats.Wire): void
+  end(): void
   fail(error: unknown): void
 } {
   let revision = 0
@@ -282,6 +488,9 @@ function fake(): Nats.Store & {
     race(key: string, wire: Nats.Wire) {
       races.set(key, wire)
     },
+    end() {
+      for (const stream of queues) stream.stop()
+    },
     fail(error: unknown) {
       for (const stream of queues) stream.fail(error)
     },
@@ -294,6 +503,7 @@ function fake(): Nats.Store & {
     push(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
     pushRaw(key: string, operation: KvEntry["operation"], value: Uint8Array): void
     race(key: string, wire: Nats.Wire): void
+    end(): void
     fail(error: unknown): void
   }
 
@@ -373,7 +583,7 @@ function queue<T>(): AsyncIterable<T> & { push(value: T): void; fail(error: unkn
 async function until(check: () => boolean): Promise<void> {
   for (let i = 0; i < 20; i++) {
     if (check()) return
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 1))
   }
   throw new Error("Condition was not reached")
 }

@@ -1,10 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process"
 import { createServer } from "node:net"
-import { Kvm, type KV } from "@nats-io/kv"
+import { Kvm, type KV, type KvWatchOptions } from "@nats-io/kv"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createScope } from "@pumped-fn/lite"
-import { sync } from "@pumped-fn/lite-extension-sync"
+import { sync, type Sync } from "@pumped-fn/lite-extension-sync"
 import { nats, type Nats } from "../src"
 
 const encoder = new TextEncoder()
@@ -150,6 +150,54 @@ run("nats sync transport integration", () => {
     })
   })
 
+  it("resumes real JetStream KV watches from the last delivered revision", async () => {
+    const watches: KvWatchOptions[] = []
+    const errors: unknown[] = []
+    const messages: Sync.Message[] = []
+    let failed = false
+    const store = {
+      get: kv.get.bind(kv),
+      create: kv.create.bind(kv),
+      update: kv.update.bind(kv),
+      async watch(options?: KvWatchOptions) {
+        if (options) watches.push(options)
+        const watch = await kv.watch(options)
+        if (failed) return watch
+        failed = true
+        return failAfterFirst(watch, new Error("watch reset"))
+      },
+    } satisfies Nats.Store
+    const transport = nats.kv(store, {
+      prefix: "resume",
+      retry: { delayMs: 0 },
+      onError: (error) => errors.push(error),
+    })
+    const off = await transport.subscribe("manual", (message) => messages.push(message))
+
+    await transport.write({
+      key: "manual",
+      peer: "left",
+      version: 1,
+      value: { ok: 1 },
+    })
+    await until(() => messages.length === 1)
+    await until(() => errors.length === 1 && watches.length === 2)
+    await transport.write({
+      key: "manual",
+      peer: "left",
+      version: 2,
+      value: { ok: 2 },
+    })
+    await until(() => messages.length === 2)
+    off()
+
+    expect(watches[1]).toEqual({
+      key: "resume.bWFudWFs",
+      resumeFromRevision: messages[0]!.version + 1,
+    })
+    expect(messages.map((message) => message.value)).toEqual([{ ok: 1 }, { ok: 2 }])
+  })
+
   it("sustains one thousand backend writes with revision and overhead evidence", async () => {
     const edits = 1000
     const transport = nats.kv(kv, { prefix: "stress" })
@@ -220,4 +268,18 @@ function delay(ms: number): Promise<void> {
 
 function encode(wire: Nats.Wire): Uint8Array {
   return encoder.encode(JSON.stringify(wire))
+}
+
+function failAfterFirst(watch: Nats.Watch, error: unknown): Nats.Watch {
+  return {
+    stop() {
+      watch.stop()
+    },
+    async *[Symbol.asyncIterator]() {
+      for await (const entry of watch) {
+        yield entry
+        throw error
+      }
+    },
+  }
 }

@@ -5,14 +5,27 @@ import { type Sync } from "@pumped-fn/lite-extension-sync"
 export namespace Nats {
   export interface Options {
     readonly prefix?: string
-    readonly onError?: (error: unknown) => void
+    readonly onError?: (error: unknown, event: WatchError) => void
+    readonly retry?: false | Retry
   }
+
+  export interface WatchError {
+    readonly attempts: number
+    readonly terminal: boolean
+  }
+
+  export interface Retry {
+    readonly attempts?: number
+    readonly delayMs?: number
+  }
+
+  export type Watch = AsyncIterable<KvEntry> & { stop(): void }
 
   export interface Store {
     get(key: string): Promise<KvEntry | null>
     create(key: string, data: Uint8Array): Promise<number>
     update(key: string, data: Uint8Array, version: number): Promise<number>
-    watch(options?: KvWatchOptions): Promise<AsyncIterable<KvEntry> & { stop(): void }>
+    watch(options?: KvWatchOptions): Promise<Watch>
   }
 
   export interface Wire {
@@ -24,6 +37,15 @@ export namespace Nats {
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const stale = new Set([10071, 10164])
+const closed = new Error("NATS KV watch closed")
+
+interface WatchState {
+  closed: boolean
+  revision: number
+  watch: Nats.Watch | undefined
+  timer: ReturnType<typeof setTimeout> | undefined
+  wake: (() => void) | undefined
+}
 
 function kv(store: Nats.Store, options?: Nats.Options): Sync.Transport {
   const prefix = options?.prefix ?? "sync"
@@ -51,30 +73,66 @@ function kv(store: Nats.Store, options?: Nats.Options): Sync.Transport {
       }
     },
     async subscribe(key, listener) {
-      const watch = await store.watch({ key: entryKey(prefix, key) })
-      void pump(key, watch, listener, options?.onError)
+      const subject = entryKey(prefix, key)
+      const state: WatchState = {
+        closed: false,
+        revision: 0,
+        watch: undefined,
+        timer: undefined,
+        wake: undefined,
+      }
+      void pump(store, subject, key, state, listener, options?.onError, retry(options?.retry))
 
       return () => {
-        watch.stop()
+        state.closed = true
+        state.watch?.stop()
+        if (state.timer) clearTimeout(state.timer)
+        state.wake?.()
       }
     },
   }
 }
 
 async function pump(
+  store: Nats.Store,
+  subject: string,
   key: string,
-  watch: AsyncIterable<KvEntry>,
+  state: WatchState,
   listener: (message: Sync.Message) => void,
-  onError: ((error: unknown) => void) | undefined
+  onError: ((error: unknown, event: Nats.WatchError) => void) | undefined,
+  retry: RetryState | undefined
 ): Promise<void> {
-  try {
-    for await (const entry of watch) {
-      if (entry.operation !== "PUT") continue
-      const message = readEntry(key, entry, onError)
-      if (message) listener(message)
+  let attempts = 0
+  while (!state.closed) {
+    try {
+      const watch = state.watch ?? await store.watch(watchOptions(subject, state.revision))
+      if (state.closed) {
+        watch.stop()
+        return
+      }
+      state.watch = watch
+      for await (const entry of watch) {
+        if (entry.operation !== "PUT") continue
+        const message = readEntry(key, entry, onError)
+        if (!message) continue
+        state.revision = message.version
+        attempts = 0
+        listener(message)
+      }
+      if (state.closed) return
+      throw closed
+    } catch (error) {
+      if (state.closed) return
+      state.watch?.stop()
+      state.watch = undefined
+      attempts += 1
+      if (!retry || attempts > retry.attempts) {
+        onError?.(error, { attempts, terminal: true })
+        return
+      }
+      onError?.(error, { attempts, terminal: false })
+      await delay(retry.delayMs, state)
     }
-  } catch (error) {
-    onError?.(error)
   }
 }
 
@@ -106,12 +164,12 @@ function decode(key: string, entry: KvEntry): Sync.Message {
 function readEntry(
   key: string,
   entry: KvEntry,
-  onError: ((error: unknown) => void) | undefined
+  onError: ((error: unknown, event: Nats.WatchError) => void) | undefined
 ): Sync.Message | undefined {
   try {
     return decode(key, entry)
   } catch (error) {
-    onError?.(error)
+    onError?.(error, { attempts: 0, terminal: false })
     return undefined
   }
 }
@@ -122,6 +180,33 @@ function isStale(error: unknown): boolean {
     && "code" in error
     && typeof error.code === "number"
     && stale.has(error.code)
+}
+
+interface RetryState {
+  readonly attempts: number
+  readonly delayMs: number
+}
+
+function retry(value: Nats.Options["retry"]): RetryState | undefined {
+  if (value === false) return undefined
+  return {
+    attempts: value?.attempts ?? Number.POSITIVE_INFINITY,
+    delayMs: value?.delayMs ?? 100,
+  }
+}
+
+function watchOptions(key: string, revision: number): KvWatchOptions {
+  return revision > 0 ? { key, resumeFromRevision: revision + 1 } : { key }
+}
+
+async function delay(ms: number, state: WatchState): Promise<void> {
+  if (ms <= 0) return
+  await new Promise<void>((resolve) => {
+    state.wake = resolve
+    state.timer = setTimeout(resolve, ms)
+  })
+  state.timer = undefined
+  state.wake = undefined
 }
 
 function base64(value: string): string {

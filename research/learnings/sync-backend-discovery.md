@@ -51,7 +51,8 @@ Implementation checkpoint:
 - The NATS adapter proof now covers stale revision racing as first-class sync write conflicts, corrupt
   persisted watch payload isolation, backend revision mapping, and a 1,000-write JetStream KV stress run
   with per-operation overhead measurement.
-- Remaining production proof is reconnect behavior.
+- The NATS adapter proof covers watch resubscribe behavior with `resumeFromRevision`, including cleanup
+  during pending retry and a real JetStream KV resume path.
 
 ## Backend Findings
 
@@ -231,7 +232,7 @@ Evidence required:
   transport lifetime;
 - stress proof that writes at least 1,000 updates and measures per-op overhead;
 - proof that backend revision is surfaced or intentionally mapped;
-- reconnect behavior remains the next adapter-hardening proof.
+- watch reconnect/resume behavior is proven with deterministic and real JetStream KV tests.
 
 Likely package shape:
 
