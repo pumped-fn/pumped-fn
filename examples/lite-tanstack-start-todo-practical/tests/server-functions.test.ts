@@ -98,6 +98,23 @@ describe("tanstack start todo functions", () => {
     expect(toggleCall.options.middleware).toEqual([request])
     expect(clearCall.options.middleware).toEqual([request])
   })
+
+  it("keeps malformed runtime input inside domain validation", async () => {
+    await expect(
+      invokeThroughStart({
+        path: "/todos",
+        method: "POST",
+        headers: {
+          "x-request-id": "req-invalid",
+          "x-tenant-id": "tenant-start-invalid",
+          "x-actor-id": "actor-invalid",
+        },
+        call: createCall,
+        data: {} as { title: string },
+        handler: lite.handler(createTodo),
+      })
+    ).rejects.toThrow("title is required")
+  })
 })
 
 async function invokeThroughStart<Output, Input>(options: {

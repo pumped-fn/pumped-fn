@@ -120,10 +120,22 @@ describe("hono todo backend", () => {
         "x-actor-id": "actor-a",
       },
     })
+    const malformed = await app.request("/todos", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-c",
+        "x-tenant-id": "tenant-error",
+        "x-actor-id": "actor-a",
+      },
+      body: JSON.stringify({}),
+    })
 
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toEqual({ error: "title is required" })
     expect(missing.status).toBe(404)
     expect(await missing.json()).toEqual({ error: "todo not found: todo-missing" })
+    expect(malformed.status).toBe(400)
+    expect(await malformed.json()).toEqual({ error: "title is required" })
   })
 })

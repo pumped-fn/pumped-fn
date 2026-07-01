@@ -39,7 +39,7 @@ app.get("/bad-input", async (context) => {
   return context.text(await context.var.lite.exec({ flow: echo, input: { id: "bad" } }))
 })
 
-const liteCtx = hono.adapter<"ctx">({ key: "ctx" })
+const liteCtx = hono.adapter({ key: "ctx" })
 createScope({ extensions: [liteCtx] })
 const custom = new Hono<hono.Env<{}, "ctx">>()
 
@@ -52,3 +52,6 @@ custom.get("/", (context) => {
 
 // @ts-expect-error custom-key middleware does not add the default lite variable
 custom.get("/bad-key", (context) => context.text(String(context.var.lite)))
+
+// @ts-expect-error custom context keys must be provided as runtime options
+hono.adapter<"ctx">()

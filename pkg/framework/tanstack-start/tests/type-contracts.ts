@@ -35,3 +35,12 @@ lite.handler(echo)({ data: { id: "bad" }, context })
 
 // @ts-expect-error a Start context must carry the Lite execution context key
 lite.handler(echo)({ data: { message: "ok" }, context: {} })
+
+const liteCtx = tanstackStart.adapter({ key: "ctx" })
+const customScope = createScope({ extensions: [liteCtx] })
+const customContext: tanstackStart.Context<"ctx"> = { ctx: customScope.createContext() }
+const customExecution: Lite.ExecutionContext = customContext.ctx
+void customExecution
+
+// @ts-expect-error custom context keys must be provided as runtime options
+tanstackStart.adapter<"ctx">()

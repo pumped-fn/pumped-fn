@@ -9,8 +9,8 @@ type StartMiddleware =
 
 type StartContext<Key extends string = typeof contextKey> = Record<Key, Lite.ExecutionContext>
 
-interface StartKeyOptions<Key extends string = typeof contextKey> {
-  key?: Key
+interface StartKeyOptions<Key extends string = string> {
+  key: Key
 }
 
 interface StartRequestOptions {
@@ -58,10 +58,14 @@ interface StartAdapter<Key extends string = typeof contextKey> {
   ): (event: StartHandlerEvent<Input, Key>) => Promise<Output>
 }
 
-function adapter<Key extends string = typeof contextKey>(
-  options?: StartKeyOptions<Key>
-): StartAdapter<Key> {
-  const key = (options?.key ?? contextKey) as Key
+function adapter(): StartAdapter
+function adapter<const Key extends string>(options: StartKeyOptions<Key>): StartAdapter<Key>
+function adapter<const Key extends string>(options?: StartKeyOptions<Key>) {
+  if (options) return bindAdapter(options.key)
+  return bindAdapter(contextKey)
+}
+
+function bindAdapter<const Key extends string>(key: Key): StartAdapter<Key> & Lite.Extension {
   let scope: Lite.Scope
 
   function request(requestOptions?: StartRequestOptions) {
@@ -141,7 +145,7 @@ function adapter<Key extends string = typeof contextKey>(
       } as Lite.ExecFlowOptions<Output, Input>)
   }
 
-  const extension = {
+  return {
     name: "@pumped-fn/lite-tanstack-start",
     init(nextScope: Lite.Scope) {
       scope = nextScope
@@ -150,15 +154,13 @@ function adapter<Key extends string = typeof contextKey>(
     call,
     handler,
   }
-
-  return extension
 }
 
 export const tanstackStart = { contextKey, adapter } as const
 
 export namespace tanstackStart {
   export type Context<Key extends string = typeof contextKey> = StartContext<Key>
-  export type KeyOptions<Key extends string = typeof contextKey> = StartKeyOptions<Key>
+  export type KeyOptions<Key extends string = string> = StartKeyOptions<Key>
   export type RequestOptions = StartRequestOptions
   export type CallOptions<TMiddlewares extends readonly StartMiddleware[] = readonly []> =
     StartCallOptions<TMiddlewares>

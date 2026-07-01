@@ -6,8 +6,8 @@ type EnvVariables<E extends HonoEnv> = E extends { Variables: infer Variables ex
 
 const contextKey = "lite"
 
-interface HonoKeyOptions<Key extends string = typeof contextKey> {
-  key?: Key
+interface HonoKeyOptions<Key extends string = string> {
+  key: Key
 }
 
 type HonoEnvShape<
@@ -31,13 +31,17 @@ interface HonoAdapter<Key extends string = typeof contextKey> {
   ): MiddlewareHandler<HonoEnvShape<E, Key>>
 }
 
-function adapter<Key extends string = typeof contextKey>(
-  options?: HonoKeyOptions<Key>
-): HonoAdapter<Key> {
-  const key = (options?.key ?? contextKey) as Key
+function adapter(): HonoAdapter
+function adapter<const Key extends string>(options: HonoKeyOptions<Key>): HonoAdapter<Key>
+function adapter<const Key extends string>(options?: HonoKeyOptions<Key>) {
+  if (options) return bindAdapter(options.key)
+  return bindAdapter(contextKey)
+}
+
+function bindAdapter<const Key extends string>(key: Key): HonoAdapter<Key> & Lite.Extension {
   let scope: Lite.Scope
 
-  const extension = {
+  return {
     name: "@pumped-fn/lite-hono",
     init(nextScope: Lite.Scope) {
       scope = nextScope
@@ -63,14 +67,12 @@ function adapter<Key extends string = typeof contextKey>(
       })
     },
   }
-
-  return extension
 }
 
 export const hono = { contextKey, adapter } as const
 
 export namespace hono {
-  export type KeyOptions<Key extends string = typeof contextKey> = HonoKeyOptions<Key>
+  export type KeyOptions<Key extends string = string> = HonoKeyOptions<Key>
   export type Env<
     E extends HonoEnv = HonoEnv,
     Key extends string = typeof contextKey,

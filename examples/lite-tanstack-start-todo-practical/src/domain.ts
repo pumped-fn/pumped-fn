@@ -197,7 +197,8 @@ export const clearCompleted = flow({
   }),
 })
 
-function normalizeTitle(input: string): string {
+function normalizeTitle(input: unknown): string {
+  if (typeof input !== "string") throw new TodoValidationError("title is required")
   const title = input.trim()
   if (title.length === 0) throw new TodoValidationError("title is required")
   return title
