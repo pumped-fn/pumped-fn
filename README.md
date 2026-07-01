@@ -313,6 +313,8 @@ The examples are part of the public contract for how code should be shaped:
 | `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
 | `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
 | `examples/lite-cli-practical` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
+| `examples/lite-sync-practical` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
+| `examples/lite-sync-web-practical` | Frontend/backend sync through a web environment gateway and ordinary React observers |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
 
 ## Local Development
