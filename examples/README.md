@@ -14,6 +14,7 @@ surfaces for documented patterns, not publishing targets.
 | `lite-bff-practical/` | `@pumped-fn/lite-bff-practical` | BFF-style composition examples. |
 | `lite-hono-todo-practical/` | `@pumped-fn/lite-hono-todo-practical` | Hono backend integration for a todo API. |
 | `lite-tanstack-start-todo-practical/` | `@pumped-fn/lite-tanstack-start-todo-practical` | TanStack Start fullstack integration for todos. |
+| `lite-cli-practical/` | `@pumped-fn/lite-cli-practical` | CLI parser integrations with per-command Lite scopes. |
 | `agent-practical/` | `@pumped-fn/agent-practical` | Agent workflow examples. |
 
 ## Naming
