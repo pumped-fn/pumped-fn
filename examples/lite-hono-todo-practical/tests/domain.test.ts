@@ -1,4 +1,4 @@
-import { createScope, preset } from "@pumped-fn/lite"
+import { createScope, ParseError, preset } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import {
   actorId,
@@ -80,9 +80,9 @@ describe("todo domain", () => {
       input: { title: "Keep tenant local" },
     })
 
-    await expect(context.exec({ flow: createTodo, input: { title: "  " } })).rejects.toBeInstanceOf(
-      TodoValidationError
-    )
+    const invalidTitle = context.exec({ flow: createTodo, input: { title: "  " } })
+    await expect(invalidTitle).rejects.toBeInstanceOf(ParseError)
+    await expect(invalidTitle).rejects.toMatchObject({ cause: expect.any(TodoValidationError) })
     await expect(
       context.exec({
         flow: toggleTodo,

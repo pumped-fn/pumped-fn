@@ -140,7 +140,7 @@ export const listTodos = flow({
 
 export const createTodo = flow({
   name: "todo.create",
-  parse: typed<CreateTodoInput>(),
+  parse: parseCreateTodo,
   deps: {
     store,
     tenantId: tags.required(tenantId),
@@ -154,7 +154,7 @@ export const createTodo = flow({
       actorId: deps.actorId,
       requestId: deps.requestId,
       operation: deps.operation,
-      title: normalizeTitle(ctx.input.title),
+      title: ctx.input.title,
     }),
 })
 
@@ -197,9 +197,18 @@ export const clearCompleted = flow({
   }),
 })
 
-function normalizeTitle(input: unknown): string {
-  if (typeof input !== "string") throw new TodoValidationError("title is required")
+function parseCreateTodo(input: unknown): CreateTodoInput {
+  if (!isRecord(input)) throw new TodoValidationError("title is required")
+  if (typeof input["title"] !== "string") throw new TodoValidationError("title is required")
+  return { title: normalizeTitle(input["title"]) }
+}
+
+function normalizeTitle(input: string): string {
   const title = input.trim()
   if (title.length === 0) throw new TodoValidationError("title is required")
   return title
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null
 }

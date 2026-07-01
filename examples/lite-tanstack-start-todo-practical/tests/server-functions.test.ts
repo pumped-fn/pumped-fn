@@ -3,11 +3,13 @@ import {
   clearCompleted,
   createTodo,
   listTodos,
+  TodoValidationError,
   toggleTodo,
 } from "../src/domain"
 import { clearCall, createCall, listCall, lite, request, toggleCall } from "../src/start"
 import { clearCompletedFn, createTodoFn, listTodosFn, toggleTodoFn } from "../src/functions"
 import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+import { ParseError } from "@pumped-fn/lite"
 
 describe("tanstack start todo functions", () => {
   it("keeps request tags and function tags explicit across the middleware chain", async () => {
@@ -100,20 +102,21 @@ describe("tanstack start todo functions", () => {
   })
 
   it("keeps malformed runtime input inside domain validation", async () => {
-    await expect(
-      invokeThroughStart({
-        path: "/todos",
-        method: "POST",
-        headers: {
-          "x-request-id": "req-invalid",
-          "x-tenant-id": "tenant-start-invalid",
-          "x-actor-id": "actor-invalid",
-        },
-        call: createCall,
-        data: {} as { title: string },
-        handler: lite.handler(createTodo),
-      })
-    ).rejects.toThrow("title is required")
+    const failed = invokeThroughStart({
+      path: "/todos",
+      method: "POST",
+      headers: {
+        "x-request-id": "req-invalid",
+        "x-tenant-id": "tenant-start-invalid",
+        "x-actor-id": "actor-invalid",
+      },
+      call: createCall,
+      data: {} as { title: string },
+      handler: lite.handler(createTodo),
+    })
+
+    await expect(failed).rejects.toBeInstanceOf(ParseError)
+    await expect(failed).rejects.toMatchObject({ cause: expect.any(TodoValidationError) })
   })
 })
 

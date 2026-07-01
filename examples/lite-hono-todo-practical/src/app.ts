@@ -1,4 +1,4 @@
-import { createScope } from "@pumped-fn/lite"
+import { createScope, ParseError } from "@pumped-fn/lite"
 import { hono } from "@pumped-fn/lite-hono"
 import { Hono } from "hono"
 import {
@@ -12,7 +12,6 @@ import {
   TodoNotFound,
   TodoValidationError,
   toggleTodo,
-  type CreateTodoInput,
 } from "./domain"
 
 export const lite = hono.adapter()
@@ -41,7 +40,7 @@ app.post("/todos", async (context) =>
   context.json(
     await context.var.lite.exec({
       flow: createTodo,
-      input: (await context.req.json()) as CreateTodoInput,
+      rawInput: await context.req.json(),
     }),
     201
   )
@@ -63,6 +62,9 @@ app.delete("/todos/completed", async (context) =>
 )
 
 app.onError((error, context) => {
+  if (error instanceof ParseError && error.cause instanceof TodoValidationError) {
+    return context.json({ error: error.cause.message }, 400)
+  }
   if (error instanceof TodoValidationError) return context.json({ error: error.message }, 400)
   if (error instanceof TodoNotFound) return context.json({ error: error.message }, 404)
   return context.json({ error: "todo backend failed" }, 500)

@@ -139,10 +139,10 @@ function bindAdapter<const Key extends string>(key: Key): StartAdapter<Key> & Li
     return (event: StartHandlerEvent<Input, Key>) =>
       event.context[key].exec({
         flow,
-        input: event.data,
+        rawInput: event.data,
         name: runOptions?.name,
         tags: runOptions?.tags,
-      } as Lite.ExecFlowOptions<Output, Input>)
+      })
   }
 
   return {
