@@ -109,6 +109,35 @@ run("nats sync transport integration", () => {
       value: { ok: 2 },
     })
   })
+
+  it("sustains one thousand backend writes with revision and overhead evidence", async () => {
+    const edits = 1000
+    const transport = nats.kv(kv, { prefix: "stress" })
+    const start = performance.now()
+    let version = 0
+
+    for (let i = 1; i <= edits; i++) {
+      const ack = await transport.write({
+        key: "draft",
+        peer: "left",
+        version: i,
+        value: { edit: i },
+      })
+      version = ack?.version ?? version
+    }
+
+    const elapsed = performance.now() - start
+    const perOp = elapsed / edits
+
+    expect(version).toBeGreaterThanOrEqual(edits)
+    expect(perOp).toBeGreaterThanOrEqual(0)
+    expect(await transport.read("draft")).toEqual({
+      key: "draft",
+      peer: "left",
+      version,
+      value: { edit: edits },
+    })
+  })
 })
 
 function docker(): boolean {

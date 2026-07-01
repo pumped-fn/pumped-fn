@@ -62,7 +62,8 @@ async function pump(
   try {
     for await (const entry of watch) {
       if (entry.operation !== "PUT") continue
-      listener(decode(key, entry))
+      const message = readEntry(key, entry, onError)
+      if (message) listener(message)
     }
   } catch (error) {
     onError?.(error)
@@ -91,6 +92,19 @@ function decode(key: string, entry: KvEntry): Sync.Message {
     peer: wire.peer,
     version: entry.revision,
     value: wire.value,
+  }
+}
+
+function readEntry(
+  key: string,
+  entry: KvEntry,
+  onError: ((error: unknown) => void) | undefined
+): Sync.Message | undefined {
+  try {
+    return decode(key, entry)
+  } catch (error) {
+    onError?.(error)
+    return undefined
   }
 }
 

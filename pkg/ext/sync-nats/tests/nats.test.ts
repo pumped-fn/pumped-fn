@@ -91,6 +91,61 @@ describe("nats sync transport", () => {
     ])
   })
 
+  it("reports corrupt watched entries and keeps delivering later records", async () => {
+    const store = fake()
+    const errors: unknown[] = []
+    const messages: unknown[] = []
+    const transport = nats.kv(store, { prefix: "p", onError: (error) => errors.push(error) })
+    const off = await transport.subscribe("draft", (message) => messages.push(message))
+
+    store.pushRaw("p.ZHJhZnQ", "PUT", encoder.encode("{"))
+    store.push("p.ZHJhZnQ", "PUT", {
+      peer: "remote",
+      value: { title: "after" },
+    })
+    await until(() => errors.length === 1 && messages.length === 1)
+    off()
+
+    expect(errors[0]).toBeInstanceOf(SyntaxError)
+    expect(messages).toEqual([
+      {
+        key: "draft",
+        peer: "remote",
+        version: 2,
+        value: { title: "after" },
+      },
+    ])
+  })
+
+  it("surfaces stale revision writes as backend CAS failures", async () => {
+    const store = fake()
+    const transport = nats.kv(store, { prefix: "p" })
+
+    await transport.write({
+      key: "draft",
+      peer: "left",
+      version: 1,
+      value: { title: "left" },
+    })
+    store.race("p.ZHJhZnQ", {
+      peer: "right",
+      value: { title: "right" },
+    })
+
+    await expect(transport.write({
+      key: "draft",
+      peer: "left",
+      version: 2,
+      value: { title: "stale" },
+    })).rejects.toThrow("NATS KV revision mismatch")
+    expect(await transport.read("draft")).toEqual({
+      key: "draft",
+      peer: "right",
+      version: 2,
+      value: { title: "right" },
+    })
+  })
+
   it("reports watch iterator failures through adapter options", async () => {
     const store = fake()
     const errors: unknown[] = []
@@ -113,6 +168,8 @@ function fake(): Nats.Store & {
   readonly watches: KvWatchOptions[]
   set(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
   push(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
+  pushRaw(key: string, operation: KvEntry["operation"], value: Uint8Array): void
+  race(key: string, wire: Nats.Wire): void
   fail(error: unknown): void
 } {
   let revision = 0
@@ -122,6 +179,7 @@ function fake(): Nats.Store & {
   const updates: { readonly key: string; readonly version: number }[] = []
   const watches: KvWatchOptions[] = []
   const queues: Array<ReturnType<typeof queue<KvEntry>>> = []
+  const races = new Map<string, Nats.Wire>()
 
   const store = {
     keys,
@@ -140,6 +198,15 @@ function fake(): Nats.Store & {
     },
     async update(key: string, data: Uint8Array, version: number) {
       updates.push({ key, version })
+      const race = races.get(key)
+      if (race) {
+        races.delete(key)
+        revision += 1
+        const next = entry(key, "PUT", revision, encode(race))
+        values.set(key, next)
+        for (const stream of queues) stream.push(next)
+      }
+      if (values.get(key)?.revision !== version) throw new Error("NATS KV revision mismatch")
       revision += 1
       values.set(key, entry(key, "PUT", revision, data))
       return revision
@@ -160,6 +227,15 @@ function fake(): Nats.Store & {
       values.set(key, next)
       for (const stream of queues) stream.push(next)
     },
+    pushRaw(key: string, operation: KvEntry["operation"], value: Uint8Array) {
+      revision += 1
+      const next = entry(key, operation, revision, value)
+      values.set(key, next)
+      for (const stream of queues) stream.push(next)
+    },
+    race(key: string, wire: Nats.Wire) {
+      races.set(key, wire)
+    },
     fail(error: unknown) {
       for (const stream of queues) stream.fail(error)
     },
@@ -170,6 +246,8 @@ function fake(): Nats.Store & {
     readonly watches: KvWatchOptions[]
     set(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
     push(key: string, operation: KvEntry["operation"], wire: Nats.Wire): void
+    pushRaw(key: string, operation: KvEntry["operation"], value: Uint8Array): void
+    race(key: string, wire: Nats.Wire): void
     fail(error: unknown): void
   }
 

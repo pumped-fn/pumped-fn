@@ -47,8 +47,11 @@ Implementation checkpoint:
   payload bytes, watches key updates, and returns KV revisions as write acknowledgements.
 - The adapter test suite covers deterministic store behavior and a real Docker-backed `nats:2.12-alpine`
   JetStream KV integration through `createScope`, `sync.extension`, and `sync.runtime`.
-- Remaining production proof is reconnect behavior, explicit stale-revision racing, invalid persisted
-  payload handling at the adapter boundary, and larger sustained update stress.
+- The NATS adapter proof now covers stale revision racing, corrupt persisted watch payload isolation,
+  backend revision mapping, and a 1,000-write JetStream KV stress run with per-operation overhead
+  measurement.
+- Remaining production proof is reconnect behavior and a first-class CAS conflict result if callers need
+  retry/accountability beyond the current write-error boundary.
 
 ## Backend Findings
 
@@ -226,10 +229,11 @@ Evidence required:
 
 - real `nats-server -js`, not mocked transport;
 - adapter package under `pkg/ext/sync-nats`;
-- conformance tests for read, write, watch, reconnect, stale revision, CAS conflict, invalid payload,
-  and shared transport lifetime;
-- stress example that writes at least 1,000 updates and reports per-op overhead;
-- proof that backend revision is surfaced or intentionally mapped.
+- conformance tests for read, write, watch, stale revision, CAS conflict, invalid payload, and shared
+  transport lifetime;
+- stress proof that writes at least 1,000 updates and measures per-op overhead;
+- proof that backend revision is surfaced or intentionally mapped;
+- reconnect behavior remains the next adapter-hardening proof.
 
 Likely package shape:
 
