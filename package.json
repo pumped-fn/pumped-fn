@@ -9,7 +9,7 @@
     "verify": "pnpm build && pnpm test && pnpm typecheck",
     "format": "echo 'Formatting disabled'",
     "format:check": "echo 'Format check disabled'",
-    "lint": "pnpm -F @pumped-fn/lite-lint build && node pkg/tool/lint/dist/cli.mjs pkg/core/lite/README.md pkg/core/lite/PATTERNS.md pkg/react/lite-react/README.md pkg/react/lite-react/PATTERNS.md examples/lite-practical examples/lite-react-practical examples/lite-bff-practical examples/lite-hono-todo-practical examples/lite-tanstack-start-todo-practical examples/lite-cli-practical",
+    "lint": "pnpm -F @pumped-fn/lite-lint build && node pkg/tool/lint/dist/cli.mjs pkg/core/lite/README.md pkg/core/lite/PATTERNS.md pkg/react/lite-react/README.md pkg/react/lite-react/PATTERNS.md examples/lite-practical examples/lite-react-practical examples/lite-bff-practical examples/lite-hono-todo-practical examples/lite-tanstack-start-todo-practical examples/lite-cli-practical examples/parking-lot-shared examples/parking-lot-cli examples/parking-lot-hono examples/parking-lot-tanstack-start examples/parking-lot-spa",
     "lint:check": "pnpm lint",
     "actionlint": "github-actionlint .github/workflows/*.yml",
     "act": "node scripts/act.mjs",
