@@ -1,4 +1,4 @@
-import { atom, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { atom, controller, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 
 export type QuoteInput = {
   readonly items: readonly number[]
@@ -88,9 +88,9 @@ export const persistReceipt = flow({
 export const checkout = flow({
   name: "checkout",
   parse: typed<QuoteInput>(),
-  factory: async (ctx) => {
-    return ctx.exec({
-      flow: persistReceipt,
+  deps: { persistReceipt: controller(persistReceipt) },
+  factory: async (ctx, { persistReceipt }) => {
+    return persistReceipt.exec({
       input: {
         itemCount: ctx.input.items.length,
         subtotalCents: await ctx.exec({

@@ -1,4 +1,4 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { controller, flow, typed } from "@pumped-fn/lite"
 import { InvalidCredentials, InvalidSession, login, validateSession } from "./auth"
 import { dashboardView, type DashboardView } from "./dashboard"
 
@@ -48,7 +48,7 @@ export type BffResult = BffResponse<LoginResponse | DashboardView | BffError>
 export const handleBffRequest = flow({
   name: "handle-bff-request",
   parse: typed<BffRequest>(),
-  deps: { dashboardView, login, validateSession },
+  deps: { dashboardView: controller(dashboardView), login: controller(login), validateSession: controller(validateSession) },
   factory: async (ctx, { dashboardView, login, validateSession }): Promise<BffResult> => {
     const request = ctx.input
     if (request.path === "/login") {

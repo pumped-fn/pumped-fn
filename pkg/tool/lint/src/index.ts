@@ -5,6 +5,7 @@ import ts from "typescript"
 export type RuleId =
   | "pumped/no-ambient-io-outside-boundary"
   | "pumped/no-definition-handle-suffix"
+  | "pumped/no-direct-flow-composition"
   | "pumped/no-internal-example-label"
   | "pumped/no-jsdom-backend"
   | "pumped/no-module-mocks"
@@ -36,7 +37,9 @@ export interface ScanOptions {
 
 type Imports = {
   createScope: Set<string>
+  controller: Set<string>
   creators: Set<string>
+  flow: Set<string>
   liteNamespaces: Set<string>
   liteReactNamespaces: Set<string>
   mockFns: Set<string>
@@ -199,7 +202,9 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
 function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
     createScope: new Set(),
+    controller: new Set(),
     creators: new Set(),
+    flow: new Set(),
     liteNamespaces: new Set(),
     liteReactNamespaces: new Set(),
     mockFns: new Set(),
@@ -231,6 +236,12 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       const local = specifier.name.text
       if (moduleName === "@pumped-fn/lite" && imported === "createScope") {
         imports.createScope.add(local)
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "controller") {
+        imports.controller.add(local)
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "flow") {
+        imports.flow.add(local)
       }
       if ((moduleName === "@pumped-fn/lite" || moduleName === "@pumped-fn/lite-react") && creatorNames.has(imported)) {
         imports.creators.add(local)
@@ -277,6 +288,11 @@ function isCreatorCall(expression: ts.Expression, imports: Imports): boolean {
   if (!ts.isPropertyAccessExpression(expression) || !creatorNames.has(expression.name.text)) return false
   if (!ts.isIdentifier(expression.expression)) return false
   return imports.liteNamespaces.has(expression.expression.text) || imports.liteReactNamespaces.has(expression.expression.text)
+}
+
+function isFlowCall(expression: ts.Expression, imports: Imports): boolean {
+  if (ts.isIdentifier(expression)) return imports.flow.has(expression.text)
+  return isNamespaceCall(expression, imports.liteNamespaces, "flow")
 }
 
 function isCreateScopeCall(expression: ts.Expression, imports: Imports): boolean {
@@ -353,6 +369,54 @@ function isAmbientCall(expression: ts.Expression): boolean {
   return false
 }
 
+function propertyNameText(name: ts.PropertyName): string | null {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text
+  return null
+}
+
+function objectProperty(object: ts.ObjectLiteralExpression, name: string): ts.PropertyAssignment | null {
+  for (const property of object.properties) {
+    if (!ts.isPropertyAssignment(property)) continue
+    if (propertyNameText(property.name) === name) return property
+  }
+  return null
+}
+
+function containsFlowProperty(object: ts.ObjectLiteralExpression): boolean {
+  return object.properties.some((property) =>
+    ts.isPropertyAssignment(property) && propertyNameText(property.name) === "flow"
+  )
+}
+
+function flowCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
+  if (!isFlowCall(node.expression, imports)) return null
+  const config = node.arguments[0]
+  return config && ts.isObjectLiteralExpression(config) ? config : null
+}
+
+function enclosingFlowFactory(node: ts.Node, imports: Imports): ts.PropertyAssignment | null {
+  let current: ts.Node | undefined = node
+  while (current) {
+    if (
+      ts.isPropertyAssignment(current)
+      && propertyNameText(current.name) === "factory"
+      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
+    ) {
+      const config = current.parent
+      const call = config.parent
+      if (
+        ts.isObjectLiteralExpression(config)
+        && ts.isCallExpression(call)
+        && flowCallObject(call, imports) === config
+      ) {
+        return current
+      }
+    }
+    current = current.parent
+  }
+  return null
+}
+
 function shouldScanAst(filePath: string): boolean {
   return isSourceFile(filePath)
 }
@@ -371,6 +435,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const localFlows = new Set<string>()
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
@@ -529,9 +594,35 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Raw ambient IO belongs in transport atoms or composition-root adapters.",
         )
       }
+
+      if (
+        enclosingFlowFactory(node, imports)
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "exec"
+        && node.arguments[0]
+        && ts.isObjectLiteralExpression(node.arguments[0])
+        && containsFlowProperty(node.arguments[0])
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-direct-flow-composition",
+          node.expression,
+          "Flows should compose child flows through deps: { child: controller(childFlow) } and child.exec(...).",
+        )
+      }
     }
 
     if (ts.isVariableDeclaration(node) && node.initializer) {
+      if (
+        ts.isIdentifier(node.name)
+        && ts.isCallExpression(node.initializer)
+        && isFlowCall(node.initializer.expression, imports)
+      ) {
+        localFlows.add(node.name.text)
+      }
+
       if (ts.isIdentifier(node.name)) {
         if (ts.isIdentifier(node.initializer) && imports.viObjects.has(node.initializer.text)) {
           imports.viObjects.add(node.name.text)
@@ -593,6 +684,33 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         node.name,
         "Definition handles should rely on inference instead of Atom/Flow/Resource/Tag suffixes.",
       )
+    }
+
+    if (ts.isCallExpression(node)) {
+      const config = flowCallObject(node, imports)
+      if (config) {
+        const deps = objectProperty(config, "deps")
+        if (deps && ts.isObjectLiteralExpression(deps.initializer)) {
+          for (const property of deps.initializer.properties) {
+            const initializer = ts.isShorthandPropertyAssignment(property)
+              ? property.name
+              : ts.isPropertyAssignment(property)
+                ? property.initializer
+                : null
+            if (!initializer) continue
+            if (ts.isIdentifier(initializer) && localFlows.has(initializer.text)) {
+              pushNodeDiagnostic(
+                diagnostics,
+                sourceFile,
+                filePath,
+                "pumped/no-direct-flow-composition",
+                initializer,
+                "Flow dependencies should be explicit controller(childFlow) deps, not raw flow handles.",
+              )
+            }
+          }
+        }
+      }
     }
 
     if (!allowScopeFactory) {

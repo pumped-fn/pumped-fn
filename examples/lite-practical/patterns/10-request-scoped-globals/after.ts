@@ -1,4 +1,4 @@
-import { flow, resource, tag, tags } from "@pumped-fn/lite"
+import { controller, flow, resource, tag, tags } from "@pumped-fn/lite"
 
 export interface RequestUser {
   readonly id: string
@@ -44,7 +44,7 @@ export const asyncSession = flow({
 
 export const nestedSession = flow({
   name: "p10.nested-session",
-  deps: { asyncSession },
+  deps: { asyncSession: controller(asyncSession) },
   factory: async (_ctx, { asyncSession }) => {
     const first = await asyncSession.exec()
     const second = await asyncSession.exec()

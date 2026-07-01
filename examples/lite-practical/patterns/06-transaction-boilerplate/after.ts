@@ -1,4 +1,4 @@
-import { flow, resource, typed } from "@pumped-fn/lite"
+import { controller, flow, resource, typed } from "@pumped-fn/lite"
 
 export type LedgerEntry = {
   readonly account: string
@@ -92,7 +92,7 @@ export const writeAuditEntry = flow({
 export const transferFunds = flow({
   name: "transfer-funds",
   parse: typed<TransferInput>(),
-  deps: { tx, writeAuditEntry },
+  deps: { tx, writeAuditEntry: controller(writeAuditEntry) },
   factory: async (ctx, { tx, writeAuditEntry }) => {
     await tx.write({ account: ctx.input.from, deltaCents: -ctx.input.cents })
     await tx.write({ account: ctx.input.to, deltaCents: ctx.input.cents })
