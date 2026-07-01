@@ -117,7 +117,7 @@ describe("nats sync transport", () => {
     ])
   })
 
-  it("surfaces stale revision writes as backend CAS failures", async () => {
+  it("surfaces stale revision writes as sync write conflicts", async () => {
     const store = fake()
     const transport = nats.kv(store, { prefix: "p" })
 
@@ -137,13 +137,59 @@ describe("nats sync transport", () => {
       peer: "left",
       version: 2,
       value: { title: "stale" },
-    })).rejects.toThrow("NATS KV revision mismatch")
+    })).resolves.toEqual({
+      conflict: {
+        key: "draft",
+        peer: "right",
+        version: 2,
+        value: { title: "right" },
+      },
+    })
     expect(await transport.read("draft")).toEqual({
       key: "draft",
       peer: "right",
       version: 2,
       value: { title: "right" },
     })
+  })
+
+  it("keeps non-stale write failures as backend errors", async () => {
+    const error = new Error("backend offline")
+    const store = {
+      get: async () => null,
+      create: async () => {
+        throw error
+      },
+      update: async () => 0,
+      watch: async () => queue<KvEntry>(),
+    } satisfies Nats.Store
+    const transport = nats.kv(store)
+
+    await expect(transport.write({
+      key: "draft",
+      peer: "left",
+      version: 1,
+      value: { title: "left" },
+    })).rejects.toBe(error)
+  })
+
+  it("keeps stale write failures as errors when no conflict record exists", async () => {
+    const store = {
+      get: async () => null,
+      create: async () => {
+        throw staleError()
+      },
+      update: async () => 0,
+      watch: async () => queue<KvEntry>(),
+    } satisfies Nats.Store
+    const transport = nats.kv(store)
+
+    await expect(transport.write({
+      key: "draft",
+      peer: "left",
+      version: 1,
+      value: { title: "left" },
+    })).rejects.toThrow("NATS KV revision mismatch")
   })
 
   it("reports watch iterator failures through adapter options", async () => {
@@ -206,7 +252,7 @@ function fake(): Nats.Store & {
         values.set(key, next)
         for (const stream of queues) stream.push(next)
       }
-      if (values.get(key)?.revision !== version) throw new Error("NATS KV revision mismatch")
+      if (values.get(key)?.revision !== version) throw staleError()
       revision += 1
       values.set(key, entry(key, "PUT", revision, data))
       return revision
@@ -275,6 +321,12 @@ function entry(key: string, operation: KvEntry["operation"], revision: number, v
 
 function encode(wire: Nats.Wire): Uint8Array {
   return encoder.encode(JSON.stringify(wire))
+}
+
+function staleError(): Error & { code: number } {
+  const error = new Error("NATS KV revision mismatch") as Error & { code: number }
+  error.code = 10071
+  return error
 }
 
 function queue<T>(): AsyncIterable<T> & { push(value: T): void; fail(error: unknown): void; stop(): void } {

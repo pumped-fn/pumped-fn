@@ -25,5 +25,7 @@ const scope = createScope({
 
 The adapter stores strict sync messages as UTF-8 JSON bytes in JetStream KV, uses watch updates for
 live delivery, and returns the backend KV revision as the sync write acknowledgement.
+JetStream stale-revision responses return sync write conflicts, so backend CAS conflicts flow through
+the same sync conflict path as watched remote records.
 Use `nats.kv(kv, { prefix, onError })` to customize the KV subject prefix or receive watch-loop
 failures from the adapter boundary.

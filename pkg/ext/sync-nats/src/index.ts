@@ -23,6 +23,7 @@ export namespace Nats {
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
+const stale = new Set([10071, 10164])
 
 function kv(store: Nats.Store, options?: Nats.Options): Sync.Transport {
   const prefix = options?.prefix ?? "sync"
@@ -36,11 +37,18 @@ function kv(store: Nats.Store, options?: Nats.Options): Sync.Transport {
     async write(message) {
       const key = entryKey(prefix, message.key)
       const payload = encode(message)
-      const current = await store.get(key)
-      const version = current && current.operation === "PUT"
-        ? await store.update(key, payload, current.revision)
-        : await store.create(key, payload)
-      return { version }
+      try {
+        const current = await store.get(key)
+        const version = current && current.operation === "PUT"
+          ? await store.update(key, payload, current.revision)
+          : await store.create(key, payload)
+        return { version }
+      } catch (error) {
+        if (!isStale(error)) throw error
+        const conflict = await store.get(key)
+        if (!conflict || conflict.operation !== "PUT") throw error
+        return { conflict: decode(message.key, conflict) }
+      }
     },
     async subscribe(key, listener) {
       const watch = await store.watch({ key: entryKey(prefix, key) })
@@ -106,6 +114,14 @@ function readEntry(
     onError?.(error)
     return undefined
   }
+}
+
+function isStale(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && typeof error.code === "number"
+    && stale.has(error.code)
 }
 
 function base64(value: string): string {

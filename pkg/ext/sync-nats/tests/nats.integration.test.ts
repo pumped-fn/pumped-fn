@@ -5,7 +5,9 @@ import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createScope } from "@pumped-fn/lite"
 import { sync } from "@pumped-fn/lite-extension-sync"
-import { nats } from "../src"
+import { nats, type Nats } from "../src"
+
+const encoder = new TextEncoder()
 
 const canRun = docker()
 const run = canRun ? describe : describe.skip
@@ -110,6 +112,44 @@ run("nats sync transport integration", () => {
     })
   })
 
+  it("maps real JetStream stale revision failures to sync write conflicts", async () => {
+    let raced = false
+    const store = {
+      get: kv.get.bind(kv),
+      create: kv.create.bind(kv),
+      async update(key: string, data: Uint8Array, version: number) {
+        if (!raced) {
+          raced = true
+          await kv.update(key, encode({ peer: "right", value: { ok: "right" } }), version)
+        }
+        return kv.update(key, data, version)
+      },
+      watch: kv.watch.bind(kv),
+    } satisfies Nats.Store
+    const transport = nats.kv(store, { prefix: "race" })
+
+    await transport.write({
+      key: "manual",
+      peer: "left",
+      version: 1,
+      value: { ok: "left" },
+    })
+
+    expect(await transport.write({
+      key: "manual",
+      peer: "left",
+      version: 2,
+      value: { ok: "stale" },
+    })).toEqual({
+      conflict: {
+        key: "manual",
+        peer: "right",
+        version: expect.any(Number),
+        value: { ok: "right" },
+      },
+    })
+  })
+
   it("sustains one thousand backend writes with revision and overhead evidence", async () => {
     const edits = 1000
     const transport = nats.kv(kv, { prefix: "stress" })
@@ -176,4 +216,8 @@ async function until(check: () => boolean): Promise<void> {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function encode(wire: Nats.Wire): Uint8Array {
+  return encoder.encode(JSON.stringify(wire))
 }

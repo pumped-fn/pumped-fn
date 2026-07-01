@@ -566,6 +566,53 @@ describe("sync extension", () => {
     await scope.dispose()
   })
 
+  it("routes backend write conflicts through sync conflict policy", async () => {
+    const conflicts: Sync.Conflict<unknown>[] = []
+    const draft = sync({
+      id: "draft",
+      factory: () => ({ title: "", version: 0 }),
+      conflict: sync.revision("version"),
+    })
+    const wire: Sync.Transport = {
+      read: () => undefined,
+      write: () => ({
+        conflict: {
+          key: "draft",
+          peer: "remote",
+          version: 2,
+          value: { title: "remote", version: 1 },
+        },
+      }),
+      subscribe() {
+        return () => {}
+      },
+    }
+    const scope = createScope({
+      extensions: [sync.extension()],
+      tags: [
+        sync.runtime({
+          peer: "local",
+          transport: wire,
+          onConflict: (conflict) => conflicts.push(conflict),
+        }),
+      ],
+    })
+
+    await scope.resolve(draft)
+    scope.controller(draft).set({ title: "local", version: 1 })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(scope.controller(draft).get()).toEqual({ title: "local", version: 1 })
+    expect(conflicts).toEqual([
+      {
+        current: { title: "local", version: 1 },
+        incoming: { title: "remote", version: 1 },
+      },
+    ])
+    await scope.dispose()
+  })
+
   it("leaves non-atom resolution untouched", async () => {
     const tx = resource({
       name: "tx",

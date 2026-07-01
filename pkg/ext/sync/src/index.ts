@@ -32,9 +32,15 @@ export namespace Sync {
     readonly version: number
   }
 
+  export interface WriteConflict {
+    readonly conflict: Message
+  }
+
+  export type WriteResult = WriteAck | WriteConflict | void
+
   export interface Transport {
     read(key: string): MaybePromise<Message | undefined>
-    write(message: Message): MaybePromise<WriteAck | void>
+    write(message: Message): MaybePromise<WriteResult>
     subscribe(key: string, listener: (message: Message) => void): MaybePromise<() => void>
     close?(): MaybePromise<void>
   }
@@ -315,7 +321,7 @@ async function bind<T>(
     if (encoded === undefined) return
     if (!state.writing && state.desired === undefined && sameValue(encoded, state.last)) return
     state.desired = encoded
-    void flush(current, state, key)
+    void flush(current, spec, ctrl, state, key)
   })
 
   const close = () => {
@@ -326,7 +332,13 @@ async function bind<T>(
   ctx.data.set(bound, state)
 }
 
-async function flush<T>(current: Active, state: Bound<T>, key: string): Promise<void> {
+async function flush<T>(
+  current: Active,
+  spec: Spec<T, Sync.Value>,
+  ctrl: Lite.Controller<T>,
+  state: Bound<T>,
+  key: string
+): Promise<void> {
   if (state.writing) return
   state.writing = true
   while (state.desired !== undefined) {
@@ -345,6 +357,10 @@ async function flush<T>(current: Active, state: Bound<T>, key: string): Promise<
       version,
       value: encoded,
     })
+    if (ack && isWriteConflict(ack)) {
+      apply(current, spec, ctrl, state, ack.conflict)
+      continue
+    }
     if (!ack || state.version !== version) continue
     state.last = encoded
     state.version = Math.max(version, ack === true ? version : ack.version)
@@ -352,7 +368,7 @@ async function flush<T>(current: Active, state: Bound<T>, key: string): Promise<
   state.writing = false
 }
 
-async function write(current: Active, message: Sync.Message): Promise<Sync.WriteAck | true | undefined> {
+async function write(current: Active, message: Sync.Message): Promise<Sync.WriteAck | Sync.WriteConflict | true | undefined> {
   try {
     return await current.transport.write(message) ?? true
   } catch (error) {
@@ -490,6 +506,10 @@ function isConflict<T>(value: T | Sync.Conflict<T>): value is Sync.Conflict<T> {
     && value !== null
     && "current" in value
     && "incoming" in value
+}
+
+function isWriteConflict(value: Sync.WriteAck | Sync.WriteConflict | true): value is Sync.WriteConflict {
+  return typeof value === "object" && "conflict" in value
 }
 
 function scopedKey(current: Active, id: string): string {

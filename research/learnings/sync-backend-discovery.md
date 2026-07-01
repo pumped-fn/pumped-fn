@@ -35,23 +35,23 @@ The current `sync(...)` package is a strict value-sync primitive:
 - non-JSON values need a codec;
 - inbound wire values are decoded before apply;
 - runtime selection is tag-injected through `sync.runtime(...)`;
-- transport shape is `read`, `write`, `subscribe`, optional `close`, with backend write acknowledgements.
+- transport shape is `read`, `write`, `subscribe`, optional `close`, with backend write acknowledgements
+  and write conflicts.
 
-That is enough for memory, simple replicated state, and backend revision evidence. It is not yet a full
-compare-and-set conflict contract.
+That is enough for memory, simple replicated state, backend revision evidence, and backend CAS conflict
+handoff into the same sync conflict path.
 
 Implementation checkpoint:
 
-- `Sync.Transport.write` now accepts a backend revision acknowledgement.
+- `Sync.Transport.write` now accepts backend revision acknowledgements and write conflicts.
 - `@pumped-fn/lite-extension-sync-nats` maps sync messages onto NATS JetStream KV keys, stores JSON
   payload bytes, watches key updates, and returns KV revisions as write acknowledgements.
 - The adapter test suite covers deterministic store behavior and a real Docker-backed `nats:2.12-alpine`
   JetStream KV integration through `createScope`, `sync.extension`, and `sync.runtime`.
-- The NATS adapter proof now covers stale revision racing, corrupt persisted watch payload isolation,
-  backend revision mapping, and a 1,000-write JetStream KV stress run with per-operation overhead
-  measurement.
-- Remaining production proof is reconnect behavior and a first-class CAS conflict result if callers need
-  retry/accountability beyond the current write-error boundary.
+- The NATS adapter proof now covers stale revision racing as first-class sync write conflicts, corrupt
+  persisted watch payload isolation, backend revision mapping, and a 1,000-write JetStream KV stress run
+  with per-operation overhead measurement.
+- Remaining production proof is reconnect behavior.
 
 ## Backend Findings
 
@@ -73,20 +73,18 @@ Decision impact:
 
 - Build `@pumped-fn/lite-extension-sync-nats` first.
 - The adapter should not merely wrap `put`; it should prove revision behavior with `update`.
-- The base `Sync.Transport` likely needs an ack shape before this becomes production-grade:
+- The base `Sync.Transport` now has an ack/conflict result shape:
 
 ```ts
 interface WriteAck {
   readonly version: number
 }
-```
 
-or a CAS-aware write result:
+interface WriteConflict {
+  readonly conflict: Sync.Message
+}
 
-```ts
-type WriteResult =
-  | { readonly ok: true; readonly version: number }
-  | { readonly ok: false; readonly conflict: Sync.Message }
+type WriteResult = WriteAck | WriteConflict | void
 ```
 
 Open risk:
