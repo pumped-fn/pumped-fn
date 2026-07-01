@@ -15,12 +15,17 @@ surfaces for documented patterns, not publishing targets.
 | `lite-hono-todo-practical/` | `@pumped-fn/lite-hono-todo-practical` | Hono backend integration for a todo API. |
 | `lite-tanstack-start-todo-practical/` | `@pumped-fn/lite-tanstack-start-todo-practical` | TanStack Start fullstack integration for todos. |
 | `lite-cli-practical/` | `@pumped-fn/lite-cli-practical` | CLI parser integrations with per-command Lite scopes. |
+| `parking-lot-shared/` | `@pumped-fn/parking-lot-shared` | Parking lot management business logic and persistence ports shared by every entrypoint. |
+| `parking-lot-cli/` | `@pumped-fn/parking-lot-cli` | CLI entrypoint over the parking lot management flows. |
+| `parking-lot-hono/` | `@pumped-fn/parking-lot-hono` | Hono API entrypoint over the parking lot management flows. |
+| `parking-lot-tanstack-start/` | `@pumped-fn/parking-lot-tanstack-start` | TanStack Start server-function entrypoint over the parking lot management flows. |
+| `parking-lot-spa/` | `@pumped-fn/parking-lot-spa` | Vite React SPA over the parking lot management flows and state. |
 | `agent-practical/` | `@pumped-fn/agent-practical` | Agent workflow examples. |
 
 ## Naming
 
-Example directories use `<surface>-practical`. Keep names explicit enough to map to the package lane
-they demonstrate.
+Small examples use `<surface>-practical`. Domain capstones use `<domain>-<surface>` with a shared
+domain package when multiple entrypoints prove the same behavior.
 
 ## Content Rules
 

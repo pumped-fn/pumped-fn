@@ -1,4 +1,4 @@
-import { flow, tag, tags } from "@pumped-fn/lite"
+import { controller, flow, tag, tags } from "@pumped-fn/lite"
 
 export const requestId = tag<string>({ label: "request.id" })
 export const channel = tag<string>({ label: "request.channel" })
@@ -21,19 +21,19 @@ export const metadata = flow({
 
 export const secondHop = flow({
   name: "p02.second-hop",
-  deps: { leaf },
+  deps: { leaf: controller(leaf) },
   factory: (_ctx, { leaf }) => leaf.exec(),
 })
 
 export const firstHop = flow({
   name: "p02.first-hop",
-  deps: { secondHop },
+  deps: { secondHop: controller(secondHop) },
   factory: (_ctx, { secondHop }) => secondHop.exec(),
 })
 
 export const boundary = flow({
   name: "p02.boundary",
-  deps: { firstHop },
+  deps: { firstHop: controller(firstHop) },
   factory: (_ctx, { firstHop }) => firstHop.exec(),
 })
 

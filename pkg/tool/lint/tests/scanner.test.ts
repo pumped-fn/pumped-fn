@@ -68,6 +68,38 @@ describe("lite lint scanner", () => {
     ])
   })
 
+  it("finds direct flow composition inside flow factories", () => {
+    expect(ids(`
+      import { controller, flow, typed } from "@pumped-fn/lite"
+
+      const load = flow({
+        name: "load",
+        parse: typed<{ id: string }>(),
+        factory: (ctx) => ctx.input.id,
+      })
+
+      const hidden = flow({
+        name: "hidden",
+        factory: (ctx) => ctx.exec({ flow: load, input: { id: "hidden" } }),
+      })
+
+      const raw = flow({
+        name: "raw",
+        deps: { load },
+        factory: (_ctx, deps) => deps.load.exec({ input: { id: "raw" } }),
+      })
+
+      const explicit = flow({
+        name: "explicit",
+        deps: { load: controller(load) },
+        factory: (_ctx, deps) => deps.load.exec({ input: { id: "explicit" } }),
+      })
+    `)).toEqual([
+      "pumped/no-direct-flow-composition",
+      "pumped/no-direct-flow-composition",
+    ])
+  })
+
   it("finds aliased module mocks and rendered node observer tests", () => {
     expect(ids(`
       import { render } from "@testing-library/react"

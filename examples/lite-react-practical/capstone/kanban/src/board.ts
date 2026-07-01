@@ -456,7 +456,7 @@ export const moveCard = flow({
     audit: actionAudit,
     actor: tags.required(actorId),
     projectId: tags.required(activeProjectId),
-    summarizeCard,
+    summarizeCard: controller(summarizeCard),
   },
   factory: async (ctx, { state, audit, actor, projectId, summarizeCard }) => {
     const before = state.get().cards.get(ctx.input.cardId)

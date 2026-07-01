@@ -1,0 +1,23 @@
+{
+  "name": "@pumped-fn/parking-lot-hono",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-hono": "workspace:*",
+    "@pumped-fn/parking-lot-shared": "workspace:*",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

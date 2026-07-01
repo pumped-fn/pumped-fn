@@ -311,6 +311,11 @@ The examples are part of the public contract for how code should be shaped:
 | `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
 | `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
 | `examples/lite-cli-practical` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
+| `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
+| `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
+| `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |
+| `examples/parking-lot-tanstack-start` | TanStack Start server-function handlers over parking lot flows |
+| `examples/parking-lot-spa` | Vite React SPA that observes and dispatches parking lot flows through Lite React providers |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
 
 ## Local Development
