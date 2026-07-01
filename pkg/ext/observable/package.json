@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-observable",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "description": "Structured lifecycle event extension for @pumped-fn/lite with tag-injected sinks",
   "type": "module",
