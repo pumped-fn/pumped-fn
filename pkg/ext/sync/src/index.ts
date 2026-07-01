@@ -28,10 +28,14 @@ export namespace Sync {
     readonly value: Value
   }
 
+  export interface WriteAck {
+    readonly version: number
+  }
+
   export interface Transport {
     read(key: string): MaybePromise<Message | undefined>
-    write(message: Message): MaybePromise<void>
-    subscribe(key: string, listener: (message: Message) => void): () => void
+    write(message: Message): MaybePromise<WriteAck | void>
+    subscribe(key: string, listener: (message: Message) => void): MaybePromise<() => void>
     close?(): MaybePromise<void>
   }
 
@@ -92,8 +96,10 @@ interface Spec<T, Wire extends Sync.Value> {
 }
 
 interface Bound<T> {
-  last: Sync.Value | undefined
+  last: Sync.Value
+  desired: Sync.Value | undefined
   version: number
+  writing: boolean
   applying: boolean
 }
 
@@ -157,7 +163,8 @@ function extension(options?: Sync.Options): Lite.Extension {
       const key = scopedKey(current, spec.id)
       const remote = await read(current, key)
       const value = remote ? decode(current, spec, remote, local) : local
-      bind(event.scope, event.target, event.ctx, current, spec, key, remote?.value)
+      const last = encode(current, spec, value, false)
+      if (last !== undefined) await bind(event.scope, event.target, event.ctx, current, spec, key, last)
       return value
     },
   }
@@ -252,7 +259,7 @@ export const sync = Object.assign(create, {
 })
 
 function validate<T>(value: T, spec: Spec<T, Sync.Value>): T {
-  spec.codec.encode(value)
+  assertValue(spec.codec.encode(value))
   return value
 }
 
@@ -278,40 +285,37 @@ async function read(current: Active, key: string): Promise<Sync.Message | undefi
   }
 }
 
-function bind<T>(
+async function bind<T>(
   scope: Lite.Scope,
   target: Lite.Atom<unknown>,
   ctx: Lite.ResolveContext,
   current: Active,
   spec: Spec<T, Sync.Value>,
   key: string,
-  last: Sync.Value | undefined
-): void {
+  last: Sync.Value
+): Promise<void> {
   const ctrl = scope.controller(target as Lite.Atom<T>)
   const state: Bound<T> = {
     last,
+    desired: undefined,
     version: 0,
+    writing: false,
     applying: false,
   }
+
+  const offRemote = await subscribe(current, key, (message) => {
+    if (message.peer === current.peer) return
+    apply(current, spec, ctrl, state, message)
+  })
 
   const offChange = ctrl.on("resolved", () => {
     if (state.applying) return
     const value = ctrl.get()
     const encoded = encode(current, spec, value)
-    if (encoded === undefined || sameValue(encoded, state.last)) return
-    state.version += 1
-    state.last = encoded
-    void write(current, {
-      key,
-      peer: current.peer,
-      version: state.version,
-      value: encoded,
-    })
-  })
-
-  const offRemote = subscribe(current, key, (message) => {
-    if (message.peer === current.peer) return
-    apply(current, spec, ctrl, state, message)
+    if (encoded === undefined) return
+    if (!state.writing && state.desired === undefined && sameValue(encoded, state.last)) return
+    state.desired = encoded
+    void flush(current, state, key)
   })
 
   const close = () => {
@@ -322,17 +326,44 @@ function bind<T>(
   ctx.data.set(bound, state)
 }
 
-async function write(current: Active, message: Sync.Message): Promise<void> {
+async function flush<T>(current: Active, state: Bound<T>, key: string): Promise<void> {
+  if (state.writing) return
+  state.writing = true
+  while (state.desired !== undefined) {
+    const encoded = state.desired
+    if (sameValue(encoded, state.last)) {
+      state.desired = undefined
+      continue
+    }
+
+    state.desired = undefined
+    state.version += 1
+    const version = state.version
+    const ack = await write(current, {
+      key,
+      peer: current.peer,
+      version,
+      value: encoded,
+    })
+    if (!ack || state.version !== version) continue
+    state.last = encoded
+    state.version = Math.max(version, ack === true ? version : ack.version)
+  }
+  state.writing = false
+}
+
+async function write(current: Active, message: Sync.Message): Promise<Sync.WriteAck | true | undefined> {
   try {
-    await current.transport.write(message)
+    return await current.transport.write(message) ?? true
   } catch (error) {
-    handleError(current, error, "write", message)
+    handleError(current, error, "write", message, false)
+    return undefined
   }
 }
 
-function subscribe(current: Active, key: string, listener: (message: Sync.Message) => void): () => void {
+async function subscribe(current: Active, key: string, listener: (message: Sync.Message) => void): Promise<() => void> {
   try {
-    return current.transport.subscribe(key, (message) => {
+    return await current.transport.subscribe(key, (message) => {
       try {
         listener(message)
       } catch (error) {
@@ -374,7 +405,7 @@ function apply<T>(
 
 function encode<T>(current: Active, spec: Spec<T, Sync.Value>, value: T, throwOnFailure = true): Sync.Value | undefined {
   try {
-    return spec.codec.encode(value)
+    return assertValue(spec.codec.encode(value))
   } catch (error) {
     handleError(current, error, "encode", undefined, throwOnFailure)
     return undefined
@@ -496,8 +527,7 @@ function assertRecord(value: Record<string, unknown>): Sync.Value {
   return result
 }
 
-function sameValue(left: Sync.Value | undefined, right: Sync.Value | undefined): boolean {
-  if (left === undefined || right === undefined) return left === right
+function sameValue(left: Sync.Value, right: Sync.Value): boolean {
   if (Object.is(left, right)) return true
   if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false
   if (Array.isArray(left) || Array.isArray(right)) return sameArray(left, right)
@@ -509,7 +539,7 @@ function sameValue(left: Sync.Value | undefined, right: Sync.Value | undefined):
   const rightRecord = right as { readonly [key: string]: Sync.Value }
   for (const key of leftKeys) {
     if (!Object.hasOwn(rightRecord, key)) return false
-    if (!sameValue(leftRecord[key], rightRecord[key])) return false
+    if (!sameValue(leftRecord[key]!, rightRecord[key]!)) return false
   }
   return true
 }
@@ -518,7 +548,7 @@ function sameArray(left: Sync.Value, right: Sync.Value): boolean {
   if (!Array.isArray(left) || !Array.isArray(right)) return false
   if (left.length !== right.length) return false
   for (let i = 0; i < left.length; i++) {
-    if (!sameValue(left[i], right[i])) return false
+    if (!sameValue(left[i]!, right[i]!)) return false
   }
   return true
 }

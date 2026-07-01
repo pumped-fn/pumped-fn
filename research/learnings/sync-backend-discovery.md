@@ -2,7 +2,8 @@
 
 Date: 2026-07-01
 
-Status: candidate learning checkpoint. This is not a package contract yet.
+Status: implementation checkpoint. The value-sync NATS adapter exists in this PR; CRDT and database
+sync lanes remain discovery.
 
 Decision target: choose the next sync implementation lane after `@pumped-fn/lite-extension-sync`.
 
@@ -34,10 +35,20 @@ The current `sync(...)` package is a strict value-sync primitive:
 - non-JSON values need a codec;
 - inbound wire values are decoded before apply;
 - runtime selection is tag-injected through `sync.runtime(...)`;
-- transport shape is `read`, `write`, `subscribe`, optional `close`.
+- transport shape is `read`, `write`, `subscribe`, optional `close`, with backend write acknowledgements.
 
-That is enough for memory and simple replicated state. It is not yet enough for a serious backend
-contract because `write` has no durable ack, backend revision, or compare-and-set result.
+That is enough for memory, simple replicated state, and backend revision evidence. It is not yet a full
+compare-and-set conflict contract.
+
+Implementation checkpoint:
+
+- `Sync.Transport.write` now accepts a backend revision acknowledgement.
+- `@pumped-fn/lite-extension-sync-nats` maps sync messages onto NATS JetStream KV keys, stores JSON
+  payload bytes, watches key updates, and returns KV revisions as write acknowledgements.
+- The adapter test suite covers deterministic store behavior and a real Docker-backed `nats:2.12-alpine`
+  JetStream KV integration through `createScope`, `sync.extension`, and `sync.runtime`.
+- Remaining production proof is reconnect behavior, explicit stale-revision racing, invalid persisted
+  payload handling at the adapter boundary, and larger sustained update stress.
 
 ## Backend Findings
 

@@ -53,6 +53,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
+| `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |

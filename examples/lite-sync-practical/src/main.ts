@@ -60,6 +60,7 @@ export async function runSyncStress(options: SyncStressOptions = {}): Promise<Sy
   await right.resolve(draft)
 
   const ctrl = left.controller(draft)
+  const mirror = right.controller(draft)
   const start = now()
   for (let i = 1; i <= edits; i++) {
     ctrl.set({
@@ -68,9 +69,10 @@ export async function runSyncStress(options: SyncStressOptions = {}): Promise<Sy
       body: `Body revision ${i}`,
       version: i,
     })
+    await until(() => mirror.get().version === i)
   }
   const localWriteMs = now() - start
-  const beforeInvalid = right.controller(draft).get()
+  const beforeInvalid = mirror.get()
 
   await wire.write({
     key: "document:proposal:draft",
@@ -83,7 +85,7 @@ export async function runSyncStress(options: SyncStressOptions = {}): Promise<Sy
       version: edits + 1,
     },
   })
-  const afterInvalid = right.controller(draft).get()
+  const afterInvalid = mirror.get()
 
   await wire.write({
     key: "document:proposal:draft",
@@ -99,7 +101,7 @@ export async function runSyncStress(options: SyncStressOptions = {}): Promise<Sy
 
   const result = {
     edits,
-    final: right.controller(draft).get(),
+    final: mirror.get(),
     records: wire.size(),
     invalidPayloadRejects: errors.filter((phase) => phase === "decode").length,
     invalidApplyCount: Number(JSON.stringify(beforeInvalid) !== JSON.stringify(afterInvalid)),
@@ -111,4 +113,10 @@ export async function runSyncStress(options: SyncStressOptions = {}): Promise<Sy
   await left.dispose()
   await right.dispose()
   return result
+}
+
+async function until(check: () => boolean): Promise<void> {
+  while (!check()) {
+    await Promise.resolve()
+  }
 }

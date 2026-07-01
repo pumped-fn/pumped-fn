@@ -23,7 +23,7 @@ describe("sync extension", () => {
     left.controller(draft).set({ title: "Plan", body: "sync" })
 
     expect(right.controller(draft).get()).toEqual({ title: "Plan", body: "sync" })
-    expect(wire.records()).toHaveLength(2)
+    expect(wire.records()).toHaveLength(1)
     await left.dispose()
     await right.dispose()
   })
@@ -428,9 +428,142 @@ describe("sync extension", () => {
     await Promise.resolve()
 
     expect(listeners.size).toBe(1)
-    expect(errors).toEqual(["read", "write", "write"])
+    expect(errors).toEqual(["read", "write"])
     await scope.dispose()
     expect(listeners.size).toBe(0)
+  })
+
+  it("keeps local payload unsynced until the transport write succeeds", async () => {
+    const errors: Sync.ErrorPhase[] = []
+    let writes = 0
+    let failedChanged = false
+    const versions: number[] = []
+    const draft = sync({
+      id: "draft",
+      factory: () => ({ title: "", body: "" }),
+    })
+    const wire: Sync.Transport = {
+      read: () => undefined,
+      write(message) {
+        writes += 1
+        versions.push(message.version)
+        if (!failedChanged && (message.value as { readonly title?: string }).title === "Changed") {
+          failedChanged = true
+          throw new Error("write failed")
+        }
+        return { version: message.version + 10 }
+      },
+      subscribe() {
+        return () => {}
+      },
+    }
+    const scope = createScope({
+      extensions: [sync.extension()],
+      tags: [
+        sync.runtime({
+          peer: "local",
+          transport: wire,
+          onError: (_error, phase) => errors.push(phase),
+        }),
+      ],
+    })
+
+    await scope.resolve(draft)
+    scope.controller(draft).set({ title: "Changed", body: "" })
+    await Promise.resolve()
+    await Promise.resolve()
+    scope.controller(draft).set({ title: "Changed", body: "" })
+    await Promise.resolve()
+    await Promise.resolve()
+    scope.controller(draft).set({ title: "Next", body: "" })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(errors).toEqual(["write"])
+    expect(writes).toBe(3)
+    expect(versions).toEqual([1, 2, 13])
+    await scope.dispose()
+  })
+
+  it("flushes a revert that happens while a write is in flight", async () => {
+    const writes: Sync.Message[] = []
+    const acks: Array<(ack: Sync.WriteAck) => void> = []
+    const draft = sync({
+      id: "draft",
+      factory: () => ({ title: "", body: "" }),
+    })
+    const wire: Sync.Transport = {
+      read: () => undefined,
+      write(message) {
+        writes.push(message)
+        return new Promise<Sync.WriteAck>((resolve) => {
+          acks.push(resolve)
+        })
+      },
+      subscribe() {
+        return () => {}
+      },
+    }
+    const scope = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime({ peer: "local", transport: wire })],
+    })
+    const ctrl = scope.controller(draft)
+
+    await scope.resolve(draft)
+    ctrl.set({ title: "Working", body: "" })
+    ctrl.set({ title: "", body: "" })
+
+    expect(writes.map((message) => message.value)).toEqual([{ title: "Working", body: "" }])
+    acks[0]!({ version: 1 })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(writes.map((message) => message.value)).toEqual([
+      { title: "Working", body: "" },
+      { title: "", body: "" },
+    ])
+    acks[1]!({ version: 2 })
+    await Promise.resolve()
+
+    expect(writes.map((message) => message.version)).toEqual([1, 2])
+    await scope.dispose()
+  })
+
+  it("coalesces repeated values while a write is in flight", async () => {
+    const writes: Sync.Message[] = []
+    const acks: Array<(ack: Sync.WriteAck) => void> = []
+    const draft = sync({
+      id: "draft",
+      factory: () => ({ title: "", body: "" }),
+    })
+    const wire: Sync.Transport = {
+      read: () => undefined,
+      write(message) {
+        writes.push(message)
+        return new Promise<Sync.WriteAck>((resolve) => {
+          acks.push(resolve)
+        })
+      },
+      subscribe() {
+        return () => {}
+      },
+    }
+    const scope = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime({ peer: "local", transport: wire })],
+    })
+    const ctrl = scope.controller(draft)
+
+    await scope.resolve(draft)
+    ctrl.set({ title: "Working", body: "" })
+    ctrl.set({ title: "Working", body: "" })
+    acks[0]!({ version: 1 })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(writes.map((message) => message.value)).toEqual([{ title: "Working", body: "" }])
+    await scope.dispose()
   })
 
   it("leaves non-atom resolution untouched", async () => {
@@ -479,7 +612,7 @@ describe("sync extension", () => {
     scope.controller(entry).set({ value: "bad" })
 
     expect(errors).toEqual(["encode"])
-    expect(wire.records()).toHaveLength(1)
+    expect(wire.records()).toHaveLength(0)
     await scope.dispose()
   })
 
@@ -602,7 +735,7 @@ describe("sync extension", () => {
     })
 
     expect(scope.controller(list).get()).toEqual(["a", "b"])
-    expect(wire.records()).toHaveLength(3)
+    expect(wire.records()).toHaveLength(2)
     await scope.dispose()
     wire.clear()
     wire.close?.()

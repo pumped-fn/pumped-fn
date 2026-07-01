@@ -1,0 +1,64 @@
+{
+  "name": "@pumped-fn/lite-extension-sync-nats",
+  "version": "0.1.0",
+  "private": false,
+  "description": "NATS JetStream KV transport for @pumped-fn/lite-extension-sync",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@nats-io/kv": "^3.4.0",
+    "@pumped-fn/lite-extension-sync": "^0.1.0"
+  },
+  "devDependencies": {
+    "@nats-io/kv": "catalog:",
+    "@nats-io/transport-node": "catalog:",
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-sync": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "keywords": [
+    "pumped-fn",
+    "sync",
+    "nats",
+    "jetstream",
+    "kv"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/ext/sync-nats",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}

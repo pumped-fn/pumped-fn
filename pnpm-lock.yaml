@@ -18,6 +18,12 @@ catalogs:
     '@json-render/react':
       specifier: 0.19.0
       version: 0.19.0
+    '@nats-io/kv':
+      specifier: 3.4.0
+      version: 3.4.0
+    '@nats-io/transport-node':
+      specifier: 3.4.0
+      version: 3.4.0
     '@opentelemetry/api':
       specifier: 1.9.1
       version: 1.9.1
@@ -803,6 +809,39 @@ importers:
       '@pumped-fn/lite':
         specifier: workspace:*
         version: link:../../core/lite
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/ext/sync-nats:
+    devDependencies:
+      '@nats-io/kv':
+        specifier: 'catalog:'
+        version: 3.4.0
+      '@nats-io/transport-node':
+        specifier: 'catalog:'
+        version: 3.4.0
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@pumped-fn/lite-extension-sync':
+        specifier: workspace:*
+        version: link:../sync
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
@@ -1648,6 +1687,27 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@nats-io/jetstream@3.4.0':
+    resolution: {integrity: sha512-GzHQodNJ942+R5LRb8PuZ5ugVWVWMRiufxUYLLVWkXKfwDXYN+Owo0d7L/b9O7BPyrbYD7jQWAC6+ZVuXa9Gyw==}
+
+  '@nats-io/kv@3.4.0':
+    resolution: {integrity: sha512-168pcRJxWcIRHwdyczI3DaGk5r3CAj3CyKXuk4Nmx5KKj7N1znQOJPIxCoV0TPlAvoTidVb7eBv41J9imapMeQ==}
+
+  '@nats-io/nats-core@3.4.0':
+    resolution: {integrity: sha512-QMDM86EUNm+wudlKC67HLar/KHHQUvJGLfb4jbahje3pUk3K9afeck9fwsxBZF0eUFox6T/TA6m/t+lQqf+QsQ==}
+
+  '@nats-io/nkeys@2.0.3':
+    resolution: {integrity: sha512-JVt56GuE6Z89KUkI4TXUbSI9fmIfAmk6PMPknijmuL72GcD+UgIomTcRWiNvvJKxA01sBbmIPStqJs5cMRBC3A==}
+    engines: {node: '>=18.0.0'}
+
+  '@nats-io/nuid@3.0.0':
+    resolution: {integrity: sha512-QbXZDrxmYlrn5AD06gYcUTmEHwxn96HBQMIk7XTjDlEcx6FPzVBBPjp4AMRh1lEv6B4iJ6Xb/Uz61JugPXFRQg==}
+    engines: {node: '>= 22.x'}
+
+  '@nats-io/transport-node@3.4.0':
+    resolution: {integrity: sha512-hH7u7ejIBTFEJIZ8rIcMrHJI6wl+HhpO5sVFs1+ppmXa8RuB2+Lh1+UwTzZ5xTNNm1TKcRkYy+2qCV56qp8RxA==}
+    engines: {node: '>= 18.0.0'}
 
   '@nodable/entities@2.2.0':
     resolution: {integrity: sha512-9uGyhaQavEUMC8AIddIjau4NsnsXhou+j5sBAGojCM1oxmQpVKTWR/9JxABD6UAv12vpIms55fPZKFQEhG6uBg==}
@@ -3442,6 +3502,9 @@ packages:
     resolution: {integrity: sha512-I8yFsfRzmzK0WV1pNNOA4A7y4RDfFxPRxb3t+e3ui14qSGOxGtiSP6GjeX+Y6CHb7HYaFj7ECUD7VE5kQMZWGQ==}
     engines: {node: '>=18', npm: '>=9'}
 
+  tweetnacl@1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
+
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
@@ -4388,6 +4451,32 @@ snapshots:
       '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.2
     optional: true
+
+  '@nats-io/jetstream@3.4.0':
+    dependencies:
+      '@nats-io/nats-core': 3.4.0
+
+  '@nats-io/kv@3.4.0':
+    dependencies:
+      '@nats-io/jetstream': 3.4.0
+      '@nats-io/nats-core': 3.4.0
+
+  '@nats-io/nats-core@3.4.0':
+    dependencies:
+      '@nats-io/nkeys': 2.0.3
+      '@nats-io/nuid': 3.0.0
+
+  '@nats-io/nkeys@2.0.3':
+    dependencies:
+      tweetnacl: 1.0.3
+
+  '@nats-io/nuid@3.0.0': {}
+
+  '@nats-io/transport-node@3.4.0':
+    dependencies:
+      '@nats-io/nats-core': 3.4.0
+      '@nats-io/nkeys': 2.0.3
+      '@nats-io/nuid': 3.0.0
 
   '@nodable/entities@2.2.0': {}
 
@@ -6151,6 +6240,8 @@ snapshots:
   turndown@7.2.4:
     dependencies:
       '@mixmark-io/domino': 2.2.0
+
+  tweetnacl@1.0.3: {}
 
   typescript@6.0.3: {}
 
