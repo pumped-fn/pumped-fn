@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-hono",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "description": "Hono middleware helpers for @pumped-fn/lite request execution contexts",
   "type": "module",
