@@ -94,7 +94,7 @@ export const login = flow({
 export const submitLogin = flow({
   name: "submitLogin",
   parse: typed<undefined>(),
-  deps: { formControl: controller(loginForm, { resolve: true }), login },
+  deps: { formControl: controller(loginForm, { resolve: true }), login: controller(login) },
   factory: async (_ctx, { formControl, login }) => {
     const form = formControl.get()
     const validationError = loginValidationError(form)
