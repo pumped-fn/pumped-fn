@@ -52,6 +52,8 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` | OpenTelemetry sink adapter for observable events |
 | `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
+| `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
+| `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
 | `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
@@ -311,6 +313,8 @@ The examples are part of the public contract for how code should be shaped:
 | `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
 | `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
 | `examples/lite-cli-practical` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
+| `examples/lite-sync-practical` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
+| `examples/lite-sync-web-practical` | Frontend/backend sync through a web environment gateway and ordinary React observers |
 | `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
 | `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
 | `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |

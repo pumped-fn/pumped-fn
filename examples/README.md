@@ -15,6 +15,8 @@ surfaces for documented patterns, not publishing targets.
 | `lite-hono-todo-practical/` | `@pumped-fn/lite-hono-todo-practical` | Hono backend integration for a todo API. |
 | `lite-tanstack-start-todo-practical/` | `@pumped-fn/lite-tanstack-start-todo-practical` | TanStack Start fullstack integration for todos. |
 | `lite-cli-practical/` | `@pumped-fn/lite-cli-practical` | CLI parser integrations with per-command Lite scopes. |
+| `lite-sync-practical/` | `@pumped-fn/lite-sync-practical` | Replicated draft state with sync stress metrics. |
+| `lite-sync-web-practical/` | `@pumped-fn/lite-sync-web-practical` | Frontend/backend sync through a web environment gateway. |
 | `parking-lot-shared/` | `@pumped-fn/parking-lot-shared` | Parking lot management business logic and persistence ports shared by every entrypoint. |
 | `parking-lot-cli/` | `@pumped-fn/parking-lot-cli` | CLI entrypoint over the parking lot management flows. |
 | `parking-lot-hono/` | `@pumped-fn/parking-lot-hono` | Hono API entrypoint over the parking lot management flows. |
