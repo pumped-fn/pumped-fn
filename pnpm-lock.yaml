@@ -253,6 +253,9 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.12.27
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -379,6 +382,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

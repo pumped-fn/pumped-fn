@@ -1,6 +1,7 @@
 import { createScope, ParseError } from "@pumped-fn/lite"
 import { hono } from "@pumped-fn/lite-hono"
 import { Hono } from "hono"
+import { ZodError } from "zod"
 import {
   actorId,
   clearCompleted,
@@ -10,7 +11,6 @@ import {
   requestId,
   tenantId,
   TodoNotFound,
-  TodoValidationError,
   toggleTodo,
 } from "./domain"
 
@@ -62,13 +62,16 @@ app.delete("/todos/completed", async (context) =>
 )
 
 app.onError((error, context) => {
-  if (error instanceof ParseError && error.cause instanceof TodoValidationError) {
-    return context.json({ error: error.cause.message }, 400)
+  if (error instanceof ParseError && error.cause instanceof ZodError) {
+    return context.json({ error: zodMessage(error.cause) }, 400)
   }
-  if (error instanceof TodoValidationError) return context.json({ error: error.message }, 400)
   if (error instanceof TodoNotFound) return context.json({ error: error.message }, 404)
   return context.json({ error: "todo backend failed" }, 500)
 })
+
+function zodMessage(error: ZodError): string {
+  return error.issues.map((issue) => issue.message).join("; ")
+}
 
 export const dispose = () => scope.dispose()
 

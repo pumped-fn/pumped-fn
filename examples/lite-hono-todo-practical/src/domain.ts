@@ -1,4 +1,5 @@
-import { atom, flow, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, flow, tag, tags } from "@pumped-fn/lite"
+import { z } from "zod"
 
 export type TodoStatus = "open" | "done"
 
@@ -13,13 +14,17 @@ export interface Todo {
   lastOperation: string
 }
 
-export interface CreateTodoInput {
-  title: string
-}
+const createTodoInput = z.object({
+  title: z.string({ error: "title is required" }).trim().min(1, "title is required"),
+})
 
-export interface ToggleTodoInput {
-  id: string
-}
+const toggleTodoInput = z.object({
+  id: z.string({ error: "id is required" }).min(1, "id is required"),
+})
+
+export type CreateTodoInput = z.infer<typeof createTodoInput>
+
+export type ToggleTodoInput = z.infer<typeof toggleTodoInput>
 
 interface MutationInput {
   tenantId: string
@@ -41,13 +46,6 @@ export interface TodoStore {
   create(input: StoreCreateInput): Promise<Todo>
   toggle(input: StoreToggleInput): Promise<Todo>
   clearCompleted(input: MutationInput): Promise<Todo[]>
-}
-
-export class TodoValidationError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = "TodoValidationError"
-  }
 }
 
 export class TodoNotFound extends Error {
@@ -122,7 +120,7 @@ export const listTodos = flow({
 
 export const createTodo = flow({
   name: "todo.create",
-  parse: parseCreateTodo,
+  parse: (input) => createTodoInput.parse(input),
   deps: {
     store,
     tenantId: tags.required(tenantId),
@@ -142,7 +140,7 @@ export const createTodo = flow({
 
 export const toggleTodo = flow({
   name: "todo.toggle",
-  parse: typed<ToggleTodoInput>(),
+  parse: (input) => toggleTodoInput.parse(input),
   deps: {
     store,
     tenantId: tags.required(tenantId),
@@ -177,19 +175,3 @@ export const clearCompleted = flow({
       operation: deps.operation,
     }),
 })
-
-function parseCreateTodo(input: unknown): CreateTodoInput {
-  if (!isRecord(input)) throw new TodoValidationError("title is required")
-  if (typeof input["title"] !== "string") throw new TodoValidationError("title is required")
-  return { title: normalizeTitle(input["title"]) }
-}
-
-function normalizeTitle(input: string): string {
-  const title = input.trim()
-  if (title.length === 0) throw new TodoValidationError("title is required")
-  return title
-}
-
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null
-}

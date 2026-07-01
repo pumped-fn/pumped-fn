@@ -10,7 +10,8 @@
   "dependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-hono": "workspace:*",
-    "hono": "catalog:"
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

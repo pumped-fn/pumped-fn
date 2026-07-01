@@ -1,5 +1,6 @@
 import { createScope, ParseError, preset } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
+import { ZodError } from "zod"
 import {
   actorId,
   clearCompleted,
@@ -11,7 +12,6 @@ import {
   store,
   tenantId,
   TodoNotFound,
-  TodoValidationError,
   toggleTodo,
 } from "../src/domain"
 
@@ -88,7 +88,7 @@ describe("todo domain", () => {
 
     const invalidTitle = context.exec({ flow: createTodo, input: { title: " " } })
     await expect(invalidTitle).rejects.toBeInstanceOf(ParseError)
-    await expect(invalidTitle).rejects.toMatchObject({ cause: expect.any(TodoValidationError) })
+    await expect(invalidTitle).rejects.toMatchObject({ cause: expect.any(ZodError) })
     await expect(
       context.exec({
         flow: toggleTodo,

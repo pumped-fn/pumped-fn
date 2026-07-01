@@ -3,13 +3,13 @@ import {
   clearCompleted,
   createTodo,
   listTodos,
-  TodoValidationError,
   toggleTodo,
 } from "../src/domain"
 import { clearCall, createCall, listCall, lite, request, toggleCall } from "../src/start"
 import { clearCompletedFn, createTodoFn, listTodosFn, toggleTodoFn } from "../src/functions"
 import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
 import { ParseError } from "@pumped-fn/lite"
+import { ZodError } from "zod"
 
 describe("tanstack start todo functions", () => {
   it("keeps request tags and function tags explicit across the middleware chain", async () => {
@@ -116,7 +116,7 @@ describe("tanstack start todo functions", () => {
     })
 
     await expect(failed).rejects.toBeInstanceOf(ParseError)
-    await expect(failed).rejects.toMatchObject({ cause: expect.any(TodoValidationError) })
+    await expect(failed).rejects.toMatchObject({ cause: expect.any(ZodError) })
   })
 })
 
