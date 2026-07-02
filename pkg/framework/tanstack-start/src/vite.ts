@@ -322,8 +322,12 @@ function packageRoot(file: string, name: string): string | undefined {
 }
 
 function packageNameOf(file: string): string | undefined {
-  const value = JSON.parse(readFileSync(file, "utf8")) as { name?: unknown }
-  return typeof value.name === "string" ? value.name : undefined
+  try {
+    const value = JSON.parse(readFileSync(file, "utf8")) as { name?: unknown }
+    return typeof value.name === "string" ? value.name : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function references(root: unknown): Reference[] {

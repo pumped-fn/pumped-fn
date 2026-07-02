@@ -371,6 +371,33 @@ describe("TanStack Start boundary Vite plugin", () => {
     })).resolves.toBeUndefined()
   })
 
+  it("ignores malformed ancestor manifests while resolving local adapter roots", async () => {
+    const plugin = boundary()
+    const root = fixture({
+      "src/bad/package.json": `{`,
+      "src/bad/shims/start.ts": `export const tanstackStart = { contextKey: "lite" }`,
+      "src/bad/shims/analytics.ts": `export const analytics = "ok"`,
+    })
+    const transform = plugin.transform as Function
+    const buildEnd = plugin.buildEnd as Function
+    const client = join(root, "src/client.ts")
+    const ctx = {
+      parse: parseAst,
+      resolve: async (source: string) => {
+        if (source === "@pumped-fn/lite-tanstack-start") return { id: join(root, "src/bad/shims/start.ts") }
+        if (source === "./bad/shims/analytics") return { id: join(root, "src/bad/shims/analytics.ts") }
+        return undefined
+      },
+    }
+
+    await transform.call(ctx, `
+      import { analytics } from "./bad/shims/analytics"
+      console.log(analytics)
+    `, client)
+
+    expect(() => buildEnd.call({ getModuleIds: () => [client].values() })).not.toThrow()
+  })
+
   it("classifies sibling files inside a local adapter package as runtime imports", async () => {
     const root = fixture({
       "src/client.ts": `
