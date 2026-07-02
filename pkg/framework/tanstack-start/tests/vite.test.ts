@@ -289,6 +289,37 @@ describe("TanStack Start boundary Vite plugin", () => {
     await expect(runWithPlugin(root, plugin)).resolves.toBeUndefined()
   })
 
+  it("keeps records when buildEnd receives an aborted build error", async () => {
+    const plugin = boundary()
+    const root = fixture({})
+    const transform = plugin.transform as Function
+    const buildEnd = plugin.buildEnd as Function
+    const client = join(root, "src/client.ts")
+    const start = join(root, "src/start.ts")
+    const ctx = {
+      parse: parseAst,
+      resolve: async (source: string) => {
+        if (source === "@pumped-fn/lite-tanstack-start") {
+          return { id: join(root, "node_modules/@pumped-fn/lite-tanstack-start/index.js") }
+        }
+        if (source === "./start") return { id: start }
+        return undefined
+      },
+    }
+
+    await transform.call(ctx, `
+      import { request } from "./start"
+      console.log(request)
+    `, client)
+    await transform.call(ctx, `
+      import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+      export const request = tanstackStart.contextKey
+    `, start)
+    buildEnd.call({ getModuleIds: () => [client].values() }, new Error("aborted"))
+
+    expect(() => buildEnd.call({ getModuleIds: () => [client, start].values() })).toThrow("reaches TanStack Start backend boundary")
+  })
+
   it("allows server-only helpers to import the runtime adapter when they are not client-reachable", async () => {
     const root = fixture({
       "src/client.ts": `console.log("client")`,
@@ -392,6 +423,40 @@ describe("TanStack Start boundary Vite plugin", () => {
       import { tanstackStart } from "start-runtime"
       console.log(tanstackStart)
     `, join(root, "src/client.ts"))).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
+  })
+
+  it("reclassifies earlier alias edges when the adapter runtime resolves later", async () => {
+    const plugin = boundary()
+    const configResolved = plugin.configResolved as Function
+    const transform = plugin.transform as Function
+    const root = fixture({
+      "packages/start/package.json": JSON.stringify({
+        type: "module",
+        name: "@pumped-fn/lite-tanstack-start",
+      }),
+      "packages/start/index.ts": `export const tanstackStart = { contextKey: "lite" }`,
+      "packages/start/runtime.ts": `export const tanstackStart = { contextKey: "lite" }`,
+    }, { adapter: false })
+    let available = false
+    const ctx = {
+      parse: parseAst,
+      resolve: async (source: string) => {
+        if (source === "@pumped-fn/lite-tanstack-start") {
+          return available ? { id: join(root, "packages/start/index.ts") } : undefined
+        }
+        if (source === "start-runtime") return { id: join(root, "packages/start/runtime.ts") }
+        return undefined
+      },
+    }
+
+    configResolved({ command: "serve" })
+    await transform.call(ctx, `
+      import { tanstackStart } from "start-runtime"
+      console.log(tanstackStart)
+    `, join(root, "src/client.ts"))
+    available = true
+
+    await expect(transform.call(ctx, `console.log("reload")`, join(root, "src/home.ts"))).rejects.toThrow("src/client.ts reaches TanStack Start backend boundary")
   })
 })
 

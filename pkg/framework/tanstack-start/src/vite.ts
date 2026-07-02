@@ -104,7 +104,8 @@ export function boundary(options: BoundaryOptions = {}): Plugin {
     watchChange(id) {
       checker.delete(clean(id))
     },
-    buildEnd() {
+    buildEnd(error) {
+      if (error) return
       checker.prune(this.getModuleIds())
       const violation = checker.violation()
       if (violation) throw new Error(format(violation))
@@ -130,7 +131,10 @@ function createChecker(options: BoundaryOptions) {
       }
       if (!runtime) {
         const adapter = await resolve(packageName).then((value) => value, () => undefined)
-        if (adapter) runtime = runtimeTarget(clean(adapter))
+        if (adapter) {
+          runtime = runtimeTarget(clean(adapter))
+          dirty = true
+        }
       }
       const record = await read(id, code, resolve, parse, config, runtime)
       const changed = JSON.stringify(records.get(id)) !== JSON.stringify(record)
@@ -143,7 +147,7 @@ function createChecker(options: BoundaryOptions) {
       cached = undefined
       for (const record of records.values()) {
         if (record.client) {
-          const violation = reachesServer(record, records, config, new Set())
+          const violation = reachesServer(record, records, config, runtime, new Set())
           if (violation) {
             cached = violation
             break
@@ -236,6 +240,7 @@ function reachesServer(
   record: ModuleRecord,
   records: ReadonlyMap<string, ModuleRecord>,
   config: Required<BoundaryOptions>,
+  runtime: RuntimeTarget | undefined,
   seen: Set<string>
 ): BoundaryViolation | undefined {
   if (record.violation) return record.violation
@@ -252,18 +257,24 @@ function reachesServer(
   for (const edge of record.edges) {
     const id = edge.resolved ? clean(edge.resolved) : undefined
     if (!id) continue
+    if (runtimeReference(edge.source, id, runtime, config)) {
+      return {
+        id: record.id,
+        message: `Client-reachable module ${record.id} reaches TanStack Start backend boundary ${id} through ${edge.source}.`,
+      }
+    }
     if (matches(config.exclude, id)) continue
     const target = records.get(id)
     const server = matches(config.server, id) || Boolean(target?.server)
-    const runtime = Boolean(target?.directRuntime && !target.bridge)
-    if (server || runtime) {
+    const targetRuntime = Boolean(target?.directRuntime && !target.bridge)
+    if (server || targetRuntime) {
       return {
         id: record.id,
         message: `Client-reachable module ${record.id} reaches TanStack Start backend boundary ${id} through ${edge.source}.`,
       }
     }
     if (target) {
-      const violation = reachesServer(target, records, config, seen)
+      const violation = reachesServer(target, records, config, runtime, seen)
       if (violation) return violation
     }
   }
@@ -311,7 +322,8 @@ function packageRoot(file: string, name: string): string | undefined {
 }
 
 function packageNameOf(file: string): string | undefined {
-  return readFileSync(file, "utf8").match(/"name"\s*:\s*"([^"]+)"/)?.[1]
+  const value = JSON.parse(readFileSync(file, "utf8")) as { name?: unknown }
+  return typeof value.name === "string" ? value.name : undefined
 }
 
 function references(root: unknown): Reference[] {
