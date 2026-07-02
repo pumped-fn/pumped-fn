@@ -31,4 +31,4 @@ cross-checks these anti-patterns.
 | Package | Role |
 | --- | --- |
 | `hono/` | Hono middleware plus request helpers. |
-| `tanstack-start/` | TanStack Start request/function middleware plus server-function flow helpers. |
+| `tanstack-start/` | TanStack Start request/function middleware, server-function flow helpers, and Vite boundary guard. |

@@ -68,17 +68,14 @@ catalog:
   "@opentelemetry/api": 1.9.1
   "@testing-library/jest-dom": 6.9.1
   "@testing-library/react": 16.3.2
-  "@types/estree": 1.0.9
   "@types/jscodeshift": 17.3.0
   "@types/node": 25.9.1
   "@types/react": 19.2.15
   "@typescript/native-preview": 7.0.0-dev.20260526.1
   "@vitest/browser-playwright": 4.1.8
   "@vitest/coverage-v8": 4.1.8
-  acorn: 8.16.0
   cac: 7.0.0
   commander: 15.0.0
-  estree-walker: 3.0.3
   github-actionlint: 1.7.12
   hono: 4.12.27
   jscodeshift: 17.3.0

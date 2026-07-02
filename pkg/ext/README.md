@@ -16,7 +16,7 @@ runtime.
 | `logging-pino/` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records. |
 | `sync/` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports. |
 | `sync-nats/` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync. |
-| `hmr/` | `@pumped-fn/lite-hmr` | Development-time HMR state preservation helpers. |
+| `hmr/` | `@pumped-fn/lite-hmr` | Vite plugin set for HMR, dev metadata, and opt-in build metadata. |
 
 ## Naming
 

@@ -1,8 +1,7 @@
 {
   "name": "@pumped-fn/lite-hmr",
   "version": "1.0.1",
-  "private": true,
-  "description": "Vite HMR plugin for @pumped-fn/lite atoms",
+  "description": "Vite plugin set for @pumped-fn/lite HMR and graph metadata",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -17,6 +16,11 @@
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js",
       "require": "./dist/runtime.cjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js",
+      "require": "./dist/client.cjs"
     }
   },
   "files": [
@@ -35,21 +39,19 @@
     "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
   },
   "dependencies": {
-    "acorn": "catalog:",
-    "estree-walker": "catalog:",
-    "magic-string": "catalog:"
+    "magic-string": "catalog:",
+    "typescript": "catalog:"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
-    "@types/estree": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
   "keywords": [
     "vite",
     "hmr",
+    "graph",
     "pumped-fn",
     "lite-hmr",
     "dependency-injection"
