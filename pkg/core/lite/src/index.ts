@@ -12,7 +12,7 @@ export {
   resourceSymbol,
   ParseError,
 } from "./types"
-export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags } from "./tag"
+export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags, retargetAtomTags } from "./tag"
 export { atom, isAtom, controller, isControllerDep, service } from "./atom"
 export { flow, isFlow, typed } from "./flow"
 export { preset, isPreset } from "./preset"

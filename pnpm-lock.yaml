@@ -39,9 +39,6 @@ catalogs:
     '@testing-library/react':
       specifier: 16.3.2
       version: 16.3.2
-    '@types/estree':
-      specifier: 1.0.9
-      version: 1.0.9
     '@types/jscodeshift':
       specifier: 17.3.0
       version: 17.3.0
@@ -60,18 +57,12 @@ catalogs:
     '@vitest/coverage-v8':
       specifier: 4.1.8
       version: 4.1.8
-    acorn:
-      specifier: 8.16.0
-      version: 8.16.0
     cac:
       specifier: 7.0.0
       version: 7.0.0
     commander:
       specifier: 15.0.0
       version: 15.0.0
-    estree-walker:
-      specifier: 3.0.3
-      version: 3.0.3
     github-actionlint:
       specifier: 1.7.12
       version: 1.7.12
@@ -518,6 +509,9 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
+      '@pumped-fn/lite-hmr':
+        specifier: workspace:*
+        version: link:../../pkg/ext/hmr
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
@@ -868,28 +862,19 @@ importers:
 
   pkg/ext/hmr:
     dependencies:
-      acorn:
-        specifier: 'catalog:'
-        version: 8.16.0
-      estree-walker:
-        specifier: 'catalog:'
-        version: 3.0.3
       magic-string:
         specifier: 'catalog:'
         version: 0.30.21
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
         version: link:../../core/lite
-      '@types/estree':
-        specifier: 'catalog:'
-        version: 1.0.9
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
       vite:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
@@ -2369,11 +2354,6 @@ packages:
 
   '@vitest/utils@4.1.8':
     resolution: {integrity: sha512-uOJamYALNhfJ6iolExyQM40yIQwDqYnkKtQ5VCiSe17E33H0aQ/u+1GlRuz4LZBk6Mm3sg90G9hEbmEt37C1Zg==}
-
-  acorn@8.16.0:
-    resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
-    engines: {node: '>=0.4.0'}
-    hasBin: true
 
   adm-zip@0.5.17:
     resolution: {integrity: sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==}
@@ -5179,8 +5159,6 @@ snapshots:
       '@vitest/pretty-format': 4.1.8
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
-
-  acorn@8.16.0: {}
 
   adm-zip@0.5.17: {}
 

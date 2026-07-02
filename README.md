@@ -44,7 +44,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
 | `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
-| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |
+| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware, server-function flow helpers, and Vite boundary guard |
 | `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
 | `pkg/render/react` | `@pumped-fn/lite-render-react` | React renderer for verified render specs over Lite scopes |
 | `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
@@ -54,7 +54,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
-| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
+| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | Vite plugin set for HMR, devtools feed, and opt-in production Lite handle/dependency metadata |
 | `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
 | `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
 | `pkg/agent/claude` | `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |

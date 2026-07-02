@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite --host 0.0.0.0",
     "test": "vitest run",
+    "test:dev": "vitest run tests/dev-mode.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit"
   },
@@ -17,6 +19,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@pumped-fn/lite-hmr": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@typescript/native-preview": "catalog:",

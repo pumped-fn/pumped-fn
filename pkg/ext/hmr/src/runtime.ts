@@ -1,8 +1,11 @@
-import type { Lite } from "@pumped-fn/lite"
-import type { AtomRegistry } from "./types"
+import { retargetAtomTags, type Lite } from "@pumped-fn/lite"
+import type { AtomRegistry, HotModule } from "./types"
 
-function getRegistry(): AtomRegistry | null {
-  const hot = import.meta.hot
+type MutableAtom<T> = {
+  -readonly [K in keyof Lite.Atom<T>]: Lite.Atom<T>[K]
+}
+
+function getRegistry(hot: HotModule | undefined): AtomRegistry | null {
   if (!hot) {
     return null
   }
@@ -16,21 +19,28 @@ function getRegistry(): AtomRegistry | null {
 
 /**
  * Registers an atom for HMR persistence.
- * Returns cached reference if key exists, otherwise stores and returns the atom.
+ * Refreshes and returns the cached reference if key exists, otherwise stores and returns the atom.
  * In production (no import.meta.hot), returns atom unchanged.
  */
 export function __hmr_register<T>(
   key: string,
-  atom: Lite.Atom<T>
+  atom: Lite.Atom<T>,
+  hot = import.meta.hot
 ): Lite.Atom<T> {
-  const registry = getRegistry()
+  const registry = getRegistry(hot)
 
   if (!registry) {
     return atom
   }
 
   if (registry.has(key)) {
-    return registry.get(key) as Lite.Atom<T>
+    const current = registry.get(key) as MutableAtom<T>
+    retargetAtomTags(current, atom)
+    current.factory = atom.factory
+    current.deps = atom.deps
+    current.tags = atom.tags
+    current.keepAlive = atom.keepAlive
+    return current
   }
 
   registry.set(key, atom)

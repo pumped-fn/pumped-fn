@@ -1,15 +1,17 @@
 import { describe, it, expect } from "vitest"
 import { createScope, atom } from "@pumped-fn/lite"
+import { __hmr_register } from "../src/runtime"
 import { transformAtoms } from "../src/transform"
+import type { HotModule } from "../src/types"
 
 describe("integration: HMR preserves scope cache", () => {
   it("demonstrates atom reference stability enables scope cache hits", async () => {
-    const atomA = atom({ factory: () => ({ value: "original" }) })
+    const original = atom({ factory: () => ({ value: "original" }) })
 
     const scope = createScope()
-    const value1 = await scope.resolve(atomA)
+    const value1 = await scope.resolve(original)
 
-    const sameReference = atomA
+    const sameReference = original
     const value2 = await scope.resolve(sameReference)
 
     expect(value2).toBe(value1)
@@ -17,53 +19,65 @@ describe("integration: HMR preserves scope cache", () => {
   })
 
   it("demonstrates new atom reference causes scope cache miss", async () => {
-    const atomA = atom({ factory: () => ({ value: "original", ts: Date.now() }) })
-    const atomB = atom({ factory: () => ({ value: "new", ts: Date.now() }) })
+    const original = atom({ factory: () => ({ value: "original", ts: Date.now() }) })
+    const next = atom({ factory: () => ({ value: "new", ts: Date.now() }) })
 
     const scope = createScope()
-    const value1 = await scope.resolve(atomA)
+    const value1 = await scope.resolve(original)
 
-    const value2 = await scope.resolve(atomB)
+    const value2 = await scope.resolve(next)
 
     expect(value2).not.toBe(value1)
   })
 
-  it("transform generates consistent keys for same source location", () => {
+  it("transform generates consistent keys for same source handle", () => {
     const code = `import { atom } from '@pumped-fn/lite'
-const configAtom = atom({ factory: () => ({}) })`
+const config = atom({ factory: () => ({}) })`
 
     const result1 = transformAtoms(code, "src/atoms.ts")
     const result2 = transformAtoms(code, "src/atoms.ts")
 
-    const keyPattern = /src\/atoms\.ts:2:\d+/
+    const keyPattern = /src\/atoms\.ts:config/
     expect(result1?.code).toMatch(keyPattern)
     expect(result2?.code).toMatch(keyPattern)
 
-    const key1 = result1?.code.match(/'(src\/atoms\.ts:\d+:\d+)'/)?.[1]
-    const key2 = result2?.code.match(/'(src\/atoms\.ts:\d+:\d+)'/)?.[1]
+    const key1 = result1?.code.match(/"(src\/atoms\.ts:config)"/)?.[1]
+    const key2 = result2?.code.match(/"(src\/atoms\.ts:config)"/)?.[1]
     expect(key1).toBe(key2)
   })
 
-  it("end-to-end: simulated HMR flow with registry pattern", () => {
-    const registry = new Map<string, unknown>()
-    const key = "test/file.ts:5:10"
+  it("end-to-end: HMR keeps identity and refreshes future resolves", async () => {
+    const hot = hotModule()
+    const first = __hmr_register("test/file.ts:value", atom({ factory: () => "first" }), hot)
+    const second = __hmr_register("test/file.ts:value", atom({ factory: () => "second" }), hot)
 
-    const simulatedRegister = <T>(k: string, newAtom: T): T => {
-      if (registry.has(k)) {
-        return registry.get(k) as T
-      }
-      registry.set(k, newAtom)
-      return newAtom
-    }
+    const scope = createScope()
 
-    const atom1 = atom({ factory: () => "first" })
-    const registered1 = simulatedRegister(key, atom1)
+    expect(second).toBe(first)
+    expect(await scope.resolve(first)).toBe("second")
+  })
 
-    const atom2 = atom({ factory: () => "second" })
-    const registered2 = simulatedRegister(key, atom2)
+  it("end-to-end: resolved scope cache remains under normal Lite invalidation", async () => {
+    const hot = hotModule()
+    const first = __hmr_register("test/file.ts:value", atom({ factory: () => "first" }), hot)
+    const scope = createScope()
 
-    expect(registered1).toBe(atom1)
-    expect(registered2).toBe(atom1)
-    expect(registered2).not.toBe(atom2)
+    expect(await scope.resolve(first)).toBe("first")
+
+    const second = __hmr_register("test/file.ts:value", atom({ factory: () => "second" }), hot)
+
+    expect(second).toBe(first)
+    expect(await scope.resolve(first)).toBe("first")
+    scope.invalidate(first)
+    await Promise.resolve()
+    expect(await scope.resolve(first)).toBe("second")
   })
 })
+
+function hotModule(): HotModule {
+  return {
+    data: {},
+    accept: () => undefined,
+    dispose: () => undefined,
+  }
+}
