@@ -40,7 +40,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["src/app.tsx", "src/model.ts", "src/runtime.ts", "src/web.ts"],
+      include: ["src/app.tsx", "src/model.ts", "src/web.ts"],
       thresholds: {
         statements: 100,
         branches: 100,

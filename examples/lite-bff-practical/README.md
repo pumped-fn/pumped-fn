@@ -7,7 +7,7 @@ calculation.
 This package is one implemented slice in the React capstone spectrum. It owns data shaping for the fat
 frontend and owns auth/session validation for the thin frontend.
 
-## The seam
+## Canonical Shape
 
 The BFF separates transport atoms from higher-level capability atoms:
 

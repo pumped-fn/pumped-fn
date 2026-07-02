@@ -4,6 +4,11 @@ This example is a small HTTP todo backend using `@pumped-fn/lite-hono`.
 
 The domain module owns todos, validation, and flows. The Hono app stays shaped like a Hono app: it exports `app`, installs middleware with `app.use`, and executes public flows from route handlers through `context.var.lite`.
 
+## Canonical Shape
+
+Framework values enter the graph as request tags. The Hono adapter creates the Lite request context, route
+handlers call public flows through `context.var.lite`, and domain tests still use `createScope` directly.
+
 ## Shape
 
 - `src/domain.ts` defines tags, the store atom, and todo flows.

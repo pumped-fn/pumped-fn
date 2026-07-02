@@ -5,7 +5,6 @@ import { createScope } from "@pumped-fn/lite"
 import { sync, type Sync } from "@pumped-fn/lite-extension-sync"
 import { describe, expect, test } from "vitest"
 import { draft } from "../src/model"
-import { createBrowserScope } from "../src/runtime"
 import { web, type Web } from "../src/web"
 
 const namespace = "workspace:demo"
@@ -20,11 +19,14 @@ describe("sync web practical environment", () => {
       transport: wire,
       authorize: (value) => value === token,
     })
-    const browser = createBrowserScope({
-      gateway,
-      token,
-      peer: "browser",
-      namespace,
+    const browser = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime(web.env({
+        gateway,
+        token,
+        peer: "browser",
+        namespace,
+      }))],
     })
     const backend = createScope({
       extensions: [sync.extension()],
@@ -73,11 +75,14 @@ describe("sync web practical environment", () => {
       authorize: (value) => value === token,
     })
     const live = await serve(gateway)
-    const browser = createBrowserScope({
-      gateway: web.client({ url: live.url, fetch }),
-      token,
-      peer: "browser",
-      namespace,
+    const browser = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime(web.env({
+        gateway: web.client({ url: live.url, fetch }),
+        token,
+        peer: "browser",
+        namespace,
+      }))],
     })
     const backend = createScope({
       extensions: [sync.extension()],
@@ -347,14 +352,17 @@ describe("sync web practical environment", () => {
       authorize: (value) => value === token,
     })
     const conflicts: Sync.Conflict<unknown>[] = []
-    const browser = createBrowserScope({
-      gateway,
-      token,
-      peer: "browser",
-      namespace,
-      onConflict: (conflict) => {
-        conflicts.push(conflict)
-      },
+    const browser = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime(web.env({
+        gateway,
+        token,
+        peer: "browser",
+        namespace,
+        onConflict: (conflict) => {
+          conflicts.push(conflict)
+        },
+      }))],
     })
 
     const current = await browser.controller(draft, { resolve: true })

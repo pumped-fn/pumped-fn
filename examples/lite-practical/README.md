@@ -15,6 +15,12 @@ Use these examples as the reference shape for application code: raw IO sits behi
 logic imports the graph nodes it needs directly, lifecycle is owned by scopes/resources/execution contexts,
 and tests change radius by changing presets instead of mocking modules.
 
+## Canonical Shape
+
+Application logic is declared as atoms, flows, resources, tags, and extensions. Tests exercise the same
+public handles through `createScope({ presets, tags, extensions })`; `before.*` files exist only as paired
+anti-pattern specimens with canonical rewrites and tests.
+
 ## Run
 
 ```bash

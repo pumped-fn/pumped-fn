@@ -13,6 +13,12 @@ It proves:
 - lazy Codex and Claude provider packages swapped through the `model` tag
 - just-bash workspace sandbox swapped through the `sandbox` tag
 
+## Canonical Shape
+
+The example keeps agent runtime variation in tags and provider packages instead of branching the workflow
+logic. Tests execute the public workflow surface and swap model, sandbox, and HTTP behavior through the
+scope seam.
+
 Run it:
 
 ```sh

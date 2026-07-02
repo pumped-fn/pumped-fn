@@ -10,6 +10,7 @@
 | --- | --- |
 | `act.mjs` | Repository wrapper for local GitHub Actions dry-runs with `act`. |
 | `check-changed-packages.mjs` | CI helper that rebuilds changed public workspace packages and dry-runs unpublished versions. |
+| `check-example-alignment.mjs` | Check example, guidance, package-map, dependency-policy, and script-surface drift. |
 | `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
 
 ## Naming

@@ -12,6 +12,11 @@ Each parser action dynamically imports the command implementation it needs. `--h
 unrelated commands do not import the Lite graph. Command modules create a fresh scope and execution
 context per operation, then install logging and observable extensions through normal tags.
 
+## Canonical Shape
+
+Parser files own command registration only. Command modules import the flows they execute, create a
+per-operation scope, and pass logging or observable runtime choices through tags and extensions.
+
 ## Run
 
 ```bash

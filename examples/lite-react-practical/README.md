@@ -9,7 +9,7 @@ This package exists to keep the library docs honest. Public README/PATTERNS clai
 provider-owned execution, transport/capability boundaries, and observer-only React are backed here by
 source shape plus structural tests.
 
-## The structural proof
+## Canonical Shape
 
 Tests run in the **node** environment by default — no DOM, no React renderer. A test of feature logic
 therefore *cannot* reach the browser; it must go through the graph. Only files named

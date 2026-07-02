@@ -4,6 +4,11 @@ This example is a small fullstack todo surface using `@pumped-fn/lite-tanstack-s
 
 The domain module owns todos and flows. `src/start.ts` follows TanStack Start's global configuration shape with `createStart({ requestMiddleware })`. `src/functions.ts` exposes server functions with function-level operation middleware, and `src/routes/index.tsx` is the file route that loads and mutates todos.
 
+## Canonical Shape
+
+TanStack Start keeps its file-route and server-function shape. Lite enters at middleware and handler
+boundaries, while domain behavior remains testable through `createScope` and exported flow handles.
+
 ## Shape
 
 - `src/domain.ts` defines tags, store, input types, and todo flows.
