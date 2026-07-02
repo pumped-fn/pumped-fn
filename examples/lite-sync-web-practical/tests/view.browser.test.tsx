@@ -4,7 +4,6 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, test } from "vitest"
 import { App } from "../src/app"
 import { draft } from "../src/model"
-import { createBrowserScope } from "../src/runtime"
 import { web } from "../src/web"
 
 const namespace = "workspace:browser"
@@ -18,11 +17,14 @@ describe("sync web React boundary", () => {
       transport: wire,
       authorize: (value) => value === token,
     })
-    const browser = createBrowserScope({
-      gateway,
-      token,
-      peer: "browser",
-      namespace,
+    const browser = createScope({
+      extensions: [sync.extension()],
+      tags: [sync.runtime(web.env({
+        gateway,
+        token,
+        peer: "browser",
+        namespace,
+      }))],
     })
     const backend = createScope({
       extensions: [sync.extension()],

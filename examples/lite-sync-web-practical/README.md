@@ -2,6 +2,12 @@
 
 Frontend/backend sync through the same Lite scope seam.
 
+## Canonical Shape
+
+The synced value declaration stays shared. Browser code injects a web runtime through `sync.runtime(...)`,
+backend code owns the gateway transport, and React observes or dispatches graph handles without owning sync
+state itself.
+
 This example keeps the synced value declaration shared:
 
 ```ts
