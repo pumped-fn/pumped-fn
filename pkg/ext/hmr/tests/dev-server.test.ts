@@ -65,6 +65,37 @@ describe("pumpedHmr dev server feed", () => {
     expect(html).toContain("<h2>Deps</h2>")
     expect(html).toContain("<h2>Issues</h2>")
   })
+
+  it("serves metadata endpoints under Vite base", async () => {
+    const root = fixture()
+    const server = await createServer({
+      root,
+      base: "/app/",
+      logLevel: "silent",
+      plugins: [pumpedHmr()],
+      resolve: {
+        alias: {
+          "@pumped-fn/lite-hmr/runtime": new URL("../src/runtime.ts", import.meta.url).pathname,
+          "@pumped-fn/lite": join(root, "lite.js"),
+        },
+      },
+      server: {
+        port: 0,
+      },
+    })
+    servers.push(server)
+    await server.listen()
+    const origin = server.resolvedUrls?.local[0]
+    expect(origin).toBeDefined()
+
+    await fetch(new URL("/app/src/main.ts", origin))
+    const meta = await fetch(new URL("/app/__pumped-fn/lite-hmr.json", origin))
+    const html = await fetch(new URL("/app/__pumped-fn/lite-hmr", origin)).then((res) => res.text())
+
+    expect(meta.status).toBe(200)
+    expect(meta.headers.get("content-type")).toContain("application/json")
+    expect(html).toContain(`fetch("/app${hmrMetaPath}")`)
+  })
 })
 
 function fixture(): string {

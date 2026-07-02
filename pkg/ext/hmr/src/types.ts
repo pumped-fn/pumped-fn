@@ -4,7 +4,7 @@ export type AtomRegistry = Map<string, Lite.Atom<unknown>>
 
 export type HandleKind = "atom" | "flow" | "resource" | "tag"
 export type EdgeVia = "direct" | "controller" | "tag"
-export type IssueCode = "dynamic-dep" | "unknown-dep"
+export type IssueCode = "dynamic-dep" | "unknown-dep" | "untracked-atom"
 
 export interface HandleMeta {
   readonly key: string

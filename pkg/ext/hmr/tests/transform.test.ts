@@ -11,7 +11,7 @@ const config = atom<{ value: number }>({ factory: () => ({ value: 1 }) })`
 
     expect(result).not.toBeNull()
     expect(result!.code).toContain("import { __hmr_register }")
-    expect(result!.code).toContain("__hmr_register('src/atoms.ts:")
+    expect(result!.code).toContain("__hmr_register(\"src/atoms.ts:")
     expect(result!.code).toContain(", atom<{ value: number }>({ factory:")
     expect(result!.meta.atoms).toEqual([
       expect.objectContaining({
@@ -31,7 +31,7 @@ const config = scoped({ factory: () => ({}) })`
     const result = transformAtoms(code, filePath)
 
     expect(result).not.toBeNull()
-    expect(result!.code).toContain("__hmr_register('src/atoms.ts:")
+    expect(result!.code).toContain("__hmr_register(\"src/atoms.ts:")
     expect(result!.meta.atoms).toEqual([
       expect.objectContaining({
         kind: "atom",
@@ -58,7 +58,7 @@ const run = Lite.flow({
     const result = transformAtoms(code, filePath)
 
     expect(result).not.toBeNull()
-    expect(result!.code).toContain("__hmr_register('src/namespace.ts:config'")
+    expect(result!.code).toContain("__hmr_register(\"src/namespace.ts:config\"")
     expect(result!.meta.handles.map((handle) => [handle.kind, handle.name])).toEqual([
       ["atom", "config"],
       ["tag", "tenant"],
@@ -300,7 +300,7 @@ export const db = atom({ factory: async () => createDb() })`
     const result = transformAtoms(code, filePath)
 
     expect(result).not.toBeNull()
-    expect(result!.code).toContain("__hmr_register('src/db.ts:")
+    expect(result!.code).toContain("__hmr_register(\"src/db.ts:")
   })
 
   it("transforms let atom declaration", () => {
@@ -311,7 +311,7 @@ let mutable = atom({ factory: () => 0 })`
     const result = transformAtoms(code, filePath)
 
     expect(result).not.toBeNull()
-    expect(result!.code).toContain("__hmr_register('src/state.ts:")
+    expect(result!.code).toContain("__hmr_register(\"src/state.ts:")
   })
 
   it("does NOT transform dynamic atom creation", () => {
@@ -321,7 +321,16 @@ const atoms = [atom({ factory: () => 1 })]`
 
     const result = transformAtoms(code, filePath)
 
-    expect(result).toBeNull()
+    expect(result).not.toBeNull()
+    expect(result!.code).not.toContain("__hmr_register")
+    expect(result!.meta.issues).toEqual([
+      expect.objectContaining({
+        code: "untracked-atom",
+        fromName: "atoms",
+        slot: "atom",
+        target: "atom({ factory: () => 1 })",
+      }),
+    ])
   })
 
   it("does NOT transform atom in function call", () => {
@@ -331,7 +340,33 @@ registerAtom(atom({ factory: () => 1 }))`
 
     const result = transformAtoms(code, filePath)
 
-    expect(result).toBeNull()
+    expect(result).not.toBeNull()
+    expect(result!.code).not.toContain("__hmr_register")
+    expect(result!.meta.issues).toEqual([
+      expect.objectContaining({
+        code: "untracked-atom",
+        fromName: "(module)",
+        target: "atom({ factory: () => 1 })",
+      }),
+    ])
+  })
+
+  it("reports atom calls imported through barrels without wrapping them", () => {
+    const code = `import { atom as define } from '../lib/lite'
+const config = define({ factory: () => ({}) })`
+    const filePath = "src/barrel.ts"
+
+    const result = transformAtoms(code, filePath)
+
+    expect(result).not.toBeNull()
+    expect(result!.code).not.toContain("__hmr_register")
+    expect(result!.meta.issues).toEqual([
+      expect.objectContaining({
+        code: "untracked-atom",
+        fromName: "config",
+        target: "define({ factory: () => ({}) }) from ../lib/lite",
+      }),
+    ])
   })
 
   it("returns null when no atom() calls present", () => {
@@ -352,8 +387,8 @@ const b = atom({ factory: () => 2 })`
     const result = transformAtoms(code, filePath)
 
     expect(result).not.toBeNull()
-    expect(result!.code).toContain("__hmr_register('src/multi.ts:a'")
-    expect(result!.code).toContain("__hmr_register('src/multi.ts:b'")
+    expect(result!.code).toContain("__hmr_register(\"src/multi.ts:a\"")
+    expect(result!.code).toContain("__hmr_register(\"src/multi.ts:b\"")
     expect(result!.meta.atoms.map((atom) => atom.name)).toEqual(["a", "b"])
   })
 

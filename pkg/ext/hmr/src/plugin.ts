@@ -45,9 +45,12 @@ export interface PumpedViteOptions {
 export const hmrMetaModule = "virtual:pumped-fn/lite-hmr"
 export const hmrMetaPath = "/__pumped-fn/lite-hmr.json"
 export const hmrInspectPath = "/__pumped-fn/lite-hmr"
+export const hmrModuleMetaKey = "pumped-fn:lite-hmr"
+export const hmrMetaEvent = hmrModuleMetaKey
 export const graphFileName = "pumped-fn-lite.json"
 
 const resolvedHmrMetaModule = `\0${hmrMetaModule}`
+const emptyMeta: LiteMeta = { modules: [], handles: [], atoms: [], edges: [], issues: [] }
 
 /**
  * Vite plugin set for Lite HMR, dev metadata, and optional production graph metadata.
@@ -56,12 +59,13 @@ export function pumpedVite(options: PumpedViteOptions = {}): Plugin[] {
   const plugins: Plugin[] = []
   if (options.hmr !== false) plugins.push(pumpedHmr(options.hmr))
   if (options.graph) plugins.push(pumpedGraph(options.graph === true ? undefined : options.graph))
+  if (options.hmr !== false && !options.graph) plugins.push(pumpedVirtual())
   return plugins
 }
 
 /**
  * Vite plugin that transforms atom declarations for HMR preservation.
- * Automatically disabled in production builds.
+ * Applies only to Vite dev server runs.
  */
 export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
   const {
@@ -71,6 +75,7 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
   const modules = new Map<string, ModuleMeta>()
   let server: ViteDevServer | undefined
   let root = ""
+  let base = ""
 
   return {
     name: "pumped-fn-hmr",
@@ -79,6 +84,7 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
 
     configResolved(config) {
       root = clean(config.root)
+      base = basePath(config.base)
     },
 
     configureServer(next) {
@@ -88,12 +94,12 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
       })
       next.middlewares.use((req, res, done) => {
         const path = req.url?.split("?")[0]
-        if (path === hmrMetaPath) {
+        if (path === endpoint(base, hmrMetaPath)) {
           send(res, "application/json; charset=utf-8", JSON.stringify(hmrMeta(modules)))
           return
         }
-        if (path === hmrInspectPath) {
-          send(res, "text/html; charset=utf-8", inspector())
+        if (path === endpoint(base, hmrInspectPath)) {
+          send(res, "text/html; charset=utf-8", inspector(endpoint(base, hmrMetaPath)))
           return
         }
         done()
@@ -107,15 +113,7 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
 
     load(id) {
       if (id !== resolvedHmrMetaModule) return null
-      const meta = hmrMeta(modules)
-      return [
-        `export const meta = ${JSON.stringify(meta)};`,
-        "export const modules = meta.modules;",
-        "export const handles = meta.handles;",
-        "export const atoms = meta.atoms;",
-        "export const edges = meta.edges;",
-        "export const issues = meta.issues;",
-      ].join("\n")
+      return metaModuleCode(hmrMeta(modules), true)
     },
 
     async transform(code, id) {
@@ -132,7 +130,7 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
         return null
       }
 
-      if (!code.includes("@pumped-fn/lite")) {
+      if (!maybeLite(code)) {
         drop(modules, key, server)
         return null
       }
@@ -146,8 +144,11 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
       const meta = await resolveMeta(result.meta, raw, root, (source, importer) => resolveHmrImport(this, server, source, importer))
       set(modules, meta, server)
       return {
-        ...result,
-        meta,
+        code: result.code,
+        map: result.map,
+        meta: {
+          [hmrModuleMetaKey]: meta,
+        },
       }
     },
 
@@ -160,12 +161,12 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
         changed = drop(modules, key, ctx.server)
       } else {
         const code = await ctx.read()
-        if (!code.includes("@pumped-fn/lite")) {
+        if (!maybeLite(code)) {
           changed = drop(modules, key, ctx.server)
         } else {
-          const result = transformAtoms(code, key)
-          changed = result
-            ? set(modules, await resolveMeta(result.meta, raw, root, (source, importer) => resolveServerImport(ctx.server, source, importer)), ctx.server)
+          const meta = readLite(code, key)
+          changed = meta
+            ? set(modules, await resolveMeta(meta, raw, root, (source, importer) => resolveServerImport(ctx.server, source, importer)), ctx.server)
             : drop(modules, key, ctx.server)
         }
       }
@@ -175,6 +176,21 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
       const mod = metaModule(ctx.server)
       if (!mod) return
       return [...ctx.modules, mod]
+    },
+  }
+}
+
+function pumpedVirtual(): Plugin {
+  return {
+    name: "pumped-fn-hmr-virtual",
+    enforce: "pre",
+    apply: "build",
+    resolveId(id) {
+      if (id === hmrMetaModule) return resolvedHmrMetaModule
+      return null
+    },
+    load(id) {
+      return id === resolvedHmrMetaModule ? metaModuleCode(emptyMeta, false) : null
     },
   }
 }
@@ -200,6 +216,23 @@ export function pumpedGraph(options: PumpedGraphOptions = {}): Plugin {
       root = clean(config.root)
     },
 
+    buildStart() {
+      modules.clear()
+    },
+
+    watchChange(id) {
+      modules.delete(displayId(clean(id), root))
+    },
+
+    resolveId(id) {
+      if (id === hmrMetaModule) return resolvedHmrMetaModule
+      return null
+    },
+
+    load(id) {
+      return id === resolvedHmrMetaModule ? metaModuleCode(emptyMeta, false) : null
+    },
+
     async transform(code, id) {
       const raw = clean(id)
       const key = displayId(raw, root)
@@ -214,7 +247,7 @@ export function pumpedGraph(options: PumpedGraphOptions = {}): Plugin {
         return null
       }
 
-      if (!code.includes("@pumped-fn/lite")) {
+      if (!maybeLite(code)) {
         modules.delete(key)
         return null
       }
@@ -366,8 +399,38 @@ function matches(pattern: RegExp, value: string): boolean {
   return result
 }
 
+function maybeLite(code: string): boolean {
+  return code.includes("@pumped-fn/lite") || code.includes("atom")
+}
+
 function clean(id: string): string {
   return id.split("?")[0]!.replace(/\\/g, "/")
+}
+
+function basePath(base: string | undefined): string {
+  if (!base || base === "/") return ""
+  return base.endsWith("/") ? base.slice(0, -1) : base
+}
+
+function endpoint(base: string, path: string): string {
+  return `${base}${path}`
+}
+
+function metaModuleCode(meta: LiteMeta, hot: boolean): string {
+  return [
+    `const next = ${JSON.stringify(meta)};`,
+    "export const meta = next;",
+    "export const modules = meta.modules;",
+    "export const handles = meta.handles;",
+    "export const atoms = meta.atoms;",
+    "export const edges = meta.edges;",
+    "export const issues = meta.issues;",
+    ...(hot ? [
+      `const emit = (value) => typeof window !== "undefined" && window.dispatchEvent(new CustomEvent(${JSON.stringify(hmrMetaEvent)}, { detail: value }));`,
+      "emit(meta);",
+      "if (import.meta.hot) import.meta.hot.accept((mod) => emit(mod.meta));",
+    ] : []),
+  ].join("\n")
 }
 
 function send(
@@ -380,7 +443,7 @@ function send(
   res.end(body)
 }
 
-function inspector(): string {
+function inspector(metaPath: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -418,7 +481,7 @@ const rows = document.querySelector("#rows")
 const deps = document.querySelector("#deps")
 const issues = document.querySelector("#issues")
 const counts = document.querySelector("#counts")
-const meta = await fetch("${hmrMetaPath}").then((res) => res.json())
+const meta = await fetch(${JSON.stringify(metaPath)}).then((res) => res.json())
 function cell(value) {
   const td = document.createElement("td")
   const node = value.includes("/") || value.includes(":") ? document.createElement("code") : document.createTextNode(value)

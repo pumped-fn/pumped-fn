@@ -14,9 +14,6 @@ interface ModuleRecord {
   readonly bridge: boolean
   readonly server: boolean
   readonly directRuntime: boolean
-}
-
-interface ReadRecord extends ModuleRecord {
   readonly violation?: BoundaryViolation
 }
 
@@ -52,6 +49,7 @@ const defaults = {
   exclude: [/\/node_modules\//, /\/dist\//],
   client: [
     /\/src\/client\.[cm]?[jt]sx?$/,
+    /\/src\/routes\//,
     /\.client\.[cm]?[jt]sx?$/,
     /\.browser\.[cm]?[jt]sx?$/,
   ],
@@ -70,18 +68,25 @@ export function boundary(options: BoundaryOptions = {}): Plugin {
   return {
     name: "pumped-fn-tanstack-start-boundary",
     async transform(code, id) {
-      checker.add(
+      const direct = await checker.add(
         clean(id),
         code,
         (source) => this.resolve(source, id, { skipSelf: true }).then((resolved) => resolved?.id),
         (input) => this.parse(input)
       )
-      const violation = await checker.nextViolation()
+      if (direct) throw new Error(format(direct))
+      const violation = checker.violation()
       if (violation) throw new Error(format(violation))
       return null
     },
-    async buildEnd() {
-      const violation = await checker.graphViolation()
+    buildStart() {
+      checker.reset()
+    },
+    watchChange(id) {
+      checker.delete(clean(id))
+    },
+    buildEnd() {
+      const violation = checker.violation()
       if (violation) throw new Error(format(violation))
     },
   }
@@ -92,27 +97,18 @@ export const tanstackStartBoundary = boundary
 function createChecker(options: BoundaryOptions) {
   const config = merge(options)
   const records = new Map<string, ModuleRecord>()
-  const pending: Promise<BoundaryViolation | undefined>[] = []
 
   return {
-    add(id: string, code: string, resolve: Resolver, parse: Parser) {
-      if (!matches(config.include, id) || matches(config.exclude, id)) return
-      pending.push(read(id, code, resolve, parse, config).then((record) => {
-        records.set(id, record)
-        return localViolation(record)
-      }))
-    },
-    async nextViolation() {
-      for (;;) {
-        const next = pending.shift()
-        if (!next) return undefined
-        const violation = await next
-        if (violation) return violation
+    async add(id: string, code: string, resolve: Resolver, parse: Parser) {
+      if (!matches(config.include, id) || matches(config.exclude, id)) {
+        records.delete(id)
+        return
       }
+      const record = await read(id, code, resolve, parse, config)
+      records.set(id, record)
+      return localViolation(record)
     },
-    async graphViolation() {
-      const local = await this.nextViolation()
-      if (local) return local
+    violation() {
       for (const record of records.values()) {
         if (record.client) {
           const violation = reachesServer(record, records, config, new Set())
@@ -120,6 +116,12 @@ function createChecker(options: BoundaryOptions) {
         }
       }
       return undefined
+    },
+    delete(id: string) {
+      records.delete(id)
+    },
+    reset() {
+      records.clear()
     },
   }
 }
@@ -141,13 +143,16 @@ async function read(
   resolve: Resolver,
   parse: Parser,
   config: Required<BoundaryOptions>
-): Promise<ReadRecord> {
+): Promise<ModuleRecord> {
   const edges: ModuleEdge[] = []
   let directRuntime = false
   let violation: BoundaryViolation | undefined
+  const adapter = await resolve(packageName)
+  const adapterRoot = adapter ? runtimeRoot(clean(adapter)) : undefined
 
   for (const reference of references(parse(code))) {
-    if (matches(config.specifiers, reference.source)) {
+    const resolved = await resolve(reference.source)
+    if (runtimeReference(reference.source, resolved, adapterRoot, config)) {
       directRuntime = true
       if (reference.kind === "export") {
         violation = location(
@@ -158,7 +163,7 @@ async function read(
         )
       }
     } else {
-      edges.push({ source: reference.source, resolved: await resolve(reference.source) })
+      edges.push({ source: reference.source, resolved })
     }
   }
 
@@ -173,12 +178,12 @@ async function read(
   }
 }
 
-function localViolation(record: ReadRecord): BoundaryViolation | undefined {
-  if (record.violation && !record.server) return record.violation
-  if (record.directRuntime && !record.server && !record.bridge) {
+function localViolation(record: ModuleRecord): BoundaryViolation | undefined {
+  if (record.violation && record.client && !record.server) return record.violation
+  if (record.directRuntime && record.client && !record.server && !record.bridge) {
     return {
       id: record.id,
-      message: `Runtime import of ${packageName} is only allowed in TanStack Start server or server-function boundary files.`,
+      message: directRuntimeMessage(),
     }
   }
   return undefined
@@ -190,12 +195,23 @@ function reachesServer(
   config: Required<BoundaryOptions>,
   seen: Set<string>
 ): BoundaryViolation | undefined {
+  if (record.violation) return record.violation
   if (seen.has(record.id) || record.bridge) return undefined
   seen.add(record.id)
+
+  if (record.directRuntime && !record.server) {
+    return {
+      id: record.id,
+      message: record.client && !record.bridge
+        ? directRuntimeMessage()
+        : `Client-reachable module ${record.id} reaches TanStack Start backend boundary ${record.id}.`,
+    }
+  }
 
   for (const edge of record.edges) {
     const id = edge.resolved ? clean(edge.resolved) : undefined
     if (!id) continue
+    if (matches(config.exclude, id)) continue
     const target = records.get(id)
     const server = matches(config.server, id) || Boolean(target?.server)
     const runtime = Boolean(target?.directRuntime && !target.bridge)
@@ -212,6 +228,31 @@ function reachesServer(
   }
 
   return undefined
+}
+
+function directRuntimeMessage(): string {
+  return `Runtime import of ${packageName} is only allowed in TanStack Start server or server-function boundary files.`
+}
+
+function runtimeReference(
+  source: string,
+  resolved: string | undefined,
+  adapterRoot: string | undefined,
+  config: Required<BoundaryOptions>
+): boolean {
+  if (matches(config.specifiers, source)) return true
+  if (source.startsWith(`${packageName}/`)) return true
+  const id = resolved ? clean(resolved) : undefined
+  if (!id) return false
+  if (id.includes(`/node_modules/${packageName}/`)) return true
+  return adapterRoot ? id === adapterRoot.slice(0, -1) || id.startsWith(adapterRoot) : false
+}
+
+function runtimeRoot(resolved: string): string {
+  const marker = `/node_modules/${packageName}/`
+  const index = resolved.indexOf(marker)
+  if (index >= 0) return resolved.slice(0, index + marker.length)
+  return resolved.slice(0, resolved.lastIndexOf("/") + 1)
 }
 
 function references(root: unknown): Reference[] {

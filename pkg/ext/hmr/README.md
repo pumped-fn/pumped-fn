@@ -19,7 +19,7 @@ sequenceDiagram
     Dev->>Vite: Save file with atom()
     Vite->>Plugin: transform(code)
     Plugin->>Plugin: AST detect: const foo = atom({...})
-    Plugin-->>Vite: const foo = __hmr_register('key', atom({...}))
+    Plugin-->>Vite: const foo = __hmr_register("key", atom({...}))
 
     Note over HMR,Scope: Runtime (HMR Reload)
 
@@ -62,7 +62,7 @@ The plugin transforms named atom declarations at build time:
 const config = atom({ factory: () => loadConfig() })
 
 // Transformed (dev only)
-const config = __hmr_register('src/atoms.ts:config', atom({ factory: () => loadConfig() }))
+const config = __hmr_register("src/atoms.ts:config", atom({ factory: () => loadConfig() }))
 ```
 
 The `__hmr_register` helper stores atom references in `import.meta.hot.data`. On HMR reload, it refreshes the cached atom definition and returns the same reference, preserving Scope cache hits. Already-resolved Scope values stay under normal Lite invalidation rules; the new factory runs for future resolves after invalidation or in a new Scope.
@@ -100,7 +100,7 @@ console.table(issues.map((issue) => ({
 })))
 ```
 
-The same feed is available during `vite dev` without adding code to the app:
+The same feed is available during `vite dev` without adding code to the app. If Vite `base` is configured, prefix these URLs with that base.
 
 | URL | Use |
 | --- | --- |
@@ -109,12 +109,15 @@ The same feed is available during `vite dev` without adding code to the app:
 
 These dev-server URLs expose source file paths and Lite handle names to anyone who can reach the Vite dev server.
 
+When `pumpedVite()` is used, production builds also resolve this virtual module to an empty feed so devtools imports do not break builds. Use `pumpedVite({ graph: true })` when the production build should also emit the JSON graph asset.
+
 Issue codes are intentionally narrow:
 
 | Code | Meaning |
 | --- | --- |
 | `dynamic-dep` | A `deps` slot used an expression the scanner cannot turn into a stable edge. |
 | `unknown-dep` | A `deps` slot points at a local identifier that is not a discovered Lite handle or import. |
+| `untracked-atom` | An `atom()` call was not HMR-wrapped because it was nested, dynamic, or imported through a barrel instead of directly from `@pumped-fn/lite`. |
 
 For imported deps, `importSource` is the source specifier from code and `importId` is the Vite-resolved module id, normalized relative to the Vite root when possible. Devtools can use `importId` to jump from a dependency slot to the actual file Vite resolved in dev or build. When the imported module is also in the feed and exports a matching Lite handle, `to` and `toKind` point at that handle.
 
@@ -155,8 +158,9 @@ export default defineConfig({
 | `const foo = atom({...})` | Yes |
 | `let foo = atom({...})` | Yes |
 | `export const foo = atom({...})` | Yes |
-| `atoms.push(atom({...}))` | No (dynamic) |
-| `createAtom(() => atom({...}))` | No (nested) |
+| `atoms.push(atom({...}))` | No; reports `untracked-atom` |
+| `createAtom(() => atom({...}))` | No; reports `untracked-atom` |
+| `import { atom } from "../lib/lite"` | No; use direct imports from `@pumped-fn/lite` for HMR wrapping |
 
 ## Options
 

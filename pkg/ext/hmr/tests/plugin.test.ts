@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { describe, it, expect, afterEach } from "vitest"
-import { graphFileName, hmrInspectPath, hmrMetaModule, hmrMetaPath, pumpedGraph, pumpedHmr, pumpedVite } from "../src/plugin"
+import { describe, it, expect } from "vitest"
+import { graphFileName, hmrInspectPath, hmrMetaEvent, hmrMetaModule, hmrMetaPath, hmrModuleMetaKey, pumpedGraph, pumpedHmr, pumpedVite } from "../src/plugin"
 
 type Middleware = (req: { url?: string }, res: Response, done: () => void) => void
 type Unlink = (file: string) => void
@@ -22,12 +22,6 @@ class Response {
 }
 
 describe("pumpedHmr plugin", () => {
-  const originalEnv = process.env.NODE_ENV
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalEnv
-  })
-
   it("has correct plugin name", () => {
     const plugin = pumpedHmr()
     expect(plugin.name).toBe("pumped-fn-hmr")
@@ -62,8 +56,8 @@ describe("pumpedHmr plugin", () => {
   it("composes the default dev Vite plugin set", () => {
     const plugins = pumpedVite()
 
-    expect(plugins.map((plugin) => plugin.name)).toEqual(["pumped-fn-hmr"])
-    expect(plugins.map((plugin) => plugin.apply)).toEqual(["serve"])
+    expect(plugins.map((plugin) => plugin.name)).toEqual(["pumped-fn-hmr", "pumped-fn-hmr-virtual"])
+    expect(plugins.map((plugin) => plugin.apply)).toEqual(["serve", "build"])
   })
 
   it("adds build graph metadata when explicitly enabled", () => {
@@ -75,7 +69,7 @@ describe("pumpedHmr plugin", () => {
 
   it("keeps the Vite plugin set opt-outs explicit", () => {
     expect(pumpedVite({ hmr: false, graph: true }).map((plugin) => plugin.name)).toEqual(["pumped-fn-graph"])
-    expect(pumpedVite({ graph: false }).map((plugin) => plugin.name)).toEqual(["pumped-fn-hmr"])
+    expect(pumpedVite({ graph: false }).map((plugin) => plugin.name)).toEqual(["pumped-fn-hmr", "pumped-fn-hmr-virtual"])
     expect(pumpedVite({ hmr: false, graph: false })).toEqual([])
   })
 
@@ -92,6 +86,7 @@ describe("pumpedHmr plugin", () => {
   })
 
   it("does not disable dev transforms from NODE_ENV alone", async () => {
+    const originalEnv = process.env.NODE_ENV
     process.env.NODE_ENV = "production"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
@@ -104,10 +99,10 @@ const config = atom({ factory: () => 1 })`,
 
     expect(result).not.toBeNull()
     expect(result.code).toContain("__hmr_register")
+    process.env.NODE_ENV = originalEnv
   })
 
   it("skips non-JS/TS files", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
 
@@ -116,7 +111,6 @@ const config = atom({ factory: () => 1 })`,
   })
 
   it("skips node_modules", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
 
@@ -129,7 +123,6 @@ const config = atom({ factory: () => 1 })`,
   })
 
   it("skips files without Lite imports", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
 
@@ -139,7 +132,6 @@ const config = atom({ factory: () => 1 })`,
   })
 
   it("transforms files with atom() calls", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
 
@@ -154,7 +146,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("normalizes Vite query ids before include matching", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
 
@@ -165,11 +156,10 @@ const config = atom({ factory: () => ({}) })`,
     )
 
     expect(result).not.toBeNull()
-    expect(result.meta.id).toBe("src/atoms.ts")
+    expect(result.meta[hmrModuleMetaKey].id).toBe("src/atoms.ts")
   })
 
   it("exposes compact handle metadata through a virtual module", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
     const resolveId = plugin.resolveId as Function
@@ -195,13 +185,14 @@ const run = flow({ deps: { config }, factory: () => "ok" })`,
     expect(code).toContain("export const atoms = meta.atoms")
     expect(code).toContain("export const edges = meta.edges")
     expect(code).toContain("export const issues = meta.issues")
+    expect(code).toContain("import.meta.hot.accept")
+    expect(code).toContain(hmrMetaEvent)
     expect(code).toContain('"fromName":"run"')
     expect(code).toContain('"toName":"config"')
     expect(code).toContain('"issues":[]')
   })
 
   it("exposes graph issues through the virtual module", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
     const load = plugin.load as Function
@@ -222,7 +213,6 @@ const run = flow({ deps: { local, config: makeConfig(local) }, factory: () => "o
   })
 
   it("removes stale atom metadata when a module no longer transforms", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const transform = transformWith(plugin)
     const load = plugin.load as Function
@@ -240,7 +230,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("invalidates the virtual metadata module when atom metadata changes", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -258,7 +247,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("does not invalidate metadata for unrelated modules", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -271,7 +259,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("clears metadata when Vite reports a deleted source file", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -294,7 +281,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("refreshes metadata when Vite reports a changed Lite source file", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -328,7 +314,6 @@ const run = flow({ deps: { config: make(config) }, factory: () => "ok" })`,
   })
 
   it("adds metadata when Vite reports a file that became Lite source", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const update = plugin.handleHotUpdate as Function
@@ -353,7 +338,6 @@ const created = atom({ factory: () => 1 })`,
   })
 
   it("drops metadata when Vite reports a Lite source file no longer uses Lite", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -384,7 +368,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("does not invalidate metadata when a Lite hot update has the same graph", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -413,7 +396,6 @@ const config = atom({ factory: () => 2 })`,
   })
 
   it("drops query-normalized metadata during hot updates", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -444,7 +426,6 @@ const config = atom({ factory: () => ({}) })`,
   })
 
   it("syncs metadata without returning a missing virtual module", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const update = plugin.handleHotUpdate as Function
@@ -469,7 +450,6 @@ const created = atom({ factory: () => 1 })`,
   })
 
   it("resolves imported deps during hot updates", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configResolved = plugin.configResolved as Function
     const configureServer = plugin.configureServer as Function
@@ -508,7 +488,6 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
   })
 
   it("keeps resolved import ids stable across transform and hot update", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configResolved = plugin.configResolved as Function
     const configureServer = plugin.configureServer as Function
@@ -545,7 +524,6 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
   })
 
   it("refreshes importer metadata when an imported target becomes resolvable", async () => {
-    process.env.NODE_ENV = "development"
     let created = false
     const plugin = pumpedHmr()
     const configResolved = plugin.configResolved as Function
@@ -581,7 +559,6 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
   })
 
   it("serves JSON metadata for external devtools", async () => {
-    process.env.NODE_ENV = "development"
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
     const transform = transformWith(plugin)
@@ -621,6 +598,25 @@ const run = flow({ deps: { config }, factory: () => "ok" })`,
     expect(meta.issues).toEqual([])
   })
 
+  it("serves metadata endpoints under Vite base", async () => {
+    const plugin = pumpedHmr()
+    const configResolved = plugin.configResolved as Function
+    const configureServer = plugin.configureServer as Function
+    const next = server()
+    const res = new Response()
+    let passed = false
+
+    configResolved({ root: "/project", base: "/app/" })
+    configureServer(next.vite)
+    next.middleware()({ url: "/app/__pumped-fn/lite-hmr.json" }, res, () => {
+      passed = true
+    })
+
+    expect(passed).toBe(false)
+    expect(res.statusCode).toBe(200)
+    expect(res.headers.get("content-type")).toBe("application/json; charset=utf-8")
+  })
+
   it("serves a compact inspector page for the metadata endpoint", () => {
     const plugin = pumpedHmr()
     const configureServer = plugin.configureServer as Function
@@ -656,6 +652,19 @@ const run = flow({ deps: { config }, factory: () => "ok" })`,
 
     expect(passed).toBe(true)
     expect(res.body).toBe("")
+  })
+
+  it("stubs the virtual metadata module during builds", () => {
+    const plugin = pumpedVite().find((item) => item.name === "pumped-fn-hmr-virtual")!
+    const resolveId = plugin.resolveId as Function
+    const load = plugin.load as Function
+    const resolved = resolveId(hmrMetaModule)
+    const code = load(resolved) as string
+
+    expect(resolved).toBe(`\0${hmrMetaModule}`)
+    expect(code).toContain("export const handles = meta.handles")
+    expect(code).toContain('"modules":[]')
+    expect(code).not.toContain("import.meta.hot.accept")
   })
 })
 

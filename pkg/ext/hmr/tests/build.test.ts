@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { build } from "vite"
 import { afterEach, describe, expect, it } from "vitest"
-import { graphFileName, pumpedGraph, type LiteMeta } from "../src"
+import { graphFileName, pumpedGraph, pumpedVite, type LiteMeta } from "../src"
 
 const roots: string[] = []
 
@@ -61,6 +61,30 @@ describe("pumpedGraph build metadata", () => {
     expect(js).not.toContain("__hmr_register")
     expect(js).not.toContain("@pumped-fn/lite-hmr/runtime")
   })
+
+  it("builds apps that import the virtual devtools feed", async () => {
+    const root = fixture()
+
+    await build({
+      root,
+      logLevel: "silent",
+      plugins: [pumpedVite({ graph: true })],
+      resolve: {
+        alias: {
+          "@pumped-fn/lite": join(root, "lite.js"),
+        },
+      },
+      build: {
+        outDir: "dist",
+        emptyOutDir: true,
+        rollupOptions: {
+          input: join(root, "src/with-feed.ts"),
+        },
+      },
+    })
+
+    expect(readFileSync(join(root, "dist", graphFileName), "utf8")).toContain('"handles"')
+  })
 })
 
 function fixture(): string {
@@ -93,6 +117,11 @@ export const run = flow<{ input: string }, string>({
   factory: () => "ok"
 })
 console.log(config, run, tx, requestId)
+`)
+  write(root, "src/with-feed.ts", `import { handles } from "virtual:pumped-fn/lite-hmr"
+import { atom } from "@pumped-fn/lite"
+export const config = atom({ factory: () => handles.length })
+console.log(config)
 `)
   return root
 }

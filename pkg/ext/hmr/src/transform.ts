@@ -24,6 +24,11 @@ interface AtomSpan {
   end: number
 }
 
+interface UnsupportedAtomBinding {
+  name: string
+  source: string
+}
+
 interface FoundHandle {
   handle: HandleMeta
   value: ts.CallExpression
@@ -49,6 +54,7 @@ function readLiteResult(code: string, filePath: string): ReadResult | null {
   const file = clean(filePath)
   const source = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, scriptKind(file))
   const bindings = liteBindings(source)
+  const unsupportedAtoms = unsupportedAtomBindings(source)
   const handles: HandleMeta[] = []
   const atoms: AtomMeta[] = []
   const atomSpans: AtomSpan[] = []
@@ -86,8 +92,6 @@ function readLiteResult(code: string, filePath: string): ReadResult | null {
     }
   }
 
-  if (handles.length === 0) return null
-
   const handlesByName = new Map(handles.map((handle) => [handle.name, handle]))
   const imports = importBindings(source)
   const graph = found.reduce<GraphMeta>((meta, item) => {
@@ -96,6 +100,9 @@ function readLiteResult(code: string, filePath: string): ReadResult | null {
     meta.issues.push(...next.issues)
     return meta
   }, { edges: [], issues: [] })
+  graph.issues.push(...untrackedAtoms(file, source, bindings, unsupportedAtoms, new Set(atomSpans.map((atom) => atom.start))))
+
+  if (handles.length === 0 && graph.issues.length === 0) return null
 
   return {
     meta: {
@@ -118,7 +125,7 @@ export function transformAtoms(
 
   const s = new MagicString(code)
   for (const atom of result.atomSpans) {
-    s.prependLeft(atom.start, `__hmr_register('${atom.key}', `)
+    s.prependLeft(atom.start, `__hmr_register(${JSON.stringify(atom.key)}, `)
     s.appendRight(atom.end, ")")
   }
 
@@ -152,6 +159,25 @@ function liteBindings(source: ts.SourceFile): ReadonlyMap<string, LiteBinding> {
       const imported = (specifier.propertyName ?? specifier.name).text
       const kind = liteBinding(imported)
       if (kind) bindings.set(specifier.name.text, kind)
+    }
+  }
+  return bindings
+}
+
+function unsupportedAtomBindings(source: ts.SourceFile): readonly UnsupportedAtomBinding[] {
+  const bindings: UnsupportedAtomBinding[] = []
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue
+    if (statement.moduleSpecifier.text === "@pumped-fn/lite") continue
+    if (statement.importClause?.isTypeOnly) continue
+    const namedBindings = statement.importClause?.namedBindings
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue
+    for (const specifier of namedBindings.elements) {
+      if (specifier.isTypeOnly) continue
+      if ((specifier.propertyName ?? specifier.name).text === "atom") {
+        bindings.push({ name: specifier.name.text, source: statement.moduleSpecifier.text })
+      }
     }
   }
   return bindings
@@ -304,6 +330,70 @@ function issueMeta(
     column: loc.character,
     target,
   }
+}
+
+function moduleIssueMeta(
+  code: IssueCode,
+  file: string,
+  source: ts.SourceFile,
+  value: ts.Node,
+  target: string,
+  fromName = "(module)"
+): IssueMeta {
+  const start = value.getStart(source)
+  const loc = source.getLineAndCharacterOfPosition(start)
+  return {
+    code,
+    fromName,
+    slot: "atom",
+    file,
+    line: loc.line + 1,
+    column: loc.character,
+    target,
+  }
+}
+
+function untrackedAtoms(
+  file: string,
+  source: ts.SourceFile,
+  bindings: ReadonlyMap<string, LiteBinding>,
+  unsupportedAtoms: readonly UnsupportedAtomBinding[],
+  wrapped: ReadonlySet<number>
+): IssueMeta[] {
+  const issues: IssueMeta[] = []
+  const unsupported = new Map(unsupportedAtoms.map((binding) => [binding.name, binding.source]))
+
+  function visit(node: ts.Node): void {
+    if (ts.isCallExpression(node)) {
+      const start = node.getStart(source)
+      const binding = exprBinding(node.expression, bindings)
+      const unsupportedSource = ts.isIdentifier(node.expression) ? unsupported.get(node.expression.text) : undefined
+      const shadowed = ts.isIdentifier(node.expression) && isShadowed(node.expression)
+      if (binding === "atom" && !wrapped.has(start) && !shadowed) {
+        issues.push(moduleIssueMeta("untracked-atom", file, source, node, sourceText(source, node), declarationName(node)))
+      } else if (unsupportedSource && !shadowed) {
+        issues.push(moduleIssueMeta("untracked-atom", file, source, node, `${sourceText(source, node)} from ${unsupportedSource}`, declarationName(node)))
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+
+  visit(source)
+  return issues
+}
+
+function declarationName(node: ts.Node): string {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text
+  }
+  return "(module)"
+}
+
+function isShadowed(node: ts.Identifier): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (ts.isFunctionLike(parent) && parent.parameters.some((param) => ts.isIdentifier(param.name) && param.name.text === node.text)) return true
+  }
+  return false
 }
 
 function edgeTarget(
