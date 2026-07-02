@@ -121,28 +121,28 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
       const key = displayId(raw, root)
 
       if (!matches(include, raw)) {
-        drop(modules, key, server)
+        if (drop(modules, key)) publishMeta(server, modules)
         return null
       }
 
       if (matches(exclude, raw)) {
-        drop(modules, key, server)
+        if (drop(modules, key)) publishMeta(server, modules)
         return null
       }
 
       if (!maybeLite(code)) {
-        drop(modules, key, server)
+        if (drop(modules, key)) publishMeta(server, modules)
         return null
       }
 
       const result = transformAtoms(code, key)
       if (!result) {
-        drop(modules, key, server)
+        if (drop(modules, key)) publishMeta(server, modules)
         return null
       }
 
       const meta = await resolveMeta(result.meta, raw, root, (source, importer) => resolveHmrImport(this, server, source, importer))
-      set(modules, meta, server)
+      if (set(modules, meta)) publishMeta(server, modules)
       return {
         code: result.code,
         map: result.map,
@@ -153,29 +153,11 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
     },
 
     async handleHotUpdate(ctx) {
-      const raw = clean(ctx.file)
-      const key = displayId(raw, root)
-      let changed = false
+      await syncHotUpdate(modules, ctx.file, "update", () => ctx.read(), ctx.server, root, include, exclude)
+    },
 
-      if (!matches(include, raw) || matches(exclude, raw)) {
-        changed = drop(modules, key, ctx.server)
-      } else {
-        const code = await ctx.read()
-        if (!maybeLite(code)) {
-          changed = drop(modules, key, ctx.server)
-        } else {
-          const meta = readLite(code, key)
-          changed = meta
-            ? set(modules, await resolveMeta(meta, raw, root, (source, importer) => resolveServerImport(ctx.server, source, importer)), ctx.server)
-            : drop(modules, key, ctx.server)
-        }
-      }
-
-      changed = await refreshImports(modules, ctx.server, root) || changed
-      if (!changed) return
-      const mod = metaModule(ctx.server)
-      if (!mod) return
-      return [...ctx.modules, mod]
+    async hotUpdate(ctx) {
+      await syncHotUpdate(modules, ctx.file, ctx.type, () => ctx.read(), ctx.server, root, include, exclude)
     },
   }
 }
@@ -214,10 +196,6 @@ export function pumpedGraph(options: PumpedGraphOptions = {}): Plugin {
 
     configResolved(config) {
       root = clean(config.root)
-    },
-
-    buildStart() {
-      modules.clear()
     },
 
     watchChange(id) {
@@ -304,8 +282,41 @@ async function dropAndRefresh(
   server: ViteDevServer | undefined,
   root: string
 ): Promise<void> {
-  drop(modules, id, server)
-  if (server) await refreshImports(modules, server, root)
+  let changed = drop(modules, id)
+  if (server) changed = await refreshImports(modules, server, root) || changed
+  if (changed) publishMeta(server, modules)
+}
+
+async function syncHotUpdate(
+  modules: Map<string, ModuleMeta>,
+  file: string,
+  type: "create" | "update" | "delete",
+  read: () => string | Promise<string>,
+  server: ViteDevServer,
+  root: string,
+  include: RegExp,
+  exclude: RegExp
+): Promise<void> {
+  const raw = clean(file)
+  const key = displayId(raw, root)
+  let changed = false
+
+  if (type === "delete" || !matches(include, raw) || matches(exclude, raw)) {
+    changed = drop(modules, key)
+  } else {
+    const code = await read()
+    if (!maybeLite(code)) {
+      changed = drop(modules, key)
+    } else {
+      const meta = readLite(code, key)
+      changed = meta
+        ? set(modules, await resolveMeta(meta, raw, root, (source, importer) => resolveServerImport(server, source, importer)))
+        : drop(modules, key)
+    }
+  }
+
+  changed = await refreshImports(modules, server, root) || changed
+  if (changed) publishMeta(server, modules)
 }
 
 async function refreshImports(modules: Map<string, ModuleMeta>, server: ViteDevServer, root: string): Promise<boolean> {
@@ -313,7 +324,7 @@ async function refreshImports(modules: Map<string, ModuleMeta>, server: ViteDevS
   for (const meta of [...modules.values()]) {
     const next = await resolveMeta(meta, sourceId(meta.id, root), root, (source, importer) => resolveServerImport(server, source, importer))
     if (modules.get(meta.id) !== meta) continue
-    changed = set(modules, next, server) || changed
+    changed = set(modules, next) || changed
   }
   return changed
 }
@@ -372,23 +383,22 @@ function metaModule(server: ViteDevServer) {
   return server.moduleGraph.getModuleById(resolvedHmrMetaModule)
 }
 
-function invalidateMeta(server: ViteDevServer | undefined): void {
+function publishMeta(server: ViteDevServer | undefined, modules: ReadonlyMap<string, ModuleMeta>): void {
   if (!server) return
   const mod = metaModule(server)
   if (mod) server.moduleGraph.invalidateModule(mod)
+  server.ws.send({ type: "custom", event: hmrMetaEvent, data: hmrMeta(modules) })
 }
 
-function set(modules: Map<string, ModuleMeta>, meta: ModuleMeta, server: ViteDevServer | undefined): boolean {
+function set(modules: Map<string, ModuleMeta>, meta: ModuleMeta): boolean {
   const current = modules.get(meta.id)
   modules.set(meta.id, meta)
   if (JSON.stringify(current) === JSON.stringify(meta)) return false
-  invalidateMeta(server)
   return true
 }
 
-function drop(modules: Map<string, ModuleMeta>, id: string, server: ViteDevServer | undefined): boolean {
+function drop(modules: Map<string, ModuleMeta>, id: string): boolean {
   if (!modules.delete(id)) return false
-  invalidateMeta(server)
   return true
 }
 
@@ -400,7 +410,7 @@ function matches(pattern: RegExp, value: string): boolean {
 }
 
 function maybeLite(code: string): boolean {
-  return code.includes("@pumped-fn/lite") || code.includes("atom")
+  return code.includes("@pumped-fn/lite") || /\batom\b/.test(code)
 }
 
 function clean(id: string): string {
@@ -428,7 +438,7 @@ function metaModuleCode(meta: LiteMeta, hot: boolean): string {
     ...(hot ? [
       `const emit = (value) => typeof window !== "undefined" && window.dispatchEvent(new CustomEvent(${JSON.stringify(hmrMetaEvent)}, { detail: value }));`,
       "emit(meta);",
-      "if (import.meta.hot) import.meta.hot.accept((mod) => emit(mod.meta));",
+      `if (import.meta.hot) { import.meta.hot.accept(); import.meta.hot.on(${JSON.stringify(hmrMetaEvent)}, emit); }`,
     ] : []),
   ].join("\n")
 }

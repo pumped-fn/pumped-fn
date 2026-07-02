@@ -73,7 +73,9 @@ The plugin also exposes discovered Lite handles through a Vite virtual module. T
 
 ```typescript
 /// <reference types="@pumped-fn/lite-hmr/client" />
+import { hmrMetaEvent } from "@pumped-fn/lite-hmr"
 import { atoms, edges, handles, issues } from "virtual:pumped-fn/lite-hmr"
+import type { LiteMeta } from "@pumped-fn/lite-hmr"
 
 console.table(handles.map((handle) => ({
   kind: handle.kind,
@@ -98,7 +100,14 @@ console.table(issues.map((issue) => ({
   slot: issue.slot,
   target: issue.target,
 })))
+
+window.addEventListener(hmrMetaEvent, (event) => {
+  const meta = (event as CustomEvent<LiteMeta>).detail
+  console.table(meta.issues)
+})
 ```
+
+The virtual module exports are a snapshot for the importing module evaluation. Live devtools should listen for the `hmrMetaEvent` custom event, whose `detail` is the latest `LiteMeta` feed after file create, update, or delete events.
 
 The same feed is available during `vite dev` without adding code to the app. If Vite `base` is configured, prefix these URLs with that base.
 

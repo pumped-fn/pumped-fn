@@ -50,6 +50,7 @@ describe("pumpedHmr plugin", () => {
     expect(plugin.name).toBe("pumped-fn-graph")
     expect(plugin.enforce).toBe("pre")
     expect(plugin.apply).toBe("build")
+    expect(plugin).not.toHaveProperty("buildStart")
     expect(graphFileName).toBe("pumped-fn-lite.json")
   })
 
@@ -186,7 +187,9 @@ const run = flow({ deps: { config }, factory: () => "ok" })`,
     expect(code).toContain("export const edges = meta.edges")
     expect(code).toContain("export const issues = meta.issues")
     expect(code).toContain("import.meta.hot.accept")
+    expect(code).toContain("import.meta.hot.on")
     expect(code).toContain(hmrMetaEvent)
+    expect(code).not.toContain("(mod) =>")
     expect(code).toContain('"fromName":"run"')
     expect(code).toContain('"toName":"config"')
     expect(code).toContain('"issues":[]')
@@ -273,10 +276,12 @@ const config = atom({ factory: () => ({}) })`,
     )
     next.invalidated.length = 0
     next.unlink("src/atoms.ts")
+    await Promise.resolve()
 
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).not.toContain('"name":"config"')
   })
 
@@ -307,8 +312,9 @@ const run = flow({ deps: { config: make(config) }, factory: () => "ok" })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).toContain('"name":"run"')
     expect(code).toContain('"code":"dynamic-dep"')
   })
@@ -332,8 +338,9 @@ const created = atom({ factory: () => 1 })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).toContain('"name":"created"')
   })
 
@@ -362,8 +369,68 @@ const config = atom({ factory: () => ({}) })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
+    expect(code).not.toContain('"name":"config"')
+  })
+
+  it("adds metadata from Vite hotUpdate create events", async () => {
+    const plugin = pumpedHmr()
+    const configureServer = plugin.configureServer as Function
+    const update = plugin.hotUpdate as Function
+    const load = plugin.load as Function
+    const next = server()
+
+    configureServer(next.vite)
+
+    const result = await update({
+      type: "create",
+      file: "src/new.ts",
+      read: async () => `import { atom } from '@pumped-fn/lite'
+const created = atom({ factory: () => 1 })`,
+      server: next.vite,
+      modules: [],
+    })
+    const code = load(`\0${hmrMetaModule}`) as string
+
+    expect(result).toBeUndefined()
+    expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
+    expect(code).toContain('"name":"created"')
+  })
+
+  it("drops metadata from Vite hotUpdate delete events", async () => {
+    const plugin = pumpedHmr()
+    const configureServer = plugin.configureServer as Function
+    const transform = transformWith(plugin)
+    const update = plugin.hotUpdate as Function
+    const load = plugin.load as Function
+    const next = server()
+
+    configureServer(next.vite)
+    await transform(
+      `import { atom } from '@pumped-fn/lite'
+const config = atom({ factory: () => ({}) })`,
+      "src/atoms.ts"
+    )
+    next.invalidated.length = 0
+    next.sent.length = 0
+
+    const result = await update({
+      type: "delete",
+      file: "src/atoms.ts",
+      read: async () => {
+        throw new Error("unexpected read")
+      },
+      server: next.vite,
+      modules: [],
+    })
+    const code = load(`\0${hmrMetaModule}`) as string
+
+    expect(result).toBeUndefined()
+    expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).not.toContain('"name":"config"')
   })
 
@@ -420,8 +487,9 @@ const config = atom({ factory: () => ({}) })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).not.toContain('"name":"config"')
   })
 
@@ -446,6 +514,7 @@ const created = atom({ factory: () => 1 })`,
 
     expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).toContain('"name":"created"')
   })
 
@@ -481,8 +550,9 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).toContain('"importSource":"./next"')
     expect(code).toContain('"importId":"src/next.ts"')
   })
@@ -553,8 +623,9 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
     })
     const code = load(`\0${hmrMetaModule}`) as string
 
-    expect(result).toEqual([source, next.mod])
+    expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([next.mod.id])
+    expect(next.sent.at(-1)).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
     expect(code).toContain('"importId":"src/external.ts"')
   })
 
@@ -675,10 +746,12 @@ function server(
   let middleware: Middleware | undefined
   let unlink: Unlink | undefined
   const invalidated: string[] = []
+  const sent: unknown[] = []
   const mod = { id: `\0${hmrMetaModule}` }
   return {
     mod,
     invalidated,
+    sent,
     middleware: () => {
       if (!middleware) throw new Error("middleware not configured")
       return middleware
@@ -701,6 +774,9 @@ function server(
       moduleGraph: {
         getModuleById: (id: string) => hasMetaModule && id === mod.id ? mod : undefined,
         invalidateModule: (target: typeof mod) => invalidated.push(target.id),
+      },
+      ws: {
+        send: (payload: unknown) => sent.push(payload),
       },
       pluginContainer: {
         resolveId,

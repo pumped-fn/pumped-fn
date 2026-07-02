@@ -66,17 +66,20 @@ import { tanstackStartBoundary } from "@pumped-fn/lite-tanstack-start/vite"
 export default defineConfig({
   plugins: [
     tanstackStart(),
-    tanstackStartBoundary({
-      client: [/\/src\/client\.[cm]?[jt]sx?$/, /\/src\/routes\//],
-    }),
+    tanstackStartBoundary(),
   ],
 })
 ```
 
 Runtime imports from `@pumped-fn/lite-tanstack-start` are allowed in `src/start.ts`, `src/server.ts`,
-`*.server.*`, and `*.functions.*` files. Client entry files cannot import the adapter directly or
-reach it through a mixed barrel. Type-only imports are erased by Vite before the guard runs.
+`*.server.*`, `*.functions.*`, and `src/routes/api/**` files. Client entry files and non-API route
+files cannot import the adapter directly or reach it through a mixed barrel. Type-only imports are
+erased by Vite before the guard runs.
 
 Use `*.functions.*` for `createServerFn(...)` wrappers that call `lite.handler(...)`; client modules
 can import those server functions as RPC stubs. Keep backend scope, sync runtime tags, request
 middleware, and transport wiring in `src/start.ts` or another server boundary file.
+
+The guard does not inspect excluded dependency packages. A package under `node_modules` that wraps or
+re-exports the adapter is trusted as dependency code; keep adapter wrappers in app source when you
+want the guard to analyze reachability.

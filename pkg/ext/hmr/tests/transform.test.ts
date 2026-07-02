@@ -369,6 +369,29 @@ const config = define({ factory: () => ({}) })`
     ])
   })
 
+  it("does not report package atom imports as Lite HMR issues", () => {
+    const code = `import { atom } from 'jotai'
+const config = atom(0)`
+    const filePath = "src/jotai.ts"
+
+    const result = transformAtoms(code, filePath)
+
+    expect(result).toBeNull()
+  })
+
+  it("does not report locally shadowed barrel atom imports", () => {
+    const code = `import { atom } from '../lib/lite'
+function make() {
+  const atom = (input: unknown) => input
+  return atom({ factory: () => ({}) })
+}`
+    const filePath = "src/shadow.ts"
+
+    const result = transformAtoms(code, filePath)
+
+    expect(result).toBeNull()
+  })
+
   it("returns null when no atom() calls present", () => {
     const code = `const x = 1`
     const filePath = "src/noatom.ts"

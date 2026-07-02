@@ -170,6 +170,7 @@ function unsupportedAtomBindings(source: ts.SourceFile): readonly UnsupportedAto
     if (!ts.isImportDeclaration(statement)) continue
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue
     if (statement.moduleSpecifier.text === "@pumped-fn/lite") continue
+    if (!localSource(statement.moduleSpecifier.text)) continue
     if (statement.importClause?.isTypeOnly) continue
     const namedBindings = statement.importClause?.namedBindings
     if (!namedBindings || !ts.isNamedImports(namedBindings)) continue
@@ -392,8 +393,27 @@ function declarationName(node: ts.Node): string {
 function isShadowed(node: ts.Identifier): boolean {
   for (let parent = node.parent; parent; parent = parent.parent) {
     if (ts.isFunctionLike(parent) && parent.parameters.some((param) => ts.isIdentifier(param.name) && param.name.text === node.text)) return true
+    if ((ts.isBlock(parent) || ts.isSourceFile(parent) || ts.isModuleBlock(parent)) && declaresName(parent.statements, node.text, node.pos)) return true
   }
   return false
+}
+
+function declaresName(statements: ts.NodeArray<ts.Statement>, name: string, before: number): boolean {
+  return statements.some((statement) => statement.pos < before && declares(statement, name))
+}
+
+function declares(statement: ts.Statement, name: string): boolean {
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.some((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name)
+  }
+  return (
+    (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) &&
+    statement.name?.text === name
+  )
+}
+
+function localSource(source: string): boolean {
+  return source.startsWith(".") || source.startsWith("/")
 }
 
 function edgeTarget(

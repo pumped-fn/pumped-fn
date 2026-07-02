@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { atom, createScope } from "@pumped-fn/lite"
+import { atom, createScope, tag } from "@pumped-fn/lite"
 import { __hmr_register } from "../src/runtime"
 import type { HotModule } from "../src/types"
 
@@ -62,6 +62,24 @@ describe("__hmr_register", () => {
 
     expect(second).toBe(first)
     expect(await scope.resolve(first)).toBe("second")
+  })
+
+  it("retargets tag reverse lookups to the preserved atom", () => {
+    const hot = hotModule()
+    const oldTag = tag<string>({ label: "old" })
+    const newTag = tag<string>({ label: "new" })
+    const first = __hmr_register("key", atom({
+      tags: [oldTag("value")],
+      factory: () => "first",
+    }), hot)
+    const second = __hmr_register("key", atom({
+      tags: [newTag("value")],
+      factory: () => "second",
+    }), hot)
+
+    expect(second).toBe(first)
+    expect(oldTag.atoms()).toEqual([])
+    expect(newTag.atoms()).toEqual([first])
   })
 })
 

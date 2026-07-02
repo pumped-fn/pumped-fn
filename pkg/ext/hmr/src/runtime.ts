@@ -1,4 +1,4 @@
-import type { Lite } from "@pumped-fn/lite"
+import { retargetAtomTags, type Lite } from "@pumped-fn/lite"
 import type { AtomRegistry, HotModule } from "./types"
 
 type MutableAtom<T> = {
@@ -35,6 +35,7 @@ export function __hmr_register<T>(
 
   if (registry.has(key)) {
     const current = registry.get(key) as MutableAtom<T>
+    retargetAtomTags(current, atom)
     current.factory = atom.factory
     current.deps = atom.deps
     current.tags = atom.tags

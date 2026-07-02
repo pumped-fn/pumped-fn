@@ -41,8 +41,8 @@ const config = atom({ factory: () => ({}) })`
     expect(result1?.code).toMatch(keyPattern)
     expect(result2?.code).toMatch(keyPattern)
 
-    const key1 = result1?.code.match(/'(src\/atoms\.ts:config)'/)?.[1]
-    const key2 = result2?.code.match(/'(src\/atoms\.ts:config)'/)?.[1]
+    const key1 = result1?.code.match(/"(src\/atoms\.ts:config)"/)?.[1]
+    const key2 = result2?.code.match(/"(src\/atoms\.ts:config)"/)?.[1]
     expect(key1).toBe(key2)
   })
 

@@ -1,6 +1,14 @@
+import { existsSync, readFileSync } from "node:fs"
+import { dirname } from "node:path"
 import type { Plugin } from "vite"
 
 type BoundaryPattern = RegExp | string
+
+interface AddResult {
+  readonly recorded: boolean
+  readonly changed: boolean
+  readonly violation?: BoundaryViolation
+}
 
 interface ModuleEdge {
   readonly source: string
@@ -33,10 +41,16 @@ interface Reference {
 type Resolver = (source: string) => Promise<string | undefined>
 type Parser = (code: string) => unknown
 
+interface RuntimeTarget {
+  readonly entry: string
+  readonly root: string | undefined
+}
+
 export interface BoundaryOptions {
   readonly include?: BoundaryPattern[]
   readonly exclude?: BoundaryPattern[]
   readonly client?: BoundaryPattern[]
+  readonly serverRoutes?: BoundaryPattern[]
   readonly server?: BoundaryPattern[]
   readonly functions?: BoundaryPattern[]
   readonly specifiers?: BoundaryPattern[]
@@ -52,6 +66,9 @@ const defaults = {
     /\/src\/routes\//,
     /\.client\.[cm]?[jt]sx?$/,
     /\.browser\.[cm]?[jt]sx?$/,
+  ],
+  serverRoutes: [
+    /\/src\/routes\/api(?:\/|\.|$)/,
   ],
   server: [
     /\/src\/start\.[cm]?[jt]sx?$/,
@@ -74,13 +91,11 @@ export function boundary(options: BoundaryOptions = {}): Plugin {
         (source) => this.resolve(source, id, { skipSelf: true }).then((resolved) => resolved?.id),
         (input) => this.parse(input)
       )
-      if (direct) throw new Error(format(direct))
-      const violation = checker.violation()
+      if (direct.violation) throw new Error(format(direct.violation))
+      if (!direct.recorded && !direct.changed) return null
+      const violation = direct.changed ? checker.violation() : undefined
       if (violation) throw new Error(format(violation))
       return null
-    },
-    buildStart() {
-      checker.reset()
     },
     watchChange(id) {
       checker.delete(clean(id))
@@ -97,31 +112,41 @@ export const tanstackStartBoundary = boundary
 function createChecker(options: BoundaryOptions) {
   const config = merge(options)
   const records = new Map<string, ModuleRecord>()
+  let dirty = true
+  let cached: BoundaryViolation | undefined
+  let runtime: Promise<RuntimeTarget | undefined> | undefined
 
   return {
-    async add(id: string, code: string, resolve: Resolver, parse: Parser) {
+    async add(id: string, code: string, resolve: Resolver, parse: Parser): Promise<AddResult> {
       if (!matches(config.include, id) || matches(config.exclude, id)) {
-        records.delete(id)
-        return
+        const changed = records.delete(id)
+        dirty = dirty || changed
+        return { recorded: false, changed }
       }
-      const record = await read(id, code, resolve, parse, config)
+      runtime ??= resolve(packageName).then((adapter) => adapter ? runtimeTarget(clean(adapter)) : undefined)
+      const record = await read(id, code, resolve, parse, config, await runtime)
+      const changed = JSON.stringify(records.get(id)) !== JSON.stringify(record)
       records.set(id, record)
-      return localViolation(record)
+      dirty = dirty || changed
+      return { recorded: true, changed, violation: localViolation(record) }
     },
     violation() {
+      if (!dirty) return cached
+      cached = undefined
       for (const record of records.values()) {
         if (record.client) {
           const violation = reachesServer(record, records, config, new Set())
-          if (violation) return violation
+          if (violation) {
+            cached = violation
+            break
+          }
         }
       }
-      return undefined
+      dirty = false
+      return cached
     },
     delete(id: string) {
-      records.delete(id)
-    },
-    reset() {
-      records.clear()
+      dirty = records.delete(id) || dirty
     },
   }
 }
@@ -131,6 +156,7 @@ function merge(options: BoundaryOptions): Required<BoundaryOptions> {
     include: options.include ?? defaults.include,
     exclude: options.exclude ?? defaults.exclude,
     client: options.client ?? defaults.client,
+    serverRoutes: options.serverRoutes ?? defaults.serverRoutes,
     server: options.server ?? defaults.server,
     functions: options.functions ?? defaults.functions,
     specifiers: options.specifiers ?? defaults.specifiers,
@@ -142,17 +168,18 @@ async function read(
   code: string,
   resolve: Resolver,
   parse: Parser,
-  config: Required<BoundaryOptions>
+  config: Required<BoundaryOptions>,
+  runtime: RuntimeTarget | undefined
 ): Promise<ModuleRecord> {
   const edges: ModuleEdge[] = []
   let directRuntime = false
   let violation: BoundaryViolation | undefined
-  const adapter = await resolve(packageName)
-  const adapterRoot = adapter ? runtimeRoot(clean(adapter)) : undefined
+  const serverRoute = matches(config.serverRoutes, id)
+  const server = serverRoute || matches(config.server, id)
 
   for (const reference of references(parse(code))) {
     const resolved = await resolve(reference.source)
-    if (runtimeReference(reference.source, resolved, adapterRoot, config)) {
+    if (runtimeReference(reference.source, resolved, runtime, config)) {
       directRuntime = true
       if (reference.kind === "export") {
         violation = location(
@@ -171,9 +198,9 @@ async function read(
     id,
     edges,
     directRuntime,
-    client: matches(config.client, id),
+    client: matches(config.client, id) && !serverRoute,
     bridge: matches(config.functions, id),
-    server: matches(config.server, id),
+    server,
     violation,
   }
 }
@@ -202,9 +229,7 @@ function reachesServer(
   if (record.directRuntime && !record.server) {
     return {
       id: record.id,
-      message: record.client && !record.bridge
-        ? directRuntimeMessage()
-        : `Client-reachable module ${record.id} reaches TanStack Start backend boundary ${record.id}.`,
+      message: record.client ? directRuntimeMessage() : `Client-reachable module ${record.id} reaches TanStack Start backend boundary.`,
     }
   }
 
@@ -237,7 +262,7 @@ function directRuntimeMessage(): string {
 function runtimeReference(
   source: string,
   resolved: string | undefined,
-  adapterRoot: string | undefined,
+  runtime: RuntimeTarget | undefined,
   config: Required<BoundaryOptions>
 ): boolean {
   if (matches(config.specifiers, source)) return true
@@ -245,14 +270,33 @@ function runtimeReference(
   const id = resolved ? clean(resolved) : undefined
   if (!id) return false
   if (id.includes(`/node_modules/${packageName}/`)) return true
-  return adapterRoot ? id === adapterRoot.slice(0, -1) || id.startsWith(adapterRoot) : false
+  if (runtime?.root && (id === runtime.root.slice(0, -1) || id.startsWith(runtime.root))) return true
+  return runtime ? id === runtime.entry : false
 }
 
-function runtimeRoot(resolved: string): string {
+function runtimeTarget(resolved: string): RuntimeTarget {
   const marker = `/node_modules/${packageName}/`
   const index = resolved.indexOf(marker)
-  if (index >= 0) return resolved.slice(0, index + marker.length)
-  return resolved.slice(0, resolved.lastIndexOf("/") + 1)
+  return {
+    entry: resolved,
+    root: index >= 0 ? resolved.slice(0, index + marker.length) : packageRoot(resolved, packageName),
+  }
+}
+
+function packageRoot(file: string, name: string): string | undefined {
+  let dir = dirname(file)
+  for (;;) {
+    const manifest = `${dir}/package.json`
+    if (existsSync(manifest) && packageNameOf(manifest) === name) return `${dir}/`
+    const parent = dirname(dir)
+    if (parent === dir) return undefined
+    dir = parent
+  }
+}
+
+function packageNameOf(file: string): string | undefined {
+  const value = JSON.parse(readFileSync(file, "utf8")) as { name?: unknown }
+  return typeof value.name === "string" ? value.name : undefined
 }
 
 function references(root: unknown): Reference[] {

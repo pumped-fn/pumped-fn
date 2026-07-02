@@ -23,6 +23,10 @@ describe("TanStack Start boundary Vite plugin", () => {
     expect(tanstackStartBoundary().name).toBe("pumped-fn-tanstack-start-boundary")
   })
 
+  it("keeps watch build records across cached rebuilds", () => {
+    expect(boundary()).not.toHaveProperty("buildStart")
+  })
+
   it("rejects runtime adapter imports from client entry modules", async () => {
     const root = fixture({
       "src/client.ts": `
@@ -143,7 +147,7 @@ describe("TanStack Start boundary Vite plugin", () => {
 
   it("treats route modules as client-reachable by default", async () => {
     const root = fixture({
-      "src/client.ts": `import "./routes/index"`,
+      "src/client.ts": `console.log("client")`,
       "src/routes/index.tsx": `
         import { request } from "../start"
         export const route = request
@@ -154,7 +158,47 @@ describe("TanStack Start boundary Vite plugin", () => {
       `,
     })
 
-    await expect(run(root)).rejects.toThrow("reaches TanStack Start backend boundary")
+    await expect(run(root, undefined, {
+      input: join(root, "src/routes/index.tsx"),
+    })).rejects.toThrow("reaches TanStack Start backend boundary")
+  })
+
+  it("allows server API routes to use the runtime adapter", async () => {
+    const root = fixture({
+      "src/client.ts": `console.log("client")`,
+      "src/routes/api/health.ts": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const request = tanstackStart.contextKey
+      `,
+    })
+
+    await expect(run(root, undefined, {
+      input: {
+        client: join(root, "src/client.ts"),
+        health: join(root, "src/routes/api/health.ts"),
+      },
+    })).resolves.toBeUndefined()
+  })
+
+  it("allows server API routes to import server helpers", async () => {
+    const root = fixture({
+      "src/client.ts": `console.log("client")`,
+      "src/routes/api/health.ts": `
+        import { request } from "../../lib/request.server"
+        export const health = request
+      `,
+      "src/lib/request.server.ts": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const request = tanstackStart.contextKey
+      `,
+    })
+
+    await expect(run(root, undefined, {
+      input: {
+        client: join(root, "src/client.ts"),
+        health: join(root, "src/routes/api/health.ts"),
+      },
+    })).resolves.toBeUndefined()
   })
 
   it("rejects transitive leaks during dev transforms", async () => {
@@ -209,6 +253,45 @@ describe("TanStack Start boundary Vite plugin", () => {
     })
 
     await expect(run(root)).resolves.toBeUndefined()
+  })
+
+  it("does not classify siblings of a local adapter entry as runtime imports", async () => {
+    const root = fixture({
+      "src/client.ts": `
+        import { analytics } from "./shims/analytics"
+        console.log(analytics)
+      `,
+      "src/shims/start.ts": `export const tanstackStart = { contextKey: "lite" }`,
+      "src/shims/analytics.ts": `export const analytics = "ok"`,
+    })
+
+    await expect(run(root, undefined, {
+      alias: {
+        "@pumped-fn/lite-tanstack-start": join(root, "src/shims/start.ts"),
+      },
+    })).resolves.toBeUndefined()
+  })
+
+  it("classifies sibling files inside a local adapter package as runtime imports", async () => {
+    const root = fixture({
+      "src/client.ts": `
+        import { tanstackStart } from "start-runtime"
+        console.log(tanstackStart)
+      `,
+      "packages/start/package.json": JSON.stringify({
+        type: "module",
+        name: "@pumped-fn/lite-tanstack-start",
+      }),
+      "packages/start/src/index.ts": `export const tanstackStart = { contextKey: "lite" }`,
+      "packages/start/runtime/adapter.ts": `export const tanstackStart = { contextKey: "lite" }`,
+    })
+
+    await expect(run(root, undefined, {
+      alias: {
+        "@pumped-fn/lite-tanstack-start": join(root, "packages/start/src/index.ts"),
+        "start-runtime": join(root, "packages/start/runtime/adapter.ts"),
+      },
+    })).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
   })
 })
 

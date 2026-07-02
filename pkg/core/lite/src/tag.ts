@@ -58,6 +58,36 @@ export function registerAtomToTags(
   }
 }
 
+function unregisterAtomFromTags(
+  atom: Lite.Atom<unknown>,
+  tags: Lite.Tagged<any>[]
+): void {
+  for (const tagged of tags) {
+    const refs = registry.get(tagged.tag)
+    if (!refs) continue
+    const liveRefs: WeakRef<Lite.Atom<unknown>>[] = []
+    for (const ref of refs) {
+      const current = ref.deref()
+      if (current && current !== atom) liveRefs.push(ref)
+    }
+    registry.set(tagged.tag, liveRefs)
+  }
+}
+
+/**
+ * Moves tag reverse-lookup registration from one atom instance to another.
+ */
+export function retargetAtomTags(
+  target: Lite.Atom<unknown>,
+  source: Lite.Atom<unknown>
+): void {
+  if (target.tags?.length) unregisterAtomFromTags(target, target.tags)
+  if (source.tags?.length) {
+    unregisterAtomFromTags(source, source.tags)
+    registerAtomToTags(target, source.tags)
+  }
+}
+
 function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
   const refs = registry.get(tag)
   if (!refs) return []

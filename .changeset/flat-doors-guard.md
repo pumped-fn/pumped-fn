@@ -1,6 +1,7 @@
 ---
 "@pumped-fn/lite-tanstack-start": minor
 "@pumped-fn/lite-hmr": minor
+"@pumped-fn/lite": patch
 ---
 
 Add a Vite boundary guard that rejects client-reachable runtime imports of the TanStack Start Lite adapter while allowing server-function bridge modules.
