@@ -6,7 +6,7 @@ import {
   toggleTodo,
 } from "../src/domain"
 import { clearCall, createCall, listCall, lite, request, toggleCall } from "../src/start"
-import { clearCompletedFn, createTodoFn, listTodosFn, toggleTodoFn } from "../src/functions"
+import { clearCompletedFn, createTodoFn, listTodosFn, toggleTodoFn } from "../src/todo.functions"
 import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
 import { ParseError } from "@pumped-fn/lite"
 import { ZodError } from "zod"
@@ -144,7 +144,7 @@ async function invokeThroughStart<Output, Input>(options: {
         serverFnMeta: {
           id: options.path,
           name: options.path,
-          filename: "src/functions.ts",
+          filename: "src/todo.functions.ts",
         },
         signal: controller.signal,
         next: async (callOptions: { context: tanstackStart.Context }) => {

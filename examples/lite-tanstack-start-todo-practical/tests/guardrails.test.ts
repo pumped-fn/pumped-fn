@@ -9,10 +9,12 @@ describe("example guardrails", () => {
     const files = [
       "src/domain.ts",
       "src/routeTree.gen.ts",
+      "src/router.tsx",
       "src/start.ts",
-      "src/functions.ts",
+      "src/todo.functions.ts",
       "src/routes/__root.tsx",
       "src/routes/index.tsx",
+      "tests/dev-mode.test.ts",
       "tests/domain.test.ts",
       "tests/server-functions.test.ts",
     ].map((path) => [path, readFileSync(resolve(root, path), "utf8")] as const)

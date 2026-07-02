@@ -6,7 +6,7 @@ import {
   createTodoFn,
   listTodosFn,
   toggleTodoFn,
-} from "../functions"
+} from "../todo.functions"
 import type { TodoList } from "../domain"
 
 export const Route = createFileRoute("/")({
