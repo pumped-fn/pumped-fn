@@ -1,5 +1,11 @@
 # @pumped-fn/lite-lint
 
+## 0.2.1
+
+### Patch Changes
+
+- dc60cea: Add a `pumped/no-direct-flow-composition` rule that requires flow-to-flow composition to use explicit `controller(childFlow)` dependencies instead of hidden direct flow execution.
+
 ## 0.2.0
 
 ### Minor Changes

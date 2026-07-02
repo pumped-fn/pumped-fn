@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-sync-nats",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": false,
   "description": "NATS JetStream KV transport for @pumped-fn/lite-extension-sync",
   "type": "module",
@@ -34,7 +34,7 @@
   },
   "peerDependencies": {
     "@nats-io/kv": "^3.4.0",
-    "@pumped-fn/lite-extension-sync": "^0.1.0"
+    "@pumped-fn/lite-extension-sync": "^0.2.0"
   },
   "devDependencies": {
     "@nats-io/kv": "catalog:",
