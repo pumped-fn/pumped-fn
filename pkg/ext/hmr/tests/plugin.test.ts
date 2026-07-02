@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import type { Plugin } from "vite"
 import { describe, it, expect } from "vitest"
 import { graphFileName, hmrInspectPath, hmrMetaEvent, hmrMetaModule, hmrMetaPath, hmrModuleMetaKey, pumpedGraph, pumpedHmr, pumpedVite } from "../src/plugin"
 
@@ -81,9 +82,40 @@ describe("pumpedHmr plugin", () => {
 
     generateBundle.call({
       emitFile: (file: { fileName?: string }) => files.push(file),
+      getModuleIds: () => [].values(),
     })
 
     expect(files.map((file) => file.fileName)).toEqual(["lite-graph.json"])
+  })
+
+  it("prunes graph metadata to the current build module set", async () => {
+    const plugin = pumpedGraph()
+    const configResolved = plugin.configResolved as Function
+    const transform = transformWith(plugin)
+    const generateBundle = plugin.generateBundle as Function
+    const files: { source?: string }[] = []
+
+    configResolved({ root: "/project" })
+    await transform(
+      `import { atom } from '@pumped-fn/lite'
+const kept = atom({ factory: () => 1 })`,
+      "/project/src/kept.ts"
+    )
+    await transform(
+      `import { atom } from '@pumped-fn/lite'
+const orphaned = atom({ factory: () => 1 })`,
+      "/project/src/orphaned.ts"
+    )
+
+    generateBundle.call({
+      emitFile: (file: { source?: string }) => files.push(file),
+      getModuleIds: () => ["/project/src/kept.ts"].values(),
+    })
+
+    const meta = JSON.parse(files[0]!.source!) as { modules: { id: string }[]; atoms: { name: string }[] }
+
+    expect(meta.modules.map((mod) => mod.id)).toEqual(["src/kept.ts"])
+    expect(meta.atoms.map((atom) => atom.name)).toEqual(["kept"])
   })
 
   it("does not disable dev transforms from NODE_ENV alone", async () => {
@@ -245,8 +277,36 @@ const config = atom({ factory: () => ({}) })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts"
     )
+    await flushMeta()
 
     expect(next.invalidated).toEqual([next.mod.id])
+  })
+
+  it("coalesces cold-start metadata broadcasts", async () => {
+    const plugin = pumpedHmr()
+    const configureServer = plugin.configureServer as Function
+    const transform = transformWith(plugin)
+    const next = server()
+
+    configureServer(next.vite)
+
+    await transform(
+      `import { atom } from '@pumped-fn/lite'
+const one = atom({ factory: () => 1 })`,
+      "src/one.ts"
+    )
+    await transform(
+      `import { atom } from '@pumped-fn/lite'
+const two = atom({ factory: () => 2 })`,
+      "src/two.ts"
+    )
+
+    expect(next.sent).toEqual([])
+
+    await flushMeta()
+
+    expect(next.sent).toHaveLength(1)
+    expect(next.sent[0]).toEqual(expect.objectContaining({ event: hmrMetaEvent }))
   })
 
   it("does not invalidate metadata for unrelated modules", async () => {
@@ -274,9 +334,11 @@ const config = atom({ factory: () => ({}) })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
     next.unlink("src/atoms.ts")
     await Promise.resolve()
+    await flushMeta()
 
     const code = load(`\0${hmrMetaModule}`) as string
 
@@ -300,6 +362,7 @@ const config = atom({ factory: () => ({}) })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -310,6 +373,7 @@ const run = flow({ deps: { config: make(config) }, factory: () => "ok" })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -336,6 +400,7 @@ const created = atom({ factory: () => 1 })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -359,6 +424,7 @@ const created = atom({ factory: () => 1 })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -367,6 +433,7 @@ const config = atom({ factory: () => ({}) })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -392,6 +459,7 @@ const created = atom({ factory: () => 1 })`,
       server: next.vite,
       modules: [],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -414,6 +482,7 @@ const created = atom({ factory: () => 1 })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
     next.sent.length = 0
 
@@ -426,6 +495,7 @@ const config = atom({ factory: () => ({}) })`,
       server: next.vite,
       modules: [],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -448,6 +518,7 @@ const config = atom({ factory: () => ({}) })`,
 const config = atom({ factory: () => 1 })`,
       "src/atoms.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -457,6 +528,7 @@ const config = atom({ factory: () => 2 })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
 
     expect(result).toBeUndefined()
     expect(next.invalidated).toEqual([])
@@ -477,6 +549,7 @@ const config = atom({ factory: () => 2 })`,
 const config = atom({ factory: () => ({}) })`,
       "src/atoms.ts?t=1"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -485,6 +558,7 @@ const config = atom({ factory: () => ({}) })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -510,6 +584,7 @@ const created = atom({ factory: () => 1 })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -538,6 +613,7 @@ import { external } from './external'
 const run = flow({ deps: { external }, factory: () => "ok" })`,
       "src/flow.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -548,6 +624,7 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -575,6 +652,7 @@ import { external } from './external'
 const run = flow({ deps: { external }, factory: () => "ok" })`,
       "/project/src/flow.ts"
     )
+    await flushMeta()
     next.invalidated.length = 0
 
     const result = await update({
@@ -585,6 +663,7 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -612,6 +691,7 @@ import { external } from './external'
 const run = flow({ deps: { external }, factory: () => "ok" })`,
       "src/flow.ts"
     )
+    await flushMeta()
     created = true
     next.invalidated.length = 0
 
@@ -621,6 +701,7 @@ const run = flow({ deps: { external }, factory: () => "ok" })`,
       server: next.vite,
       modules: [source],
     })
+    await flushMeta()
     const code = load(`\0${hmrMetaModule}`) as string
 
     expect(result).toBeUndefined()
@@ -785,7 +866,11 @@ function server(
   }
 }
 
-function transformWith(plugin: ReturnType<typeof pumpedHmr>) {
+function flushMeta(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+function transformWith(plugin: Plugin) {
   const transform = plugin.transform as (
     this: { resolve(source: string, importer: string, options: { skipSelf: boolean }): Promise<{ id: string } | undefined> },
     code: string,

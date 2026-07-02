@@ -72,9 +72,11 @@ export default defineConfig({
 ```
 
 Runtime imports from `@pumped-fn/lite-tanstack-start` are allowed in `src/start.ts`, `src/server.ts`,
-`*.server.*`, `*.functions.*`, and `src/routes/api/**` files. Client entry files and non-API route
-files cannot import the adapter directly or reach it through a mixed barrel. Type-only imports are
-erased by Vite before the guard runs.
+`*.server.*`, `*.functions.*`, and `src/routes/api/**` files. The default API route trust requires
+the `api` path segment; flat page route files such as `src/routes/api.tsx` and
+`src/routes/api.users.tsx` remain client-reachable. Client entry files and non-API route files cannot
+import the adapter directly or reach it through a mixed barrel. Type-only imports are erased by Vite
+before the guard runs.
 
 Use `*.functions.*` for `createServerFn(...)` wrappers that call `lite.handler(...)`; client modules
 can import those server functions as RPC stubs. Keep backend scope, sync runtime tags, request
@@ -83,3 +85,11 @@ middleware, and transport wiring in `src/start.ts` or another server boundary fi
 The guard does not inspect excluded dependency packages. A package under `node_modules` that wraps or
 re-exports the adapter is trusted as dependency code; keep adapter wrappers in app source when you
 want the guard to analyze reachability.
+
+Customize `serverRoutes` only for route files that are guaranteed to execute as server-only handlers:
+
+```ts
+tanstackStartBoundary({
+  serverRoutes: [/\/src\/routes\/api(?:\/|$)/],
+})
+```

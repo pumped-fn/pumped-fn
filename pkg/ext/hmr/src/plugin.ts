@@ -51,6 +51,7 @@ export const graphFileName = "pumped-fn-lite.json"
 
 const resolvedHmrMetaModule = `\0${hmrMetaModule}`
 const emptyMeta: LiteMeta = { modules: [], handles: [], atoms: [], edges: [], issues: [] }
+const metaQueues = new WeakMap<ViteDevServer, ReturnType<typeof setTimeout>>()
 
 /**
  * Vite plugin set for Lite HMR, dev metadata, and optional production graph metadata.
@@ -121,28 +122,28 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
       const key = displayId(raw, root)
 
       if (!matches(include, raw)) {
-        if (drop(modules, key)) publishMeta(server, modules)
+        if (drop(modules, key)) queueMeta(server, modules)
         return null
       }
 
       if (matches(exclude, raw)) {
-        if (drop(modules, key)) publishMeta(server, modules)
+        if (drop(modules, key)) queueMeta(server, modules)
         return null
       }
 
       if (!maybeLite(code)) {
-        if (drop(modules, key)) publishMeta(server, modules)
+        if (drop(modules, key)) queueMeta(server, modules)
         return null
       }
 
       const result = transformAtoms(code, key)
       if (!result) {
-        if (drop(modules, key)) publishMeta(server, modules)
+        if (drop(modules, key)) queueMeta(server, modules)
         return null
       }
 
       const meta = await resolveMeta(result.meta, raw, root, (source, importer) => resolveHmrImport(this, server, source, importer))
-      if (set(modules, meta)) publishMeta(server, modules)
+      if (set(modules, meta)) queueMeta(server, modules)
       return {
         code: result.code,
         map: result.map,
@@ -241,6 +242,7 @@ export function pumpedGraph(options: PumpedGraphOptions = {}): Plugin {
     },
 
     generateBundle() {
+      pruneModules(modules, this.getModuleIds(), root)
       this.emitFile({
         type: "asset",
         fileName,
@@ -284,7 +286,7 @@ async function dropAndRefresh(
 ): Promise<void> {
   let changed = drop(modules, id)
   if (server) changed = await refreshImports(modules, server, root) || changed
-  if (changed) publishMeta(server, modules)
+  if (changed) queueMeta(server, modules)
 }
 
 async function syncHotUpdate(
@@ -316,7 +318,7 @@ async function syncHotUpdate(
   }
 
   changed = await refreshImports(modules, server, root) || changed
-  if (changed) publishMeta(server, modules)
+  if (changed) queueMeta(server, modules)
 }
 
 async function refreshImports(modules: Map<string, ModuleMeta>, server: ViteDevServer, root: string): Promise<boolean> {
@@ -383,6 +385,14 @@ function metaModule(server: ViteDevServer) {
   return server.moduleGraph.getModuleById(resolvedHmrMetaModule)
 }
 
+function queueMeta(server: ViteDevServer | undefined, modules: ReadonlyMap<string, ModuleMeta>): void {
+  if (!server || metaQueues.has(server)) return
+  metaQueues.set(server, setTimeout(() => {
+    metaQueues.delete(server)
+    publishMeta(server, modules)
+  }, 0))
+}
+
 function publishMeta(server: ViteDevServer | undefined, modules: ReadonlyMap<string, ModuleMeta>): void {
   if (!server) return
   const mod = metaModule(server)
@@ -400,6 +410,13 @@ function set(modules: Map<string, ModuleMeta>, meta: ModuleMeta): boolean {
 function drop(modules: Map<string, ModuleMeta>, id: string): boolean {
   if (!modules.delete(id)) return false
   return true
+}
+
+function pruneModules(modules: Map<string, ModuleMeta>, ids: Iterable<string>, root: string): void {
+  const live = new Set([...ids].map((id) => displayId(clean(id), root)))
+  for (const id of modules.keys()) {
+    if (!live.has(id)) modules.delete(id)
+  }
 }
 
 function matches(pattern: RegExp, value: string): boolean {

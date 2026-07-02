@@ -68,7 +68,7 @@ const defaults = {
     /\.browser\.[cm]?[jt]sx?$/,
   ],
   serverRoutes: [
-    /\/src\/routes\/api(?:\/|\.|$)/,
+    /\/src\/routes\/api(?:\/|$)/,
   ],
   server: [
     /\/src\/start\.[cm]?[jt]sx?$/,
@@ -81,9 +81,13 @@ const defaults = {
 
 export function boundary(options: BoundaryOptions = {}): Plugin {
   const checker = createChecker(options)
+  let command: "build" | "serve" = "build"
 
   return {
     name: "pumped-fn-tanstack-start-boundary",
+    configResolved(config) {
+      command = config.command
+    },
     async transform(code, id) {
       const direct = await checker.add(
         clean(id),
@@ -93,7 +97,7 @@ export function boundary(options: BoundaryOptions = {}): Plugin {
       )
       if (direct.violation) throw new Error(format(direct.violation))
       if (!direct.recorded && !direct.changed) return null
-      const violation = direct.changed ? checker.violation() : undefined
+      const violation = command === "serve" ? checker.violation() : undefined
       if (violation) throw new Error(format(violation))
       return null
     },
@@ -101,6 +105,7 @@ export function boundary(options: BoundaryOptions = {}): Plugin {
       checker.delete(clean(id))
     },
     buildEnd() {
+      checker.prune(this.getModuleIds())
       const violation = checker.violation()
       if (violation) throw new Error(format(violation))
     },
@@ -114,7 +119,7 @@ function createChecker(options: BoundaryOptions) {
   const records = new Map<string, ModuleRecord>()
   let dirty = true
   let cached: BoundaryViolation | undefined
-  let runtime: Promise<RuntimeTarget | undefined> | undefined
+  let runtime: RuntimeTarget | undefined
 
   return {
     async add(id: string, code: string, resolve: Resolver, parse: Parser): Promise<AddResult> {
@@ -123,8 +128,11 @@ function createChecker(options: BoundaryOptions) {
         dirty = dirty || changed
         return { recorded: false, changed }
       }
-      runtime ??= resolve(packageName).then((adapter) => adapter ? runtimeTarget(clean(adapter)) : undefined)
-      const record = await read(id, code, resolve, parse, config, await runtime)
+      if (!runtime) {
+        const adapter = await resolve(packageName).then((value) => value, () => undefined)
+        if (adapter) runtime = runtimeTarget(clean(adapter))
+      }
+      const record = await read(id, code, resolve, parse, config, runtime)
       const changed = JSON.stringify(records.get(id)) !== JSON.stringify(record)
       records.set(id, record)
       dirty = dirty || changed
@@ -147,6 +155,14 @@ function createChecker(options: BoundaryOptions) {
     },
     delete(id: string) {
       dirty = records.delete(id) || dirty
+    },
+    prune(ids: Iterable<string>) {
+      const live = new Set([...ids].map(clean))
+      let changed = false
+      for (const id of records.keys()) {
+        if (!live.has(id)) changed = records.delete(id) || changed
+      }
+      dirty = dirty || changed
     },
   }
 }
@@ -295,8 +311,7 @@ function packageRoot(file: string, name: string): string | undefined {
 }
 
 function packageNameOf(file: string): string | undefined {
-  const value = JSON.parse(readFileSync(file, "utf8")) as { name?: unknown }
-  return typeof value.name === "string" ? value.name : undefined
+  return readFileSync(file, "utf8").match(/"name"\s*:\s*"([^"]+)"/)?.[1]
 }
 
 function references(root: unknown): Reference[] {

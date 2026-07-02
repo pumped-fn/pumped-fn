@@ -369,6 +369,24 @@ const config = define({ factory: () => ({}) })`
     ])
   })
 
+  it("reports atom calls imported through common Vite alias barrels", () => {
+    const code = `import { atom } from '@/lib/lite'
+const config = atom({ factory: () => ({}) })`
+    const filePath = "src/alias.ts"
+
+    const result = transformAtoms(code, filePath)
+
+    expect(result).not.toBeNull()
+    expect(result!.code).not.toContain("__hmr_register")
+    expect(result!.meta.issues).toEqual([
+      expect.objectContaining({
+        code: "untracked-atom",
+        fromName: "config",
+        target: "atom({ factory: () => ({}) }) from @/lib/lite",
+      }),
+    ])
+  })
+
   it("does not report package atom imports as Lite HMR issues", () => {
     const code = `import { atom } from 'jotai'
 const config = atom(0)`

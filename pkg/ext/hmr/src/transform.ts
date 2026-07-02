@@ -413,7 +413,7 @@ function declares(statement: ts.Statement, name: string): boolean {
 }
 
 function localSource(source: string): boolean {
-  return source.startsWith(".") || source.startsWith("/")
+  return source.startsWith(".") || source.startsWith("/") || source.startsWith("@/") || source.startsWith("~/")
 }
 
 function edgeTarget(

@@ -126,7 +126,7 @@ Issue codes are intentionally narrow:
 | --- | --- |
 | `dynamic-dep` | A `deps` slot used an expression the scanner cannot turn into a stable edge. |
 | `unknown-dep` | A `deps` slot points at a local identifier that is not a discovered Lite handle or import. |
-| `untracked-atom` | An `atom()` call was not HMR-wrapped because it was nested, dynamic, or imported through a barrel instead of directly from `@pumped-fn/lite`. |
+| `untracked-atom` | An `atom()` call was not HMR-wrapped because it was nested, dynamic, or imported through a local barrel instead of directly from `@pumped-fn/lite`. |
 
 For imported deps, `importSource` is the source specifier from code and `importId` is the Vite-resolved module id, normalized relative to the Vite root when possible. Devtools can use `importId` to jump from a dependency slot to the actual file Vite resolved in dev or build. When the imported module is also in the feed and exports a matching Lite handle, `to` and `toKind` point at that handle.
 
@@ -169,7 +169,8 @@ export default defineConfig({
 | `export const foo = atom({...})` | Yes |
 | `atoms.push(atom({...}))` | No; reports `untracked-atom` |
 | `createAtom(() => atom({...}))` | No; reports `untracked-atom` |
-| `import { atom } from "../lib/lite"` | No; use direct imports from `@pumped-fn/lite` for HMR wrapping |
+| `import { atom } from "../lib/lite"` | No; reports `untracked-atom`; use direct imports from `@pumped-fn/lite` for HMR wrapping |
+| `import { atom } from "@/lib/lite"` | No; reports `untracked-atom` for common Vite aliases; arbitrary custom aliases are not resolved by the scanner |
 
 ## Options
 

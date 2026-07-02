@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { build, createServer, type ViteDevServer } from "vite"
+import { build, createServer, parseAst, type Plugin, type ViteDevServer } from "vite"
 import { afterEach, describe, expect, it } from "vitest"
 import { boundary, tanstackStartBoundary } from "../src/vite"
 
@@ -180,6 +180,32 @@ describe("TanStack Start boundary Vite plugin", () => {
     })).resolves.toBeUndefined()
   })
 
+  it("rejects flat api page routes as client routes", async () => {
+    const root = fixture({
+      "src/routes/api.tsx": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const route = tanstackStart.contextKey
+      `,
+    })
+
+    await expect(run(root, undefined, {
+      input: join(root, "src/routes/api.tsx"),
+    })).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
+  })
+
+  it("rejects flat api resource page routes as client routes", async () => {
+    const root = fixture({
+      "src/routes/api.users.tsx": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const route = tanstackStart.contextKey
+      `,
+    })
+
+    await expect(run(root, undefined, {
+      input: join(root, "src/routes/api.users.tsx"),
+    })).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
+  })
+
   it("allows server API routes to import server helpers", async () => {
     const root = fixture({
       "src/client.ts": `console.log("client")`,
@@ -219,6 +245,48 @@ describe("TanStack Start boundary Vite plugin", () => {
 
     await server.transformRequest("/src/client.ts")
     await expect(server.transformRequest("/src/index.ts")).rejects.toThrow("reaches TanStack Start backend boundary")
+  })
+
+  it("rethrows cached graph violations during dev reloads", async () => {
+    const root = fixture({
+      "src/routes/index.tsx": `
+        import { request } from "../start"
+        export const route = request
+      `,
+      "src/start.ts": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const request = tanstackStart.contextKey
+      `,
+    })
+    const server = await createServer({
+      root,
+      logLevel: "silent",
+      plugins: [boundary()],
+    })
+    servers.push(server)
+
+    await expect(server.transformRequest("/src/routes/index.tsx")).rejects.toThrow("reaches TanStack Start backend boundary")
+    await expect(server.transformRequest("/src/routes/index.tsx")).rejects.toThrow("reaches TanStack Start backend boundary")
+  })
+
+  it("prunes orphaned records before build graph checks", async () => {
+    const root = fixture({
+      "src/client.ts": `
+        import { request } from "./start"
+        console.log(request)
+      `,
+      "src/start.ts": `
+        import { tanstackStart } from "@pumped-fn/lite-tanstack-start"
+        export const request = tanstackStart.contextKey
+      `,
+    })
+    const plugin = boundary()
+
+    await expect(runWithPlugin(root, plugin)).rejects.toThrow("reaches TanStack Start backend boundary")
+
+    write(root, "src/client.ts", `console.log("clean")`)
+
+    await expect(runWithPlugin(root, plugin)).resolves.toBeUndefined()
   })
 
   it("allows server-only helpers to import the runtime adapter when they are not client-reachable", async () => {
@@ -293,23 +361,57 @@ describe("TanStack Start boundary Vite plugin", () => {
       },
     })).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
   })
+
+  it("retries adapter package resolution after a missing package result", async () => {
+    const plugin = boundary()
+    const root = fixture({
+      "packages/start/package.json": JSON.stringify({
+        type: "module",
+        name: "@pumped-fn/lite-tanstack-start",
+      }),
+      "packages/start/index.ts": `export const tanstackStart = { contextKey: "lite" }`,
+      "packages/start/runtime.ts": `export const tanstackStart = { contextKey: "lite" }`,
+    }, { adapter: false })
+    const transform = plugin.transform as Function
+    let available = false
+    const ctx = {
+      parse: parseAst,
+      resolve: async (source: string) => {
+        if (source === "@pumped-fn/lite-tanstack-start") {
+          return available ? { id: join(root, "packages/start/index.ts") } : undefined
+        }
+        if (source === "start-runtime") return { id: join(root, "packages/start/runtime.ts") }
+        return undefined
+      },
+    }
+
+    await transform.call(ctx, `console.log("clean")`, join(root, "src/client.ts"))
+    available = true
+
+    await expect(transform.call(ctx, `
+      import { tanstackStart } from "start-runtime"
+      console.log(tanstackStart)
+    `, join(root, "src/client.ts"))).rejects.toThrow("Runtime import of @pumped-fn/lite-tanstack-start is only allowed")
+  })
 })
 
-function fixture(files: Record<string, string>): string {
+function fixture(files: Record<string, string>, options: { adapter?: boolean } = {}): string {
   const root = mkdtempSync(join(tmpdir(), "pumped-start-boundary-"))
   roots.push(root)
   write(root, "package.json", JSON.stringify({ type: "module" }))
-  write(root, "node_modules/@pumped-fn/lite-tanstack-start/package.json", JSON.stringify({
-    type: "module",
-    main: "./index.js",
-    module: "./index.js",
-  }))
-  write(root, "node_modules/@pumped-fn/lite-tanstack-start/index.js", `
-    export const tanstackStart = { contextKey: "lite" }
-  `)
-  write(root, "node_modules/@pumped-fn/lite-tanstack-start/deep.js", `
-    export const tanstackStart = { contextKey: "lite" }
-  `)
+  if (options.adapter !== false) {
+    write(root, "node_modules/@pumped-fn/lite-tanstack-start/package.json", JSON.stringify({
+      type: "module",
+      main: "./index.js",
+      module: "./index.js",
+    }))
+    write(root, "node_modules/@pumped-fn/lite-tanstack-start/index.js", `
+      export const tanstackStart = { contextKey: "lite" }
+    `)
+    write(root, "node_modules/@pumped-fn/lite-tanstack-start/deep.js", `
+      export const tanstackStart = { contextKey: "lite" }
+    `)
+  }
   for (const [path, content] of Object.entries(files)) {
     write(root, path, content)
   }
@@ -329,10 +431,21 @@ async function run(
     input?: string | Record<string, string>
   } = {}
 ): Promise<void> {
+  await runWithPlugin(root, boundary(options), config)
+}
+
+async function runWithPlugin(
+  root: string,
+  plugin: Plugin,
+  config: {
+    alias?: Record<string, string>
+    input?: string | Record<string, string>
+  } = {}
+): Promise<void> {
   await build({
     root,
     logLevel: "silent",
-    plugins: [boundary(options)],
+    plugins: [plugin],
     resolve: {
       alias: config.alias,
     },
