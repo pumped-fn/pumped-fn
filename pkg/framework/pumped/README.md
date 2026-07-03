@@ -17,8 +17,8 @@ Discovery is flat and convention-driven under `src/`:
 - `src/server/*.ts`, `src/cli/*.ts`, `src/jobs/*.ts` — one file per flow, kebab-case filename, default
   export is the flow. The filename becomes the route/command/schedule name unless overridden by a
   `route`/`command`/`schedule` tag on the flow.
-- `src/agents/*.ts` — one file per agent, default export is either an `@pumped-fn/agent-sdk` `Agent`
-  struct (detected structurally by a `.turn` flow — the framework never imports `@pumped-fn/agent-sdk`
+- `src/agents/*.ts` — one file per agent, default export is either an `@pumped-fn/sdk` `Agent`
+  struct (detected structurally by a `.turn` flow — the framework never imports `@pumped-fn/sdk`
   types) or a plain flow. An agent is mounted as `POST /agents/<name>` on the HTTP server and as
   `pumped agent <name> --json '...'` on the CLI, both executing `agent.turn` with the request/JSON
   body as `rawInput`.
@@ -30,12 +30,12 @@ Discovery is flat and convention-driven under `src/`:
 
 ### Provider wiring for agents
 
-Agents read their model off a `model` tag (from `@pumped-fn/agent-sdk`), resolved through the scope
+Agents read their model off a `model` tag (from `@pumped-fn/sdk`), resolved through the scope
 like any other tag. Wiring a provider is a one-liner on the app config:
 
 ```ts
 // src/app.ts
-import { claude } from "@pumped-fn/agent-sdk-claude"
+import { claude } from "@pumped-fn/sdk-claude"
 
 export default { tags: [claude()] }
 ```
@@ -62,8 +62,8 @@ export default flow({
 ### Workflow tag
 
 `pumped.workflowRun` is a lightweight `{ taskId, runId }` tag the framework defines itself, so the
-base package never hard-depends on `@pumped-fn/agent-sdk`'s durable-workflow extension. If you want
-`@pumped-fn/agent-sdk`'s suspend/resume `workflowExtension`, wire it yourself via `app.extensions` —
+base package never hard-depends on `@pumped-fn/sdk`'s durable-workflow extension. If you want
+`@pumped-fn/sdk`'s suspend/resume `workflowExtension`, wire it yourself via `app.extensions` —
 `runWorkflows` only guarantees each entry gets *a* run/task id pair on its context, not durability.
 
 Inside the app body itself, follow the strata convention: nouns (`atom.*`, `resource.*`) at the

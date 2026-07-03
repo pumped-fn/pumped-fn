@@ -1,15 +1,12 @@
 {
-  "name": "@pumped-fn/pumped",
-  "version": "0.0.1",
+  "name": "@pumped-fn/sdk-codex",
+  "version": "1.1.0",
   "private": false,
-  "description": "Convention-driven scope compiler: discover flows on disk, assemble a scope, drive it as CLI or HTTP server",
+  "description": "Codex CLI model provider for @pumped-fn/sdk",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
-  "bin": {
-    "pumped": "./dist/cli.mjs"
-  },
   "exports": {
     ".": {
       "import": {
@@ -25,7 +22,6 @@
   "files": [
     "dist",
     "README.md",
-    "CHANGELOG.md",
     "LICENSE"
   ],
   "publishConfig": {
@@ -33,53 +29,28 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsgo --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@hono/node-server": "^2.0.0",
-    "@pumped-fn/lite": "^3.1.0",
-    "@pumped-fn/lite-hono": "^0.2.0",
-    "hono": "^4.12.0",
-    "vite": "^8.0.0"
-  },
-  "dependencies": {
-    "@pumped-fn/lite-hmr": "workspace:*",
-    "cac": "catalog:",
-    "croner": "catalog:"
+    "@pumped-fn/sdk": "^1.0.0",
+    "@pumped-fn/lite": "^3.1.0"
   },
   "devDependencies": {
-    "acorn": "catalog:",
-    "@hono/node-server": "catalog:",
-    "@types/estree": "catalog:",
     "@pumped-fn/sdk": "workspace:*",
-    "@pumped-fn/sdk-test": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-hono": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "keywords": [
-    "pumped-fn",
-    "lite",
-    "framework",
-    "cli",
-    "vite",
-    "dependency-injection"
-  ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "directory": "pkg/framework/pumped",
+    "directory": "pkg/sdk/codex",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }

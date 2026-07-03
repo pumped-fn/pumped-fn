@@ -1,6 +1,6 @@
 # Agent Practical
 
-Runnable `@pumped-fn/agent-sdk` example.
+Runnable `@pumped-fn/sdk` example.
 
 It proves:
 

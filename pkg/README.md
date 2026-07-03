@@ -13,7 +13,7 @@ names so new packages can be added without turning the workspace into a flat lis
 | `react/` | React bindings and React-specific adapters. |
 | `framework/` | Server and full-stack framework adapters over Lite scopes. |
 | `ext/` | Optional Lite extensions and development add-ons. |
-| `agent/` | Agent workflow SDK packages and provider integrations. |
+| `sdk/` | Generic runtime primitive SDK packages (workflow, sessions, materials, events, guards, sandboxes, agents/models) and provider integrations. |
 | `render/` | Portable render contracts and renderer bindings. |
 | `tool/` | Repository tooling, scanners, and migration CLIs. |
 

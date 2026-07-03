@@ -1,5 +1,5 @@
 import { createScope } from "@pumped-fn/lite"
-import { model as agentModel } from "@pumped-fn/agent-sdk"
+import { model as agentModel } from "@pumped-fn/sdk"
 import { expect, it } from "vitest"
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"

@@ -56,11 +56,11 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
-| `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
-| `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
-| `pkg/agent/claude` | `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
-| `pkg/agent/bash` | `@pumped-fn/agent-sdk-just-bash` | Lazy just-bash sandbox provider tag for agent-sdk |
-| `pkg/agent/test` | `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
+| `pkg/sdk/core` | `@pumped-fn/sdk` | Generic runtime primitives over lite: durable workflow steps, sessions, materials, events, guards, sandboxes, CLI workers, eval harness, and agents/models as one primitive family |
+| `pkg/sdk/codex` | `@pumped-fn/sdk-codex` | Lazy Codex CLI model provider tag for sdk |
+| `pkg/sdk/claude` | `@pumped-fn/sdk-claude` | Lazy Claude CLI model provider tag for sdk |
+| `pkg/sdk/bash` | `@pumped-fn/sdk-just-bash` | Lazy just-bash sandbox provider tag for sdk |
+| `pkg/sdk/test` | `@pumped-fn/sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
 | `pkg/tool/lint` | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
 | `pkg/tool/codemod` | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
@@ -84,9 +84,9 @@ execution context
   tags: tenant, locale, trace id, runtime config
         |
         v
-agent workflow
-  model and sandbox providers as tags
-  tools and subagents as ctx.exec flow steps
+sdk primitives (@pumped-fn/sdk)
+  durable workflow steps, sessions, materials, guards, sandboxes, CLI workers, eval harness
+  agents and models are one primitive family: providers as tags, tools/subagents as ctx.exec flow steps
   events as a boundary resource
 ```
 

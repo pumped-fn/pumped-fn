@@ -1,7 +1,7 @@
 import { createScope, flow, tags, typed } from "@pumped-fn/lite"
-import { claude, type ClaudeOptions } from "@pumped-fn/agent-sdk-claude"
-import { codex, type CodexOptions } from "@pumped-fn/agent-sdk-codex"
-import { sandbox as bash } from "@pumped-fn/agent-sdk-just-bash"
+import { claude, type ClaudeOptions } from "@pumped-fn/sdk-claude"
+import { codex, type CodexOptions } from "@pumped-fn/sdk-codex"
+import { sandbox as bash } from "@pumped-fn/sdk-just-bash"
 import {
   agent,
   events,
@@ -24,8 +24,8 @@ import {
   workflowRun,
   type Model,
   type RunLog,
-} from "@pumped-fn/agent-sdk"
-import { kit } from "@pumped-fn/agent-sdk-test"
+} from "@pumped-fn/sdk"
+import { kit } from "@pumped-fn/sdk-test"
 
 const loadTicket = tool({
   description: "Load ticket details.",

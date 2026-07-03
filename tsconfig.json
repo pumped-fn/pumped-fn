@@ -14,8 +14,8 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@pumped-fn/agent-sdk": ["pkg/agent/core/src/index.ts"],
-      "@pumped-fn/agent-sdk-test": ["pkg/agent/test/src/index.ts"],
+      "@pumped-fn/sdk": ["pkg/sdk/core/src/index.ts"],
+      "@pumped-fn/sdk-test": ["pkg/sdk/test/src/index.ts"],
       "@pumped-fn/lite": ["pkg/core/lite/src/index.ts"],
       "@pumped-fn/lite/*": ["pkg/core/lite/src/*"]
     }
