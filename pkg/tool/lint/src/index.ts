@@ -1282,7 +1282,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         filePath,
         "pumped/no-untyped-throw",
         node.expression,
-        `Throw a domain error class carrying structured fields (kind/op/entity) instead of bare "${node.expression.expression.text}"; typed errors let traces and edges discriminate planned vs unplanned failures.`,
+        `Throw a domain error class carrying structured fields (kind/op/entity) instead of bare "${node.expression.expression.text}"; in a flow factory, prefer ctx.fail(fault) with a declared "faults: typed<...>()" so traces and edges discriminate planned vs unplanned failures.`,
       )
     }
 

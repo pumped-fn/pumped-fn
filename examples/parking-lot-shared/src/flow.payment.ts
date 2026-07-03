@@ -1,9 +1,9 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
 import type { ParkingSession, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
-import { ParkingError } from "./error"
+import type { Fault } from "./error"
 
 export interface PairPaymentInput {
   externalRef: string
@@ -24,12 +24,13 @@ export interface RefundPaymentInput {
 export const pairPayment = flow({
   name: "parking.pair-payment",
   parse: typed<PairPaymentInput>(),
+  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt; session: ParkingSession }> => {
     await allow.exec({ input: { action: "pair payment", roles: ["operator"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "pending" && payment.status !== "failed") {
-      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "paired" })
+      ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "paired" })
     }
     const session = tx.store.session(payment.sessionId)
     const paired: Payment = {
@@ -50,12 +51,13 @@ export const pairPayment = flow({
 export const recordPaymentFailure = flow({
   name: "parking.record-payment-failure",
   parse: typed<RecordPaymentFailureInput>(),
+  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow },
   factory: async (ctx, { tx, allow }): Promise<Payment> => {
     await allow.exec({ input: { action: "record payment failure", roles: ["operator"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "pending") {
-      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "failed" })
+      ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "failed" })
     }
     const failed = tx.store.savePayment({
       ...payment,
@@ -70,12 +72,13 @@ export const recordPaymentFailure = flow({
 export const refundPayment = flow({
   name: "parking.refund-payment",
   parse: typed<RefundPaymentInput>(),
+  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "refund payment", roles: ["manager"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "paired" && payment.status !== "disputed") {
-      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "refunded" })
+      ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "refunded" })
     }
     const refunded = tx.store.savePayment({
       ...payment,

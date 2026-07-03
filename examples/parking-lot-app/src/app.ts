@@ -1,15 +1,16 @@
-import { preset } from "@pumped-fn/lite"
+import { preset, FlowFault } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import type { pumped } from "@pumped-fn/pumped"
-import { actor, store, ParkingError, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
+import { actor, store, NotFoundError, type Actor, type Fault, type Role } from "@pumped-fn/parking-lot-shared"
 import { createSqliteStore } from "@pumped-fn/parking-lot-shared/sqlite"
 
-const faultStatus = { forbidden: 403, conflict: 409, "not-found": 404, unavailable: 409 } as const
+const faultStatus = { forbidden: 403, conflict: 409, "not-found": 404, unavailable: 409 } satisfies Record<Fault["kind"], number>
 
 function mapError(error: unknown): { status: number; body: unknown } | undefined {
-  if (!(error instanceof ParkingError)) return undefined
-  return { status: faultStatus[error.fault.kind], body: error.fault }
+  if (error instanceof FlowFault) return { status: faultStatus[(error.fault as Fault).kind], body: error.fault }
+  if (error instanceof NotFoundError) return { status: 404, body: { kind: "not-found", entity: error.entity, id: error.id } }
+  return undefined
 }
 
 const database = createSqliteStore(process.env["PARKING_DB_PATH"] ?? "parking-lot.sqlite")

@@ -1,10 +1,10 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
 import type { Booking } from "./model"
 import { tx } from "./resource.tx"
 import { normalizePlate } from "./rules"
 import { allow } from "./flow.rule.allow"
 import { assertCapacity } from "./flow.rule.assert-capacity"
-import { ParkingError } from "./error"
+import type { Fault } from "./error"
 
 export interface BookSpaceInput {
   endAt: string
@@ -20,6 +20,7 @@ export interface CancelBookingInput {
 export const bookSpace = flow({
   name: "parking.book-space",
   parse: typed<BookSpaceInput>(),
+  faults: typed<Lite.Utils.FaultsOf<typeof allow> | Lite.Utils.FaultsOf<typeof assertCapacity>>(),
   deps: { tx, allow, assertCapacity },
   factory: async (ctx, { tx, allow, assertCapacity }): Promise<Booking> => {
     await allow.exec({ input: { action: "book space", roles: ["user"] } })
@@ -44,14 +45,15 @@ export const bookSpace = flow({
 export const cancelBooking = flow({
   name: "parking.cancel-booking",
   parse: typed<CancelBookingInput>(),
+  faults: typed<Extract<Fault, { kind: "forbidden" | "conflict" }>>(),
   deps: { tx },
   factory: (ctx, { tx }): Booking => {
     const booking = tx.store.booking(ctx.input.bookingId)
     if (tx.actor.role !== "manager" && tx.actor.id !== booking.userId) {
-      throw new ParkingError({ kind: "forbidden", action: `cancel booking ${booking.id}`, actorId: tx.actor.id })
+      ctx.fail({ kind: "forbidden", action: `cancel booking ${booking.id}`, actorId: tx.actor.id })
     }
     if (booking.status !== "held") {
-      throw new ParkingError({ kind: "conflict", entity: "booking", id: booking.id, from: booking.status, attempted: "cancelled" })
+      ctx.fail({ kind: "conflict", entity: "booking", id: booking.id, from: booking.status, attempted: "cancelled" })
     }
     const next = tx.store.saveBooking({
       ...booking,

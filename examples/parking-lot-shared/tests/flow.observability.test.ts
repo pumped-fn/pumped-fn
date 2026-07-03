@@ -56,8 +56,16 @@ describe("nested rule exec observability", () => {
     const bookSpaceError = events.find((event) => event.phase === "error" && event.name === "parking.book-space")
 
     expect(allowError).toBeDefined()
-    expect(allowError?.error?.message).toBe("actor operator-1 cannot book space")
+    expect((allowError?.error as { fault?: unknown } | undefined)?.fault).toEqual({
+      kind: "forbidden",
+      action: "book space",
+      actorId: "operator-1",
+    })
     expect(bookSpaceError).toBeDefined()
-    expect(bookSpaceError?.error?.message).toBe("actor operator-1 cannot book space")
+    expect((bookSpaceError?.error as { fault?: unknown } | undefined)?.fault).toEqual({
+      kind: "forbidden",
+      action: "book space",
+      actorId: "operator-1",
+    })
   })
 })

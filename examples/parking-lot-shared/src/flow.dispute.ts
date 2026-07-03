@@ -1,9 +1,9 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
 import type { Dispute, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
-import { ParkingError } from "./error"
+import type { Fault } from "./error"
 
 export interface OpenDisputeInput {
   paymentId: string
@@ -18,16 +18,17 @@ export interface ResolveDisputeInput {
 export const openDispute = flow({
   name: "parking.open-dispute",
   parse: typed<OpenDisputeInput>(),
+  faults: typed<Extract<Fault, { kind: "forbidden" | "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "open dispute", roles: ["user"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     const session = tx.store.session(payment.sessionId)
     if (session.userId !== tx.actor.id) {
-      throw new ParkingError({ kind: "forbidden", action: `dispute payment ${payment.id}`, actorId: tx.actor.id })
+      ctx.fail({ kind: "forbidden", action: `dispute payment ${payment.id}`, actorId: tx.actor.id })
     }
     if (payment.status !== "paired") {
-      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "disputed" })
+      ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "disputed" })
     }
     const disputed = tx.store.savePayment({
       ...payment,
@@ -51,12 +52,13 @@ export const openDispute = flow({
 export const resolveDispute = flow({
   name: "parking.resolve-dispute",
   parse: typed<ResolveDisputeInput>(),
+  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt?: Receipt }> => {
     await allow.exec({ input: { action: "resolve dispute", roles: ["manager"] } })
     const dispute = tx.store.dispute(ctx.input.disputeId)
     if (dispute.status !== "open") {
-      throw new ParkingError({ kind: "conflict", entity: "dispute", id: dispute.id, from: dispute.status, attempted: ctx.input.decision })
+      ctx.fail({ kind: "conflict", entity: "dispute", id: dispute.id, from: dispute.status, attempted: ctx.input.decision })
     }
     const payment = tx.store.payment(dispute.paymentId)
     const resolved = tx.store.saveDispute({

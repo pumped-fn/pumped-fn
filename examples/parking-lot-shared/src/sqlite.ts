@@ -9,8 +9,8 @@ import type {
   Payment,
   Receipt,
 } from "./model"
-import type { ParkingStore } from "./store"
-import { ParkingError, StoreError } from "./error"
+import { NotFoundError, type ParkingStore } from "./store"
+import { StoreError } from "./error"
 
 type Kind =
   | "audit"
@@ -173,7 +173,7 @@ export class SqliteParkingStore implements ParkingStore {
     const row = this.driver("read", kind, () =>
       this.db.prepare("SELECT body FROM parking_documents WHERE kind = ? AND id = ?").get(kind, id)
     ) as Row | undefined
-    if (row === undefined) throw new ParkingError({ kind: "not-found", entity: kind, id })
+    if (row === undefined) throw new NotFoundError(kind, id)
     return JSON.parse(row.body) as T
   }
 
@@ -192,7 +192,7 @@ export class SqliteParkingStore implements ParkingStore {
     try {
       return run()
     } catch (cause) {
-      if (cause instanceof ParkingError) throw cause
+      if (cause instanceof NotFoundError) throw cause
       throw new StoreError(op, entity, cause)
     }
   }

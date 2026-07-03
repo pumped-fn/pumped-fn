@@ -1,4 +1,4 @@
-import { resource, tag, tags, type Lite } from "@pumped-fn/lite"
+import { resource, tag, tags, FlowFault, type Lite } from "@pumped-fn/lite"
 
 export namespace Logging {
   export type Level = "debug" | "info" | "warn" | "error"
@@ -345,6 +345,9 @@ function identity(fields: Logging.Fields | undefined): Logging.Fields | undefine
 }
 
 function mapError(error: unknown): Logging.Fields {
+  if (error instanceof FlowFault) {
+    return { name: error.name, message: error.message, stack: error.stack, fault: error.fault }
+  }
   if (error instanceof Error) {
     return { name: error.name, message: error.message, stack: error.stack }
   }

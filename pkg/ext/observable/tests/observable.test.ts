@@ -2,6 +2,28 @@ import { describe, expect, it } from "vitest"
 import { atom, createScope, flow, resource, typed, type Lite } from "@pumped-fn/lite"
 import { observable, type Observable } from "../src"
 
+describe("observable extension — typed faults", () => {
+  it("includes the fault payload in the emitted error event when a FlowFault is thrown", async () => {
+    const sink = observable.memory()
+    const withFault = flow({
+      name: "withFault",
+      faults: typed<{ kind: "conflict"; id: string }>(),
+      factory: (ctx) => ctx.fail({ kind: "conflict", id: "p1" }),
+    })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink] })],
+    })
+    await scope.ready
+
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: withFault })).rejects.toMatchObject({ fault: { kind: "conflict", id: "p1" } })
+
+    const errorEvent = sink.events().find((event) => event.phase === "error")
+    expect(errorEvent?.error?.fault).toEqual({ kind: "conflict", id: "p1" })
+  })
+})
+
 function clock(values: readonly number[]): () => number {
   let index = 0
   return () => values[index++] ?? values[values.length - 1]!

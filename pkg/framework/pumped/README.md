@@ -121,6 +121,30 @@ bottom, verbs (`flow.*`) in the middle, edges (the discovered entries) at the to
 flowing downward only. A unit's kind is either its filename prefix or its parent directory — never
 both, never inferred from content.
 
+### Typed faults and `mapError`
+
+Flows declare their planned failures with `faults: typed<F>()` and raise them with `ctx.fail(fault)`
+(both from `@pumped-fn/lite`) instead of throwing an ad hoc error class. `ctx.fail` throws a
+`FlowFault` — `{ fault: F; flow: string }` — with the flow's name attached automatically. The
+framework's `mapError` seam (`pumped.Config.mapError`) still receives the thrown error as
+`unknown`; nothing structural changed there, but a `FlowFault` is now the shape to narrow on:
+
+```ts
+import { FlowFault } from "@pumped-fn/lite"
+
+const faultStatus = { conflict: 409, "not-found": 404, forbidden: 403 } satisfies Record<Fault["kind"], number>
+
+function mapError(error: unknown): { status: number; body: unknown } | undefined {
+  if (!(error instanceof FlowFault)) return undefined
+  const fault = error.fault as Fault
+  return { status: faultStatus[fault.kind], body: fault }
+}
+```
+
+Declaring `faultStatus` with `satisfies Record<Fault["kind"], number>` makes a missing fault kind a
+compile error instead of a silent `undefined` status. See `examples/parking-lot-app/src/app.ts` for
+a full worked example.
+
 ## Quick start
 
 ```ts

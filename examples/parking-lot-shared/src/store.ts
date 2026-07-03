@@ -8,7 +8,15 @@ import type {
   Payment,
   Receipt,
 } from "./model"
-import { ParkingError } from "./error"
+
+export class NotFoundError extends Error {
+  constructor(
+    readonly entity: string,
+    readonly id: string
+  ) {
+    super(`unknown ${entity}: ${id}`)
+  }
+}
 
 export interface ParkingStore {
   audit(id: string): AuditRecord
@@ -175,7 +183,7 @@ export class MemoryParkingStore implements ParkingStore {
 
   private must<T extends Entity>(records: Map<string, T>, id: string, kind: Kind): T {
     const record = records.get(id)
-    if (record === undefined) throw new ParkingError({ kind: "not-found", entity: kind, id })
+    if (record === undefined) throw new NotFoundError(kind, id)
     return record
   }
 }
