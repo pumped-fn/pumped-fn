@@ -54,6 +54,14 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
   const appPlugin: Plugin = {
     name: "pumped-fn",
 
+    config() {
+      return {
+        ssr: {
+          external: ["@pumped-fn/pumped", "@pumped-fn/lite", "@pumped-fn/lite-hono"],
+        },
+      }
+    },
+
     configResolved(config) {
       root = config.root
     },
