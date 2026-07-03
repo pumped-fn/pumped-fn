@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { ParkingSession, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
-import { issueReceipt } from "./rules"
+import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
 
 export interface PairPaymentInput {
@@ -23,8 +23,8 @@ export interface RefundPaymentInput {
 export const pairPayment = flow({
   name: "parking.pair-payment",
   parse: typed<PairPaymentInput>(),
-  deps: { tx, allow },
-  factory: async (ctx, { tx, allow }): Promise<{ payment: Payment; receipt: Receipt; session: ParkingSession }> => {
+  deps: { tx, allow, issueReceipt },
+  factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt; session: ParkingSession }> => {
     await allow.exec({ input: { action: "pair payment", roles: ["operator"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "pending" && payment.status !== "failed") {
@@ -38,7 +38,7 @@ export const pairPayment = flow({
       pairedAt: tx.at(),
       status: "paired",
     }
-    const receipt = issueReceipt(tx, paired, "charge", paired.amountCents)
+    const receipt = await issueReceipt.exec({ input: { amountCents: paired.amountCents, payment: paired, type: "charge" } })
     const released = tx.store.saveSession({ ...session, status: "released" })
     tx.store.savePayment(paired)
     tx.record("payment.paired", paired.id, { amountCents: paired.amountCents, receiptId: receipt.id })
@@ -67,8 +67,8 @@ export const recordPaymentFailure = flow({
 export const refundPayment = flow({
   name: "parking.refund-payment",
   parse: typed<RefundPaymentInput>(),
-  deps: { tx, allow },
-  factory: async (ctx, { tx, allow }): Promise<{ payment: Payment; receipt: Receipt }> => {
+  deps: { tx, allow, issueReceipt },
+  factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "refund payment", roles: ["manager"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "paired" && payment.status !== "disputed") {
@@ -79,7 +79,7 @@ export const refundPayment = flow({
       refundedAt: tx.at(),
       status: "refunded",
     })
-    const receipt = issueReceipt(tx, refunded, "refund", -refunded.amountCents)
+    const receipt = await issueReceipt.exec({ input: { amountCents: -refunded.amountCents, payment: refunded, type: "refund" } })
     tx.record("payment.refunded", refunded.id, { reason: ctx.input.reason, receiptId: receipt.id })
     return { payment: refunded, receipt }
   },

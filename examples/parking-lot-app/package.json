@@ -13,6 +13,8 @@
     "@hono/node-server": "catalog:",
     "@pumped-fn/pumped": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-logging": "workspace:*",
+    "@pumped-fn/lite-extension-observable": "workspace:*",
     "@pumped-fn/lite-hono": "workspace:*",
     "@pumped-fn/parking-lot-shared": "workspace:*",
     "hono": "catalog:",

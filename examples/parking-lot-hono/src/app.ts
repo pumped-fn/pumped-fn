@@ -4,8 +4,8 @@ import {
   actor,
   bookSpace,
   checkInVehicle,
+  clock,
   configureLot,
-  now,
   pairPayment,
   prepareExit,
   readReport,
@@ -24,7 +24,7 @@ export interface Runtime {
 export function createApp(runtime: Runtime) {
   const lite = hono.adapter()
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
+    presets: [preset(store, runtime.store), preset(clock, () => readAt(runtime))],
     extensions: [lite],
   })
   const app = new Hono<hono.Env>()
@@ -32,7 +32,6 @@ export function createApp(runtime: Runtime) {
   app.use("*", lite.middleware({
     tags: (request) => [
       actor(readActor(request.headers.get("x-actor-id") ?? undefined, request.headers.get("x-role") ?? undefined)),
-      now(() => readAt(runtime)),
     ],
   }))
   app.post("/lots", async (context) => context.json(await context.var.lite.exec({

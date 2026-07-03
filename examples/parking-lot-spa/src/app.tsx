@@ -1,8 +1,8 @@
-import { createScope } from "@pumped-fn/lite"
+import { createScope, preset } from "@pumped-fn/lite"
 import { ExecutionContextProvider, ScopeProvider, useAtom, useFlow } from "@pumped-fn/lite-react"
 import {
   actor,
-  now,
+  clock,
   type Role,
 } from "@pumped-fn/parking-lot-shared"
 import { useMemo, useRef } from "react"
@@ -11,21 +11,26 @@ import * as app from "./state"
 const roleLabels: Role[] = ["manager", "operator", "user"]
 
 export function ParkingLotRoot() {
-  const scope = useMemo(() => createScope(), [])
+  const clockRef = useRef("2026-07-01T08:00:00.000Z")
+  const scope = useMemo(() => createScope({
+    presets: [preset(clock, () => clockRef.current)],
+  }), [])
   return (
     <ScopeProvider scope={scope}>
-      <ParkingLotApp />
+      <ParkingLotApp clock={clockRef} />
     </ScopeProvider>
   )
 }
 
-export function ParkingLotApp() {
+interface AppProps {
+  clock: { current: string }
+}
+
+export function ParkingLotApp({ clock }: AppProps) {
   const state = useAtom(app.ui, { suspense: false, resolve: true })
   const value = state.data ?? app.initialUi
-  const clock = useRef("2026-07-01T08:00:00.000Z")
   const tags = useMemo(() => [
     actor({ id: `${value.role}-spa`, role: value.role }),
-    now(() => clock.current),
   ], [value.role])
 
   return (

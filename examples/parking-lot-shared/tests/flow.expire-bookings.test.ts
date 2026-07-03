@@ -4,10 +4,10 @@ import {
   actor,
   bookSpace,
   checkInVehicle,
+  clock,
   configureLot,
   createMemoryStore,
   expireBookings,
-  now,
   prepareExit,
   store,
 } from "../src"
@@ -16,8 +16,8 @@ describe("expireBookings", () => {
   test("cancels no-show held bookings past the grace window", async () => {
     const backing = createMemoryStore()
     const managerScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const manager = managerScope.createContext()
     const lot = await manager.exec({
@@ -34,8 +34,8 @@ describe("expireBookings", () => {
     })
 
     const userScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "user-1", role: "user" }), now(() => "2026-07-01T08:05:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:05:00.000Z")],
+      tags: [actor({ id: "user-1", role: "user" })],
     })
     const user = userScope.createContext()
     const booking = await user.exec({
@@ -44,8 +44,8 @@ describe("expireBookings", () => {
     })
 
     const jobScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T09:20:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T09:20:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const job = jobScope.createContext()
     const result = await job.exec({ flow: expireBookings, input: {} })
@@ -65,8 +65,8 @@ describe("expireBookings", () => {
   test("force-collects payments and issues charge receipts past the refund window", async () => {
     const backing = createMemoryStore()
     const managerScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const manager = managerScope.createContext()
     const lot = await manager.exec({
@@ -83,8 +83,8 @@ describe("expireBookings", () => {
     })
 
     const operatorScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T10:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T10:00:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const operator = operatorScope.createContext()
     const session = await operator.exec({
@@ -93,15 +93,15 @@ describe("expireBookings", () => {
     })
 
     const exitScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T11:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T11:00:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const exit = exitScope.createContext()
     const prepared = await exit.exec({ flow: prepareExit, input: { sessionId: session.id } })
 
     const jobScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T11:45:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T11:45:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const job = jobScope.createContext()
     const result = await job.exec({ flow: expireBookings, input: {} })

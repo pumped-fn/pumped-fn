@@ -17,8 +17,8 @@ same shared scope.
   `pending`/`failed` past a session's refund window, issuing a `charge` receipt for each so the
   books close instead of leaking `awaiting_payment` sessions forever.
 - **Reconciles a day's takings** — `src/workflows/day-close.ts` runs `dayClose` once at process
-  boot. It sums payments paired "today" against receipts issued "today" (by the tag-driven `now`
-  clock) and reports any discrepancy between money collected and money receipted.
+  boot. It sums payments paired "today" against receipts issued "today" (by the `clock` adapter
+  atom) and reports any discrepancy between money collected and money receipted.
 - **Serves receipts** — `GET /receipts?userId=...` (`src/server/receipts.ts`) lists a user's
   receipts; manager/operator actors may omit `userId` to see all of them.
 
@@ -36,11 +36,14 @@ here do.
 ## Architecture
 
 `src/app.ts` is the composition seam: it presets the shared `store` atom to a SQLite-backed
-implementation (`createSqliteStore` from `@pumped-fn/parking-lot-shared/sqlite`) and derives
-`actor`/`now` context tags per request (HTTP: `x-actor-id`/`x-role` headers) or per process (CLI/
+implementation (`createSqliteStore` from `@pumped-fn/parking-lot-shared/sqlite`) and derives an
+`actor` context tag per request (HTTP: `x-actor-id`/`x-role` headers) or per process (CLI/
 jobs/workflows: `PARKING_ACTOR_ID`/`PARKING_ROLE` env vars, defaulting to a `manager` actor). This
-is the one place in the app that reads `process.env` directly — everywhere else the actor and clock
-arrive as declared tag dependencies, never as ambient global reads.
+is the one place in the app that reads `process.env` directly — everywhere else the actor arrives as
+a declared tag dependency and the clock arrives as the `clock` adapter atom, never as an ambient
+global read. It also wires `@pumped-fn/lite-extension-logging` and
+`@pumped-fn/lite-extension-observable` so nested rule execs (e.g. the `allow` rule inside
+`bookSpace`) are attributable in traces and logs instead of surfacing as indistinguishable errors.
 
 `pumped dev`/`pumped build` discover `src/server`, `src/cli`, `src/jobs`, `src/workflows` and wire
 one shared `@pumped-fn/lite` scope (via `pumped.createAppScope`) across the HTTP server, the cron
@@ -86,7 +89,7 @@ that documents the expected JSON shape inline, but a flag-to-input mapping (driv
 
 ```
 HTTP request ──┐
-CLI invocation ─┼─► src/app.ts (SQLite store preset, actor/now context tags)
+CLI invocation ─┼─► src/app.ts (SQLite store preset, clock atom, actor context tag)
 Cron tick ──────┤        │
 Boot workflow ──┘        ▼
                  one shared @pumped-fn/lite scope

@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { ParkingSession, Payment } from "./model"
 import { tx } from "./resource.tx"
-import { completeBookingForSession } from "./rules"
+import { completeBooking } from "./flow.complete-booking"
 import { allow } from "./flow.rule.allow"
 import { amountDue } from "./flow.rule.amount-due"
 
@@ -12,8 +12,8 @@ export interface PrepareExitInput {
 export const prepareExit = flow({
   name: "parking.prepare-exit",
   parse: typed<PrepareExitInput>(),
-  deps: { tx, allow, amountDue },
-  factory: async (ctx, { tx, allow, amountDue }): Promise<{ payment: Payment; session: ParkingSession }> => {
+  deps: { tx, allow, amountDue, completeBooking },
+  factory: async (ctx, { tx, allow, amountDue, completeBooking }): Promise<{ payment: Payment; session: ParkingSession }> => {
     await allow.exec({ input: { action: "prepare exit", roles: ["operator"] } })
     const session = tx.store.session(ctx.input.sessionId)
     if (session.status !== "parked") throw new Error(`session ${session.id} is not parked`)
@@ -28,7 +28,7 @@ export const prepareExit = flow({
     }
     const next = tx.store.saveSession({ ...session, exitedAt, status: "awaiting_payment" })
     tx.store.savePayment(payment)
-    completeBookingForSession(tx.store, next)
+    await completeBooking.exec({ input: { session: next } })
     tx.record("session.exit-prepared", next.id, { amountCents: payment.amountCents, paymentId: payment.id })
     return { payment, session: next }
   },

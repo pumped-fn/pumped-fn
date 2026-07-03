@@ -1,8 +1,9 @@
 import { resource, tags } from "@pumped-fn/lite"
+import { clock } from "./atom.clock"
 import { store } from "./atom.store"
 import type { Actor, AuditRecord } from "./model"
 import type { ParkingStore } from "./store"
-import { actor, now } from "./tags"
+import { actor } from "./tags"
 
 export interface Work {
   actor: Actor
@@ -17,22 +18,22 @@ export const tx = resource({
   ownership: "current",
   deps: {
     actor: tags.required(actor),
-    now: tags.required(now),
+    clock,
     store,
   },
-  factory: (ctx, { actor, now, store }): Work => {
+  factory: (ctx, { actor, clock, store }): Work => {
     const events: AuditRecord[] = []
     ctx.cleanup(() => {
       for (const event of events) store.saveAudit(event)
     })
     return {
       actor,
-      at: now,
+      at: clock,
       id: (prefix) => store.nextId(prefix),
       record: (type, targetId, data = {}) => {
         events.push({
           actorId: actor.id,
-          at: now(),
+          at: clock(),
           data,
           id: store.nextId("audit"),
           role: actor.role,

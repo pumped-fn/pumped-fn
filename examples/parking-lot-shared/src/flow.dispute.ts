@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { Dispute, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
-import { issueReceipt } from "./rules"
+import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
 
 export interface OpenDisputeInput {
@@ -17,8 +17,8 @@ export interface ResolveDisputeInput {
 export const openDispute = flow({
   name: "parking.open-dispute",
   parse: typed<OpenDisputeInput>(),
-  deps: { tx, allow },
-  factory: async (ctx, { tx, allow }): Promise<{ dispute: Dispute; payment: Payment; receipt: Receipt }> => {
+  deps: { tx, allow, issueReceipt },
+  factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "open dispute", roles: ["user"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     const session = tx.store.session(payment.sessionId)
@@ -37,7 +37,7 @@ export const openDispute = flow({
       status: "open",
       userId: tx.actor.id,
     })
-    const receipt = issueReceipt(tx, disputed, "dispute", 0)
+    const receipt = await issueReceipt.exec({ input: { amountCents: 0, payment: disputed, type: "dispute" } })
     tx.record("payment.disputed", disputed.id, { disputeId: dispute.id, receiptId: receipt.id })
     return { dispute, payment: disputed, receipt }
   },
@@ -46,8 +46,8 @@ export const openDispute = flow({
 export const resolveDispute = flow({
   name: "parking.resolve-dispute",
   parse: typed<ResolveDisputeInput>(),
-  deps: { tx, allow },
-  factory: async (ctx, { tx, allow }): Promise<{ dispute: Dispute; payment: Payment; receipt?: Receipt }> => {
+  deps: { tx, allow, issueReceipt },
+  factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt?: Receipt }> => {
     await allow.exec({ input: { action: "resolve dispute", roles: ["manager"] } })
     const dispute = tx.store.dispute(ctx.input.disputeId)
     if (dispute.status !== "open") throw new Error(`dispute ${dispute.id} is not open`)
@@ -67,7 +67,7 @@ export const resolveDispute = flow({
       refundedAt: tx.at(),
       status: "refunded",
     })
-    const receipt = issueReceipt(tx, refunded, "refund", -refunded.amountCents)
+    const receipt = await issueReceipt.exec({ input: { amountCents: -refunded.amountCents, payment: refunded, type: "refund" } })
     tx.record("dispute.accepted", resolved.id, { paymentId: payment.id, receiptId: receipt.id })
     return { dispute: resolved, payment: refunded, receipt }
   },

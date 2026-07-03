@@ -12,10 +12,10 @@ import {
   cancelBooking,
   checkInBooking,
   checkInVehicle,
+  clock,
   configureLot,
   createMemoryStore,
   listReceipts,
-  now,
   openDispute,
   pairPayment,
   prepareExit,
@@ -31,8 +31,8 @@ describe("parking lot workflows", () => {
   test("accepts a real multi-role workflow matrix through the scope seam", async () => {
     const backing = createMemoryStore()
     const managerScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const manager = managerScope.createContext()
 
@@ -50,8 +50,8 @@ describe("parking lot workflows", () => {
     })
 
     const userScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "user-1", role: "user" }), now(() => "2026-07-01T08:05:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:05:00.000Z")],
+      tags: [actor({ id: "user-1", role: "user" })],
     })
     const user = userScope.createContext()
 
@@ -79,15 +79,15 @@ describe("parking lot workflows", () => {
     })
 
     const operatorScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-02T08:10:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-02T08:10:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const operator = operatorScope.createContext()
     const bookedSession = await operator.exec({ flow: checkInBooking, input: { bookingId: booking.id } })
 
     const exitScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-02T10:20:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-02T10:20:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const exit = exitScope.createContext()
     const bookedExit = await exit.exec({ flow: prepareExit, input: { sessionId: bookedSession.id } })
@@ -183,7 +183,8 @@ describe("parking lot workflows", () => {
 
   test("enforces role boundaries through tags", async () => {
     const scope = createScope({
-      tags: [actor({ id: "user-1", role: "user" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "user-1", role: "user" })],
     })
     const ctx = scope.createContext()
 
@@ -209,8 +210,8 @@ describe("parking lot workflows", () => {
     const path = join(dir, "parking.sqlite")
     const sqlite = createSqliteStore(path)
     const scope = createScope({
-      presets: [preset(store, sqlite)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, sqlite), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const ctx = scope.createContext()
 
@@ -245,8 +246,8 @@ describe("parking lot workflows", () => {
       factory: () => 250,
     })
     const managerScope = createScope({
-      presets: [preset(store, backing), preset(amountDue, flatFee)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, backing), preset(amountDue, flatFee), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const manager = managerScope.createContext()
     const lot = await manager.exec({
@@ -263,8 +264,8 @@ describe("parking lot workflows", () => {
     })
 
     const operatorScope = createScope({
-      presets: [preset(store, backing), preset(amountDue, flatFee)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T08:10:00.000Z")],
+      presets: [preset(store, backing), preset(amountDue, flatFee), preset(clock, () => "2026-07-01T08:10:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const operator = operatorScope.createContext()
     const session = await operator.exec({

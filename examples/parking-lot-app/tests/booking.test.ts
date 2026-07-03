@@ -4,9 +4,9 @@ import {
   actor,
   bookSpace,
   checkInVehicle,
+  clock,
   configureLot,
   createMemoryStore,
-  now,
   prepareExit,
   store,
 } from "@pumped-fn/parking-lot-shared"
@@ -15,8 +15,8 @@ describe("parking lot app domain", () => {
   test("configures a lot, books a space, checks in and prepares exit through the scope seam", async () => {
     const backing = createMemoryStore()
     const scope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      tags: [actor({ id: "manager-1", role: "manager" })],
     })
     const manager = scope.createContext()
 
@@ -34,8 +34,8 @@ describe("parking lot app domain", () => {
     })
 
     const userScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "user-1", role: "user" }), now(() => "2026-07-01T08:05:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T08:05:00.000Z")],
+      tags: [actor({ id: "user-1", role: "user" })],
     })
     const user = userScope.createContext()
     const booking = await user.exec({
@@ -45,8 +45,8 @@ describe("parking lot app domain", () => {
     expect(booking.status).toBe("held")
 
     const operatorScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T10:05:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T10:05:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const operator = operatorScope.createContext()
     const session = await operator.exec({
@@ -56,8 +56,8 @@ describe("parking lot app domain", () => {
     expect(session.status).toBe("parked")
 
     const exitScope = createScope({
-      presets: [preset(store, backing)],
-      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T11:05:00.000Z")],
+      presets: [preset(store, backing), preset(clock, () => "2026-07-01T11:05:00.000Z")],
+      tags: [actor({ id: "operator-1", role: "operator" })],
     })
     const exit = await exitScope.createContext().exec({
       flow: prepareExit,

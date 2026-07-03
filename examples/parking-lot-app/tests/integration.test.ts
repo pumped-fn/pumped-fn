@@ -4,23 +4,23 @@ import { describe, expect, it } from "vitest"
 import {
   actor,
   bookSpace,
+  clock,
   configureLot,
   createMemoryStore,
   expireBookings,
   listReceipts,
-  now,
   readReport,
   store,
 } from "@pumped-fn/parking-lot-shared"
 
-function manifest(clock: { value: string }): pumped.Manifest {
+function manifest(fixedClock: { value: string }): pumped.Manifest {
   return {
     app: {
-      presets: [preset(store, createMemoryStore())],
+      presets: [preset(store, createMemoryStore()), preset(clock, () => fixedClock.value)],
       context: (request?: Request) => {
         const role = (request?.headers.get("x-role") as "manager" | "operator" | "user" | null) ?? "manager"
         const id = request?.headers.get("x-actor-id") ?? "manager-1"
-        return [actor({ id, role }), now(() => clock.value)]
+        return [actor({ id, role })]
       },
     },
     entries: [
@@ -45,9 +45,9 @@ function manifest(clock: { value: string }): pumped.Manifest {
 
 describe("parking lot app composition", () => {
   it("books a session via HTTP, expires it via the job on one shared scope, and observes the audit trail", async () => {
-    const clock = { value: "2026-07-01T08:00:00.000Z" }
-    const { app: honoApp, scope } = pumped.createServer(manifest(clock))
-    const jobs = pumped.runJobs(manifest(clock), undefined, scope)
+    const fixedClock = { value: "2026-07-01T08:00:00.000Z" }
+    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock))
+    const jobs = pumped.runJobs(manifest(fixedClock), undefined, scope)
 
     const configured = await honoApp.request("/lots", {
       method: "POST",
@@ -79,7 +79,7 @@ describe("parking lot app composition", () => {
     const booking = await booked.json()
     expect(booking.status).toBe("held")
 
-    clock.value = "2026-07-01T09:20:00.000Z"
+    fixedClock.value = "2026-07-01T09:20:00.000Z"
     await jobs.tick({
       kind: "jobs",
       name: "expire-bookings",

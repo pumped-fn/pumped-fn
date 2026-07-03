@@ -1,13 +1,13 @@
 import { preset } from "@pumped-fn/lite"
 import { pumped } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
-import { actor, configureLot, createMemoryStore, now, store } from "@pumped-fn/parking-lot-shared"
+import { actor, clock, configureLot, createMemoryStore, store } from "@pumped-fn/parking-lot-shared"
 
 function manifest(): pumped.Manifest {
   return {
     app: {
-      presets: [preset(store, createMemoryStore())],
-      context: () => [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+      presets: [preset(store, createMemoryStore()), preset(clock, () => "2026-07-01T08:00:00.000Z")],
+      context: () => [actor({ id: "manager-1", role: "manager" })],
     },
     entries: [{ kind: "cli", name: "configure", file: "virtual", flow: configureLot }],
   }

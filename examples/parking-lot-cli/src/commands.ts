@@ -3,8 +3,8 @@ import {
   actor,
   bookSpace,
   checkInVehicle,
+  clock,
   configureLot,
-  now,
   pairPayment,
   prepareExit,
   readReport,
@@ -29,8 +29,8 @@ export interface Runtime {
 
 export async function configure(runtime: Runtime, input: ConfigureLotInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: configureLot, input })
@@ -41,8 +41,8 @@ export async function configure(runtime: Runtime, input: ConfigureLotInput) {
 
 export async function book(runtime: Runtime, input: BookSpaceInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: bookSpace, input })
@@ -53,8 +53,8 @@ export async function book(runtime: Runtime, input: BookSpaceInput) {
 
 export async function checkIn(runtime: Runtime, input: CheckInVehicleInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: checkInVehicle, input })
@@ -65,8 +65,8 @@ export async function checkIn(runtime: Runtime, input: CheckInVehicleInput) {
 
 export async function exit(runtime: Runtime, input: PrepareExitInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: prepareExit, input })
@@ -77,8 +77,8 @@ export async function exit(runtime: Runtime, input: PrepareExitInput) {
 
 export async function pay(runtime: Runtime, input: PairPaymentInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: pairPayment, input })
@@ -89,8 +89,8 @@ export async function pay(runtime: Runtime, input: PairPaymentInput) {
 
 export async function fail(runtime: Runtime, input: RecordPaymentFailureInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: recordPaymentFailure, input })
@@ -101,8 +101,8 @@ export async function fail(runtime: Runtime, input: RecordPaymentFailureInput) {
 
 export async function report(runtime: Runtime, input: ReadReportInput) {
   const scope = createScope({
-    presets: [preset(store, runtime.store)],
-    tags: [actor(runtime.actor), now(() => runtime.at)],
+    presets: [preset(store, runtime.store), preset(clock, () => runtime.at)],
+    tags: [actor(runtime.actor)],
   })
   const ctx = scope.createContext()
   const output = await ctx.exec({ flow: readReport, input })
