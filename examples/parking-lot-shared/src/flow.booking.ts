@@ -1,7 +1,9 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { Booking } from "./model"
 import { tx } from "./resource.tx"
-import { allow, assertCapacity, normalizePlate } from "./rules"
+import { normalizePlate } from "./rules"
+import { allow } from "./flow.rule.allow"
+import { assertCapacity } from "./flow.rule.assert-capacity"
 
 export interface BookSpaceInput {
   endAt: string
@@ -17,23 +19,23 @@ export interface CancelBookingInput {
 export const bookSpace = flow({
   name: "parking.book-space",
   parse: typed<BookSpaceInput>(),
-  deps: { tx },
-  factory: (ctx, deps): Booking => {
-    allow(deps.tx.actor, ["user"], "book space")
-    const lot = deps.tx.store.lot(ctx.input.lotId)
-    assertCapacity(deps.tx.store, lot, ctx.input.startAt, ctx.input.endAt)
+  deps: { tx, allow, assertCapacity },
+  factory: async (ctx, { tx, allow, assertCapacity }): Promise<Booking> => {
+    await allow.exec({ input: { action: "book space", roles: ["user"] } })
+    const lot = tx.store.lot(ctx.input.lotId)
+    await assertCapacity.exec({ input: { endAt: ctx.input.endAt, lot, startAt: ctx.input.startAt } })
     const booking: Booking = {
-      createdAt: deps.tx.at(),
+      createdAt: tx.at(),
       endAt: ctx.input.endAt,
-      id: deps.tx.id("booking"),
+      id: tx.id("booking"),
       lotId: lot.id,
       plate: normalizePlate(ctx.input.plate),
       startAt: ctx.input.startAt,
       status: "held",
-      userId: deps.tx.actor.id,
+      userId: tx.actor.id,
     }
-    deps.tx.store.saveBooking(booking)
-    deps.tx.record("booking.held", booking.id, { lotId: lot.id, userId: booking.userId })
+    tx.store.saveBooking(booking)
+    tx.record("booking.held", booking.id, { lotId: lot.id, userId: booking.userId })
     return booking
   },
 })
@@ -42,18 +44,18 @@ export const cancelBooking = flow({
   name: "parking.cancel-booking",
   parse: typed<CancelBookingInput>(),
   deps: { tx },
-  factory: (ctx, deps): Booking => {
-    const booking = deps.tx.store.booking(ctx.input.bookingId)
-    if (deps.tx.actor.role !== "manager" && deps.tx.actor.id !== booking.userId) {
-      throw new Error(`role ${deps.tx.actor.role} cannot cancel booking ${booking.id}`)
+  factory: (ctx, { tx }): Booking => {
+    const booking = tx.store.booking(ctx.input.bookingId)
+    if (tx.actor.role !== "manager" && tx.actor.id !== booking.userId) {
+      throw new Error(`role ${tx.actor.role} cannot cancel booking ${booking.id}`)
     }
     if (booking.status !== "held") throw new Error(`booking ${booking.id} is not held`)
-    const next = deps.tx.store.saveBooking({
+    const next = tx.store.saveBooking({
       ...booking,
-      cancelledAt: deps.tx.at(),
+      cancelledAt: tx.at(),
       status: "cancelled",
     })
-    deps.tx.record("booking.cancelled", next.id, { userId: next.userId })
+    tx.record("booking.cancelled", next.id, { userId: next.userId })
     return next
   },
 })

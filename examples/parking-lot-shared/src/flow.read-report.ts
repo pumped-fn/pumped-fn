@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { LotReport, Report } from "./model"
 import { tx } from "./resource.tx"
-import { allow } from "./rules"
+import { allow } from "./flow.rule.allow"
 
 export interface ReadReportInput {
   lotId?: string
@@ -10,29 +10,29 @@ export interface ReadReportInput {
 export const readReport = flow({
   name: "parking.read-report",
   parse: typed<ReadReportInput>(),
-  deps: { tx },
-  factory: (ctx, deps): Report => {
-    allow(deps.tx.actor, ["manager"], "read report")
-    const lots = deps.tx.store.lots()
+  deps: { tx, allow },
+  factory: async (ctx, { tx, allow }): Promise<Report> => {
+    await allow.exec({ input: { action: "read report", roles: ["manager"] } })
+    const lots = tx.store.lots()
       .filter((lot) => ctx.input.lotId === undefined || lot.id === ctx.input.lotId)
       .map((lot): LotReport => {
-        const sessions = deps.tx.store.sessions().filter((session) => session.lotId === lot.id)
-        const payments = deps.tx.store.payments().filter((payment) => sessions.some((session) => session.id === payment.sessionId))
-        const disputes = deps.tx.store.disputes().filter((dispute) => payments.some((payment) => payment.id === dispute.paymentId))
+        const sessions = tx.store.sessions().filter((session) => session.lotId === lot.id)
+        const payments = tx.store.payments().filter((payment) => sessions.some((session) => session.id === payment.sessionId))
+        const disputes = tx.store.disputes().filter((dispute) => payments.some((payment) => payment.id === dispute.paymentId))
         return {
           awaitingPayment: sessions.filter((session) => session.status === "awaiting_payment").length,
           capacity: lot.capacity,
           failedPayments: payments.filter((payment) => payment.status === "failed").length,
-          heldBookings: deps.tx.store.bookings().filter((booking) => booking.lotId === lot.id && booking.status === "held").length,
+          heldBookings: tx.store.bookings().filter((booking) => booking.lotId === lot.id && booking.status === "held").length,
           lotId: lot.id,
           name: lot.name,
           openDisputes: disputes.filter((dispute) => dispute.status === "open").length,
           parked: sessions.filter((session) => session.status === "parked").length,
-          revenueCents: deps.tx.store.receipts().filter((receipt) => receipt.type === "charge").reduce((sum, receipt) => sum + receipt.amountCents, 0),
+          revenueCents: tx.store.receipts().filter((receipt) => receipt.type === "charge").reduce((sum, receipt) => sum + receipt.amountCents, 0),
         }
       })
     return {
-      generatedAt: deps.tx.at(),
+      generatedAt: tx.at(),
       lots,
       totals: {
         capacity: lots.reduce((sum, lot) => sum + lot.capacity, 0),

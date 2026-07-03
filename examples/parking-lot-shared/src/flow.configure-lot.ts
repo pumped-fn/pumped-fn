@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { Lot } from "./model"
 import { tx } from "./resource.tx"
-import { allow } from "./rules"
+import { allow } from "./flow.rule.allow"
 
 export interface ConfigureLotInput {
   bookingLeadMinutes: number
@@ -17,12 +17,12 @@ export interface ConfigureLotInput {
 export const configureLot = flow({
   name: "parking.configure-lot",
   parse: typed<ConfigureLotInput>(),
-  deps: { tx },
-  factory: (ctx, deps): Lot => {
-    allow(deps.tx.actor, ["manager"], "configure lot")
+  deps: { tx, allow },
+  factory: async (ctx, { tx, allow }): Promise<Lot> => {
+    await allow.exec({ input: { action: "configure lot", roles: ["manager"] } })
     const lot: Lot = {
       capacity: ctx.input.capacity,
-      id: ctx.input.lotId ?? deps.tx.id("lot"),
+      id: ctx.input.lotId ?? tx.id("lot"),
       name: ctx.input.name,
       rateCentsPerHour: ctx.input.rateCentsPerHour,
       settings: {
@@ -32,8 +32,8 @@ export const configureLot = flow({
         refundWindowMinutes: ctx.input.refundWindowMinutes,
       },
     }
-    deps.tx.store.saveLot(lot)
-    deps.tx.record("lot.configured", lot.id, { capacity: lot.capacity, rateCentsPerHour: lot.rateCentsPerHour })
+    tx.store.saveLot(lot)
+    tx.record("lot.configured", lot.id, { capacity: lot.capacity, rateCentsPerHour: lot.rateCentsPerHour })
     return lot
   },
 })

@@ -1,7 +1,9 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { ParkingSession } from "./model"
 import { tx } from "./resource.tx"
-import { allow, assertDriveUpCapacity, normalizePlate } from "./rules"
+import { normalizePlate } from "./rules"
+import { allow } from "./flow.rule.allow"
+import { assertDriveUpCapacity } from "./flow.rule.assert-drive-up-capacity"
 
 export interface CheckInVehicleInput {
   lotId: string
@@ -16,21 +18,21 @@ export interface CheckInBookingInput {
 export const checkInVehicle = flow({
   name: "parking.check-in-vehicle",
   parse: typed<CheckInVehicleInput>(),
-  deps: { tx },
-  factory: (ctx, deps): ParkingSession => {
-    allow(deps.tx.actor, ["operator"], "check in vehicle")
-    const lot = deps.tx.store.lot(ctx.input.lotId)
-    assertDriveUpCapacity(deps.tx.store, lot)
+  deps: { tx, allow, assertDriveUpCapacity },
+  factory: async (ctx, { tx, allow, assertDriveUpCapacity }): Promise<ParkingSession> => {
+    await allow.exec({ input: { action: "check in vehicle", roles: ["operator"] } })
+    const lot = tx.store.lot(ctx.input.lotId)
+    await assertDriveUpCapacity.exec({ input: { lot } })
     const session: ParkingSession = {
-      enteredAt: deps.tx.at(),
-      id: deps.tx.id("session"),
+      enteredAt: tx.at(),
+      id: tx.id("session"),
       lotId: lot.id,
       plate: normalizePlate(ctx.input.plate),
       status: "parked",
       userId: ctx.input.userId,
     }
-    deps.tx.store.saveSession(session)
-    deps.tx.record("session.parked", session.id, { lotId: lot.id, plate: session.plate })
+    tx.store.saveSession(session)
+    tx.record("session.parked", session.id, { lotId: lot.id, plate: session.plate })
     return session
   },
 })
@@ -38,25 +40,25 @@ export const checkInVehicle = flow({
 export const checkInBooking = flow({
   name: "parking.check-in-booking",
   parse: typed<CheckInBookingInput>(),
-  deps: { tx },
-  factory: (ctx, deps): ParkingSession => {
-    allow(deps.tx.actor, ["operator"], "check in booking")
-    const booking = deps.tx.store.booking(ctx.input.bookingId)
+  deps: { tx, allow, assertDriveUpCapacity },
+  factory: async (ctx, { tx, allow, assertDriveUpCapacity }): Promise<ParkingSession> => {
+    await allow.exec({ input: { action: "check in booking", roles: ["operator"] } })
+    const booking = tx.store.booking(ctx.input.bookingId)
     if (booking.status !== "held") throw new Error(`booking ${booking.id} is not held`)
-    const lot = deps.tx.store.lot(booking.lotId)
-    assertDriveUpCapacity(deps.tx.store, lot)
+    const lot = tx.store.lot(booking.lotId)
+    await assertDriveUpCapacity.exec({ input: { lot } })
     const session: ParkingSession = {
       bookingId: booking.id,
-      enteredAt: deps.tx.at(),
-      id: deps.tx.id("session"),
+      enteredAt: tx.at(),
+      id: tx.id("session"),
       lotId: lot.id,
       plate: booking.plate,
       status: "parked",
       userId: booking.userId,
     }
-    deps.tx.store.saveSession(session)
-    deps.tx.store.saveBooking({ ...booking, sessionId: session.id, status: "checked_in" })
-    deps.tx.record("booking.checked-in", booking.id, { sessionId: session.id })
+    tx.store.saveSession(session)
+    tx.store.saveBooking({ ...booking, sessionId: session.id, status: "checked_in" })
+    tx.record("booking.checked-in", booking.id, { sessionId: session.id })
     return session
   },
 })

@@ -10,14 +10,14 @@ export const listReceipts = flow({
   name: "parking.list-receipts",
   parse: typed<ListReceiptsInput>(),
   deps: { tx },
-  factory: (ctx, deps): Receipt[] => {
-    const requestedUser = ctx.input.userId ?? deps.tx.actor.id
-    if (deps.tx.actor.role === "user" && requestedUser !== deps.tx.actor.id) {
-      throw new Error(`user ${deps.tx.actor.id} cannot read receipts for ${requestedUser}`)
+  factory: (ctx, { tx }): Receipt[] => {
+    const requestedUser = ctx.input.userId ?? tx.actor.id
+    if (tx.actor.role === "user" && requestedUser !== tx.actor.id) {
+      throw new Error(`user ${tx.actor.id} cannot read receipts for ${requestedUser}`)
     }
-    return deps.tx.store.receipts().filter((receipt) => {
-      if (deps.tx.actor.role !== "user") return true
-      return deps.tx.store.session(receipt.sessionId).userId === requestedUser
+    return tx.store.receipts().filter((receipt) => {
+      if (tx.actor.role !== "user") return true
+      return tx.store.session(receipt.sessionId).userId === requestedUser
     })
   },
 })

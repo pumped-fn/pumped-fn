@@ -20,27 +20,27 @@ export const tx = resource({
     now: tags.required(now),
     store,
   },
-  factory: (ctx, deps): Work => {
+  factory: (ctx, { actor, now, store }): Work => {
     const events: AuditRecord[] = []
     ctx.cleanup(() => {
-      for (const event of events) deps.store.saveAudit(event)
+      for (const event of events) store.saveAudit(event)
     })
     return {
-      actor: deps.actor,
-      at: deps.now,
-      id: (prefix) => deps.store.nextId(prefix),
+      actor,
+      at: now,
+      id: (prefix) => store.nextId(prefix),
       record: (type, targetId, data = {}) => {
         events.push({
-          actorId: deps.actor.id,
-          at: deps.now(),
+          actorId: actor.id,
+          at: now(),
           data,
-          id: deps.store.nextId("audit"),
-          role: deps.actor.role,
+          id: store.nextId("audit"),
+          role: actor.role,
           targetId,
           type,
         })
       },
-      store: deps.store,
+      store,
     }
   },
 })

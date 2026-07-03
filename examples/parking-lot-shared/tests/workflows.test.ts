@@ -1,11 +1,13 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createScope, preset } from "@pumped-fn/lite"
+import { createScope, flow, preset, typed } from "@pumped-fn/lite"
+import type { AmountDueInput } from "../src"
 import { describe, expect, test } from "vitest"
 import {
   acceptedWorkflows,
   actor,
+  amountDue,
   bookSpace,
   cancelBooking,
   checkInBooking,
@@ -233,5 +235,49 @@ describe("parking lot workflows", () => {
     expect(reopened.lot(lot.id)).toMatchObject({ name: "SQLite Garage", rateCentsPerHour: 700 })
     reopened.close()
     rmSync(dir, { force: true, recursive: true })
+  })
+
+  test("substitutes the amount-due rule flow to change prepareExit's pricing policy", async () => {
+    const backing = createMemoryStore()
+    const flatFee = flow({
+      name: "flat-fee-pricing",
+      parse: typed<AmountDueInput>(),
+      factory: () => 250,
+    })
+    const managerScope = createScope({
+      presets: [preset(store, backing), preset(amountDue, flatFee)],
+      tags: [actor({ id: "manager-1", role: "manager" }), now(() => "2026-07-01T08:00:00.000Z")],
+    })
+    const manager = managerScope.createContext()
+    const lot = await manager.exec({
+      flow: configureLot,
+      input: {
+        bookingLeadMinutes: 60,
+        capacity: 4,
+        currency: "USD",
+        graceMinutes: 0,
+        name: "Flat Fee Garage",
+        rateCentsPerHour: 900,
+        refundWindowMinutes: 60,
+      },
+    })
+
+    const operatorScope = createScope({
+      presets: [preset(store, backing), preset(amountDue, flatFee)],
+      tags: [actor({ id: "operator-1", role: "operator" }), now(() => "2026-07-01T08:10:00.000Z")],
+    })
+    const operator = operatorScope.createContext()
+    const session = await operator.exec({
+      flow: checkInVehicle,
+      input: { lotId: lot.id, plate: "flat-001" },
+    })
+    const exit = await operator.exec({ flow: prepareExit, input: { sessionId: session.id } })
+
+    expect(exit.payment.amountCents).toBe(250)
+
+    await manager.close({ ok: true })
+    await operator.close({ ok: true })
+    await managerScope.dispose()
+    await operatorScope.dispose()
   })
 })

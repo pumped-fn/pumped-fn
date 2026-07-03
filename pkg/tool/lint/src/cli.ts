@@ -35,7 +35,7 @@ function usage(): string {
 }
 
 function formatDiagnostic(diagnostic: Diagnostic): string {
-  return `${diagnostic.filePath}:${diagnostic.line}:${diagnostic.column} ${diagnostic.ruleId} ${diagnostic.message}`
+  return `${diagnostic.filePath}:${diagnostic.line}:${diagnostic.column} [${diagnostic.severity}] ${diagnostic.ruleId} ${diagnostic.message}`
 }
 
 async function main(): Promise<void> {
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
     console.log(`pumped-lite-lint: ${result.filesScanned} files scanned, ${result.diagnostics.length} diagnostics`)
   }
 
-  if (result.diagnostics.length > 0) process.exitCode = 1
+  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) process.exitCode = 1
 }
 
 main().catch((error) => {
