@@ -353,3 +353,6 @@ dist/skills/
 .claude/plugins/local/
 examples/reactivity-bench/
 *.sqlite
+
+# test fixtures are sources, never binaries
+!pkg/*/*/tests/fixtures/**
