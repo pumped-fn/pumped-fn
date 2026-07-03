@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { basename, relative, resolve } from "node:path"
+import { relative, resolve } from "node:path"
 import ts from "typescript"
 
 const root = process.cwd()
@@ -10,7 +10,7 @@ function read(path: string): string {
 }
 
 function readBffPackage(...path: string[]): string {
-  return readFileSync(resolve(root, "..", basename(root).replace("-react-", "-bff-"), ...path), "utf8")
+  return readFileSync(resolve(root, "..", "service-health-bff", ...path), "utf8")
 }
 
 function section(source: string, heading: string): string {

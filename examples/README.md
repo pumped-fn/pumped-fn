@@ -9,26 +9,28 @@ surfaces for documented patterns, not publishing targets.
 
 | Directory | Package | Role |
 | --- | --- | --- |
-| `lite-practical/` | `@pumped-fn/lite-practical` | Backend and framework-neutral Lite patterns. |
-| `lite-react-practical/` | `@pumped-fn/lite-react-practical` | React patterns, capstones, and browser checks. |
-| `lite-bff-practical/` | `@pumped-fn/lite-bff-practical` | BFF-style composition examples. |
-| `lite-hono-todo-practical/` | `@pumped-fn/lite-hono-todo-practical` | Hono backend integration for a todo API. |
-| `lite-tanstack-start-todo-practical/` | `@pumped-fn/lite-tanstack-start-todo-practical` | TanStack Start fullstack integration for todos. |
-| `lite-cli-practical/` | `@pumped-fn/lite-cli-practical` | CLI parser integrations with per-command Lite scopes. |
-| `lite-sync-practical/` | `@pumped-fn/lite-sync-practical` | Replicated draft state with sync stress metrics. |
-| `lite-sync-web-practical/` | `@pumped-fn/lite-sync-web-practical` | Frontend/backend sync through a web environment gateway. |
+| `lite-tour/` | `@pumped-fn/lite-tour` | Backend and framework-neutral Lite patterns. |
+| `lite-react-tour/` | `@pumped-fn/lite-react-tour` | React patterns, capstones, and browser checks. |
+| `service-health-bff/` | `@pumped-fn/service-health-bff` | BFF-style composition examples. |
+| `todo-hono/` | `@pumped-fn/todo-hono` | Hono backend integration for a todo API. |
+| `todo-tanstack-start/` | `@pumped-fn/todo-tanstack-start` | TanStack Start fullstack integration for todos. |
+| `deploy-cli/` | `@pumped-fn/deploy-cli` | CLI parser integrations with per-command Lite scopes. |
+| `draft-sync/` | `@pumped-fn/draft-sync` | Replicated draft state with sync stress metrics. |
+| `draft-sync-web/` | `@pumped-fn/draft-sync-web` | Frontend/backend sync through a web environment gateway. |
 | `parking-lot-shared/` | `@pumped-fn/parking-lot-shared` | Parking lot management business logic and persistence ports shared by every entrypoint. |
 | `parking-lot-cli/` | `@pumped-fn/parking-lot-cli` | CLI entrypoint over the parking lot management flows. |
 | `parking-lot-hono/` | `@pumped-fn/parking-lot-hono` | Hono API entrypoint over the parking lot management flows. |
 | `parking-lot-app/` | `@pumped-fn/parking-lot-app` | Convention-driven `@pumped-fn/app` entrypoint producing a CLI and HTTP server from one manifest over the parking lot management flows. |
 | `parking-lot-tanstack-start/` | `@pumped-fn/parking-lot-tanstack-start` | TanStack Start server-function entrypoint over the parking lot management flows. |
 | `parking-lot-spa/` | `@pumped-fn/parking-lot-spa` | Vite React SPA over the parking lot management flows and state. |
-| `agent-practical/` | `@pumped-fn/agent-practical` | Agent workflow examples. |
+| `ticket-triage/` | `@pumped-fn/ticket-triage` | Agent workflow examples. |
 
 ## Naming
 
-Small examples use `<surface>-practical`. Domain capstones use `<domain>-<surface>` with a shared
-domain package when multiple entrypoints prove the same behavior.
+Examples are named after what the application is, not the lesson it teaches. A tech suffix (e.g.
+`-hono`, `-cli`, `-web`) is kept only where it distinguishes variants of the same domain. Pure API
+tours with no domain get an honest `<library>-tour` name. Domain capstones use `<domain>-<surface>`
+with a shared domain package when multiple entrypoints prove the same behavior.
 
 ## Canonical Usage
 

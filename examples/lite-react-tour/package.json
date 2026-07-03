@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/lite-sync-web-practical",
+  "name": "@pumped-fn/lite-react-tour",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,9 +8,12 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@json-render/core": "catalog:",
+    "@json-render/react": "catalog:",
     "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-extension-sync": "workspace:*",
-    "@pumped-fn/lite-react": "workspace:*"
+    "@pumped-fn/lite-react": "workspace:*",
+    "@pumped-fn/lite-react-json-render": "workspace:*",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "react": "^19.2.3",

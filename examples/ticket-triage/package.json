@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/lite-tanstack-start-todo-practical",
+  "name": "@pumped-fn/ticket-triage",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,17 +8,15 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-tanstack-start": "workspace:*",
-    "@tanstack/react-router": "catalog:",
-    "@tanstack/react-start": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "zod": "catalog:"
+    "@pumped-fn/sdk": "workspace:*",
+    "@pumped-fn/sdk-claude": "workspace:*",
+    "@pumped-fn/sdk-codex": "workspace:*",
+    "@pumped-fn/sdk-just-bash": "workspace:*",
+    "@pumped-fn/sdk-test": "workspace:*",
+    "@pumped-fn/lite": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/react": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

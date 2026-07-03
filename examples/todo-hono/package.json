@@ -1,19 +1,21 @@
 {
-  "name": "@pumped-fn/lite-bff-practical",
+  "name": "@pumped-fn/todo-hono",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run --coverage",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/lite": "workspace:*"
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-hono": "workspace:*",
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

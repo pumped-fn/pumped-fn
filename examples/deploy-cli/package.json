@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/agent-practical",
+  "name": "@pumped-fn/deploy-cli",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,12 +8,12 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/sdk": "workspace:*",
-    "@pumped-fn/sdk-claude": "workspace:*",
-    "@pumped-fn/sdk-codex": "workspace:*",
-    "@pumped-fn/sdk-just-bash": "workspace:*",
-    "@pumped-fn/sdk-test": "workspace:*",
-    "@pumped-fn/lite": "workspace:*"
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-logging": "workspace:*",
+    "@pumped-fn/lite-extension-observable": "workspace:*",
+    "cac": "catalog:",
+    "commander": "catalog:",
+    "yargs": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

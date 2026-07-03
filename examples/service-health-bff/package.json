@@ -1,5 +1,5 @@
 {
-  "name": "@pumped-fn/lite-sync-practical",
+  "name": "@pumped-fn/service-health-bff",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-extension-sync": "workspace:*"
+    "@pumped-fn/lite": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

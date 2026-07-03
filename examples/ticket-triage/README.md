@@ -22,6 +22,6 @@ scope seam.
 Run it:
 
 ```sh
-pnpm -F @pumped-fn/agent-practical test
-pnpm -F @pumped-fn/agent-practical typecheck
+pnpm -F @pumped-fn/ticket-triage test
+pnpm -F @pumped-fn/ticket-triage typecheck
 ```
