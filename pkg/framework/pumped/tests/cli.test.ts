@@ -48,4 +48,27 @@ describe("runCli", () => {
 
     process.exitCode = originalExitCode
   })
+
+  it("reports invalid --json input via err() and sets exitCode without creating a scope", async () => {
+    const manifest: Manifest = {
+      app: undefined,
+      entries: [{ kind: "cli", name: "greet", file: "virtual", flow: greet }],
+    }
+
+    const lines: string[] = []
+    const errors: string[] = []
+    const originalExitCode = process.exitCode
+
+    await runCli(manifest, ["greet", "--json", "{not valid json"], {
+      out: (line) => lines.push(line),
+      err: (line) => errors.push(line),
+    })
+
+    expect(lines).toEqual([])
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatch(/invalid --json payload/)
+    expect(process.exitCode).toBe(1)
+
+    process.exitCode = originalExitCode
+  })
 })

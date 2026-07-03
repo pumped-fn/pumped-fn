@@ -1,6 +1,7 @@
-import { createScope } from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 import { Cron } from "croner"
 import { schedule } from "../tags"
+import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
 export interface JobsIo {
@@ -18,7 +19,7 @@ function resolveSchedule(entry: ManifestEntry): { cron: string } {
   return meta
 }
 
-export function runJobs(manifest: Manifest, io?: JobsIo): JobsRunner {
+export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): JobsRunner {
   const appConfig = manifest.app
   const onError =
     io?.onError ??
@@ -29,14 +30,11 @@ export function runJobs(manifest: Manifest, io?: JobsIo): JobsRunner {
   const entries = manifest.entries.filter((entry) => entry.kind === "jobs")
   const schedules = entries.map((entry) => ({ entry, cron: resolveSchedule(entry).cron }))
 
-  const scope = createScope({
-    extensions: appConfig?.extensions,
-    tags: appConfig?.tags,
-    presets: appConfig?.presets,
-  })
+  const ownsScope = scope === undefined
+  const appScope = scope ?? createAppScope(manifest)
 
   async function tick(entry: ManifestEntry): Promise<void> {
-    const context = scope.createContext({ tags: appConfig?.context?.() })
+    const context = appScope.createContext({ tags: appConfig?.context?.() })
 
     try {
       await context.exec({ flow: entry.flow, rawInput: undefined })
@@ -53,7 +51,7 @@ export function runJobs(manifest: Manifest, io?: JobsIo): JobsRunner {
     tick,
     async stop() {
       for (const job of jobs) job.stop()
-      await scope.dispose()
+      if (ownsScope) await appScope.dispose()
     },
   }
 }

@@ -23,13 +23,23 @@ export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Pr
   const program = cac("pumped")
 
   async function runEntry(entry: ManifestEntry, json: string | undefined): Promise<void> {
+    let rawInput: unknown
+    if (json) {
+      try {
+        rawInput = JSON.parse(json)
+      } catch (error) {
+        err(`invalid --json payload: ${error instanceof Error ? error.message : String(error)}`)
+        process.exitCode = 1
+        return
+      }
+    }
+
     const scope = createScope({
       extensions: appConfig?.extensions,
       tags: appConfig?.tags,
       presets: appConfig?.presets,
     })
     const context = scope.createContext({ tags: appConfig?.context?.() })
-    const rawInput = json ? JSON.parse(json) : undefined
 
     try {
       const output = await context.exec({ flow: entry.flow, rawInput })

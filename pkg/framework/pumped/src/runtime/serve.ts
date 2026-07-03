@@ -1,7 +1,8 @@
-import { createScope } from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 import { hono } from "@pumped-fn/lite-hono"
 import { Hono } from "hono"
 import { route } from "../tags"
+import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
 function resolveRoute(entry: ManifestEntry): { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string } {
@@ -12,14 +13,36 @@ function resolveRoute(entry: ManifestEntry): { method: "GET" | "POST" | "PUT" | 
   }
 }
 
-export function createServer(manifest: Manifest) {
+function queryToInput(searchParams: URLSearchParams): Record<string, string | string[]> {
+  const input: Record<string, string | string[]> = {}
+  for (const key of new Set(searchParams.keys())) {
+    const values = searchParams.getAll(key)
+    input[key] = values.length > 1 ? values : (values[0] as string)
+  }
+  return input
+}
+
+const INVALID_JSON = Symbol("invalid-json")
+
+async function readJsonBody(req: { text(): Promise<string> }): Promise<unknown> {
+  const raw = await req.text()
+  if (raw.trim() === "") return undefined
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return INVALID_JSON
+  }
+}
+
+export interface SharedScope {
+  scope: Lite.Scope
+  lite: hono.Adapter
+}
+
+export function createServer(manifest: Manifest, shared?: SharedScope) {
   const appConfig = manifest.app
-  const lite = hono.adapter()
-  const scope = createScope({
-    extensions: [lite, ...(appConfig?.extensions ?? [])],
-    tags: appConfig?.tags,
-    presets: appConfig?.presets,
-  })
+  const lite = shared?.lite ?? hono.adapter()
+  const appScope = shared?.scope ?? createAppScope(manifest, [lite])
 
   const app = new Hono<hono.Env>()
 
@@ -35,7 +58,9 @@ export function createServer(manifest: Manifest) {
 
     app.on(method, path, async (context) => {
       const rawInput =
-        method === "GET" ? Object.fromEntries(new URL(context.req.url).searchParams) : await context.req.json()
+        method === "GET" ? queryToInput(new URL(context.req.url).searchParams) : await readJsonBody(context.req)
+
+      if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
       return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
     })
@@ -43,10 +68,12 @@ export function createServer(manifest: Manifest) {
 
   for (const entry of manifest.entries.filter((entry) => entry.kind === "agents")) {
     app.post(`/agents/${entry.name}`, async (context) => {
-      const rawInput = await context.req.json()
+      const rawInput = await readJsonBody(context.req)
+      if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
+
       return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
     })
   }
 
-  return { app, scope }
+  return { app, scope: appScope }
 }

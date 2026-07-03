@@ -4,6 +4,7 @@ import { createServer } from "./runtime/serve"
 import { runCli } from "./runtime/cli"
 import { runJobs } from "./runtime/jobs"
 import { runWorkflows } from "./runtime/workflows"
+import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
 
 export const pumped = {
@@ -13,6 +14,7 @@ export const pumped = {
   workflowRun,
   plugin: pumpedPlugin,
   createServer,
+  createAppScope,
   runCli,
   runJobs,
   runWorkflows,

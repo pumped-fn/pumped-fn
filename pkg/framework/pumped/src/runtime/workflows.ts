@@ -1,6 +1,7 @@
-import { createScope, type Lite } from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 import { randomUUID } from "node:crypto"
 import { workflowRun } from "../tags"
+import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
 export interface WorkflowsIo {
@@ -11,7 +12,7 @@ export interface WorkflowsRunner {
   stop(): Promise<void>
 }
 
-export function runWorkflows(manifest: Manifest, io?: WorkflowsIo): WorkflowsRunner {
+export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.Scope): WorkflowsRunner {
   const appConfig = manifest.app
   const onError =
     io?.onError ??
@@ -21,11 +22,8 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo): WorkflowsRun
 
   const entries = manifest.entries.filter((entry) => entry.kind === "workflows")
 
-  const scope = createScope({
-    extensions: appConfig?.extensions,
-    tags: appConfig?.tags,
-    presets: appConfig?.presets,
-  })
+  const ownsScope = scope === undefined
+  const appScope = scope ?? createAppScope(manifest)
 
   const runs = entries.map((entry) => runEntry(entry))
 
@@ -34,7 +32,7 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo): WorkflowsRun
       workflowRun({ taskId: entry.name, runId: randomUUID() }),
       ...(appConfig?.context?.() ?? []),
     ]
-    const context = scope.createContext({ tags })
+    const context = appScope.createContext({ tags })
 
     try {
       await context.exec({ flow: entry.flow, rawInput: undefined })
@@ -48,7 +46,7 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo): WorkflowsRun
   return {
     async stop() {
       await Promise.allSettled(runs)
-      await scope.dispose()
+      if (ownsScope) await appScope.dispose()
     },
   }
 }

@@ -40,13 +40,49 @@ import { claude } from "@pumped-fn/sdk-claude"
 export default { tags: [claude()] }
 ```
 
+### One scope per process
+
+`pumped.createServer`, `pumped.runJobs`, and `pumped.runWorkflows` all accept an existing
+`@pumped-fn/lite` scope so a single process — dev server or built entry — runs HTTP, jobs, and
+workflows against **one** shared scope. Stateful atoms are therefore the same instance whether
+they're read from an HTTP handler, a cron tick, or a workflow run in the same process:
+
+```ts
+import { pumped } from "@pumped-fn/pumped"
+import { hono } from "@pumped-fn/lite-hono"
+
+const lite = hono.adapter()
+const scope = pumped.createAppScope(manifest, [lite])
+const { app } = pumped.createServer(manifest, { scope, lite })
+pumped.runJobs(manifest, undefined, scope)
+pumped.runWorkflows(manifest, undefined, scope)
+```
+
+`pumped.createAppScope(manifest, extraExtensions?)` derives a scope's `extensions`/`tags`/`presets`
+from `manifest.app` (the `src/app.ts` config), merged with any `extraExtensions` the caller needs
+(the HTTP server needs the `@pumped-fn/lite-hono` adapter extension; jobs/workflows don't). Each
+runner still creates its own per-request/per-tick/per-run `ExecutionContext` off the shared scope —
+only the scope (and its atoms) is shared, never the context. Calling `createServer`/`runJobs`/
+`runWorkflows` with no scope argument builds a standalone scope internally (useful for tests/scripts)
+and owns its disposal; passing a scope hands disposal ownership to the caller — `stop()` will not
+dispose a scope it didn't create.
+
+The generated production entry (`ENTRY_SERVER_SOURCE` in `src/plugin.ts`) and `pumped dev` both wire
+one shared scope this way, so `pumped dev` boots the same server + jobs + workflows composition as
+production — a missing `schedule` tag or invalid cron expression surfaces as a dev-startup error
+instead of only crashing in prod. On Vite server close, `pumped dev` stops jobs/workflows and
+disposes the shared scope. A `src/` file change that breaks the graph is not cached forever: dev
+rebuilds on every watcher `add`/`unlink`/`change` event, and a rejected build never poisons the
+cache — the next request retries the build with the just-saved fix.
+
 ### Jobs and cron
 
 `src/jobs/*.ts` flows require a `schedule` tag (`{ cron: string }`) — the framework throws a startup
 error naming the entry if it's missing. Cron parsing/scheduling is done by
 [`croner`](https://github.com/hexagon/croner). `pumped.runJobs(manifest)` starts one long-lived scope
-for the whole runner and creates a fresh context per tick; the per-tick function is also exposed
-directly so tests can invoke it without waiting on real cron timing:
+for the whole runner (or reuses a scope passed as the third argument) and creates a fresh context per
+tick; the per-tick function is also exposed directly so tests can invoke it without waiting on real
+cron timing:
 
 ```ts
 // src/jobs/nightly-sweep.ts
@@ -65,6 +101,20 @@ export default flow({
 base package never hard-depends on `@pumped-fn/sdk`'s durable-workflow extension. If you want
 `@pumped-fn/sdk`'s suspend/resume `workflowExtension`, wire it yourself via `app.extensions` —
 `runWorkflows` only guarantees each entry gets *a* run/task id pair on its context, not durability.
+
+### HTTP input semantics
+
+`src/server/*.ts` flows receive `rawInput` derived from the request, with no implicit type
+coercion — the framework never guesses a query string is "really" a number or boolean:
+
+- **GET**: `rawInput` is built from the URL's query string. A key that appears once becomes a
+  plain `string`; a key repeated (`?a=1&a=2`) becomes a `string[]` of all its values, in order. If
+  your flow needs a number, boolean, or single-vs-array normalization, declare that in the flow's
+  own `parse`/`typed<T>()` or write your own coercion — don't rely on framework guessing.
+- **Non-GET** (`POST`/`PUT`/`PATCH`/`DELETE`): the raw body is read as text first. An empty body
+  becomes `rawInput: undefined` (no `req.json()` thrown on an empty request). A non-empty body that
+  fails to parse as JSON responds `400 { error: "invalid JSON body" }` instead of an unhandled
+  framework-level `500`. A well-formed JSON body is parsed and passed through as `rawInput`.
 
 Inside the app body itself, follow the strata convention: nouns (`atom.*`, `resource.*`) at the
 bottom, verbs (`flow.*`) in the middle, edges (the discovered entries) at the top, with imports

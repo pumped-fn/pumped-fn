@@ -1,9 +1,13 @@
 import { pumpedHmr } from "@pumped-fn/lite-hmr"
 import { getRequestListener } from "@hono/node-server"
 import { isRunnableDevEnvironment, type Plugin, type RunnableDevEnvironment } from "vite"
+import type { Lite } from "@pumped-fn/lite"
 import { discover } from "./discover"
 import { generateManifest } from "./codegen"
+import { createDevRunner } from "./runtime/dev-runner"
 import type { Manifest } from "./runtime/manifest"
+import type { JobsRunner } from "./runtime/jobs"
+import type { WorkflowsRunner } from "./runtime/workflows"
 
 export interface PumpedOptions {
   dir?: string
@@ -18,12 +22,16 @@ const RESOLVED_ENTRY_CLI_ID = "\0pumped:entry-cli"
 
 export const ENTRY_SERVER_SOURCE = `
 import { pumped } from "@pumped-fn/pumped"
+import { hono } from "@pumped-fn/lite-hono"
 import { serve } from "@hono/node-server"
 import { app as manifestApp, entries } from ${JSON.stringify(MANIFEST_ID)}
 
-const { app: honoApp } = pumped.createServer({ app: manifestApp, entries })
-pumped.runJobs({ app: manifestApp, entries })
-pumped.runWorkflows({ app: manifestApp, entries })
+const manifest = { app: manifestApp, entries }
+const lite = hono.adapter()
+const scope = pumped.createAppScope(manifest, [lite])
+const { app: honoApp } = pumped.createServer(manifest, { scope, lite })
+pumped.runJobs(manifest, undefined, scope)
+pumped.runWorkflows(manifest, undefined, scope)
 const port = Number(process.env.PORT ?? 3000)
 serve({ fetch: honoApp.fetch, port })
 `
@@ -68,34 +76,68 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     },
 
     configureServer(server) {
-      let handlerPromise: Promise<(request: Request) => Promise<Response> | Response> | undefined
+      interface DevApp {
+        fetch: (request: Request) => Promise<Response> | Response
+        scope: Lite.Scope
+        jobs: JobsRunner
+        workflows: WorkflowsRunner
+      }
 
       if (!isRunnableDevEnvironment(server.environments.ssr)) {
         throw new Error("pumped-fn requires a runnable ssr environment")
       }
       const ssrEnvironment = server.environments.ssr as RunnableDevEnvironment
 
-      async function loadHandler() {
-        const module = (await ssrEnvironment.runner.import(MANIFEST_ID)) as Manifest
+      async function loadDevApp(): Promise<DevApp> {
+        const manifest = (await ssrEnvironment.runner.import(MANIFEST_ID)) as Manifest
         const { createServer } = await import("./runtime/serve")
-        return createServer(module).app.fetch
+        const { runJobs } = await import("./runtime/jobs")
+        const { runWorkflows } = await import("./runtime/workflows")
+        const { createAppScope } = await import("./runtime/app-scope")
+        const { hono } = await import("@pumped-fn/lite-hono")
+
+        const lite = hono.adapter()
+        const scope = createAppScope(manifest, [lite])
+        const { app } = createServer(manifest, { scope, lite })
+        const jobs = runJobs(manifest, undefined, scope)
+        const workflows = runWorkflows(manifest, undefined, scope)
+
+        return { fetch: app.fetch, scope, jobs, workflows }
       }
+
+      async function disposeDevApp(devApp: DevApp): Promise<void> {
+        await devApp.jobs.stop()
+        await devApp.workflows.stop()
+        await devApp.scope.dispose()
+      }
+
+      const runner = createDevRunner(loadDevApp, disposeDevApp)
 
       function invalidate() {
         const manifestModule = ssrEnvironment.moduleGraph.getModuleById(RESOLVED_MANIFEST_ID)
         if (manifestModule) ssrEnvironment.moduleGraph.invalidateModule(manifestModule)
-        handlerPromise = undefined
+        runner.invalidate()
       }
 
       server.watcher.add(sourceDir())
       server.watcher.on("add", invalidate)
       server.watcher.on("unlink", invalidate)
+      server.watcher.on("change", invalidate)
+
+      runner.get().catch((error) => {
+        server.config.logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error), {
+          error: error instanceof Error ? error : undefined,
+        })
+      })
+
+      server.httpServer?.on("close", () => {
+        void runner.disposeCurrent()
+      })
 
       return () => {
         server.middlewares.use(async (request, response) => {
-          handlerPromise ??= loadHandler()
-          const fetchHandler = await handlerPromise
-          getRequestListener(fetchHandler)(request, response)
+          const devApp = await runner.get()
+          getRequestListener(devApp.fetch)(request, response)
         })
       }
     },
