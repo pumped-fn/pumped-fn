@@ -92,26 +92,26 @@ export const deploymentPlan = flow({
     operation: tags.required(operation),
     actor: tags.required(actor),
   },
-  factory: (ctx, deps): DeployPlan => {
-    const record = deps.registry.service(ctx.input.service)
-    const next = deps.registry.nextVersion(record, ctx.input.target)
+  factory: (ctx, { registry, logger, operation, actor }): DeployPlan => {
+    const record = registry.service(ctx.input.service)
+    const next = registry.nextVersion(record, ctx.input.target)
     const steps = [
       `load ${record.service}`,
       `promote ${record.current} to ${next}`,
       ctx.input.dryRun ? "write plan" : "execute release",
     ]
 
-    deps.logger.info("deploy.plan", {
-      operation: deps.operation,
-      actor: deps.actor,
+    logger.info("deploy.plan", {
+      operation,
+      actor,
       service: record.service,
       target: ctx.input.target,
       dryRun: ctx.input.dryRun,
     })
 
     return {
-      operation: deps.operation,
-      actor: deps.actor,
+      operation,
+      actor,
       service: record.service,
       target: ctx.input.target,
       current: record.current,
@@ -131,8 +131,8 @@ export const auditReadiness = flow({
     operation: tags.required(operation),
     actor: tags.required(actor),
   },
-  factory: (ctx, deps): AuditReport => {
-    const services = deps.registry.list().map((record) => ({
+  factory: (ctx, { registry, logger, operation, actor }): AuditReport => {
+    const services = registry.list().map((record) => ({
       service: record.service,
       current: record.current,
       staging: record.staging,
@@ -141,17 +141,17 @@ export const auditReadiness = flow({
     }))
     const risky = services.filter((service) => service.pendingChecks > 0).length
 
-    deps.logger.info("audit.report", {
-      operation: deps.operation,
-      actor: deps.actor,
+    logger.info("audit.report", {
+      operation,
+      actor,
       services: services.length,
       risky,
       json: ctx.input.json,
     })
 
     return {
-      operation: deps.operation,
-      actor: deps.actor,
+      operation,
+      actor,
       format: ctx.input.json ? "json" : "text",
       services,
       risky,

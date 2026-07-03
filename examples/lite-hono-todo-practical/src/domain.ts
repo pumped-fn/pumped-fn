@@ -115,7 +115,7 @@ export const listTodos = flow({
     store,
     tenantId: tags.required(tenantId),
   },
-  factory: (_ctx, deps) => deps.store.list(deps.tenantId),
+  factory: (_ctx, { store, tenantId }) => store.list(tenantId),
 })
 
 export const createTodo = flow({
@@ -128,12 +128,12 @@ export const createTodo = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: (ctx, deps) =>
-    deps.store.create({
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+  factory: (ctx, { store, tenantId, actorId, requestId, operation }) =>
+    store.create({
+      tenantId,
+      actorId,
+      requestId,
+      operation,
       title: ctx.input.title,
     }),
 })
@@ -148,13 +148,13 @@ export const toggleTodo = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: (ctx, deps) =>
-    deps.store.toggle({
+  factory: (ctx, { store, tenantId, actorId, requestId, operation }) =>
+    store.toggle({
       id: ctx.input.id,
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+      tenantId,
+      actorId,
+      requestId,
+      operation,
     }),
 })
 
@@ -167,11 +167,11 @@ export const clearCompleted = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: (_ctx, deps) =>
-    deps.store.clearCompleted({
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+  factory: (_ctx, { store, tenantId, actorId, requestId, operation }) =>
+    store.clearCompleted({
+      tenantId,
+      actorId,
+      requestId,
+      operation,
     }),
 })

@@ -1,10 +1,7 @@
-import { controller, flow } from "@pumped-fn/lite"
+import { expireBookings } from "@pumped-fn/parking-lot-shared"
 import { pumped } from "@pumped-fn/pumped"
-import { readReport } from "@pumped-fn/parking-lot-shared"
 
-export default flow({
-  name: "expire-bookings",
-  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-  deps: { report: controller(readReport) },
-  factory: (_ctx, { report }) => report.exec({ input: {} }),
-})
+export default {
+  ...expireBookings,
+  tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })],
+}

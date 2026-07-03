@@ -1,41 +1,104 @@
 # Parking Lot App
 
-Convention-driven `@pumped-fn/pumped` entrypoint over the shared parking lot management flows. One `src/`
-tree produces both an HTTP server and a CLI from the same manifest.
+A runnable operator application over the shared parking-lot domain (`@pumped-fn/parking-lot-shared`),
+assembled by `@pumped-fn/pumped`'s convention-driven discovery. One `src/` tree produces an HTTP
+server, a CLI, a cron job, and a boot-time reconciliation workflow from the same manifest and the
+same shared scope.
+
+## What it does
+
+- **Configure lots, book spaces, check vehicles in, prepare exits, pair/refund payments, open and
+  resolve disputes, read occupancy/revenue reports** — the full flow set exported by
+  `@pumped-fn/parking-lot-shared`, exposed over HTTP (`src/server/*.ts`) and the CLI
+  (`src/cli/*.ts`).
+- **Expires stale bookings and stuck payments** — `src/jobs/expire-bookings.ts` runs
+  `expireBookings` (from the shared package) on a 5-minute cron. It cancels `held` bookings whose
+  lot grace window has elapsed with no check-in ("no-shows"), and force-collects payments still
+  `pending`/`failed` past a session's refund window, issuing a `charge` receipt for each so the
+  books close instead of leaking `awaiting_payment` sessions forever.
+- **Reconciles a day's takings** — `src/workflows/day-close.ts` runs `dayClose` once at process
+  boot. It sums payments paired "today" against receipts issued "today" (by the tag-driven `now`
+  clock) and reports any discrepancy between money collected and money receipted.
+- **Serves receipts** — `GET /receipts?userId=...` (`src/server/receipts.ts`) lists a user's
+  receipts; manager/operator actors may omit `userId` to see all of them.
 
 ## Canonical Shape
 
-`src/app.ts` default-exports the scope config (presets, context tags). Every file under `src/server/`
-and `src/cli/` default-exports a shared flow verbatim — no wrapper, no facade. The `pumped` CLI
-discovers those files by directory (`server`, `cli`, `jobs`), reads `route`/`command` tags off each
-flow for method/path/name overrides, and generates the manifest that `createServer`/`runCli` execute
-through a scope built from `src/app.ts`. Domain code never imports `@pumped-fn/pumped`; only the generated
-entries do.
+`src/app.ts` default-exports the scope config (`presets`, `context`). Every file under
+`src/server/`, `src/cli/`, `src/jobs/`, `src/workflows/` default-exports a shared flow — either
+verbatim or re-tagged with `pumped.route`/`pumped.command`/`pumped.schedule` metadata, never
+wrapped in a facade. The `pumped` CLI discovers those files by directory, reads the tags off each
+flow for method/path/name/cron overrides, and generates the manifest that `createServer`/`runCli`/
+`runJobs`/`runWorkflows` execute through one scope built from `src/app.ts`. Domain code
+(`@pumped-fn/parking-lot-shared`) never imports `@pumped-fn/pumped`; only the files under `src/`
+here do.
 
-## Shape
+## Architecture
 
-- `src/app.ts` — scope config: in-memory store preset, actor/now context tags from request headers
-  (HTTP) or env vars (CLI).
-- `src/server/{lots,bookings,check-ins,exits,payments-pair,reports}.ts` — one-line default exports of
-  the shared flows, routed by filename.
-- `src/cli/{configure,book,report}.ts` — one-line default exports of the shared flows, run as CLI
-  commands by filename.
-- `vite.config.ts` — installs the `pumped.plugin()` Vite plugin that powers `pumped dev`/`pumped build`.
-- `tests/booking.test.ts` — plain `createScope({presets})` + `ctx.exec`, importing only
-  `@pumped-fn/lite` and `@pumped-fn/parking-lot-shared`.
-- `tests/server-entry.test.ts` / `tests/cli-entry.test.ts` — hand-built manifests driven through
-  `@pumped-fn/pumped`'s `createServer`/`runCli` runtime, mirroring `parking-lot-hono`'s Hono round trips.
+`src/app.ts` is the composition seam: it presets the shared `store` atom to a SQLite-backed
+implementation (`createSqliteStore` from `@pumped-fn/parking-lot-shared/sqlite`) and derives
+`actor`/`now` context tags per request (HTTP: `x-actor-id`/`x-role` headers) or per process (CLI/
+jobs/workflows: `PARKING_ACTOR_ID`/`PARKING_ROLE` env vars, defaulting to a `manager` actor). This
+is the one place in the app that reads `process.env` directly — everywhere else the actor and clock
+arrive as declared tag dependencies, never as ambient global reads.
+
+`pumped dev`/`pumped build` discover `src/server`, `src/cli`, `src/jobs`, `src/workflows` and wire
+one shared `@pumped-fn/lite` scope (via `pumped.createAppScope`) across the HTTP server, the cron
+runner, and the workflow runner, so the SQLite-backed store atom is the same instance whether it's
+touched from a request, a job tick, or the boot-time day-close run. Domain logic (rules, flows, the
+`tx` transactional resource, the `ParkingStore` contract and its memory/SQLite implementations)
+lives entirely in `@pumped-fn/parking-lot-shared` and never imports `@pumped-fn/pumped` — every file
+under `src/server`, `src/cli`, `src/jobs`, `src/workflows` is a thin default export of a shared flow,
+optionally re-tagged with `pumped.route`/`pumped.command`/`pumped.schedule` metadata.
+
+## Where data lives
+
+SQLite file path comes from the `PARKING_DB_PATH` env var, defaulting to `parking-lot.sqlite` in the
+process's working directory. Set it to `:memory:` for an ephemeral run, or point it at a persistent
+path for a real deployment. Test scopes never touch this file — every test presets the shared
+`store` atom with `createMemoryStore()` directly.
 
 ## Run
 
 ```bash
-pnpm test
+pnpm test               # vitest — domain + entry + full-composition integration tests
 pnpm typecheck
-pnpm dev            # pumped dev — starts the Vite dev server with HMR
-pnpm build           # pumped build --target all — emits dist/server.mjs + dist/cli.mjs
-node dist/server.mjs
+pnpm dev                 # pumped dev — Vite dev server with HMR over the discovered graph
+pnpm build                # pumped build --target all — emits dist/server.mjs + dist/cli.mjs
+PARKING_DB_PATH=./data/parking-lot.sqlite node dist/server.mjs
 node dist/cli.mjs configure --json '{"name":"Downtown","capacity":10,"rateCentsPerHour":500,"graceMinutes":10,"bookingLeadMinutes":120,"currency":"USD","refundWindowMinutes":1440}'
+node dist/cli.mjs book --json '{"lotId":"lot-0001","plate":"abc-123","startAt":"2026-07-01T09:00:00.000Z","endAt":"2026-07-01T12:00:00.000Z"}'
+node dist/cli.mjs report --json '{}'
 ```
 
-Compare with `examples/parking-lot-cli` and `examples/parking-lot-hono`, which wire the same domain by
-hand instead of through convention-driven discovery.
+Run `pumped dev --help`/`node dist/cli.mjs --help` to see the CLI's generated command list — each
+command's description states its expected `--json` shape (see "Framework feedback" below).
+
+## Framework feedback
+
+The CLI runner (`@pumped-fn/pumped`'s `runCli`) currently accepts input only via a single `--json`
+payload flag; there is no mapping from named CLI flags (e.g. `--lot-id`, `--plate`) to flow input
+fields. `src/cli/*.ts` compensates by tagging each command with a `pumped.command({ description })`
+that documents the expected JSON shape inline, but a flag-to-input mapping (driven off each flow's
+`parse`/`typed<T>()` shape) would make the CLI usable without hand-authored JSON blobs.
+
+## Architecture sketch
+
+```
+HTTP request ──┐
+CLI invocation ─┼─► src/app.ts (SQLite store preset, actor/now context tags)
+Cron tick ──────┤        │
+Boot workflow ──┘        ▼
+                 one shared @pumped-fn/lite scope
+                          │
+        ┌─────────────────┼─────────────────┐
+        ▼                 ▼                 ▼
+ @pumped-fn/parking-lot-shared flows   tx (audit trail)   ParkingStore (SQLite)
+   configureLot, bookSpace, checkIn*, prepareExit,
+   pairPayment/refundPayment/recordPaymentFailure,
+   openDispute/resolveDispute, listReceipts, readReport,
+   expireBookings (job), dayClose (workflow)
+```
+
+Compare with `examples/parking-lot-cli` and `examples/parking-lot-hono`, which wire the same domain
+by hand instead of through convention-driven discovery.

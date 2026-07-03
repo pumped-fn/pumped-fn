@@ -1,8 +1,9 @@
 import { preset } from "@pumped-fn/lite"
 import type { pumped } from "@pumped-fn/pumped"
-import { actor, createMemoryStore, now, store, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
+import { actor, now, store, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
+import { createSqliteStore } from "@pumped-fn/parking-lot-shared/sqlite"
 
-const database = createMemoryStore()
+const database = createSqliteStore(process.env["PARKING_DB_PATH"] ?? "parking-lot.sqlite")
 
 function readRole(value: string | undefined): Role {
   if (value === "manager" || value === "operator" || value === "user") return value

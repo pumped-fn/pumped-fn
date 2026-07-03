@@ -645,6 +645,9 @@ importers:
         specifier: workspace:*
         version: link:../../pkg/core/lite
     devDependencies:
+      '@pumped-fn/lite-hmr':
+        specifier: workspace:*
+        version: link:../../pkg/ext/hmr
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1

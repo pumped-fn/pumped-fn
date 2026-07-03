@@ -42,7 +42,7 @@ const readWorkspace = tool({
     name: "read-workspace",
     parse: typed<{ path: string }>(),
     deps: { sandbox: tags.required(sandbox) },
-    factory: (ctx, deps) => deps.sandbox.readFile(ctx.input.path),
+    factory: (ctx, { sandbox }) => sandbox.readFile(ctx.input.path),
   }),
 })
 

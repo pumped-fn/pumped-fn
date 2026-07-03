@@ -128,11 +128,11 @@ export const listTodos = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: async (_ctx, deps): Promise<TodoList> => ({
-    todos: await deps.store.list(deps.tenantId),
-    tenantId: deps.tenantId,
-    requestId: deps.requestId,
-    operation: deps.operation,
+  factory: async (_ctx, { store, tenantId, requestId, operation }): Promise<TodoList> => ({
+    todos: await store.list(tenantId),
+    tenantId,
+    requestId,
+    operation,
   }),
 })
 
@@ -146,12 +146,12 @@ export const createTodo = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: (ctx, deps) =>
-    deps.store.create({
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+  factory: (ctx, { store, tenantId, actorId, requestId, operation }) =>
+    store.create({
+      tenantId,
+      actorId,
+      requestId,
+      operation,
       title: ctx.input.title,
     }),
 })
@@ -166,13 +166,13 @@ export const toggleTodo = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: (ctx, deps) =>
-    deps.store.toggle({
+  factory: (ctx, { store, tenantId, actorId, requestId, operation }) =>
+    store.toggle({
       id: ctx.input.id,
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+      tenantId,
+      actorId,
+      requestId,
+      operation,
     }),
 })
 
@@ -185,12 +185,12 @@ export const clearCompleted = flow({
     requestId: tags.required(requestId),
     operation: tags.required(operation),
   },
-  factory: async (_ctx, deps): Promise<DeleteCompletedResult> => ({
-    deleted: await deps.store.clearCompleted({
-      tenantId: deps.tenantId,
-      actorId: deps.actorId,
-      requestId: deps.requestId,
-      operation: deps.operation,
+  factory: async (_ctx, { store, tenantId, actorId, requestId, operation }): Promise<DeleteCompletedResult> => ({
+    deleted: await store.clearCompleted({
+      tenantId,
+      actorId,
+      requestId,
+      operation,
     }),
   }),
 })

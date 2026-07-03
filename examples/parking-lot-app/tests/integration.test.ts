@@ -1,0 +1,104 @@
+import { preset } from "@pumped-fn/lite"
+import { pumped } from "@pumped-fn/pumped"
+import { describe, expect, it } from "vitest"
+import {
+  actor,
+  bookSpace,
+  configureLot,
+  createMemoryStore,
+  expireBookings,
+  listReceipts,
+  now,
+  readReport,
+  store,
+} from "@pumped-fn/parking-lot-shared"
+
+function manifest(clock: { value: string }): pumped.Manifest {
+  return {
+    app: {
+      presets: [preset(store, createMemoryStore())],
+      context: (request?: Request) => {
+        const role = (request?.headers.get("x-role") as "manager" | "operator" | "user" | null) ?? "manager"
+        const id = request?.headers.get("x-actor-id") ?? "manager-1"
+        return [actor({ id, role }), now(() => clock.value)]
+      },
+    },
+    entries: [
+      { kind: "server", name: "lots", file: "virtual", flow: configureLot },
+      { kind: "server", name: "bookings", file: "virtual", flow: bookSpace },
+      {
+        kind: "server",
+        name: "receipts",
+        file: "virtual",
+        flow: { ...listReceipts, tags: [...(listReceipts.tags ?? []), pumped.route({ method: "GET" })] },
+      },
+      { kind: "server", name: "reports", file: "virtual", flow: readReport },
+      {
+        kind: "jobs",
+        name: "expire-bookings",
+        file: "virtual",
+        flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
+      },
+    ],
+  }
+}
+
+describe("parking lot app composition", () => {
+  it("books a session via HTTP, expires it via the job on one shared scope, and observes the audit trail", async () => {
+    const clock = { value: "2026-07-01T08:00:00.000Z" }
+    const { app: honoApp, scope } = pumped.createServer(manifest(clock))
+    const jobs = pumped.runJobs(manifest(clock), undefined, scope)
+
+    const configured = await honoApp.request("/lots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        bookingLeadMinutes: 120,
+        capacity: 1,
+        currency: "USD",
+        graceMinutes: 15,
+        name: "Integration Lot",
+        rateCentsPerHour: 500,
+        refundWindowMinutes: 1440,
+      }),
+    })
+    expect(configured.status).toBe(200)
+    const lot = await configured.json()
+
+    const booked = await honoApp.request("/bookings", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-role": "user", "x-actor-id": "user-1" },
+      body: JSON.stringify({
+        endAt: "2026-07-01T12:00:00.000Z",
+        lotId: lot.id,
+        plate: "int-001",
+        startAt: "2026-07-01T09:00:00.000Z",
+      }),
+    })
+    expect(booked.status).toBe(200)
+    const booking = await booked.json()
+    expect(booking.status).toBe("held")
+
+    clock.value = "2026-07-01T09:20:00.000Z"
+    await jobs.tick({
+      kind: "jobs",
+      name: "expire-bookings",
+      file: "virtual",
+      flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
+    })
+
+    const receiptsRes = await honoApp.request(`/receipts?userId=${encodeURIComponent(booking.userId)}`)
+    expect(receiptsRes.status).toBe(200)
+
+    const reportRes = await honoApp.request("/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lotId: lot.id }),
+    })
+    const report = await reportRes.json()
+    expect(report.lots[0].heldBookings).toBe(0)
+
+    await jobs.stop()
+    await scope.dispose()
+  })
+})
