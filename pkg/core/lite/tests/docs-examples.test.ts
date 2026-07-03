@@ -13,11 +13,11 @@ const tsgoBin = join(pkgRoot, "node_modules", ".bin", "tsgo")
 const REFERENCE_PREAMBLE = `/// <reference path="${preludePath}" />\n`
 const IMPORT_PREAMBLE = `import {
   atom, isAtom, controller, isControllerDep, service,
-  flow, isFlow, typed,
+  flow, isFlow, typed, isFault,
   resource, isResource,
   tag, tags, isTag, isTagged, isTagExecutor, getAllTags,
   preset, isPreset,
-  createScope, setControllerReadHook, shallowEqual, ParseError,
+  createScope, setControllerReadHook, shallowEqual, ParseError, FlowFault,
 } from "../../src/index"
 import type { Lite, AtomState } from "../../src/index"
 `

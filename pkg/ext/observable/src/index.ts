@@ -1,4 +1,4 @@
-import { tag, type Lite } from "@pumped-fn/lite"
+import { tag, FlowFault, type Lite } from "@pumped-fn/lite"
 
 export namespace Observable {
   export type Phase = "start" | "success" | "error"
@@ -9,6 +9,7 @@ export namespace Observable {
     readonly name?: string
     readonly message: string
     readonly stack?: string
+    readonly fault?: unknown
   }
 
   export interface Event {
@@ -318,6 +319,9 @@ function identity(value: unknown): unknown {
 }
 
 function mapError(error: unknown): Observable.ErrorInfo {
+  if (error instanceof FlowFault) {
+    return { name: error.name, message: error.message, stack: error.stack, fault: error.fault }
+  }
   if (error instanceof Error) {
     return { name: error.name, message: error.message, stack: error.stack }
   }

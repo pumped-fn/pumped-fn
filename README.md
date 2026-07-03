@@ -43,6 +43,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
+| `pkg/framework/pumped` | `@pumped-fn/pumped` | Convention-driven scope compiler: discovers flows on disk, assembles a scope, and drives it as a CLI or HTTP server |
 | `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
 | `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |
 | `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
@@ -55,11 +56,11 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
-| `pkg/agent/core` | `@pumped-fn/agent-sdk` | Agent workflows, tools, skills, sessions, evals, HTTP adapters, and run inspection over lite |
-| `pkg/agent/codex` | `@pumped-fn/agent-sdk-codex` | Lazy Codex CLI model provider tag for agent-sdk |
-| `pkg/agent/claude` | `@pumped-fn/agent-sdk-claude` | Lazy Claude CLI model provider tag for agent-sdk |
-| `pkg/agent/bash` | `@pumped-fn/agent-sdk-just-bash` | Lazy just-bash sandbox provider tag for agent-sdk |
-| `pkg/agent/test` | `@pumped-fn/agent-sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
+| `pkg/sdk/core` | `@pumped-fn/sdk` | Generic runtime primitives over lite: durable workflow steps, sessions, materials, events, guards, sandboxes, CLI workers, eval harness, and agents/models as one primitive family |
+| `pkg/sdk/codex` | `@pumped-fn/sdk-codex` | Lazy Codex CLI model provider tag for sdk |
+| `pkg/sdk/claude` | `@pumped-fn/sdk-claude` | Lazy Claude CLI model provider tag for sdk |
+| `pkg/sdk/bash` | `@pumped-fn/sdk-just-bash` | Lazy just-bash sandbox provider tag for sdk |
+| `pkg/sdk/test` | `@pumped-fn/sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
 | `pkg/tool/lint` | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
 | `pkg/tool/codemod` | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
 
@@ -83,9 +84,9 @@ execution context
   tags: tenant, locale, trace id, runtime config
         |
         v
-agent workflow
-  model and sandbox providers as tags
-  tools and subagents as ctx.exec flow steps
+sdk primitives (@pumped-fn/sdk)
+  durable workflow steps, sessions, materials, guards, sandboxes, CLI workers, eval harness
+  agents and models are one primitive family: providers as tags, tools/subagents as ctx.exec flow steps
   events as a boundary resource
 ```
 
@@ -309,18 +310,19 @@ The examples are part of the public contract for how code should be shaped:
 
 | Path | What it shows |
 | --- | --- |
-| `examples/lite-practical` | Backend and service-style patterns, plus a service health capstone |
-| `examples/lite-react-practical` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
-| `examples/lite-bff-practical` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
-| `examples/lite-hono-todo-practical` | Hono todo backend that keeps framework routing at the edge and executes Lite flows through middleware |
-| `examples/lite-tanstack-start-todo-practical` | TanStack Start todo surface with Lite request middleware and server-function handlers |
-| `examples/lite-cli-practical` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
-| `examples/lite-sync-practical` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
-| `examples/lite-sync-web-practical` | Frontend/backend sync through a web environment gateway and ordinary React observers |
-| `examples/agent-practical` | Agent workflow, provider, sandbox, tool, subagent, and eval examples over Lite |
+| `examples/lite-tour` | Backend and service-style patterns, plus a service health capstone |
+| `examples/lite-react-tour` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
+| `examples/service-health-bff` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
+| `examples/todo-hono` | Hono todo backend that keeps framework routing at the edge and executes Lite flows through middleware |
+| `examples/todo-tanstack-start` | TanStack Start todo surface with Lite request middleware and server-function handlers |
+| `examples/deploy-cli` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
+| `examples/draft-sync` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
+| `examples/draft-sync-web` | Frontend/backend sync through a web environment gateway and ordinary React observers |
+| `examples/ticket-triage` | Agent workflow, provider, sandbox, tool, subagent, and eval examples over Lite |
 | `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
 | `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
 | `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |
+| `examples/parking-lot-app` | Convention-driven `@pumped-fn/pumped` entrypoint producing a CLI and HTTP server from one manifest over parking lot flows |
 | `examples/parking-lot-tanstack-start` | TanStack Start server-function handlers over parking lot flows |
 | `examples/parking-lot-spa` | Vite React SPA that observes and dispatches parking lot flows through Lite React providers |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |

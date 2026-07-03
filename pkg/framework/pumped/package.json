@@ -1,0 +1,85 @@
+{
+  "name": "@pumped-fn/pumped",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Convention-driven scope compiler: discover flows on disk, assemble a scope, drive it as CLI or HTTP server",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "bin": {
+    "pumped": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@hono/node-server": "^2.0.0",
+    "@pumped-fn/lite": "^3.1.0",
+    "@pumped-fn/lite-hono": "^0.2.0",
+    "hono": "^4.12.0",
+    "vite": "^8.0.0"
+  },
+  "dependencies": {
+    "@pumped-fn/lite-hmr": "workspace:*",
+    "cac": "catalog:",
+    "croner": "catalog:"
+  },
+  "devDependencies": {
+    "acorn": "catalog:",
+    "@hono/node-server": "catalog:",
+    "@types/estree": "catalog:",
+    "@pumped-fn/sdk": "workspace:*",
+    "@pumped-fn/sdk-test": "workspace:*",
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-hono": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "hono": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "pumped-fn",
+    "lite",
+    "framework",
+    "cli",
+    "vite",
+    "dependency-injection"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/framework/pumped",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}

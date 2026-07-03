@@ -16,6 +16,8 @@
     "@pumped-fn/lite": "workspace:*"
   },
   "devDependencies": {
+    "@pumped-fn/lite-extension-observable": "workspace:*",
+    "@pumped-fn/lite-hmr": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

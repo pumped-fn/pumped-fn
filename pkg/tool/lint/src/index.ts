@@ -6,9 +6,12 @@ export type RuleId =
   | "pumped/no-ambient-io-outside-boundary"
   | "pumped/no-definition-handle-suffix"
   | "pumped/no-direct-flow-composition"
+  | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
   | "pumped/no-jsdom-backend"
   | "pumped/no-module-mocks"
+  | "pumped/no-module-state"
+  | "pumped/no-naked-globals"
   | "pumped/no-render-outside-browser-test"
   | "pumped/no-react-local-state"
   | "pumped/no-react-manual-execution-context"
@@ -16,10 +19,16 @@ export type RuleId =
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
   | "pumped/no-shared-scope-factory"
+  | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-untyped-throw"
+  | "pumped/prefer-destructured-deps"
+
+export type Severity = "error" | "warn"
 
 export interface Diagnostic {
   ruleId: RuleId
+  severity: Severity
   filePath: string
   line: number
   column: number
@@ -31,8 +40,71 @@ export interface ScanResult {
   filesScanned: number
 }
 
+/**
+ * Per-rule config. Rules with no config accept no key. `allowImplicit` and
+ * `allowGlobals` list identifiers that are exempt from their rule's checks
+ * (tag labels for no-implicit-tag-read, global names for no-naked-globals).
+ * `allowBuiltins` lists builtin error constructor names exempt from
+ * no-untyped-throw. `severity` overrides a rule's default severity ("error",
+ * "warn", or "off" to disable it entirely). Six dependency-graph and
+ * error-taxonomy rules — no-implicit-tag-read, no-naked-globals,
+ * no-module-state, prefer-destructured-deps, no-untyped-throw, and
+ * no-swallowed-error — default to "warn" severity (see `defaultSeverity`) so
+ * they surface in `--json` output and local runs without failing the root
+ * `pnpm lint` exit code, which today only scans docs and practical examples
+ * rather than the whole monorepo — a wide, unaudited sweep of those rules
+ * across every package would produce noise no single PR could clean up in
+ * one pass. Projects that want to enforce a rule as a hard failure can opt
+ * in via `rules: { "<ruleId>": { severity: "error" } }`.
+ */
+export interface RuleConfig {
+  severity?: Severity | "off"
+  allowImplicit?: string[]
+  allowGlobals?: string[]
+  allowBuiltins?: string[]
+}
+
+export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
+
 export interface ScanOptions {
   cwd?: string
+  rules?: RuleOptions
+}
+
+const defaultSeverity: Partial<Record<RuleId, Severity>> = {
+  "pumped/no-implicit-tag-read": "warn",
+  "pumped/no-naked-globals": "warn",
+  "pumped/no-module-state": "warn",
+  "pumped/prefer-destructured-deps": "warn",
+  "pumped/no-untyped-throw": "warn",
+  "pumped/no-swallowed-error": "warn",
+}
+
+const builtinErrorNames = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "SyntaxError",
+  "ReferenceError",
+  "EvalError",
+  "URIError",
+  "AggregateError",
+])
+
+function severityOf(ruleId: RuleId): Severity {
+  return defaultSeverity[ruleId] ?? "error"
+}
+
+function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Diagnostic[] {
+  const rules = options?.rules
+  if (!rules) return diagnostics
+  const result: Diagnostic[] = []
+  for (const diagnostic of diagnostics) {
+    const override = rules[diagnostic.ruleId]?.severity
+    if (override === "off") continue
+    result.push(override ? { ...diagnostic, severity: override } : diagnostic)
+  }
+  return result
 }
 
 type Imports = {
@@ -43,8 +115,11 @@ type Imports = {
   liteNamespaces: Set<string>
   liteReactNamespaces: Set<string>
   mockFns: Set<string>
+  nodeBuiltins: Map<string, string>
   reactNamespaces: Set<string>
   render: Set<string>
+  tagExecutorLocals: Map<string, string>
+  tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
   useExecutionContext: Set<string>
   useScope: Set<string>
@@ -69,6 +144,10 @@ const ambientNamePattern = /(Http|Transport|Clock|Storage|Random|Timer|Poller|Ro
 const ambientCalls = new Set(["fetch", "setTimeout", "setInterval", "clearTimeout", "clearInterval"])
 const ambientObjects = new Set(["window", "document", "localStorage", "sessionStorage", "crypto"])
 const mockCalls = new Set(["mock", "doMock", "spyOn"])
+const tagExecutorModes = new Set(["required", "optional", "all"])
+const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
+const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
+const containerCreators = new Set(["Map", "Set"])
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -137,7 +216,7 @@ function pushTextDiagnostic(
   index: number,
   message: string,
 ): void {
-  diagnostics.push({ ruleId, filePath, ...textLocation(source, index), message })
+  diagnostics.push({ ruleId, severity: severityOf(ruleId), filePath, ...textLocation(source, index), message })
 }
 
 function pushNodeDiagnostic(
@@ -148,7 +227,7 @@ function pushNodeDiagnostic(
   node: ts.Node,
   message: string,
 ): void {
-  diagnostics.push({ ruleId, filePath, ...nodeLocation(sourceFile, node), message })
+  diagnostics.push({ ruleId, severity: severityOf(ruleId), filePath, ...nodeLocation(sourceFile, node), message })
 }
 
 function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagnostic[]): void {
@@ -208,8 +287,11 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     liteNamespaces: new Set(),
     liteReactNamespaces: new Set(),
     mockFns: new Set(),
+    nodeBuiltins: new Map(),
     reactNamespaces: new Set(),
     render: new Set(),
+    tagExecutorLocals: new Map(),
+    tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
     useExecutionContext: new Set(),
     useScope: new Set(),
@@ -221,13 +303,29 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue
     const moduleName = statement.moduleSpecifier.text
     const clause = statement.importClause
-    if (!clause?.namedBindings) continue
+    if (!clause) continue
+
+    if (moduleName.startsWith("node:") || nodeBuiltinModulePattern.test(moduleName)) {
+      if (clause.name) imports.nodeBuiltins.set(clause.name.text, moduleName)
+      if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+        imports.nodeBuiltins.set(clause.namedBindings.name.text, moduleName)
+      }
+      if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        for (const specifier of clause.namedBindings.elements) {
+          imports.nodeBuiltins.set(specifier.name.text, moduleName)
+        }
+      }
+      continue
+    }
+
+    if (!clause.namedBindings) continue
 
     if (ts.isNamespaceImport(clause.namedBindings)) {
       if (moduleName === "@pumped-fn/lite") imports.liteNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@pumped-fn/lite-react") imports.liteReactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "react") imports.reactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@testing-library/react") imports.testLibraryNamespaces.add(clause.namedBindings.name.text)
+      if (/tags/i.test(moduleName)) imports.tagsNamespaceLocals.add(clause.namedBindings.name.text)
       continue
     }
 
@@ -263,6 +361,12 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@jest/globals" && imported === "jest") {
         imports.viObjects.add(local)
+      }
+      if (imported === "tags") {
+        imports.tagsNamespaceLocals.add(local)
+      }
+      if (tagExecutorModes.has(imported)) {
+        imports.tagExecutorLocals.set(local, imported)
       }
     }
   }
@@ -417,11 +521,207 @@ function enclosingFlowFactory(node: ts.Node, imports: Imports): ts.PropertyAssig
   return null
 }
 
+function insideFactory(node: ts.Node, imports: Imports): boolean {
+  return enclosingUnitFactory(node, imports) !== null || enclosingFlowFactory(node, imports) !== null
+}
+
+function containsThrow(root: ts.Node): boolean {
+  let found = false
+  function walk(node: ts.Node): void {
+    if (found) return
+    if (ts.isThrowStatement(node)) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(root)
+  return found
+}
+
+function unitCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
+  if (!isCreatorCall(node.expression, imports)) return null
+  const config = node.arguments[0]
+  return config && ts.isObjectLiteralExpression(config) ? config : null
+}
+
+function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
+  let current: ts.Node | undefined = node
+  while (current) {
+    if (
+      ts.isPropertyAssignment(current)
+      && propertyNameText(current.name) === "factory"
+      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
+    ) {
+      const config = current.parent
+      const call = config.parent
+      if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && unitCallObject(call, imports) === config) {
+        return current.initializer
+      }
+    }
+    current = current.parent
+  }
+  return null
+}
+
+function enclosingUnitConfig(node: ts.Node, imports: Imports): ts.ObjectLiteralExpression | null {
+  const factory = enclosingUnitFactory(node, imports)
+  return factory ? (factory.parent as ts.PropertyAssignment).parent as ts.ObjectLiteralExpression : null
+}
+
+function tagExecutorModeOf(expression: ts.Expression, imports: Imports): string | null {
+  if (ts.isIdentifier(expression) && imports.tagExecutorLocals.has(expression.text)) {
+    return imports.tagExecutorLocals.get(expression.text)!
+  }
+  if (
+    ts.isPropertyAccessExpression(expression)
+    && tagExecutorModes.has(expression.name.text)
+    && ts.isIdentifier(expression.expression)
+    && imports.tagsNamespaceLocals.has(expression.expression.text)
+  ) {
+    return expression.name.text
+  }
+  return null
+}
+
+function resolveObjectLiteral(expression: ts.Expression, sourceFile: ts.SourceFile): ts.ObjectLiteralExpression | null {
+  if (ts.isObjectLiteralExpression(expression)) return expression
+  if (!ts.isIdentifier(expression)) return null
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === expression.text && declaration.initializer) {
+        return resolveObjectLiteral(declaration.initializer, sourceFile)
+      }
+    }
+  }
+  return null
+}
+
+interface DepsAnalysis {
+  names: Set<string>
+  resolvable: boolean
+}
+
+function analyzeDeps(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): DepsAnalysis {
+  const object = resolveObjectLiteral(expression, sourceFile)
+  if (!object) return { names: new Set(), resolvable: false }
+
+  const names = new Set<string>()
+  let resolvable = true
+  for (const property of object.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      const spread = analyzeDeps(property.expression, sourceFile, imports)
+      for (const name of spread.names) names.add(name)
+      if (!spread.resolvable) resolvable = false
+      continue
+    }
+    if (!ts.isPropertyAssignment(property)) continue
+    const initializer = property.initializer
+    if (
+      ts.isCallExpression(initializer)
+      && tagExecutorModeOf(initializer.expression, imports)
+      && initializer.arguments[0]
+      && ts.isIdentifier(initializer.arguments[0])
+    ) {
+      names.add(initializer.arguments[0].text)
+    }
+  }
+  return { names, resolvable }
+}
+
+function declaredTagNames(config: ts.ObjectLiteralExpression, sourceFile: ts.SourceFile, imports: Imports): DepsAnalysis {
+  const deps = objectProperty(config, "deps")
+  if (!deps) return { names: new Set(), resolvable: true }
+  return analyzeDeps(deps.initializer, sourceFile, imports)
+}
+
+function collectUnitFactoryNodes(sourceFile: ts.SourceFile, imports: Imports): Array<ts.ArrowFunction | ts.FunctionExpression> {
+  const nodes: Array<ts.ArrowFunction | ts.FunctionExpression> = []
+  function walk(node: ts.Node): void {
+    if (ts.isCallExpression(node)) {
+      const config = unitCallObject(node, imports)
+      const factory = config && objectProperty(config, "factory")
+      if (factory && (ts.isArrowFunction(factory.initializer) || ts.isFunctionExpression(factory.initializer))) {
+        nodes.push(factory.initializer)
+      }
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(sourceFile)
+  return nodes
+}
+
+function collectIdentifierReferences(root: ts.Node): Set<string> {
+  const names = new Set<string>()
+  function walk(node: ts.Node): void {
+    if (ts.isPropertyAccessExpression(node)) {
+      walk(node.expression)
+      return
+    }
+    if (ts.isPropertyAssignment(node)) {
+      if (ts.isComputedPropertyName(node.name)) walk(node.name.expression)
+      walk(node.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(node)) {
+      names.add(node.name.text)
+      return
+    }
+    if (ts.isIdentifier(node)) {
+      names.add(node.text)
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(root)
+  return names
+}
+
+function isClosedOverByFactory(name: string, factoryNodes: Array<ts.ArrowFunction | ts.FunctionExpression>): boolean {
+  return factoryNodes.some((factory) => collectIdentifierReferences(factory).has(name))
+}
+
+function nakedGlobalName(node: ts.CallExpression | ts.NewExpression): string | null {
+  if (ts.isNewExpression(node)) {
+    if (ts.isIdentifier(node.expression) && node.expression.text === "Date" && (node.arguments ?? []).length === 0) return "Date"
+    return null
+  }
+
+  const expression = node.expression
+  if (ts.isIdentifier(expression)) {
+    if (expression.text === "fetch") return "fetch"
+    if (expression.text === "setTimeout" || expression.text === "setInterval") return expression.text
+    return null
+  }
+
+  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+    if (expression.expression.text === "Date" && expression.name.text === "now" && node.arguments.length === 0) return "Date.now"
+    if (expression.expression.text === "Math" && expression.name.text === "random") return "Math.random"
+  }
+
+  return null
+}
+
+function containsMemberRead(body: ts.Node, paramName: string): boolean {
+  let found = false
+  function walk(node: ts.Node): void {
+    if (found) return
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === paramName) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(body)
+  return found
+}
+
 function shouldScanAst(filePath: string): boolean {
   return isSourceFile(filePath)
 }
 
-function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagnostic[]): void {
+function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagnostic[], options?: ScanOptions): void {
   if (!shouldScanAst(filePath)) return
 
   const sourceFile = ts.createSourceFile(
@@ -436,6 +736,11 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
   const localFlows = new Set<string>()
+  const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
+  const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
+  const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
+  const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
+  const hasGraphNodes = unitFactoryNodes.length > 0
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
@@ -612,6 +917,146 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Flows should compose child flows through deps: { child: controller(childFlow) } and child.exec(...).",
         )
       }
+
+      const unitFactory = unitCallObject(node, imports)
+      const factoryProperty = unitFactory && objectProperty(unitFactory, "factory")
+      if (
+        factoryProperty
+        && (ts.isArrowFunction(factoryProperty.initializer) || ts.isFunctionExpression(factoryProperty.initializer))
+      ) {
+        const depsParam = factoryProperty.initializer.parameters[1]
+        if (depsParam && ts.isIdentifier(depsParam.name) && factoryProperty.initializer.body && containsMemberRead(factoryProperty.initializer.body, depsParam.name.text)) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/prefer-destructured-deps",
+            depsParam,
+            `Destructure the deps parameter in the factory signature (e.g. "factory: (ctx, { ${depsParam.name.text} }) => ...") instead of reading "${depsParam.name.text}.<field>" from an identifier param.`,
+          )
+        }
+      }
+
+      const unitConfig = enclosingUnitConfig(node, imports)
+      if (unitConfig) {
+        if (
+          ts.isPropertyAccessExpression(node.expression)
+          && (node.expression.name.text === "seekTag" || node.expression.name.text === "getTag")
+          && node.arguments[0]
+          && ts.isIdentifier(node.arguments[0])
+        ) {
+          const tagName = node.arguments[0].text
+          const declared = declaredTagNames(unitConfig, sourceFile, imports)
+          if (declared.resolvable && !declared.names.has(tagName) && !allowImplicit.has(tagName)) {
+            pushNodeDiagnostic(
+              diagnostics,
+              sourceFile,
+              filePath,
+              "pumped/no-implicit-tag-read",
+              node.expression,
+              `Tag "${tagName}" is read via ${node.expression.name.text} but not declared in this unit's deps; declare it with tags.required/tags.optional/tags.all or allowlist it.`,
+            )
+          }
+        }
+
+        if (
+          ts.isPropertyAccessExpression(node.expression)
+          && node.expression.name.text === "resolve"
+          && ts.isPropertyAccessExpression(node.expression.expression)
+          && node.expression.expression.name.text === "scope"
+        ) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-implicit-tag-read",
+            node.expression,
+            "Undeclared graph value access via scope.resolve(...) inside a factory; declare the dependency in deps instead.",
+          )
+        }
+
+        const globalName = nakedGlobalName(node)
+        if (globalName && !allowGlobals.has(globalName) && !ambientAllowedAt(node, filePath)) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-naked-globals",
+            node.expression,
+            `Wrap "${globalName}" in an adapter atom/resource or a tag instead of reading it directly inside a factory.`,
+          )
+        }
+
+        if (
+          ts.isIdentifier(node.expression)
+          && imports.nodeBuiltins.has(node.expression.text)
+          && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.text)!)
+          && !ambientAllowedAt(node, filePath)
+        ) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-naked-globals",
+            node.expression,
+            `Wrap "${imports.nodeBuiltins.get(node.expression.text)}" access in an adapter atom/resource instead of calling it directly inside a factory.`,
+          )
+        }
+
+        if (
+          ts.isPropertyAccessExpression(node.expression)
+          && ts.isIdentifier(node.expression.expression)
+          && imports.nodeBuiltins.has(node.expression.expression.text)
+          && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.expression.text)!)
+          && !ambientAllowedAt(node, filePath)
+        ) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-naked-globals",
+            node.expression,
+            `Wrap "${imports.nodeBuiltins.get(node.expression.expression.text)}" access in an adapter atom/resource instead of calling it directly inside a factory.`,
+          )
+        }
+      }
+    }
+
+    if (
+      ts.isNewExpression(node)
+      && enclosingUnitConfig(node, imports)
+      && !ambientAllowedAt(node, filePath)
+    ) {
+      const globalName = nakedGlobalName(node)
+      if (globalName && !allowGlobals.has(globalName)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-naked-globals",
+          node,
+          `Wrap "${globalName}" in an adapter atom/resource or a tag instead of reading it directly inside a factory.`,
+        )
+      }
+    }
+
+    if (
+      ts.isPropertyAccessExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === "process"
+      && node.name.text === "env"
+      && enclosingUnitConfig(node, imports)
+      && !allowGlobals.has("process.env")
+      && !ambientAllowedAt(node, filePath)
+    ) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-naked-globals",
+        node,
+        'Wrap "process.env" in an adapter atom/resource or a tag instead of reading it directly inside a factory.',
+      )
     }
 
     if (ts.isVariableDeclaration(node) && node.initializer) {
@@ -773,17 +1218,103 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
     }
 
+    if (hasGraphNodes && ts.isVariableStatement(node) && node.parent === sourceFile) {
+      const isLet = (node.declarationList.flags & ts.NodeFlags.Let) !== 0
+      for (const declaration of node.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name)) continue
+
+        if (isLet) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-module-state",
+            declaration.name,
+            `Module-level "let ${declaration.name.text}" is shared mutable state; own it inside a resource/atom or scope-owned context instead.`,
+          )
+          continue
+        }
+
+        const initializer = declaration.initializer
+        if (!initializer) continue
+
+        const frozen = ts.isCallExpression(initializer)
+          && ts.isPropertyAccessExpression(initializer.expression)
+          && ts.isIdentifier(initializer.expression.expression)
+          && initializer.expression.expression.text === "Object"
+          && initializer.expression.name.text === "freeze"
+        if (frozen) continue
+
+        const isContainerLiteral = ts.isObjectLiteralExpression(initializer)
+          || ts.isArrayLiteralExpression(initializer)
+          || (ts.isNewExpression(initializer) && ts.isIdentifier(initializer.expression) && containerCreators.has(initializer.expression.text))
+        if (!isContainerLiteral) continue
+
+        const isExported = exported(node)
+        const closedOver = isClosedOverByFactory(declaration.name.text, unitFactoryNodes)
+        if (!isExported && !closedOver) continue
+
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-module-state",
+          declaration.name,
+          isExported
+            ? `Module-level mutable container "${declaration.name.text}" is exported unfrozen; wrap it in Object.freeze(...) or own it inside a resource/atom instead.`
+            : `Module-level mutable container "${declaration.name.text}" is closed over by a factory; own it inside a resource/atom or scope-owned context instead.`,
+        )
+      }
+    }
+
+    if (
+      ts.isThrowStatement(node)
+      && node.expression
+      && ts.isNewExpression(node.expression)
+      && ts.isIdentifier(node.expression.expression)
+      && builtinErrorNames.has(node.expression.expression.text)
+      && !allowBuiltins.has(node.expression.expression.text)
+      && insideFactory(node, imports)
+    ) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-untyped-throw",
+        node.expression,
+        `Throw a domain error class carrying structured fields (kind/op/entity) instead of bare "${node.expression.expression.text}"; in a flow factory, prefer ctx.fail(fault) with a declared "faults: typed<...>()" so traces and edges discriminate planned vs unplanned failures.`,
+      )
+    }
+
+    if (ts.isCatchClause(node) && insideFactory(node, imports)) {
+      const bindingName = node.variableDeclaration && ts.isIdentifier(node.variableDeclaration.name)
+        ? node.variableDeclaration.name.text
+        : null
+      const rethrows = containsThrow(node.block)
+      const referencesBinding = bindingName !== null && collectIdentifierReferences(node.block).has(bindingName)
+      if (!rethrows && !referencesBinding) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-swallowed-error",
+          node,
+          "Catch clause neither rethrows nor references the caught error; swallowing it here blinds the trace seam at this graph node.",
+        )
+      }
+    }
+
     ts.forEachChild(node, visit)
   }
 
   visit(sourceFile)
 }
 
-export function scanText(source: string, filePath: string, _options?: ScanOptions): Diagnostic[] {
+export function scanText(source: string, filePath: string, options?: ScanOptions): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   addTextDiagnostics(source, filePath, diagnostics)
-  addAstDiagnostics(source, filePath, diagnostics)
-  return diagnostics
+  addAstDiagnostics(source, filePath, diagnostics, options)
+  return applyRuleOptions(diagnostics, options)
 }
 
 async function collectFiles(targetPath: string, files: string[]): Promise<void> {

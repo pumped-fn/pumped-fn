@@ -2,10 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { scanPaths, scanText } from "../src/index"
+import { scanPaths, scanText, type Diagnostic, type ScanOptions } from "../src/index"
 
-function ids(source: string, filePath = "src/example.ts") {
-  return scanText(source, filePath).map((diagnostic) => diagnostic.ruleId)
+function ids(source: string, filePath = "src/example.ts", options?: ScanOptions) {
+  return scanText(source, filePath, options).map((diagnostic) => diagnostic.ruleId)
+}
+
+function diagnostics(source: string, filePath = "src/example.ts", options?: ScanOptions): Diagnostic[] {
+  return scanText(source, filePath, options)
 }
 
 describe("lite lint scanner", () => {
@@ -48,6 +52,7 @@ describe("lite lint scanner", () => {
       "pumped/no-module-mocks",
       "pumped/no-definition-handle-suffix",
       "pumped/no-ambient-io-outside-boundary",
+      "pumped/no-naked-globals",
       "pumped/no-scope-argument",
       "pumped/no-definition-handle-suffix",
     ])
@@ -96,7 +101,9 @@ describe("lite lint scanner", () => {
       })
     `)).toEqual([
       "pumped/no-direct-flow-composition",
+      "pumped/prefer-destructured-deps",
       "pumped/no-direct-flow-composition",
+      "pumped/prefer-destructured-deps",
     ])
   })
 
@@ -258,5 +265,514 @@ describe("lite lint scanner", () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  it("finds implicit tag reads and undeclared scope.resolve inside factories", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual(["pumped/no-implicit-tag-read"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const withOther = atom({
+        name: "withOther",
+        factory: (ctx) => ctx.scope.resolve(other),
+      })
+    `)).toEqual(["pumped/no-implicit-tag-read"])
+  })
+
+  it("flags implicit tag reads regardless of destructured deps in the factory signature", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: tags.required(requestIdTag) },
+        factory: (ctx, { id }) => id ?? ctx.data.seekTag(traceIdTag),
+      })
+    `)).toEqual(["pumped/no-implicit-tag-read"])
+  })
+
+  it("allows tag reads declared in deps or allowlisted", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: tags.required(requestIdTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: tags.required(requestIdTag) },
+        factory: (ctx, { id }) => id ?? ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const traced = atom({
+        name: "traced",
+        factory: (ctx) => ctx.data.getTag(traceTag),
+      })
+    `, "src/example.ts", { rules: { "pumped/no-implicit-tag-read": { allowImplicit: ["traceTag"] } } })).toEqual([])
+  })
+
+  it("finds naked globals inside factory bodies", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const stamped = atom({ name: "stamped", factory: () => Date.now() })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const created = atom({ name: "created", factory: () => new Date() })
+    `)).toEqual(["pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const configured = atom({ name: "configured", factory: () => process.env.API_KEY })
+    `)).toEqual(["pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { readFileSync } from "node:fs"
+      import { atom } from "@pumped-fn/lite"
+
+      const contents = atom({ name: "contents", factory: () => readFileSync("./x") })
+    `)).toEqual(["pumped/no-naked-globals"])
+  })
+
+  it("allows naked globals outside factory bodies and via the allowlist", () => {
+    expect(ids(`
+      const stamped = Date.now()
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `, "src/example.ts", { rules: { "pumped/no-naked-globals": { allowGlobals: ["Math.random"] } } })).toEqual(["pumped/no-ambient-io-outside-boundary"])
+  })
+
+  it("finds module-level mutable state in graph files", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      let counter = 0
+      const bump = atom({ name: "bump", factory: () => ++counter })
+    `)).toEqual(["pumped/no-module-state"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      export const registry = new Map<string, number>()
+      const size = atom({ name: "size", factory: () => registry.size })
+    `)).toEqual(["pumped/no-module-state"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const cache = { hits: 0 }
+      const bumpHits = atom({ name: "bumpHits", factory: () => cache.hits++ })
+    `)).toEqual(["pumped/no-module-state"])
+  })
+
+  it("allows frozen or unreferenced module-level containers, and let in non-graph files", () => {
+    expect(ids(`
+      let plain = 0
+      plain += 1
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      export const config = Object.freeze({ retries: 3 })
+      const retries = atom({ name: "retries", factory: () => config.retries })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const localOnly = { count: 0 }
+      const store = atom({ name: "store", factory: () => 0 })
+    `)).toEqual([])
+  })
+
+  it("finds resource/flow factories reading deps via an identifier instead of destructuring", () => {
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: (ctx, deps) => deps.store,
+      })
+    `)).toEqual(["pumped/prefer-destructured-deps"])
+
+    expect(ids(`
+      import { flow, typed } from "@pumped-fn/lite"
+
+      export const save = flow({
+        name: "save",
+        parse: typed<{ key: string }>(),
+        factory: (ctx, deps) => deps.tx.save(ctx.input.key),
+      })
+    `)).toEqual(["pumped/prefer-destructured-deps"])
+  })
+
+  it("allows destructured deps params, no second param, and identifiers only passed through whole", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: (ctx, { config }) => config.retries })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: (ctx) => ctx.input })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      function forward(deps: unknown) {
+        return deps
+      }
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: (ctx, deps) => forward(deps),
+      })
+    `)).toEqual([])
+  })
+
+  it("detects closure references to identifiers containing $ via AST instead of regex", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const cache$ = { hits: 0 }
+      const bumpHits = atom({ name: "bumpHits", factory: () => cache$.hits++ })
+    `)).toEqual(["pumped/no-module-state"])
+  })
+
+  it("does not treat string/template literal text matching an in-scope identifier as a closure reference", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const localOnly = { count: 0 }
+      const label = atom({ name: "label", factory: () => "localOnly count is high" })
+      const templated = atom({ name: "templated", factory: () => \`localOnly\` })
+    `)).toEqual([])
+  })
+
+  it("resolves an identifier-referenced deps object for no-implicit-tag-read", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const sharedDeps = { id: tags.required(requestIdTag) }
+
+      const requestId = atom({
+        name: "requestId",
+        deps: sharedDeps,
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("resolves spread deps that include a resolvable shared identifier", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const sharedDeps = { id: tags.required(requestIdTag) }
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { ...sharedDeps, foo: tags.required(fooTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag) || ctx.data.seekTag(fooTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("resolves aliased and namespaced tags helper imports", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import { required as req } from "../tags"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: req(requestIdTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import * as T from "../tags"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: T.required(requestIdTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("skips no-implicit-tag-read when the deps shape is unresolvable, preferring false negatives", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import { sharedDeps } from "./deps"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: sharedDeps,
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: buildDeps(),
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("escalates a warn-default rule to error via per-rule severity override", () => {
+    const result = diagnostics(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `, "src/example.ts", { rules: { "pumped/no-naked-globals": { severity: "error" } } })
+
+    const nakedGlobal = result.find((diagnostic) => diagnostic.ruleId === "pumped/no-naked-globals")
+    expect(nakedGlobal?.severity).toBe("error")
+  })
+
+  it("finds untyped throws inside atom/flow/resource factories", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new Error("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: () => {
+          throw new TypeError("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+
+    expect(ids(`
+      import { flow, typed } from "@pumped-fn/lite"
+
+      export const save = flow({
+        name: "save",
+        parse: typed<{ key: string }>(),
+        factory: () => {
+          throw new RangeError("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+  })
+
+  it("allows typed domain errors, rethrows, and non-factory throws", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      class StoreError extends Error {}
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new StoreError("bad")
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw error
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      throw new Error("outside a factory")
+    `)).toEqual([])
+  })
+
+  it("allows builtin throws via allowBuiltins config", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new TypeError("bad")
+        },
+      })
+    `, "src/example.ts", { rules: { "pumped/no-untyped-throw": { allowBuiltins: ["TypeError"] } } })).toEqual([])
+  })
+
+  it("finds swallowed errors inside factory catch clauses", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch {
+            return null
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            console.log("ignored")
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+  })
+
+  it("allows factory catch clauses that rethrow, wrap with cause, or otherwise reference the error", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw error
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      class StoreError extends Error {}
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw new StoreError("wrapped", error)
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom, controller } from "@pumped-fn/lite"
+
+      const logger = atom({ name: "logger", factory: () => console })
+
+      const store = atom({
+        name: "store",
+        deps: { logger },
+        factory: (ctx, { logger }) => {
+          try {
+            return risky()
+          } catch (error) {
+            logger.error(error)
+            return null
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      const value = (() => {
+        try {
+          return risky()
+        } catch (error) {
+        }
+      })()
+    `)).toEqual([])
+  })
+
+  it("silences a rule entirely via severity: off", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `, "src/example.ts", { rules: { "pumped/no-naked-globals": { severity: "off" } } })).toEqual([
+      "pumped/no-ambient-io-outside-boundary",
+    ])
   })
 })

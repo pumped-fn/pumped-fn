@@ -1,4 +1,4 @@
-import { controllerSymbol, tagExecutorSymbol, ParseError, type Lite, type MaybePromise, type AtomState } from "./types"
+import { controllerSymbol, tagExecutorSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
@@ -353,7 +353,7 @@ class ResourceControllerImpl<T> implements Lite.ResourceController<T> {
 
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
-  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown> | Lite.Resource<unknown>, unknown>()
+  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any> | Lite.Resource<unknown>, unknown>()
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
@@ -1052,7 +1052,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private createFlowHandle<Output, Input>(
-    flow: Lite.Flow<Output, Input>,
+    flow: Lite.Flow<Output, Input, any>,
     ctx: Lite.ExecutionContext,
     defaults?: Lite.FlowControllerOptions<Input>
   ): Lite.FlowHandle<Output, Input> {
@@ -1096,7 +1096,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private execFlowHandle<Output, Input>(
-    flow: Lite.Flow<Output, Input>,
+    flow: Lite.Flow<Output, Input, any>,
     ctx: Lite.ExecutionContext,
     options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
   ): Promise<Output> {
@@ -1207,8 +1207,8 @@ class ScopeImpl implements Lite.Scope {
     return new SelectHandleImpl(ctrl, selector, eq)
   }
 
-  getFlowPreset<O, I>(flow: Lite.Flow<O, I>): Lite.PresetValue<O, I> | undefined {
-    return this.presets.get(flow as Lite.Flow<unknown, unknown>) as Lite.PresetValue<O, I> | undefined
+  getFlowPreset<O, I>(flow: Lite.Flow<O, I, any>): Lite.PresetValue<O, I> | undefined {
+    return this.presets.get(flow as Lite.Flow<unknown, unknown, any>) as Lite.PresetValue<O, I> | undefined
   }
 
   resolveResource<T>(
@@ -1645,6 +1645,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
+  fail(fault: unknown): never {
+    throw new FlowFault(fault, this.name)
+  }
+
   resourceOwner(resource?: Lite.Resource<unknown>): ExecutionContextImpl {
     if (!this.parent || resource?.ownership === "current") return this
     assertExecutionContextImpl(this.parent)
@@ -1748,6 +1752,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       controller: owner.controller.bind(owner),
       onClose: owner.onClose.bind(owner),
       close: owner.close.bind(owner),
+      fail: owner.fail.bind(owner),
       cleanup(fn: () => MaybePromise<void>) {
         owner.assertOpen()
         if (owner.getLocalResourceEntry(resource) !== entry) {
@@ -1785,7 +1790,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   async exec(options: {
-    flow: Lite.Flow<unknown, unknown>
+    flow: Lite.Flow<unknown, unknown, any>
     input?: unknown
     rawInput?: unknown
     name?: string
@@ -1891,7 +1896,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private execFlowInternal(flow: Lite.Flow<unknown, unknown>): MaybePromise<unknown> {
+  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any>): MaybePromise<unknown> {
     const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
 
     const factory = flow.factory as unknown as (
@@ -1920,7 +1925,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   private async applyExecPipeline(
-    target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
+    target: Lite.Flow<unknown, unknown, any> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
     doExec: () => Promise<unknown>
   ): Promise<unknown> {
     let next = doExec

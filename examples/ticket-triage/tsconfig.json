@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "typeRoots": ["./node_modules/@types", "../../pkg/core/lite/node_modules/@types"],
+    "paths": {
+      "@pumped-fn/sdk": ["../../pkg/sdk/core/src/index.ts"],
+      "@pumped-fn/sdk-claude": ["../../pkg/sdk/claude/src/index.ts"],
+      "@pumped-fn/sdk-codex": ["../../pkg/sdk/codex/src/index.ts"],
+      "@pumped-fn/sdk-just-bash": ["../../pkg/sdk/bash/src/index.ts"],
+      "@pumped-fn/sdk-test": ["../../pkg/sdk/test/src/index.ts"],
+      "@pumped-fn/lite-extension-suspense": ["../../pkg/ext/suspense/src/index.ts"],
+      "@pumped-fn/lite": ["../../pkg/core/lite/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

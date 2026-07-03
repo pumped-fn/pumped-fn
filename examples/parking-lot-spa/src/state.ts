@@ -28,9 +28,9 @@ export const selectRole = flow({
   name: "parking-spa.select-role",
   parse: typed<Role>(),
   deps: { ui: controller(ui, { resolve: true }) },
-  factory: (ctx, deps): UiState => {
-    const next = { ...deps.ui.get(), role: ctx.input }
-    deps.ui.set(next)
+  factory: (ctx, { ui }): UiState => {
+    const next = { ...ui.get(), role: ctx.input }
+    ui.set(next)
     return next
   },
 })
@@ -41,8 +41,8 @@ export const configure = flow({
     configureLot: controller(parking.configureLot),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const lot = await deps.configureLot.exec({
+  factory: async (_ctx, { configureLot, ui }): Promise<UiState> => {
+    const lot = await configureLot.exec({
       input: {
         bookingLeadMinutes: 120,
         capacity: 36,
@@ -53,8 +53,8 @@ export const configure = flow({
         refundWindowMinutes: 1440,
       },
     })
-    const next = { ...deps.ui.get(), lotId: lot.id, message: `Configured ${lot.name}` }
-    deps.ui.set(next)
+    const next = { ...ui.get(), lotId: lot.id, message: `Configured ${lot.name}` }
+    ui.set(next)
     return next
   },
 })
@@ -65,9 +65,9 @@ export const book = flow({
     bookSpace: controller(parking.bookSpace),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const state = deps.ui.get()
-    const booking = await deps.bookSpace.exec({
+  factory: async (_ctx, { bookSpace, ui }): Promise<UiState> => {
+    const state = ui.get()
+    const booking = await bookSpace.exec({
       input: {
         endAt: "2026-07-02T12:00:00.000Z",
         lotId: state.lotId,
@@ -76,7 +76,7 @@ export const book = flow({
       },
     })
     const next = { ...state, message: `Booked ${booking.plate}` }
-    deps.ui.set(next)
+    ui.set(next)
     return next
   },
 })
@@ -87,13 +87,13 @@ export const checkIn = flow({
     checkInVehicle: controller(parking.checkInVehicle),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const state = deps.ui.get()
-    const session = await deps.checkInVehicle.exec({
+  factory: async (_ctx, { checkInVehicle, ui }): Promise<UiState> => {
+    const state = ui.get()
+    const session = await checkInVehicle.exec({
       input: { lotId: state.lotId, plate: "SPA-202", userId: "user-spa" },
     })
     const next = { ...state, message: `Parked ${session.plate}`, sessionId: session.id }
-    deps.ui.set(next)
+    ui.set(next)
     return next
   },
 })
@@ -104,9 +104,9 @@ export const exit = flow({
     prepareExit: controller(parking.prepareExit),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const state = deps.ui.get()
-    const prepared = await deps.prepareExit.exec({
+  factory: async (_ctx, { prepareExit, ui }): Promise<UiState> => {
+    const state = ui.get()
+    const prepared = await prepareExit.exec({
       input: { sessionId: state.sessionId },
     })
     const next = {
@@ -114,7 +114,7 @@ export const exit = flow({
       message: `Due ${money(prepared.payment.amountCents)}`,
       paymentId: prepared.payment.id,
     }
-    deps.ui.set(next)
+    ui.set(next)
     return next
   },
 })
@@ -125,13 +125,13 @@ export const pay = flow({
     pairPayment: controller(parking.pairPayment),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const state = deps.ui.get()
-    const paid = await deps.pairPayment.exec({
+  factory: async (_ctx, { pairPayment, ui }): Promise<UiState> => {
+    const state = ui.get()
+    const paid = await pairPayment.exec({
       input: { externalRef: "spa-payment", method: "card", paymentId: state.paymentId },
     })
     const next = { ...state, message: `Receipt ${paid.receipt.id}` }
-    deps.ui.set(next)
+    ui.set(next)
     return next
   },
 })
@@ -142,11 +142,11 @@ export const read = flow({
     readReport: controller(parking.readReport),
     ui: controller(ui, { resolve: true }),
   },
-  factory: async (_ctx, deps): Promise<UiState> => {
-    const state = deps.ui.get()
-    const report = await deps.readReport.exec({ input: { lotId: state.lotId } })
+  factory: async (_ctx, { readReport, ui }): Promise<UiState> => {
+    const state = ui.get()
+    const report = await readReport.exec({ input: { lotId: state.lotId } })
     const next = { ...state, message: "Report updated", revenueCents: report.totals.revenueCents }
-    deps.ui.set(next)
+    ui.set(next)
     return next
   },
 })

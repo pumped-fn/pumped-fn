@@ -4,7 +4,7 @@ import { isFlow } from "./flow"
 
 export interface DepsGraph {
   atoms: [string, Lite.Atom<unknown>][]
-  flows: [string, Lite.Flow<any, any>, Lite.FlowControllerOptions<any>?][]
+  flows: [string, Lite.Flow<any, any, any>, Lite.FlowControllerOptions<any>?][]
   controllers: [string, Lite.AtomControllerDep<unknown> | Lite.ResourceControllerDep<unknown>][]
   tags: [string, Lite.TagExecutor<unknown, boolean>][]
   resources: [string, Lite.Resource<unknown>][]

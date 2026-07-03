@@ -9,6 +9,15 @@ import type {
   Receipt,
 } from "./model"
 
+export class NotFoundError extends Error {
+  constructor(
+    readonly entity: string,
+    readonly id: string
+  ) {
+    super(`unknown ${entity}: ${id}`)
+  }
+}
+
 export interface ParkingStore {
   audit(id: string): AuditRecord
   audits(): AuditRecord[]
@@ -174,7 +183,7 @@ export class MemoryParkingStore implements ParkingStore {
 
   private must<T extends Entity>(records: Map<string, T>, id: string, kind: Kind): T {
     const record = records.get(id)
-    if (record === undefined) throw new Error(`unknown ${kind}: ${id}`)
+    if (record === undefined) throw new NotFoundError(kind, id)
     return record
   }
 }

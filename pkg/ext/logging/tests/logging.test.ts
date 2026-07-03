@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow } from "@pumped-fn/lite"
+import { createScope, flow, typed } from "@pumped-fn/lite"
 import { logging, type Logging } from "../src"
+
+describe("logging extension — typed faults", () => {
+  it("includes the fault payload in the logged error record when a FlowFault is thrown", async () => {
+    const sink = logging.memory()
+    const withFault = flow({
+      name: "withFault",
+      faults: typed<{ kind: "conflict"; id: string }>(),
+      factory: (ctx) => ctx.fail({ kind: "conflict", id: "p1" }),
+    })
+    const scope = createScope({
+      extensions: [logging.extension()],
+      tags: [logging.runtime({ sinks: [sink], level: "debug", flow: "errors" })],
+    })
+    await scope.ready
+
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: withFault })).rejects.toMatchObject({ fault: { kind: "conflict", id: "p1" } })
+
+    const errorRecord = sink.records().find((record) => record.level === "error")
+    expect(errorRecord?.fields?.error).toMatchObject({ fault: { kind: "conflict", id: "p1" } })
+  })
+})
 
 function clock(values: readonly number[]): () => number {
   let index = 0
