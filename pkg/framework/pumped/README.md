@@ -109,9 +109,9 @@ sibling `meta` export:
 ```ts
 // src/jobs/expire-bookings.ts
 export { expireBookings as default } from "@pumped-fn/parking-lot-shared"
-import { pumped } from "@pumped-fn/pumped"
+import { schedule } from "@pumped-fn/pumped"
 
-export const meta = pumped.schedule({ cron: "*/5 * * * *" })
+export const meta = schedule({ cron: "*/5 * * * *" })
 ```
 
 The generated manifest discovers `meta` alongside the default export (`import e0, * as ns0 from
@@ -189,6 +189,10 @@ compile error instead of a silent `undefined` status. See `examples/parking-lot-
 a full worked example.
 
 ## Quick start
+
+Everything is available three ways: the `pumped` namespace, its `p` alias (zod-style),
+and direct named exports — `import { p } from "@pumped-fn/pumped"` then `p.schedule(...)`,
+or `import { schedule } from "@pumped-fn/pumped"` and destructure what you use.
 
 ```ts
 // vite.config.ts

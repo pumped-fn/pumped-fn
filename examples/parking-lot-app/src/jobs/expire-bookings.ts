@@ -1,4 +1,4 @@
 export { expireBookings as default } from "@pumped-fn/parking-lot-shared"
-import { pumped } from "@pumped-fn/pumped"
+import { schedule } from "@pumped-fn/pumped"
 
-export const meta = pumped.schedule({ cron: "*/5 * * * *" })
+export const meta = schedule({ cron: "*/5 * * * *" })
