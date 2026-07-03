@@ -2,8 +2,15 @@ import { preset } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import type { pumped } from "@pumped-fn/pumped"
-import { actor, store, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
+import { actor, store, ParkingError, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
 import { createSqliteStore } from "@pumped-fn/parking-lot-shared/sqlite"
+
+const faultStatus = { forbidden: 403, conflict: 409, "not-found": 404, unavailable: 409 } as const
+
+function mapError(error: unknown): { status: number; body: unknown } | undefined {
+  if (!(error instanceof ParkingError)) return undefined
+  return { status: faultStatus[error.fault.kind], body: error.fault }
+}
 
 const database = createSqliteStore(process.env["PARKING_DB_PATH"] ?? "parking-lot.sqlite")
 const logSink = logging.memory()
@@ -29,4 +36,5 @@ export default {
     logging.runtime({ sinks: [logSink], level: "info", flow: "all" }),
     observable.runtime({ sinks: [obsSink], input: true }),
   ],
+  mapError,
 } satisfies pumped.Config

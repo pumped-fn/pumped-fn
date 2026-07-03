@@ -2,6 +2,7 @@ import { flow, typed } from "@pumped-fn/lite"
 import type { Lot } from "./model"
 import { overlaps, parkedCount } from "./rules"
 import { store } from "./atom.store"
+import { ParkingError } from "./error"
 import { rule } from "./tags"
 
 export interface AssertCapacityInput {
@@ -22,6 +23,7 @@ export const assertCapacity = flow({
       overlaps(ctx.input.startAt, ctx.input.endAt, booking.startAt, booking.endAt)
     ).length
     const parked = parkedCount(store, ctx.input.lot.id)
-    if (held + parked >= ctx.input.lot.capacity) throw new Error(`lot ${ctx.input.lot.id} has no reservable capacity`)
+    if (held + parked >= ctx.input.lot.capacity)
+      throw new ParkingError({ kind: "unavailable", entity: "lot", id: ctx.input.lot.id, reason: "capacity" })
   },
 })

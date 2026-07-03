@@ -1,4 +1,5 @@
 export * from "./tags"
+export * from "./error"
 export * from "./atom.clock"
 export * from "./atom.store"
 export * from "./resource.tx"

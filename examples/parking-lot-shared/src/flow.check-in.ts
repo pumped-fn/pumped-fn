@@ -4,6 +4,7 @@ import { tx } from "./resource.tx"
 import { normalizePlate } from "./rules"
 import { allow } from "./flow.rule.allow"
 import { assertDriveUpCapacity } from "./flow.rule.assert-drive-up-capacity"
+import { ParkingError } from "./error"
 
 export interface CheckInVehicleInput {
   lotId: string
@@ -44,7 +45,9 @@ export const checkInBooking = flow({
   factory: async (ctx, { tx, allow, assertDriveUpCapacity }): Promise<ParkingSession> => {
     await allow.exec({ input: { action: "check in booking", roles: ["operator"] } })
     const booking = tx.store.booking(ctx.input.bookingId)
-    if (booking.status !== "held") throw new Error(`booking ${booking.id} is not held`)
+    if (booking.status !== "held") {
+      throw new ParkingError({ kind: "conflict", entity: "booking", id: booking.id, from: booking.status, attempted: "checked_in" })
+    }
     const lot = tx.store.lot(booking.lotId)
     await assertDriveUpCapacity.exec({ input: { lot } })
     const session: ParkingSession = {

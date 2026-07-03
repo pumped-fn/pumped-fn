@@ -16,6 +16,12 @@ export interface CliIo {
   err(line: string): void
 }
 
+/**
+ * Runs the manifest's cli entries. On a flow failure mapped by `appConfig.mapError`,
+ * the mapped body is rendered to `err()` and `process.exitCode` is derived from the
+ * mapped status: 403 -> 3, 409 -> 4, 404 -> 5, anything else -> 1. Unmapped failures
+ * keep the prior behavior of printing the error message and exiting with code 1.
+ */
 export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Promise<void> {
   const appConfig = manifest.app
   const out = io?.out ?? ((line: string) => process.stdout.write(`${line}\n`))
@@ -47,8 +53,14 @@ export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Pr
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      err(error instanceof Error ? error.message : String(error))
-      process.exitCode = 1
+      const mapped = appConfig?.mapError?.(error)
+      if (mapped === undefined) {
+        err(error instanceof Error ? error.message : String(error))
+        process.exitCode = 1
+      } else {
+        err(JSON.stringify(mapped.body))
+        process.exitCode = mapped.status === 403 ? 3 : mapped.status === 409 ? 4 : mapped.status === 404 ? 5 : 1
+      }
     } finally {
       await scope.dispose()
     }

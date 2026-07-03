@@ -30,6 +30,22 @@ const echoBody = flow({
   factory: (ctx) => ({ received: ctx.input ?? null }),
 })
 
+class Forbidden extends Error {}
+
+const guarded = flow({
+  tags: [route({ method: "POST", path: "/guarded" })],
+  factory: () => {
+    throw new Forbidden("nope")
+  },
+})
+
+const unmapped = flow({
+  tags: [route({ method: "POST", path: "/unmapped" })],
+  factory: () => {
+    throw new Error("boom")
+  },
+})
+
 describe("createServer", () => {
   it("binds server entries with filename defaults and executes flows through the scope", async () => {
     const manifest: Manifest = {
@@ -105,6 +121,37 @@ describe("createServer", () => {
     })
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: "invalid JSON body" })
+
+    await scope.dispose()
+  })
+
+  it("consults appConfig.mapError and returns the mapped status and body instead of a raw 500", async () => {
+    const manifest: Manifest = {
+      app: {
+        mapError: (error) => (error instanceof Forbidden ? { status: 403, body: { kind: "forbidden" } } : undefined),
+      },
+      entries: [{ kind: "server", name: "guarded", file: "virtual", flow: guarded }],
+    }
+
+    const { app, scope } = createServer(manifest)
+
+    const response = await app.request("/guarded", { method: "POST" })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ kind: "forbidden" })
+
+    await scope.dispose()
+  })
+
+  it("falls through to the current 500 path when mapError returns undefined", async () => {
+    const manifest: Manifest = {
+      app: { mapError: () => undefined },
+      entries: [{ kind: "server", name: "unmapped", file: "virtual", flow: unmapped }],
+    }
+
+    const { app, scope } = createServer(manifest)
+
+    const response = await app.request("/unmapped", { method: "POST" })
+    expect(response.status).toBe(500)
 
     await scope.dispose()
   })

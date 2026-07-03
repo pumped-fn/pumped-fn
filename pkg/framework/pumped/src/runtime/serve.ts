@@ -1,6 +1,7 @@
 import type { Lite } from "@pumped-fn/lite"
 import { hono } from "@pumped-fn/lite-hono"
 import { Hono } from "hono"
+import type { ContentfulStatusCode } from "hono/utils/http-status"
 import { route } from "../tags"
 import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
@@ -62,7 +63,13 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
 
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
-      return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+      try {
+        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+      } catch (error) {
+        const mapped = appConfig?.mapError?.(error)
+        if (mapped === undefined) throw error
+        return context.json(mapped.body, mapped.status as ContentfulStatusCode)
+      }
     })
   }
 
@@ -71,7 +78,13 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
       const rawInput = await readJsonBody(context.req)
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
-      return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+      try {
+        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+      } catch (error) {
+        const mapped = appConfig?.mapError?.(error)
+        if (mapped === undefined) throw error
+        return context.json(mapped.body, mapped.status as ContentfulStatusCode)
+      }
     })
   }
 

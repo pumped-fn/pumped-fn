@@ -44,4 +44,23 @@ describe("runWorkflows", () => {
     expect(errors).toHaveLength(1)
     expect((errors[0] as [string, Error])[0]).toBe("boom")
   })
+
+  it("passes the mapped fault from appConfig.mapError alongside the raw error", async () => {
+    class Conflict extends Error {}
+    const boom = flow({
+      factory: () => {
+        throw new Conflict("boom")
+      },
+    })
+    const manifest: Manifest = {
+      app: { mapError: (error) => (error instanceof Conflict ? { status: 409, body: { kind: "conflict" } } : undefined) },
+      entries: [{ kind: "workflows", name: "boom", file: "virtual", flow: boom }],
+    }
+
+    const seen: unknown[] = []
+    const runner = runWorkflows(manifest, { onError: (entry, error, mapped) => seen.push([entry.name, error, mapped]) })
+    await runner.stop()
+
+    expect(seen).toEqual([["boom", expect.any(Conflict), { status: 409, body: { kind: "conflict" } }]])
+  })
 })

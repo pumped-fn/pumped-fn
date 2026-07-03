@@ -3,6 +3,7 @@ import type { ParkingSession, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
+import { ParkingError } from "./error"
 
 export interface PairPaymentInput {
   externalRef: string
@@ -28,7 +29,7 @@ export const pairPayment = flow({
     await allow.exec({ input: { action: "pair payment", roles: ["operator"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "pending" && payment.status !== "failed") {
-      throw new Error(`payment ${payment.id} cannot be paired from ${payment.status}`)
+      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "paired" })
     }
     const session = tx.store.session(payment.sessionId)
     const paired: Payment = {
@@ -53,7 +54,9 @@ export const recordPaymentFailure = flow({
   factory: async (ctx, { tx, allow }): Promise<Payment> => {
     await allow.exec({ input: { action: "record payment failure", roles: ["operator"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
-    if (payment.status !== "pending") throw new Error(`payment ${payment.id} is not pending`)
+    if (payment.status !== "pending") {
+      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "failed" })
+    }
     const failed = tx.store.savePayment({
       ...payment,
       failureReason: ctx.input.reason,
@@ -72,7 +75,7 @@ export const refundPayment = flow({
     await allow.exec({ input: { action: "refund payment", roles: ["manager"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "paired" && payment.status !== "disputed") {
-      throw new Error(`payment ${payment.id} cannot be refunded from ${payment.status}`)
+      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "refunded" })
     }
     const refunded = tx.store.savePayment({
       ...payment,

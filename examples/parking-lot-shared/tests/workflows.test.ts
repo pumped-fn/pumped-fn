@@ -199,7 +199,7 @@ describe("parking lot workflows", () => {
         rateCentsPerHour: 300,
         refundWindowMinutes: 60,
       },
-    })).rejects.toThrow("role user cannot configure lot")
+    })).rejects.toMatchObject({ fault: { kind: "forbidden", action: "configure lot", actorId: "user-1" } })
 
     await ctx.close({ ok: true })
     await scope.dispose()

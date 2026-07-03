@@ -4,25 +4,41 @@ import { describe, expect, it } from "vitest"
 import {
   actor,
   bookSpace,
+  cancelBooking,
   checkInVehicle,
   clock,
   configureLot,
   createMemoryStore,
   pairPayment,
+  ParkingError,
   prepareExit,
   readReport,
   store,
+  type Role,
 } from "@pumped-fn/parking-lot-shared"
+
+const faultStatus = { forbidden: 403, conflict: 409, "not-found": 404, unavailable: 409 } as const
+
+function mapError(error: unknown): { status: number; body: unknown } | undefined {
+  if (!(error instanceof ParkingError)) return undefined
+  return { status: faultStatus[error.fault.kind], body: error.fault }
+}
 
 function manifest(): pumped.Manifest {
   return {
     app: {
       presets: [preset(store, createMemoryStore()), preset(clock, () => "2026-07-01T08:00:00.000Z")],
-      context: () => [actor({ id: "manager-1", role: "manager" })],
+      context: (request?: Request) => {
+        const role = (request?.headers.get("x-role") as Role | null) ?? "manager"
+        const id = request?.headers.get("x-actor-id") ?? "manager-1"
+        return [actor({ id, role })]
+      },
+      mapError,
     },
     entries: [
       { kind: "server", name: "lots", file: "virtual", flow: configureLot },
       { kind: "server", name: "bookings", file: "virtual", flow: bookSpace },
+      { kind: "server", name: "bookings-cancel", file: "virtual", flow: cancelBooking },
       { kind: "server", name: "check-ins", file: "virtual", flow: checkInVehicle },
       { kind: "server", name: "exits", file: "virtual", flow: prepareExit },
       { kind: "server", name: "payments-pair", file: "virtual", flow: pairPayment },
@@ -61,6 +77,80 @@ describe("parking lot app server entry", () => {
     const report = await reported.json()
     expect(report.lots).toHaveLength(1)
     expect(report.lots[0].lotId).toBe(lot.id)
+
+    await scope.dispose()
+  })
+
+  it("maps an unauthorized actor to a 403 with a forbidden fault body instead of a raw 500", async () => {
+    const { app: honoApp, scope } = pumped.createServer(manifest())
+
+    const response = await honoApp.request("/bookings", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-role": "operator", "x-actor-id": "operator-1" },
+      body: JSON.stringify({
+        endAt: "2026-07-01T12:00:00.000Z",
+        lotId: "lot-0001",
+        plate: "abc-123",
+        startAt: "2026-07-01T09:00:00.000Z",
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ kind: "forbidden", action: "book space", actorId: "operator-1" })
+
+    await scope.dispose()
+  })
+
+  it("maps a booking state conflict to a 409 with a conflict fault body", async () => {
+    const { app: honoApp, scope } = pumped.createServer(manifest())
+
+    const configured = await honoApp.request("/lots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        bookingLeadMinutes: 120,
+        capacity: 5,
+        currency: "USD",
+        graceMinutes: 10,
+        name: "Conflict Lot",
+        rateCentsPerHour: 300,
+        refundWindowMinutes: 1440,
+      }),
+    })
+    const lot = await configured.json()
+
+    const booked = await honoApp.request("/bookings", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-role": "user", "x-actor-id": "user-1" },
+      body: JSON.stringify({
+        endAt: "2026-07-01T12:00:00.000Z",
+        lotId: lot.id,
+        plate: "abc-123",
+        startAt: "2026-07-01T09:00:00.000Z",
+      }),
+    })
+    const booking = await booked.json()
+
+    await honoApp.request("/bookings-cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-role": "user", "x-actor-id": "user-1" },
+      body: JSON.stringify({ bookingId: booking.id }),
+    })
+
+    const secondCancel = await honoApp.request("/bookings-cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-role": "user", "x-actor-id": "user-1" },
+      body: JSON.stringify({ bookingId: booking.id }),
+    })
+
+    expect(secondCancel.status).toBe(409)
+    expect(await secondCancel.json()).toEqual({
+      kind: "conflict",
+      entity: "booking",
+      id: booking.id,
+      from: "cancelled",
+      attempted: "cancelled",
+    })
 
     await scope.dispose()
   })

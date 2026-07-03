@@ -6,6 +6,7 @@ export interface AppConfig {
   tags?: Lite.Tagged<any>[]
   extensions?: Lite.Extension[]
   context?: (request?: Request) => Lite.Tagged<any>[]
+  mapError?: (error: unknown) => { status: number; body: unknown } | undefined
 }
 
 export interface ManifestAgentMeta {

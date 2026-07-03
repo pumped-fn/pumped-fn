@@ -3,6 +3,7 @@ import type { Dispute, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
 import { allow } from "./flow.rule.allow"
+import { ParkingError } from "./error"
 
 export interface OpenDisputeInput {
   paymentId: string
@@ -22,8 +23,12 @@ export const openDispute = flow({
     await allow.exec({ input: { action: "open dispute", roles: ["user"] } })
     const payment = tx.store.payment(ctx.input.paymentId)
     const session = tx.store.session(payment.sessionId)
-    if (session.userId !== tx.actor.id) throw new Error(`user ${tx.actor.id} cannot dispute payment ${payment.id}`)
-    if (payment.status !== "paired") throw new Error(`payment ${payment.id} cannot be disputed from ${payment.status}`)
+    if (session.userId !== tx.actor.id) {
+      throw new ParkingError({ kind: "forbidden", action: `dispute payment ${payment.id}`, actorId: tx.actor.id })
+    }
+    if (payment.status !== "paired") {
+      throw new ParkingError({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "disputed" })
+    }
     const disputed = tx.store.savePayment({
       ...payment,
       disputedAt: tx.at(),
@@ -50,7 +55,9 @@ export const resolveDispute = flow({
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt?: Receipt }> => {
     await allow.exec({ input: { action: "resolve dispute", roles: ["manager"] } })
     const dispute = tx.store.dispute(ctx.input.disputeId)
-    if (dispute.status !== "open") throw new Error(`dispute ${dispute.id} is not open`)
+    if (dispute.status !== "open") {
+      throw new ParkingError({ kind: "conflict", entity: "dispute", id: dispute.id, from: dispute.status, attempted: ctx.input.decision })
+    }
     const payment = tx.store.payment(dispute.paymentId)
     const resolved = tx.store.saveDispute({
       ...dispute,

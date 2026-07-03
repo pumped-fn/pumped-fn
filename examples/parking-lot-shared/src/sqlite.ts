@@ -10,6 +10,7 @@ import type {
   Receipt,
 } from "./model"
 import type { ParkingStore } from "./store"
+import { ParkingError, StoreError } from "./error"
 
 type Kind =
   | "audit"
@@ -84,13 +85,16 @@ export class SqliteParkingStore implements ParkingStore {
   }
 
   nextId(prefix: string): string {
-    const row = this.db.prepare("SELECT value FROM parking_counters WHERE name = ?").get(prefix) as CounterRow | undefined
-    const next = (row?.value ?? 0) + 1
-    this.db.prepare(`
-      INSERT INTO parking_counters (name, value)
-      VALUES (?, ?)
-      ON CONFLICT(name) DO UPDATE SET value = excluded.value
-    `).run(prefix, next)
+    const next = this.driver("counter", prefix, () => {
+      const row = this.db.prepare("SELECT value FROM parking_counters WHERE name = ?").get(prefix) as CounterRow | undefined
+      const value = (row?.value ?? 0) + 1
+      this.db.prepare(`
+        INSERT INTO parking_counters (name, value)
+        VALUES (?, ?)
+        ON CONFLICT(name) DO UPDATE SET value = excluded.value
+      `).run(prefix, value)
+      return value
+    })
     return `${prefix}-${next.toString().padStart(4, "0")}`
   }
 
@@ -159,23 +163,38 @@ export class SqliteParkingStore implements ParkingStore {
   }
 
   private list<T>(kind: Kind): T[] {
-    return this.db.prepare("SELECT body FROM parking_documents WHERE kind = ? ORDER BY id").all(kind)
-      .map((row) => JSON.parse((row as unknown as Row).body) as T)
+    const rows = this.driver("list", kind, () =>
+      this.db.prepare("SELECT body FROM parking_documents WHERE kind = ? ORDER BY id").all(kind)
+    )
+    return rows.map((row) => JSON.parse((row as unknown as Row).body) as T)
   }
 
   private read<T>(kind: Kind, id: string): T {
-    const row = this.db.prepare("SELECT body FROM parking_documents WHERE kind = ? AND id = ?").get(kind, id) as Row | undefined
-    if (row === undefined) throw new Error(`unknown ${kind}: ${id}`)
+    const row = this.driver("read", kind, () =>
+      this.db.prepare("SELECT body FROM parking_documents WHERE kind = ? AND id = ?").get(kind, id)
+    ) as Row | undefined
+    if (row === undefined) throw new ParkingError({ kind: "not-found", entity: kind, id })
     return JSON.parse(row.body) as T
   }
 
   private save<T>(kind: Kind, id: string, value: T): T {
-    this.db.prepare(`
-      INSERT INTO parking_documents (kind, id, body)
-      VALUES (?, ?, ?)
-      ON CONFLICT(kind, id) DO UPDATE SET body = excluded.body
-    `).run(kind, id, JSON.stringify(value))
+    this.driver("save", kind, () =>
+      this.db.prepare(`
+        INSERT INTO parking_documents (kind, id, body)
+        VALUES (?, ?, ?)
+        ON CONFLICT(kind, id) DO UPDATE SET body = excluded.body
+      `).run(kind, id, JSON.stringify(value))
+    )
     return value
+  }
+
+  private driver<T>(op: string, entity: string, run: () => T): T {
+    try {
+      return run()
+    } catch (cause) {
+      if (cause instanceof ParkingError) throw cause
+      throw new StoreError(op, entity, cause)
+    }
   }
 }
 

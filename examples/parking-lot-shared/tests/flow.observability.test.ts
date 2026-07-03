@@ -46,7 +46,7 @@ describe("nested rule exec observability", () => {
         plate: "abc-111",
         startAt: "2026-07-02T08:00:00.000Z",
       },
-    })).rejects.toThrow("role operator cannot book space")
+    })).rejects.toMatchObject({ fault: { kind: "forbidden", action: "book space", actorId: "operator-1" } })
 
     await ctx.close({ ok: false, error: new Error("rejected by allow rule") })
     await scope.dispose()
@@ -56,8 +56,8 @@ describe("nested rule exec observability", () => {
     const bookSpaceError = events.find((event) => event.phase === "error" && event.name === "parking.book-space")
 
     expect(allowError).toBeDefined()
-    expect(allowError?.error?.message).toBe("role operator cannot book space")
+    expect(allowError?.error?.message).toBe("actor operator-1 cannot book space")
     expect(bookSpaceError).toBeDefined()
-    expect(bookSpaceError?.error?.message).toBe("role operator cannot book space")
+    expect(bookSpaceError?.error?.message).toBe("actor operator-1 cannot book space")
   })
 })

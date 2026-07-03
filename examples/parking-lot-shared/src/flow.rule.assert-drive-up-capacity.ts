@@ -1,6 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { Lot } from "./model"
 import { store } from "./atom.store"
+import { ParkingError } from "./error"
 import { parkedCount } from "./rules"
 import { rule } from "./tags"
 
@@ -14,6 +15,7 @@ export const assertDriveUpCapacity = flow({
   deps: { store },
   tags: [rule({ name: "assert-drive-up-capacity" })],
   factory: (ctx, { store }): void => {
-    if (parkedCount(store, ctx.input.lot.id) >= ctx.input.lot.capacity) throw new Error(`lot ${ctx.input.lot.id} is full`)
+    if (parkedCount(store, ctx.input.lot.id) >= ctx.input.lot.capacity)
+      throw new ParkingError({ kind: "unavailable", entity: "lot", id: ctx.input.lot.id, reason: "drive-up-capacity" })
   },
 })

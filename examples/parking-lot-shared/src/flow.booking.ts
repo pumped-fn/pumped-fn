@@ -4,6 +4,7 @@ import { tx } from "./resource.tx"
 import { normalizePlate } from "./rules"
 import { allow } from "./flow.rule.allow"
 import { assertCapacity } from "./flow.rule.assert-capacity"
+import { ParkingError } from "./error"
 
 export interface BookSpaceInput {
   endAt: string
@@ -47,9 +48,11 @@ export const cancelBooking = flow({
   factory: (ctx, { tx }): Booking => {
     const booking = tx.store.booking(ctx.input.bookingId)
     if (tx.actor.role !== "manager" && tx.actor.id !== booking.userId) {
-      throw new Error(`role ${tx.actor.role} cannot cancel booking ${booking.id}`)
+      throw new ParkingError({ kind: "forbidden", action: `cancel booking ${booking.id}`, actorId: tx.actor.id })
     }
-    if (booking.status !== "held") throw new Error(`booking ${booking.id} is not held`)
+    if (booking.status !== "held") {
+      throw new ParkingError({ kind: "conflict", entity: "booking", id: booking.id, from: booking.status, attempted: "cancelled" })
+    }
     const next = tx.store.saveBooking({
       ...booking,
       cancelledAt: tx.at(),

@@ -1,11 +1,12 @@
 import type { Lite } from "@pumped-fn/lite"
+import { randomUUID } from "node:crypto"
 import { Cron } from "croner"
-import { schedule } from "../tags"
+import { jobRun, schedule } from "../tags"
 import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
 export interface JobsIo {
-  onError(entry: ManifestEntry, error: unknown): void
+  onError(entry: ManifestEntry, error: unknown, mapped?: { status: number; body: unknown }): void
 }
 
 export interface JobsRunner {
@@ -34,14 +35,18 @@ export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): Jo
   const appScope = scope ?? createAppScope(manifest)
 
   async function tick(entry: ManifestEntry): Promise<void> {
-    const context = appScope.createContext({ tags: appConfig?.context?.() })
+    const tags: Lite.Tagged<any>[] = [
+      jobRun({ job: entry.name, tickId: randomUUID() }),
+      ...(appConfig?.context?.() ?? []),
+    ]
+    const context = appScope.createContext({ tags })
 
     try {
       await context.exec({ flow: entry.flow, rawInput: undefined })
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      onError(entry, error)
+      onError(entry, error, appConfig?.mapError?.(error))
     }
   }
 

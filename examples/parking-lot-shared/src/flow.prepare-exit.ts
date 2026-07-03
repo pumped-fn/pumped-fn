@@ -4,6 +4,7 @@ import { tx } from "./resource.tx"
 import { completeBooking } from "./flow.complete-booking"
 import { allow } from "./flow.rule.allow"
 import { amountDue } from "./flow.rule.amount-due"
+import { ParkingError } from "./error"
 
 export interface PrepareExitInput {
   sessionId: string
@@ -16,7 +17,9 @@ export const prepareExit = flow({
   factory: async (ctx, { tx, allow, amountDue, completeBooking }): Promise<{ payment: Payment; session: ParkingSession }> => {
     await allow.exec({ input: { action: "prepare exit", roles: ["operator"] } })
     const session = tx.store.session(ctx.input.sessionId)
-    if (session.status !== "parked") throw new Error(`session ${session.id} is not parked`)
+    if (session.status !== "parked") {
+      throw new ParkingError({ kind: "conflict", entity: "session", id: session.id, from: session.status, attempted: "awaiting_payment" })
+    }
     const exitedAt = tx.at()
     const lot = tx.store.lot(session.lotId)
     const payment: Payment = {

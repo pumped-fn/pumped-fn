@@ -5,7 +5,7 @@ import { createAppScope } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
 export interface WorkflowsIo {
-  onError(entry: ManifestEntry, error: unknown): void
+  onError(entry: ManifestEntry, error: unknown, mapped?: { status: number; body: unknown }): void
 }
 
 export interface WorkflowsRunner {
@@ -39,7 +39,7 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      onError(entry, error)
+      onError(entry, error, appConfig?.mapError?.(error))
     }
   }
 
