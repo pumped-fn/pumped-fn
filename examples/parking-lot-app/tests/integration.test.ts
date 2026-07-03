@@ -102,17 +102,23 @@ describe("parking lot app composition", () => {
     await scope.dispose()
   })
 
-  it("resolves the receipts route and the expire-bookings schedule from entry.meta, since neither shared flow carries a route/schedule tag itself", async () => {
+  it("resolves the receipts route from entry.meta, since the shared flow carries no route tag itself", async () => {
     const fixedClock = { value: "2026-07-01T08:00:00.000Z" }
 
-    expect(pumped.route.find(listReceipts)).toBeUndefined()
-    expect(pumped.schedule.find(expireBookings)).toBeUndefined()
+    const expireSchedule = scheduler.schedule({
+      name: "expire-bookings",
+      cadence: { cron: "*/5 * * * *" },
+      flow: expireBookings,
+      input: () => ({}),
+    })
 
-    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock))
+    expect(pumped.route.find(listReceipts)).toBeUndefined()
+
+    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock, expireSchedule))
     const receiptsRes = await honoApp.request("/receipts?userId=nobody")
     expect(receiptsRes.status).toBe(200)
 
-    const jobs = pumped.runJobs(manifest(fixedClock), undefined, scope)
+    const jobs = pumped.runJobs(manifest(fixedClock, expireSchedule), undefined, scope)
     await jobs.stop()
     await scope.dispose()
   })
