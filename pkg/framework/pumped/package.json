@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/pumped",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": false,
   "description": "Convention-driven scope compiler: discover flows on disk, assemble a scope, drive it as CLI or HTTP server",
   "type": "module",
