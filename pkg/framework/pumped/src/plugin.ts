@@ -57,7 +57,12 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     config() {
       return {
         ssr: {
-          external: ["@pumped-fn/pumped", "@pumped-fn/lite", "@pumped-fn/lite-hono"],
+          external: [
+            "@pumped-fn/pumped",
+            "@pumped-fn/lite",
+            "@pumped-fn/lite-hono",
+            "@pumped-fn/lite-extension-scheduler",
+          ],
         },
       }
     },

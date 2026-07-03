@@ -7,7 +7,7 @@ import { createAppScope } from "./app-scope"
 import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveRoute(entry: ManifestEntry): { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string } {
-  const meta = route.find(entry.meta ? [entry.meta] : []) ?? route.find(entry.flow)
+  const meta = route.find(entry.meta ? [entry.meta] : []) ?? route.find(entry.flow!)
   return {
     method: meta?.method ?? "POST",
     path: meta?.path ?? `/${entry.name}`,
@@ -64,7 +64,7 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
       try {
-        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+        return context.json(await context.var.lite.exec({ flow: entry.flow!, rawInput }))
       } catch (error) {
         const mapped = appConfig.mapError?.(error)
         if (mapped === undefined) throw error
@@ -79,7 +79,7 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
       try {
-        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+        return context.json(await context.var.lite.exec({ flow: entry.flow!, rawInput }))
       } catch (error) {
         const mapped = appConfig.mapError?.(error)
         if (mapped === undefined) throw error

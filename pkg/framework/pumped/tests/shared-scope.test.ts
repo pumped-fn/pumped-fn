@@ -1,12 +1,12 @@
 import { atom, flow } from "@pumped-fn/lite"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { hono } from "@pumped-fn/lite-hono"
 import { describe, expect, it } from "vitest"
 import { createAppScope } from "../src/runtime/app-scope"
 import { createServer } from "../src/runtime/serve"
 import { runJobs } from "../src/runtime/jobs"
 import { route } from "../src/tags"
-import { schedule } from "../src/tags"
-import { entry, manifest } from "./helpers"
+import { manifest } from "./helpers"
 
 const counter = atom({ factory: () => ({ value: 0 }) })
 
@@ -20,7 +20,6 @@ const bump = flow({
 })
 
 const sweep = flow({
-  tags: [schedule({ cron: "*/5 * * * *" })],
   deps: { counter },
   factory: (_ctx, deps) => {
     deps.counter.value += 1
@@ -28,10 +27,20 @@ const sweep = flow({
   },
 })
 
+const sweepSchedule = scheduler.schedule({
+  name: "sweep",
+  cadence: { cron: "*/5 * * * *" },
+  flow: sweep,
+  input: () => undefined,
+})
+
 describe("shared scope across server and jobs", () => {
   it("has an http handler and a job tick observe the same atom instance", async () => {
-    const sweepEntry = entry("jobs", "sweep", sweep)
-    const sharedManifest = manifest(undefined, entry("server", "bump", bump), sweepEntry)
+    const sharedManifest = manifest(
+      undefined,
+      { kind: "server", name: "bump", file: "virtual", flow: bump },
+      { kind: "jobs", name: "sweep", file: "virtual", schedule: sweepSchedule },
+    )
 
     const lite = hono.adapter()
     const scope = createAppScope(sharedManifest, [lite])
@@ -41,7 +50,8 @@ describe("shared scope across server and jobs", () => {
     const first = await app.request("/bump", { method: "POST" })
     expect(await first.json()).toEqual({ value: 1 })
 
-    await jobs.tick(sweepEntry)
+    const registration = await scope.resolve(sweepSchedule)
+    await registration.trigger()
 
     const second = await app.request("/bump", { method: "POST" })
     expect(await second.json()).toEqual({ value: 3 })

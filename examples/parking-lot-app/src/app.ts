@@ -25,6 +25,7 @@ export default {
     ...(process.env["PARKING_DB_PATH"] ? [dbPath(process.env["PARKING_DB_PATH"])] : []),
     logging.runtime({ sinks: [logSink], level: "info", flow: "all" }),
     observable.runtime({ sinks: [obsSink], input: true }),
+    actor({ id: "scheduler", role: "manager" }),
   ],
   mapError,
 } satisfies pumped.Config

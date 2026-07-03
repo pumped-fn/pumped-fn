@@ -15,6 +15,7 @@
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-extension-logging": "workspace:*",
     "@pumped-fn/lite-extension-observable": "workspace:*",
+    "@pumped-fn/lite-extension-scheduler": "workspace:*",
     "@pumped-fn/lite-hono": "workspace:*",
     "@pumped-fn/parking-lot-shared": "workspace:*",
     "hono": "catalog:",

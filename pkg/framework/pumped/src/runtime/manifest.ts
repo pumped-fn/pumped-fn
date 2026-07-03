@@ -39,8 +39,9 @@ export interface ManifestEntry {
   kind: EntryKind
   name: string
   file: string
-  flow: Lite.Flow<any, any>
+  flow?: Lite.Flow<any, any>
   meta?: Lite.Tagged<any>
+  schedule?: Lite.Atom<unknown>
   agent?: ManifestAgentMeta
 }
 

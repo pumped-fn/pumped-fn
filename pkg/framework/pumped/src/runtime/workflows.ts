@@ -35,7 +35,7 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.
     const context = appScope.createContext({ tags })
 
     try {
-      await context.exec({ flow: entry.flow, rawInput: undefined })
+      await context.exec({ flow: entry.flow!, rawInput: undefined })
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })

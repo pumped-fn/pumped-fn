@@ -4,7 +4,7 @@ import { command } from "../tags"
 import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveCommand(entry: ManifestEntry): { name: string; description: string | undefined } {
-  const meta = command.find(entry.meta ? [entry.meta] : []) ?? command.find(entry.flow)
+  const meta = command.find(entry.meta ? [entry.meta] : []) ?? command.find(entry.flow!)
   return {
     name: meta?.name ?? entry.name,
     description: meta?.description,
@@ -48,7 +48,7 @@ export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Pr
     const context = scope.createContext({ tags: appConfig.context() })
 
     try {
-      const output = await context.exec({ flow: entry.flow, rawInput })
+      const output = await context.exec({ flow: entry.flow!, rawInput })
       out(JSON.stringify(output))
       await context.close({ ok: true })
     } catch (error) {

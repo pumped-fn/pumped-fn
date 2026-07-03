@@ -11,9 +11,9 @@ export function generateManifest(entries: EntryDescriptor[], appFile: string | u
   const entryLiterals = entries
     .map((entry, index) => {
       const base = `kind: ${JSON.stringify(entry.kind)}, name: ${JSON.stringify(entry.name)}, file: ${JSON.stringify(entry.file)}`
-      return entry.kind === "agents"
-        ? `  { ${base}, ...normalizeAgentEntry(e${index}) }`
-        : `  { ${base}, flow: e${index}, meta: ns${index}.meta }`
+      if (entry.kind === "agents") return `  { ${base}, ...normalizeAgentEntry(e${index}) }`
+      if (entry.kind === "jobs") return `  { ${base}, schedule: e${index} }`
+      return `  { ${base}, flow: e${index}, meta: ns${index}.meta }`
     })
     .join(",\n")
 

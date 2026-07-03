@@ -10,6 +10,11 @@ export interface CommandMeta {
   description?: string
 }
 
+/**
+ * Freeform `{ cron: string }` metadata tag. No longer consulted by `runJobs` — `src/jobs/*.ts`
+ * entries schedule themselves via `scheduler.schedule({ cadence: { cron } })` from
+ * `@pumped-fn/lite-extension-scheduler`. Kept for callers with their own uses for a cron-shaped tag.
+ */
 export interface ScheduleMeta {
   cron: string
 }
@@ -19,6 +24,12 @@ export interface WorkflowRunMeta {
   runId: string
 }
 
+/**
+ * `{ job, tickId }` metadata tag, mirroring `workflowRun`. `runJobs` no longer stamps this
+ * automatically: context creation for a job tick is now owned by the `schedule()` atom's own
+ * backend (`@pumped-fn/lite-extension-scheduler`), which has no seam for pumped-specific tags.
+ * Kept for callers who tag their own job flows with it directly.
+ */
 export interface JobRunMeta {
   job: string
   tickId: string

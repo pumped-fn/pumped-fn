@@ -14,9 +14,11 @@ build. One graph, three projections:
 
 Discovery is flat and convention-driven under `src/`:
 
-- `src/server/*.ts`, `src/cli/*.ts`, `src/jobs/*.ts` — one file per flow, kebab-case filename, default
-  export is the flow. The filename becomes the route/command/schedule name unless overridden by a
-  `route`/`command`/`schedule` tag on the flow.
+- `src/server/*.ts`, `src/cli/*.ts` — one file per flow, kebab-case filename, default export is the
+  flow. The filename becomes the route/command name unless overridden by a `route`/`command` tag on
+  the flow.
+- `src/jobs/*.ts` — one file per recurring job, default export is a `scheduler.schedule({...})` atom
+  from `@pumped-fn/lite-extension-scheduler` (not a plain flow — see "Jobs and scheduling" below).
 - `src/agents/*.ts` — one file per agent, default export is either an `@pumped-fn/sdk` `Agent`
   struct (detected structurally by a `.turn` flow — the framework never imports `@pumped-fn/sdk`
   types) or a plain flow. An agent is mounted as `POST /agents/<name>` on the HTTP server and as
@@ -69,74 +71,86 @@ dispose a scope it didn't create.
 
 The generated production entry (`ENTRY_SERVER_SOURCE` in `src/plugin.ts`) and `pumped dev` both wire
 one shared scope this way, so `pumped dev` boots the same server + jobs + workflows composition as
-production — a missing `schedule` tag or invalid cron expression surfaces as a dev-startup error
-instead of only crashing in prod. On Vite server close, `pumped dev` stops jobs/workflows and
+production — a jobs entry that isn't a `schedule()` atom surfaces as a dev-startup error naming the
+entry, instead of only crashing in prod. On Vite server close, `pumped dev` stops jobs/workflows and
 disposes the shared scope. A `src/` file change that breaks the graph is not cached forever: dev
 rebuilds on every watcher `add`/`unlink`/`change` event, and a rejected build never poisons the
 cache — the next request retries the build with the just-saved fix.
 
-### Jobs and cron
+### Jobs and scheduling
 
-`src/jobs/*.ts` flows require a `schedule` tag (`{ cron: string }`) — the framework throws a startup
-error naming the entry if it's missing. Cron parsing/scheduling is done by
-[`croner`](https://github.com/hexagon/croner). `pumped.runJobs(manifest)` starts one long-lived scope
-for the whole runner (or reuses a scope passed as the third argument) and creates a fresh context per
-tick; the per-tick function is also exposed directly so tests can invoke it without waiting on real
-cron timing:
+`src/jobs/*.ts` default-exports a `keepAlive` atom built by `scheduler.schedule({...})` from
+`@pumped-fn/lite-extension-scheduler` — cadence (`{ cron }` or `{ every }`), overlap, and catch-up
+policy live on that call, not on a tag. `pumped.runJobs(manifest)` resolves each jobs entry's
+`schedule()` atom against the shared scope (throwing a startup error naming the entry if the default
+export isn't actually an atom from that package) and lets the registration's own backend drive ticks;
+`stop()` awaits every registration and, if it owns the scope, disposes it — which in turn calls
+`registration.stop()` via the atom's own `ctx.cleanup`.
+
+If `manifest.app.tags` doesn't set `scheduler.backend`, `createAppScope` wires in
+`@pumped-fn/lite-extension-scheduler`'s `inProcess()` as the framework's own default — **dev/test
+grade, not durable**. `runJobs`'s optional `io.onDefaultBackend()` callback fires once when that
+default is the one in effect, so a caller can log/notice it without the framework hardcoding a
+logging subsystem.
 
 ```ts
 // src/jobs/nightly-sweep.ts
 import { flow } from "@pumped-fn/lite"
-import { pumped } from "@pumped-fn/pumped"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 
-export default flow({
-  tags: [pumped.schedule({ cron: "0 2 * * *" })],
-  factory: (ctx) => sweepExpired(ctx),
+const sweep = flow({ factory: (ctx) => sweepExpired(ctx) })
+
+export default scheduler.schedule({
+  name: "nightly-sweep",
+  cadence: { cron: "0 2 * * *" },
+  flow: sweep,
+  input: () => undefined,
 })
 ```
 
 ### Reusing shared flows at the edge
 
-Sometimes a domain flow that already lives in a shared package needs an edge tag attached — a
-`src/jobs/*.ts` entry needs `pumped.schedule(...)`, a `src/server/*.ts` entry needs `pumped.route(...)`.
-Don't object-spread the handle (`{ ...sharedFlow, tags: [...(sharedFlow.tags ?? []), pumped.schedule(...)] }`)
-— spreading forks the flow's node identity, so presets targeting the original shared flow silently
-miss the copy, and it blindly copies whatever fields the handle happens to have.
+A domain flow from a shared package often IS the entry — re-export it as the default export and
+attach edge naming through a sibling `meta` export (`route`/`command` only; jobs are schedule
+nodes, below). Don't object-spread the handle — spreading forks the flow's node identity, so
+presets targeting the original shared flow silently miss the copy.
 
-Instead, re-export the shared flow as the entry's default export and attach the edge tag through a
-sibling `meta` export:
+```ts
+// src/server/receipts.ts
+export { listReceipts as default } from "@pumped-fn/parking-lot-shared"
+import { route } from "@pumped-fn/pumped"
+
+export const meta = route({ method: "GET" })
+```
+
+The generated manifest discovers `meta` alongside the default export with no conditional detection;
+runners resolve `entry.meta` over any tag on the flow, over the filename default. Presets targeting
+the shared flow reach entries directly — there is no wrapper node to miss.
+
+Jobs are different: a schedule is behavior, not naming. `src/jobs/*.ts` default-exports a
+`schedule()` node from `@pumped-fn/lite-extension-scheduler`:
 
 ```ts
 // src/jobs/expire-bookings.ts
-export { expireBookings as default } from "@pumped-fn/parking-lot-shared"
-import { schedule } from "@pumped-fn/pumped"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
+import { expireBookings } from "@pumped-fn/parking-lot-shared"
 
-export const meta = schedule({ cron: "*/5 * * * *" })
+export default scheduler.schedule({
+  name: "expire-bookings",
+  cadence: { cron: "*/5 * * * *" },
+  flow: expireBookings,
+  input: () => ({}),
+})
 ```
 
-The generated manifest discovers `meta` alongside the default export (`import e0, * as ns0 from
-"./expire-bookings"`, `{ flow: e0, meta: ns0.meta }`) with no conditional detection — a file with no
-`meta` export simply produces `meta: undefined`, and each runner (`serve`, `cli`, `jobs`) resolves the
-tag with entry.meta taking precedence over any tag already on the flow, which in turn takes precedence
-over the filename-derived default. Presets and substitutes targeting the shared flow now reach entries
-directly — there is no wrapper node to miss, because the shared flow *is* the entry.
+Tick execution (context creation, `exec`, `close`) is owned by the schedule node and its
+`SchedulerBackend` — `runJobs` just resolves the schedule atoms on the shared scope. Per-tick error
+handling and correlation are backend concerns (the `spec.name` passed to `register()` identifies the
+entry); `pumped.jobRun` remains available for flows that tag their own contexts.
 
 Only fall back to a thin wrapper flow (`controller` + `exec`) for the genuine case where the entry needs
 to adapt or transform its input before calling the shared flow — that's still legitimate, it's just not
 the default pattern for attaching tags:
-
-```ts
-import { controller, flow } from "@pumped-fn/lite"
-import { expireBookings } from "@pumped-fn/parking-lot-shared"
-import { pumped } from "@pumped-fn/pumped"
-
-export default flow({
-  name: "expire-bookings",
-  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-  deps: { run: controller(expireBookings) },
-  factory: (ctx, { run }) => run.exec({ input: adaptInput(ctx.input) }),
-})
-```
 
 ### Workflow tag
 

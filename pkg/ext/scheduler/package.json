@@ -1,0 +1,61 @@
+{
+  "name": "@pumped-fn/lite-extension-scheduler",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Recurring schedule extension for @pumped-fn/lite: a keepAlive schedule() atom against a pluggable SchedulerBackend",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": "^3.1.0"
+  },
+  "dependencies": {
+    "croner": "catalog:"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "keywords": [
+    "pumped-fn",
+    "scheduler",
+    "cron",
+    "extension"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/ext/scheduler",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}
