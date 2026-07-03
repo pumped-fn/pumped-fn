@@ -146,7 +146,8 @@ export default scheduler.schedule({
 Tick execution (context creation, `exec`, `close`) is owned by the schedule node and its
 `SchedulerBackend` — `runJobs` just resolves the schedule atoms on the shared scope. Per-tick error
 handling and correlation are backend concerns (the `spec.name` passed to `register()` identifies the
-entry); `pumped.jobRun` remains available for flows that tag their own contexts.
+entry); the former `pumped.schedule` tag is removed — cadence lives in the `schedule()` call itself.
+`pumped.jobRun` remains available for flows that tag their own contexts.
 
 Only fall back to a thin wrapper flow (`controller` + `exec`) for the genuine case where the entry needs
 to adapt or transform its input before calling the shared flow — that's still legitimate, it's just not

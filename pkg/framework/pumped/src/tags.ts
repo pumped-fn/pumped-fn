@@ -10,15 +10,6 @@ export interface CommandMeta {
   description?: string
 }
 
-/**
- * Freeform `{ cron: string }` metadata tag. No longer consulted by `runJobs` — `src/jobs/*.ts`
- * entries schedule themselves via `scheduler.schedule({ cadence: { cron } })` from
- * `@pumped-fn/lite-extension-scheduler`. Kept for callers with their own uses for a cron-shaped tag.
- */
-export interface ScheduleMeta {
-  cron: string
-}
-
 export interface WorkflowRunMeta {
   taskId: string
   runId: string
@@ -37,6 +28,5 @@ export interface JobRunMeta {
 
 export const route = tag<RouteMeta>({ label: "app.route" })
 export const command = tag<CommandMeta>({ label: "app.command" })
-export const schedule = tag<ScheduleMeta>({ label: "app.schedule" })
 export const workflowRun = tag<WorkflowRunMeta>({ label: "app.workflowRun" })
 export const jobRun = tag<JobRunMeta>({ label: "app.jobRun" })

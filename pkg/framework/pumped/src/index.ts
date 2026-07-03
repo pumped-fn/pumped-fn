@@ -1,4 +1,4 @@
-import { route, command, schedule, workflowRun, jobRun } from "./tags"
+import { route, command, workflowRun, jobRun } from "./tags"
 import { pumped as pumpedPlugin } from "./plugin"
 import { createServer } from "./runtime/serve"
 import { runCli } from "./runtime/cli"
@@ -10,7 +10,6 @@ import { normalizeAgentEntry } from "./runtime/agent"
 export const pumped = {
   route,
   command,
-  schedule,
   workflowRun,
   jobRun,
   plugin: pumpedPlugin,
@@ -24,7 +23,6 @@ export const pumped = {
 export namespace pumped {
   export type RouteMeta = import("./tags").RouteMeta
   export type CommandMeta = import("./tags").CommandMeta
-  export type ScheduleMeta = import("./tags").ScheduleMeta
   export type WorkflowRunMeta = import("./tags").WorkflowRunMeta
   export type JobRunMeta = import("./tags").JobRunMeta
   export type Manifest = import("./runtime/manifest").Manifest
