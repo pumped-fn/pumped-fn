@@ -35,9 +35,10 @@ here do.
 
 ## Architecture
 
-`src/app.ts` is the composition seam: it presets the shared `store` atom to a SQLite-backed
-implementation (`createSqliteStore` from `@pumped-fn/parking-lot-shared/sqlite`) and derives an
-`actor` context tag per request (HTTP: `x-actor-id`/`x-role` headers) or per process (CLI/
+`src/app.ts` is the composition seam. The shared `store` atom already defaults to a SQLite-backed
+implementation, so `app.ts` presets nothing for it — it only sets the `dbPath` tag when
+`PARKING_DB_PATH` is provided, and derives an `actor` context tag per request (HTTP:
+`x-actor-id`/`x-role` headers) or per process (CLI/
 jobs/workflows: `PARKING_ACTOR_ID`/`PARKING_ROLE` env vars, defaulting to a `manager` actor). This
 is the one place in the app that reads `process.env` directly — everywhere else the actor arrives as
 a declared tag dependency and the clock arrives as the `clock` adapter atom, never as an ambient
@@ -56,10 +57,10 @@ optionally re-tagged with `pumped.route`/`pumped.command`/`pumped.schedule` meta
 
 ## Where data lives
 
-SQLite file path comes from the `PARKING_DB_PATH` env var, defaulting to `parking-lot.sqlite` in the
-process's working directory. Set it to `:memory:` for an ephemeral run, or point it at a persistent
-path for a real deployment. Test scopes never touch this file — every test presets the shared
-`store` atom with `createMemoryStore()` directly.
+Data lives in `parking-lot.sqlite` in the process's working directory by default (the shared
+`store` atom's `dbPath` tag default). Set `PARKING_DB_PATH` to override the path, or to `:memory:`
+for an ephemeral run. Test scopes never touch this file — every test presets the shared `store`
+atom with `createMemoryStore()` directly.
 
 ## Run
 
@@ -89,7 +90,7 @@ that documents the expected JSON shape inline, but a flag-to-input mapping (driv
 
 ```
 HTTP request ──┐
-CLI invocation ─┼─► src/app.ts (SQLite store preset, clock atom, actor context tag)
+CLI invocation ─┼─► src/app.ts (dbPath tag, clock atom, actor context tag)
 Cron tick ──────┤        │
 Boot workflow ──┘        ▼
                  one shared @pumped-fn/lite scope

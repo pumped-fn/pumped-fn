@@ -61,6 +61,9 @@ export const resolveDispute = flow({
       ctx.fail({ kind: "conflict", entity: "dispute", id: dispute.id, from: dispute.status, attempted: ctx.input.decision })
     }
     const payment = tx.store.payment(dispute.paymentId)
+    if (payment.status !== "disputed") {
+      ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "resolve-dispute" })
+    }
     const resolved = tx.store.saveDispute({
       ...dispute,
       resolvedAt: tx.at(),

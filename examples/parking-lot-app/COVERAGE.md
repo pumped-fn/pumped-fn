@@ -271,7 +271,7 @@ Currently covered by existing tests (`examples/parking-lot-shared/tests/*.test.t
 
 Explicitly covered failure-path row IDs: **BOOK-01 (partial, via CFG-01 pattern), CFG-01, JOB-02/03 (partial — only one side), JOB-04/05 (partial — only one side)** — i.e. **2 fully covered, 2 partially covered (one-sided boundary only)**.
 
-Coverage percentage: **~3–6% of the 64-row matrix** (2 full + 2 half ≈ 3/64 ≈ 4.7%).
+Coverage percentage: **64/64 rows implemented** (tests/matrix.*.test.ts in parking-lot-shared; row IDs prefix test names). Historical baseline at ratification: ~4.7% (2 full + 2 half rows).
 
 Uncovered row IDs (59.3 rows-equivalent), by category:
 - Forbidden/role errors: BOOK-01(bookSpace-direct), CHECKIN-01, EXIT-01, PAY-01, PAY-06, PAY-09, DISPUTE-01, DISPUTE-05, REPORT-01 — 9 uncovered.
@@ -286,3 +286,28 @@ Uncovered row IDs (59.3 rows-equivalent), by category:
 - Refund-window enforcement gap: PAY-12 — 1 uncovered (currently no enforcement exists to test).
 
 Total distinct uncovered IDs: **57** of 64 (89%).
+
+---
+
+## F. Decisions (ratified domain-bug fixes + matrix implementation, PAY/DISPUTE/REPORT/RECEIPT/JOB/WF rows)
+
+Three domain bugs identified in sections A/B were fixed (maintainer-ratified, this pass):
+
+1. **`pairPayment` unguarded session release** (`examples/parking-lot-shared/src/flow.payment.ts`) — added a guard
+   `if (session.status !== "awaiting_payment") ctx.fail({ kind: "conflict", entity: "session", id, from: session.status, attempted: "release" })`
+   before the session is written to `"released"`. `"awaiting_payment"` is the sole legitimate predecessor per the state table in section A (`prepareExit` is the only producer of `awaiting_payment`). No `Fault` union change needed — `conflict` already covers `entity: "session"`. Test: PAY-05 (`tests/matrix.payment.test.ts`), which directly mutates the backing store to simulate an out-of-band release, then asserts `pairPayment` now rejects instead of silently overwriting.
+2. **`resolveDispute` stale-read on payment status** (`examples/parking-lot-shared/src/flow.dispute.ts`) — added
+   `if (payment.status !== "disputed") ctx.fail({ kind: "conflict", entity: "payment", id, from: payment.status, attempted: "resolve-dispute" })`
+   immediately after reading the payment and before either the accepted/rejected branch mutates it. Test: DISPUTE-08, which mutates the backing payment to `"refunded"` out-of-band while the dispute is still `"open"`, then asserts `resolveDispute` now rejects instead of reopening/re-refunding it.
+3. **`refundPayment` never enforced `refundWindowMinutes`** (`examples/parking-lot-shared/src/flow.payment.ts`) — added a
+   window check (session `exitedAt` + lot `refundWindowMinutes` vs `tx.at()`) after the existing status guard, for every role including manager:
+   `ctx.fail({ kind: "conflict", entity: "payment", id, from: payment.status, attempted: "refund" })`.
+   Deviated slightly from the literal proposal in section B (which hardcoded `from: "paired"`): used `from: payment.status` instead, since the same window now applies whether the payment is `"paired"` or `"disputed"`-then-refunded, and hardcoding `"paired"` would misreport the latter case. Tests: PAY-12a (exact boundary succeeds), PAY-12b (one ms past boundary rejects for a manager), PAY-12c (rejection is traced as an `observable` error event on `parking.refund-payment`).
+
+Matrix rows implemented (33/33, no skips): PAY-01..12 (14 tests — PAY-12 split into a/b/c for the boundary pair plus a trace assertion; PAY-03 and PAY-05 both exercise the same guard from different angles per the instructions), DISPUTE-01..08 (8 tests, 1:1), REPORT-01..02 (2 tests), RECEIPT-01..02 (2 tests), JOB-01..06 (6 tests), WF-01..03 (3 tests). Files: `tests/matrix.payment.test.ts`, `tests/matrix.dispute.test.ts`, `tests/matrix.reporting.test.ts`, `tests/matrix.jobs.test.ts`.
+
+Notes on discipline:
+- Every `createScope` call presets `store` and `clock` explicitly (never relies on defaults).
+- `jobRun`/`workflowRun` tags (`pkg/framework/pumped/src/tags.ts`) are not importable from `@pumped-fn/parking-lot-shared` — it has no dependency on `@pumped-fn/pumped`, and this task's file fence forbids adding one. Both matrix files (`matrix.jobs.test.ts`, `matrix.reporting.test.ts`) instead define a structurally identical local `tag()` (`test.jobRun` / `test.workflowRun`) and assert `ctx.data.getTag(...)` returns the tagged value inside the flow's context, proving the same tag-propagation mechanism the real framework tags rely on. This is noted as a decision rather than silently deviating from "drive runJobs' exposed tick" — `runJobs`/`runWorkflows` live in `pkg/framework/pumped/src/runtime`, outside this package's dependency graph.
+- WF-02 (day-close discrepancy alertability): `dayClose` already calls `tx.record("day.closed", ..., { discrepancyCents, ... })` unconditionally (`flow.day-close.ts`), which lands in `AuditRecord`s via the `tx` resource's cleanup. No code change was needed to make the row assertable — the test asserts the audit record's `discrepancyCents` field directly, rather than treating the discrepancy as silently unobservable. A true alerting/event-sink hook for discrepancies (beyond the audit trail) remains an open framework gap per section C/D, out of scope for this pass.
+- PAY-05, DISPUTE-08, and WF-02 each construct their precondition by writing directly to the shared `MemoryParkingStore` instance (`backing.saveSession(...)`, `backing.savePayment(...)`) rather than through a flow, because the state they need to reach (an independently-released session, an independently-refunded payment, a post-hoc amended payment amount) has no legitimate flow path in the current domain — that absence of a flow path is itself the condition the bug fix guards against.

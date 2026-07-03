@@ -352,3 +352,4 @@ benchmarks/**/prof/out/
 dist/skills/
 .claude/plugins/local/
 examples/reactivity-bench/
+*.sqlite

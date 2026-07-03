@@ -3,6 +3,8 @@ import { ExecutionContextProvider, ScopeProvider, useAtom, useFlow } from "@pump
 import {
   actor,
   clock,
+  createMemoryStore,
+  store,
   type Role,
 } from "@pumped-fn/parking-lot-shared"
 import { useMemo, useRef } from "react"
@@ -13,7 +15,8 @@ const roleLabels: Role[] = ["manager", "operator", "user"]
 export function ParkingLotRoot() {
   const clockRef = useRef("2026-07-01T08:00:00.000Z")
   const scope = useMemo(() => createScope({
-    presets: [preset(clock, () => clockRef.current)],
+    // Browser demo can't run the sqlite-backed default — preset memory.
+    presets: [preset(clock, () => clockRef.current), preset(store, createMemoryStore())],
   }), [])
   return (
     <ScopeProvider scope={scope}>

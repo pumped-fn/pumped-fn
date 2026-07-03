@@ -33,6 +33,9 @@ export const pairPayment = flow({
       ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "paired" })
     }
     const session = tx.store.session(payment.sessionId)
+    if (session.status !== "awaiting_payment") {
+      ctx.fail({ kind: "conflict", entity: "session", id: session.id, from: session.status, attempted: "release" })
+    }
     const paired: Payment = {
       ...payment,
       externalRef: ctx.input.externalRef,
@@ -79,6 +82,14 @@ export const refundPayment = flow({
     const payment = tx.store.payment(ctx.input.paymentId)
     if (payment.status !== "paired" && payment.status !== "disputed") {
       ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "refunded" })
+    }
+    const session = tx.store.session(payment.sessionId)
+    if (session.exitedAt !== undefined) {
+      const lot = tx.store.lot(session.lotId)
+      const deadline = Date.parse(session.exitedAt) + lot.settings.refundWindowMinutes * 60000
+      if (Date.parse(tx.at()) > deadline) {
+        ctx.fail({ kind: "conflict", entity: "payment", id: payment.id, from: payment.status, attempted: "refund" })
+      }
     }
     const refunded = tx.store.savePayment({
       ...payment,
