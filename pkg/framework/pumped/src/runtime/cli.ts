@@ -4,7 +4,7 @@ import { command } from "../tags"
 import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveCommand(entry: ManifestEntry): { name: string; description: string | undefined } {
-  const meta = command.find(entry.flow)
+  const meta = command.find(entry.meta ? [entry.meta] : []) ?? command.find(entry.flow)
   return {
     name: meta?.name ?? entry.name,
     description: meta?.description,

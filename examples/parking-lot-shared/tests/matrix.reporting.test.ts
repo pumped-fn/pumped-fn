@@ -34,7 +34,8 @@ async function exec<T>(
   fn: (ctx: Lite.ExecutionContext) => Promise<T>,
   extraTags: Lite.Tagged<any>[] = []
 ): Promise<T> {
-  const { scope, exec: ctx } = parking({ at: iso, as: who, presets: [preset(store, backing)], tags: extraTags })
+  const { scope } = parking(iso, who, preset(store, backing))
+  const ctx = extraTags.length > 0 ? scope.createContext({ tags: extraTags }) : scope.createContext()
   try {
     return await fn(ctx)
   } finally {

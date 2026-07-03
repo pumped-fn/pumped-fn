@@ -10,12 +10,12 @@ describe("generateManifest", () => {
 
     expect(source).toBe(
       [
-        'import e0 from "/abs/src/server/book-space.ts"',
+        'import e0, * as ns0 from "/abs/src/server/book-space.ts"',
         'import app from "/abs/src/app.ts"',
         "",
         "export { app }",
         "export const entries = [",
-        '  { kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts", flow: e0 }',
+        '  { kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts", flow: e0, meta: ns0.meta }',
         "]",
         "",
       ].join("\n")

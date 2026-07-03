@@ -15,7 +15,7 @@ export interface JobsRunner {
 }
 
 function resolveSchedule(entry: ManifestEntry): { cron: string } {
-  const meta = schedule.find(entry.flow)
+  const meta = schedule.find(entry.meta ? [entry.meta] : []) ?? schedule.find(entry.flow)
   if (!meta) throw new Error(`jobs entry "${entry.name}" is missing a required schedule tag`)
   return meta
 }

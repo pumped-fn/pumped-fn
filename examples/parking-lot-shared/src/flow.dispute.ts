@@ -1,8 +1,8 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
 import type { Dispute, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
-import { allow, type ConflictOrAllowFault } from "./flow.rule.allow"
+import { allow } from "./flow.rule.allow"
 import type { Forbidden, Conflict } from "./error"
 
 export interface OpenDisputeInput {
@@ -18,7 +18,7 @@ export interface ResolveDisputeInput {
 export const openDispute = flow({
   name: "parking.open-dispute",
   parse: typed<OpenDisputeInput>(),
-  faults: typed<Forbidden | ConflictOrAllowFault>(),
+  faults: typed<Forbidden | Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "open dispute", roles: ["user"] } })
@@ -52,7 +52,7 @@ export const openDispute = flow({
 export const resolveDispute = flow({
   name: "parking.resolve-dispute",
   parse: typed<ResolveDisputeInput>(),
-  faults: typed<ConflictOrAllowFault>(),
+  faults: typed<Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ dispute: Dispute; payment: Payment; receipt?: Receipt }> => {
     await allow.exec({ input: { action: "resolve dispute", roles: ["manager"] } })

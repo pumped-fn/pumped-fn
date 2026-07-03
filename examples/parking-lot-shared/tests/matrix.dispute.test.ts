@@ -25,7 +25,7 @@ async function exec<T>(
   iso: string,
   fn: (ctx: Lite.ExecutionContext) => Promise<T>
 ): Promise<T> {
-  const { scope, exec: ctx } = parking({ at: iso, as: who, presets: [preset(store, backing)] })
+  const { scope, ctx } = parking(iso, who, preset(store, backing))
   try {
     return await fn(ctx)
   } finally {

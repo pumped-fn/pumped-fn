@@ -40,6 +40,7 @@ export interface ManifestEntry {
   name: string
   file: string
   flow: Lite.Flow<any, any>
+  meta?: Lite.Tagged<any>
   agent?: ManifestAgentMeta
 }
 

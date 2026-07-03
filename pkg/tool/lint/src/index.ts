@@ -1193,7 +1193,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           filePath,
           "pumped/no-handle-spread",
           property,
-          "Wrap the shared flow in a thin entry flow (controller + exec) instead of spreading the handle — spreads fork node identity and break preset targeting.",
+          "Re-export the shared flow directly and attach tags via a sibling `export const meta = pumped.route(...)` (or command/schedule) instead of spreading the handle — spreads fork node identity and break preset targeting. Only wrap in a thin entry flow (controller + exec) when the entry genuinely adapts/transforms input before calling the shared flow.",
         )
       }
     }

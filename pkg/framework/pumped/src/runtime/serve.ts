@@ -7,7 +7,7 @@ import { createAppScope } from "./app-scope"
 import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveRoute(entry: ManifestEntry): { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string } {
-  const meta = route.find(entry.flow)
+  const meta = route.find(entry.meta ? [entry.meta] : []) ?? route.find(entry.flow)
   return {
     method: meta?.method ?? "POST",
     path: meta?.path ?? `/${entry.name}`,

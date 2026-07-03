@@ -9,8 +9,6 @@ export type Fault =
 
 export type Forbidden = Extract<Fault, { kind: "forbidden" }>
 export type Conflict = Extract<Fault, { kind: "conflict" }>
-export type NotFound = Extract<Fault, { kind: "not-found" }>
-export type Unavailable = Extract<Fault, { kind: "unavailable" }>
 
 export const faultStatus = {
   forbidden: 403,

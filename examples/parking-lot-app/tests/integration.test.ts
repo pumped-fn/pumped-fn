@@ -13,16 +13,6 @@ import {
   store,
 } from "@pumped-fn/parking-lot-shared"
 
-const receipts = pumped.entry(listReceipts, {
-  name: "receipts",
-  tags: [pumped.route({ method: "GET" })],
-})
-
-const expireBookingsJob = pumped.entry(expireBookings, {
-  name: "expire-bookings",
-  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-})
-
 function manifest(fixedClock: { value: string }): pumped.Manifest {
   return {
     app: {
@@ -36,9 +26,21 @@ function manifest(fixedClock: { value: string }): pumped.Manifest {
     entries: [
       { kind: "server", name: "lots", file: "virtual", flow: configureLot },
       { kind: "server", name: "bookings", file: "virtual", flow: bookSpace },
-      { kind: "server", name: "receipts", file: "virtual", flow: receipts },
+      {
+        kind: "server",
+        name: "receipts",
+        file: "virtual",
+        flow: listReceipts,
+        meta: pumped.route({ method: "GET" }),
+      },
       { kind: "server", name: "reports", file: "virtual", flow: readReport },
-      { kind: "jobs", name: "expire-bookings", file: "virtual", flow: expireBookingsJob },
+      {
+        kind: "jobs",
+        name: "expire-bookings",
+        file: "virtual",
+        flow: expireBookings,
+        meta: pumped.schedule({ cron: "*/5 * * * *" }),
+      },
     ],
   }
 }
@@ -80,7 +82,13 @@ describe("parking lot app composition", () => {
     expect(booking.status).toBe("held")
 
     fixedClock.value = "2026-07-01T09:20:00.000Z"
-    await jobs.tick({ kind: "jobs", name: "expire-bookings", file: "virtual", flow: expireBookingsJob })
+    await jobs.tick({
+      kind: "jobs",
+      name: "expire-bookings",
+      file: "virtual",
+      flow: expireBookings,
+      meta: pumped.schedule({ cron: "*/5 * * * *" }),
+    })
 
     const receiptsRes = await honoApp.request(`/receipts?userId=${encodeURIComponent(booking.userId)}`)
     expect(receiptsRes.status).toBe(200)
@@ -93,6 +101,21 @@ describe("parking lot app composition", () => {
     const report = await reportRes.json()
     expect(report.lots[0].heldBookings).toBe(0)
 
+    await jobs.stop()
+    await scope.dispose()
+  })
+
+  it("resolves the receipts route and the expire-bookings schedule from entry.meta, since neither shared flow carries a route/schedule tag itself", async () => {
+    const fixedClock = { value: "2026-07-01T08:00:00.000Z" }
+
+    expect(pumped.route.find(listReceipts)).toBeUndefined()
+    expect(pumped.schedule.find(expireBookings)).toBeUndefined()
+
+    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock))
+    const receiptsRes = await honoApp.request("/receipts?userId=nobody")
+    expect(receiptsRes.status).toBe(200)
+
+    const jobs = pumped.runJobs(manifest(fixedClock), undefined, scope)
     await jobs.stop()
     await scope.dispose()
   })

@@ -6,7 +6,6 @@ import { runJobs } from "./runtime/jobs"
 import { runWorkflows } from "./runtime/workflows"
 import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
-import { entry } from "./entry"
 
 export const pumped = {
   route,
@@ -20,7 +19,6 @@ export const pumped = {
   runCli,
   runJobs,
   runWorkflows,
-  entry,
 } as const
 
 export namespace pumped {

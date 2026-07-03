@@ -6,14 +6,9 @@ import { parking } from "./harness"
 describe("configure-lot matrix", () => {
   it("CFG-01 rejects configureLot when actor role is not manager", async () => {
     const backing = createMemoryStore()
-    const operator = parking({
-      at: "2026-07-01T08:00:00.000Z",
-      as: { id: "operator-1", role: "operator" },
-      observe: true,
-      presets: [preset(store, backing)],
-    })
+    const operator = parking("2026-07-01T08:00:00.000Z", { id: "operator-1", role: "operator" }, preset(store, backing))
 
-    await expect(operator.exec.exec({
+    await expect(operator.ctx.exec({
       flow: configureLot,
       input: {
         bookingLeadMinutes: 60,
@@ -26,19 +21,19 @@ describe("configure-lot matrix", () => {
       },
     })).rejects.toMatchObject({ fault: { kind: "forbidden", action: "configure lot", actorId: "operator-1" } })
 
-    const events = operator.sink!.events().filter((event) => event.phase === "error")
+    const events = operator.sink.events().filter((event) => event.phase === "error")
     expect(events.some((event) => event.name === "parking.rule.allow")).toBe(true)
     expect(events.some((event) => event.name === "parking.configure-lot")).toBe(true)
 
-    await operator.exec.close({ ok: false, error: new Error("rejected") })
+    await operator.ctx.close({ ok: false, error: new Error("rejected") })
     await operator.scope.dispose()
   })
 
   it("CFG-02 updates an existing lot in place when lotId is provided, vs creating a new one when absent", async () => {
     const backing = createMemoryStore()
-    const manager = parking({ at: "2026-07-01T08:00:00.000Z", as: { id: "manager-1", role: "manager" }, presets: [preset(store, backing)] })
+    const manager = parking("2026-07-01T08:00:00.000Z", { id: "manager-1", role: "manager" }, preset(store, backing))
 
-    const created = await manager.exec.exec({
+    const created = await manager.ctx.exec({
       flow: configureLot,
       input: {
         bookingLeadMinutes: 60,
@@ -52,7 +47,7 @@ describe("configure-lot matrix", () => {
     })
     expect(backing.lots()).toHaveLength(1)
 
-    const updated = await manager.exec.exec({
+    const updated = await manager.ctx.exec({
       flow: configureLot,
       input: {
         bookingLeadMinutes: 90,
@@ -70,7 +65,7 @@ describe("configure-lot matrix", () => {
     expect(backing.lots()).toHaveLength(1)
     expect(backing.lot(created.id)).toMatchObject({ capacity: 4, name: "Updated Lot", rateCentsPerHour: 800 })
 
-    await manager.exec.close({ ok: true })
+    await manager.ctx.close({ ok: true })
     await manager.scope.dispose()
   })
 })

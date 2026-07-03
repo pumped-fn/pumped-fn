@@ -24,7 +24,7 @@ async function exec<T>(
   iso: string,
   fn: (ctx: Lite.ExecutionContext) => Promise<T>
 ): Promise<T> {
-  const { scope, exec: ctx } = parking({ at: iso, as: who, presets: [preset(store, backing)] })
+  const { scope, ctx } = parking(iso, who, preset(store, backing))
   try {
     return await fn(ctx)
   } finally {
@@ -250,24 +250,19 @@ describe("PAY matrix", () => {
         input: { externalRef: "ext-1", method: "card", paymentId: prepared.payment.id },
       }))
 
-    const managerCtx = parking({
-      at: "2026-07-01T11:00:00.001Z",
-      as: manager,
-      observe: true,
-      presets: [preset(store, backing)],
-    })
+    const managerCtx = parking("2026-07-01T11:00:00.001Z", manager, preset(store, backing))
 
-    await expect(managerCtx.exec.exec({
+    await expect(managerCtx.ctx.exec({
       flow: refundPayment,
       input: { paymentId: prepared.payment.id, reason: "customer request" },
     })).rejects.toMatchObject({
       fault: { kind: "conflict", entity: "payment", from: "paired", attempted: "refund" },
     })
 
-    await managerCtx.exec.close({ ok: false, error: new Error("refund window expired") })
+    await managerCtx.ctx.close({ ok: false, error: new Error("refund window expired") })
     await managerCtx.scope.dispose()
 
-    const refundError = managerCtx.sink!.events().find((event) => event.phase === "error" && event.name === "parking.refund-payment")
+    const refundError = managerCtx.sink.events().find((event) => event.phase === "error" && event.name === "parking.refund-payment")
     expect(refundError).toBeDefined()
     expect((refundError?.error as { fault?: unknown } | undefined)?.fault).toMatchObject({
       kind: "conflict",

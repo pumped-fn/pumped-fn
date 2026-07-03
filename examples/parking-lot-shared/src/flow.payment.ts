@@ -1,8 +1,9 @@
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
 import type { ParkingSession, Payment, Receipt } from "./model"
 import { tx } from "./resource.tx"
 import { issueReceipt } from "./flow.issue-receipt"
-import { allow, type ConflictOrAllowFault } from "./flow.rule.allow"
+import { allow } from "./flow.rule.allow"
+import type { Conflict } from "./error"
 
 export interface PairPaymentInput {
   externalRef: string
@@ -23,7 +24,7 @@ export interface RefundPaymentInput {
 export const pairPayment = flow({
   name: "parking.pair-payment",
   parse: typed<PairPaymentInput>(),
-  faults: typed<ConflictOrAllowFault>(),
+  faults: typed<Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt; session: ParkingSession }> => {
     await allow.exec({ input: { action: "pair payment", roles: ["operator"] } })
@@ -53,7 +54,7 @@ export const pairPayment = flow({
 export const recordPaymentFailure = flow({
   name: "parking.record-payment-failure",
   parse: typed<RecordPaymentFailureInput>(),
-  faults: typed<ConflictOrAllowFault>(),
+  faults: typed<Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow },
   factory: async (ctx, { tx, allow }): Promise<Payment> => {
     await allow.exec({ input: { action: "record payment failure", roles: ["operator"] } })
@@ -74,7 +75,7 @@ export const recordPaymentFailure = flow({
 export const refundPayment = flow({
   name: "parking.refund-payment",
   parse: typed<RefundPaymentInput>(),
-  faults: typed<ConflictOrAllowFault>(),
+  faults: typed<Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, issueReceipt },
   factory: async (ctx, { tx, allow, issueReceipt }): Promise<{ payment: Payment; receipt: Receipt }> => {
     await allow.exec({ input: { action: "refund payment", roles: ["manager"] } })

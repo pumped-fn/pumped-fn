@@ -101,22 +101,29 @@ Sometimes a domain flow that already lives in a shared package needs an edge tag
 `src/jobs/*.ts` entry needs `pumped.schedule(...)`, a `src/server/*.ts` entry needs `pumped.route(...)`.
 Don't object-spread the handle (`{ ...sharedFlow, tags: [...(sharedFlow.tags ?? []), pumped.schedule(...)] }`)
 — spreading forks the flow's node identity, so presets targeting the original shared flow silently
-miss the copy, and it blindly copies whatever fields the handle happens to have. Instead, wrap the
-shared flow in a thin entry flow that depends on it through `controller` and executes it. `pumped.entry`
-generates exactly that wrapper:
+miss the copy, and it blindly copies whatever fields the handle happens to have.
+
+Instead, re-export the shared flow as the entry's default export and attach the edge tag through a
+sibling `meta` export:
 
 ```ts
 // src/jobs/expire-bookings.ts
-import { expireBookings } from "@pumped-fn/parking-lot-shared"
+export { expireBookings as default } from "@pumped-fn/parking-lot-shared"
 import { pumped } from "@pumped-fn/pumped"
 
-export default pumped.entry(expireBookings, {
-  name: "expire-bookings",
-  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-})
+export const meta = pumped.schedule({ cron: "*/5 * * * *" })
 ```
 
-which is exactly the hand-written expansion:
+The generated manifest discovers `meta` alongside the default export (`import e0, * as ns0 from
+"./expire-bookings"`, `{ flow: e0, meta: ns0.meta }`) with no conditional detection — a file with no
+`meta` export simply produces `meta: undefined`, and each runner (`serve`, `cli`, `jobs`) resolves the
+tag with entry.meta taking precedence over any tag already on the flow, which in turn takes precedence
+over the filename-derived default. Presets and substitutes targeting the shared flow now reach entries
+directly — there is no wrapper node to miss, because the shared flow *is* the entry.
+
+Only fall back to a thin wrapper flow (`controller` + `exec`) for the genuine case where the entry needs
+to adapt or transform its input before calling the shared flow — that's still legitimate, it's just not
+the default pattern for attaching tags:
 
 ```ts
 import { controller, flow } from "@pumped-fn/lite"
@@ -127,12 +134,9 @@ export default flow({
   name: "expire-bookings",
   tags: [pumped.schedule({ cron: "*/5 * * * *" })],
   deps: { run: controller(expireBookings) },
-  factory: (ctx, { run }) => run.exec({ input: ctx.input }),
+  factory: (ctx, { run }) => run.exec({ input: adaptInput(ctx.input) }),
 })
 ```
-
-The wrapper is its own graph node with its own tags; the shared flow keeps its original identity, so
-presets and substitutes targeting it keep working from every entry point that reuses it.
 
 ### Workflow tag
 
