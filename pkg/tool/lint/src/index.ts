@@ -42,17 +42,24 @@ export interface ScanResult {
  * Per-rule config. Rules with no config accept no key. `allowImplicit` and
  * `allowGlobals` list identifiers that are exempt from their rule's checks
  * (tag labels for no-implicit-tag-read, global names for no-naked-globals).
- * Both new dependency-graph rules default to "warn" severity (see
- * `defaultSeverity`) so they surface in `--json` output and local runs
- * without failing the root `pnpm lint` exit code, which today only scans
- * docs and practical examples rather than the whole monorepo — a wide,
- * unaudited sweep of those rules across every package would produce noise
- * no single PR could clean up in one pass.
+ * `severity` overrides a rule's default severity ("error", "warn", or "off"
+ * to disable it entirely). Four dependency-graph rules — no-implicit-tag-read,
+ * no-naked-globals, no-module-state, and prefer-destructured-deps — default
+ * to "warn" severity (see `defaultSeverity`) so they surface in `--json`
+ * output and local runs without failing the root `pnpm lint` exit code,
+ * which today only scans docs and practical examples rather than the whole
+ * monorepo — a wide, unaudited sweep of those rules across every package
+ * would produce noise no single PR could clean up in one pass. Projects
+ * that want to enforce a rule as a hard failure can opt in via
+ * `rules: { "<ruleId>": { severity: "error" } }`.
  */
-export interface RuleOptions {
-  "pumped/no-implicit-tag-read"?: { allowImplicit?: string[] }
-  "pumped/no-naked-globals"?: { allowGlobals?: string[] }
+export interface RuleConfig {
+  severity?: Severity | "off"
+  allowImplicit?: string[]
+  allowGlobals?: string[]
 }
+
+export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
 
 export interface ScanOptions {
   cwd?: string
@@ -70,6 +77,18 @@ function severityOf(ruleId: RuleId): Severity {
   return defaultSeverity[ruleId] ?? "error"
 }
 
+function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Diagnostic[] {
+  const rules = options?.rules
+  if (!rules) return diagnostics
+  const result: Diagnostic[] = []
+  for (const diagnostic of diagnostics) {
+    const override = rules[diagnostic.ruleId]?.severity
+    if (override === "off") continue
+    result.push(override ? { ...diagnostic, severity: override } : diagnostic)
+  }
+  return result
+}
+
 type Imports = {
   createScope: Set<string>
   controller: Set<string>
@@ -81,6 +100,8 @@ type Imports = {
   nodeBuiltins: Map<string, string>
   reactNamespaces: Set<string>
   render: Set<string>
+  tagExecutorLocals: Map<string, string>
+  tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
   useExecutionContext: Set<string>
   useScope: Set<string>
@@ -251,6 +272,8 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     nodeBuiltins: new Map(),
     reactNamespaces: new Set(),
     render: new Set(),
+    tagExecutorLocals: new Map(),
+    tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
     useExecutionContext: new Set(),
     useScope: new Set(),
@@ -284,6 +307,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       if (moduleName === "@pumped-fn/lite-react") imports.liteReactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "react") imports.reactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@testing-library/react") imports.testLibraryNamespaces.add(clause.namedBindings.name.text)
+      if (/tags/i.test(moduleName)) imports.tagsNamespaceLocals.add(clause.namedBindings.name.text)
       continue
     }
 
@@ -319,6 +343,12 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@jest/globals" && imported === "jest") {
         imports.viObjects.add(local)
+      }
+      if (imported === "tags") {
+        imports.tagsNamespaceLocals.add(local)
+      }
+      if (tagExecutorModes.has(imported)) {
+        imports.tagExecutorLocals.set(local, imported)
       }
     }
   }
@@ -503,47 +533,117 @@ function enclosingUnitConfig(node: ts.Node, imports: Imports): ts.ObjectLiteralE
   return factory ? (factory.parent as ts.PropertyAssignment).parent as ts.ObjectLiteralExpression : null
 }
 
-function declaredTagNames(config: ts.ObjectLiteralExpression): Set<string> {
+function tagExecutorModeOf(expression: ts.Expression, imports: Imports): string | null {
+  if (ts.isIdentifier(expression) && imports.tagExecutorLocals.has(expression.text)) {
+    return imports.tagExecutorLocals.get(expression.text)!
+  }
+  if (
+    ts.isPropertyAccessExpression(expression)
+    && tagExecutorModes.has(expression.name.text)
+    && ts.isIdentifier(expression.expression)
+    && imports.tagsNamespaceLocals.has(expression.expression.text)
+  ) {
+    return expression.name.text
+  }
+  return null
+}
+
+function resolveObjectLiteral(expression: ts.Expression, sourceFile: ts.SourceFile): ts.ObjectLiteralExpression | null {
+  if (ts.isObjectLiteralExpression(expression)) return expression
+  if (!ts.isIdentifier(expression)) return null
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === expression.text && declaration.initializer) {
+        return resolveObjectLiteral(declaration.initializer, sourceFile)
+      }
+    }
+  }
+  return null
+}
+
+interface DepsAnalysis {
+  names: Set<string>
+  resolvable: boolean
+}
+
+function analyzeDeps(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): DepsAnalysis {
+  const object = resolveObjectLiteral(expression, sourceFile)
+  if (!object) return { names: new Set(), resolvable: false }
+
   const names = new Set<string>()
-  const deps = objectProperty(config, "deps")
-  if (!deps || !ts.isObjectLiteralExpression(deps.initializer)) return names
-  for (const property of deps.initializer.properties) {
+  let resolvable = true
+  for (const property of object.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      const spread = analyzeDeps(property.expression, sourceFile, imports)
+      for (const name of spread.names) names.add(name)
+      if (!spread.resolvable) resolvable = false
+      continue
+    }
     if (!ts.isPropertyAssignment(property)) continue
     const initializer = property.initializer
     if (
       ts.isCallExpression(initializer)
-      && ts.isPropertyAccessExpression(initializer.expression)
-      && ts.isIdentifier(initializer.expression.expression)
-      && initializer.expression.expression.text === "tags"
-      && tagExecutorModes.has(initializer.expression.name.text)
+      && tagExecutorModeOf(initializer.expression, imports)
       && initializer.arguments[0]
       && ts.isIdentifier(initializer.arguments[0])
     ) {
       names.add(initializer.arguments[0].text)
     }
   }
-  return names
+  return { names, resolvable }
 }
 
-function collectUnitFactoryRanges(sourceFile: ts.SourceFile, imports: Imports): Array<{ start: number; end: number }> {
-  const ranges: Array<{ start: number; end: number }> = []
+function declaredTagNames(config: ts.ObjectLiteralExpression, sourceFile: ts.SourceFile, imports: Imports): DepsAnalysis {
+  const deps = objectProperty(config, "deps")
+  if (!deps) return { names: new Set(), resolvable: true }
+  return analyzeDeps(deps.initializer, sourceFile, imports)
+}
+
+function collectUnitFactoryNodes(sourceFile: ts.SourceFile, imports: Imports): Array<ts.ArrowFunction | ts.FunctionExpression> {
+  const nodes: Array<ts.ArrowFunction | ts.FunctionExpression> = []
   function walk(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
       const config = unitCallObject(node, imports)
       const factory = config && objectProperty(config, "factory")
       if (factory && (ts.isArrowFunction(factory.initializer) || ts.isFunctionExpression(factory.initializer))) {
-        ranges.push({ start: factory.initializer.getStart(sourceFile), end: factory.initializer.getEnd() })
+        nodes.push(factory.initializer)
       }
     }
     ts.forEachChild(node, walk)
   }
   walk(sourceFile)
-  return ranges
+  return nodes
 }
 
-function isClosedOverByFactory(name: string, source: string, ranges: Array<{ start: number; end: number }>): boolean {
-  const pattern = new RegExp(`\\b${name}\\b`)
-  return ranges.some((range) => pattern.test(source.slice(range.start, range.end)))
+function collectIdentifierReferences(root: ts.Node): Set<string> {
+  const names = new Set<string>()
+  function walk(node: ts.Node): void {
+    if (ts.isPropertyAccessExpression(node)) {
+      walk(node.expression)
+      return
+    }
+    if (ts.isPropertyAssignment(node)) {
+      if (ts.isComputedPropertyName(node.name)) walk(node.name.expression)
+      walk(node.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(node)) {
+      names.add(node.name.text)
+      return
+    }
+    if (ts.isIdentifier(node)) {
+      names.add(node.text)
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(root)
+  return names
+}
+
+function isClosedOverByFactory(name: string, factoryNodes: Array<ts.ArrowFunction | ts.FunctionExpression>): boolean {
+  return factoryNodes.some((factory) => collectIdentifierReferences(factory).has(name))
 }
 
 function nakedGlobalName(node: ts.CallExpression | ts.NewExpression): string | null {
@@ -602,8 +702,8 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const localFlows = new Set<string>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
-  const unitFactoryRanges = collectUnitFactoryRanges(sourceFile, imports)
-  const hasGraphNodes = unitFactoryRanges.length > 0
+  const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
+  const hasGraphNodes = unitFactoryNodes.length > 0
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
@@ -809,7 +909,8 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           && ts.isIdentifier(node.arguments[0])
         ) {
           const tagName = node.arguments[0].text
-          if (!declaredTagNames(unitConfig).has(tagName) && !allowImplicit.has(tagName)) {
+          const declared = declaredTagNames(unitConfig, sourceFile, imports)
+          if (declared.resolvable && !declared.names.has(tagName) && !allowImplicit.has(tagName)) {
             pushNodeDiagnostic(
               diagnostics,
               sourceFile,
@@ -1113,7 +1214,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         if (!isContainerLiteral) continue
 
         const isExported = exported(node)
-        const closedOver = isClosedOverByFactory(declaration.name.text, source, unitFactoryRanges)
+        const closedOver = isClosedOverByFactory(declaration.name.text, unitFactoryNodes)
         if (!isExported && !closedOver) continue
 
         pushNodeDiagnostic(
@@ -1139,7 +1240,7 @@ export function scanText(source: string, filePath: string, options?: ScanOptions
   const diagnostics: Diagnostic[] = []
   addTextDiagnostics(source, filePath, diagnostics)
   addAstDiagnostics(source, filePath, diagnostics, options)
-  return diagnostics
+  return applyRuleOptions(diagnostics, options)
 }
 
 async function collectFiles(targetPath: string, files: string[]): Promise<void> {

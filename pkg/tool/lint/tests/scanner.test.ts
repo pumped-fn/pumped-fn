@@ -2,10 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { scanPaths, scanText, type ScanOptions } from "../src/index"
+import { scanPaths, scanText, type Diagnostic, type ScanOptions } from "../src/index"
 
 function ids(source: string, filePath = "src/example.ts", options?: ScanOptions) {
   return scanText(source, filePath, options).map((diagnostic) => diagnostic.ruleId)
+}
+
+function diagnostics(source: string, filePath = "src/example.ts", options?: ScanOptions): Diagnostic[] {
+  return scanText(source, filePath, options)
 }
 
 describe("lite lint scanner", () => {
@@ -463,5 +467,120 @@ describe("lite lint scanner", () => {
         factory: (ctx, deps) => forward(deps),
       })
     `)).toEqual([])
+  })
+
+  it("detects closure references to identifiers containing $ via AST instead of regex", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const cache$ = { hits: 0 }
+      const bumpHits = atom({ name: "bumpHits", factory: () => cache$.hits++ })
+    `)).toEqual(["pumped/no-module-state"])
+  })
+
+  it("does not treat string/template literal text matching an in-scope identifier as a closure reference", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const localOnly = { count: 0 }
+      const label = atom({ name: "label", factory: () => "localOnly count is high" })
+      const templated = atom({ name: "templated", factory: () => \`localOnly\` })
+    `)).toEqual([])
+  })
+
+  it("resolves an identifier-referenced deps object for no-implicit-tag-read", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const sharedDeps = { id: tags.required(requestIdTag) }
+
+      const requestId = atom({
+        name: "requestId",
+        deps: sharedDeps,
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("resolves spread deps that include a resolvable shared identifier", () => {
+    expect(ids(`
+      import { atom, tags } from "@pumped-fn/lite"
+
+      const sharedDeps = { id: tags.required(requestIdTag) }
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { ...sharedDeps, foo: tags.required(fooTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag) || ctx.data.seekTag(fooTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("resolves aliased and namespaced tags helper imports", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import { required as req } from "../tags"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: req(requestIdTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import * as T from "../tags"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: { id: T.required(requestIdTag) },
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("skips no-implicit-tag-read when the deps shape is unresolvable, preferring false negatives", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+      import { sharedDeps } from "./deps"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: sharedDeps,
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const requestId = atom({
+        name: "requestId",
+        deps: buildDeps(),
+        factory: (ctx) => ctx.data.seekTag(requestIdTag),
+      })
+    `)).toEqual([])
+  })
+
+  it("escalates a warn-default rule to error via per-rule severity override", () => {
+    const result = diagnostics(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `, "src/example.ts", { rules: { "pumped/no-naked-globals": { severity: "error" } } })
+
+    const nakedGlobal = result.find((diagnostic) => diagnostic.ruleId === "pumped/no-naked-globals")
+    expect(nakedGlobal?.severity).toBe("error")
+  })
+
+  it("silences a rule entirely via severity: off", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const roll = atom({ name: "roll", factory: () => Math.random() })
+    `, "src/example.ts", { rules: { "pumped/no-naked-globals": { severity: "off" } } })).toEqual([
+      "pumped/no-ambient-io-outside-boundary",
+    ])
   })
 })

@@ -1,41 +1,66 @@
 #!/usr/bin/env node
 
-import { scanPaths, type Diagnostic } from "./index"
+import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
+import { scanPaths, type Diagnostic, type RuleOptions } from "./index"
 
 interface CliArgs {
   paths: string[]
   json: boolean
   help: boolean
+  configPath: string | null
+  maxWarnings: number | null
+}
+
+interface CliConfig {
+  rules?: RuleOptions
+  maxWarnings?: number
 }
 
 function parseArgs(argv: string[]): CliArgs {
   const paths: string[] = []
   let json = false
   let help = false
+  let configPath: string | null = null
+  let maxWarnings: number | null = null
 
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!
     if (arg === "--json") {
       json = true
     } else if (arg === "--help" || arg === "-h") {
       help = true
+    } else if (arg === "--config") {
+      configPath = argv[++i] ?? null
+    } else if (arg === "--max-warnings") {
+      maxWarnings = Number(argv[++i])
     } else {
       paths.push(arg)
     }
   }
 
-  return { paths, json, help }
+  return { paths, json, help, configPath, maxWarnings }
 }
 
 function usage(): string {
   return [
-    "Usage: pumped-lite-lint [--json] [paths...]",
+    "Usage: pumped-lite-lint [--json] [--config <path>] [--max-warnings <n>] [paths...]",
     "",
     "Scans @pumped-fn/lite and @pumped-fn/lite-react source for documented anti-patterns.",
+    "",
+    "--config <path>       JSON file with { rules, maxWarnings } to override rule severities.",
+    "--max-warnings <n>    Fail the build once the warning count exceeds n (0 means any warning fails).",
   ].join("\n")
 }
 
 function formatDiagnostic(diagnostic: Diagnostic): string {
   return `${diagnostic.filePath}:${diagnostic.line}:${diagnostic.column} [${diagnostic.severity}] ${diagnostic.ruleId} ${diagnostic.message}`
+}
+
+async function loadConfig(configPath: string | null, cwd: string): Promise<CliConfig> {
+  if (!configPath) return {}
+  const contents = await readFile(resolve(cwd, configPath), "utf8")
+  return JSON.parse(contents) as CliConfig
 }
 
 async function main(): Promise<void> {
@@ -45,7 +70,10 @@ async function main(): Promise<void> {
     return
   }
 
-  const result = await scanPaths(args.paths)
+  const config = await loadConfig(args.configPath, process.cwd())
+  const maxWarnings = args.maxWarnings ?? config.maxWarnings ?? null
+
+  const result = await scanPaths(args.paths, { rules: config.rules })
   if (args.json) {
     console.log(JSON.stringify(result, null, 2))
   } else if (result.diagnostics.length === 0) {
@@ -57,7 +85,11 @@ async function main(): Promise<void> {
     console.log(`pumped-lite-lint: ${result.filesScanned} files scanned, ${result.diagnostics.length} diagnostics`)
   }
 
-  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) process.exitCode = 1
+  const warningCount = result.diagnostics.filter((diagnostic) => diagnostic.severity === "warn").length
+  const hasErrors = result.diagnostics.some((diagnostic) => diagnostic.severity === "error")
+  const exceedsMaxWarnings = maxWarnings !== null && warningCount > maxWarnings
+
+  if (hasErrors || exceedsMaxWarnings) process.exitCode = 1
 }
 
 main().catch((error) => {
