@@ -102,10 +102,23 @@ Sometimes a domain flow that already lives in a shared package needs an edge tag
 Don't object-spread the handle (`{ ...sharedFlow, tags: [...(sharedFlow.tags ?? []), pumped.schedule(...)] }`)
 — spreading forks the flow's node identity, so presets targeting the original shared flow silently
 miss the copy, and it blindly copies whatever fields the handle happens to have. Instead, wrap the
-shared flow in a thin entry flow that depends on it through `controller` and executes it:
+shared flow in a thin entry flow that depends on it through `controller` and executes it. `pumped.entry`
+generates exactly that wrapper:
 
 ```ts
 // src/jobs/expire-bookings.ts
+import { expireBookings } from "@pumped-fn/parking-lot-shared"
+import { pumped } from "@pumped-fn/pumped"
+
+export default pumped.entry(expireBookings, {
+  name: "expire-bookings",
+  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
+})
+```
+
+which is exactly the hand-written expansion:
+
+```ts
 import { controller, flow } from "@pumped-fn/lite"
 import { expireBookings } from "@pumped-fn/parking-lot-shared"
 import { pumped } from "@pumped-fn/pumped"
@@ -114,7 +127,7 @@ export default flow({
   name: "expire-bookings",
   tags: [pumped.schedule({ cron: "*/5 * * * *" })],
   deps: { run: controller(expireBookings) },
-  factory: (_ctx, { run }) => run.exec({ input: {} }),
+  factory: (ctx, { run }) => run.exec({ input: ctx.input }),
 })
 ```
 

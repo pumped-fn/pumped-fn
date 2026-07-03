@@ -9,6 +9,24 @@ export interface AppConfig {
   mapError?: (error: unknown) => { status: number; body: unknown } | undefined
 }
 
+export interface NormalizedAppConfig {
+  presets: Lite.Preset<any, any>[]
+  tags: Lite.Tagged<any>[]
+  extensions: Lite.Extension[]
+  context: (request?: Request) => Lite.Tagged<any>[]
+  mapError?: (error: unknown) => { status: number; body: unknown } | undefined
+}
+
+export function normalizeApp(app?: AppConfig): NormalizedAppConfig {
+  return {
+    presets: app?.presets ?? [],
+    tags: app?.tags ?? [],
+    extensions: app?.extensions ?? [],
+    context: app?.context ?? (() => []),
+    mapError: app?.mapError,
+  }
+}
+
 export interface ManifestAgentMeta {
   name: string
   description?: string

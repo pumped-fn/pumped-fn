@@ -1,7 +1,7 @@
 import { createScope } from "@pumped-fn/lite"
 import { cac } from "cac"
 import { command } from "../tags"
-import type { Manifest, ManifestEntry } from "./manifest"
+import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveCommand(entry: ManifestEntry): { name: string; description: string | undefined } {
   const meta = command.find(entry.flow)
@@ -23,7 +23,7 @@ export interface CliIo {
  * keep the prior behavior of printing the error message and exiting with code 1.
  */
 export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Promise<void> {
-  const appConfig = manifest.app
+  const appConfig = normalizeApp(manifest.app)
   const out = io?.out ?? ((line: string) => process.stdout.write(`${line}\n`))
   const err = io?.err ?? ((line: string) => process.stderr.write(`${line}\n`))
   const program = cac("pumped")
@@ -41,11 +41,11 @@ export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Pr
     }
 
     const scope = createScope({
-      extensions: appConfig?.extensions,
-      tags: appConfig?.tags,
-      presets: appConfig?.presets,
+      extensions: appConfig.extensions,
+      tags: appConfig.tags,
+      presets: appConfig.presets,
     })
-    const context = scope.createContext({ tags: appConfig?.context?.() })
+    const context = scope.createContext({ tags: appConfig.context() })
 
     try {
       const output = await context.exec({ flow: entry.flow, rawInput })
@@ -53,7 +53,7 @@ export async function runCli(manifest: Manifest, argv: string[], io?: CliIo): Pr
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      const mapped = appConfig?.mapError?.(error)
+      const mapped = appConfig.mapError?.(error)
       if (mapped === undefined) {
         err(error instanceof Error ? error.message : String(error))
         process.exitCode = 1

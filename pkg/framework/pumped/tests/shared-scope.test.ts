@@ -6,7 +6,7 @@ import { createServer } from "../src/runtime/serve"
 import { runJobs } from "../src/runtime/jobs"
 import { route } from "../src/tags"
 import { schedule } from "../src/tags"
-import type { Manifest } from "../src/runtime/manifest"
+import { entry, manifest } from "./helpers"
 
 const counter = atom({ factory: () => ({ value: 0 }) })
 
@@ -30,23 +30,18 @@ const sweep = flow({
 
 describe("shared scope across server and jobs", () => {
   it("has an http handler and a job tick observe the same atom instance", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [
-        { kind: "server", name: "bump", file: "virtual", flow: bump },
-        { kind: "jobs", name: "sweep", file: "virtual", flow: sweep },
-      ],
-    }
+    const sweepEntry = entry("jobs", "sweep", sweep)
+    const sharedManifest = manifest(undefined, entry("server", "bump", bump), sweepEntry)
 
     const lite = hono.adapter()
-    const scope = createAppScope(manifest, [lite])
-    const { app } = createServer(manifest, { scope, lite })
-    const jobs = runJobs(manifest, undefined, scope)
+    const scope = createAppScope(sharedManifest, [lite])
+    const { app } = createServer(sharedManifest, { scope, lite })
+    const jobs = runJobs(sharedManifest, undefined, scope)
 
     const first = await app.request("/bump", { method: "POST" })
     expect(await first.json()).toEqual({ value: 1 })
 
-    await jobs.tick(manifest.entries[1]!)
+    await jobs.tick(sweepEntry)
 
     const second = await app.request("/bump", { method: "POST" })
     expect(await second.json()).toEqual({ value: 3 })

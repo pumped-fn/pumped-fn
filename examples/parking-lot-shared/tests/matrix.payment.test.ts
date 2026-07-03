@@ -1,10 +1,7 @@
-import { createScope, preset, type Lite } from "@pumped-fn/lite"
-import { observable } from "@pumped-fn/lite-extension-observable"
+import { preset, type Lite } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
 import {
-  actor,
   checkInVehicle,
-  clock,
   configureLot,
   createMemoryStore,
   pairPayment,
@@ -15,6 +12,7 @@ import {
   type Actor,
   type ParkingStore,
 } from "../src"
+import { parking } from "./harness"
 
 const manager: Actor = { id: "manager-1", role: "manager" }
 const operator: Actor = { id: "operator-1", role: "operator" }
@@ -26,11 +24,7 @@ async function exec<T>(
   iso: string,
   fn: (ctx: Lite.ExecutionContext) => Promise<T>
 ): Promise<T> {
-  const scope = createScope({
-    presets: [preset(store, backing), preset(clock, () => iso)],
-    tags: [actor(who)],
-  })
-  const ctx = scope.createContext()
+  const { scope, exec: ctx } = parking({ at: iso, as: who, presets: [preset(store, backing)] })
   try {
     return await fn(ctx)
   } finally {
@@ -256,25 +250,24 @@ describe("PAY matrix", () => {
         input: { externalRef: "ext-1", method: "card", paymentId: prepared.payment.id },
       }))
 
-    const obsSink = observable.memory()
-    const scope = createScope({
-      extensions: [observable.extension()],
-      presets: [preset(store, backing), preset(clock, () => "2026-07-01T11:00:00.001Z")],
-      tags: [actor(manager), observable.runtime({ sinks: [obsSink] })],
+    const managerCtx = parking({
+      at: "2026-07-01T11:00:00.001Z",
+      as: manager,
+      observe: true,
+      presets: [preset(store, backing)],
     })
-    const ctx = scope.createContext()
 
-    await expect(ctx.exec({
+    await expect(managerCtx.exec.exec({
       flow: refundPayment,
       input: { paymentId: prepared.payment.id, reason: "customer request" },
     })).rejects.toMatchObject({
       fault: { kind: "conflict", entity: "payment", from: "paired", attempted: "refund" },
     })
 
-    await ctx.close({ ok: false, error: new Error("refund window expired") })
-    await scope.dispose()
+    await managerCtx.exec.close({ ok: false, error: new Error("refund window expired") })
+    await managerCtx.scope.dispose()
 
-    const refundError = obsSink.events().find((event) => event.phase === "error" && event.name === "parking.refund-payment")
+    const refundError = managerCtx.sink!.events().find((event) => event.phase === "error" && event.name === "parking.refund-payment")
     expect(refundError).toBeDefined()
     expect((refundError?.error as { fault?: unknown } | undefined)?.fault).toMatchObject({
       kind: "conflict",

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { Cron } from "croner"
 import { jobRun, schedule } from "../tags"
 import { createAppScope } from "./app-scope"
-import type { Manifest, ManifestEntry } from "./manifest"
+import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 export interface JobsIo {
   onError(entry: ManifestEntry, error: unknown, mapped?: { status: number; body: unknown }): void
@@ -21,7 +21,7 @@ function resolveSchedule(entry: ManifestEntry): { cron: string } {
 }
 
 export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): JobsRunner {
-  const appConfig = manifest.app
+  const appConfig = normalizeApp(manifest.app)
   const onError =
     io?.onError ??
     ((entry: ManifestEntry, error: unknown) => {
@@ -37,7 +37,7 @@ export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): Jo
   async function tick(entry: ManifestEntry): Promise<void> {
     const tags: Lite.Tagged<any>[] = [
       jobRun({ job: entry.name, tickId: randomUUID() }),
-      ...(appConfig?.context?.() ?? []),
+      ...appConfig.context(),
     ]
     const context = appScope.createContext({ tags })
 
@@ -46,7 +46,7 @@ export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): Jo
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      onError(entry, error, appConfig?.mapError?.(error))
+      onError(entry, error, appConfig.mapError?.(error))
     }
   }
 

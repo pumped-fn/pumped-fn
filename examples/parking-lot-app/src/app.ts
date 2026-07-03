@@ -1,16 +1,7 @@
-import { FlowFault } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import type { pumped } from "@pumped-fn/pumped"
-import { actor, dbPath, NotFoundError, type Actor, type Fault, type Role } from "@pumped-fn/parking-lot-shared"
-
-const faultStatus = { forbidden: 403, conflict: 409, "not-found": 404, unavailable: 409 } satisfies Record<Fault["kind"], number>
-
-function mapError(error: unknown): { status: number; body: unknown } | undefined {
-  if (error instanceof FlowFault) return { status: faultStatus[(error.fault as Fault).kind], body: error.fault }
-  if (error instanceof NotFoundError) return { status: 404, body: { kind: "not-found", entity: error.entity, id: error.id } }
-  return undefined
-}
+import { actor, dbPath, mapError, type Actor, type Role } from "@pumped-fn/parking-lot-shared"
 
 const logSink = logging.memory()
 const obsSink = observable.memory()

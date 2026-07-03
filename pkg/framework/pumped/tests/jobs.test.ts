@@ -2,15 +2,14 @@ import { flow } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { runJobs } from "../src/runtime/jobs"
 import { jobRun, schedule } from "../src/tags"
-import type { Manifest, ManifestEntry } from "../src/runtime/manifest"
+import { entry as manifestEntry, manifest } from "./helpers"
 
 describe("runJobs", () => {
   it("throws a startup error naming the entry when a jobs flow is missing a schedule tag", () => {
     const sweep = flow({ factory: () => undefined })
-    const entry: ManifestEntry = { kind: "jobs", name: "nightly-sweep", file: "virtual", flow: sweep }
-    const manifest: Manifest = { app: undefined, entries: [entry] }
+    const entry = manifestEntry("jobs", "nightly-sweep", sweep)
 
-    expect(() => runJobs(manifest)).toThrow(/nightly-sweep/)
+    expect(() => runJobs(manifest(undefined, entry))).toThrow(/nightly-sweep/)
   })
 
   it("runs a tick through a fresh context and reports ok", async () => {
@@ -22,10 +21,9 @@ describe("runJobs", () => {
         return { swept: true }
       },
     })
-    const entry: ManifestEntry = { kind: "jobs", name: "nightly-sweep", file: "virtual", flow: sweep }
-    const manifest: Manifest = { app: undefined, entries: [entry] }
+    const entry = manifestEntry("jobs", "nightly-sweep", sweep)
 
-    const runner = runJobs(manifest)
+    const runner = runJobs(manifest(undefined, entry))
     await runner.tick(entry)
     await runner.tick(entry)
     await runner.stop()
@@ -40,11 +38,10 @@ describe("runJobs", () => {
         throw new Error("boom")
       },
     })
-    const entry: ManifestEntry = { kind: "jobs", name: "boom", file: "virtual", flow: boom }
-    const manifest: Manifest = { app: undefined, entries: [entry] }
+    const entry = manifestEntry("jobs", "boom", boom)
 
     const errors: unknown[] = []
-    const runner = runJobs(manifest, { onError: (entry, error) => errors.push([entry.name, error]) })
+    const runner = runJobs(manifest(undefined, entry), { onError: (entry, error) => errors.push([entry.name, error]) })
     await runner.tick(entry)
     await runner.stop()
 
@@ -62,10 +59,9 @@ describe("runJobs", () => {
         return { swept: true }
       },
     })
-    const entry: ManifestEntry = { kind: "jobs", name: "nightly-sweep", file: "virtual", flow: sweep }
-    const manifest: Manifest = { app: undefined, entries: [entry] }
+    const entry = manifestEntry("jobs", "nightly-sweep", sweep)
 
-    const runner = runJobs(manifest)
+    const runner = runJobs(manifest(undefined, entry))
     await runner.tick(entry)
     await runner.tick(entry)
     await runner.stop()
@@ -84,14 +80,14 @@ describe("runJobs", () => {
         throw new Conflict("boom")
       },
     })
-    const entry: ManifestEntry = { kind: "jobs", name: "boom", file: "virtual", flow: boom }
-    const manifest: Manifest = {
-      app: { mapError: (error) => (error instanceof Conflict ? { status: 409, body: { kind: "conflict" } } : undefined) },
-      entries: [entry],
-    }
+    const entry = manifestEntry("jobs", "boom", boom)
+    const withMapError = manifest(
+      { mapError: (error) => (error instanceof Conflict ? { status: 409, body: { kind: "conflict" } } : undefined) },
+      entry
+    )
 
     const seen: unknown[] = []
-    const runner = runJobs(manifest, { onError: (entry, error, mapped) => seen.push([entry.name, error, mapped]) })
+    const runner = runJobs(withMapError, { onError: (entry, error, mapped) => seen.push([entry.name, error, mapped]) })
     await runner.tick(entry)
     await runner.stop()
 

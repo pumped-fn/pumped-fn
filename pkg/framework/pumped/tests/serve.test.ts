@@ -2,7 +2,7 @@ import { atom, flow, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { createServer } from "../src/runtime/serve"
 import { route } from "../src/tags"
-import type { Manifest } from "../src/runtime/manifest"
+import { entry, manifest } from "./helpers"
 
 const counter = atom({ factory: () => ({ value: 0 }) })
 
@@ -48,15 +48,9 @@ const unmapped = flow({
 
 describe("createServer", () => {
   it("binds server entries with filename defaults and executes flows through the scope", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [
-        { kind: "server", name: "increment", file: "virtual", flow: increment },
-        { kind: "server", name: "lots", file: "virtual", flow: getLots },
-      ],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(
+      manifest(undefined, entry("server", "increment", increment), entry("server", "lots", getLots))
+    )
 
     const first = await app.request("/increment", {
       method: "POST",
@@ -78,12 +72,7 @@ describe("createServer", () => {
   })
 
   it("coerces repeated GET query keys into arrays while leaving single keys as strings, without type coercion", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "server", name: "echo", file: "virtual", flow: echoQuery }],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(manifest(undefined, entry("server", "echo", echoQuery)))
 
     const response = await app.request("/echo?a=1&a=2&b=x")
     expect(await response.json()).toEqual({ received: { a: ["1", "2"], b: "x" } })
@@ -92,12 +81,7 @@ describe("createServer", () => {
   })
 
   it("treats an empty non-GET body as undefined input", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "server", name: "echo-body", file: "virtual", flow: echoBody }],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(manifest(undefined, entry("server", "echo-body", echoBody)))
 
     const response = await app.request("/echo-body", { method: "POST" })
     expect(response.status).toBe(200)
@@ -107,12 +91,7 @@ describe("createServer", () => {
   })
 
   it("responds 400 with a clear message for an invalid JSON non-GET body instead of a raw 500", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "server", name: "echo-body", file: "virtual", flow: echoBody }],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(manifest(undefined, entry("server", "echo-body", echoBody)))
 
     const response = await app.request("/echo-body", {
       method: "POST",
@@ -126,14 +105,12 @@ describe("createServer", () => {
   })
 
   it("consults appConfig.mapError and returns the mapped status and body instead of a raw 500", async () => {
-    const manifest: Manifest = {
-      app: {
-        mapError: (error) => (error instanceof Forbidden ? { status: 403, body: { kind: "forbidden" } } : undefined),
-      },
-      entries: [{ kind: "server", name: "guarded", file: "virtual", flow: guarded }],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(
+      manifest(
+        { mapError: (error) => (error instanceof Forbidden ? { status: 403, body: { kind: "forbidden" } } : undefined) },
+        entry("server", "guarded", guarded)
+      )
+    )
 
     const response = await app.request("/guarded", { method: "POST" })
     expect(response.status).toBe(403)
@@ -143,12 +120,7 @@ describe("createServer", () => {
   })
 
   it("falls through to the current 500 path when mapError returns undefined", async () => {
-    const manifest: Manifest = {
-      app: { mapError: () => undefined },
-      entries: [{ kind: "server", name: "unmapped", file: "virtual", flow: unmapped }],
-    }
-
-    const { app, scope } = createServer(manifest)
+    const { app, scope } = createServer(manifest({ mapError: () => undefined }, entry("server", "unmapped", unmapped)))
 
     const response = await app.request("/unmapped", { method: "POST" })
     expect(response.status).toBe(500)

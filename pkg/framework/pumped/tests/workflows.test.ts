@@ -2,7 +2,7 @@ import { flow } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { runWorkflows } from "../src/runtime/workflows"
 import { workflowRun } from "../src/tags"
-import type { Manifest } from "../src/runtime/manifest"
+import { entry, manifest } from "./helpers"
 
 describe("runWorkflows", () => {
   it("runs each workflows entry once in its own context tagged with workflowRun", async () => {
@@ -13,12 +13,8 @@ describe("runWorkflows", () => {
         return { done: true }
       },
     })
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "workflows", name: "onboarding", file: "virtual", flow: step }],
-    }
 
-    const runner = runWorkflows(manifest)
+    const runner = runWorkflows(manifest(undefined, entry("workflows", "onboarding", step)))
     await runner.stop()
 
     expect(seen).toHaveLength(1)
@@ -32,13 +28,11 @@ describe("runWorkflows", () => {
         throw new Error("boom")
       },
     })
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "workflows", name: "boom", file: "virtual", flow: boom }],
-    }
 
     const errors: unknown[] = []
-    const runner = runWorkflows(manifest, { onError: (entry, error) => errors.push([entry.name, error]) })
+    const runner = runWorkflows(manifest(undefined, entry("workflows", "boom", boom)), {
+      onError: (entry, error) => errors.push([entry.name, error]),
+    })
     await runner.stop()
 
     expect(errors).toHaveLength(1)
@@ -52,13 +46,13 @@ describe("runWorkflows", () => {
         throw new Conflict("boom")
       },
     })
-    const manifest: Manifest = {
-      app: { mapError: (error) => (error instanceof Conflict ? { status: 409, body: { kind: "conflict" } } : undefined) },
-      entries: [{ kind: "workflows", name: "boom", file: "virtual", flow: boom }],
-    }
+    const withMapError = manifest(
+      { mapError: (error) => (error instanceof Conflict ? { status: 409, body: { kind: "conflict" } } : undefined) },
+      entry("workflows", "boom", boom)
+    )
 
     const seen: unknown[] = []
-    const runner = runWorkflows(manifest, { onError: (entry, error, mapped) => seen.push([entry.name, error, mapped]) })
+    const runner = runWorkflows(withMapError, { onError: (entry, error, mapped) => seen.push([entry.name, error, mapped]) })
     await runner.stop()
 
     expect(seen).toEqual([["boom", expect.any(Conflict), { status: 409, body: { kind: "conflict" } }]])

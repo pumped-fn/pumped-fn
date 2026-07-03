@@ -1,9 +1,7 @@
-import { createScope, preset, type Lite } from "@pumped-fn/lite"
+import { preset, type Lite } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
 import {
-  actor,
   checkInVehicle,
-  clock,
   configureLot,
   createMemoryStore,
   openDispute,
@@ -14,6 +12,7 @@ import {
   type Actor,
   type ParkingStore,
 } from "../src"
+import { parking } from "./harness"
 
 const manager: Actor = { id: "manager-1", role: "manager" }
 const operator: Actor = { id: "operator-1", role: "operator" }
@@ -26,11 +25,7 @@ async function exec<T>(
   iso: string,
   fn: (ctx: Lite.ExecutionContext) => Promise<T>
 ): Promise<T> {
-  const scope = createScope({
-    presets: [preset(store, backing), preset(clock, () => iso)],
-    tags: [actor(who)],
-  })
-  const ctx = scope.createContext()
+  const { scope, exec: ctx } = parking({ at: iso, as: who, presets: [preset(store, backing)] })
   try {
     return await fn(ctx)
   } finally {

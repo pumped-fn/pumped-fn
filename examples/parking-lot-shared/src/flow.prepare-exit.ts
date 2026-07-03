@@ -1,10 +1,9 @@
-import { flow, typed, type Lite } from "@pumped-fn/lite"
+import { flow, typed } from "@pumped-fn/lite"
 import type { ParkingSession, Payment } from "./model"
 import { tx } from "./resource.tx"
 import { completeBooking } from "./flow.complete-booking"
-import { allow } from "./flow.rule.allow"
+import { allow, type ConflictOrAllowFault } from "./flow.rule.allow"
 import { amountDue } from "./flow.rule.amount-due"
-import type { Fault } from "./error"
 
 export interface PrepareExitInput {
   sessionId: string
@@ -13,7 +12,7 @@ export interface PrepareExitInput {
 export const prepareExit = flow({
   name: "parking.prepare-exit",
   parse: typed<PrepareExitInput>(),
-  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
+  faults: typed<ConflictOrAllowFault>(),
   deps: { tx, allow, amountDue, completeBooking },
   factory: async (ctx, { tx, allow, amountDue, completeBooking }): Promise<{ payment: Payment; session: ParkingSession }> => {
     await allow.exec({ input: { action: "prepare exit", roles: ["operator"] } })

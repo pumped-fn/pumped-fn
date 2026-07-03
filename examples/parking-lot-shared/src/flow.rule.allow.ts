@@ -1,7 +1,7 @@
-import { flow, tags, typed } from "@pumped-fn/lite"
+import { flow, tags, typed, type Lite } from "@pumped-fn/lite"
 import type { Role } from "./model"
 import { actor, rule } from "./tags"
-import type { Fault } from "./error"
+import type { Conflict, Forbidden } from "./error"
 
 export interface AllowInput {
   action: string
@@ -11,7 +11,7 @@ export interface AllowInput {
 export const allow = flow({
   name: "parking.rule.allow",
   parse: typed<AllowInput>(),
-  faults: typed<Extract<Fault, { kind: "forbidden" }>>(),
+  faults: typed<Forbidden>(),
   deps: { actor: tags.required(actor) },
   tags: [rule({ name: "allow" })],
   factory: (ctx, { actor }): void => {
@@ -20,3 +20,13 @@ export const allow = flow({
     }
   },
 })
+
+/**
+ * The compound fault union repeated across flows that call `allow` and only
+ * fail with `conflict` themselves: replaces the hand-written
+ * `Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>`.
+ * Lives here (next to `allow`) rather than in error.ts, since error.ts must
+ * not import flow modules — putting it there would create an import cycle
+ * (error.ts -> flow.rule.allow.ts -> error.ts).
+ */
+export type ConflictOrAllowFault = Conflict | Lite.Utils.FaultsOf<typeof allow>

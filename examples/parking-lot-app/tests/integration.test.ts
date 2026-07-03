@@ -1,4 +1,4 @@
-import { controller, flow, preset, typed } from "@pumped-fn/lite"
+import { preset } from "@pumped-fn/lite"
 import { pumped } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
 import {
@@ -11,22 +11,16 @@ import {
   listReceipts,
   readReport,
   store,
-  type ListReceiptsInput,
 } from "@pumped-fn/parking-lot-shared"
 
-const receipts = flow({
+const receipts = pumped.entry(listReceipts, {
   name: "receipts",
-  parse: typed<ListReceiptsInput>(),
   tags: [pumped.route({ method: "GET" })],
-  deps: { run: controller(listReceipts) },
-  factory: (ctx, { run }) => run.exec({ input: ctx.input }),
 })
 
-const expireBookingsJob = flow({
+const expireBookingsJob = pumped.entry(expireBookings, {
   name: "expire-bookings",
   tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-  deps: { run: controller(expireBookings) },
-  factory: (_ctx, { run }) => run.exec({ input: {} }),
 })
 
 function manifest(fixedClock: { value: string }): pumped.Manifest {

@@ -2,7 +2,7 @@ import { flow, typed } from "@pumped-fn/lite"
 import type { Lot } from "./model"
 import { overlaps, parkedCount } from "./rules"
 import { store } from "./atom.store"
-import type { Fault } from "./error"
+import type { Unavailable } from "./error"
 import { rule } from "./tags"
 
 export interface AssertCapacityInput {
@@ -14,7 +14,7 @@ export interface AssertCapacityInput {
 export const assertCapacity = flow({
   name: "parking.rule.assert-capacity",
   parse: typed<AssertCapacityInput>(),
-  faults: typed<Extract<Fault, { kind: "unavailable" }>>(),
+  faults: typed<Unavailable>(),
   deps: { store },
   tags: [rule({ name: "assert-capacity" })],
   factory: (ctx, { store }): void => {

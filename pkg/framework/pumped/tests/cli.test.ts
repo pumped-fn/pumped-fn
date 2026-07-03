@@ -2,7 +2,7 @@ import { flow, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { runCli } from "../src/runtime/cli"
 import { command } from "../src/tags"
-import type { Manifest } from "../src/runtime/manifest"
+import { entry, manifest } from "./helpers"
 
 const greet = flow({
   parse: typed<{ name: string }>(),
@@ -50,13 +50,8 @@ function mapError(error: unknown): { status: number; body: unknown } | undefined
 
 describe("runCli", () => {
   it("runs a matched command with --json input and prints the output", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "cli", name: "greet", file: "virtual", flow: greet }],
-    }
-
     const lines: string[] = []
-    await runCli(manifest, ["greet", "--json", JSON.stringify({ name: "ada" })], {
+    await runCli(manifest(undefined, entry("cli", "greet", greet)), ["greet", "--json", JSON.stringify({ name: "ada" })], {
       out: (line) => lines.push(line),
       err: () => {},
     })
@@ -65,15 +60,10 @@ describe("runCli", () => {
   })
 
   it("closes with ok:false and sets exitCode on flow failure", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "cli", name: "boom", file: "virtual", flow: boom }],
-    }
-
     const errors: string[] = []
     const originalExitCode = process.exitCode
 
-    await runCli(manifest, ["boom"], { out: () => {}, err: (line) => errors.push(line) })
+    await runCli(manifest(undefined, entry("cli", "boom", boom)), ["boom"], { out: () => {}, err: (line) => errors.push(line) })
 
     expect(process.exitCode).toBe(1)
     expect(errors).toEqual(["boom"])
@@ -82,16 +72,11 @@ describe("runCli", () => {
   })
 
   it("reports invalid --json input via err() and sets exitCode without creating a scope", async () => {
-    const manifest: Manifest = {
-      app: undefined,
-      entries: [{ kind: "cli", name: "greet", file: "virtual", flow: greet }],
-    }
-
     const lines: string[] = []
     const errors: string[] = []
     const originalExitCode = process.exitCode
 
-    await runCli(manifest, ["greet", "--json", "{not valid json"], {
+    await runCli(manifest(undefined, entry("cli", "greet", greet)), ["greet", "--json", "{not valid json"], {
       out: (line) => lines.push(line),
       err: (line) => errors.push(line),
     })
@@ -109,15 +94,10 @@ describe("runCli", () => {
     ["conflict", conflict, { kind: "conflict" }, 4],
     ["not-found", notFound, { kind: "not-found" }, 5],
   ] as const)("maps a %s failure to the mapped body and derived exit code", async (name, mappedFlow, body, exitCode) => {
-    const manifest: Manifest = {
-      app: { mapError },
-      entries: [{ kind: "cli", name, file: "virtual", flow: mappedFlow }],
-    }
-
     const errors: string[] = []
     const originalExitCode = process.exitCode
 
-    await runCli(manifest, [name], { out: () => {}, err: (line) => errors.push(line) })
+    await runCli(manifest({ mapError }, entry("cli", name, mappedFlow)), [name], { out: () => {}, err: (line) => errors.push(line) })
 
     expect(errors).toEqual([JSON.stringify(body)])
     expect(process.exitCode).toBe(exitCode)
@@ -126,15 +106,13 @@ describe("runCli", () => {
   })
 
   it("keeps the unmapped path (raw message, exit code 1) when mapError returns undefined", async () => {
-    const manifest: Manifest = {
-      app: { mapError: () => undefined },
-      entries: [{ kind: "cli", name: "boom", file: "virtual", flow: boom }],
-    }
-
     const errors: string[] = []
     const originalExitCode = process.exitCode
 
-    await runCli(manifest, ["boom"], { out: () => {}, err: (line) => errors.push(line) })
+    await runCli(manifest({ mapError: () => undefined }, entry("cli", "boom", boom)), ["boom"], {
+      out: () => {},
+      err: (line) => errors.push(line),
+    })
 
     expect(errors).toEqual(["boom"])
     expect(process.exitCode).toBe(1)

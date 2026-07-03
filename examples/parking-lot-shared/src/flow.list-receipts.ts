@@ -1,7 +1,7 @@
 import { flow, typed } from "@pumped-fn/lite"
 import type { Receipt } from "./model"
 import { tx } from "./resource.tx"
-import type { Fault } from "./error"
+import type { Forbidden } from "./error"
 
 export interface ListReceiptsInput {
   userId?: string
@@ -10,7 +10,7 @@ export interface ListReceiptsInput {
 export const listReceipts = flow({
   name: "parking.list-receipts",
   parse: typed<ListReceiptsInput>(),
-  faults: typed<Extract<Fault, { kind: "forbidden" }>>(),
+  faults: typed<Forbidden>(),
   deps: { tx },
   factory: (ctx, { tx }): Receipt[] => {
     const requestedUser = ctx.input.userId ?? tx.actor.id

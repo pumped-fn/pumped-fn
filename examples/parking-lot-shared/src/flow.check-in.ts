@@ -4,7 +4,7 @@ import { tx } from "./resource.tx"
 import { normalizePlate } from "./rules"
 import { allow } from "./flow.rule.allow"
 import { assertDriveUpCapacity } from "./flow.rule.assert-drive-up-capacity"
-import type { Fault } from "./error"
+import type { Conflict } from "./error"
 
 export interface CheckInVehicleInput {
   lotId: string
@@ -43,7 +43,7 @@ export const checkInBooking = flow({
   name: "parking.check-in-booking",
   parse: typed<CheckInBookingInput>(),
   faults: typed<
-    | Extract<Fault, { kind: "conflict" }>
+    | Conflict
     | Lite.Utils.FaultsOf<typeof allow>
     | Lite.Utils.FaultsOf<typeof assertDriveUpCapacity>
   >(),
