@@ -45,6 +45,12 @@ interface Scheduler.Backend {
   - `catchUp` — `inProcess` has no persistence to catch up *from*, so only `"skip"` is accepted;
     `"last"`/`"all"` throw immediately from `register()` pointing at "a durable backend".
 
+## Backends
+
+- `@pumped-fn/lite-extension-scheduler-nats` — a distributed backend built on NATS JetStream KV:
+  exactly-once ticks across instances via KV `create`, `catchUp` derived from a `last:` key, and a
+  run history/audit trail in the KV itself.
+
 ## Example
 
 ```ts

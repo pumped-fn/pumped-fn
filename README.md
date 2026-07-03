@@ -54,6 +54,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
 | `pkg/ext/scheduler` | `@pumped-fn/lite-extension-scheduler` | Recurring schedule() atom against a pluggable SchedulerBackend, with an in-process croner-based default |
+| `pkg/ext/scheduler-nats` | `@pumped-fn/lite-extension-scheduler-nats` | NATS JetStream KV distributed backend for the scheduler: exactly-once locking, catch-up, and run history |
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
 | `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
