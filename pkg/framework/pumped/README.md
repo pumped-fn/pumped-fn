@@ -95,6 +95,32 @@ export default flow({
 })
 ```
 
+### Reusing shared flows at the edge
+
+Sometimes a domain flow that already lives in a shared package needs an edge tag attached — a
+`src/jobs/*.ts` entry needs `pumped.schedule(...)`, a `src/server/*.ts` entry needs `pumped.route(...)`.
+Don't object-spread the handle (`{ ...sharedFlow, tags: [...(sharedFlow.tags ?? []), pumped.schedule(...)] }`)
+— spreading forks the flow's node identity, so presets targeting the original shared flow silently
+miss the copy, and it blindly copies whatever fields the handle happens to have. Instead, wrap the
+shared flow in a thin entry flow that depends on it through `controller` and executes it:
+
+```ts
+// src/jobs/expire-bookings.ts
+import { controller, flow } from "@pumped-fn/lite"
+import { expireBookings } from "@pumped-fn/parking-lot-shared"
+import { pumped } from "@pumped-fn/pumped"
+
+export default flow({
+  name: "expire-bookings",
+  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
+  deps: { run: controller(expireBookings) },
+  factory: (_ctx, { run }) => run.exec({ input: {} }),
+})
+```
+
+The wrapper is its own graph node with its own tags; the shared flow keeps its original identity, so
+presets and substitutes targeting it keep working from every entry point that reuses it.
+
 ### Workflow tag
 
 `pumped.workflowRun` is a lightweight `{ taskId, runId }` tag the framework defines itself, so the

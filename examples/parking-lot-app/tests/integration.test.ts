@@ -1,4 +1,4 @@
-import { preset } from "@pumped-fn/lite"
+import { controller, flow, preset, typed } from "@pumped-fn/lite"
 import { pumped } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
 import {
@@ -11,7 +11,23 @@ import {
   listReceipts,
   readReport,
   store,
+  type ListReceiptsInput,
 } from "@pumped-fn/parking-lot-shared"
+
+const receipts = flow({
+  name: "receipts",
+  parse: typed<ListReceiptsInput>(),
+  tags: [pumped.route({ method: "GET" })],
+  deps: { run: controller(listReceipts) },
+  factory: (ctx, { run }) => run.exec({ input: ctx.input }),
+})
+
+const expireBookingsJob = flow({
+  name: "expire-bookings",
+  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
+  deps: { run: controller(expireBookings) },
+  factory: (_ctx, { run }) => run.exec({ input: {} }),
+})
 
 function manifest(fixedClock: { value: string }): pumped.Manifest {
   return {
@@ -26,19 +42,9 @@ function manifest(fixedClock: { value: string }): pumped.Manifest {
     entries: [
       { kind: "server", name: "lots", file: "virtual", flow: configureLot },
       { kind: "server", name: "bookings", file: "virtual", flow: bookSpace },
-      {
-        kind: "server",
-        name: "receipts",
-        file: "virtual",
-        flow: { ...listReceipts, tags: [...(listReceipts.tags ?? []), pumped.route({ method: "GET" })] },
-      },
+      { kind: "server", name: "receipts", file: "virtual", flow: receipts },
       { kind: "server", name: "reports", file: "virtual", flow: readReport },
-      {
-        kind: "jobs",
-        name: "expire-bookings",
-        file: "virtual",
-        flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
-      },
+      { kind: "jobs", name: "expire-bookings", file: "virtual", flow: expireBookingsJob },
     ],
   }
 }
@@ -80,12 +86,7 @@ describe("parking lot app composition", () => {
     expect(booking.status).toBe("held")
 
     fixedClock.value = "2026-07-01T09:20:00.000Z"
-    await jobs.tick({
-      kind: "jobs",
-      name: "expire-bookings",
-      file: "virtual",
-      flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
-    })
+    await jobs.tick({ kind: "jobs", name: "expire-bookings", file: "virtual", flow: expireBookingsJob })
 
     const receiptsRes = await honoApp.request(`/receipts?userId=${encodeURIComponent(booking.userId)}`)
     expect(receiptsRes.status).toBe(200)

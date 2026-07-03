@@ -775,4 +775,57 @@ describe("lite lint scanner", () => {
       "pumped/no-ambient-io-outside-boundary",
     ])
   })
+
+  it("finds handle spreads that retrofit a tags property onto a same-file creator result", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const expireBookings = flow({ name: "expire", factory: () => "ok" })
+
+      export default {
+        ...expireBookings,
+        tags: [],
+      }
+    `)).toEqual(["pumped/no-handle-spread"])
+  })
+
+  it("finds handle spreads retrofitting tags onto an imported flow handle", () => {
+    expect(ids(`
+      import { expireBookings } from "./shared"
+
+      export default {
+        ...expireBookings,
+        tags: [...(expireBookings.tags ?? []), { kind: "schedule" }],
+      }
+    `)).toEqual(["pumped/no-handle-spread"])
+  })
+
+  it("finds a bare spread of a same-file creator result even without a tags property", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: () => ({}) })
+
+      const copy = { ...store }
+    `)).toEqual(["pumped/no-handle-spread"])
+  })
+
+  it("allows plain data object spreads with no tags property and no local creator handle", () => {
+    expect(ids(`
+      const base = { a: 1, b: 2 }
+      const merged = { ...base, c: 3 }
+    `)).toEqual([])
+  })
+
+  it("allows plain data object spreads that happen to also set unrelated fields", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const defaults = { timeout: 100 }
+
+      const config = { ...defaults, retries: 3 }
+
+      const job = flow({ name: "job", factory: () => "ok" })
+    `)).toEqual([])
+  })
 })
