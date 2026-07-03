@@ -41,7 +41,6 @@ export const p = pumped
 export namespace p {
   export type RouteMeta = pumped.RouteMeta
   export type CommandMeta = pumped.CommandMeta
-  export type ScheduleMeta = pumped.ScheduleMeta
   export type WorkflowRunMeta = pumped.WorkflowRunMeta
   export type JobRunMeta = pumped.JobRunMeta
   export type Manifest = pumped.Manifest
@@ -55,7 +54,7 @@ export namespace p {
   export type WorkflowsRunner = pumped.WorkflowsRunner
 }
 
-export { route, command, schedule, workflowRun, jobRun }
+export { route, command, workflowRun, jobRun }
 export { createServer, createAppScope, runCli, runJobs, runWorkflows }
 export type { EntryDescriptor, EntryKind } from "./discover"
 export { discover } from "./discover"
