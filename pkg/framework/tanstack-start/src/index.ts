@@ -49,11 +49,11 @@ interface StartAdapter<Key extends string = typeof contextKey> {
     undefined
   >
   handler<Output>(
-    flow: Lite.Flow<Output, void>,
+    flow: Lite.Flow<Output, void, any>,
     runOptions?: Lite.FlowRunOptions
   ): (event: StartHandlerEvent<void, Key>) => Promise<Output>
   handler<Output, Input>(
-    flow: Lite.Flow<Output, Input>,
+    flow: Lite.Flow<Output, Input, any>,
     runOptions?: Lite.FlowRunOptions
   ): (event: StartHandlerEvent<Input, Key>) => Promise<Output>
 }
@@ -119,21 +119,21 @@ function bindAdapter<const Key extends string>(key: Key): StartAdapter<Key> & Li
   function handler<
     Output
   >(
-    flow: Lite.Flow<Output, void>,
+    flow: Lite.Flow<Output, void, any>,
     runOptions?: Lite.FlowRunOptions
   ): (event: StartHandlerEvent<void, Key>) => Promise<Output>
   function handler<
     Output,
     Input
   >(
-    flow: Lite.Flow<Output, Input>,
+    flow: Lite.Flow<Output, Input, any>,
     runOptions?: Lite.FlowRunOptions
   ): (event: StartHandlerEvent<Input, Key>) => Promise<Output>
   function handler<
     Output,
     Input
   >(
-    flow: Lite.Flow<Output, Input>,
+    flow: Lite.Flow<Output, Input, any>,
     runOptions?: Lite.FlowRunOptions
   ) {
     return (event: StartHandlerEvent<Input, Key>) =>

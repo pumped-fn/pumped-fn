@@ -170,23 +170,23 @@ export function controller<T>(
 ): Lite.NonWatchResourceControllerDep<T>
 
 export function controller<TOutput, TInput>(
-  flow: Lite.Flow<TOutput, TInput>
+  flow: Lite.Flow<TOutput, TInput, any>
 ): Lite.FlowControllerDep<TOutput, TInput>
 
 export function controller<TOutput, TInput>(
-  flow: Lite.Flow<TOutput, TInput>,
+  flow: Lite.Flow<TOutput, TInput, any>,
   options: Lite.FlowControllerOptions<TInput>
 ): Lite.FlowControllerDep<TOutput, TInput>
 
 export function controller<T>(
-  target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any>,
+  target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any, any>,
   options?: Lite.ControllerDepOptions<T> | Lite.ResourceControllerDepOptions | Lite.FlowControllerOptions<any>
 ): Lite.ControllerDep<T> {
   if ((target as unknown as Record<symbol, unknown>)[flowSymbol] === true) {
     const flowOptions = options as Lite.FlowControllerOptions<any> | undefined
     return {
       [controllerDepSymbol]: true,
-      flow: target as Lite.Flow<any, any>,
+      flow: target as Lite.Flow<any, any, any>,
       name: flowOptions?.name,
       tags: flowOptions?.tags,
       key: flowOptions?.key,
