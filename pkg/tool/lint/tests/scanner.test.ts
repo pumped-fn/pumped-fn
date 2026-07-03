@@ -574,6 +574,198 @@ describe("lite lint scanner", () => {
     expect(nakedGlobal?.severity).toBe("error")
   })
 
+  it("finds untyped throws inside atom/flow/resource factories", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new Error("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: () => {
+          throw new TypeError("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+
+    expect(ids(`
+      import { flow, typed } from "@pumped-fn/lite"
+
+      export const save = flow({
+        name: "save",
+        parse: typed<{ key: string }>(),
+        factory: () => {
+          throw new RangeError("bad")
+        },
+      })
+    `)).toEqual(["pumped/no-untyped-throw"])
+  })
+
+  it("allows typed domain errors, rethrows, and non-factory throws", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      class StoreError extends Error {}
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new StoreError("bad")
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw error
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      throw new Error("outside a factory")
+    `)).toEqual([])
+  })
+
+  it("allows builtin throws via allowBuiltins config", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          throw new TypeError("bad")
+        },
+      })
+    `, "src/example.ts", { rules: { "pumped/no-untyped-throw": { allowBuiltins: ["TypeError"] } } })).toEqual([])
+  })
+
+  it("finds swallowed errors inside factory catch clauses", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch {
+            return null
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            console.log("ignored")
+          }
+        },
+      })
+    `)).toEqual(["pumped/no-swallowed-error"])
+  })
+
+  it("allows factory catch clauses that rethrow, wrap with cause, or otherwise reference the error", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw error
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      class StoreError extends Error {}
+
+      const store = atom({
+        name: "store",
+        factory: () => {
+          try {
+            return risky()
+          } catch (error) {
+            throw new StoreError("wrapped", error)
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom, controller } from "@pumped-fn/lite"
+
+      const logger = atom({ name: "logger", factory: () => console })
+
+      const store = atom({
+        name: "store",
+        deps: { logger },
+        factory: (ctx, { logger }) => {
+          try {
+            return risky()
+          } catch (error) {
+            logger.error(error)
+            return null
+          }
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      const value = (() => {
+        try {
+          return risky()
+        } catch (error) {
+        }
+      })()
+    `)).toEqual([])
+  })
+
   it("silences a rule entirely via severity: off", () => {
     expect(ids(`
       import { atom } from "@pumped-fn/lite"

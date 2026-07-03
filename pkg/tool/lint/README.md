@@ -40,6 +40,8 @@ pnpm lint
 | `pumped/no-naked-globals` (warn) | `Date.now()`, `new Date()`, `Math.random()`, `process.env`, `fetch`, `setTimeout`/`setInterval`, and `fs`/`child_process`/`node:*` builtin usage inside atom/flow/resource factory bodies; wrap the global in an adapter atom/resource or a tag. |
 | `pumped/no-module-state` (warn) | Module-level `let` declarations, and module-level mutable object/array/Map/Set literals that are exported unfrozen or closed over by a factory, in files that also define atom/flow/resource units. |
 | `pumped/prefer-destructured-deps` (warn) | Atom/flow/resource/tag factories whose second (deps) parameter is a plain identifier read via member access (e.g. `deps.store`); destructure it in the signature instead (`factory: (ctx, { store }) => ...`). |
+| `pumped/no-untyped-throw` (warn) | `throw new Error(...)` and other builtin error constructors (`TypeError`, `RangeError`, etc.) inside atom/flow/resource factories; throw a domain error class carrying structured fields (kind/op/entity) so traces and edges can discriminate planned vs unplanned failures. Rethrow of a caught identifier (`throw error`) and user-defined error classes both pass. |
+| `pumped/no-swallowed-error` (warn) | Catch clauses inside atom/flow/resource factories that neither rethrow nor reference the caught error (empty catch bodies, `catch {}` with no throw, or bodies that discard the binding); swallowing the error here blinds the trace seam. Wrapping with a cause (`throw new StoreError(msg, error)`), rethrowing, or passing the error to a dep (e.g. logging) all pass. |
 
 The default path walk skips `before.*` example files, generated output, lockfiles, and dependency
 directories where examples intentionally contain bad shapes or third-party code.
@@ -49,7 +51,8 @@ directories where examples intentionally contain bad shapes or third-party code.
 Every diagnostic carries a `severity` of `"error"` or `"warn"`. The CLI exits nonzero only when at
 least one `"error"` diagnostic is found; `"warn"` diagnostics still print (and show up in `--json`
 output) but never fail the process. `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`,
-`pumped/no-module-state`, and `pumped/prefer-destructured-deps` default to `"warn"` because root `pnpm lint` only scans docs and the
+`pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, and
+`pumped/no-swallowed-error` default to `"warn"` because root `pnpm lint` only scans docs and the
 practical example packages today (not the whole monorepo), and turning them into hard failures for
 every existing example in one pass isn't the goal of adding them — treat their output as an
 inventory to clean up incrementally. All other rules default to `"error"`, matching current
@@ -75,6 +78,8 @@ const result = await scanPaths(["src", "tests"], {
 `"setTimeout"`, `"setInterval"`, or a builtin module specifier like `"node:fs"`) that are exempt from
 `no-naked-globals`; it is merged with a small built-in allowlist of already-safe statics
 (`JSON`, `Math`, `Object`, `Array`, `String`, `Number`, `structuredClone`, `URL`).
+`allowBuiltins` lists builtin error constructor names (e.g. `"TypeError"`) that are exempt from
+`no-untyped-throw`; empty by default.
 
 ## API
 

@@ -19,7 +19,9 @@ export type RuleId =
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
   | "pumped/no-shared-scope-factory"
+  | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
 
 export type Severity = "error" | "warn"
@@ -42,21 +44,24 @@ export interface ScanResult {
  * Per-rule config. Rules with no config accept no key. `allowImplicit` and
  * `allowGlobals` list identifiers that are exempt from their rule's checks
  * (tag labels for no-implicit-tag-read, global names for no-naked-globals).
- * `severity` overrides a rule's default severity ("error", "warn", or "off"
- * to disable it entirely). Four dependency-graph rules — no-implicit-tag-read,
- * no-naked-globals, no-module-state, and prefer-destructured-deps — default
- * to "warn" severity (see `defaultSeverity`) so they surface in `--json`
- * output and local runs without failing the root `pnpm lint` exit code,
- * which today only scans docs and practical examples rather than the whole
- * monorepo — a wide, unaudited sweep of those rules across every package
- * would produce noise no single PR could clean up in one pass. Projects
- * that want to enforce a rule as a hard failure can opt in via
- * `rules: { "<ruleId>": { severity: "error" } }`.
+ * `allowBuiltins` lists builtin error constructor names exempt from
+ * no-untyped-throw. `severity` overrides a rule's default severity ("error",
+ * "warn", or "off" to disable it entirely). Six dependency-graph and
+ * error-taxonomy rules — no-implicit-tag-read, no-naked-globals,
+ * no-module-state, prefer-destructured-deps, no-untyped-throw, and
+ * no-swallowed-error — default to "warn" severity (see `defaultSeverity`) so
+ * they surface in `--json` output and local runs without failing the root
+ * `pnpm lint` exit code, which today only scans docs and practical examples
+ * rather than the whole monorepo — a wide, unaudited sweep of those rules
+ * across every package would produce noise no single PR could clean up in
+ * one pass. Projects that want to enforce a rule as a hard failure can opt
+ * in via `rules: { "<ruleId>": { severity: "error" } }`.
  */
 export interface RuleConfig {
   severity?: Severity | "off"
   allowImplicit?: string[]
   allowGlobals?: string[]
+  allowBuiltins?: string[]
 }
 
 export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
@@ -71,7 +76,20 @@ const defaultSeverity: Partial<Record<RuleId, Severity>> = {
   "pumped/no-naked-globals": "warn",
   "pumped/no-module-state": "warn",
   "pumped/prefer-destructured-deps": "warn",
+  "pumped/no-untyped-throw": "warn",
+  "pumped/no-swallowed-error": "warn",
 }
+
+const builtinErrorNames = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "SyntaxError",
+  "ReferenceError",
+  "EvalError",
+  "URIError",
+  "AggregateError",
+])
 
 function severityOf(ruleId: RuleId): Severity {
   return defaultSeverity[ruleId] ?? "error"
@@ -503,6 +521,24 @@ function enclosingFlowFactory(node: ts.Node, imports: Imports): ts.PropertyAssig
   return null
 }
 
+function insideFactory(node: ts.Node, imports: Imports): boolean {
+  return enclosingUnitFactory(node, imports) !== null || enclosingFlowFactory(node, imports) !== null
+}
+
+function containsThrow(root: ts.Node): boolean {
+  let found = false
+  function walk(node: ts.Node): void {
+    if (found) return
+    if (ts.isThrowStatement(node)) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(root)
+  return found
+}
+
 function unitCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
   if (!isCreatorCall(node.expression, imports)) return null
   const config = node.arguments[0]
@@ -702,6 +738,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const localFlows = new Set<string>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
+  const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
   const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
   const hasGraphNodes = unitFactoryNodes.length > 0
 
@@ -1226,6 +1263,43 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           isExported
             ? `Module-level mutable container "${declaration.name.text}" is exported unfrozen; wrap it in Object.freeze(...) or own it inside a resource/atom instead.`
             : `Module-level mutable container "${declaration.name.text}" is closed over by a factory; own it inside a resource/atom or scope-owned context instead.`,
+        )
+      }
+    }
+
+    if (
+      ts.isThrowStatement(node)
+      && node.expression
+      && ts.isNewExpression(node.expression)
+      && ts.isIdentifier(node.expression.expression)
+      && builtinErrorNames.has(node.expression.expression.text)
+      && !allowBuiltins.has(node.expression.expression.text)
+      && insideFactory(node, imports)
+    ) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-untyped-throw",
+        node.expression,
+        `Throw a domain error class carrying structured fields (kind/op/entity) instead of bare "${node.expression.expression.text}"; typed errors let traces and edges discriminate planned vs unplanned failures.`,
+      )
+    }
+
+    if (ts.isCatchClause(node) && insideFactory(node, imports)) {
+      const bindingName = node.variableDeclaration && ts.isIdentifier(node.variableDeclaration.name)
+        ? node.variableDeclaration.name.text
+        : null
+      const rethrows = containsThrow(node.block)
+      const referencesBinding = bindingName !== null && collectIdentifierReferences(node.block).has(bindingName)
+      if (!rethrows && !referencesBinding) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-swallowed-error",
+          node,
+          "Catch clause neither rethrows nor references the caught error; swallowing it here blinds the trace seam at this graph node.",
         )
       }
     }
