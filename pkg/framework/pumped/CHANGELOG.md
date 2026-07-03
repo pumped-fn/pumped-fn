@@ -1,6 +1,6 @@
-# @pumped-fn/agent-sdk-just-bash
+# @pumped-fn/pumped
 
-## 1.2.0
+## 0.1.0
 
 ### Minor Changes
 
@@ -28,10 +28,6 @@
   runtime-primitive toolkit counterpart to pumped; agents/models are one
   primitive family. API unchanged.
 
-## 1.1.0
+### Patch Changes
 
-### Minor Changes
-
-- fb8329c: Ship the agent workflow surface over lite primitives.
-
-  Adds concise agent authoring helpers, workflow-backed turns, skills, tools, subagents, sessions, run inspection, Fetch request adapters, eval summaries, in-memory test runtime helpers, isolated Codex/Claude CLI model harnesses, lazy Codex/Claude provider packages, and a lazy just-bash sandbox provider package.
+- @pumped-fn/lite-hmr@1.0.1

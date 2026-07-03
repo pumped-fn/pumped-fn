@@ -1,5 +1,12 @@
 # @pumped-fn/lite-extension-logging-pino
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [80e17f0]
+  - @pumped-fn/lite-extension-logging@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
