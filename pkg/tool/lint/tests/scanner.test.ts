@@ -97,7 +97,9 @@ describe("lite lint scanner", () => {
       })
     `)).toEqual([
       "pumped/no-direct-flow-composition",
+      "pumped/prefer-destructured-deps",
       "pumped/no-direct-flow-composition",
+      "pumped/prefer-destructured-deps",
     ])
   })
 
@@ -410,6 +412,56 @@ describe("lite lint scanner", () => {
 
       const localOnly = { count: 0 }
       const store = atom({ name: "store", factory: () => 0 })
+    `)).toEqual([])
+  })
+
+  it("finds resource/flow factories reading deps via an identifier instead of destructuring", () => {
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: (ctx, deps) => deps.store,
+      })
+    `)).toEqual(["pumped/prefer-destructured-deps"])
+
+    expect(ids(`
+      import { flow, typed } from "@pumped-fn/lite"
+
+      export const save = flow({
+        name: "save",
+        parse: typed<{ key: string }>(),
+        factory: (ctx, deps) => deps.tx.save(ctx.input.key),
+      })
+    `)).toEqual(["pumped/prefer-destructured-deps"])
+  })
+
+  it("allows destructured deps params, no second param, and identifiers only passed through whole", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: (ctx, { config }) => config.retries })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ name: "store", factory: (ctx) => ctx.input })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      function forward(deps: unknown) {
+        return deps
+      }
+
+      const tx = resource({
+        name: "tx",
+        ownership: "current",
+        factory: (ctx, deps) => forward(deps),
+      })
     `)).toEqual([])
   })
 })

@@ -6,5 +6,5 @@ export default flow({
   name: "expire-bookings",
   tags: [pumped.schedule({ cron: "*/5 * * * *" })],
   deps: { report: controller(readReport) },
-  factory: (_ctx, deps) => deps.report.exec({ input: {} }),
+  factory: (_ctx, { report }) => report.exec({ input: {} }),
 })

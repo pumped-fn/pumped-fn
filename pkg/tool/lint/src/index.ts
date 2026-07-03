@@ -20,6 +20,7 @@ export type RuleId =
   | "pumped/no-scope-argument"
   | "pumped/no-shared-scope-factory"
   | "pumped/no-test-only-branches"
+  | "pumped/prefer-destructured-deps"
 
 export type Severity = "error" | "warn"
 
@@ -62,6 +63,7 @@ const defaultSeverity: Partial<Record<RuleId, Severity>> = {
   "pumped/no-implicit-tag-read": "warn",
   "pumped/no-naked-globals": "warn",
   "pumped/no-module-state": "warn",
+  "pumped/prefer-destructured-deps": "warn",
 }
 
 function severityOf(ruleId: RuleId): Severity {
@@ -565,6 +567,20 @@ function nakedGlobalName(node: ts.CallExpression | ts.NewExpression): string | n
   return null
 }
 
+function containsMemberRead(body: ts.Node, paramName: string): boolean {
+  let found = false
+  function walk(node: ts.Node): void {
+    if (found) return
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === paramName) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(body)
+  return found
+}
+
 function shouldScanAst(filePath: string): boolean {
   return isSourceFile(filePath)
 }
@@ -763,6 +779,25 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           node.expression,
           "Flows should compose child flows through deps: { child: controller(childFlow) } and child.exec(...).",
         )
+      }
+
+      const unitFactory = unitCallObject(node, imports)
+      const factoryProperty = unitFactory && objectProperty(unitFactory, "factory")
+      if (
+        factoryProperty
+        && (ts.isArrowFunction(factoryProperty.initializer) || ts.isFunctionExpression(factoryProperty.initializer))
+      ) {
+        const depsParam = factoryProperty.initializer.parameters[1]
+        if (depsParam && ts.isIdentifier(depsParam.name) && factoryProperty.initializer.body && containsMemberRead(factoryProperty.initializer.body, depsParam.name.text)) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/prefer-destructured-deps",
+            depsParam,
+            `Destructure the deps parameter in the factory signature (e.g. "factory: (ctx, { ${depsParam.name.text} }) => ...") instead of reading "${depsParam.name.text}.<field>" from an identifier param.`,
+          )
+        }
       }
 
       const unitConfig = enclosingUnitConfig(node, imports)

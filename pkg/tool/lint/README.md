@@ -39,6 +39,7 @@ pnpm lint
 | `pumped/no-implicit-tag-read` (warn) | `ctx.data.seekTag`/`getTag` reads for a tag not declared in the unit's `deps` (via `tags.required`/`tags.optional`/`tags.all`), and `scope.resolve(...)` calls inside factory bodies; declare the dependency instead. |
 | `pumped/no-naked-globals` (warn) | `Date.now()`, `new Date()`, `Math.random()`, `process.env`, `fetch`, `setTimeout`/`setInterval`, and `fs`/`child_process`/`node:*` builtin usage inside atom/flow/resource factory bodies; wrap the global in an adapter atom/resource or a tag. |
 | `pumped/no-module-state` (warn) | Module-level `let` declarations, and module-level mutable object/array/Map/Set literals that are exported unfrozen or closed over by a factory, in files that also define atom/flow/resource units. |
+| `pumped/prefer-destructured-deps` (warn) | Atom/flow/resource/tag factories whose second (deps) parameter is a plain identifier read via member access (e.g. `deps.store`); destructure it in the signature instead (`factory: (ctx, { store }) => ...`). |
 
 The default path walk skips `before.*` example files, generated output, lockfiles, and dependency
 directories where examples intentionally contain bad shapes or third-party code.
@@ -47,8 +48,8 @@ directories where examples intentionally contain bad shapes or third-party code.
 
 Every diagnostic carries a `severity` of `"error"` or `"warn"`. The CLI exits nonzero only when at
 least one `"error"` diagnostic is found; `"warn"` diagnostics still print (and show up in `--json`
-output) but never fail the process. `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, and
-`pumped/no-module-state` default to `"warn"` because root `pnpm lint` only scans docs and the
+output) but never fail the process. `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`,
+`pumped/no-module-state`, and `pumped/prefer-destructured-deps` default to `"warn"` because root `pnpm lint` only scans docs and the
 practical example packages today (not the whole monorepo), and turning them into hard failures for
 every existing example in one pass isn't the goal of adding them — treat their output as an
 inventory to clean up incrementally. All other rules default to `"error"`, matching current
