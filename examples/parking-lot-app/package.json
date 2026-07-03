@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "pumped dev",
-    "build": "pumped build --target all",
+    "build": "node ../../pkg/framework/pumped/dist/cli.mjs build --target all",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit"
