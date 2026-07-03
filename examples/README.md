@@ -20,6 +20,7 @@ surfaces for documented patterns, not publishing targets.
 | `parking-lot-shared/` | `@pumped-fn/parking-lot-shared` | Parking lot management business logic and persistence ports shared by every entrypoint. |
 | `parking-lot-cli/` | `@pumped-fn/parking-lot-cli` | CLI entrypoint over the parking lot management flows. |
 | `parking-lot-hono/` | `@pumped-fn/parking-lot-hono` | Hono API entrypoint over the parking lot management flows. |
+| `parking-lot-app/` | `@pumped-fn/parking-lot-app` | Convention-driven `@pumped-fn/app` entrypoint producing a CLI and HTTP server from one manifest over the parking lot management flows. |
 | `parking-lot-tanstack-start/` | `@pumped-fn/parking-lot-tanstack-start` | TanStack Start server-function entrypoint over the parking lot management flows. |
 | `parking-lot-spa/` | `@pumped-fn/parking-lot-spa` | Vite React SPA over the parking lot management flows and state. |
 | `agent-practical/` | `@pumped-fn/agent-practical` | Agent workflow examples. |

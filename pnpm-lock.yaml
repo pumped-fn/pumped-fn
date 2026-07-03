@@ -12,6 +12,9 @@ catalogs:
     '@changesets/cli':
       specifier: 2.31.0
       version: 2.31.0
+    '@hono/node-server':
+      specifier: 2.0.6
+      version: 2.0.6
     '@json-render/core':
       specifier: 0.19.0
       version: 0.19.0
@@ -69,6 +72,9 @@ catalogs:
     commander:
       specifier: 15.0.0
       version: 15.0.0
+    croner:
+      specifier: 10.0.1
+      version: 10.0.1
     estree-walker:
       specifier: 3.0.3
       version: 3.0.3
@@ -533,6 +539,43 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  examples/parking-lot-app:
+    dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.0.6(hono@4.12.27)
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../pkg/core/lite
+      '@pumped-fn/lite-hono':
+        specifier: workspace:*
+        version: link:../../pkg/framework/hono
+      '@pumped-fn/parking-lot-shared':
+        specifier: workspace:*
+        version: link:../parking-lot-shared
+      '@pumped-fn/pumped':
+        specifier: workspace:*
+        version: link:../../pkg/framework/pumped
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.27
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
@@ -1082,6 +1125,61 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260526.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.27
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/framework/pumped:
+    dependencies:
+      '@pumped-fn/lite-hmr':
+        specifier: workspace:*
+        version: link:../../ext/hmr
+      cac:
+        specifier: 'catalog:'
+        version: 7.0.0
+      croner:
+        specifier: 'catalog:'
+        version: 10.0.1
+    devDependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.0.6(hono@4.12.27)
+      '@pumped-fn/agent-sdk':
+        specifier: workspace:*
+        version: link:../../agent/core
+      '@pumped-fn/agent-sdk-test':
+        specifier: workspace:*
+        version: link:../../agent/test
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@pumped-fn/lite-hono':
+        specifier: workspace:*
+        version: link:../hono
+      '@types/estree':
+        specifier: 'catalog:'
+        version: 1.0.9
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260526.1
+      acorn:
+        specifier: 'catalog:'
+        version: 8.16.0
       hono:
         specifier: 'catalog:'
         version: 4.12.27
@@ -1828,6 +1926,12 @@ packages:
       '@noble/hashes':
         optional: true
 
+  '@hono/node-server@2.0.6':
+    resolution: {integrity: sha512-7DeRlKG57JDBNZ5Qj2jwVdgwQy4b0tLubRLl3zCf91/rCf9i7p1V5FtW/yWibm1uUHE493ts9ZXH/7g/LQWl+g==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4
+
   '@inquirer/external-editor@1.0.3':
     resolution: {integrity: sha512-RWbSrDiYmO4LbejWY7ttpxczuwQyZLBUyygsA9Nsv95hpzUWwnNTVQmAq3xuh7vNwCp07UTmE5i11XAEExx4RA==}
     engines: {node: '>=18'}
@@ -2535,6 +2639,10 @@ packages:
 
   cookie-es@3.1.1:
     resolution: {integrity: sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==}
+
+  croner@10.0.1:
+    resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
+    engines: {node: '>=18.0'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -3533,11 +3641,6 @@ packages:
 
   sql.js@1.14.1:
     resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
-
-  srvx@0.11.16:
-    resolution: {integrity: sha512-bp07zRuycfTY43IjAvvTFnmnJi8ikW0VFiHwOhhYcVW/L4xQ1XY4PAd4Nuum1rsA17C39zL7x+CDhrn5AL32Rw==}
-    engines: {node: '>=20.16.0'}
-    hasBin: true
 
   srvx@0.11.17:
     resolution: {integrity: sha512-43yM4luKfCJamyCMhrUeHUPOrf8TdZe7kN8s5zayZCH5OeprYqi49Aso5ZvHXR4aB+DHaRNO/diNFgZSMNG8Xw==}
@@ -4571,6 +4674,10 @@ snapshots:
   '@exodus/bytes@1.15.0':
     optional: true
 
+  '@hono/node-server@2.0.6(hono@4.12.27)':
+    dependencies:
+      hono: 4.12.27
+
   '@inquirer/external-editor@1.0.3(@types/node@25.9.1)':
     dependencies:
       chardet: 2.1.1
@@ -5325,6 +5432,8 @@ snapshots:
 
   cookie-es@3.1.1: {}
 
+  croner@10.0.1: {}
+
   cross-spawn@7.0.6:
     dependencies:
       path-key: 3.1.1
@@ -5578,7 +5687,7 @@ snapshots:
   h3@2.0.1-rc.20:
     dependencies:
       rou3: 0.8.1
-      srvx: 0.11.16
+      srvx: 0.11.17
 
   happy-dom@20.9.0:
     dependencies:
@@ -6277,8 +6386,6 @@ snapshots:
   sprintf-js@1.1.3: {}
 
   sql.js@1.14.1: {}
-
-  srvx@0.11.16: {}
 
   srvx@0.11.17: {}
 

@@ -1,0 +1,27 @@
+{
+  "name": "@pumped-fn/parking-lot-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pumped dev",
+    "build": "pumped build --target all",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@pumped-fn/pumped": "workspace:*",
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-hono": "workspace:*",
+    "@pumped-fn/parking-lot-shared": "workspace:*",
+    "hono": "catalog:",
+    "vite": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

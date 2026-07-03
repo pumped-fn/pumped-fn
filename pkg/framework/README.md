@@ -30,5 +30,6 @@ cross-checks these anti-patterns.
 
 | Package | Role |
 | --- | --- |
+| `pumped/` | Convention-driven scope compiler: discovers flows on disk, assembles a scope, and drives it as a CLI or HTTP server. |
 | `hono/` | Hono middleware plus request helpers. |
 | `tanstack-start/` | TanStack Start request/function middleware plus server-function flow helpers. |

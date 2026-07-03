@@ -43,6 +43,7 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
+| `pkg/framework/pumped` | `@pumped-fn/pumped` | Convention-driven scope compiler: discovers flows on disk, assembles a scope, and drives it as a CLI or HTTP server |
 | `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
 | `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |
 | `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
@@ -321,6 +322,7 @@ The examples are part of the public contract for how code should be shaped:
 | `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
 | `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
 | `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |
+| `examples/parking-lot-app` | Convention-driven `@pumped-fn/pumped` entrypoint producing a CLI and HTTP server from one manifest over parking lot flows |
 | `examples/parking-lot-tanstack-start` | TanStack Start server-function handlers over parking lot flows |
 | `examples/parking-lot-spa` | Vite React SPA that observes and dispatches parking lot flows through Lite React providers |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
