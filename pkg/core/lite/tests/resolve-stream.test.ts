@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, expectTypeOf, it } from "vitest"
 import { atom, createScope, preset } from "../src/index"
 import type { Lite } from "../src/index"
 
@@ -7,24 +7,18 @@ type Pending<T> = {
   reject(error: unknown): void
 }
 
-function typeContracts(
-  scope: Lite.Scope,
-  iterable: Lite.Atom<AsyncIterable<number>>,
-  iterator: Lite.Atom<AsyncIterator<string>>
-): void {
-  const iterableStream: AsyncIterable<number> = scope.resolveStream(iterable)
-  const iteratorStream: AsyncIterable<string> = scope.resolveStream(iterator)
-  const drained: Promise<number[]> = scope.drain(iterable, { take: 1 })
-  type ResolveStreamAtom = Parameters<Lite.Scope["resolveStream"]>[0]
-  type NonIterableRejected = Lite.Atom<number> extends ResolveStreamAtom ? false : true
-  const nonIterableRejected = true satisfies NonIterableRejected
-  void iterableStream
-  void iteratorStream
-  void drained
-  void nonIterableRejected
-}
-
-void typeContracts
+it("types resolveStream and drain", async () => {
+  const scope = createScope()
+  const feed = atom({
+    factory: async function* () {
+      yield 1
+    },
+  })
+  expectTypeOf(scope.resolveStream(feed)).toEqualTypeOf<AsyncIterable<number>>()
+  expectTypeOf(scope.drain(feed, { take: 0 })).toEqualTypeOf<Promise<number[]>>()
+  expectTypeOf<Lite.Atom<number>>().not.toExtend<Parameters<Lite.Scope["resolveStream"]>[0]>()
+  await scope.dispose()
+})
 
 function createQueue<T>() {
   const values: T[] = []
