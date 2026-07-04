@@ -364,26 +364,10 @@ describe("scope.resolveStream()", () => {
     await scope.dispose()
   })
 
-  it("fails all views when the producer errors", async () => {
-    const queue = createQueue<number>()
-    const source = atom({ factory: () => queue.iterable })
-    const scope = createScope()
-    await scope.resolve(source)
-
-    const left = scope.resolveStream(source)[Symbol.asyncIterator]()
-    const right = scope.resolveStream(source)[Symbol.asyncIterator]()
-    const error = new Error("boom")
-    const leftNext = left.next()
-    const rightNext = right.next()
-
-    queue.fail(error)
-
-    await expect(leftNext).rejects.toBe(error)
-    await expect(rightNext).rejects.toBe(error)
-    await scope.dispose()
-  })
-
-  it("ends all views when the producer completes", async () => {
+  it.each([
+    ["fails all views when the producer errors", "fail"],
+    ["ends all views when the producer completes", "close"],
+  ] as const)("%s", async (_name, terminal) => {
     const queue = createQueue<number>()
     const source = atom({ factory: () => queue.iterable })
     const scope = createScope()
@@ -394,10 +378,16 @@ describe("scope.resolveStream()", () => {
     const leftNext = left.next()
     const rightNext = right.next()
 
-    queue.close()
-
-    expect(await leftNext).toEqual({ done: true, value: undefined })
-    expect(await rightNext).toEqual({ done: true, value: undefined })
+    if (terminal === "fail") {
+      const error = new Error("boom")
+      queue.fail(error)
+      await expect(leftNext).rejects.toBe(error)
+      await expect(rightNext).rejects.toBe(error)
+    } else {
+      queue.close()
+      expect(await leftNext).toEqual({ done: true, value: undefined })
+      expect(await rightNext).toEqual({ done: true, value: undefined })
+    }
     await scope.dispose()
   })
 })

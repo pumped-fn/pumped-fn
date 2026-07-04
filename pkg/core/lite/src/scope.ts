@@ -4,7 +4,7 @@ import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { latest, type Latest } from "./latest"
-import { consumeScalarResult, drainGenerator, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, isStreamingExec, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
+import { consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
@@ -1415,21 +1415,24 @@ class ScopeImpl implements Lite.Scope {
     } catch {}
   }
 
-  private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> | undefined {
+  private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> {
     const hub = this.streamHubs.get(atom)
-    if (hub) return this.stopStreamHub(hub)
+    return hub ? this.stopStreamHub(hub) : Promise.resolve()
   }
 
-  private releaseStreamHub(atom: Lite.Atom<unknown>): Promise<void> | undefined {
+  private releaseStreamHub(atom: Lite.Atom<unknown>): Promise<void> {
     const hub = this.streamHubs.get(atom)
-    if (!hub) return undefined
-    return this.stopStreamHub(hub).then(() => this.finishStreamHub(hub, false))
+    return hub ? this.releaseStreamHubInstance(hub) : Promise.resolve()
+  }
+
+  private async releaseStreamHubInstance<T>(hub: StreamHub<T>): Promise<void> {
+    await this.stopStreamHub(hub)
+    this.finishStreamHub(hub, false)
   }
 
   private async releaseStreamHubs(): Promise<void> {
     for (const hub of [...this.streamHubs.values()]) {
-      await this.stopStreamHub(hub)
-      this.finishStreamHub(hub, false)
+      await this.releaseStreamHubInstance(hub)
     }
   }
 
@@ -1687,8 +1690,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
-    const streamStop = this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
-    if (streamStop) await streamStop
+    if (this.streamHubs.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
 
     if (entry.cleanups.length > 0) {
       await runCleanupsSafe(entry.cleanups)
@@ -1715,8 +1717,7 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.cache.get(atom)
     if (!entry) return
 
-    const streamRelease = this.releaseStreamHub(atom as Lite.Atom<unknown>)
-    if (streamRelease) await streamRelease
+    if (this.streamHubs.has(atom as Lite.Atom<unknown>)) await this.releaseStreamHub(atom as Lite.Atom<unknown>)
 
     if (entry.gcScheduled) {
       clearTimeout(entry.gcScheduled)
@@ -1937,6 +1938,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return ctrl
   }
 
+  private bindLatestToContextClose<T>(stream: Latest<T>): Latest<T> {
+    stream.onClose(this.onClose(() => stream.close()))
+    return stream
+  }
+
   changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
   changes<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): AsyncIterable<Lite.AtomChange<T>>
   changes<T>(handle: Lite.SelectHandle<T>): AsyncIterable<T>
@@ -1948,22 +1954,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const iterable = isAtom(target)
       ? (options ? this.scope.changes(target, options) : this.scope.changes(target))
       : this.scope.changes(target)
-    const stream = iterable as unknown as Latest<T | Lite.AtomChange<T>>
-    const offClose = this.onClose(() => {
-      stream.close()
-    })
-    stream.onClose(offClose)
+    const stream = this.bindLatestToContextClose(iterable as unknown as Latest<T | Lite.AtomChange<T>>)
     return stream as unknown as AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>>
   }
 
   resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
     this.assertOpen()
-    const stream = this.scope.resolveStream(atom) as Latest<T>
-    const offClose = this.onClose(() => {
-      stream.close()
-    })
-    stream.onClose(offClose)
-    return stream
+    return this.bindLatestToContextClose(this.scope.resolveStream(atom) as Latest<T>)
   }
 
   private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
@@ -2299,40 +2296,35 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<unknown> {
+  private execFlowFactoryResult<T>(
+    flow: Lite.Flow<unknown, unknown, any, unknown>,
+    consume: (value: MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>) => MaybePromise<T>
+  ): MaybePromise<T> {
     const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
-
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
       deps?: Record<string, unknown>
     ) => MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>
-
     const run = (resolvedDeps: Record<string, unknown>) => {
-      const value = flow.deps ? factory(this, resolvedDeps) : factory(this)
-      if (isAsyncGenerator(value)) markStreamingExec(this, flow)
-      return consumeScalarResult(value)
+      return consume(flow.deps ? factory(this, resolvedDeps) : factory(this))
     }
 
     if (isPromiseLike(depsResult)) {
-      return (depsResult as Promise<Record<string, unknown>>).then((resolvedDeps) => {
-        return run(resolvedDeps)
-      })
+      return (depsResult as Promise<Record<string, unknown>>).then(run)
     }
 
     return run(depsResult as Record<string, unknown>)
   }
 
-  private async execFlowStreamInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): Promise<AsyncGenerator<unknown, unknown, unknown>> {
-    const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
-    const resolvedDeps = isPromiseLike(depsResult)
-      ? await depsResult as Record<string, unknown>
-      : depsResult as Record<string, unknown>
-    const factory = flow.factory as unknown as (
-      ctx: Lite.ExecutionContext,
-      deps?: Record<string, unknown>
-    ) => unknown
-    const value = flow.deps ? factory(this, resolvedDeps) : factory(this)
-    return requireAsyncGenerator(value)
+  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<unknown> {
+    return this.execFlowFactoryResult(flow, (value) => {
+      if (isAsyncGenerator(value)) markStreamingExec(this, flow)
+      return consumeScalarResult(value)
+    })
+  }
+
+  private execFlowStreamInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<AsyncGenerator<unknown, unknown, unknown>> {
+    return this.execFlowFactoryResult(flow, (value) => requireAsyncGenerator(value))
   }
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
