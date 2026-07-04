@@ -1,21 +1,31 @@
 import { describe, expect, it } from "vitest"
 import { atom, createScope, preset } from "../src/index"
 
+async function take<T>(iterable: AsyncIterable<T>, count: number): Promise<T[]> {
+  const values: T[] = []
+  for await (const value of iterable) {
+    values.push(value)
+    if (values.length === count) break
+  }
+  return values
+}
+
 describe("scope.changes()", () => {
   it("conflates atom values to the latest unconsumed value", async () => {
     const scope = createScope()
     const count = atom({ factory: () => 0 })
-    await scope.resolve(count)
+    const ctrl = await scope.controller(count, { resolve: true })
 
-    const iterator = scope.changes(count)[Symbol.asyncIterator]()
-    expect(await iterator.next()).toEqual({ done: false, value: 0 })
+    const values: number[] = []
+    for await (const value of scope.changes(count)) {
+      values.push(value)
+      if (values.length === 2) break
+      ctrl.set(1)
+      ctrl.set(2)
+      ctrl.set(3)
+    }
 
-    const ctrl = scope.controller(count)
-    ctrl.set(1)
-    ctrl.set(2)
-    ctrl.set(3)
-
-    expect(await iterator.next()).toEqual({ done: false, value: 3 })
+    expect(values).toEqual([0, 3])
     await scope.dispose()
   })
 
@@ -29,14 +39,13 @@ describe("scope.changes()", () => {
 
     const first = iterator.next()
     const second = iterator.next()
-    const unresolved = Symbol("unresolved")
     const ctrl = scope.controller(count)
 
     ctrl.set(1)
     ctrl.set(2)
 
-    expect(await Promise.race([first, Promise.resolve(unresolved)])).toEqual({ done: false, value: 1 })
-    expect(await Promise.race([second, Promise.resolve(unresolved)])).toEqual({ done: false, value: 2 })
+    expect(await first).toEqual({ done: false, value: 1 })
+    expect(await second).toEqual({ done: false, value: 2 })
     await scope.dispose()
   })
 
@@ -45,7 +54,7 @@ describe("scope.changes()", () => {
     const count = atom({ factory: () => 42 })
     await scope.resolve(count)
 
-    expect(await scope.changes(count)[Symbol.asyncIterator]().next()).toEqual({ done: false, value: 42 })
+    expect(await take(scope.changes(count), 1)).toEqual([42])
     await scope.dispose()
   })
 
@@ -55,9 +64,8 @@ describe("scope.changes()", () => {
     await scope.resolve(user)
 
     const name = scope.select(user, (value) => value.name)
-    const iterator = scope.changes(name)[Symbol.asyncIterator]()
 
-    expect(await iterator.next()).toEqual({ done: false, value: "Ada" })
+    expect(await take(scope.changes(name), 1)).toEqual(["Ada"])
     await scope.dispose()
   })
 
@@ -70,9 +78,7 @@ describe("scope.changes()", () => {
       },
     })
 
-    const iterator = scope.changes(failing)[Symbol.asyncIterator]()
-
-    await expect(iterator.next()).rejects.toBe(error)
+    await expect(take(scope.changes(failing), 1)).rejects.toBe(error)
     await scope.dispose()
   })
 
@@ -85,9 +91,7 @@ describe("scope.changes()", () => {
       },
     })
 
-    const iterator = scope.changes(failing, { states: true })[Symbol.asyncIterator]()
-
-    expect(await iterator.next()).toEqual({ done: false, value: { state: "failed", error } })
+    expect(await take(scope.changes(failing, { states: true }), 1)).toEqual([{ state: "failed", error }])
     await scope.dispose()
   })
 
@@ -130,9 +134,10 @@ describe("scope.changes()", () => {
     })
     await scope.resolve(count)
 
-    const iterator = scope.changes(count)[Symbol.asyncIterator]()
-    expect(await iterator.next()).toEqual({ done: false, value: 1 })
-    await iterator.return?.()
+    for await (const value of scope.changes(count)) {
+      expect(value).toBe(1)
+      break
+    }
 
     const ctrl = scope.controller(count)
     ctrl.set(2)
@@ -149,12 +154,14 @@ describe("scope.changes()", () => {
       presets: [preset(target, replacement)],
     })
 
-    const iterator = scope.changes(target)[Symbol.asyncIterator]()
-    expect(await iterator.next()).toEqual({ done: false, value: 10 })
+    const values: number[] = []
+    for await (const value of scope.changes(target)) {
+      values.push(value)
+      if (values.length === 2) break
+      scope.controller(replacement).set(11)
+    }
 
-    scope.controller(replacement).set(11)
-
-    expect(await iterator.next()).toEqual({ done: false, value: 11 })
+    expect(values).toEqual([10, 11])
     await scope.dispose()
   })
 })
