@@ -508,6 +508,34 @@ describe("nats scheduler backend", () => {
       await registration.stop()
     })
 
+    it("continues replaying remaining missed ticks after an earlier catch-up replay fails", async () => {
+      const kv = fakeKv()
+      const last = new Date(Date.now() - 3 * 60 * 60 * 1000)
+      await kv.put("last.resilient", encoder.encode(last.toISOString()))
+      const calls: Date[] = []
+      const errors: unknown[] = []
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        {
+          name: "resilient",
+          cadence: { cron: "0 * * * *" },
+          overlap: "skip",
+          catchUp: "all",
+          onError: (error) => errors.push(error),
+        },
+        async (run) => {
+          calls.push(run.scheduledAt)
+          if (calls.length === 1) throw new Error("first replay boom")
+        }
+      )
+
+      await until(() => calls.length >= 3)
+      const sorted = [...calls].sort((a, b) => a.getTime() - b.getTime())
+      expect(calls).toEqual(sorted)
+      expect(errors.length).toBeGreaterThan(0)
+      await registration.stop()
+    })
+
     it("all policy derives missed ticks for an every-ms cadence too", async () => {
       const kv = fakeKv()
       const last = new Date(Date.now() - 250)

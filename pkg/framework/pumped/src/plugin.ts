@@ -115,7 +115,14 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
         const { app } = createServer(manifest, { scope, lite })
         const jobs = runJobs(manifest, undefined, scope)
         const workflows = runWorkflows(manifest, undefined, scope)
-        await jobs.ready
+
+        try {
+          await jobs.ready
+        } catch (error) {
+          await Promise.allSettled([jobs.stop(), workflows.stop()])
+          await scope.dispose()
+          throw error
+        }
 
         return { fetch: app.fetch, scope, jobs, workflows }
       }

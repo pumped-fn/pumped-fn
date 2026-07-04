@@ -9,9 +9,9 @@ restarted instances catch up on what they missed.
 
 | What NATS gives | What stays local |
 | --- | --- |
-| Exactly-once execution per scheduled tick, via KV `create` (exclusive — fails if the run key already exists); the winner runs the tick, losers skip silently. | Timing: each instance runs its own `croner` job (or interval) for the cadence, exactly like `scheduler.inProcess()` — NATS adds distributed coordination on top, it does not replace the clock. |
+| Exactly-once execution per scheduled tick **while the lock holder finishes within `lockTtlMs`**, via KV `create` (exclusive — fails if the run key already exists); the winner runs the tick, losers skip silently. If the holder is still running past `lockTtlMs`, another contender is allowed to take the lock over and also runs the tick — see "Stale-lock takeover" below, this degrades the guarantee to at-least-once across a lease expiry. | Timing: each instance runs its own `croner` job (or interval) for the cadence, exactly like `scheduler.inProcess()` — NATS adds distributed coordination on top, it does not replace the clock. |
 | Catch-up on restart/rejoin, via a `last:<name>` key updated after every completed tick; `catchUp: "last"`/`"all"` derive missed scheduled times from croner's run enumeration and replay them through the **same overlap chain** as timer ticks (see below). | `overlap: "skip"`/`"queue"` — governs successive ticks piling up **on one instance** (e.g. a slow tick still running when the next timer fires). The KV lock already makes cross-instance overlap for the *same* scheduled tick a non-issue. |
-| A run history/audit trail in the KV: each run key holds a JSON marker (`startedAt`, `host`, then `completedAt` or `failedAt`/`error`) that `history` (`kv.history()`/`kv.get()`) can inspect after the fact. | `trigger(dedupKey?)` — a manual, immediate tick (`scheduledAt = now`). With an explicit `dedupKey`, cluster-wide exactly-once for that key (see below); without one, only locally deduped (see below). |
+| A run history/audit trail in the KV: each run key holds a JSON marker (`startedAt`, `host`, then `completedAt` or `failedAt`/`error`) that `history` (`kv.history()`/`kv.get()`) can inspect after the fact. | `trigger(dedupKey?)` — a manual, immediate tick (`scheduledAt = now`). With an explicit `dedupKey`, cluster-wide exactly-once for that key while the holder completes within `lockTtlMs` (see below); without one, only locally deduped (see below). |
 
 ### Overlap chain and catch-up
 
@@ -43,6 +43,16 @@ If a process crashes between claiming a run's lock (`startedAt` written) and com
 attempts a takeover via NATS KV's revision-based `update` (compare-and-swap on the observed
 revision) — exactly one contender's takeover succeeds; the rest see a revision conflict and back off
 without running the tick.
+
+**This takeover is age-based, not liveness-based**: it cannot distinguish a crashed holder from one
+that is simply slow. If the original holder is still alive and still executing the tick past
+`lockTtlMs`, a contender takes the lock over anyway and runs the tick again — both instances end up
+running the same scheduled tick concurrently. Cluster-wide execution is therefore **exactly-once per
+run key only while the holder completes within `lockTtlMs`**; across a lease expiry it degrades to
+**at-least-once**. Choose `lockTtlMs` comfortably above the worst-case tick duration to keep this rare
+in practice. There is no heartbeat/lease-renewal mechanism today — a holder cannot extend its lock by
+signaling it is still alive; adding one (so a live holder renews before `lockTtlMs` elapses and a
+takeover only ever targets a truly dead holder) is possible future work.
 
 ## Usage
 
@@ -87,10 +97,12 @@ await scope.resolve(nightlySweep)
   ticks do. This is **local dedup only** — two replicas each calling `trigger()` a few milliseconds
   apart will very likely get distinct `scheduledAt` values and therefore distinct lock keys, so there
   is **no cross-replica dedup** without an explicit `dedupKey`.
-- `registration.trigger(dedupKey)` uses the KV key `run.<name>.manual.<dedupKey>`, giving true
-  cluster-wide exactly-once semantics for that key: whichever replica's `trigger(dedupKey)` call
-  claims the key first runs it, and every other replica calling `trigger()` with the same `dedupKey`
-  is a no-op.
+- `registration.trigger(dedupKey)` uses the KV key `run.<name>.manual.<dedupKey>`, giving cluster-wide
+  exactly-once semantics for that key while the winning replica completes within `lockTtlMs`:
+  whichever replica's `trigger(dedupKey)` call claims the key first runs it, and every other replica
+  calling `trigger()` with the same `dedupKey` is a no-op. The same stale-lock takeover described
+  above applies here too — a manual trigger that runs longer than `lockTtlMs` can be taken over and
+  re-run by another contender.
 
 ## Keys
 

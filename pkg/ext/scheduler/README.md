@@ -65,8 +65,9 @@ interface Scheduler.Backend {
 ## Backends
 
 - `@pumped-fn/lite-extension-scheduler-nats` — a distributed backend built on NATS JetStream KV:
-  exactly-once ticks across instances via KV `create`, `catchUp` derived from a `last:` key, and a
-  run history/audit trail in the KV itself.
+  exactly-once ticks across instances via KV `create` while the lock holder completes within
+  `lockTtlMs` (degrading to at-least-once across a lease expiry — see that package's README),
+  `catchUp` derived from a `last:` key, and a run history/audit trail in the KV itself.
 
 ## Example
 

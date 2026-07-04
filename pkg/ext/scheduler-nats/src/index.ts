@@ -193,7 +193,7 @@ async function recordLast(kv: Nats.Store, name: string, scheduledAt: Date): Prom
 
 async function catchUp(
   kv: Nats.Store,
-  spec: { name: string; cadence: Scheduler.Cadence; catchUp: Scheduler.CatchUp },
+  spec: { name: string; cadence: Scheduler.Cadence; catchUp: Scheduler.CatchUp; onError?: Scheduler.OnError },
   fire: (scheduledAt: Date) => Promise<void>
 ): Promise<void> {
   if (spec.catchUp === "skip") return
@@ -206,8 +206,20 @@ async function catchUp(
   if (missed.length === 0) return
 
   const targets = spec.catchUp === "last" ? [missed[missed.length - 1]!] : missed
+  const failures: { scheduledAt: Date; error: unknown }[] = []
   for (const scheduledAt of targets) {
-    await fire(scheduledAt)
+    try {
+      await fire(scheduledAt)
+    } catch (error) {
+      failures.push({ scheduledAt, error })
+    }
+  }
+
+  if (failures.length > 0) {
+    spec.onError?.(new AggregateError(failures.map((failure) => failure.error), `catch-up failed for ${failures.length} of ${targets.length} tick(s)`), {
+      key: runKey(spec.name, failures[0]!.scheduledAt),
+      scheduledAt: failures[0]!.scheduledAt,
+    })
   }
 }
 
