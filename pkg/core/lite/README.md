@@ -318,6 +318,7 @@ to the latest value: a slow consumer skips intermediates and never buffers unbou
 import { atom, createScope } from "@pumped-fn/lite"
 
 const config = atom({ factory: () => ({ level: "info" }) })
+function applyLogLevel(_level: string): void {}
 
 const scope = createScope()
 for await (const value of scope.changes(config)) {
@@ -337,6 +338,17 @@ resolved iterable into the same views.
 
 ```ts
 import { atom, createScope } from "@pumped-fn/lite"
+
+type Order = { id: string }
+async function connect(_topic: string) {
+  return {
+    close() {},
+    async *[Symbol.asyncIterator]() {
+      yield { id: "o1" }
+    },
+  }
+}
+async function handle(_order: Order): Promise<void> {}
 
 const orders = atom({
   factory: async function* (ctx) {

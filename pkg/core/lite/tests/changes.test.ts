@@ -19,6 +19,27 @@ describe("scope.changes()", () => {
     await scope.dispose()
   })
 
+  it("settles concurrent atom value reads in order", async () => {
+    const scope = createScope()
+    const count = atom({ factory: () => 0 })
+    await scope.resolve(count)
+
+    const iterator = scope.changes(count)[Symbol.asyncIterator]()
+    expect(await iterator.next()).toEqual({ done: false, value: 0 })
+
+    const first = iterator.next()
+    const second = iterator.next()
+    const unresolved = Symbol("unresolved")
+    const ctrl = scope.controller(count)
+
+    ctrl.set(1)
+    ctrl.set(2)
+
+    expect(await Promise.race([first, Promise.resolve(unresolved)])).toEqual({ done: false, value: 1 })
+    expect(await Promise.race([second, Promise.resolve(unresolved)])).toEqual({ done: false, value: 2 })
+    await scope.dispose()
+  })
+
   it("yields the current atom value first when already resolved", async () => {
     const scope = createScope()
     const count = atom({ factory: () => 42 })

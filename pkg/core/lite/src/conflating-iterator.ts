@@ -2,7 +2,7 @@ type Pending<T> = { resolve(result: IteratorResult<T, undefined>): void; reject(
 export type ConflatingAsyncIterable<T> = AsyncIterable<T> & { push(value: T): void; fail(error: unknown): void; close(): void; onClose(fn: () => void): () => void }
 const done: IteratorReturnResult<undefined> = { done: true, value: undefined }
 export function createConflatingAsyncIterable<T>(): ConflatingAsyncIterable<T> {
-  let pending: Pending<T> | undefined
+  const pendings: Pending<T>[] = []
   let latest: T | undefined
   let hasLatest = false
   let error: unknown
@@ -20,7 +20,7 @@ export function createConflatingAsyncIterable<T>(): ConflatingAsyncIterable<T> {
     }
     if (!hasLatest) {
       return new Promise((resolve, reject) => {
-        pending = { resolve, reject }
+        pendings.push({ resolve, reject })
       })
     }
     const value = latest as T
@@ -35,25 +35,25 @@ export function createConflatingAsyncIterable<T>(): ConflatingAsyncIterable<T> {
   function push(value: T): void {
     if (closed) return
     hasError = false
+    const pending = pendings.shift()
     if (!pending) {
       latest = value
       hasLatest = true
       return
     }
     pending.resolve({ done: false, value })
-    pending = undefined
   }
   function fail(errorValue: unknown): void {
     if (closed) return
     latest = undefined
     hasLatest = false
+    const pending = pendings.shift()
     if (!pending) {
       error = errorValue
       hasError = true
       return
     }
     pending.reject(errorValue)
-    pending = undefined
   }
   function close(): void {
     if (closed) return
@@ -61,12 +61,11 @@ export function createConflatingAsyncIterable<T>(): ConflatingAsyncIterable<T> {
     latest = undefined
     hasLatest = false
     hasError = false
-    const closing = pending
-    pending = undefined
+    const closing = pendings.splice(0)
     const fns = [...closeFns]
     closeFns.clear()
     for (let i = 0; i < fns.length; i++) fns[i]!()
-    closing?.resolve(done)
+    for (let i = 0; i < closing.length; i++) closing[i]!.resolve(done)
   }
   function onClose(fn: () => void): () => void {
     if (closed) {

@@ -210,6 +210,30 @@ describe("scope.resolveStream()", () => {
     expect(cleanups).toBe(1)
   })
 
+  it("disposes and closes stream views when producer return rejects", async () => {
+    const error = new Error("return failed")
+    let returned = false
+    const source = atom({
+      factory: async function* () {
+        try {
+          yield 1
+        } finally {
+          returned = true
+          throw error
+        }
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(source)
+
+    const iterator = scope.resolveStream(source)[Symbol.asyncIterator]()
+
+    await expect(scope.dispose()).resolves.toBeUndefined()
+
+    expect(returned).toBe(true)
+    expect(await iterator.next()).toEqual({ done: true, value: undefined })
+  })
+
   it("re-drives a newly resolved iterable into the same views after invalidation", async () => {
     const first = createQueue<number>()
     const second = createQueue<number>()
@@ -237,6 +261,40 @@ describe("scope.resolveStream()", () => {
     await scope.dispose()
   })
 
+  it("keeps redriven views alive when a stale iterator return rejects", async () => {
+    let rejectReturn!: (error: unknown) => void
+    const second = createQueue<number>()
+    const first: AsyncIterable<number> = {
+      [Symbol.asyncIterator]() {
+        return {
+          next: () => new Promise<IteratorResult<number, undefined>>(() => {}),
+          return: () => new Promise<IteratorResult<number, undefined>>((_, reject) => {
+            rejectReturn = reject
+          }),
+        }
+      },
+    }
+    const source = atom({ factory: () => first })
+    const scope = createScope()
+    await scope.resolve(source)
+
+    const iterator = scope.resolveStream(source)[Symbol.asyncIterator]()
+    let pending = iterator.next()
+
+    scope.controller(source).set(second.iterable)
+    second.push(2)
+
+    expect(await pending).toEqual({ done: false, value: 2 })
+
+    pending = iterator.next()
+    rejectReturn(new Error("return failed"))
+    await tick()
+    second.push(3)
+
+    expect(await pending).toEqual({ done: false, value: 3 })
+    await scope.dispose()
+  })
+
   it("drains a fresh stream view up to take", async () => {
     const queue = createQueue<number>()
     const source = atom({ factory: () => queue.iterable })
@@ -252,6 +310,21 @@ describe("scope.resolveStream()", () => {
 
     expect(await drained).toEqual([1, 2])
     expect(queue.returns()).toBe(0)
+    await scope.dispose()
+  })
+
+  it("returns an empty drain without starting a producer when take is zero", async () => {
+    let starts = 0
+    const source = atom({
+      factory: () => {
+        starts++
+        return createQueue<number>().iterable
+      },
+    })
+    const scope = createScope()
+
+    expect(await scope.drain(source, { take: 0 })).toEqual([])
+    expect(starts).toBe(0)
     await scope.dispose()
   })
 

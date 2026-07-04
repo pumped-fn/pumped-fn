@@ -1320,9 +1320,10 @@ class ScopeImpl implements Lite.Scope {
   }
 
   async drain<T>(atom: Lite.Atom<StreamSource<T>>, options?: Lite.DrainOptions): Promise<T[]> {
+    const take = options?.take
+    if (take !== undefined && take <= 0) return []
     const values: T[] = []
     const iterator = this.resolveStream(atom)[Symbol.asyncIterator]()
-    const take = options?.take
     while (take === undefined || values.length < take) {
       const result = await iterator.next()
       if (result.done) return values
@@ -1343,7 +1344,7 @@ class ScopeImpl implements Lite.Scope {
     }
     hub.unsubs = [
       this.on("resolving", atom as Lite.Atom<unknown>, () => {
-        void this.stopStreamHub(hub).then(undefined, error => this.finishStreamHub(hub, true, error))
+        void this.stopStreamHub(hub)
       }),
       this.on("resolved", atom as Lite.Atom<unknown>, () => this.driveResolvedStreamHub(hub)),
       this.on("failed", atom as Lite.Atom<unknown>, () => {
@@ -1379,7 +1380,7 @@ class ScopeImpl implements Lite.Scope {
 
   private driveStreamHub<T>(hub: StreamHub<T>, source: StreamSource<T>): void {
     if (hub.unsubs.length === 0 || Object.is(hub.source, source)) return
-    void this.stopStreamHub(hub).then(undefined, error => this.finishStreamHub(hub, true, error))
+    void this.stopStreamHub(hub)
     hub.source = source
     hub.iterator = getAsyncIterator(source)
     const version = ++hub.version
@@ -1413,7 +1414,9 @@ class ScopeImpl implements Lite.Scope {
     const iterator = hub.iterator
     hub.iterator = undefined
     hub.source = undefined
-    await iterator?.return?.()
+    try {
+      await iterator?.return?.()
+    } catch {}
   }
 
   private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> | undefined {
