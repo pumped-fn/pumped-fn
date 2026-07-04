@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-scheduler-nats",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": false,
   "description": "NATS JetStream KV distributed backend for @pumped-fn/lite-extension-scheduler",
   "type": "module",
@@ -34,7 +34,7 @@
   },
   "peerDependencies": {
     "@nats-io/kv": "^3.4.0",
-    "@pumped-fn/lite-extension-scheduler": "^0.1.0"
+    "@pumped-fn/lite-extension-scheduler": "^0.2.0"
   },
   "dependencies": {
     "croner": "catalog:"
