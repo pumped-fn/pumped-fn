@@ -3,7 +3,7 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
-import { createConflatingAsyncIterable, type ConflatingAsyncIterable } from "./conflating-iterator"
+import { latest, type Latest } from "./latest"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
   const prototype = Object.getPrototypeOf(value)
@@ -157,7 +157,7 @@ type StreamSource<T> = AsyncIterable<T> | AsyncIterator<T>
 
 type StreamHub<T> = {
   atom: Lite.Atom<StreamSource<T>>
-  views: Set<ConflatingAsyncIterable<T>>
+  views: Set<Latest<T>>
   unsubs: (() => void)[]
   version: number
   iterator?: AsyncIterator<T>
@@ -1251,15 +1251,15 @@ class ScopeImpl implements Lite.Scope {
     return options ? this.atomChanges(target, options) : this.atomChanges(target)
   }
 
-  private atomChanges<T>(atom: Lite.Atom<T>): ConflatingAsyncIterable<T>
-  private atomChanges<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): ConflatingAsyncIterable<Lite.AtomChange<T>>
-  private atomChanges<T>(atom: Lite.Atom<T>, options?: Lite.ChangesOptions): ConflatingAsyncIterable<T | Lite.AtomChange<T>> {
+  private atomChanges<T>(atom: Lite.Atom<T>): Latest<T>
+  private atomChanges<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): Latest<Lite.AtomChange<T>>
+  private atomChanges<T>(atom: Lite.Atom<T>, options?: Lite.ChangesOptions): Latest<T | Lite.AtomChange<T>> {
     const presetValue = this.presets.get(atom)
     if (isAtom(presetValue)) {
       return options ? this.atomChanges(presetValue as Lite.Atom<T>, options) : this.atomChanges(presetValue as Lite.Atom<T>)
     }
 
-    const stream = createConflatingAsyncIterable<T | Lite.AtomChange<T>>()
+    const stream = latest<T | Lite.AtomChange<T>>()
     const emit = () => {
       const entry = this.cache.get(atom) as AtomEntry<T> | undefined
       if (!entry) return
@@ -1291,8 +1291,8 @@ class ScopeImpl implements Lite.Scope {
     return stream
   }
 
-  private selectChanges<T>(handle: Lite.SelectHandle<T>): ConflatingAsyncIterable<T> {
-    const stream = createConflatingAsyncIterable<T>()
+  private selectChanges<T>(handle: Lite.SelectHandle<T>): Latest<T> {
+    const stream = latest<T>()
     stream.push(handle.get())
     const unsub = handle.subscribe(() => {
       stream.push(handle.get())
@@ -1310,7 +1310,7 @@ class ScopeImpl implements Lite.Scope {
     const presetValue = this.presets.get(atom as Lite.Atom<unknown>)
     if (isAtom(presetValue)) return this.resolveStream(presetValue as Lite.Atom<StreamSource<T>>)
     const hub = this.getStreamHub(atom)
-    const stream = createConflatingAsyncIterable<T>()
+    const stream = latest<T>()
     hub.views.add(stream)
     stream.onClose(() => {
       hub.views.delete(stream)
@@ -1960,7 +1960,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const iterable = isAtom(target)
       ? (options ? this.scope.changes(target, options) : this.scope.changes(target))
       : this.scope.changes(target)
-    const stream = iterable as unknown as ConflatingAsyncIterable<T | Lite.AtomChange<T>>
+    const stream = iterable as unknown as Latest<T | Lite.AtomChange<T>>
     const offClose = this.onClose(() => {
       stream.close()
     })
@@ -1970,7 +1970,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
     this.assertOpen()
-    const stream = this.scope.resolveStream(atom) as ConflatingAsyncIterable<T>
+    const stream = this.scope.resolveStream(atom) as Latest<T>
     const offClose = this.onClose(() => {
       stream.close()
     })
