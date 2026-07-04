@@ -621,7 +621,7 @@ export namespace Lite {
    * Target type for wrapExec extension hook.
    * Either a Flow or an inline function.
    */
-  export type ExecTarget = (Flow<unknown, unknown, any, unknown> & { readonly streaming?: true }) | ExecTargetFn
+  export type ExecTarget = Flow<unknown, unknown, any, unknown> | ExecTargetFn
 
   /**
    * Inline function that can be executed via ctx.exec.

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
-import { createScope, flow, FlowFault, preset, resource, typed } from "../src/index"
+import { createScope, flow, FlowFault, isStreamingExec, preset, resource, typed } from "../src/index"
 import type { Lite } from "../src/index"
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
@@ -81,6 +81,44 @@ describe("ctx.execStream()", () => {
     await scope.dispose()
   })
 
+  it("settles abort cleanup failures and makes returned streams terminal", async () => {
+    let starts = 0
+    const closes: Lite.CloseResult[] = []
+    const read = flow({
+      factory: async function* (ctx) {
+        starts++
+        ctx.onClose((result) => {
+          closes.push(result)
+        })
+        try {
+          yield "first"
+          yield "second"
+          return "done"
+        } finally {
+          throw new Error("finally failed")
+        }
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const unopened = ctx.execStream({ flow: read })[Symbol.asyncIterator]()
+
+    expect(await unopened.return?.()).toEqual({ done: true, value: undefined })
+    expect(await unopened.next()).toEqual({ done: true, value: undefined })
+    expect(starts).toBe(0)
+
+    const stream = ctx.execStream({ flow: read })
+    const iterator = stream[Symbol.asyncIterator]()
+    expect(await iterator.next()).toEqual({ done: false, value: "first" })
+    expect(await iterator.return?.()).toEqual({ done: true, value: undefined })
+    expect(await iterator.next()).toEqual({ done: true, value: undefined })
+    await expect(stream.result).rejects.toThrow("Flow stream aborted")
+    expect(starts).toBe(1)
+    expect(closes[0]).toMatchObject({ ok: false, aborted: true })
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("F2 throws synchronously when result is read before iteration and exec drains to output", async () => {
     const read = flow({
       factory: async function* () {
@@ -102,7 +140,7 @@ describe("ctx.execStream()", () => {
   })
 
   it("F3 rejects non-generator factories that resolve to async iterables", async () => {
-    async function* values() {
+    async function* values(): AsyncGenerator<number, void, unknown> {
       yield 1
     }
     const read = flow({
@@ -129,6 +167,38 @@ describe("ctx.execStream()", () => {
 
     stream[Symbol.asyncIterator]()
     expect(() => stream[Symbol.asyncIterator]()).toThrow("consumed only once")
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("passes the real flow target and exposes streaming detection to extensions", async () => {
+    const read = flow({
+      factory: () => "real",
+    })
+    const seen: boolean[] = []
+    const scope = createScope({
+      presets: [
+        preset(read, async function* () {
+          return "done"
+        }),
+      ],
+      extensions: [
+        {
+          name: "identity",
+          async wrapExec(next, target, ctx) {
+            seen.push(target === read && isStreamingExec(target, ctx))
+            return next()
+          },
+        },
+      ],
+    })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: read })).resolves.toBe("done")
+    const stream = ctx.execStream({ flow: read })
+    expect(await collect(stream)).toEqual([])
+    await expect(stream.result).resolves.toBe("done")
+    expect(seen).toEqual([true, true])
     await ctx.close()
     await scope.dispose()
   })
@@ -209,6 +279,41 @@ describe("ctx.execStream()", () => {
     expect(await collect(stream)).toEqual(["fake:a"])
     await expect(stream.result).resolves.toBe("fake")
     expect(await ctx.exec({ flow: read, input: { id: "b" } })).toBe("fake")
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("classifies direct AsyncGenerator values without accepting scalar async iterables", async () => {
+    async function* values(): AsyncGenerator<number, string, unknown> {
+      yield 1
+      yield 2
+      return "done"
+    }
+    const read = flow({
+      factory: () => values(),
+    })
+    const custom = flow({
+      factory: () => ({
+        [Symbol.asyncIterator]: () => ({
+          next: async () => ({ done: true as const, value: undefined }),
+        }),
+      }),
+    })
+    const scalar = flow({
+      factory: () => 1,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const stream = ctx.execStream({ flow: read })
+
+    expectTypeOf(stream).toEqualTypeOf<Lite.FlowStream<number, string>>()
+    expect(await collect(stream)).toEqual([1, 2])
+    await expect(stream.result).resolves.toBe("done")
+    await expect(ctx.exec({ flow: read })).resolves.toBe("done")
+    await expect(ctx.exec({ flow: custom })).rejects.toThrow("use an async generator flow for yields or an iterable atom")
+    const rejected = ctx.execStream({ flow: scalar })
+    await expect(rejected[Symbol.asyncIterator]().next()).rejects.toThrow("requires an async generator flow")
+    await expect(rejected.result).rejects.toThrow("requires an async generator flow")
     await ctx.close()
     await scope.dispose()
   })

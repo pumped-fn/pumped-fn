@@ -1,4 +1,4 @@
-import { tag, type Lite } from "@pumped-fn/lite"
+import { isStreamingExec, tag, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -103,7 +103,7 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
     name: options.name ?? "suspense",
     async wrapExec(next, target, ctx) {
       if (!(options.shouldHandle ?? shouldHandleSuspenseTarget)(target, ctx)) return next()
-      if (isStreamingTarget(target)) throw new Error("streaming flows are not replayable yet")
+      if (isStreamingExec(target, ctx)) throw new Error("streaming flows are not replayable yet")
 
       const key = options.getKey ? options.getKey(ctx, target) : nextSuspenseKey(ctx, options)
       const targetName = options.getTargetName ? options.getTargetName(target, ctx) : getTargetName(target, ctx)
@@ -124,6 +124,7 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
       }
 
       const result = await (options.run ? options.run(event, next) : next())
+      if (isStreamingExec(target, ctx)) throw new Error("streaming flows are not replayable yet")
       await options.log.putCompleted({ status: "completed", key, targetName, result })
       return result
     },
@@ -132,11 +133,6 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
 
 function shouldHandleSuspenseTarget(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): boolean {
   return active(target, replay, ctx) || active(target, suspend, ctx)
-}
-
-function isStreamingTarget(target: Lite.ExecTarget): boolean {
-  if ((typeof target !== "object" && typeof target !== "function") || target === null) return false
-  return (target as { readonly streaming?: true }).streaming === true
 }
 
 function assertSameTarget(entry: SuspenseStepEntry, targetName: string): void {
