@@ -55,7 +55,7 @@ run("nats scheduler backend integration", () => {
     const regA = backendA.register(spec, tick)
     const regB = backendB.register(spec, tick)
 
-    await Promise.all([regA.trigger(), regB.trigger()])
+    await Promise.all([regA.trigger("shared-once"), regB.trigger("shared-once")])
 
     expect(calls).toEqual([1])
 

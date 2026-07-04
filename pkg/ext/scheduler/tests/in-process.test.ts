@@ -191,6 +191,46 @@ describe("inProcess backend", () => {
     expect(unhandled).toHaveLength(0)
   })
 
+  it("does not emit an unhandled rejection when a cron-fired tick throws", async () => {
+    const unhandled: unknown[] = []
+    const onUnhandledRejection = (reason: unknown) => unhandled.push(reason)
+    process.on("unhandledRejection", onUnhandledRejection)
+
+    const backend = scheduler.inProcess()
+    const registration = backend.register(
+      { name: "cron-throws", cadence: { cron: "* * * * * *" }, overlap: "skip", catchUp: "skip" },
+      async () => {
+        throw new Error("cron boom")
+      }
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 1100))
+    await registration.stop()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    process.off("unhandledRejection", onUnhandledRejection)
+    expect(unhandled).toHaveLength(0)
+  }, 3000)
+
+  it("stop() resolves even when the in-flight tick rejects", async () => {
+    let rejectSlow!: (error: unknown) => void
+    const slow = new Promise<void>((_, reject) => {
+      rejectSlow = reject
+    })
+    const backend = scheduler.inProcess()
+    const registration = backend.register(
+      { name: "slow-fail", cadence: { cron: "* * * * *" }, overlap: "skip", catchUp: "skip" },
+      async () => slow
+    )
+
+    const triggering = registration.trigger()
+    const stopping = registration.stop()
+
+    rejectSlow(new Error("mid-flight boom"))
+    await expect(triggering).rejects.toThrow("mid-flight boom")
+    await stopping
+  })
+
   it("stop() awaits in-flight work before resolving", async () => {
     let resolveSlow!: () => void
     const slow = new Promise<void>((resolve) => {

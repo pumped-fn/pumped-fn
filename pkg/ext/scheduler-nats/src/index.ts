@@ -96,7 +96,7 @@ export function nats(options: Nats.Options): Scheduler.Backend {
         async stop() {
           job.stop()
           await catchUpDone
-          await Promise.all([inFlight?.catch(() => {}), chain?.catch(() => {})])
+          await Promise.all([inFlight?.catch(() => {}), chain])
         },
       }
     },

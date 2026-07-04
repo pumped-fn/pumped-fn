@@ -139,7 +139,7 @@ export function inProcess(): Scheduler.Backend {
         },
         async stop() {
           job.stop()
-          await Promise.all([inFlight?.catch(() => {}), chain?.catch(() => {})])
+          await Promise.all([inFlight?.catch(() => {}), chain])
         },
       }
     },

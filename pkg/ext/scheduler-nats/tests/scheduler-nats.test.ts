@@ -9,6 +9,8 @@ function fakeKv() {
   let revision = 0
   const log: string[] = []
   const failCreate = new Map<string, unknown>()
+  const failUpdate = new Map<string, unknown>()
+  const raceCreate = new Map<string, Uint8Array>()
 
   const kv = {
     log,
@@ -20,8 +22,17 @@ function fakeKv() {
     async create(key: string, data: Uint8Array) {
       const forced = failCreate.get(key)
       if (forced) {
+        failCreate.delete(key)
         log.push(`conflict:${key}`)
         throw forced
+      }
+      const raced = raceCreate.get(key)
+      if (raced) {
+        raceCreate.delete(key)
+        revision += 1
+        values.set(key, { value: raced, revision })
+        log.push(`conflict:${key}`)
+        throw staleError()
       }
       if (values.has(key)) {
         log.push(`conflict:${key}`)
@@ -39,6 +50,12 @@ function fakeKv() {
       return revision
     },
     async update(key: string, data: Uint8Array, version: number) {
+      const forced = failUpdate.get(key)
+      if (forced) {
+        failUpdate.delete(key)
+        log.push(`conflict:${key}`)
+        throw forced
+      }
       const found = values.get(key)
       if (!found || found.revision !== version) {
         log.push(`conflict:${key}`)
@@ -51,6 +68,12 @@ function fakeKv() {
     },
     failCreateWith(key: string, error: unknown) {
       failCreate.set(key, error)
+    },
+    failUpdateWith(key: string, error: unknown) {
+      failUpdate.set(key, error)
+    },
+    raceCreateWith(key: string, value: Uint8Array) {
+      raceCreate.set(key, value)
     },
     seed(key: string, value: Uint8Array) {
       revision += 1
@@ -294,21 +317,29 @@ describe("nats scheduler backend", () => {
     expect(seen.length).toBeGreaterThan(0)
   })
 
-  it("fires on its own timer for a cron cadence, not only via trigger()", async () => {
+  it("fires on its own timer for a cron cadence and consumes tick rejections", async () => {
     const kv = fakeKv()
     const seen: number[] = []
+    const unhandled: unknown[] = []
+    const onUnhandledRejection = (reason: unknown) => unhandled.push(reason)
+    process.on("unhandledRejection", onUnhandledRejection)
+
     const backend = await withBucket(kv)
     const registration = backend.register(
       { name: "real-cron", cadence: { cron: "* * * * * *" }, overlap: "skip", catchUp: "skip" },
       async () => {
         seen.push(seen.length + 1)
+        throw new Error("cron boom")
       }
     )
 
     await new Promise((resolve) => setTimeout(resolve, 1100))
     await registration.stop()
+    await new Promise((resolve) => setTimeout(resolve, 10))
 
+    process.off("unhandledRejection", onUnhandledRejection)
     expect(seen.length).toBeGreaterThan(0)
+    expect(unhandled).toHaveLength(0)
   }, 3000)
 
   it("throws for a non-numeric every cadence", async () => {
@@ -514,9 +545,9 @@ describe("nats scheduler backend", () => {
       await registration.stop()
     })
 
-    it("does not regress last.<name> when a catch-up tick's scheduledAt is older than the stored value", async () => {
+    it("does not regress last.<name> when a tick's scheduledAt is older than the stored value", async () => {
       const kv = fakeKv()
-      const newer = new Date()
+      const newer = new Date(Date.now() + 60 * 60 * 1000)
       await kv.put("last.monotonic", encoder.encode(newer.toISOString()))
       const backend = await withBucket(kv)
       const registration = backend.register(
@@ -524,13 +555,73 @@ describe("nats scheduler backend", () => {
         async () => {}
       )
 
-      const older = new Date(newer.getTime() - 60 * 60 * 1000)
       await registration.trigger()
       await registration.stop()
 
       const entry = await kv.get("last.monotonic")
-      expect(new Date(decoder.decode(entry!.value)).getTime()).toBeGreaterThanOrEqual(newer.getTime())
-      expect(older.getTime()).toBeLessThan(newer.getTime())
+      expect(decoder.decode(entry!.value)).toBe(newer.toISOString())
+    })
+
+    it("retries recordLast when the create races a concurrent writer", async () => {
+      const kv = fakeKv()
+      const older = new Date(Date.now() - 60 * 60 * 1000)
+      kv.raceCreateWith("last.race-create", encoder.encode(older.toISOString()))
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "race-create", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      await registration.trigger()
+      await registration.stop()
+
+      const entry = await kv.get("last.race-create")
+      expect(new Date(decoder.decode(entry!.value)).getTime()).toBeGreaterThan(older.getTime())
+    })
+
+    it("propagates non-conflict errors from the recordLast create", async () => {
+      const kv = fakeKv()
+      kv.failCreateWith("last.broken-create", new Error("backend offline"))
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "broken-create", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      await expect(registration.trigger()).rejects.toThrow("backend offline")
+      await registration.stop()
+    })
+
+    it("propagates non-conflict errors from the recordLast update", async () => {
+      const kv = fakeKv()
+      await kv.put("last.broken-update", encoder.encode(new Date(Date.now() - 60 * 60 * 1000).toISOString()))
+      kv.failUpdateWith("last.broken-update", new Error("backend offline"))
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "broken-update", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      await expect(registration.trigger()).rejects.toThrow("backend offline")
+      await registration.stop()
+    })
+
+    it("retries recordLast when the update loses a revision race", async () => {
+      const kv = fakeKv()
+      const older = new Date(Date.now() - 60 * 60 * 1000)
+      await kv.put("last.race-update", encoder.encode(older.toISOString()))
+      kv.failUpdateWith("last.race-update", staleError())
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "race-update", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      await registration.trigger()
+      await registration.stop()
+
+      const entry = await kv.get("last.race-update")
+      expect(new Date(decoder.decode(entry!.value)).getTime()).toBeGreaterThan(older.getTime())
     })
   })
 
@@ -620,6 +711,50 @@ describe("nats scheduler backend", () => {
     })
   })
 
+  it("stop() resolves even when the in-flight tick rejects", async () => {
+    const kv = fakeKv()
+    let rejectSlow!: (error: unknown) => void
+    const slow = new Promise<void>((_, reject) => {
+      rejectSlow = reject
+    })
+    const backend = await withBucket(kv)
+    const registration = backend.register(
+      { name: "slow-fail", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+      async () => slow
+    )
+
+    const triggering = registration.trigger()
+    const stopping = registration.stop()
+
+    rejectSlow(new Error("mid-flight boom"))
+    await expect(triggering).rejects.toThrow("mid-flight boom")
+    await stopping
+  })
+
+  it("stop() resolves even when the bucket cannot be opened for catch-up", async () => {
+    vi.resetModules()
+    vi.doMock("@nats-io/kv", async () => {
+      const actual = await vi.importActual<typeof import("@nats-io/kv")>("@nats-io/kv")
+      return {
+        ...actual,
+        Kvm: class {
+          async create() {
+            throw new Error("bucket down")
+          }
+        },
+      }
+    })
+    const { nats } = await import("../src")
+    const backend = nats({ connection: {} as never })
+    const registration = backend.register(
+      { name: "no-bucket", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "all" },
+      async () => {}
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await registration.stop()
+  })
+
   describe("stale lock takeover (finding 3)", () => {
     it("lets exactly one of two racing contenders take over a stale startedAt-only marker", async () => {
       const kv = fakeKv()
@@ -675,6 +810,54 @@ describe("nats scheduler backend", () => {
       }
 
       expect(calls).toHaveLength(0)
+      await registration.stop()
+    })
+
+    it("treats a lock whose entry vanished after the create conflict as lost", async () => {
+      const kv = fakeKv()
+      kv.failCreateWith("run.vanished.2026-01-01T00-00-00.000Z", staleError())
+      const backend = await withBucket(kv)
+      const calls: string[] = []
+      const registration = backend.register(
+        { name: "vanished", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {
+          calls.push("ran")
+        }
+      )
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+      try {
+        await registration.trigger()
+      } finally {
+        vi.useRealTimers()
+      }
+
+      expect(calls).toHaveLength(0)
+      await registration.stop()
+    })
+
+    it("propagates non-conflict errors from the takeover update", async () => {
+      const kv = fakeKv()
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+      const staleStartedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const key = "run.broken-takeover.2026-01-01T00-00-00.000Z"
+      kv.seed(key, encoder.encode(JSON.stringify({ startedAt: staleStartedAt, host: "dead-host" })))
+      kv.failUpdateWith(key, new Error("backend offline"))
+
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "broken-takeover", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      try {
+        await expect(registration.trigger()).rejects.toThrow("backend offline")
+      } finally {
+        vi.useRealTimers()
+      }
       await registration.stop()
     })
   })
