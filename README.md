@@ -82,7 +82,7 @@ scope
         v
 execution context
   request, job, action, route, or UI boundary
-  flows: input/output work
+  flows: input/output work; generator flows stream yields via execStream
   resources: transactions, request loggers, form drafts, spans
   tags: tenant, locale, trace id, runtime config
         |
@@ -114,6 +114,7 @@ The same seam works for backend and frontend:
 | `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
 | `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |
 | `changes` / `resolveStream` / `drain` | Async-iterator consumption | `for await` over atom changes, fan-out over async-iterable atoms, bounded collection |
+| generator `flow` / `execStream` | Streaming execution | Flows that yield progress or elements and return a final output; break cancels with cleanup |
 
 ## Extension Runtime Options
 
