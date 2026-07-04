@@ -8,6 +8,7 @@ export interface JobsIo {
 }
 
 export interface JobsRunner {
+  ready: Promise<void>
   stop(): Promise<void>
 }
 
@@ -26,15 +27,36 @@ export function runJobs(manifest: Manifest, io?: JobsIo, scope?: Lite.Scope): Jo
         `jobs entry "${entry.name}" must default-export a schedule() atom from @pumped-fn/lite-extension-scheduler`
       )
     }
-    const registration = appScope.resolve(entry.schedule)
-    registration.catch(() => {})
-    return registration
+    return { name: entry.name, registration: appScope.resolve(entry.schedule) }
   })
 
+  const ready = Promise.all(
+    registrations.map(({ name, registration }) =>
+      registration.catch((error) => {
+        throw new Error(`jobs entry "${name}" failed to register: ${error instanceof Error ? error.message : String(error)}`, {
+          cause: error,
+        })
+      })
+    )
+  ).then(() => undefined)
+
   return {
+    ready,
     async stop() {
-      await Promise.all(registrations)
+      let firstError: unknown
+      let hasError = false
+      for (const { registration } of registrations) {
+        try {
+          await registration
+        } catch (error) {
+          if (!hasError) {
+            firstError = error
+            hasError = true
+          }
+        }
+      }
       if (ownsScope) await appScope.dispose()
+      if (hasError) throw firstError
     },
   }
 }

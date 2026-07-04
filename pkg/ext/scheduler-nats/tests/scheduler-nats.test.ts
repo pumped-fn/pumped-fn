@@ -38,8 +38,24 @@ function fakeKv() {
       log.push(`put:${key}`)
       return revision
     },
+    async update(key: string, data: Uint8Array, version: number) {
+      const found = values.get(key)
+      if (!found || found.revision !== version) {
+        log.push(`conflict:${key}`)
+        throw staleError()
+      }
+      revision += 1
+      values.set(key, { value: data, revision })
+      log.push(`update:${key}`)
+      return revision
+    },
     failCreateWith(key: string, error: unknown) {
       failCreate.set(key, error)
+    },
+    seed(key: string, value: Uint8Array) {
+      revision += 1
+      values.set(key, { value, revision })
+      return revision
     },
   }
   return kv
@@ -476,6 +492,214 @@ describe("nats scheduler backend", () => {
 
       await until(() => calls.length >= 2)
       await registration.stop()
+    })
+
+    it("routes catch-up ticks through the same overlap chain as timer ticks (queue order preserved)", async () => {
+      const kv = fakeKv()
+      const last = new Date(Date.now() - 3 * 60 * 60 * 1000)
+      await kv.put("last.ordered", encoder.encode(last.toISOString()))
+      const order: string[] = []
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "ordered", cadence: { cron: "0 * * * *" }, overlap: "queue", catchUp: "all" },
+        async (run) => {
+          order.push(run.scheduledAt.toISOString())
+          await new Promise((resolve) => setTimeout(resolve, 5))
+        }
+      )
+
+      await until(() => order.length >= 2)
+      const sorted = [...order].sort()
+      expect(order).toEqual(sorted)
+      await registration.stop()
+    })
+
+    it("does not regress last.<name> when a catch-up tick's scheduledAt is older than the stored value", async () => {
+      const kv = fakeKv()
+      const newer = new Date()
+      await kv.put("last.monotonic", encoder.encode(newer.toISOString()))
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "monotonic", cadence: { cron: "0 * * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {}
+      )
+
+      const older = new Date(newer.getTime() - 60 * 60 * 1000)
+      await registration.trigger()
+      await registration.stop()
+
+      const entry = await kv.get("last.monotonic")
+      expect(new Date(decoder.decode(entry!.value)).getTime()).toBeGreaterThanOrEqual(newer.getTime())
+      expect(older.getTime()).toBeLessThan(newer.getTime())
+    })
+  })
+
+  describe("overlap chain resilience (finding 1)", () => {
+    it("overlap: queue keeps running subsequent ticks after one tick throws", async () => {
+      const kv = fakeKv()
+      const errors: unknown[] = []
+      const order: number[] = []
+      let call = 0
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        {
+          name: "recovers",
+          cadence: { cron: "0 0 * * *" },
+          overlap: "queue",
+          catchUp: "skip",
+          onError: (error) => errors.push(error),
+        },
+        async () => {
+          call += 1
+          order.push(call)
+          if (call === 1) throw new Error("boom")
+        }
+      )
+
+      const first = registration.trigger().catch(() => {})
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const second = registration.trigger()
+      await Promise.all([first, second])
+
+      expect(order).toEqual([1, 2])
+      expect(errors).toHaveLength(1)
+      await registration.stop()
+    })
+
+    it("does not emit an unhandled rejection when a timer-fired tick throws", async () => {
+      const kv = fakeKv()
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (reason: unknown) => unhandled.push(reason)
+      process.on("unhandledRejection", onUnhandledRejection)
+
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "timer-throws", cadence: { every: "10" }, overlap: "skip", catchUp: "skip" },
+        async () => {
+          throw new Error("timer boom")
+        }
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      await registration.stop()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      process.off("unhandledRejection", onUnhandledRejection)
+      expect(unhandled).toHaveLength(0)
+    })
+  })
+
+  describe("stop() awaits in-flight work (finding 4)", () => {
+    it("stop() does not resolve until a slow in-flight tick completes", async () => {
+      const kv = fakeKv()
+      let resolveSlow!: () => void
+      const slow = new Promise<void>((resolve) => {
+        resolveSlow = resolve
+      })
+      let completed = false
+      const backend = await withBucket(kv)
+      const registration = backend.register(
+        { name: "slow", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {
+          await slow
+          completed = true
+        }
+      )
+
+      const triggering = registration.trigger()
+      const stopping = registration.stop()
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(completed).toBe(false)
+
+      resolveSlow()
+      await stopping
+      await triggering
+
+      expect(completed).toBe(true)
+    })
+  })
+
+  describe("stale lock takeover (finding 3)", () => {
+    it("lets exactly one of two racing contenders take over a stale startedAt-only marker", async () => {
+      const kv = fakeKv()
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+      const staleStartedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      kv.seed("run.stuck.2026-01-01T00-00-00.000Z", encoder.encode(JSON.stringify({ startedAt: staleStartedAt, host: "dead-host" })))
+
+      const backendA = await withBucket(kv)
+      const backendB = await withBucket(kv)
+      const calls: string[] = []
+      const spec = { name: "stuck", cadence: { cron: "0 0 * * *" }, overlap: "skip" as const, catchUp: "skip" as const }
+      const regA = backendA.register(spec, async () => {
+        calls.push("A")
+      })
+      const regB = backendB.register(spec, async () => {
+        calls.push("B")
+      })
+
+      try {
+        await Promise.all([regA.trigger(), regB.trigger()])
+      } finally {
+        vi.useRealTimers()
+      }
+
+      expect(calls).toHaveLength(1)
+      await regA.stop()
+      await regB.stop()
+    })
+
+    it("refuses takeover while the stale marker is still within lockTtlMs", async () => {
+      const kv = fakeKv()
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+      const recentStartedAt = new Date(Date.now() - 1000).toISOString()
+      kv.seed("run.fresh-lock.2026-01-01T00-00-00.000Z", encoder.encode(JSON.stringify({ startedAt: recentStartedAt, host: "other-host" })))
+
+      const backend = await withBucket(kv)
+      const calls: string[] = []
+      const registration = backend.register(
+        { name: "fresh-lock", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {
+          calls.push("ran")
+        }
+      )
+
+      try {
+        await registration.trigger()
+      } finally {
+        vi.useRealTimers()
+      }
+
+      expect(calls).toHaveLength(0)
+      await registration.stop()
+    })
+  })
+
+  describe("trigger(dedupKey) cross-replica dedup (finding 7)", () => {
+    it("dedups manual triggers across replicas when an explicit dedupKey is given", async () => {
+      const kv = fakeKv()
+      const calls: string[] = []
+      const spec = { name: "manual-explicit", cadence: { cron: "0 0 * * *" }, overlap: "skip" as const, catchUp: "skip" as const }
+      const backendA = await withBucket(kv)
+      const backendB = await withBucket(kv)
+      const regA = backendA.register(spec, async () => {
+        calls.push("A")
+      })
+      const regB = backendB.register(spec, async () => {
+        calls.push("B")
+      })
+
+      await Promise.all([regA.trigger("daily-report"), regB.trigger("daily-report")])
+
+      expect(calls).toHaveLength(1)
+      expect(kv.log.some((entry) => entry.startsWith("create:run.manual-explicit.manual.daily-report"))).toBe(true)
+
+      await regA.stop()
+      await regB.stop()
     })
   })
 })

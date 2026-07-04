@@ -5,16 +5,17 @@ export namespace Scheduler {
   export type Cadence = { cron: string } | { every: string }
   export type Overlap = "skip" | "queue"
   export type CatchUp = "skip" | "last" | "all"
+  export type OnError = (error: unknown, run: { key: string; scheduledAt: Date }) => void
 
   export interface Registration {
-    trigger(): Promise<void>
+    trigger(dedupKey?: string): Promise<void>
     next(): Date | undefined
     stop(): Promise<void>
   }
 
   export interface Backend {
     register(
-      spec: { name: string; cadence: Cadence; overlap: Overlap; catchUp: CatchUp },
+      spec: { name: string; cadence: Cadence; overlap: Overlap; catchUp: CatchUp; onError?: OnError },
       tick: (run: { key: string; scheduledAt: Date }) => Promise<void>
     ): Registration
   }
@@ -26,6 +27,8 @@ export namespace Scheduler {
     catchUp?: CatchUp
     flow: Lite.Flow<any, Input, any>
     input: () => Input
+    onError?: OnError
+    tags?: () => Lite.Tagged<any>[]
   }
 }
 
@@ -45,9 +48,11 @@ export function schedule<Input>(opts: Scheduler.Options<Input>): Lite.Atom<Sched
     deps: { backend: tags.required(backend) },
     factory: (ctx, deps) => {
       const registration = deps.backend.register(
-        { name, cadence: opts.cadence, overlap, catchUp },
+        { name, cadence: opts.cadence, overlap, catchUp, onError: opts.onError },
         async (tick) => {
-          const context = ctx.scope.createContext({ tags: [run({ name, scheduledAt: tick.scheduledAt })] })
+          const context = ctx.scope.createContext({
+            tags: [run({ name, scheduledAt: tick.scheduledAt }), ...(opts.tags?.() ?? [])],
+          })
           try {
             await context.exec({ flow: opts.flow, input: opts.input() } as Lite.ExecFlowOptions<unknown, Input>)
             await context.close({ ok: true })
@@ -98,34 +103,43 @@ export function inProcess(): Scheduler.Backend {
       let inFlight: Promise<void> | undefined
       let chain: Promise<void> | undefined
 
-      function fire(scheduledAt: Date): void {
+      function fire(scheduledAt: Date): Promise<void> {
         const key = `${spec.name}:${scheduledAt.toISOString()}`
+
         if (spec.overlap === "skip") {
-          if (inFlight) return
-          inFlight = tick({ key, scheduledAt }).finally(() => {
+          if (inFlight) return inFlight
+          const current = tick({ key, scheduledAt }).catch((error) => {
+            spec.onError?.(error, { key, scheduledAt })
+            throw error
+          })
+          inFlight = current.finally(() => {
             inFlight = undefined
           })
-          return
+          return inFlight
         }
-        chain = (chain ?? Promise.resolve()).then(() => tick({ key, scheduledAt }))
+
+        const previous = chain ?? Promise.resolve()
+        const current = previous.then(() => tick({ key, scheduledAt }))
+        chain = current.catch((error) => {
+          spec.onError?.(error, { key, scheduledAt })
+        })
+        return current
       }
 
       const job =
         "cron" in spec.cadence
-          ? new Cron(spec.cadence.cron, () => fire(new Date()))
-          : intervalJob(parseEvery(spec.cadence.every), (at) => fire(at))
+          ? new Cron(spec.cadence.cron, () => void fire(new Date()).catch(() => {}))
+          : intervalJob(parseEvery(spec.cadence.every), (at) => void fire(at).catch(() => {}))
 
       return {
-        async trigger() {
-          fire(new Date())
-          await (spec.overlap === "skip" ? inFlight : chain)
-        },
+        trigger: (_dedupKey?: string) => fire(new Date()),
         next() {
           if ("nextRun" in job) return job.nextRun() ?? undefined
           return job.next()
         },
         async stop() {
           job.stop()
+          await Promise.all([inFlight?.catch(() => {}), chain?.catch(() => {})])
         },
       }
     },

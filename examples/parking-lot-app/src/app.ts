@@ -11,9 +11,16 @@ function readRole(value: string | undefined): Role {
   throw new Error(`unknown role: ${value ?? "missing"}`)
 }
 
+function envActor(): Actor {
+  const actorId = process.env["PARKING_ACTOR_ID"] ?? "anonymous"
+  const role = readRole(process.env["PARKING_ROLE"] ?? "manager")
+  return { id: actorId, role }
+}
+
 function contextTags(request?: Request) {
-  const actorId = request?.headers.get("x-actor-id") ?? process.env["PARKING_ACTOR_ID"] ?? "anonymous"
-  const role = readRole(request?.headers.get("x-role") ?? process.env["PARKING_ROLE"] ?? "manager")
+  if (!request) return []
+  const actorId = request.headers.get("x-actor-id") ?? process.env["PARKING_ACTOR_ID"] ?? "anonymous"
+  const role = readRole(request.headers.get("x-role") ?? process.env["PARKING_ROLE"] ?? "manager")
   const value: Actor = { id: actorId, role }
   return [actor(value)]
 }
@@ -25,7 +32,7 @@ export default {
     ...(process.env["PARKING_DB_PATH"] ? [dbPath(process.env["PARKING_DB_PATH"])] : []),
     logging.runtime({ sinks: [logSink], level: "info", flow: "all" }),
     observable.runtime({ sinks: [obsSink], input: true }),
-    actor({ id: "scheduler", role: "manager" }),
+    actor(envActor()),
   ],
   mapError,
 } satisfies pumped.Config

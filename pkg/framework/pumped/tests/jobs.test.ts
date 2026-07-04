@@ -32,6 +32,7 @@ describe("runJobs", () => {
 
     const scope = createScope({ tags: [scheduler.backend(scheduler.inProcess())] })
     const runner = runJobs(manifest, undefined, scope)
+    await runner.ready
     const registration = await scope.resolve(scheduleAtom)
     await registration.trigger()
     await registration.trigger()
@@ -39,6 +40,32 @@ describe("runJobs", () => {
     await scope.dispose()
 
     expect(calls).toEqual([1, 1])
+  })
+
+  it("rejects runner.ready with the entry name when a job's registration fails", async () => {
+    const failing = scheduler.schedule({
+      name: "nightly-sweep",
+      cadence: { cron: "*/5 * * * *" },
+      flow: flow({ factory: () => undefined }),
+      input: () => undefined,
+    })
+    const entry: ManifestEntry = { kind: "jobs", name: "nightly-sweep", file: "virtual", schedule: failing }
+    const manifest: Manifest = {
+      app: {
+        tags: [
+          scheduler.backend({
+            register() {
+              throw new Error("backend offline")
+            },
+          }),
+        ],
+      },
+      entries: [entry],
+    }
+
+    const runner = runJobs(manifest)
+    await expect(runner.ready).rejects.toThrow(/nightly-sweep/)
+    await expect(runner.stop()).rejects.toThrow(/backend offline/)
   })
 
   it("notifies io.onDefaultBackend when no scheduler.backend tag is set on the scope", async () => {

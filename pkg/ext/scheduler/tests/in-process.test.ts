@@ -138,6 +138,87 @@ describe("inProcess backend", () => {
     ).toThrow(/positive number of milliseconds/)
   })
 
+  it("overlap: queue continues chaining after a tick throws, instead of poisoning the chain", async () => {
+    const order: number[] = []
+    const errors: unknown[] = []
+    const backend = scheduler.inProcess()
+    let call = 0
+    const registration = backend.register(
+      {
+        name: "recovers",
+        cadence: { cron: "* * * * *" },
+        overlap: "queue",
+        catchUp: "skip",
+        onError: (error) => errors.push(error),
+      },
+      async () => {
+        call += 1
+        order.push(call)
+        if (call === 2) throw new Error("boom")
+      }
+    )
+
+    const first = registration.trigger()
+    const second = registration.trigger().catch(() => {})
+    const third = registration.trigger()
+
+    await Promise.all([first, second, third])
+
+    expect(order).toEqual([1, 2, 3])
+    expect(errors).toHaveLength(1)
+
+    await registration.stop()
+  })
+
+  it("does not emit an unhandled rejection when a timer-fired tick throws", async () => {
+    const unhandled: unknown[] = []
+    const onUnhandledRejection = (reason: unknown) => unhandled.push(reason)
+    process.on("unhandledRejection", onUnhandledRejection)
+
+    const backend = scheduler.inProcess()
+    const registration = backend.register(
+      { name: "timer-throws", cadence: { every: "10" }, overlap: "skip", catchUp: "skip" },
+      async () => {
+        throw new Error("timer boom")
+      }
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    await registration.stop()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    process.off("unhandledRejection", onUnhandledRejection)
+    expect(unhandled).toHaveLength(0)
+  })
+
+  it("stop() awaits in-flight work before resolving", async () => {
+    let resolveSlow!: () => void
+    const slow = new Promise<void>((resolve) => {
+      resolveSlow = resolve
+    })
+    let completed = false
+    const backend = scheduler.inProcess()
+    const registration = backend.register(
+      { name: "slow", cadence: { cron: "* * * * *" }, overlap: "skip", catchUp: "skip" },
+      async () => {
+        await slow
+        completed = true
+      }
+    )
+
+    const triggering = registration.trigger()
+    const stopping = registration.stop()
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(completed).toBe(false)
+
+    resolveSlow()
+    await stopping
+    await triggering
+
+    expect(completed).toBe(true)
+  })
+
   it("exposes the next cron run date", () => {
     const backend = scheduler.inProcess()
     const registration = backend.register(

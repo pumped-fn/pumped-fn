@@ -9,22 +9,28 @@ export namespace Nats {
     readonly connection: NatsConnection
     readonly bucket?: string
     readonly history?: { readonly ttlMs?: number }
+    readonly lockTtlMs?: number
   }
 
-  export type Store = Pick<KV, "create" | "get" | "put">
+  export type Store = Pick<KV, "create" | "get" | "put" | "update">
 }
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const conflict = new Set([10071, 10164])
+const defaultLockTtlMs = 5 * 60 * 1000
 
 interface Marker {
   readonly startedAt: string
   readonly host: string
+  readonly completedAt?: string
+  readonly failedAt?: string
+  readonly error?: string
 }
 
 export function nats(options: Nats.Options): Scheduler.Backend {
   const bucketName = options.bucket ?? "scheduler"
+  const lockTtlMs = options.lockTtlMs ?? defaultLockTtlMs
   const kvm = new Kvm(options.connection)
   let opened: Promise<Nats.Store> | undefined
 
@@ -38,52 +44,59 @@ export function nats(options: Nats.Options): Scheduler.Backend {
       let inFlight: Promise<void> | undefined
       let chain: Promise<void> | undefined
 
-      async function runLocked(scheduledAt: Date): Promise<void> {
+      async function runLocked(scheduledAt: Date, key: string): Promise<void> {
         const kv = await store()
-        const key = runKey(spec.name, scheduledAt)
-        const won = await claim(kv, key)
+        const won = await claim(kv, key, lockTtlMs)
         if (!won) return
 
         try {
           await tick({ key, scheduledAt })
         } catch (error) {
           await fail(kv, key, error)
+          spec.onError?.(error, { key, scheduledAt })
           throw error
         }
         await complete(kv, key)
         await recordLast(kv, spec.name, scheduledAt)
       }
 
-      function fire(scheduledAt: Date): void {
+      function fire(scheduledAt: Date, dedupKey?: string): Promise<void> {
+        const key = dedupKey ? manualKey(spec.name, dedupKey) : runKey(spec.name, scheduledAt)
+
         if (spec.overlap === "skip") {
-          if (inFlight) return
-          inFlight = runLocked(scheduledAt).finally(() => {
+          if (inFlight) return inFlight
+          const current = runLocked(scheduledAt, key)
+          inFlight = current.finally(() => {
             inFlight = undefined
           })
-          return
+          return inFlight
         }
-        chain = (chain ?? Promise.resolve()).then(() => runLocked(scheduledAt))
+
+        const previous = chain ?? Promise.resolve()
+        const current = previous.then(() => runLocked(scheduledAt, key))
+        chain = current.catch(() => {})
+        return current
       }
 
       const job =
         "cron" in spec.cadence
-          ? new Cron(spec.cadence.cron, () => fire(new Date()))
-          : intervalJob(parseEvery(spec.cadence.every), (at) => fire(at))
+          ? new Cron(spec.cadence.cron, () => void fire(new Date()).catch(() => {}))
+          : intervalJob(parseEvery(spec.cadence.every), (at) => void fire(at).catch(() => {}))
 
-      void store().then((kv) => catchUp(kv, spec, runLocked))
+      const catchUpDone = store()
+        .then((kv) => catchUp(kv, spec, fire))
+        .catch(() => {})
 
       return {
-        async trigger() {
-          const scheduledAt = new Date()
-          fire(scheduledAt)
-          await (spec.overlap === "skip" ? inFlight : chain)
-        },
+        trigger: (dedupKey?: string) => fire(new Date(), dedupKey),
         next() {
           if ("nextRun" in job) return job.nextRun() ?? undefined
           return job.next()
         },
         async stop() {
           job.stop()
+          await catchUpDone
+          await Promise.all([inFlight?.catch(() => {}), chain?.catch(() => {})])
         },
       }
     },
@@ -98,18 +111,42 @@ function runKey(name: string, scheduledAt: Date): string {
   return `run.${name}.${scheduledAt.toISOString().replace(/:/g, "-")}`
 }
 
+function manualKey(name: string, dedupKey: string): string {
+  return `run.${name}.manual.${dedupKey}`
+}
+
 function lastKey(name: string): string {
   return `last.${name}`
 }
 
-async function claim(kv: Nats.Store, key: string): Promise<boolean> {
+async function claim(kv: Nats.Store, key: string, lockTtlMs: number): Promise<boolean> {
   const marker: Marker = { startedAt: new Date().toISOString(), host: hostname() }
   try {
     await kv.create(key, encoder.encode(JSON.stringify(marker)))
     return true
   } catch (error) {
-    if (isConflict(error)) return false
-    throw error
+    if (!isConflict(error)) throw error
+    return takeover(kv, key, lockTtlMs)
+  }
+}
+
+async function takeover(kv: Nats.Store, key: string, lockTtlMs: number): Promise<boolean> {
+  const entry = await kv.get(key)
+  if (!entry) return false
+
+  const marker = JSON.parse(decoder.decode(entry.value)) as Marker
+  if (marker.completedAt || marker.failedAt) return false
+
+  const age = Date.now() - new Date(marker.startedAt).getTime()
+  if (age < lockTtlMs) return false
+
+  const takenOver: Marker = { startedAt: new Date().toISOString(), host: hostname() }
+  try {
+    await kv.update(key, encoder.encode(JSON.stringify(takenOver)), entry.revision)
+    return true
+  } catch (error) {
+    if (!isConflict(error)) throw error
+    return false
   }
 }
 
@@ -130,13 +167,34 @@ async function readMarker(kv: Nats.Store, key: string): Promise<Marker> {
 }
 
 async function recordLast(kv: Nats.Store, name: string, scheduledAt: Date): Promise<void> {
-  await kv.put(lastKey(name), encoder.encode(scheduledAt.toISOString()))
+  const key = lastKey(name)
+  const entry = await kv.get(key)
+
+  if (!entry) {
+    try {
+      await kv.create(key, encoder.encode(scheduledAt.toISOString()))
+    } catch (error) {
+      if (!isConflict(error)) throw error
+      await recordLast(kv, name, scheduledAt)
+    }
+    return
+  }
+
+  const current = new Date(decoder.decode(entry.value))
+  if (scheduledAt <= current) return
+
+  try {
+    await kv.update(key, encoder.encode(scheduledAt.toISOString()), entry.revision)
+  } catch (error) {
+    if (!isConflict(error)) throw error
+    await recordLast(kv, name, scheduledAt)
+  }
 }
 
 async function catchUp(
   kv: Nats.Store,
   spec: { name: string; cadence: Scheduler.Cadence; catchUp: Scheduler.CatchUp },
-  runLocked: (scheduledAt: Date) => Promise<void>
+  fire: (scheduledAt: Date) => Promise<void>
 ): Promise<void> {
   if (spec.catchUp === "skip") return
 
@@ -149,7 +207,7 @@ async function catchUp(
 
   const targets = spec.catchUp === "last" ? [missed[missed.length - 1]!] : missed
   for (const scheduledAt of targets) {
-    await runLocked(scheduledAt)
+    await fire(scheduledAt)
   }
 }
 

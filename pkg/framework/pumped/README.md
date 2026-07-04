@@ -93,6 +93,25 @@ grade, not durable**. `runJobs`'s optional `io.onDefaultBackend()` callback fire
 default is the one in effect, so a caller can log/notice it without the framework hardcoding a
 logging subsystem.
 
+`runJobs` returns `{ ready, stop }`: `ready` resolves once every jobs entry's `schedule()` atom has
+resolved (i.e. `backend.register()` succeeded for all of them), and rejects — naming the failing
+entry — if any registration throws or its promise rejects. Both the built entry-server template and
+`pumped dev`'s dev-runner `await jobs.ready` before considering the server "up", so a broken
+registration fails startup loudly instead of silently leaving a job unscheduled. `stop()` awaits
+every registration (settling all of them even if one throws, so one bad registration never blocks
+disposing the others), disposes the scope if it owns one, then rethrows the first registration
+error it saw, if any.
+
+**Job ticks do not run `app.context()`.** `context(request)` only fires for HTTP requests handled by
+`createServer`; a background tick has no request, so anything a job needs from tag-space must come
+from one of two places: the scope's own ambient `tags` (set once, e.g. in `app.ts`'s `tags` array,
+and visible to every tick and every request alike) or `schedule({ tags })` — an optional
+`() => Lite.Tagged<any>[]` applied to that job's own tick contexts on top of the scope's ambient
+tags. Reaching into `app.context()`'s request-only branch for a job's identity/config is a bug (see
+`examples/parking-lot-app`'s `src/app.ts`, whose actor tag is derived from env vars once at the scope
+level precisely so job ticks see the same actor identity requests do, instead of a job-only
+hardcoded stand-in).
+
 ```ts
 // src/jobs/nightly-sweep.ts
 import { flow } from "@pumped-fn/lite"
