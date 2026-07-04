@@ -814,6 +814,36 @@ describe("nats scheduler backend", () => {
       await regB.stop()
     })
 
+    it("refuses takeover of a marker that already recorded failedAt", async () => {
+      const kv = fakeKv()
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+      const staleStartedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      kv.seed(
+        "run.failed-run.2026-01-01T00-00-00.000Z",
+        encoder.encode(JSON.stringify({ startedAt: staleStartedAt, failedAt: staleStartedAt, host: "dead-host" }))
+      )
+
+      const backend = await withBucket(kv)
+      const calls: string[] = []
+      const registration = backend.register(
+        { name: "failed-run", cadence: { cron: "0 0 * * *" }, overlap: "skip", catchUp: "skip" },
+        async () => {
+          calls.push("ran")
+        }
+      )
+
+      try {
+        await registration.trigger()
+      } finally {
+        vi.useRealTimers()
+      }
+
+      expect(calls).toHaveLength(0)
+      await registration.stop()
+    })
+
     it("refuses takeover while the stale marker is still within lockTtlMs", async () => {
       const kv = fakeKv()
 
