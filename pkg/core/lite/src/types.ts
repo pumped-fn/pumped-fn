@@ -58,6 +58,9 @@ export namespace Lite {
     flush(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
     on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+    changes<T>(atom: Atom<T>): AsyncIterable<T>
+    changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
+    changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
     select<T, S>(
       atom: Atom<T>,
       selector: (value: T) => S,
@@ -231,6 +234,9 @@ export namespace Lite {
     controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    changes<T>(atom: Atom<T>): AsyncIterable<T>
+    changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
+    changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
     onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
     close(result?: CloseResult): Promise<void>
     /** Throws a `FlowFault` carrying `fault`, tagged with the executing flow's name. */
@@ -330,6 +336,15 @@ export namespace Lite {
     subscribe(listener: () => void): () => void
     dispose(): void
   }
+
+  export interface ChangesOptions {
+    states: true
+  }
+
+  export type AtomChange<T> =
+    | { readonly state: "resolving" }
+    | { readonly state: "resolved"; readonly value: T }
+    | { readonly state: "failed"; readonly error: Error }
 
   export interface Tag<T, HasDefault extends boolean = false> {
     readonly [tagSymbol]: true

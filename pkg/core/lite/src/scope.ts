@@ -3,6 +3,7 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
+import { createConflatingAsyncIterable, type ConflatingAsyncIterable } from "./conflating-iterator"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
   const prototype = Object.getPrototypeOf(value)
@@ -364,6 +365,7 @@ class ScopeImpl implements Lite.Scope {
   private chainError: unknown = null
   private initialized = false
   private disposed = false
+  private disposeListeners = new Set<() => void>()
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
@@ -594,6 +596,19 @@ class ScopeImpl implements Lite.Scope {
         }
       }
     }
+  }
+
+  private onDispose(listener: () => void): () => void {
+    this.disposeListeners.add(listener)
+    return () => {
+      this.disposeListeners.delete(listener)
+    }
+  }
+
+  private emitDispose(): void {
+    const listeners = [...this.disposeListeners]
+    this.disposeListeners.clear()
+    for (let i = 0; i < listeners.length; i++) listeners[i]!()
   }
 
   private tryResolveSyncDeps(
@@ -1207,6 +1222,72 @@ class ScopeImpl implements Lite.Scope {
     return new SelectHandleImpl(ctrl, selector, eq)
   }
 
+  changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
+  changes<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): AsyncIterable<Lite.AtomChange<T>>
+  changes<T>(handle: Lite.SelectHandle<T>): AsyncIterable<T>
+  changes<T>(
+    target: Lite.Atom<T> | Lite.SelectHandle<T>,
+    options?: Lite.ChangesOptions
+  ): AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>> {
+    if (this.disposed) throw new Error("Scope is disposed")
+    if (!isAtom(target)) return this.selectChanges(target)
+    return options ? this.atomChanges(target, options) : this.atomChanges(target)
+  }
+
+  private atomChanges<T>(atom: Lite.Atom<T>): ConflatingAsyncIterable<T>
+  private atomChanges<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): ConflatingAsyncIterable<Lite.AtomChange<T>>
+  private atomChanges<T>(atom: Lite.Atom<T>, options?: Lite.ChangesOptions): ConflatingAsyncIterable<T | Lite.AtomChange<T>> {
+    const presetValue = this.presets.get(atom)
+    if (isAtom(presetValue)) {
+      return options ? this.atomChanges(presetValue as Lite.Atom<T>, options) : this.atomChanges(presetValue as Lite.Atom<T>)
+    }
+
+    const stream = createConflatingAsyncIterable<T | Lite.AtomChange<T>>()
+    const emit = () => {
+      const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+      if (!entry) return
+      if (options?.states) {
+        if (entry.state === "resolving") stream.push({ state: "resolving" })
+        if (entry.state === "resolved" && entry.hasValue) stream.push({ state: "resolved", value: entry.value as T })
+        if (entry.state === "failed" && entry.error) stream.push({ state: "failed", error: entry.error })
+        return
+      }
+      if (entry.state === "resolved" && entry.hasValue) stream.push(entry.value as T)
+      if (entry.state === "failed" && entry.error) stream.fail(entry.error)
+    }
+    const unsubs = [
+      this.on("resolving", atom, emit),
+      this.on("resolved", atom, emit),
+      this.on("failed", atom, emit),
+      this.onDispose(() => stream.close()),
+    ]
+    stream.onClose(() => {
+      for (let i = unsubs.length - 1; i >= 0; i--) unsubs[i]!()
+    })
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (entry?.state === "resolved" || entry?.state === "failed" || entry?.state === "resolving") {
+      emit()
+    }
+    if (!entry || entry.state === "idle") {
+      void this.resolve(atom).catch(() => {})
+    }
+    return stream
+  }
+
+  private selectChanges<T>(handle: Lite.SelectHandle<T>): ConflatingAsyncIterable<T> {
+    const stream = createConflatingAsyncIterable<T>()
+    stream.push(handle.get())
+    const unsub = handle.subscribe(() => {
+      stream.push(handle.get())
+    })
+    const offDispose = this.onDispose(() => stream.close())
+    stream.onClose(() => {
+      offDispose()
+      unsub()
+    })
+    return stream
+  }
+
   getFlowPreset<O, I>(flow: Lite.Flow<O, I, any>): Lite.PresetValue<O, I> | undefined {
     return this.presets.get(flow as Lite.Flow<unknown, unknown, any>) as Lite.PresetValue<O, I> | undefined
   }
@@ -1511,6 +1592,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.disposed = true
+    this.emitDispose()
 
     this.invalidationQueue.length = 0
     this.invalidationQueued.clear()
@@ -1691,6 +1773,25 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return ctrl
   }
 
+  changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
+  changes<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): AsyncIterable<Lite.AtomChange<T>>
+  changes<T>(handle: Lite.SelectHandle<T>): AsyncIterable<T>
+  changes<T>(
+    target: Lite.Atom<T> | Lite.SelectHandle<T>,
+    options?: Lite.ChangesOptions
+  ): AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>> {
+    this.assertOpen()
+    const iterable = isAtom(target)
+      ? (options ? this.scope.changes(target, options) : this.scope.changes(target))
+      : this.scope.changes(target)
+    const stream = iterable as unknown as ConflatingAsyncIterable<T | Lite.AtomChange<T>>
+    const offClose = this.onClose(() => {
+      stream.close()
+    })
+    stream.onClose(offClose)
+    return stream as unknown as AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>>
+  }
+
   private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
     let listeners = this.resourceListeners.get(resource)
     if (!listeners) {
@@ -1750,6 +1851,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
       release: owner.release.bind(owner) as Lite.ResourceContext["release"],
       controller: owner.controller.bind(owner),
+      changes: owner.changes.bind(owner) as Lite.ResourceContext["changes"],
       onClose: owner.onClose.bind(owner),
       close: owner.close.bind(owner),
       fail: owner.fail.bind(owner),
