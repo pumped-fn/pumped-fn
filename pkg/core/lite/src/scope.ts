@@ -4,85 +4,14 @@ import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { latest, type Latest } from "./latest"
+import { consumeScalarResult, drainGenerator, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, isStreamingExec, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
+export { isStreamingExec } from "./streaming"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
   const prototype = Object.getPrototypeOf(value)
   return prototype === Object.prototype || prototype === null
 }
 
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  if ((typeof value !== "object" && typeof value !== "function") || value === null) return false
-  return typeof (value as { readonly then?: unknown }).then === "function"
-}
-
-function isAsyncGeneratorFunction(value: unknown): boolean {
-  return typeof value === "function" && Object.prototype.toString.call(value) === "[object AsyncGeneratorFunction]"
-}
-
-function isObjectKey(value: unknown): value is object {
-  return (typeof value === "object" || typeof value === "function") && value !== null
-}
-
-function isAsyncGenerator(value: unknown): value is AsyncGenerator<unknown, unknown, unknown> {
-  return isObjectKey(value) && Object.prototype.toString.call(value) === "[object AsyncGenerator]"
-}
-
-function isAsyncStream(value: unknown): boolean {
-  if (!isObjectKey(value)) return false
-  return typeof (value as { readonly [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function"
-}
-
-function assertNoReturnedStream(value: unknown): unknown {
-  if (isAsyncStream(value)) {
-    throw new Error("Flow returned an async iterable from a non-generator factory; use an async generator flow for yields or an iterable atom with resolveStream().")
-  }
-  return value
-}
-
-function consumeScalarResult(value: unknown): MaybePromise<unknown> {
-  if (isAsyncGenerator(value)) return drainGenerator(value)
-  return isPromiseLike(value)
-    ? Promise.resolve(value).then(assertNoReturnedStream)
-    : assertNoReturnedStream(value)
-}
-
-async function drainGenerator(generator: AsyncGenerator<unknown, unknown, unknown>): Promise<unknown> {
-  for (;;) {
-    const result = await generator.next()
-    if (result.done) return result.value
-  }
-}
-
-function streamRequiredError(): Error {
-  return new Error("execStream() requires an async generator flow; use exec() to run scalar flows.")
-}
-
-function requireAsyncGenerator(value: unknown): AsyncGenerator<unknown, unknown, unknown> {
-  if (isAsyncGenerator(value)) return value
-  throw streamRequiredError()
-}
-
-const streamingExecSymbol = Symbol("pumped-fn.streamingExec")
-const streamingExecTargets = new WeakSet<object>()
-
-function registerStreamingExec(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): () => void {
-  ctx.data.set(streamingExecSymbol, target)
-  if (isObjectKey(target)) streamingExecTargets.add(target)
-  return () => {
-    ctx.data.delete(streamingExecSymbol)
-    if (isObjectKey(target)) streamingExecTargets.delete(target)
-  }
-}
-
-export function isStreamingExec(target: Lite.ExecTarget, ctx?: Lite.ExecutionContext): boolean {
-  if (isFlow(target) && isAsyncGeneratorFunction(target.factory)) return true
-  if (ctx?.data.seek(streamingExecSymbol) === target) return true
-  return isObjectKey(target) && streamingExecTargets.has(target)
-}
-
-function streamResultBeforeStartError(): Error {
-  return new Error("execStream().result is unavailable before iteration begins; use exec() to drain a streaming flow to its final output.")
-}
 
 export function shallowEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
@@ -623,7 +552,6 @@ class ScopeImpl implements Lite.Scope {
       }, this.gcOptions.graceMs)
     })
   }
-
 
   private async executeGC<T>(atom: Lite.Atom<T>): Promise<void> {
     const entry = this.cache.get(atom)!
@@ -2462,7 +2390,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     const run = (resolvedDeps: Record<string, unknown>) => {
       const value = flow.deps ? factory(this, resolvedDeps) : factory(this)
-      if (isAsyncGenerator(value)) this.data.set(streamingExecSymbol, flow)
+      if (isAsyncGenerator(value)) markStreamingExec(this, flow)
       return consumeScalarResult(value)
     }
 
@@ -2498,7 +2426,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     target?: Lite.ExecTarget
   ): Promise<unknown> {
     const value = fn(this)
-    if (target && isAsyncGenerator(value)) this.data.set(streamingExecSymbol, target)
+    if (target && isAsyncGenerator(value)) markStreamingExec(this, target)
     return consumeScalarResult(value)
   }
 
