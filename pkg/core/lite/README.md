@@ -63,6 +63,7 @@ composition root
 scope
   atom graph: transports, capabilities, state, derived data
   controller/select: opt-in reactivity
+  changes/resolveStream/drain: async-iterator consumption
         |
         v
 execution context
@@ -306,6 +307,60 @@ Use `controller(dep, { resolve: true, watch: true, eq })` in atom dependencies f
 should invalidate when a dependency changes. That replaces manual subscription wiring and automatically
 cleans up on re-resolve, release, and dispose.
 
+### Async Iteration
+
+Every subscription surface is also consumable as an async iterator. `scope.changes(atom)` yields values
+as the atom resolves, sets, and invalidates; `scope.changes(handle)` iterates a select slice;
+`scope.changes(atom, { states: true })` yields state transitions with errors as data. Iteration conflates
+to the latest value: a slow consumer skips intermediates and never buffers unboundedly.
+
+```ts
+import { atom, createScope } from "@pumped-fn/lite"
+
+const config = atom({ factory: () => ({ level: "info" }) })
+
+const scope = createScope()
+for await (const value of scope.changes(config)) {
+  applyLogLevel(value.level)
+}
+```
+
+Loops terminate with `done` on `scope.dispose()`. Inside flows and resources, `ctx.changes(...)` binds the
+loop to the execution context instead, ending it at `ctx.close()`. Breaking out of a loop detaches that
+iterator only; the atom stays resolved.
+
+Atoms whose value is an async iterable get a managed consuming view through `scope.resolveStream(atom)`.
+The scope drives the underlying iterator once and fans it out: each caller gets its own conflating view,
+so concurrent consumers never steal elements from each other. Disposal and invalidation call
+`iterator.return()`, so generator `finally` blocks and `ctx.cleanup` run; invalidation re-drives the newly
+resolved iterable into the same views.
+
+```ts
+import { atom, createScope } from "@pumped-fn/lite"
+
+const orders = atom({
+  factory: async function* (ctx) {
+    const sub = await connect("orders")
+    ctx.cleanup(() => sub.close())
+    yield* sub
+  },
+})
+
+const scope = createScope()
+for await (const order of scope.resolveStream(orders)) {
+  await handle(order)
+}
+```
+
+`scope.drain(atom, { take })` collects a fresh view into an array — until the producer completes, or after
+`take` elements. Without `take` it only returns when the producer ends, so do not drain an infinite feed
+unbounded. One producer-side caveat: `scope.dispose()` awaits `iterator.return()`, and JavaScript queues
+that behind a pending `await` inside the generator, so a producer blocked on IO without yielding delays
+disposal until that await settles.
+
+Presets compose with all of it: `preset(orders, fakeFeed)` swaps the producer for a test, and
+`await scope.drain(orders, { take: 3 })` asserts the consumed elements through the same seam.
+
 ## Presets And Tests
 
 Presets replace atoms, flows, and resources at scope creation.
@@ -357,6 +412,9 @@ Extension hooks run around graph work, so they see the same seams as tests and c
 | `controller(target, options?)` | Request an atom/resource controller dependency, or preconfigure flow-handle defaults |
 | `scope.controller(atom)` | Observe and control atom state from the boundary |
 | `scope.select(atom, selector, options?)` | Subscribe to a derived slice |
+| `scope.changes(target, options?)` / `ctx.changes(...)` | Async-iterate atom values, select slices, or state transitions, conflated to latest |
+| `scope.resolveStream(atom)` / `ctx.resolveStream(atom)` | Consume an async-iterable atom through a scope-driven fan-out view |
+| `scope.drain(atom, options?)` | Collect an async-iterable atom into an array, optionally `take`-bounded |
 
 Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
 

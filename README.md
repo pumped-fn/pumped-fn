@@ -77,6 +77,7 @@ scope
   long-lived graph boundary
   atoms: cached capabilities, state, derived data, infrastructure
   controllers/select: opt-in reactivity
+  changes/resolveStream/drain: async-iterator consumption of graph state and iterable atoms
         |
         v
 execution context
@@ -112,6 +113,7 @@ The same seam works for backend and frontend:
 | `preset` | Replacement at the seam | Unit radius tests, outside-in adapter tests, tenant-specific implementation swaps |
 | `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
 | `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |
+| `changes` / `resolveStream` / `drain` | Async-iterator consumption | `for await` over atom changes, fan-out over async-iterable atoms, bounded collection |
 
 ## Extension Runtime Options
 
