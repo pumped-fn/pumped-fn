@@ -46,8 +46,8 @@
   },
   "dependencies": {
     "@pumped-fn/lite-hmr": "workspace:*",
-    "cac": "catalog:",
-    "croner": "catalog:"
+    "@pumped-fn/lite-extension-scheduler": "workspace:*",
+    "cac": "catalog:"
   },
   "devDependencies": {
     "acorn": "catalog:",

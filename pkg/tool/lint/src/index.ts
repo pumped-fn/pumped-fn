@@ -6,6 +6,7 @@ export type RuleId =
   | "pumped/no-ambient-io-outside-boundary"
   | "pumped/no-definition-handle-suffix"
   | "pumped/no-direct-flow-composition"
+  | "pumped/no-handle-spread"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
   | "pumped/no-jsdom-backend"
@@ -46,10 +47,10 @@ export interface ScanResult {
  * (tag labels for no-implicit-tag-read, global names for no-naked-globals).
  * `allowBuiltins` lists builtin error constructor names exempt from
  * no-untyped-throw. `severity` overrides a rule's default severity ("error",
- * "warn", or "off" to disable it entirely). Six dependency-graph and
+ * "warn", or "off" to disable it entirely). Seven dependency-graph and
  * error-taxonomy rules — no-implicit-tag-read, no-naked-globals,
- * no-module-state, prefer-destructured-deps, no-untyped-throw, and
- * no-swallowed-error — default to "warn" severity (see `defaultSeverity`) so
+ * no-module-state, prefer-destructured-deps, no-untyped-throw,
+ * no-swallowed-error, and no-handle-spread — default to "warn" severity (see `defaultSeverity`) so
  * they surface in `--json` output and local runs without failing the root
  * `pnpm lint` exit code, which today only scans docs and practical examples
  * rather than the whole monorepo — a wide, unaudited sweep of those rules
@@ -72,6 +73,7 @@ export interface ScanOptions {
 }
 
 const defaultSeverity: Partial<Record<RuleId, Severity>> = {
+  "pumped/no-handle-spread": "warn",
   "pumped/no-implicit-tag-read": "warn",
   "pumped/no-naked-globals": "warn",
   "pumped/no-module-state": "warn",
@@ -636,6 +638,24 @@ function declaredTagNames(config: ts.ObjectLiteralExpression, sourceFile: ts.Sou
   return analyzeDeps(deps.initializer, sourceFile, imports)
 }
 
+function collectCreatorHandleNames(sourceFile: ts.SourceFile, imports: Imports): Set<string> {
+  const names = new Set<string>()
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name)
+        && declaration.initializer
+        && ts.isCallExpression(declaration.initializer)
+        && isCreatorCall(declaration.initializer.expression, imports)
+      ) {
+        names.add(declaration.name.text)
+      }
+    }
+  }
+  return names
+}
+
 function collectUnitFactoryNodes(sourceFile: ts.SourceFile, imports: Imports): Array<ts.ArrowFunction | ts.FunctionExpression> {
   const nodes: Array<ts.ArrowFunction | ts.FunctionExpression> = []
   function walk(node: ts.Node): void {
@@ -741,6 +761,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
   const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
   const hasGraphNodes = unitFactoryNodes.length > 0
+  const creatorHandleNames = collectCreatorHandleNames(sourceFile, imports)
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
@@ -1155,6 +1176,25 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
             }
           }
         }
+      }
+    }
+
+    if (ts.isObjectLiteralExpression(node)) {
+      const hasTagsProperty = node.properties.some((property) =>
+        ts.isPropertyAssignment(property) && propertyNameText(property.name) === "tags"
+      )
+      for (const property of node.properties) {
+        if (!ts.isSpreadAssignment(property) || !ts.isIdentifier(property.expression)) continue
+        const isCreatorHandle = creatorHandleNames.has(property.expression.text)
+        if (!isCreatorHandle && !hasTagsProperty) continue
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-handle-spread",
+          property,
+          "Re-export the shared flow directly and attach tags via a sibling `export const meta = pumped.route(...)` (or command/schedule) instead of spreading the handle — spreads fork node identity and break preset targeting. Only wrap in a thin entry flow (controller + exec) when the entry genuinely adapts/transforms input before calling the shared flow.",
+        )
       }
     }
 

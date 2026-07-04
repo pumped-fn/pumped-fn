@@ -1,4 +1,5 @@
 import { preset } from "@pumped-fn/lite"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { pumped } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
 import {
@@ -13,10 +14,11 @@ import {
   store,
 } from "@pumped-fn/parking-lot-shared"
 
-function manifest(fixedClock: { value: string }): pumped.Manifest {
+function manifest(fixedClock: { value: string }, expireSchedule: ReturnType<typeof scheduler.schedule>): pumped.Manifest {
   return {
     app: {
       presets: [preset(store, createMemoryStore()), preset(clock, () => fixedClock.value)],
+      tags: [actor({ id: "scheduler", role: "manager" })],
       context: (request?: Request) => {
         const role = (request?.headers.get("x-role") as "manager" | "operator" | "user" | null) ?? "manager"
         const id = request?.headers.get("x-actor-id") ?? "manager-1"
@@ -30,15 +32,11 @@ function manifest(fixedClock: { value: string }): pumped.Manifest {
         kind: "server",
         name: "receipts",
         file: "virtual",
-        flow: { ...listReceipts, tags: [...(listReceipts.tags ?? []), pumped.route({ method: "GET" })] },
+        flow: listReceipts,
+        meta: pumped.route({ method: "GET" }),
       },
       { kind: "server", name: "reports", file: "virtual", flow: readReport },
-      {
-        kind: "jobs",
-        name: "expire-bookings",
-        file: "virtual",
-        flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
-      },
+      { kind: "jobs", name: "expire-bookings", file: "virtual", schedule: expireSchedule },
     ],
   }
 }
@@ -46,8 +44,14 @@ function manifest(fixedClock: { value: string }): pumped.Manifest {
 describe("parking lot app composition", () => {
   it("books a session via HTTP, expires it via the job on one shared scope, and observes the audit trail", async () => {
     const fixedClock = { value: "2026-07-01T08:00:00.000Z" }
-    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock))
-    const jobs = pumped.runJobs(manifest(fixedClock), undefined, scope)
+    const expireSchedule = scheduler.schedule({
+      name: "expire-bookings",
+      cadence: { cron: "*/5 * * * *" },
+      flow: expireBookings,
+      input: () => ({}),
+    })
+    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock, expireSchedule))
+    const jobs = pumped.runJobs(manifest(fixedClock, expireSchedule), undefined, scope)
 
     const configured = await honoApp.request("/lots", {
       method: "POST",
@@ -80,12 +84,8 @@ describe("parking lot app composition", () => {
     expect(booking.status).toBe("held")
 
     fixedClock.value = "2026-07-01T09:20:00.000Z"
-    await jobs.tick({
-      kind: "jobs",
-      name: "expire-bookings",
-      file: "virtual",
-      flow: { ...expireBookings, tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })] },
-    })
+    const registration = await scope.resolve(expireSchedule)
+    await registration.trigger()
 
     const receiptsRes = await honoApp.request(`/receipts?userId=${encodeURIComponent(booking.userId)}`)
     expect(receiptsRes.status).toBe(200)
@@ -98,6 +98,27 @@ describe("parking lot app composition", () => {
     const report = await reportRes.json()
     expect(report.lots[0].heldBookings).toBe(0)
 
+    await jobs.stop()
+    await scope.dispose()
+  })
+
+  it("resolves the receipts route from entry.meta, since the shared flow carries no route tag itself", async () => {
+    const fixedClock = { value: "2026-07-01T08:00:00.000Z" }
+
+    const expireSchedule = scheduler.schedule({
+      name: "expire-bookings",
+      cadence: { cron: "*/5 * * * *" },
+      flow: expireBookings,
+      input: () => ({}),
+    })
+
+    expect(pumped.route.find(listReceipts)).toBeUndefined()
+
+    const { app: honoApp, scope } = pumped.createServer(manifest(fixedClock, expireSchedule))
+    const receiptsRes = await honoApp.request("/receipts?userId=nobody")
+    expect(receiptsRes.status).toBe(200)
+
+    const jobs = pumped.runJobs(manifest(fixedClock, expireSchedule), undefined, scope)
     await jobs.stop()
     await scope.dispose()
   })

@@ -4,7 +4,7 @@ import { tx } from "./resource.tx"
 import { normalizePlate } from "./rules"
 import { allow } from "./flow.rule.allow"
 import { assertCapacity } from "./flow.rule.assert-capacity"
-import type { Fault } from "./error"
+import type { Forbidden, Conflict } from "./error"
 
 export interface BookSpaceInput {
   endAt: string
@@ -45,7 +45,7 @@ export const bookSpace = flow({
 export const cancelBooking = flow({
   name: "parking.cancel-booking",
   parse: typed<CancelBookingInput>(),
-  faults: typed<Extract<Fault, { kind: "forbidden" | "conflict" }>>(),
+  faults: typed<Forbidden | Conflict>(),
   deps: { tx },
   factory: (ctx, { tx }): Booking => {
     const booking = tx.store.booking(ctx.input.bookingId)

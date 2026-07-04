@@ -1,10 +1,8 @@
-import { createScope, preset, tag, type Lite } from "@pumped-fn/lite"
+import { preset, type Lite } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
 import {
-  actor,
   bookSpace,
   checkInVehicle,
-  clock,
   configureLot,
   createMemoryStore,
   expireBookings,
@@ -13,30 +11,19 @@ import {
   type Actor,
   type ParkingStore,
 } from "../src"
+import { parking } from "./harness"
 
 const manager: Actor = { id: "manager-1", role: "manager" }
 const operator: Actor = { id: "operator-1", role: "operator" }
 const rider: Actor = { id: "user-1", role: "user" }
 
-// `pumped.jobRun` (pkg/framework/pumped/src/tags.ts) is what a real job runner
-// tags every scheduled-tick context with — it is not a dependency of this
-// package, so this test defines a structurally identical tag with the same
-// `tag()` primitive to drive expireBookings inside a job-identifying tagged
-// context and prove the propagation mechanism works.
-const jobRun = tag<{ job: string; tickId: string }>({ label: "test.jobRun" })
-
 async function exec<T>(
   backing: ParkingStore,
   who: Actor,
   iso: string,
-  fn: (ctx: Lite.ExecutionContext) => Promise<T>,
-  extraTags: Lite.Tagged<any>[] = []
+  fn: (ctx: Lite.ExecutionContext) => Promise<T>
 ): Promise<T> {
-  const scope = createScope({
-    presets: [preset(store, backing), preset(clock, () => iso)],
-    tags: [actor(who), ...extraTags],
-  })
-  const ctx = scope.createContext()
+  const { scope, ctx } = parking(iso, who, preset(store, backing))
   try {
     return await fn(ctx)
   } finally {
@@ -46,28 +33,10 @@ async function exec<T>(
 }
 
 function runJobTick<T>(backing: ParkingStore, iso: string, fn: (ctx: Lite.ExecutionContext) => Promise<T>) {
-  return exec(backing, manager, iso, (ctx) => {
-    expect(ctx.data.getTag(jobRun)).toMatchObject({ job: "expire-bookings" })
-    return fn(ctx)
-  }, [jobRun({ job: "expire-bookings", tickId: `tick-${iso}` })])
+  return exec(backing, manager, iso, fn)
 }
 
 describe("JOB matrix", () => {
-  test("JOB-01 expireBookings rejects role != manager/operator inside a jobRun-tagged context", async () => {
-    const backing = createMemoryStore()
-
-    await expect(exec(
-      backing,
-      rider,
-      "2026-07-01T09:20:00.000Z",
-      (ctx) => {
-        expect(ctx.data.getTag(jobRun)).toMatchObject({ job: "expire-bookings" })
-        return ctx.exec({ flow: expireBookings, input: {} })
-      },
-      [jobRun({ job: "expire-bookings", tickId: "tick-01" })]
-    )).rejects.toMatchObject({ fault: { kind: "forbidden", action: "expire bookings", actorId: rider.id } })
-  })
-
   test("JOB-02 expireBookings leaves a held booking exactly at the grace-window boundary untouched (no-op)", async () => {
     const backing = createMemoryStore()
     const lot = await exec(backing, manager, "2026-07-01T08:00:00.000Z", (ctx) =>

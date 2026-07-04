@@ -421,6 +421,9 @@ importers:
       '@pumped-fn/lite-extension-observable':
         specifier: workspace:*
         version: link:../../pkg/ext/observable
+      '@pumped-fn/lite-extension-scheduler':
+        specifier: workspace:*
+        version: link:../../pkg/ext/scheduler
       '@pumped-fn/lite-hono':
         specifier: workspace:*
         version: link:../../pkg/framework/hono
@@ -904,6 +907,68 @@ importers:
         specifier: 'catalog:'
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  pkg/ext/scheduler:
+    dependencies:
+      croner:
+        specifier: 'catalog:'
+        version: 10.0.1
+    devDependencies:
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  pkg/ext/scheduler-nats:
+    dependencies:
+      croner:
+        specifier: 'catalog:'
+        version: 10.0.1
+    devDependencies:
+      '@nats-io/kv':
+        specifier: 'catalog:'
+        version: 3.4.0
+      '@nats-io/transport-node':
+        specifier: 'catalog:'
+        version: 3.4.0
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../core/lite
+      '@pumped-fn/lite-extension-scheduler':
+        specifier: workspace:*
+        version: link:../scheduler
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.8(@vitest/browser@4.1.8)(vitest@4.1.8)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
   pkg/ext/suspense:
     devDependencies:
       '@pumped-fn/lite':
@@ -1011,15 +1076,15 @@ importers:
 
   pkg/framework/pumped:
     dependencies:
+      '@pumped-fn/lite-extension-scheduler':
+        specifier: workspace:*
+        version: link:../../ext/scheduler
       '@pumped-fn/lite-hmr':
         specifier: workspace:*
         version: link:../../ext/hmr
       cac:
         specifier: 'catalog:'
         version: 7.0.0
-      croner:
-        specifier: 'catalog:'
-        version: 10.0.1
     devDependencies:
       '@hono/node-server':
         specifier: 'catalog:'
@@ -3655,6 +3720,11 @@ packages:
   sql.js@1.14.1:
     resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
 
+  srvx@0.11.16:
+    resolution: {integrity: sha512-bp07zRuycfTY43IjAvvTFnmnJi8ikW0VFiHwOhhYcVW/L4xQ1XY4PAd4Nuum1rsA17C39zL7x+CDhrn5AL32Rw==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
+
   srvx@0.11.17:
     resolution: {integrity: sha512-43yM4luKfCJamyCMhrUeHUPOrf8TdZe7kN8s5zayZCH5OeprYqi49Aso5ZvHXR4aB+DHaRNO/diNFgZSMNG8Xw==}
     engines: {node: '>=20.16.0'}
@@ -5700,7 +5770,7 @@ snapshots:
   h3@2.0.1-rc.20:
     dependencies:
       rou3: 0.8.1
-      srvx: 0.11.17
+      srvx: 0.11.16
 
   happy-dom@20.9.0:
     dependencies:
@@ -6399,6 +6469,8 @@ snapshots:
   sprintf-js@1.1.3: {}
 
   sql.js@1.14.1: {}
+
+  srvx@0.11.16: {}
 
   srvx@0.11.17: {}
 

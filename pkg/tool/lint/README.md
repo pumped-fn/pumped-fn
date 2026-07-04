@@ -42,6 +42,7 @@ pnpm lint
 | `pumped/prefer-destructured-deps` (warn) | Atom/flow/resource/tag factories whose second (deps) parameter is a plain identifier read via member access (e.g. `deps.store`); destructure it in the signature instead (`factory: (ctx, { store }) => ...`). |
 | `pumped/no-untyped-throw` (warn) | `throw new Error(...)` and other builtin error constructors (`TypeError`, `RangeError`, etc.) inside atom/flow/resource factories; throw a domain error class carrying structured fields (kind/op/entity) so traces and edges can discriminate planned vs unplanned failures. Rethrow of a caught identifier (`throw error`) and user-defined error classes both pass. |
 | `pumped/no-swallowed-error` (warn) | Catch clauses inside atom/flow/resource factories that neither rethrow nor reference the caught error (empty catch bodies, `catch {}` with no throw, or bodies that discard the binding); swallowing the error here blinds the trace seam. Wrapping with a cause (`throw new StoreError(msg, error)`), rethrowing, or passing the error to a dep (e.g. logging) all pass. |
+| `pumped/no-handle-spread` (warn) | Object literals that spread a lite handle (`{ ...sharedFlow, tags: [...] }`), detected conservatively — the spread identifier is a same-file `atom`/`flow`/`resource`/... creator result, or the object literal also sets a `tags` property alongside any spread (the retrofit fingerprint); spreads fork node identity and silently miss presets targeting the original. Wrap the shared flow in a thin entry flow (`deps: { run: controller(sharedFlow) }`, `factory: (ctx, { run }) => run.exec(...)`) instead. Plain data object spreads are not flagged. |
 
 The default path walk skips `before.*` example files, generated output, lockfiles, and dependency
 directories where examples intentionally contain bad shapes or third-party code.
@@ -51,8 +52,8 @@ directories where examples intentionally contain bad shapes or third-party code.
 Every diagnostic carries a `severity` of `"error"` or `"warn"`. The CLI exits nonzero only when at
 least one `"error"` diagnostic is found; `"warn"` diagnostics still print (and show up in `--json`
 output) but never fail the process. `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`,
-`pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, and
-`pumped/no-swallowed-error` default to `"warn"` because root `pnpm lint` only scans docs and the
+`pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`,
+`pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` because root `pnpm lint` only scans docs and the
 practical example packages today (not the whole monorepo), and turning them into hard failures for
 every existing example in one pass isn't the goal of adding them — treat their output as an
 inventory to clean up incrementally. All other rules default to `"error"`, matching current

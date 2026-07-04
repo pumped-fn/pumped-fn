@@ -77,6 +77,48 @@ describe("createDevRunner", () => {
     expect(value).toEqual({ id: 2 })
   })
 
+  it("a load that disposes its own partial composition on failure keeps the previous app untouched and disposes only the failed scope", async () => {
+    const scopeDisposals: number[] = []
+    let attempt = 0
+
+    async function load() {
+      attempt += 1
+      const id = attempt
+      const scope = {
+        dispose: async () => {
+          scopeDisposals.push(id)
+        },
+      }
+      const jobsReady = id === 2 ? Promise.reject(new Error("jobs registration failed")) : Promise.resolve()
+
+      try {
+        await jobsReady
+      } catch (error) {
+        await scope.dispose()
+        throw error
+      }
+
+      return { id, scope, fetch: () => `app-${id}` }
+    }
+
+    const runner = createDevRunner(load, async (value) => {
+      await value.scope.dispose()
+    })
+
+    const first = await runner.get()
+    expect(first.fetch()).toBe("app-1")
+
+    runner.invalidate()
+    await expect(runner.get()).rejects.toThrow("jobs registration failed")
+
+    // the failed reload's own scope was disposed, the still-serving previous scope was not
+    expect(scopeDisposals).toEqual([2])
+
+    const recovered = await runner.get()
+    expect(recovered.fetch()).toBe("app-3")
+    expect(scopeDisposals).toEqual([2, 1])
+  })
+
   it("disposeCurrent() disposes the last resolved value and clears it", async () => {
     const disposed: number[] = []
     const runner = createDevRunner(

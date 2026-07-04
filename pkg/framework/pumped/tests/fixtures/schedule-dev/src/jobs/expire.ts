@@ -1,7 +1,11 @@
 import { flow } from "@pumped-fn/lite"
-import { pumped } from "@pumped-fn/pumped"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 
-export default flow({
-  tags: [pumped.schedule({ cron: "*/5 * * * *" })],
-  factory: () => undefined,
+const expire = flow({ factory: () => undefined })
+
+export default scheduler.schedule({
+  name: "expire",
+  cadence: { cron: "*/5 * * * *" },
+  flow: expire,
+  input: () => undefined,
 })

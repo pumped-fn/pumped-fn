@@ -26,9 +26,10 @@ same shared scope.
 
 `src/app.ts` default-exports the scope config (`presets`, `context`). Every file under
 `src/server/`, `src/cli/`, `src/jobs/`, `src/workflows/` default-exports a shared flow — either
-verbatim or re-tagged with `pumped.route`/`pumped.command`/`pumped.schedule` metadata, never
+verbatim or re-tagged with `pumped.route`/`pumped.command` metadata (jobs default-export a
+`scheduler.schedule()` atom instead), never
 wrapped in a facade. The `pumped` CLI discovers those files by directory, reads the tags off each
-flow for method/path/name/cron overrides, and generates the manifest that `createServer`/`runCli`/
+flow for method/path/name overrides, and generates the manifest that `createServer`/`runCli`/
 `runJobs`/`runWorkflows` execute through one scope built from `src/app.ts`. Domain code
 (`@pumped-fn/parking-lot-shared`) never imports `@pumped-fn/pumped`; only the files under `src/`
 here do.
@@ -53,7 +54,8 @@ touched from a request, a job tick, or the boot-time day-close run. Domain logic
 `tx` transactional resource, the `ParkingStore` contract and its memory/SQLite implementations)
 lives entirely in `@pumped-fn/parking-lot-shared` and never imports `@pumped-fn/pumped` — every file
 under `src/server`, `src/cli`, `src/jobs`, `src/workflows` is a thin default export of a shared flow,
-optionally re-tagged with `pumped.route`/`pumped.command`/`pumped.schedule` metadata.
+optionally re-tagged with `pumped.route`/`pumped.command` metadata (jobs default-export a
+`scheduler.schedule()` atom).
 
 ## Where data lives
 

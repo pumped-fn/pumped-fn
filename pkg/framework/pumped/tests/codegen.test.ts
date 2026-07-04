@@ -10,12 +10,21 @@ describe("generateManifest", () => {
 
     expect(source).toBe(
       [
-        'import e0 from "/abs/src/server/book-space.ts"',
+        'import * as ns0 from "/abs/src/server/book-space.ts"',
         'import app from "/abs/src/app.ts"',
+        "",
+        "function entryDefault(ns, name, file) {",
+        "  if (ns.default === undefined) {",
+        '    throw new Error(`entry "${name}" in ${file} has no default export`)',
+        "  }",
+        "  return ns.default",
+        "}",
+        "",
+        'const e0 = entryDefault(ns0, "book-space", "/abs/src/server/book-space.ts")',
         "",
         "export { app }",
         "export const entries = [",
-        '  { kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts", flow: e0 }',
+        '  { kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts", flow: e0, meta: ns0.meta }',
         "]",
         "",
       ].join("\n")
@@ -26,7 +35,37 @@ describe("generateManifest", () => {
     const source = generateManifest([], undefined)
 
     expect(source).toBe(
-      ["const app = undefined", "", "export { app }", "export const entries = [", "", "]", ""].join("\n")
+      [
+        "const app = undefined",
+        "",
+        "function entryDefault(ns, name, file) {",
+        "  if (ns.default === undefined) {",
+        '    throw new Error(`entry "${name}" in ${file} has no default export`)',
+        "  }",
+        "  return ns.default",
+        "}",
+        "",
+        "export { app }",
+        "export const entries = [",
+        "",
+        "]",
+        "",
+      ].join("\n")
     )
+  })
+
+  it("throws the friendly named error, not a raw ESM error, when an entry has no default export", async () => {
+    const { mkdtempSync, writeFileSync } = await import("node:fs")
+    const { tmpdir } = await import("node:os")
+    const { join } = await import("node:path")
+    const dir = mkdtempSync(join(tmpdir(), "pumped-codegen-"))
+    const file = join(dir, "no-default.mjs")
+    writeFileSync(file, "export const meta = { not: 'default' }\n")
+
+    const source = generateManifest([{ kind: "server", name: "no-default", file }], undefined)
+    const moduleFile = join(dir, "manifest.mjs")
+    writeFileSync(moduleFile, source)
+
+    await expect(import(moduleFile)).rejects.toThrow(/entry "no-default".*has no default export/)
   })
 })

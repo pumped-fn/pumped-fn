@@ -1,7 +1,9 @@
 import { expireBookings } from "@pumped-fn/parking-lot-shared"
-import { pumped } from "@pumped-fn/pumped"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 
-export default {
-  ...expireBookings,
-  tags: [...(expireBookings.tags ?? []), pumped.schedule({ cron: "*/5 * * * *" })],
-}
+export default scheduler.schedule({
+  name: "expire-bookings",
+  cadence: { cron: "*/5 * * * *" },
+  flow: expireBookings,
+  input: () => ({}),
+})

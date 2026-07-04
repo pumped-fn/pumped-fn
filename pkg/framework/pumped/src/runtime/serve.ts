@@ -4,10 +4,10 @@ import { Hono } from "hono"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import { route } from "../tags"
 import { createAppScope } from "./app-scope"
-import type { Manifest, ManifestEntry } from "./manifest"
+import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 function resolveRoute(entry: ManifestEntry): { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string } {
-  const meta = route.find(entry.flow)
+  const meta = route.find(entry.meta ? [entry.meta] : []) ?? route.find(entry.flow!)
   return {
     method: meta?.method ?? "POST",
     path: meta?.path ?? `/${entry.name}`,
@@ -41,7 +41,7 @@ export interface SharedScope {
 }
 
 export function createServer(manifest: Manifest, shared?: SharedScope) {
-  const appConfig = manifest.app
+  const appConfig = normalizeApp(manifest.app)
   const lite = shared?.lite ?? hono.adapter()
   const appScope = shared?.scope ?? createAppScope(manifest, [lite])
 
@@ -50,7 +50,7 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
   app.use(
     "*",
     lite.middleware({
-      tags: (request) => appConfig?.context?.(request) ?? [],
+      tags: (request) => appConfig.context(request),
     })
   )
 
@@ -64,9 +64,9 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
       try {
-        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+        return context.json(await context.var.lite.exec({ flow: entry.flow!, rawInput }))
       } catch (error) {
-        const mapped = appConfig?.mapError?.(error)
+        const mapped = appConfig.mapError?.(error)
         if (mapped === undefined) throw error
         return context.json(mapped.body, mapped.status as ContentfulStatusCode)
       }
@@ -79,9 +79,9 @@ export function createServer(manifest: Manifest, shared?: SharedScope) {
       if (rawInput === INVALID_JSON) return context.json({ error: "invalid JSON body" }, 400)
 
       try {
-        return context.json(await context.var.lite.exec({ flow: entry.flow, rawInput }))
+        return context.json(await context.var.lite.exec({ flow: entry.flow!, rawInput }))
       } catch (error) {
-        const mapped = appConfig?.mapError?.(error)
+        const mapped = appConfig.mapError?.(error)
         if (mapped === undefined) throw error
         return context.json(mapped.body, mapped.status as ContentfulStatusCode)
       }

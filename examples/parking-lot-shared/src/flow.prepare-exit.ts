@@ -4,7 +4,7 @@ import { tx } from "./resource.tx"
 import { completeBooking } from "./flow.complete-booking"
 import { allow } from "./flow.rule.allow"
 import { amountDue } from "./flow.rule.amount-due"
-import type { Fault } from "./error"
+import type { Conflict } from "./error"
 
 export interface PrepareExitInput {
   sessionId: string
@@ -13,7 +13,7 @@ export interface PrepareExitInput {
 export const prepareExit = flow({
   name: "parking.prepare-exit",
   parse: typed<PrepareExitInput>(),
-  faults: typed<Extract<Fault, { kind: "conflict" }> | Lite.Utils.FaultsOf<typeof allow>>(),
+  faults: typed<Conflict | Lite.Utils.FaultsOf<typeof allow>>(),
   deps: { tx, allow, amountDue, completeBooking },
   factory: async (ctx, { tx, allow, amountDue, completeBooking }): Promise<{ payment: Payment; session: ParkingSession }> => {
     await allow.exec({ input: { action: "prepare exit", roles: ["operator"] } })

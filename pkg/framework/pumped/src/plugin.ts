@@ -30,8 +30,9 @@ const manifest = { app: manifestApp, entries }
 const lite = hono.adapter()
 const scope = pumped.createAppScope(manifest, [lite])
 const { app: honoApp } = pumped.createServer(manifest, { scope, lite })
-pumped.runJobs(manifest, undefined, scope)
+const jobs = pumped.runJobs(manifest, undefined, scope)
 pumped.runWorkflows(manifest, undefined, scope)
+await jobs.ready
 const port = Number(process.env.PORT ?? 3000)
 serve({ fetch: honoApp.fetch, port })
 `
@@ -57,7 +58,12 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     config() {
       return {
         ssr: {
-          external: ["@pumped-fn/pumped", "@pumped-fn/lite", "@pumped-fn/lite-hono"],
+          external: [
+            "@pumped-fn/pumped",
+            "@pumped-fn/lite",
+            "@pumped-fn/lite-hono",
+            "@pumped-fn/lite-extension-scheduler",
+          ],
         },
       }
     },
@@ -109,6 +115,14 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
         const { app } = createServer(manifest, { scope, lite })
         const jobs = runJobs(manifest, undefined, scope)
         const workflows = runWorkflows(manifest, undefined, scope)
+
+        try {
+          await jobs.ready
+        } catch (error) {
+          await Promise.allSettled([jobs.stop(), workflows.stop()])
+          await scope.dispose()
+          throw error
+        }
 
         return { fetch: app.fetch, scope, jobs, workflows }
       }

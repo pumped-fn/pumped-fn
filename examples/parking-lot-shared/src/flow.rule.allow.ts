@@ -1,7 +1,7 @@
 import { flow, tags, typed } from "@pumped-fn/lite"
 import type { Role } from "./model"
 import { actor, rule } from "./tags"
-import type { Fault } from "./error"
+import type { Forbidden } from "./error"
 
 export interface AllowInput {
   action: string
@@ -11,7 +11,7 @@ export interface AllowInput {
 export const allow = flow({
   name: "parking.rule.allow",
   parse: typed<AllowInput>(),
-  faults: typed<Extract<Fault, { kind: "forbidden" }>>(),
+  faults: typed<Forbidden>(),
   deps: { actor: tags.required(actor) },
   tags: [rule({ name: "allow" })],
   factory: (ctx, { actor }): void => {

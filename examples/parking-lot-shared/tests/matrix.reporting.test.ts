@@ -1,9 +1,7 @@
-import { createScope, preset, tag, type Lite } from "@pumped-fn/lite"
+import { preset, tag, type Lite } from "@pumped-fn/lite"
 import { describe, expect, test } from "vitest"
 import {
-  actor,
   checkInVehicle,
-  clock,
   configureLot,
   createMemoryStore,
   dayClose,
@@ -15,6 +13,7 @@ import {
   type Actor,
   type ParkingStore,
 } from "../src"
+import { parking } from "./harness"
 
 const manager: Actor = { id: "manager-1", role: "manager" }
 const operator: Actor = { id: "operator-1", role: "operator" }
@@ -35,11 +34,8 @@ async function exec<T>(
   fn: (ctx: Lite.ExecutionContext) => Promise<T>,
   extraTags: Lite.Tagged<any>[] = []
 ): Promise<T> {
-  const scope = createScope({
-    presets: [preset(store, backing), preset(clock, () => iso)],
-    tags: [actor(who), ...extraTags],
-  })
-  const ctx = scope.createContext()
+  const { scope } = parking(iso, who, preset(store, backing))
+  const ctx = extraTags.length > 0 ? scope.createContext({ tags: extraTags }) : scope.createContext()
   try {
     return await fn(ctx)
   } finally {

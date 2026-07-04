@@ -2,7 +2,7 @@ import type { Lite } from "@pumped-fn/lite"
 import { randomUUID } from "node:crypto"
 import { workflowRun } from "../tags"
 import { createAppScope } from "./app-scope"
-import type { Manifest, ManifestEntry } from "./manifest"
+import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
 export interface WorkflowsIo {
   onError(entry: ManifestEntry, error: unknown, mapped?: { status: number; body: unknown }): void
@@ -13,7 +13,7 @@ export interface WorkflowsRunner {
 }
 
 export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.Scope): WorkflowsRunner {
-  const appConfig = manifest.app
+  const appConfig = normalizeApp(manifest.app)
   const onError =
     io?.onError ??
     ((entry: ManifestEntry, error: unknown) => {
@@ -30,16 +30,16 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.
   async function runEntry(entry: ManifestEntry): Promise<void> {
     const tags: Lite.Tagged<any>[] = [
       workflowRun({ taskId: entry.name, runId: randomUUID() }),
-      ...(appConfig?.context?.() ?? []),
+      ...appConfig.context(),
     ]
     const context = appScope.createContext({ tags })
 
     try {
-      await context.exec({ flow: entry.flow, rawInput: undefined })
+      await context.exec({ flow: entry.flow!, rawInput: undefined })
       await context.close({ ok: true })
     } catch (error) {
       await context.close({ ok: false, error })
-      onError(entry, error, appConfig?.mapError?.(error))
+      onError(entry, error, appConfig.mapError?.(error))
     }
   }
 

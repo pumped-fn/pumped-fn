@@ -10,15 +10,17 @@ export interface CommandMeta {
   description?: string
 }
 
-export interface ScheduleMeta {
-  cron: string
-}
-
 export interface WorkflowRunMeta {
   taskId: string
   runId: string
 }
 
+/**
+ * `{ job, tickId }` metadata tag, mirroring `workflowRun`. `runJobs` no longer stamps this
+ * automatically: context creation for a job tick is now owned by the `schedule()` atom's own
+ * backend (`@pumped-fn/lite-extension-scheduler`), which has no seam for pumped-specific tags.
+ * Kept for callers who tag their own job flows with it directly.
+ */
 export interface JobRunMeta {
   job: string
   tickId: string
@@ -26,6 +28,5 @@ export interface JobRunMeta {
 
 export const route = tag<RouteMeta>({ label: "app.route" })
 export const command = tag<CommandMeta>({ label: "app.command" })
-export const schedule = tag<ScheduleMeta>({ label: "app.schedule" })
 export const workflowRun = tag<WorkflowRunMeta>({ label: "app.workflowRun" })
 export const jobRun = tag<JobRunMeta>({ label: "app.jobRun" })
