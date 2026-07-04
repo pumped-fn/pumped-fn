@@ -10,6 +10,48 @@ function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) return false
+  return typeof (value as { readonly then?: unknown }).then === "function"
+}
+
+function isAsyncGeneratorFunction(value: unknown): boolean {
+  return typeof value === "function" && Object.prototype.toString.call(value) === "[object AsyncGeneratorFunction]"
+}
+
+function isAsyncStream(value: unknown): boolean {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) return false
+  return typeof (value as { readonly [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function"
+}
+
+function assertNoReturnedStream(value: unknown): unknown {
+  if (isAsyncStream(value)) {
+    throw new Error("Flow returned an async iterable from a non-generator factory; use an async generator flow for yields or an iterable atom with resolveStream().")
+  }
+  return value
+}
+
+function consumeScalarResult(value: unknown): MaybePromise<unknown> {
+  return isPromiseLike(value)
+    ? Promise.resolve(value).then(assertNoReturnedStream)
+    : assertNoReturnedStream(value)
+}
+
+async function drainGenerator(generator: AsyncGenerator<unknown, unknown, unknown>): Promise<unknown> {
+  for (;;) {
+    const result = await generator.next()
+    if (result.done) return result.value
+  }
+}
+
+function markStreamingTarget(flow: Lite.Flow<unknown, unknown, any, unknown>): Lite.ExecTarget {
+  return Object.assign(Object.create(flow), { streaming: true as const }) as Lite.ExecTarget
+}
+
+function streamResultBeforeStartError(): Error {
+  return new Error("execStream().result is unavailable before iteration begins; use exec() to drain a streaming flow to its final output.")
+}
+
 export function shallowEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
@@ -370,7 +412,7 @@ class ResourceControllerImpl<T> implements Lite.ResourceController<T> {
 
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
-  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any> | Lite.Resource<unknown>, unknown>()
+  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>()
   private resolving = new Set<Lite.Atom<unknown>>()
   private pending = new Map<Lite.Atom<unknown>, Promise<unknown>>()
   private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<() => void>>>()
@@ -1083,11 +1125,11 @@ class ScopeImpl implements Lite.Scope {
     return Promise.all(parallel).then(() => result)
   }
 
-  private createFlowHandle<Output, Input>(
-    flow: Lite.Flow<Output, Input, any>,
+  private createFlowHandle<Output, Input, Yield>(
+    flow: Lite.Flow<Output, Input, any, Yield>,
     ctx: Lite.ExecutionContext,
     defaults?: Lite.FlowControllerOptions<Input>
-  ): Lite.FlowHandle<Output, Input> {
+  ): Lite.FlowHandle<Output, Input, Yield> {
     return {
       flow,
       exec: (...args: Lite.FlowExecArgs<Input>) => {
@@ -1128,7 +1170,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private execFlowHandle<Output, Input>(
-    flow: Lite.Flow<Output, Input, any>,
+    flow: Lite.Flow<Output, Input, any, any>,
     ctx: Lite.ExecutionContext,
     options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
   ): Promise<Output> {
@@ -1457,8 +1499,8 @@ class ScopeImpl implements Lite.Scope {
     hub.unsubs = []
   }
 
-  getFlowPreset<O, I>(flow: Lite.Flow<O, I, any>): Lite.PresetValue<O, I> | undefined {
-    return this.presets.get(flow as Lite.Flow<unknown, unknown, any>) as Lite.PresetValue<O, I> | undefined
+  getFlowPreset<O, I, Y>(flow: Lite.Flow<O, I, any, Y>): Lite.PresetValue<O, I, Y> | undefined {
+    return this.presets.get(flow as Lite.Flow<unknown, unknown, any, unknown>) as Lite.PresetValue<O, I, Y> | undefined
   }
 
   resolveResource<T>(
@@ -2034,6 +2076,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       get parent() { return owner.parent },
       get data() { return owner.data },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
+      execStream: owner.execStream.bind(owner) as Lite.ResourceContext["execStream"],
       resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
       release: owner.release.bind(owner) as Lite.ResourceContext["release"],
       controller: owner.controller.bind(owner),
@@ -2079,7 +2122,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   async exec(options: {
-    flow: Lite.Flow<unknown, unknown, any>
+    flow: Lite.Flow<unknown, unknown, any, unknown>
     input?: unknown
     rawInput?: unknown
     name?: string
@@ -2094,6 +2137,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       if (presetValue !== undefined && isFlow(presetValue)) {
         return this.exec({ ...options, flow: presetValue })
       }
+      const streaming = typeof presetValue === "function"
+        ? isAsyncGeneratorFunction(presetValue)
+        : isAsyncGeneratorFunction(flow.factory)
+      const target = streaming ? markStreamingTarget(flow) : flow
 
       const rawValue = rawInput !== undefined ? rawInput : input
       let parsedInput: unknown = rawValue
@@ -2144,7 +2191,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
           const runFlow = async () => presetValue !== undefined && typeof presetValue === 'function'
             ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
             : await childCtx.execFlowInternal(flow)
-          result = await childCtx.applyExecPipeline(flow, runFlow)
+          result = await childCtx.applyExecPipeline(target, runFlow)
         }
         await childCtx.close({ ok: true })
         return result
@@ -2185,23 +2232,217 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any>): MaybePromise<unknown> {
+  execStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  execStream(options: {
+    flow: Lite.Flow<unknown, unknown, any, unknown>
+    input?: unknown
+    rawInput?: unknown
+    name?: string
+    tags?: Lite.Tagged<any>[]
+  }): Lite.FlowStream<unknown, unknown>
+  execStream(options: {
+    flow: Lite.Flow<unknown, unknown, any, unknown>
+    input?: unknown
+    rawInput?: unknown
+    name?: string
+    tags?: Lite.Tagged<any>[]
+  }): Lite.FlowStream<unknown, unknown> {
+    this.assertOpen()
+
+    const { flow, input, rawInput, name: execName, tags: execTags } = options
+    const presetValue = this.scope.getFlowPreset(flow)
+    if (presetValue !== undefined && isFlow(presetValue)) {
+      return this.execStream({ ...options, flow: presetValue })
+    }
+
+    let consumed = false
+    let started = false
+    let setup: Promise<void> | undefined
+    let result: Promise<unknown> | undefined
+    let iterator: AsyncGenerator<unknown, unknown, unknown> | undefined
+    let shortCircuit: IteratorReturnResult<unknown> | undefined
+    let settleRaw: ((value: unknown) => void) | undefined
+    let failRaw: ((error: unknown) => void) | undefined
+    let abortError: Error | undefined
+    let resolveSetup: (() => void) | undefined
+    let rejectSetup: ((error: unknown) => void) | undefined
+
+    const start = () => {
+      if (setup) return setup
+      started = true
+      setup = new Promise<void>((resolve, reject) => {
+        resolveSetup = resolve
+        rejectSetup = reject
+      })
+      const raw = new Promise<unknown>((resolve, reject) => {
+        settleRaw = resolve
+        failRaw = reject
+      })
+      raw.catch(() => {})
+      result = new Promise<unknown>((resolve, reject) => {
+        void (async () => {
+          let childCtx: ExecutionContextImpl | undefined
+          try {
+            this.assertOpen()
+            const rawValue = rawInput !== undefined ? rawInput : input
+            let parsedInput: unknown = rawValue
+            if (flow.parse) {
+              const label = execName ?? flow.name ?? "anonymous"
+              try {
+                parsedInput = await flow.parse(rawValue)
+              } catch (err) {
+                throw new ParseError(
+                  `Failed to parse flow input "${label}"`,
+                  "flow-input",
+                  label,
+                  err
+                )
+              }
+            }
+
+            childCtx = new ExecutionContextImpl(this.scope, {
+              parent: this,
+              input: parsedInput,
+              execName,
+              flowName: flow.name,
+              boundary: false
+            })
+
+            if (execTags && execTags.length > 0) {
+              for (let i = 0; i < execTags.length; i++) {
+                childCtx.data.set(execTags[i]!.key, execTags[i]!.value)
+              }
+            }
+
+            const flowTags = flow.tags
+            if (flowTags && flowTags.length > 0) {
+              for (let i = 0; i < flowTags.length; i++) {
+                if (!childCtx.data.has(flowTags[i]!.key)) {
+                  childCtx.data.set(flowTags[i]!.key, flowTags[i]!.value)
+                }
+              }
+            }
+
+            const streaming = typeof presetValue === "function"
+              ? isAsyncGeneratorFunction(presetValue)
+              : isAsyncGeneratorFunction(flow.factory)
+            if (!streaming) throw new Error("execStream() requires an async generator flow; use exec() to run scalar flows.")
+            const runFlow = async () => {
+              iterator = presetValue !== undefined && typeof presetValue === "function"
+                ? childCtx!.execPresetStreamFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
+                : await childCtx!.execFlowStreamInternal(flow)
+              resolveSetup?.()
+              return raw
+            }
+            const pipeline = this.scope.execExts.length === 0
+              ? runFlow()
+              : childCtx.applyExecPipeline(markStreamingTarget(flow), runFlow)
+            const value = await pipeline
+            if (!iterator) {
+              shortCircuit = { done: true, value }
+              resolveSetup?.()
+            }
+            await childCtx.close({ ok: true })
+            resolve(value)
+          } catch (error) {
+            if (childCtx) {
+              const closeResult: Lite.CloseResult = error === abortError
+                ? { ok: false, error, aborted: true }
+                : { ok: false, error }
+              await childCtx.close(closeResult)
+            }
+            rejectSetup?.(error)
+            reject(error)
+          }
+        })()
+      })
+      result.catch(() => {})
+      return setup
+    }
+
+    const next = async (): Promise<IteratorResult<unknown>> => {
+      await start()
+      if (shortCircuit) {
+        await result
+        return shortCircuit
+      }
+      const current = iterator!
+      try {
+        const step = await current.next()
+        if (step.done) {
+          settleRaw?.(step.value)
+          await result
+        }
+        return step
+      } catch (error) {
+        failRaw?.(error)
+        await result?.catch(() => {})
+        throw error
+      }
+    }
+
+    const closeAborted = async (): Promise<IteratorReturnResult<unknown>> => {
+      if (!started) return { done: true, value: undefined }
+      await setup
+      if (shortCircuit) return shortCircuit
+      const current = iterator!
+      abortError = new Error("Flow stream aborted")
+      await current.return?.(undefined)
+      failRaw?.(abortError)
+      await result?.catch(() => {})
+      return { done: true, value: undefined }
+    }
+
+    return {
+      get result() {
+        if (!started || !result) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execStream() results can be consumed only once.")
+        consumed = true
+        return {
+          next,
+          return: closeAborted,
+        }
+      },
+    }
+  }
+
+  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<unknown> {
     const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
 
     const factory = flow.factory as unknown as (
       ctx: Lite.ExecutionContext,
       deps?: Record<string, unknown>
-    ) => MaybePromise<unknown>
+    ) => MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>
 
-    if (depsResult != null && typeof (depsResult as any).then === 'function') {
+    const run = (resolvedDeps: Record<string, unknown>) => {
+      const value = flow.deps ? factory(this, resolvedDeps) : factory(this)
+      return isAsyncGeneratorFunction(flow.factory)
+        ? drainGenerator(value as AsyncGenerator<unknown, unknown, unknown>)
+        : consumeScalarResult(value)
+    }
+
+    if (isPromiseLike(depsResult)) {
       return (depsResult as Promise<Record<string, unknown>>).then((resolvedDeps) => {
-        return flow.deps ? factory(this, resolvedDeps) : factory(this)
+        return run(resolvedDeps)
       })
     }
 
-    const resolvedDeps = depsResult as Record<string, unknown>
+    return run(depsResult as Record<string, unknown>)
+  }
 
-    return flow.deps ? factory(this, resolvedDeps) : factory(this)
+  private async execFlowStreamInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): Promise<AsyncGenerator<unknown, unknown, unknown>> {
+    const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
+    const resolvedDeps = isPromiseLike(depsResult)
+      ? await depsResult as Record<string, unknown>
+      : depsResult as Record<string, unknown>
+    const factory = flow.factory as unknown as (
+      ctx: Lite.ExecutionContext,
+      deps?: Record<string, unknown>
+    ) => unknown
+    return (flow.deps ? factory(this, resolvedDeps) : factory(this)) as AsyncGenerator<unknown, unknown, unknown>
   }
 
   private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
@@ -2209,12 +2450,19 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return fn(this, ...params)
   }
 
-  private async execPresetFn(fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown>): Promise<unknown> {
-    return fn(this)
+  private async execPresetFn(fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>): Promise<unknown> {
+    const value = fn(this)
+    return isAsyncGeneratorFunction(fn)
+      ? drainGenerator(value as AsyncGenerator<unknown, unknown, unknown>)
+      : consumeScalarResult(value)
+  }
+
+  private execPresetStreamFn(fn: (ctx: Lite.ExecutionContext) => unknown): AsyncGenerator<unknown, unknown, unknown> {
+    return fn(this) as AsyncGenerator<unknown, unknown, unknown>
   }
 
   private async applyExecPipeline(
-    target: Lite.Flow<unknown, unknown, any> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => MaybePromise<unknown>),
+    target: Lite.ExecTarget,
     doExec: () => Promise<unknown>
   ): Promise<unknown> {
     let next = doExec

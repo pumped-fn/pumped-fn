@@ -24,12 +24,13 @@ export interface FlowConfig<
   Input,
   D extends Record<string, Lite.Dependency>,
   Fault = never,
+  Yield = never,
 > {
   name?: string
   parse?: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
   deps?: D
   faults?: Lite.Typed<Fault>
-  factory: Lite.FlowFactory<Output, Input, Fault, D>
+  factory: Lite.FlowFactory<Output, Input, Fault, D, Yield>
   tags?: Lite.Tagged<any>[]
 }
 
@@ -50,6 +51,77 @@ export interface FlowConfig<
  * })
  * ```
  */
+export function flow<TOutput, TYield, Fault = never>(config: {
+  name?: string
+  parse?: undefined
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, void, Fault, TYield>
+
+export function flow<TOutput, TYield, TInput, Fault = never>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput, Fault, TYield>
+
+export function flow<TOutput, TYield, TInput, Fault = never>(config: {
+  name?: string
+  parse: Lite.Typed<TInput>
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput, Fault, TYield>
+
+export function flow<
+  TOutput,
+  TYield,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse?: undefined
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, void, Fault, TYield>
+
+export function flow<
+  TOutput,
+  TYield,
+  TInput,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<TInput>
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput, Fault, TYield>
+
+export function flow<
+  TOutput,
+  TYield,
+  TInput,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse: Lite.Typed<TInput>
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<TOutput, TInput, Fault, TYield>
+
 export function flow<TOutput, Fault = never>(config: {
   name?: string
   parse?: undefined
@@ -118,7 +190,7 @@ export function flow<
   tags?: Lite.Tagged<any>[]
 }): Lite.Flow<TOutput, TInput, Fault>
 
-export function flow(config: any): Lite.Flow<any, any> {
+export function flow(config: any): Lite.Flow<any, any, any, any> {
   const parse = config.parse
   const isTypedMarker =
     typeof parse === "object" && parse !== null && typedSymbol in parse
@@ -135,7 +207,8 @@ export function flow(config: any): Lite.Flow<any, any> {
       unknown,
       unknown,
       unknown,
-      Record<string, Lite.Dependency>
+      Record<string, Lite.Dependency>,
+      unknown
     >,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     tags: config.tags,
@@ -155,7 +228,7 @@ export function flow(config: any): Lite.Flow<any, any> {
  * }
  * ```
  */
-export function isFlow(value: unknown): value is Lite.Flow<unknown, unknown> {
+export function isFlow(value: unknown): value is Lite.Flow<unknown, unknown, unknown, unknown> {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -190,7 +263,7 @@ export function isFlow(value: unknown): value is Lite.Flow<unknown, unknown> {
  * ```
  */
 export function isFault<F>(
-  flow: Lite.Flow<any, any, F>,
+  flow: Lite.Flow<any, any, F, any>,
   error: unknown
 ): error is FlowFault & { fault: F } {
   return error instanceof FlowFault && error.flow === (flow.name ?? "anonymous")

@@ -169,24 +169,24 @@ export function controller<T>(
   options: { resolve?: never; watch?: never; eq?: never }
 ): Lite.NonWatchResourceControllerDep<T>
 
-export function controller<TOutput, TInput>(
-  flow: Lite.Flow<TOutput, TInput, any>
-): Lite.FlowControllerDep<TOutput, TInput>
+export function controller<TOutput, TInput, TYield>(
+  flow: Lite.Flow<TOutput, TInput, any, TYield>
+): Lite.FlowControllerDep<TOutput, TInput, TYield>
 
-export function controller<TOutput, TInput>(
-  flow: Lite.Flow<TOutput, TInput, any>,
+export function controller<TOutput, TInput, TYield>(
+  flow: Lite.Flow<TOutput, TInput, any, TYield>,
   options: Lite.FlowControllerOptions<TInput>
-): Lite.FlowControllerDep<TOutput, TInput>
+): Lite.FlowControllerDep<TOutput, TInput, TYield>
 
 export function controller<T>(
-  target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any, any>,
+  target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any, any, any>,
   options?: Lite.ControllerDepOptions<T> | Lite.ResourceControllerDepOptions | Lite.FlowControllerOptions<any>
 ): Lite.ControllerDep<T> {
   if ((target as unknown as Record<symbol, unknown>)[flowSymbol] === true) {
     const flowOptions = options as Lite.FlowControllerOptions<any> | undefined
     return {
       [controllerDepSymbol]: true,
-      flow: target as Lite.Flow<any, any, any>,
+      flow: target as Lite.Flow<any, any, any, any>,
       name: flowOptions?.name,
       tags: flowOptions?.tags,
       key: flowOptions?.key,
@@ -236,7 +236,7 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
   )
 }
 
-export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown> {
+export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown, unknown> {
   return isControllerDep(value) && "flow" in value
 }
 
