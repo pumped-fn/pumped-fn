@@ -61,6 +61,8 @@ export namespace Lite {
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
+    resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
+    drain<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>, options?: DrainOptions): Promise<T[]>
     select<T, S>(
       atom: Atom<T>,
       selector: (value: T) => S,
@@ -237,6 +239,7 @@ export namespace Lite {
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
+    resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
     onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
     close(result?: CloseResult): Promise<void>
     /** Throws a `FlowFault` carrying `fault`, tagged with the executing flow's name. */
@@ -339,6 +342,10 @@ export namespace Lite {
 
   export interface ChangesOptions {
     states: true
+  }
+
+  export interface DrainOptions {
+    take?: number
   }
 
   export type AtomChange<T> =

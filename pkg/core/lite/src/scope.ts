@@ -153,6 +153,17 @@ type ResourceDependencyConsumer = {
   entry: ResourceEntry<unknown>
 }
 
+type StreamSource<T> = AsyncIterable<T> | AsyncIterator<T>
+
+type StreamHub<T> = {
+  atom: Lite.Atom<StreamSource<T>>
+  views: Set<ConflatingAsyncIterable<T>>
+  unsubs: (() => void)[]
+  version: number
+  iterator?: AsyncIterator<T>
+  source?: StreamSource<T>
+}
+
 function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
   if (!(ctx instanceof ExecutionContextImpl)) {
     throw new Error("Resource deps require an ExecutionContext")
@@ -161,6 +172,11 @@ function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is 
 
 function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.AtomControllerDep<unknown> {
   return dep.atom !== undefined
+}
+
+function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
+  const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
+  return iterate ? iterate.call(source) : source as AsyncIterator<T>
 }
 
 // Snapshot per dispatch, no caching: a size- or version-validated cache over a
@@ -367,6 +383,7 @@ class ScopeImpl implements Lite.Scope {
   private disposed = false
   private disposeListeners = new Set<() => void>()
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
+  private streamHubs = new Map<Lite.Atom<unknown>, StreamHub<unknown>>()
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
   readonly tags: Lite.Tagged<any>[]
@@ -1288,6 +1305,155 @@ class ScopeImpl implements Lite.Scope {
     return stream
   }
 
+  resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
+    if (this.disposed) throw new Error("Scope is disposed")
+    const presetValue = this.presets.get(atom as Lite.Atom<unknown>)
+    if (isAtom(presetValue)) return this.resolveStream(presetValue as Lite.Atom<StreamSource<T>>)
+    const hub = this.getStreamHub(atom)
+    const stream = createConflatingAsyncIterable<T>()
+    hub.views.add(stream)
+    stream.onClose(() => {
+      hub.views.delete(stream)
+    })
+    this.ensureStreamHub(hub)
+    return stream
+  }
+
+  async drain<T>(atom: Lite.Atom<StreamSource<T>>, options?: Lite.DrainOptions): Promise<T[]> {
+    const values: T[] = []
+    const iterator = this.resolveStream(atom)[Symbol.asyncIterator]()
+    const take = options?.take
+    while (take === undefined || values.length < take) {
+      const result = await iterator.next()
+      if (result.done) return values
+      values.push(result.value)
+    }
+    await iterator.return?.()
+    return values
+  }
+
+  private getStreamHub<T>(atom: Lite.Atom<StreamSource<T>>): StreamHub<T> {
+    const cached = this.streamHubs.get(atom as Lite.Atom<unknown>) as StreamHub<T> | undefined
+    if (cached) return cached
+    const hub: StreamHub<T> = {
+      atom,
+      views: new Set(),
+      unsubs: [],
+      version: 0,
+    }
+    hub.unsubs = [
+      this.on("resolving", atom as Lite.Atom<unknown>, () => {
+        void this.stopStreamHub(hub).then(undefined, error => this.finishStreamHub(hub, true, error))
+      }),
+      this.on("resolved", atom as Lite.Atom<unknown>, () => this.driveResolvedStreamHub(hub)),
+      this.on("failed", atom as Lite.Atom<unknown>, () => {
+        const entry = this.cache.get(atom as Lite.Atom<unknown>)
+        if (entry?.state === "failed" && entry.error) this.finishStreamHub(hub, true, entry.error)
+      }),
+    ]
+    this.streamHubs.set(atom as Lite.Atom<unknown>, hub as StreamHub<unknown>)
+    return hub
+  }
+
+  private ensureStreamHub<T>(hub: StreamHub<T>): void {
+    const entry = this.cache.get(hub.atom as Lite.Atom<unknown>) as AtomEntry<StreamSource<T>> | undefined
+    if (entry?.state === "resolved" && entry.hasValue) {
+      this.driveStreamHub(hub, entry.value as StreamSource<T>)
+      return
+    }
+    if (entry?.state === "failed" && entry.error) {
+      this.finishStreamHub(hub, true, entry.error)
+      return
+    }
+    void this.resolve(hub.atom).then(
+      source => this.driveStreamHub(hub, source),
+      error => this.finishStreamHub(hub, true, error)
+    )
+  }
+
+  private driveResolvedStreamHub<T>(hub: StreamHub<T>): void {
+    const entry = this.cache.get(hub.atom as Lite.Atom<unknown>) as AtomEntry<StreamSource<T>> | undefined
+    if (entry?.state !== "resolved" || !entry.hasValue) return
+    this.driveStreamHub(hub, entry.value as StreamSource<T>)
+  }
+
+  private driveStreamHub<T>(hub: StreamHub<T>, source: StreamSource<T>): void {
+    if (hub.unsubs.length === 0 || Object.is(hub.source, source)) return
+    void this.stopStreamHub(hub).then(undefined, error => this.finishStreamHub(hub, true, error))
+    hub.source = source
+    hub.iterator = getAsyncIterator(source)
+    const version = ++hub.version
+    void this.runStreamHub(hub, hub.iterator, version)
+  }
+
+  private async runStreamHub<T>(
+    hub: StreamHub<T>,
+    iterator: AsyncIterator<T>,
+    version: number
+  ): Promise<void> {
+    try {
+      for (;;) {
+        const result = await iterator.next()
+        if (hub.unsubs.length === 0 || hub.version !== version || hub.iterator !== iterator) return
+        if (result.done) {
+          this.finishStreamHub(hub, false)
+          return
+        }
+        for (const view of hub.views) view.push(result.value)
+      }
+    } catch (error) {
+      if (hub.unsubs.length > 0 && hub.version === version && hub.iterator === iterator) {
+        this.finishStreamHub(hub, true, error)
+      }
+    }
+  }
+
+  private async stopStreamHub<T>(hub: StreamHub<T>): Promise<void> {
+    hub.version++
+    const iterator = hub.iterator
+    hub.iterator = undefined
+    hub.source = undefined
+    await iterator?.return?.()
+  }
+
+  private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> | undefined {
+    const hub = this.streamHubs.get(atom)
+    if (hub) return this.stopStreamHub(hub)
+  }
+
+  private releaseStreamHub(atom: Lite.Atom<unknown>): Promise<void> | undefined {
+    const hub = this.streamHubs.get(atom)
+    if (!hub) return undefined
+    return this.stopStreamHub(hub).then(() => this.finishStreamHub(hub, false))
+  }
+
+  private async releaseStreamHubs(): Promise<void> {
+    for (const hub of [...this.streamHubs.values()]) {
+      await this.stopStreamHub(hub)
+      this.finishStreamHub(hub, false)
+    }
+  }
+
+  private finishStreamHub<T>(hub: StreamHub<T>, failed: boolean, error?: unknown): void {
+    if (hub.unsubs.length === 0) return
+    hub.version++
+    hub.iterator = undefined
+    hub.source = undefined
+    this.streamHubs.delete(hub.atom as Lite.Atom<unknown>)
+    this.cleanupStreamHub(hub)
+    const views = [...hub.views]
+    hub.views.clear()
+    for (let i = 0; i < views.length; i++) {
+      if (failed) views[i]!.fail(error)
+      else views[i]!.close()
+    }
+  }
+
+  private cleanupStreamHub<T>(hub: StreamHub<T>): void {
+    for (let i = hub.unsubs.length - 1; i >= 0; i--) hub.unsubs[i]!()
+    hub.unsubs = []
+  }
+
   getFlowPreset<O, I>(flow: Lite.Flow<O, I, any>): Lite.PresetValue<O, I> | undefined {
     return this.presets.get(flow as Lite.Flow<unknown, unknown, any>) as Lite.PresetValue<O, I> | undefined
   }
@@ -1528,6 +1694,9 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
+    const streamStop = this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
+    if (streamStop) await streamStop
+
     if (entry.cleanups.length > 0) {
       await runCleanupsSafe(entry.cleanups)
       entry.cleanups = []
@@ -1552,6 +1721,9 @@ class ScopeImpl implements Lite.Scope {
   async release<T>(atom: Lite.Atom<T>): Promise<void> {
     const entry = this.cache.get(atom)
     if (!entry) return
+
+    const streamRelease = this.releaseStreamHub(atom as Lite.Atom<unknown>)
+    if (streamRelease) await streamRelease
 
     if (entry.gcScheduled) {
       clearTimeout(entry.gcScheduled)
@@ -1592,6 +1764,7 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.disposed = true
+    if (this.streamHubs.size > 0) await this.releaseStreamHubs()
     this.emitDispose()
 
     this.invalidationQueue.length = 0
@@ -1792,6 +1965,16 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return stream as unknown as AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>>
   }
 
+  resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
+    this.assertOpen()
+    const stream = this.scope.resolveStream(atom) as ConflatingAsyncIterable<T>
+    const offClose = this.onClose(() => {
+      stream.close()
+    })
+    stream.onClose(offClose)
+    return stream
+  }
+
   private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
     let listeners = this.resourceListeners.get(resource)
     if (!listeners) {
@@ -1852,6 +2035,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       release: owner.release.bind(owner) as Lite.ResourceContext["release"],
       controller: owner.controller.bind(owner),
       changes: owner.changes.bind(owner) as Lite.ResourceContext["changes"],
+      resolveStream: owner.resolveStream.bind(owner),
       onClose: owner.onClose.bind(owner),
       close: owner.close.bind(owner),
       fail: owner.fail.bind(owner),
