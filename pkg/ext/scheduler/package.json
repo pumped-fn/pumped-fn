@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-scheduler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "description": "Recurring schedule extension for @pumped-fn/lite: a keepAlive schedule() atom against a pluggable SchedulerBackend",
   "type": "module",
