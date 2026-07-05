@@ -56,7 +56,7 @@ export function runHandlingFee(_ctx: Lite.ExecutionContext, totalCents: number):
   return totalCents + 25
 }
 
-export function priceItems(_ctx: Lite.ExecutionContext, items: readonly number[]): number {
+export function priceItems(items: readonly number[]): number {
   return items.reduce((total, item) => total + item, 0)
 }
 
@@ -65,7 +65,7 @@ export const quote = flow({
   parse: typed<QuoteInput>(),
   deps: { taxRate, fee: requestFee },
   factory: (ctx, { taxRate, fee }) => {
-    const subtotalCents = priceItems(ctx, ctx.input.items)
+    const subtotalCents = priceItems(ctx.input.items)
     return {
       subtotalCents,
       taxBasisPoints: taxRate,
@@ -94,7 +94,7 @@ export const checkout = flow({
       input: {
         itemCount: ctx.input.items.length,
         subtotalCents: await ctx.exec({
-          fn: priceItems,
+          fn: (_ctx: Lite.ExecutionContext, items: readonly number[]) => priceItems(items),
           name: "price-items",
           params: [ctx.input.items],
         }),

@@ -236,7 +236,7 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
   )
 }
 
-export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown, unknown> {
+export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown, never> {
   return isControllerDep(value) && "flow" in value
 }
 
