@@ -47,10 +47,12 @@ export function preset<T>(
  * })
  * ```
  */
-export function preset<TOutput, TInput>(
-  target: Lite.Flow<TOutput, TInput>,
-  value: Lite.Flow<TOutput, TInput> | ((ctx: Lite.ExecutionContext & { readonly input: TInput }) => MaybePromise<TOutput>)
-): Lite.Preset<TOutput, TInput>
+export function preset<Output, Input, Fault, Yield>(
+  target: Lite.Flow<Output, Input, Fault, Yield>,
+  value:
+    | Lite.Flow<Output, Input, Fault, Yield>
+    | ((ctx: Lite.ExecutionContext<Fault> & { readonly input: Input }) => MaybePromise<Output> | AsyncGenerator<Yield, Output, unknown>)
+): Lite.Preset<Output, Input, Yield>
 
 /**
  * Creates a preset that overrides a Resource within an execution context.
@@ -64,10 +66,10 @@ export function preset<T>(
   value: ResourcePresetValue<T>
 ): Lite.Preset<T>
 
-export function preset<T, I>(
-  target: Lite.PresetTarget<T, I>,
-  value: Lite.PresetValue<T, I>
-): Lite.Preset<T, I> {
+export function preset<T, I, Y>(
+  target: Lite.PresetTarget<T, I, Y>,
+  value: Lite.PresetValue<T, I, Y>
+): Lite.Preset<T, I, Y> {
   if (!isAtom(target) && !isFlow(target) && !isResource(target)) {
     throw new Error("preset target must be Atom, Flow, or Resource")
   }

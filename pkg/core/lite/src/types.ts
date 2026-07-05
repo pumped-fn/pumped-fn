@@ -8,6 +8,7 @@ export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/contr
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
 export const typedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/typed")
 export const resourceSymbol: unique symbol = Symbol.for("@pumped-fn/lite/resource")
+export const boundDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/bound-dep")
 
 export class ParseError extends Error {
   override readonly name = "ParseError"
@@ -58,6 +59,11 @@ export namespace Lite {
     flush(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
     on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+    changes<T>(atom: Atom<T>): AsyncIterable<T>
+    changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
+    changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
+    resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
+    drain<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>, options?: DrainOptions): Promise<T[]>
     select<T, S>(
       atom: Atom<T>,
       selector: (value: T) => S,
@@ -73,7 +79,7 @@ export namespace Lite {
   export interface ScopeOptions {
     extensions?: Extension[]
     tags?: Tagged<any>[]
-    presets?: Preset<any, any>[]
+    presets?: Preset<any, any, any>[]
     gc?: GCOptions
   }
 
@@ -92,15 +98,16 @@ export namespace Lite {
     readonly keepAlive?: boolean
   }
 
-  export interface Flow<TOutput, TInput = unknown, TFault = never> {
+  export interface Flow<Output, Input = unknown, Fault = never, Yield = never> {
     readonly [flowSymbol]: true
     readonly name?: string
-    readonly parse?: (raw: unknown) => MaybePromise<TInput>
-    readonly factory: FlowFactory<TOutput, TInput, TFault, Record<string, Dependency>>
+    readonly parse?: (raw: unknown) => MaybePromise<Input>
+    readonly factory: FlowFactory<Output, Input, Fault, Record<string, Dependency>, Yield>
     readonly deps?: Record<string, Dependency>
     readonly tags?: Tagged<any>[]
     /** Phantom marker carrying the flow's declared fault type; never assigned at runtime. */
-    readonly faultType?: TFault
+    readonly faultType?: Fault
+    readonly yieldType?: Yield
   }
 
   export interface FlowRunOptions {
@@ -131,18 +138,19 @@ export namespace Lite {
     ? [] | [options: FlowPrepareOptions<Input>]
     : [options: FlowPrepareOptions<Input>]
 
-  export interface FlowInvocation<Output, Input> {
-    readonly flow: Flow<Output, Input, any>
+  export interface FlowInvocation<Output, Input, Yield = never> {
+    readonly flow: Flow<Output, Input, any, Yield>
     readonly options: FlowPrepareOptions<Input>
     readonly key: string | undefined
     readonly ready: Promise<void>
     exec(): Promise<Output>
   }
 
-  export interface FlowHandle<Output, Input> {
-    readonly flow: Flow<Output, Input, any>
+  export interface FlowHandle<Output, Input, Yield = never> {
+    readonly flow: Flow<Output, Input, any, Yield>
     exec(...args: FlowExecArgs<Input>): Promise<Output>
-    prepare(...args: FlowPrepareArgs<Input>): FlowInvocation<Output, Input>
+    execStream(...args: FlowExecArgs<Input>): FlowStream<Yield, Output>
+    prepare(...args: FlowPrepareArgs<Input>): FlowInvocation<Output, Input, Yield>
   }
 
   export interface Resource<T, D extends Record<string, Dependency> = Record<string, Dependency>> {
@@ -152,6 +160,23 @@ export namespace Lite {
     readonly tags?: Tagged<any>[]
     readonly ownership?: ResourceOwnership
     readonly factory: ResourceFactory<T, D>
+  }
+
+  export type Bound<T> = T extends undefined
+    ? undefined
+    : T extends (ctx: ExecutionContext<any>, ...args: infer Args) => infer R
+      ? (...args: Args) => R
+      : T extends object
+        ? {
+            [K in keyof T]: T[K] extends (ctx: ExecutionContext<any>, ...args: infer Args) => infer R
+              ? (...args: Args) => R
+              : T[K]
+          }
+        : never
+
+  export interface BoundDep<T> {
+    readonly [boundDepSymbol]: true
+    readonly dep: Atom<T> | Resource<T> | TagExecutor<T, any>
   }
 
   export type ResourceOwnership = "boundary" | "current"
@@ -217,7 +242,11 @@ export namespace Lite {
     readonly data: ContextData
   }
 
-  export type CloseResult = { ok: true } | { ok: false; error: unknown }
+  export type CloseResult = { ok: true } | { ok: false; error: unknown; readonly aborted?: true }
+
+  export type FlowStream<Yield, Output> = AsyncIterable<Yield> & {
+    readonly result: Promise<Output>
+  }
 
   export interface ExecutionContext<Fault = never> {
     readonly input: unknown
@@ -229,8 +258,13 @@ export namespace Lite {
     resolve<T>(target: Resource<T>): Promise<T>
     release<T>(resource: Resource<T>): Promise<void>
     controller<T>(resource: Resource<T>): ResourceController<T>
-    exec<Output, Input>(options: ExecFlowOptions<Output, Input>): Promise<Output>
+    exec<Output, Input, Yield>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
+    changes<T>(atom: Atom<T>): AsyncIterable<T>
+    changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
+    changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
+    resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
     onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
     close(result?: CloseResult): Promise<void>
     /** Throws a `FlowFault` carrying `fault`, tagged with the executing flow's name. */
@@ -241,8 +275,8 @@ export namespace Lite {
     cleanup(fn: () => MaybePromise<void>): void
   }
 
-  export type ExecFlowOptions<Output, Input> = {
-    flow: Flow<Output, Input, any>
+  export type ExecFlowOptions<Output, Input, Yield = never> = {
+    flow: Flow<Output, Input, any, Yield>
     name?: string
     tags?: Tagged<any>[]
   } & (
@@ -331,6 +365,19 @@ export namespace Lite {
     dispose(): void
   }
 
+  export interface ChangesOptions {
+    states: true
+  }
+
+  export interface DrainOptions {
+    take?: number
+  }
+
+  export type AtomChange<T> =
+    | { readonly state: "resolving" }
+    | { readonly state: "resolved"; readonly value: T }
+    | { readonly state: "failed"; readonly error: Error }
+
   export interface Tag<T, HasDefault extends boolean = false> {
     readonly [tagSymbol]: true
     readonly key: symbol
@@ -356,9 +403,9 @@ export namespace Lite {
 
   export type TagSource = Tagged<any>[] | { tags?: Tagged<any>[] }
 
-  export interface TagExecutor<TOutput, TTag = TOutput> {
+  export interface TagExecutor<Output, Value = Output> {
     readonly [tagExecutorSymbol]: true
-    readonly tag: Tag<TTag, boolean>
+    readonly tag: Tag<Value, boolean>
     readonly mode: "required" | "optional" | "all"
   }
 
@@ -380,17 +427,17 @@ export namespace Lite {
     readonly eq?: (a: any, b: any) => boolean
   }
 
-  export interface FlowControllerDep<Output, Input> {
+  export interface FlowControllerDep<Output, Input, Yield = never> {
     readonly [controllerDepSymbol]: true
     readonly atom?: undefined
     readonly resource?: undefined
-    readonly flow: Flow<Output, Input, any>
+    readonly flow: Flow<Output, Input, any, Yield>
     readonly name?: string
     readonly tags?: Tagged<any>[]
     readonly key?: string
   }
 
-  export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T> | FlowControllerDep<any, any>
+  export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T> | FlowControllerDep<any, any, any>
 
   export type WatchControllerDep<T> = AtomControllerDep<T> & {
     readonly resolve: true
@@ -432,20 +479,20 @@ export namespace Lite {
     readonly [typedSymbol]: true
   }
 
-  export type PresetTarget<T, I = unknown> = Atom<T> | Flow<T, I, any> | Resource<T>
+  export type PresetTarget<T, I = unknown, Y = never> = Atom<T> | Flow<T, I, any, Y> | Resource<T>
 
-  export type PresetValue<T, I = unknown> =
+  export type PresetValue<T, I = unknown, Y = never> =
     | T
     | Atom<T>
-    | Flow<T, I, any>
+    | Flow<T, I, any, Y>
     | Resource<T>
-    | ((ctx: ExecutionContext & { readonly input: I }) => MaybePromise<T>)
+    | ((ctx: ExecutionContext & { readonly input: I }) => MaybePromise<T> | AsyncGenerator<Y, T, unknown>)
     | ((ctx: ResourceContext) => MaybePromise<T>)
 
-  export interface Preset<T, I = unknown> {
+  export interface Preset<T, I = unknown, Y = never> {
     readonly [presetSymbol]: true
-    readonly target: PresetTarget<T, I>
-    readonly value: PresetValue<T, I>
+    readonly target: PresetTarget<T, I, Y>
+    readonly value: PresetValue<T, I, Y>
   }
 
   /**
@@ -500,8 +547,9 @@ export namespace Lite {
 
   export type Dependency =
     | Atom<unknown>
-    | Flow<any, any, any>
+    | Flow<any, any, any, any>
     | ControllerDep<unknown>
+    | BoundDep<any>
     | TagExecutor<any>
     | Resource<unknown>
 
@@ -509,34 +557,38 @@ export namespace Lite {
 
   export type ExecutionDependency =
     | Atom<unknown>
-    | Flow<any, any, any>
-    | FlowControllerDep<any, any>
+    | Flow<any, any, any, any>
+    | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | NonWatchResourceControllerDep<unknown>
+    | BoundDep<any>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
   export type ResourceDependency =
     | Atom<unknown>
-    | Flow<any, any, any>
-    | FlowControllerDep<any, any>
+    | Flow<any, any, any, any>
+    | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | ResourceControllerDep<unknown>
+    | BoundDep<any>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
-    : D extends Flow<infer TOutput, infer TInput, any>
-      ? FlowHandle<TOutput, TInput>
-    : D extends FlowControllerDep<infer TOutput, infer TInput>
-      ? FlowHandle<TOutput, TInput>
+    : D extends Flow<infer Output, infer Input, any, infer Yield>
+      ? FlowHandle<Output, Input, Yield>
+    : D extends FlowControllerDep<infer Output, infer Input, infer Yield>
+      ? FlowHandle<Output, Input, Yield>
     : D extends AtomControllerDep<infer T>
       ? Controller<T>
       : D extends ResourceControllerDep<infer T>
-        ? ResourceController<T>
-      : D extends TagExecutor<infer TOutput, infer _TTag>
-        ? TOutput
+      ? ResourceController<T>
+      : D extends BoundDep<infer T>
+        ? Bound<T>
+      : D extends TagExecutor<infer Output, infer _Value>
+        ? Output
         : D extends Resource<infer T>
           ? T
           : never
@@ -553,9 +605,10 @@ export namespace Lite {
     Input,
     Fault,
     D extends Record<string, Dependency>,
+    Yield = never,
   > = keyof D extends never
-    ? (ctx: ExecutionContext<Fault> & { readonly input: Input }) => MaybePromise<Output>
-    : (ctx: ExecutionContext<Fault> & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output>
+    ? (ctx: ExecutionContext<Fault> & { readonly input: Input }) => MaybePromise<Output> | AsyncGenerator<Yield, Output, unknown>
+    : (ctx: ExecutionContext<Fault> & { readonly input: Input }, deps: InferDeps<D>) => MaybePromise<Output> | AsyncGenerator<Yield, Output, unknown>
 
   export type ResourceFactory<T, D extends Record<string, Dependency>> =
     keyof D extends never
@@ -576,7 +629,7 @@ export namespace Lite {
    * Any flow regardless of input/output types.
    * Useful for APIs that don't need the type parameters.
    */
-  export type AnyFlow = Flow<any, any, any>
+  export type AnyFlow = Flow<any, any, any, any>
 
   /**
    * Any controller regardless of value type.
@@ -592,7 +645,7 @@ export namespace Lite {
    * Target type for wrapExec extension hook.
    * Either a Flow or an inline function.
    */
-  export type ExecTarget = Flow<unknown, unknown, any> | ExecTargetFn
+  export type ExecTarget = Flow<unknown, unknown, any, unknown> | ExecTargetFn
 
   /**
    * Inline function that can be executed via ctx.exec.
@@ -618,21 +671,21 @@ export namespace Lite {
      * @example
      * type Result = Lite.Utils.FlowOutput<typeof process> // ProcessResult
      */
-    export type FlowOutput<F> = F extends Flow<infer O, any, any> ? O : never
+    export type FlowOutput<F> = F extends Flow<infer O, any, any, any> ? O : never
 
     /**
      * Extract input type from a Flow.
      * @example
      * type Input = Lite.Utils.FlowInput<typeof process> // ProcessRequest
      */
-    export type FlowInput<F> = F extends Flow<unknown, infer I, any> ? I : never
+    export type FlowInput<F> = F extends Flow<unknown, infer I, any, any> ? I : never
 
     /**
      * Extract the declared fault union from a Flow.
      * @example
      * type Faults = Lite.Utils.FaultsOf<typeof pairPayment> // "conflict" | "not-found"
      */
-    export type FaultsOf<F> = F extends Flow<any, any, infer Fault> ? Fault : never
+    export type FaultsOf<F> = F extends Flow<any, any, infer Fault, any> ? Fault : never
 
     /**
      * Extract value type from a Tag.
@@ -651,7 +704,7 @@ export namespace Lite {
      */
     export type DepsOf<T> = T extends Atom<unknown>
       ? T['deps']
-      : T extends Flow<unknown, unknown, any>
+      : T extends Flow<unknown, unknown, any, unknown>
         ? T['deps']
         : never
 

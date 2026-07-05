@@ -1,0 +1,274 @@
+{
+  "version": 1,
+  "context_key": "pumped-fn-lite",
+  "note": "Generated guardrail library, not authority \u2014 authority is per-run consolidation records (.okra/runs/<run-id>/memory/). Candidate-only until a current run ratifies an entry into its frame.",
+  "anti_goals": [
+    {
+      "metric_id": "lint_diagnostics",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-8e/report.md",
+        "commit f266ee51"
+      ],
+      "applies_when": "any pumped-fn code is produced (src, examples, tests); pumped-lite-lint wired as a package script",
+      "does_not_apply_when": "non-pumped-fn code",
+      "invalidates_when": "lint rules change materially",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "example 11 tests green before and after reaching 0 diagnostics",
+      "ratification": "user-caught 2026-07-05, not yet frame-ratified"
+    },
+    {
+      "metric_id": "entrypoint_executed",
+      "threshold": "1 end-to-end run, exit 0, expected output observed, before acceptance",
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "commit 433bf999"
+      ],
+      "applies_when": "anything labeled runnable or production-ready ships an entrypoint",
+      "does_not_apply_when": "library-only changes with no entrypoint",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "main.ts ran green after fix; suites unaffected",
+      "ratification": "orchestrator-caught, not yet frame-ratified"
+    },
+    {
+      "metric_id": "embedded_fixture_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "commit 773fac25"
+      ],
+      "applies_when": "production entrypoints/composition roots; demo data enters via real input boundaries (stdin/files/queues) from fixtures/",
+      "does_not_apply_when": "test files",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "NDJSON intake replaced embedded demo; 11 tests green",
+      "ratification": "user-caught 2026-07-05"
+    },
+    {
+      "metric_id": "scope_param_functions",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "commits 66119663 + 433bf999",
+        "memory graph-nodes-not-scope-functions"
+      ],
+      "applies_when": "pumped-fn app/example code; grep for Scope/ExecutionContext/handle-typed params outside composition roots; root privilege = create scope, exec flows, dispose",
+      "does_not_apply_when": "composition roots creating/disposing, tests",
+      "invalidates_when": "lite boundary-ownership doctrine changes",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "conversions net-negative LOC, suites green both rounds",
+      "ratification": "user-caught twice (glue re-hid in main.ts once)"
+    },
+    {
+      "metric_id": "direct_flow_composition_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-8e/report.md",
+        "lint rule pumped/no-direct-flow-composition"
+      ],
+      "applies_when": "flows composing flows \u2014 deps-declared handles (exec/execStream), never closure imports; a missing API for the idiom is a core-gap finding (FlowHandle.execStream precedent), not an excuse",
+      "does_not_apply_when": "composition roots exec-ing top-level flows",
+      "invalidates_when": "covered by lint_diagnostics if that is ratified",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "5 conversions, deps-graph edges appeared, 11+181 green",
+      "ratification": "user-caught 2026-07-05"
+    },
+    {
+      "metric_id": "burst_no_loss_test_present",
+      "threshold": "1 per path where a stream carries must-not-drop work",
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-8c/report.md",
+        "lite README Async Iteration conflation rule"
+      ],
+      "applies_when": "consumers of conflating channels (resolveStream/changes) touch work items; test = N pushes mid-consumption, each item lands exactly once",
+      "does_not_apply_when": "genuinely conflatable feeds (state views, tickers, heartbeats)",
+      "invalidates_when": "core gains a lossless buffered stream mode",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "gated burst test passes; prior architecture demonstrably dropped batches",
+      "ratification": "orchestrator-caught (orchestrator specced the lossy pattern itself)"
+    },
+    {
+      "metric_id": "test_slop_findings",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "commits 00e8e2a2 + 67aa2efb",
+        "memory codex-exec-stdin-and-okra-run"
+      ],
+      "applies_when": "all tests: no hand-rolled type gymnastics (use expectTypeOf \u2014 it evaluates its argument), no never-executed scaffolding, for await over manual iterator driving unless the assertion is about protocol timing, succinct names",
+      "does_not_apply_when": "timing-sensitive assertions needing pending next() control",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "rewrites kept every invariant, suites green",
+      "ratification": "user-caught 2026-07-04"
+    },
+    {
+      "metric_id": "style_wall_surface_enumeration",
+      "threshold": "frame style walls list source, tests, type-param naming, boundary rules explicitly",
+      "type": "drift",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "retrospective: 4 post-green style catches all outside A4 as written"
+      ],
+      "applies_when": "frame drafting for implementation loops",
+      "does_not_apply_when": "research-only loops",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "later packets with enumerated surfaces produced clean output first pass",
+      "ratification": "not yet frame-ratified"
+    },
+    {
+      "metric_id": "negative_detector_fp_review",
+      "threshold": "1 explicit false-positive pass per rejection heuristic before acceptance",
+      "type": "drift",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "F3 narrowed twice: orchestrator .next catch + review-2 AsyncGenerator ruling"
+      ],
+      "applies_when": "walls implemented as runtime rejection heuristics",
+      "does_not_apply_when": "positive-path assertions",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "both narrowings kept suites green",
+      "ratification": "not yet frame-ratified"
+    },
+    {
+      "metric_id": "loc_ceiling_has_shrink_pass",
+      "threshold": "every LOC ceiling paired with one compression round (sweep + apply, revert-dont-weaken) before acceptance",
+      "type": "drift",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "PKR-6 (-81) + DKR-3/PKR-7 (-18) after user pushed too-much-code twice under a held 400 ceiling"
+      ],
+      "applies_when": "implementation frames with size budgets",
+      "does_not_apply_when": "doc-only or fix-only rounds",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "-99 total with zero behavior change, all tests unmodified",
+      "ratification": "user-caught 2026-07-04"
+    },
+    {
+      "metric_id": "naming_succinct_lib_style",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "commit c349bc91 (T-prefix strip)",
+        "latest.ts rename ffa48cc5",
+        "CLAUDE.md no-slop naming rules"
+      ],
+      "applies_when": "all pumped-fn identifiers: no type suffixes on definition handles (store not storeAtom), prefix-free type params (Output/Input/Fault/Yield, never TOutput), files/factories named for the policy not the mechanism (latest.ts not conflating-iterator.ts), no jargon where a plain word carries the meaning; count = identifiers violating lib style at acceptance",
+      "does_not_apply_when": "a bare name would shadow an existing type in scope (TagExecutor Value-not-Tag precedent)",
+      "invalidates_when": "CLAUDE.md naming doctrine changes",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "T-prefix strip and latest rename were pure renames, 180+ tests green, no .d.ts structural change",
+      "ratification": "user-caught twice (conflatingIterator naming, T-prefixes), user-requested as wall 2026-07-05"
+    },
+    {
+      "metric_id": "business_features_are_nodes",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "domain.ts critique 2026-07-05",
+        "workers/pkr-9/packet.md",
+        "generalizes scope_param_functions"
+      ],
+      "applies_when": "pumped-fn app/example code: every business feature (state mutation, orchestration, effectful operation, boundary validation) is a flow or resource; state queries are derived atoms/selects; boundary parsing lives in flow parse; free functions are ONLY pure calculations over plain values; count = helpers receiving ctx/scope/handles/atom-state-for-mutation, plus reducer/query grab-bag modules (a file named domain/utils/helpers holding state transformers is the smell)",
+      "does_not_apply_when": "pure policy over plain values (parsers, templates, date math); third-party port contracts that take ctx at the factory call site (sdk model.complete)",
+      "invalidates_when": "lite boundary-ownership doctrine changes",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-9: domain.ts deleted, queue/ledger split, reducers inlined, net -37 LOC, lint 0, 11+181 tests green, entrypoint runs",
+      "ratification": "user-stated rule 2026-07-05 (third occurrence of the pattern: runIngest(scope), main.ts glue, domain.ts reducers)"
+    },
+    {
+      "metric_id": "atomic_state_mutations",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-11/report.md",
+        "drain-race regression test"
+      ],
+      "applies_when": "any controller state mutation: no get()+set() read-modify-write, ever \u2014 single atomic update(fn) including drains (capture inside the updater) and check-then-act guards (decide inside the updater); interleaving regression test required for drain/queue patterns",
+      "does_not_apply_when": "read-only get() with no subsequent set",
+      "invalidates_when": "controller gains transactional batching",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-11: 3 RMW sites converted, drain-race test proves interleaved enqueue survives, 12+181 green",
+      "ratification": "orchestrator-confirmed defect after user pushed for harder review 2026-07-05"
+    },
+    {
+      "metric_id": "semantic_diff_review_every_round",
+      "threshold": "full line-by-line diff read per worker acceptance; gates (lint/tests/entrypoint) are necessary, never sufficient",
+      "type": "drift",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "registerCron survived 5 gate-green acceptances; get/set race survived 4 incl. its own burst test"
+      ],
+      "applies_when": "every worker diff, example/app code included, regardless of loop fatigue or round count",
+      "does_not_apply_when": "never",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "the round that reinstated full review found 2 defects + 5 discipline breaks the gates had passed",
+      "ratification": "user-caught 2026-07-05 (you don't work hard enough)"
+    },
+    {
+      "metric_id": "ctx_never_an_argument",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-12b/packet.md",
+        "lint rule pumped/no-ctx-argument",
+        "user design discussion 2026-07-05"
+      ],
+      "applies_when": "all node factories: ctx is a receiver, never a call argument or literal-embedded value; ctx-taking third-party contracts are wrapped via bound() in deps, which curries the per-invocation ctx (FlowHandle precedent). Enforcement: pumped/no-ctx-argument at error level",
+      "does_not_apply_when": "receiver usage (ctx.exec/ctx.input/ctx.changes); lite/sdk internals implementing the binding machinery itself",
+      "invalidates_when": "bound() semantics change",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-12b: bound() shipped with per-invocation rebinding test, lint rule live, example migrated; 186 lite + 42 lint + 12 example green, lint 0",
+      "ratification": "user-ratified rule + mechanism 2026-07-05; earlier resource-wrapper approach rejected for ctx misattribution (would capture owning ctx, not per-invocation ctx)"
+    }
+  ]
+}

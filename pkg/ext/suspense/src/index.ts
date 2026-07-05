@@ -1,4 +1,4 @@
-import { tag, type Lite } from "@pumped-fn/lite"
+import { isStreamingExec, tag, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -103,6 +103,7 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
     name: options.name ?? "suspense",
     async wrapExec(next, target, ctx) {
       if (!(options.shouldHandle ?? shouldHandleSuspenseTarget)(target, ctx)) return next()
+      if (isStreamingExec(target, ctx)) throw new Error("streaming flows are not replayable yet")
 
       const key = options.getKey ? options.getKey(ctx, target) : nextSuspenseKey(ctx, options)
       const targetName = options.getTargetName ? options.getTargetName(target, ctx) : getTargetName(target, ctx)
@@ -123,6 +124,7 @@ export function extension(options: SuspenseExtensionOptions): Lite.Extension {
       }
 
       const result = await (options.run ? options.run(event, next) : next())
+      if (isStreamingExec(target, ctx)) throw new Error("streaming flows are not replayable yet")
       await options.log.putCompleted({ status: "completed", key, targetName, result })
       return result
     },

@@ -107,6 +107,57 @@ describe("lite lint scanner", () => {
     ])
   })
 
+  it("finds factory ctx used as an argument or embedded value", () => {
+    expect(ids(`
+      import { atom, flow, resource } from "@pumped-fn/lite"
+
+      declare function send(value: unknown): unknown
+
+      const store = atom({
+        factory: (ctx) => send(ctx),
+      })
+
+      const run = flow({
+        factory: (context) => {
+          send({ context })
+          send([context])
+          return "ok"
+        },
+      })
+
+      const tx = resource({
+        factory: (_ctx) => {
+          send({ ..._ctx })
+          send([..._ctx])
+          return { id: "tx" }
+        },
+      })
+    `)).toEqual([
+      "pumped/no-ctx-argument",
+      "pumped/no-ctx-argument",
+      "pumped/no-ctx-argument",
+      "pumped/no-ctx-argument",
+      "pumped/no-ctx-argument",
+    ])
+  })
+
+  it("allows factory ctx receiver usage and property reads", () => {
+    expect(ids(`
+      import { atom, flow } from "@pumped-fn/lite"
+
+      const queue = atom({ factory: () => [] as string[] })
+
+      const run = flow({
+        factory: (ctx) => {
+          void ctx.input
+          void ctx.name
+          void ctx.changes(queue)
+          return { input: ctx.input }
+        },
+      })
+    `)).toEqual([])
+  })
+
   it("finds aliased module mocks and rendered node observer tests", () => {
     expect(ids(`
       import { render } from "@testing-library/react"

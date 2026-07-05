@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "vitest"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "paths": {
+      "@pumped-fn/lite": ["../../pkg/core/lite/src/index.ts"],
+      "@pumped-fn/lite-extension-logging": ["../../pkg/ext/logging/src/index.ts"],
+      "@pumped-fn/lite-extension-scheduler": ["../../pkg/ext/scheduler/src/index.ts"],
+      "@pumped-fn/sdk": ["../../pkg/sdk/core/src/index.ts"],
+      "@pumped-fn/sdk-test": ["../../pkg/sdk/test/src/index.ts"]
+    }
+  },
+  "include": ["vitest.config.ts", "src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
