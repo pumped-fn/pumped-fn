@@ -196,6 +196,25 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "T-prefix strip and latest rename were pure renames, 180+ tests green, no .d.ts structural change",
       "ratification": "user-caught twice (conflatingIterator naming, T-prefixes), user-requested as wall 2026-07-05"
+    },
+    {
+      "metric_id": "business_features_are_nodes",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "domain.ts critique 2026-07-05",
+        "workers/pkr-9/packet.md",
+        "generalizes scope_param_functions"
+      ],
+      "applies_when": "pumped-fn app/example code: every business feature (state mutation, orchestration, effectful operation, boundary validation) is a flow or resource; state queries are derived atoms/selects; boundary parsing lives in flow parse; free functions are ONLY pure calculations over plain values; count = helpers receiving ctx/scope/handles/atom-state-for-mutation, plus reducer/query grab-bag modules (a file named domain/utils/helpers holding state transformers is the smell)",
+      "does_not_apply_when": "pure policy over plain values (parsers, templates, date math); third-party port contracts that take ctx at the factory call site (sdk model.complete)",
+      "invalidates_when": "lite boundary-ownership doctrine changes",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-9: domain.ts deleted, queue/ledger split, reducers inlined, net -37 LOC, lint 0, 11+181 tests green, entrypoint runs",
+      "ratification": "user-stated rule 2026-07-05 (third occurrence of the pattern: runIngest(scope), main.ts glue, domain.ts reducers)"
     }
   ]
 }

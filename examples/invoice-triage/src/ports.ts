@@ -1,7 +1,8 @@
-import { atom, tag, type Lite } from "@pumped-fn/lite"
+import { atom, controller, tag, type Lite } from "@pumped-fn/lite"
 import { createInterface } from "node:readline"
 import type { Model } from "@pumped-fn/sdk"
-import { classifyHeuristically, emptyStore, type Invoice, type ReminderMessage } from "./domain"
+import { classifyHeuristically } from "./model"
+import type { Invoice, ReminderMessage, StoredInvoice } from "./types"
 
 type Pending<T> = {
   resolve(result: IteratorResult<T, undefined>): void
@@ -83,13 +84,30 @@ export const reminderWindowDays = tag<number>({
   default: 7,
 })
 
+export const reminderRecipient = tag<string>({
+  label: "invoice.reminderRecipient",
+  default: "ap@company.local",
+})
+
 export const intakeLines = atom({
   factory: readlineAdapter,
 })
 
-export const store = atom({
+export const queue = atom({
   keepAlive: true,
-  factory: emptyStore,
+  factory: (): readonly Invoice[] => [],
+})
+
+export const ledger = atom({
+  keepAlive: true,
+  factory: (): readonly StoredInvoice[] => [],
+})
+
+export const reviewCount = atom({
+  deps: {
+    ledger: controller(ledger, { resolve: true, watch: true }),
+  },
+  factory: (_ctx, { ledger }) => ledger.get().filter((invoice) => invoice.classification.risk === "review").length,
 })
 
 export const opsHeartbeat = atom({

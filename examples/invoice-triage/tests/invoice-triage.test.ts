@@ -18,16 +18,18 @@ import {
   clock,
   heuristic,
   intakeLines,
+  ledger,
   mailer,
   memoryMailer,
   opsHeartbeat,
+  queue,
+  reminderRecipient,
   reminderCron,
   reminderWindowDays,
   reportCron,
-  store,
+  reviewCount,
 } from "../src/ports"
 import {
-  reviewIds,
   type Category,
   type Classification,
   type ImportProgress,
@@ -35,7 +37,7 @@ import {
   type Invoice,
   type Risk,
   type StoredInvoice,
-} from "../src/domain"
+} from "../src/types"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
 
@@ -108,7 +110,8 @@ function gated(outputs: readonly string[]) {
 }
 
 async function waitForImported(scope: Lite.Scope, count: number): Promise<string[]> {
-  const imported = scope.select(store, (state) => state.invoices.map((invoice) => invoice.id), { eq: sameIds })
+  await scope.resolve(ledger)
+  const imported = scope.select(ledger, (invoices) => invoices.map((invoice) => invoice.id), { eq: sameIds })
   for await (const ids of scope.changes(imported)) {
     if (ids.length === count) {
       imported.dispose()
@@ -247,7 +250,7 @@ describe("invoice triage patterns", () => {
       flow: importBatch,
       input: { invoices: [invoice("inv-exec-1"), invoice("inv-exec-2")] },
     })).resolves.toEqual({ imported: 2, review: ["inv-exec-1"] })
-    expect((await scope.resolve(store)).invoices.map((item) => item.id)).toEqual(["inv-exec-1", "inv-exec-2"])
+    expect((await scope.resolve(ledger)).map((item) => item.id)).toEqual(["inv-exec-1", "inv-exec-2"])
     await ctx.close({ ok: true })
     await scope.dispose()
   })
@@ -292,7 +295,7 @@ describe("invoice triage patterns", () => {
     await expect(stream.result).rejects.toThrow("Flow stream aborted")
     expect(streaming).toEqual([true])
     expect(seen.at(-1)).toEqual({ invoiceId: "inv-abandon-1", done: 1, total: 2, risk: "auto-approve" })
-    expect((await scope.resolve(store)).invoices.map((item) => item.id)).toEqual(["inv-abandon-1"])
+    expect((await scope.resolve(ledger)).map((item) => item.id)).toEqual(["inv-abandon-1"])
     expect(closes[0]).toMatchObject({ ok: false, aborted: true })
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -364,7 +367,7 @@ describe("invoice triage patterns", () => {
 
     const imported = await waitForImported(scope, all.length)
     expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
-    expect((await scope.resolve(store)).pending).toEqual([])
+    expect(await scope.resolve(queue)).toEqual([])
     expect(gate.calls()).toBe(all.length)
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -392,9 +395,9 @@ describe("invoice triage patterns", () => {
     })
     const log = scope.createContext()
     const logger = await log.resolve(logging.logger)
-    await scope.resolve(store)
-    const review = scope.select(store, (state) => reviewIds(state).length)
-    const changes = scope.changes(review)[Symbol.asyncIterator]()
+    await scope.resolve(ledger)
+    await scope.resolve(reviewCount)
+    const changes = scope.changes(reviewCount)[Symbol.asyncIterator]()
     const observations: number[] = []
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "changes", runId: "run-1" })] })
     const first = await changes.next()
@@ -413,7 +416,6 @@ describe("invoice triage patterns", () => {
       logger.info("invoice.reviewQueue", { count: latest.value })
     }
     await changes.return?.()
-    review.dispose()
     expect(observations).toEqual([0, 3])
     expect(sink.records().map((record) => record.fields?.["count"])).toEqual([0, 3])
     await ctx.close({ ok: true })
@@ -425,19 +427,17 @@ describe("invoice triage patterns", () => {
     const messages = memoryMailer()
     const scope = createScope({
       presets: [
-        preset(store, {
-          invoices: [
-            stored("inv-remind-today", "2026-07-05", "utilities", "auto-approve"),
-            stored("inv-remind-horizon", "2026-07-08", "saas", "auto-approve"),
-            stored("inv-remind-beyond", "2026-07-09", "saas", "auto-approve"),
-            stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
-          ],
-          pending: [],
-        }),
+        preset(ledger, [
+          stored("inv-remind-today", "2026-07-05", "utilities", "auto-approve"),
+          stored("inv-remind-horizon", "2026-07-08", "saas", "auto-approve"),
+          stored("inv-remind-beyond", "2026-07-09", "saas", "auto-approve"),
+          stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
+        ]),
         preset(mailer, messages),
       ],
       tags: [
         clock({ now: () => now }),
+        reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
       ],
     })
@@ -448,6 +448,7 @@ describe("invoice triage patterns", () => {
       invoiceIds: ["inv-remind-today", "inv-remind-horizon"],
     })
     expect(messages.sent().map((message) => message.invoiceId)).toEqual(["inv-remind-today", "inv-remind-horizon"])
+    expect(messages.sent().map((message) => message.to)).toEqual(["ap-test@company.local", "ap-test@company.local"])
     await expect(ctx.exec({ flow: sendReminders })).resolves.toEqual({ sent: 0, invoiceIds: [] })
     expect(messages.sent()).toHaveLength(2)
     await ctx.close({ ok: true })
@@ -457,14 +458,11 @@ describe("invoice triage patterns", () => {
   it("pattern: dailyReport summarizes totals, categories, and overdue invoices", async () => {
     const scope = createScope({
       presets: [
-        preset(store, {
-          invoices: [
-            stored("inv-report-overdue", "2026-07-04", "utilities", "auto-approve"),
-            stored("inv-report-today", "2026-07-05", "saas", "auto-approve"),
-            stored("inv-report-review", "2026-07-10", "hardware", "review"),
-          ],
-          pending: [],
-        }),
+        preset(ledger, [
+          stored("inv-report-overdue", "2026-07-04", "utilities", "auto-approve"),
+          stored("inv-report-today", "2026-07-05", "saas", "auto-approve"),
+          stored("inv-report-review", "2026-07-10", "hardware", "review"),
+        ]),
       ],
       tags: [clock({ now: () => now })],
     })
@@ -489,10 +487,7 @@ describe("invoice triage patterns", () => {
     const messages = memoryMailer()
     const scope = createScope({
       presets: [
-        preset(store, {
-          invoices: [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")],
-          pending: [],
-        }),
+        preset(ledger, [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")]),
         preset(mailer, messages),
       ],
       tags: [
@@ -536,8 +531,7 @@ describe("invoice triage patterns", () => {
     const summary = await ctx.exec({ flow: intake })
 
     expect(summary).toEqual({ accepted: 2, rejected: 2 })
-    const state = await scope.resolve(store)
-    expect(state.pending.map((invoice) => invoice.id)).toEqual(["inv-in-1", "inv-in-3"])
+    expect((await scope.resolve(queue)).map((invoice) => invoice.id)).toEqual(["inv-in-1", "inv-in-3"])
     await ctx.close({ ok: true })
     await scope.dispose()
   })

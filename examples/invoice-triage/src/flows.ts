@@ -1,32 +1,35 @@
-import { controller, flow, tags, typed } from "@pumped-fn/lite"
+import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
+import { classificationPrompt, parseClassification } from "./model"
 import {
-  classificationPrompt,
-  dailySummary,
-  dueForReminder,
-  enqueueInvoices,
-  findInvoice,
-  markReminded,
-  pendingIds,
-  parseClassification,
-  parseIntakeLine,
-  reminderMessage,
-  reviewIds,
-  takePending,
-  upsertInvoice,
-  type Classification,
-  type DailyReport,
-  type ImportProgress,
-  type ImportSummary,
-  type Invoice,
-  type ReminderResult,
-  type ReminderSummary,
-  type SaveInvoiceInput,
-  type TriageProgress,
-} from "./domain"
-import { clock, intakeLines, mailer, reminderCron, reminderWindowDays, reportCron, store } from "./ports"
+  clock,
+  intakeLines,
+  ledger,
+  mailer,
+  queue,
+  reminderCron,
+  reminderRecipient,
+  reminderWindowDays,
+  reportCron,
+  reviewCount,
+} from "./ports"
+import type {
+  Category,
+  Classification,
+  DailyReport,
+  EnqueueSummary,
+  ImportProgress,
+  ImportSummary,
+  Invoice,
+  ReminderResult,
+  ReminderSummary,
+  SaveInvoiceInput,
+  TriageProgress,
+} from "./types"
+
+const msPerDay = 86_400_000
 
 export const classify = flow({
   name: "invoice.classify",
@@ -50,14 +53,21 @@ export const saveInvoice = flow({
   name: "invoice.save",
   parse: typed<SaveInvoiceInput>(),
   deps: {
-    store: controller(store, { resolve: true }),
+    ledger: controller(ledger, { resolve: true }),
     clock: tags.required(clock),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: (ctx, { store, clock }) => {
-    const next = upsertInvoice(store.get(), ctx.input.invoice, ctx.input.classification, clock.now().toISOString())
-    store.set(next)
-    return findInvoice(next, ctx.input.invoice.id)!
+  factory: (ctx, { ledger, clock }) => {
+    const current = ledger.get()
+    const found = current.find((item) => item.id === ctx.input.invoice.id)
+    const stored = {
+      ...ctx.input.invoice,
+      classification: ctx.input.classification,
+      importedAt: clock.now().toISOString(),
+      remindedAt: found?.remindedAt,
+    }
+    ledger.set(found ? current.map((item) => item.id === stored.id ? stored : item) : [...current, stored])
+    return stored
   },
 })
 
@@ -108,29 +118,30 @@ export const importBatch = flow({
 
 export const enqueue = flow({
   name: "invoice.enqueue",
-  parse: typed<{ invoices: readonly Invoice[] }>(),
+  parse: parseEnqueue,
   deps: {
-    store: controller(store, { resolve: true }),
+    queue: controller(queue, { resolve: true }),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: (ctx, { store }) => {
-    store.update((state) => enqueueInvoices(state, ctx.input.invoices))
+  factory: (ctx, { queue }): EnqueueSummary => {
+    if (ctx.input.invoices.length > 0) queue.update((pending) => [...pending, ...ctx.input.invoices])
+    return { accepted: ctx.input.invoices.length }
   },
 })
 
 export const ingest = flow({
   name: "invoice.ingest",
   deps: {
-    control: controller(store, { resolve: true }),
+    control: controller(queue, { resolve: true }),
     importBatch: controller(importBatch),
   },
   factory: async (ctx, { control, importBatch }): Promise<void> => {
-    for await (const state of ctx.changes(store)) {
-      if (pendingIds(state).length === 0) continue
-      const drained = takePending(control.get())
-      if (drained.invoices.length === 0) continue
-      control.set(drained.state)
-      await importBatch.exec({ input: { invoices: drained.invoices } })
+    for await (const pending of ctx.changes(queue)) {
+      if (pending.length === 0) continue
+      const invoices = control.get()
+      if (invoices.length === 0) continue
+      control.set([])
+      await importBatch.exec({ input: { invoices } })
     }
   },
 })
@@ -140,8 +151,7 @@ export const watchReviewQueue = flow({
   factory: async (ctx): Promise<void> => {
     const logger = await ctx.resolve(logging.logger)
     let last = -1
-    for await (const state of ctx.changes(store)) {
-      const count = reviewIds(state).length
+    for await (const count of ctx.changes(reviewCount)) {
       if (count === last) continue
       last = count
       logger.info("invoice.reviewQueue", { count })
@@ -160,16 +170,13 @@ export const intake = flow({
     let accepted = 0
     let rejected = 0
     for await (const line of lines) {
-      const invoice = parseIntakeLine(line)
-      if (!invoice) {
-        if (line.trim() !== "") {
-          rejected += 1
-          logger.warn("invoice.intake.rejected", { line })
-        }
-        continue
+      try {
+        accepted += (await enqueue.exec({ rawInput: line })).accepted
+      } catch (err) {
+        if (!(err instanceof ParseError)) throw err
+        rejected += 1
+        logger.warn("invoice.intake.rejected", { line })
       }
-      await enqueue.exec({ input: { invoices: [invoice] } })
-      accepted += 1
     }
     return { accepted, rejected }
   },
@@ -178,8 +185,8 @@ export const intake = flow({
 export const awaitDrained = flow({
   name: "invoice.awaitDrained",
   factory: async (ctx): Promise<number> => {
-    for await (const state of ctx.changes(store)) {
-      if (pendingIds(state).length === 0) return state.invoices.length
+    for await (const pending of ctx.changes(queue)) {
+      if (pending.length === 0) return (await ctx.resolve(ledger)).length
     }
     return 0
   },
@@ -188,27 +195,55 @@ export const awaitDrained = flow({
 export const dailyReport = flow({
   name: "invoice.dailyReport",
   deps: {
-    store,
+    ledger,
     clock: tags.required(clock),
   },
   tags: [step({ workflow: true, kind: "report" })],
-  factory: (_ctx, { store, clock }): DailyReport => dailySummary(store, clock.now()),
+  factory: (_ctx, { ledger, clock }): DailyReport => {
+    const byCategory = {
+      utilities: 0,
+      saas: 0,
+      hardware: 0,
+      other: 0,
+    } satisfies Record<Category, number>
+    for (const invoice of ledger) byCategory[invoice.classification.category] += 1
+    const today = utcDay(clock.now())
+    return {
+      total: ledger.length,
+      byCategory,
+      overdue: ledger
+        .filter((invoice) => utcDay(invoice.dueDate) < today)
+        .map((invoice) => invoice.id),
+    }
+  },
 })
 
 export const sendReminder = flow({
   name: "invoice.sendReminder",
   parse: typed<{ invoiceId: string }>(),
   deps: {
-    store: controller(store, { resolve: true }),
+    ledger: controller(ledger, { resolve: true }),
     mailer,
     clock: tags.required(clock),
+    reminderRecipient: tags.required(reminderRecipient),
   },
   tags: [step({ workflow: true, kind: "email" })],
-  factory: async (ctx, { store, mailer, clock }): Promise<ReminderResult> => {
-    const invoice = findInvoice(store.get(), ctx.input.invoiceId)
-    if (!invoice || invoice.remindedAt !== undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
-    store.set(markReminded(store.get(), invoice.id, clock.now().toISOString()))
-    await mailer.send(reminderMessage(invoice))
+  factory: async (ctx, { ledger, mailer, clock, reminderRecipient }): Promise<ReminderResult> => {
+    const current = ledger.get()
+    const invoice = current.find((item) => item.id === ctx.input.invoiceId)
+    if (invoice === undefined || invoice.remindedAt !== undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
+    ledger.set(current.map((item) =>
+      item.id === invoice.id ? { ...item, remindedAt: clock.now().toISOString() } : item
+    ))
+    await mailer.send({
+      invoiceId: invoice.id,
+      vendor: invoice.classification.vendor,
+      dueDate: invoice.classification.dueDate,
+      amount: invoice.classification.amount,
+      to: reminderRecipient,
+      subject: `Invoice ${invoice.id} due ${invoice.classification.dueDate}`,
+      body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
+    })
     return { invoiceId: invoice.id, sent: true }
   },
 })
@@ -216,15 +251,19 @@ export const sendReminder = flow({
 export const sendReminders = flow({
   name: "invoice.sendReminders",
   deps: {
-    store,
+    ledger,
     clock: tags.required(clock),
     reminderWindowDays: tags.required(reminderWindowDays),
     sendReminder: controller(sendReminder),
   },
   tags: [step({ workflow: true, kind: "reminders" })],
-  factory: async (_ctx, { store, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
+  factory: async (_ctx, { ledger, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
     const sent: string[] = []
-    for (const invoice of dueForReminder(store, clock.now(), reminderWindowDays)) {
+    const start = utcDay(clock.now())
+    const end = start + reminderWindowDays * msPerDay
+    for (const invoice of ledger) {
+      const due = utcDay(invoice.dueDate)
+      if (invoice.remindedAt !== undefined || due < start || due > end) continue
       const result = await sendReminder.exec({ input: { invoiceId: invoice.id } })
       if (result.sent) sent.push(result.invoiceId)
     }
@@ -260,3 +299,49 @@ export const registerCron = flow({
     })),
   }),
 })
+
+function parseEnqueue(raw: unknown): { invoices: readonly Invoice[] } {
+  if (typeof raw === "string") return { invoices: parseLine(raw) }
+  if (isRecord(raw) && Array.isArray(raw["lines"])) return { invoices: raw["lines"].flatMap(parseLineValue) }
+  if (isRecord(raw) && Array.isArray(raw["invoices"])) return { invoices: raw["invoices"].map(parseInvoice) }
+  if (Array.isArray(raw)) return { invoices: raw.map(parseInvoice) }
+  return { invoices: [parseInvoice(raw)] }
+}
+
+function parseLineValue(value: unknown): readonly Invoice[] {
+  if (typeof value === "string") return parseLine(value)
+  return [parseInvoice(value)]
+}
+
+function parseLine(line: string): readonly Invoice[] {
+  const trimmed = line.trim()
+  if (trimmed === "") return []
+  return [parseInvoice(JSON.parse(trimmed))]
+}
+
+function parseInvoice(value: unknown): Invoice {
+  if (!isRecord(value)) throw new Error("Expected invoice object")
+  if (
+    typeof value["id"] !== "string" ||
+    typeof value["vendor"] !== "string" ||
+    typeof value["amount"] !== "number" ||
+    typeof value["dueDate"] !== "string" ||
+    typeof value["description"] !== "string"
+  ) throw new Error("Expected invoice fields")
+  return {
+    id: value["id"],
+    vendor: value["vendor"],
+    amount: value["amount"],
+    dueDate: value["dueDate"],
+    description: value["description"],
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function utcDay(value: string | Date): number {
+  const date = typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
