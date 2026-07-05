@@ -2,6 +2,8 @@ import { z } from "zod"
 
 export const category = z.enum(["utilities", "saas", "hardware", "other"])
 
+export const categories = category.options
+
 export const risk = z.enum(["auto-approve", "review"])
 
 export const invoice = z.object({

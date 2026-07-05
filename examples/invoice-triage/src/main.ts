@@ -3,7 +3,7 @@ import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { pathToFileURL } from "node:url"
-import { awaitDrained, ingest, intake, registerCron, watchReviewQueue } from "./flows"
+import { awaitDrained, dailyReportJob, ingest, intake, sendRemindersJob, watchReviewQueue } from "./flows"
 import { heuristic } from "./ports"
 
 export async function main(): Promise<void> {
@@ -30,7 +30,8 @@ export async function main(): Promise<void> {
   const ctx = scope.createContext()
   const processing = ctx.exec({ flow: ingest })
   const watching = ctx.exec({ flow: watchReviewQueue })
-  await ctx.exec({ flow: registerCron })
+  await ctx.resolve(dailyReportJob)
+  await ctx.resolve(sendRemindersJob)
   await ctx.exec({ flow: intake })
   await ctx.exec({ flow: awaitDrained })
   await ctx.close({ ok: true })

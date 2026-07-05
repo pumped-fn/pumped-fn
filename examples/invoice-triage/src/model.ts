@@ -1,5 +1,6 @@
 import { z } from "zod"
-import { classification, type Classification, type Invoice } from "./types"
+import type { Model } from "@pumped-fn/sdk"
+import { categories, classification, type Classification, type Invoice } from "./types"
 
 const classificationOutput = z.string().transform((output, ctx): unknown => {
   try {
@@ -13,10 +14,23 @@ const classificationOutput = z.string().transform((output, ctx): unknown => {
 export function classificationPrompt(invoice: Invoice): string {
   return [
     "Return JSON only with vendor, amount, dueDate, category, risk, and reason.",
-    "category must be utilities, saas, hardware, or other.",
+    `category must be ${categories.join(", ")}.`,
     "risk must be auto-approve or review.",
     `Invoice: ${JSON.stringify(invoice)}`,
   ].join("\n")
+}
+
+export function classifyRequest(invoice: Invoice): Parameters<Model["complete"]>[1] {
+  return {
+    agentName: "invoice-triage",
+    instructions: "Classify invoices for accounts-payable automation.",
+    messages: [{ role: "user", content: classificationPrompt(invoice) }],
+    tools: [],
+    skills: [],
+    loadedSkills: [],
+    subagents: [],
+    round: 0,
+  }
 }
 
 export function parseClassification(output: string, invoice: Invoice): Classification {

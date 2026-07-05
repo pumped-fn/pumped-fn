@@ -69,16 +69,6 @@ export const clock = tag<Clock>({
   default: { now: () => new Date() },
 })
 
-export const reportCron = tag<string>({
-  label: "invoice.reportCron",
-  default: "0 8 * * *",
-})
-
-export const reminderCron = tag<string>({
-  label: "invoice.reminderCron",
-  default: "0 9 * * *",
-})
-
 export const reminderWindowDays = tag<number>({
   label: "invoice.reminderWindowDays",
   default: 7,

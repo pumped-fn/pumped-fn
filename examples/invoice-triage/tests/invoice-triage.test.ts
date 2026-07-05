@@ -6,11 +6,12 @@ import { kit } from "@pumped-fn/sdk-test"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import {
   dailyReport,
+  dailyReportJob,
   enqueue,
   ingest,
   importBatch,
   intake,
-  registerCron,
+  sendRemindersJob,
   sendReminders,
   triage,
 } from "../src/flows"
@@ -24,9 +25,7 @@ import {
   opsHeartbeat,
   queue,
   reminderRecipient,
-  reminderCron,
   reminderWindowDays,
-  reportCron,
   reviewCount,
 } from "../src/ports"
 import {
@@ -374,6 +373,50 @@ describe("invoice triage patterns", () => {
     await processing
   })
 
+  it("drain-race: enqueue interleaved after wakeup is drained without loss", async () => {
+    const first = [invoice("inv-race-wakeup")]
+    const second = [invoice("inv-race-mid-cycle")]
+    const all = [...first, ...second]
+    const gate = gated(all.map((item) => json({
+      vendor: item.vendor,
+      amount: item.amount,
+      dueDate: item.dueDate,
+    })))
+    const scope = createScope({
+      tags: [
+        provider(gate.model),
+        clock({ now: () => now }),
+      ],
+    })
+    const ctx = scope.createContext()
+    const changes = scope.changes(queue)[Symbol.asyncIterator]()
+    const interleave = (async () => {
+      for (;;) {
+        const next = await changes.next()
+        if (next.done) return
+        if (next.value.some((item) => item.id === first[0]!.id)) {
+          await ctx.exec({ flow: enqueue, input: { invoices: second } })
+          await changes.return?.()
+          return
+        }
+      }
+    })()
+    const processing = ctx.exec({ flow: ingest })
+
+    await ctx.exec({ flow: enqueue, input: { invoices: first } })
+    await interleave
+    await gate.firstStarted
+    gate.releaseFirst()
+
+    const imported = await waitForImported(scope, all.length)
+    expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
+    expect(await scope.resolve(queue)).toEqual([])
+    expect(gate.calls()).toBe(all.length)
+    await ctx.close({ ok: true })
+    await scope.dispose()
+    await processing
+  })
+
   it("pattern: changes ops view conflates review-count observations during import", async () => {
     const runtime = kit()
     const sink = logging.memory()
@@ -492,18 +535,17 @@ describe("invoice triage patterns", () => {
       ],
       tags: [
         scheduler.backend(backend),
-        reportCron("0 7 * * *"),
-        reminderCron("0 8 * * *"),
         reminderWindowDays(5),
         clock({ now: () => now }),
       ],
     })
     const ctx = scope.createContext()
 
-    await ctx.exec({ flow: registerCron })
+    await ctx.resolve(dailyReportJob)
+    await ctx.resolve(sendRemindersJob)
     expect(backend.registrations.map((registration) => registration.spec)).toMatchObject([
-      { name: "invoice.dailyReport", cadence: { cron: "0 7 * * *" }, overlap: "skip", catchUp: "skip" },
-      { name: "invoice.sendReminders", cadence: { cron: "0 8 * * *" }, overlap: "queue", catchUp: "skip" },
+      { name: "invoice.dailyReport", cadence: { cron: "0 8 * * *" }, overlap: "skip", catchUp: "skip" },
+      { name: "invoice.sendReminders", cadence: { cron: "0 9 * * *" }, overlap: "queue", catchUp: "skip" },
     ])
     await backend.registrations[0]!.trigger("report")
     await backend.registrations[1]!.trigger("reminders")

@@ -88,7 +88,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 `resolveStream` and `changes` views conflate to the latest unconsumed value. That is correct for status views and processor wakeups, but not for must-not-drop work items; invoice batches live in `queue` and the processor drains state on each wakeup.
 
-`reportCron`, `reminderCron`, `reminderWindowDays`, and `reminderRecipient` are tags. Preset them at the composition root for each environment.
+`dailyReportJob` and `sendRemindersJob` are module-level `scheduler.schedule` atoms resolved at the composition root. `reminderWindowDays` and `reminderRecipient` are tags. Preset them at the composition root for each environment.
 
 ## Ops Notes
 

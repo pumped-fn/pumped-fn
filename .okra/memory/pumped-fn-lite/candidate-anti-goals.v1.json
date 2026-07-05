@@ -215,6 +215,41 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "PKR-9: domain.ts deleted, queue/ledger split, reducers inlined, net -37 LOC, lint 0, 11+181 tests green, entrypoint runs",
       "ratification": "user-stated rule 2026-07-05 (third occurrence of the pattern: runIngest(scope), main.ts glue, domain.ts reducers)"
+    },
+    {
+      "metric_id": "atomic_state_mutations",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-11/report.md",
+        "drain-race regression test"
+      ],
+      "applies_when": "any controller state mutation: no get()+set() read-modify-write, ever \u2014 single atomic update(fn) including drains (capture inside the updater) and check-then-act guards (decide inside the updater); interleaving regression test required for drain/queue patterns",
+      "does_not_apply_when": "read-only get() with no subsequent set",
+      "invalidates_when": "controller gains transactional batching",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-11: 3 RMW sites converted, drain-race test proves interleaved enqueue survives, 12+181 green",
+      "ratification": "orchestrator-confirmed defect after user pushed for harder review 2026-07-05"
+    },
+    {
+      "metric_id": "semantic_diff_review_every_round",
+      "threshold": "full line-by-line diff read per worker acceptance; gates (lint/tests/entrypoint) are necessary, never sufficient",
+      "type": "drift",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "registerCron survived 5 gate-green acceptances; get/set race survived 4 incl. its own burst test"
+      ],
+      "applies_when": "every worker diff, example/app code included, regardless of loop fatigue or round count",
+      "does_not_apply_when": "never",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "the round that reinstated full review found 2 defects + 5 discipline breaks the gates had passed",
+      "ratification": "user-caught 2026-07-05 (you don't work hard enough)"
     }
   ]
 }
