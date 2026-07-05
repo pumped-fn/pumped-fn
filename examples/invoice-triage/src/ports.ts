@@ -97,7 +97,10 @@ export const reviewCount = atom({
   deps: {
     ledger: controller(ledger, { resolve: true, watch: true }),
   },
-  factory: (_ctx, { ledger }) => ledger.get().filter((invoice) => invoice.classification.risk === "review").length,
+  factory: (_ctx, { ledger }) => {
+    const review = ledger.get().filter((invoice) => invoice.classification.risk === "review")
+    return review.length
+  },
 })
 
 export const opsHeartbeat = atom({

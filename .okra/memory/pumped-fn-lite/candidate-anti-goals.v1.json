@@ -269,6 +269,23 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "PKR-12b: bound() shipped with per-invocation rebinding test, lint rule live, example migrated; 186 lite + 42 lint + 12 example green, lint 0",
       "ratification": "user-ratified rule + mechanism 2026-07-05; earlier resource-wrapper approach rejected for ctx misattribution (would capture owning ctx, not per-invocation ctx)"
+    },
+    {
+      "metric_id": "no_nested_call_chains",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "classify one-liner: parseClassification((await model.complete(classifyRequest(ctx.input))).content, ctx.input)"
+      ],
+      "applies_when": "expressions where a call's argument is itself a nontrivial call result (result-of-that-as-param-of-this, awaits inside argument positions): name the intermediate steps \u2014 pipelines read top-to-bottom and diff line-per-step. The no-single-use-variable rule bans `const x = f(); return x` ceremony, NOT named pipeline steps",
+      "does_not_apply_when": "single-hop wrapping (f(g(x)) where both are trivial), idiomatic array method chains (filter/map), zod schema builders",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "classify + reviewCount unnested, 12 tests + lint 0 unchanged",
+      "ratification": "user-caught 2026-07-05: no human saves a line of code by sacrificing readability; diff noise"
     }
   ]
 }
