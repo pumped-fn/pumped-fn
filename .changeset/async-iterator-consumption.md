@@ -1,6 +1,7 @@
 ---
 "@pumped-fn/lite": minor
 "@pumped-fn/lite-extension-suspense": patch
+"@pumped-fn/lite-lint": minor
 ---
 
 Async-iterator consumption of the graph. `scope.changes(atom | selectHandle)` and
@@ -25,3 +26,9 @@ Streaming invocations are marked on the exec target for extensions; the
 suspense extension refuses to replay them until stream journaling exists.
 Flow handles gain `execStream(...)` so streaming composition is deps-declared:
 `deps.child.execStream(input)` + `yield*` + `await stream.result`.
+
+`bound(dep)` curries the executing invocation's context into ctx-first
+functions (or objects of them) resolved from tags, atoms, or resources —
+`deps: { model: bound(tags.required(model)) }` then `model.complete(request)`.
+ctx is a receiver, never an argument; the new lint rule
+`pumped/no-ctx-argument` enforces it.

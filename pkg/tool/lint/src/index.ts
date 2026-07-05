@@ -4,6 +4,7 @@ import ts from "typescript"
 
 export type RuleId =
   | "pumped/no-ambient-io-outside-boundary"
+  | "pumped/no-ctx-argument"
   | "pumped/no-definition-handle-suffix"
   | "pumped/no-direct-flow-composition"
   | "pumped/no-handle-spread"
@@ -112,6 +113,7 @@ function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Dia
 type Imports = {
   createScope: Set<string>
   controller: Set<string>
+  creatorKinds: Map<string, CreatorKind>
   creators: Set<string>
   flow: Set<string>
   liteNamespaces: Set<string>
@@ -128,6 +130,8 @@ type Imports = {
   useState: Set<string>
   viObjects: Set<string>
 }
+
+type CreatorKind = "atom" | "flow" | "resource" | "tag" | "scopedValue"
 
 const creatorNames = new Set(["atom", "flow", "resource", "tag", "scopedValue"])
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])
@@ -150,6 +154,7 @@ const tagExecutorModes = new Set(["required", "optional", "all"])
 const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
+const ctxArgumentMessage = "ctx is a receiver, never an argument; wrap ctx-taking contracts with bound() in deps."
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -284,6 +289,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
     createScope: new Set(),
     controller: new Set(),
+    creatorKinds: new Map(),
     creators: new Set(),
     flow: new Set(),
     liteNamespaces: new Set(),
@@ -345,6 +351,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if ((moduleName === "@pumped-fn/lite" || moduleName === "@pumped-fn/lite-react") && creatorNames.has(imported)) {
         imports.creators.add(local)
+        imports.creatorKinds.set(local, imported as CreatorKind)
       }
       if (moduleName === "@testing-library/react" && imported === "render") {
         imports.render.add(local)
@@ -382,6 +389,14 @@ function calledName(expression: ts.Expression): string | null {
   return null
 }
 
+function creatorKind(expression: ts.Expression, imports: Imports): CreatorKind | null {
+  if (ts.isIdentifier(expression)) return imports.creatorKinds.get(expression.text) ?? null
+  if (!ts.isPropertyAccessExpression(expression) || !creatorNames.has(expression.name.text)) return null
+  if (!ts.isIdentifier(expression.expression)) return null
+  if (!imports.liteNamespaces.has(expression.expression.text) && !imports.liteReactNamespaces.has(expression.expression.text)) return null
+  return expression.name.text as CreatorKind
+}
+
 function isNamespaceCall(expression: ts.Expression, namespaces: Set<string>, name: string): boolean {
   return ts.isPropertyAccessExpression(expression)
     && expression.name.text === name
@@ -390,10 +405,7 @@ function isNamespaceCall(expression: ts.Expression, namespaces: Set<string>, nam
 }
 
 function isCreatorCall(expression: ts.Expression, imports: Imports): boolean {
-  if (ts.isIdentifier(expression)) return imports.creators.has(expression.text)
-  if (!ts.isPropertyAccessExpression(expression) || !creatorNames.has(expression.name.text)) return false
-  if (!ts.isIdentifier(expression.expression)) return false
-  return imports.liteNamespaces.has(expression.expression.text) || imports.liteReactNamespaces.has(expression.expression.text)
+  return creatorKind(expression, imports) !== null
 }
 
 function isFlowCall(expression: ts.Expression, imports: Imports): boolean {
@@ -737,6 +749,29 @@ function containsMemberRead(body: ts.Node, paramName: string): boolean {
   return found
 }
 
+function factoryCtxName(factory: ts.ArrowFunction | ts.FunctionExpression | null): string | null {
+  const parameter = factory?.parameters[0]
+  return parameter && ts.isIdentifier(parameter.name) ? parameter.name.text : null
+}
+
+function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
+  let current: ts.Node | undefined = node.parent
+  while (current && current !== boundary) {
+    if (
+      (ts.isFunctionDeclaration(current)
+        || ts.isFunctionExpression(current)
+        || ts.isArrowFunction(current)
+        || ts.isMethodDeclaration(current)
+        || ts.isConstructorDeclaration(current))
+      && current.parameters.some((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === name)
+    ) {
+      return true
+    }
+    current = current.parent
+  }
+  return false
+}
+
 function shouldScanAst(filePath: string): boolean {
   return isSourceFile(filePath)
 }
@@ -763,7 +798,87 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const hasGraphNodes = unitFactoryNodes.length > 0
   const creatorHandleNames = collectCreatorHandleNames(sourceFile, imports)
 
+  function factoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
+    const factory = enclosingUnitFactory(node, imports)
+    const name = factoryCtxName(factory)
+    return factory && name ? { factory, name } : null
+  }
+
+  function pushCtxDiagnostic(node: ts.Node): void {
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-ctx-argument",
+      node,
+      ctxArgumentMessage,
+    )
+  }
+
+  function isDirectCtxExpression(expression: ts.Expression, ctxName: string): expression is ts.Identifier {
+    return ts.isIdentifier(expression) && expression.text === ctxName
+  }
+
   function visit(node: ts.Node): void {
+    const ctxBinding = factoryCtxAt(node)
+    if (ctxBinding) {
+      if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+        for (const argument of node.arguments ?? []) {
+          if (ts.isSpreadElement(argument)) {
+            if (isDirectCtxExpression(argument.expression, ctxBinding.name) && !shadowsName(argument.expression, ctxBinding.factory, ctxBinding.name)) {
+              pushCtxDiagnostic(argument.expression)
+            }
+            continue
+          }
+          if (isDirectCtxExpression(argument, ctxBinding.name) && !shadowsName(argument, ctxBinding.factory, ctxBinding.name)) {
+            pushCtxDiagnostic(argument)
+          }
+        }
+      }
+
+      if (ts.isObjectLiteralExpression(node)) {
+        for (const property of node.properties) {
+          if (ts.isSpreadAssignment(property)) {
+            if (isDirectCtxExpression(property.expression, ctxBinding.name) && !shadowsName(property.expression, ctxBinding.factory, ctxBinding.name)) {
+              pushCtxDiagnostic(property.expression)
+            }
+            continue
+          }
+          if (ts.isShorthandPropertyAssignment(property)) {
+            if (property.name.text === ctxBinding.name && !shadowsName(property.name, ctxBinding.factory, ctxBinding.name)) {
+              pushCtxDiagnostic(property.name)
+            }
+            continue
+          }
+          if (!ts.isPropertyAssignment(property)) continue
+          if (
+            ts.isComputedPropertyName(property.name)
+            && isDirectCtxExpression(property.name.expression, ctxBinding.name)
+            && !shadowsName(property.name.expression, ctxBinding.factory, ctxBinding.name)
+          ) {
+            pushCtxDiagnostic(property.name.expression)
+          }
+          if (isDirectCtxExpression(property.initializer, ctxBinding.name) && !shadowsName(property.initializer, ctxBinding.factory, ctxBinding.name)) {
+            pushCtxDiagnostic(property.initializer)
+          }
+        }
+      }
+
+      if (ts.isArrayLiteralExpression(node)) {
+        for (const element of node.elements) {
+          if (ts.isSpreadElement(element)) {
+            if (isDirectCtxExpression(element.expression, ctxBinding.name) && !shadowsName(element.expression, ctxBinding.factory, ctxBinding.name)) {
+              pushCtxDiagnostic(element.expression)
+            }
+            continue
+          }
+          if (isDirectCtxExpression(element, ctxBinding.name) && !shadowsName(element, ctxBinding.factory, ctxBinding.name)) {
+            pushCtxDiagnostic(element)
+          }
+        }
+      }
+    }
+
     if (ts.isCallExpression(node)) {
       const name = calledName(node.expression)
       if (

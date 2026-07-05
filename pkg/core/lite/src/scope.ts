@@ -1034,6 +1034,19 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
+    for (let i = 0; i < graph.bound.length; i++) {
+      if (!ctx) throw new Error("Bound deps require an ExecutionContext")
+      const [key, dep] = graph.bound[i]!
+      const value = this.resolveBoundDep(dep, ctx, dependentAtom, resourcePath)
+      if (isPromiseLike(value)) {
+        parallel.push(Promise.resolve(value).then((boundValue) => {
+          result[key] = boundValue
+        }))
+      } else {
+        result[key] = value
+      }
+    }
+
     for (let i = 0; i < graph.tags.length; i++) {
       const [key, tagExecutor] = graph.tags[i]!
       switch (tagExecutor.mode) {
@@ -1166,6 +1179,72 @@ class ScopeImpl implements Lite.Scope {
       prev = next
     })
     dependent.entry.cleanups.push(unsub)
+  }
+
+  private bindBoundValue(value: unknown, ctx: Lite.ExecutionContext): unknown {
+    if (value === undefined) return undefined
+    if (typeof value === "function") {
+      const fn = value as (ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown
+      return (...args: unknown[]) => fn(ctx, ...args)
+    }
+    if (typeof value !== "object" || value === null) {
+      throw new Error("bound() deps must resolve to a function or object")
+    }
+    const source = value as Record<PropertyKey, unknown>
+    const result: Record<PropertyKey, unknown> = {}
+    for (const property of Reflect.ownKeys(source)) {
+      if (!Object.prototype.propertyIsEnumerable.call(source, property)) continue
+      const member = source[property]
+      result[property] = typeof member === "function"
+        ? (...args: unknown[]) => (member as (ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown)(ctx, ...args)
+        : member
+    }
+    return result
+  }
+
+  private resolveBoundTag(tagExecutor: Lite.TagExecutor<unknown, unknown>, ctx: Lite.ExecutionContext): unknown {
+    switch (tagExecutor.mode) {
+      case "required": {
+        const value = ctx.data.seekTag(tagExecutor.tag)
+        if (value !== undefined) return value
+        if (tagExecutor.tag.hasDefault) return tagExecutor.tag.defaultValue
+        throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
+      }
+      case "optional": {
+        const value = ctx.data.seekTag(tagExecutor.tag)
+        return value ?? tagExecutor.tag.defaultValue
+      }
+      case "all":
+        throw new Error("bound() tag deps support tags.required and tags.optional")
+    }
+  }
+
+  private resolveBoundDep(
+    dep: Lite.BoundDep<unknown>,
+    ctx: Lite.ExecutionContext,
+    dependentAtom: Lite.Atom<unknown> | undefined,
+    resourcePath?: Set<Lite.Resource<unknown>>,
+  ): unknown | Promise<unknown> {
+    const source = dep.dep
+    if (isAtom(source)) {
+      const cachedEntry = this.cache.get(source)
+      if (cachedEntry?.state === "resolved") {
+        this.trackDependent(source, dependentAtom)
+        return this.bindBoundValue(cachedEntry.value, ctx)
+      }
+      return this.resolve(source).then((value) => {
+        this.trackDependent(source, dependentAtom)
+        return this.bindBoundValue(value, ctx)
+      })
+    }
+    if (isResource(source)) {
+      assertExecutionContextImpl(ctx)
+      return this.resolveResource(source, ctx, resourcePath).then((value) => this.bindBoundValue(value, ctx))
+    }
+    if (typeof source === "object" && source !== null && tagExecutorSymbol in source) {
+      return this.bindBoundValue(this.resolveBoundTag(source as Lite.TagExecutor<unknown, unknown>, ctx), ctx)
+    }
+    throw new Error("bound() deps can wrap tags.required, tags.optional, atom, or resource")
   }
 
   private async resolveResourceDeps(

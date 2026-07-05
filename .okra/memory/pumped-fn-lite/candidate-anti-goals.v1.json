@@ -250,6 +250,25 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "the round that reinstated full review found 2 defects + 5 discipline breaks the gates had passed",
       "ratification": "user-caught 2026-07-05 (you don't work hard enough)"
+    },
+    {
+      "metric_id": "ctx_never_an_argument",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "workers/pkr-12b/packet.md",
+        "lint rule pumped/no-ctx-argument",
+        "user design discussion 2026-07-05"
+      ],
+      "applies_when": "all node factories: ctx is a receiver, never a call argument or literal-embedded value; ctx-taking third-party contracts are wrapped via bound() in deps, which curries the per-invocation ctx (FlowHandle precedent). Enforcement: pumped/no-ctx-argument at error level",
+      "does_not_apply_when": "receiver usage (ctx.exec/ctx.input/ctx.changes); lite/sdk internals implementing the binding machinery itself",
+      "invalidates_when": "bound() semantics change",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-12b: bound() shipped with per-invocation rebinding test, lint rule live, example migrated; 186 lite + 42 lint + 12 example green, lint 0",
+      "ratification": "user-ratified rule + mechanism 2026-07-05; earlier resource-wrapper approach rejected for ctx misattribution (would capture owning ctx, not per-invocation ctx)"
     }
   ]
 }
