@@ -51,106 +51,36 @@ export interface FlowConfig<
  * })
  * ```
  */
-export function flow<TOutput, TYield, Fault = never>(config: {
+export function flow<Output, Yield, Fault = never>(config: {
   name?: string
   parse?: undefined
   deps?: undefined
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault>) => AsyncGenerator<TYield, TOutput, unknown>
+  factory: (ctx: Lite.ExecutionContext<Fault>) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void, Fault, TYield>
+}): Lite.Flow<Output, void, Fault, Yield>
 
-export function flow<TOutput, TYield, TInput, Fault = never>(config: {
+export function flow<Output, Yield, Input, Fault = never>(config: {
   name?: string
-  parse: (raw: unknown) => MaybePromise<TInput>
+  parse: (raw: unknown) => MaybePromise<Input>
   deps?: undefined
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => AsyncGenerator<TYield, TOutput, unknown>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault, TYield>
+}): Lite.Flow<Output, Input, Fault, Yield>
 
-export function flow<TOutput, TYield, TInput, Fault = never>(config: {
+export function flow<Output, Yield, Input, Fault = never>(config: {
   name?: string
-  parse: Lite.Typed<TInput>
+  parse: Lite.Typed<Input>
   deps?: undefined
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => AsyncGenerator<TYield, TOutput, unknown>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault, TYield>
+}): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<
-  TOutput,
-  TYield,
-  const D extends Record<string, Lite.ExecutionDependency>,
-  Fault = never,
->(config: {
-  name?: string
-  parse?: undefined
-  deps: D
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void, Fault, TYield>
-
-export function flow<
-  TOutput,
-  TYield,
-  TInput,
-  const D extends Record<string, Lite.ExecutionDependency>,
-  Fault = never,
->(config: {
-  name?: string
-  parse: (raw: unknown) => MaybePromise<TInput>
-  deps: D
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault, TYield>
-
-export function flow<
-  TOutput,
-  TYield,
-  TInput,
-  const D extends Record<string, Lite.ExecutionDependency>,
-  Fault = never,
->(config: {
-  name?: string
-  parse: Lite.Typed<TInput>
-  deps: D
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => AsyncGenerator<TYield, TOutput, unknown>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault, TYield>
-
-export function flow<TOutput, Fault = never>(config: {
-  name?: string
-  parse?: undefined
-  deps?: undefined
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault>) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void, Fault>
-
-export function flow<TOutput, TInput, Fault = never>(config: {
-  name?: string
-  parse: (raw: unknown) => MaybePromise<TInput>
-  deps?: undefined
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault>
-
-export function flow<TOutput, TInput, Fault = never>(config: {
-  name?: string
-  parse: Lite.Typed<TInput>
-  deps?: undefined
-  faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }) => MaybePromise<TOutput>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault>
-
-export function flow<
-  TOutput,
+  Output,
+  Yield,
   const D extends Record<string, Lite.ExecutionDependency>,
   Fault = never,
 >(config: {
@@ -158,37 +88,107 @@ export function flow<
   parse?: undefined
   deps: D
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, void, Fault>
+}): Lite.Flow<Output, void, Fault, Yield>
 
 export function flow<
-  TOutput,
-  TInput,
+  Output,
+  Yield,
+  Input,
   const D extends Record<string, Lite.ExecutionDependency>,
   Fault = never,
 >(config: {
   name?: string
-  parse: (raw: unknown) => MaybePromise<TInput>
+  parse: (raw: unknown) => MaybePromise<Input>
   deps: D
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault>
+}): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<
-  TOutput,
-  TInput,
+  Output,
+  Yield,
+  Input,
   const D extends Record<string, Lite.ExecutionDependency>,
   Fault = never,
 >(config: {
   name?: string
-  parse: Lite.Typed<TInput>
+  parse: Lite.Typed<Input>
   deps: D
   faults?: Lite.Typed<Fault>
-  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<TInput> }, deps: Lite.InferDeps<D>) => MaybePromise<TOutput>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
   tags?: Lite.Tagged<any>[]
-}): Lite.Flow<TOutput, TInput, Fault>
+}): Lite.Flow<Output, Input, Fault, Yield>
+
+export function flow<Output, Fault = never>(config: {
+  name?: string
+  parse?: undefined
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, void, Fault>
+
+export function flow<Output, Input, Fault = never>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<Input>
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, Input, Fault>
+
+export function flow<Output, Input, Fault = never>(config: {
+  name?: string
+  parse: Lite.Typed<Input>
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, Input, Fault>
+
+export function flow<
+  Output,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse?: undefined
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, void, Fault>
+
+export function flow<
+  Output,
+  Input,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse: (raw: unknown) => MaybePromise<Input>
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, Input, Fault>
+
+export function flow<
+  Output,
+  Input,
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse: Lite.Typed<Input>
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => MaybePromise<Output>
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<Output, Input, Fault>
 
 export function flow(config: any): Lite.Flow<any, any, any, any> {
   const parse = config.parse

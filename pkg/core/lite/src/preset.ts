@@ -47,12 +47,12 @@ export function preset<T>(
  * })
  * ```
  */
-export function preset<TOutput, TInput, TFault, TYield>(
-  target: Lite.Flow<TOutput, TInput, TFault, TYield>,
+export function preset<Output, Input, Fault, Yield>(
+  target: Lite.Flow<Output, Input, Fault, Yield>,
   value:
-    | Lite.Flow<TOutput, TInput, TFault, TYield>
-    | ((ctx: Lite.ExecutionContext<TFault> & { readonly input: TInput }) => MaybePromise<TOutput> | AsyncGenerator<TYield, TOutput, unknown>)
-): Lite.Preset<TOutput, TInput, TYield>
+    | Lite.Flow<Output, Input, Fault, Yield>
+    | ((ctx: Lite.ExecutionContext<Fault> & { readonly input: Input }) => MaybePromise<Output> | AsyncGenerator<Yield, Output, unknown>)
+): Lite.Preset<Output, Input, Yield>
 
 /**
  * Creates a preset that overrides a Resource within an execution context.

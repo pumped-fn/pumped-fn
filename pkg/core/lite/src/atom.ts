@@ -169,14 +169,14 @@ export function controller<T>(
   options: { resolve?: never; watch?: never; eq?: never }
 ): Lite.NonWatchResourceControllerDep<T>
 
-export function controller<TOutput, TInput, TYield>(
-  flow: Lite.Flow<TOutput, TInput, any, TYield>
-): Lite.FlowControllerDep<TOutput, TInput, TYield>
+export function controller<Output, Input, Yield>(
+  flow: Lite.Flow<Output, Input, any, Yield>
+): Lite.FlowControllerDep<Output, Input, Yield>
 
-export function controller<TOutput, TInput, TYield>(
-  flow: Lite.Flow<TOutput, TInput, any, TYield>,
-  options: Lite.FlowControllerOptions<TInput>
-): Lite.FlowControllerDep<TOutput, TInput, TYield>
+export function controller<Output, Input, Yield>(
+  flow: Lite.Flow<Output, Input, any, Yield>,
+  options: Lite.FlowControllerOptions<Input>
+): Lite.FlowControllerDep<Output, Input, Yield>
 
 export function controller<T>(
   target: Lite.Atom<T> | Lite.Resource<T> | Lite.Flow<any, any, any, any>,

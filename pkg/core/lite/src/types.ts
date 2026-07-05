@@ -97,16 +97,16 @@ export namespace Lite {
     readonly keepAlive?: boolean
   }
 
-  export interface Flow<TOutput, TInput = unknown, TFault = never, TYield = never> {
+  export interface Flow<Output, Input = unknown, Fault = never, Yield = never> {
     readonly [flowSymbol]: true
     readonly name?: string
-    readonly parse?: (raw: unknown) => MaybePromise<TInput>
-    readonly factory: FlowFactory<TOutput, TInput, TFault, Record<string, Dependency>, TYield>
+    readonly parse?: (raw: unknown) => MaybePromise<Input>
+    readonly factory: FlowFactory<Output, Input, Fault, Record<string, Dependency>, Yield>
     readonly deps?: Record<string, Dependency>
     readonly tags?: Tagged<any>[]
     /** Phantom marker carrying the flow's declared fault type; never assigned at runtime. */
-    readonly faultType?: TFault
-    readonly yieldType?: TYield
+    readonly faultType?: Fault
+    readonly yieldType?: Yield
   }
 
   export interface FlowRunOptions {
@@ -384,9 +384,9 @@ export namespace Lite {
 
   export type TagSource = Tagged<any>[] | { tags?: Tagged<any>[] }
 
-  export interface TagExecutor<TOutput, TTag = TOutput> {
+  export interface TagExecutor<Output, Value = Output> {
     readonly [tagExecutorSymbol]: true
-    readonly tag: Tag<TTag, boolean>
+    readonly tag: Tag<Value, boolean>
     readonly mode: "required" | "optional" | "all"
   }
 
@@ -555,16 +555,16 @@ export namespace Lite {
 
   export type InferDep<D> = D extends Atom<infer T>
     ? T
-    : D extends Flow<infer TOutput, infer TInput, any, infer TYield>
-      ? FlowHandle<TOutput, TInput, TYield>
-    : D extends FlowControllerDep<infer TOutput, infer TInput, infer TYield>
-      ? FlowHandle<TOutput, TInput, TYield>
+    : D extends Flow<infer Output, infer Input, any, infer Yield>
+      ? FlowHandle<Output, Input, Yield>
+    : D extends FlowControllerDep<infer Output, infer Input, infer Yield>
+      ? FlowHandle<Output, Input, Yield>
     : D extends AtomControllerDep<infer T>
       ? Controller<T>
       : D extends ResourceControllerDep<infer T>
         ? ResourceController<T>
-      : D extends TagExecutor<infer TOutput, infer _TTag>
-        ? TOutput
+      : D extends TagExecutor<infer Output, infer _Value>
+        ? Output
         : D extends Resource<infer T>
           ? T
           : never
