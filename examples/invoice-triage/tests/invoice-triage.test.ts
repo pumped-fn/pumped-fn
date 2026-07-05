@@ -9,12 +9,15 @@ import {
   enqueue,
   ingest,
   importBatch,
+  intake,
   registerCron,
   sendReminders,
   triage,
 } from "../src/flows"
 import {
   clock,
+  heuristic,
+  intakeLines,
   mailer,
   memoryMailer,
   opsHeartbeat,
@@ -510,6 +513,31 @@ describe("invoice triage patterns", () => {
     await backend.registrations[0]!.trigger("report")
     await backend.registrations[1]!.trigger("reminders")
     expect(messages.sent().map((message) => message.invoiceId)).toEqual(["inv-cron-reminder"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
+  it("intake: validates NDJSON lines by direct pull, rejecting malformed input", async () => {
+    const lines = [
+      JSON.stringify({ id: "inv-in-1", vendor: "Northwind Utilities", amount: 90, dueDate: "2026-07-09", description: "utility service" }),
+      "not json",
+      JSON.stringify({ id: "inv-in-2", vendor: "Fabrikam SaaS", amount: 1200 }),
+      "",
+      JSON.stringify({ id: "inv-in-3", vendor: "Contoso Hardware", amount: 300, dueDate: "2026-07-12", description: "cables" }),
+    ]
+    const scope = createScope({
+      tags: [provider(heuristic), clock({ now: () => now })],
+      presets: [preset(intakeLines, (async function* () {
+        yield* lines
+      })())],
+    })
+    const ctx = scope.createContext()
+
+    const summary = await ctx.exec({ flow: intake })
+
+    expect(summary).toEqual({ accepted: 2, rejected: 2 })
+    const state = await scope.resolve(store)
+    expect(state.pending.map((invoice) => invoice.id)).toEqual(["inv-in-1", "inv-in-3"])
     await ctx.close({ ok: true })
     await scope.dispose()
   })

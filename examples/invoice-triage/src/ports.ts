@@ -1,4 +1,5 @@
 import { atom, tag } from "@pumped-fn/lite"
+import { createInterface } from "node:readline"
 import type { Model } from "@pumped-fn/sdk"
 import { classifyHeuristically, emptyStore, type Invoice, type ReminderMessage } from "./domain"
 
@@ -80,6 +81,14 @@ export const reminderCron = tag<string>({
 export const reminderWindowDays = tag<number>({
   label: "invoice.reminderWindowDays",
   default: 7,
+})
+
+export const intakeLines = atom({
+  factory: (ctx): AsyncIterable<string> => {
+    const lines = createInterface({ input: process.stdin })
+    ctx.cleanup(() => lines.close())
+    return lines
+  },
 })
 
 export const store = atom({

@@ -85,7 +85,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 ## Ops Notes
 
-Run the demo with `pnpm start`; tests with `pnpm test`. The composition root execs `ingest`, `watchReviewQueue`, and `awaitImported` as flows — it holds the scope, but every loop lives in the graph. `scope.dispose()` closes change and stream views and ends the ingest flow. The entrypoint also registers a SIGINT handler that disposes the scope.
+Run with `pnpm start < fixtures/demo.ndjson` (invoices arrive as NDJSON on stdin — pipe from any producer); tests with `pnpm test`. The composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows — it holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull: exactly one flow owns the iterator, so it is backpressured and lossless, the correct shape for must-not-drop transport (contrast with the conflated `changes()` wakeup that drives `ingest` from state). Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then drains pending work and disposes — shutdown is the graph closing, not a kill.
 
 Reminder idempotency is store-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, preset `store` with a durable persistence adapter or an outbox-backed implementation, preset `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 

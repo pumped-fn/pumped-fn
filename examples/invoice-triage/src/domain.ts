@@ -284,3 +284,30 @@ function utcDay(value: string | Date): number {
   const date = typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
 }
+
+export function parseIntakeLine(line: string): Invoice | null {
+  const trimmed = line.trim()
+  if (trimmed === "") return null
+  let value: unknown
+  try {
+    value = JSON.parse(trimmed)
+  } catch {
+    return null
+  }
+  if (typeof value !== "object" || value === null) return null
+  const record = value as Partial<Invoice>
+  if (
+    typeof record.id !== "string" ||
+    typeof record.vendor !== "string" ||
+    typeof record.amount !== "number" ||
+    typeof record.dueDate !== "string" ||
+    typeof record.description !== "string"
+  ) return null
+  return {
+    id: record.id,
+    vendor: record.vendor,
+    amount: record.amount,
+    dueDate: record.dueDate,
+    description: record.description,
+  }
+}

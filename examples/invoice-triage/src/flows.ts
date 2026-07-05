@@ -11,6 +11,7 @@ import {
   markReminded,
   pendingIds,
   parseClassification,
+  parseIntakeLine,
   reminderMessage,
   reviewIds,
   takePending,
@@ -25,7 +26,7 @@ import {
   type SaveInvoiceInput,
   type TriageProgress,
 } from "./domain"
-import { clock, mailer, reminderCron, reminderWindowDays, reportCron, store } from "./ports"
+import { clock, intakeLines, mailer, reminderCron, reminderWindowDays, reportCron, store } from "./ports"
 
 export const classify = flow({
   name: "invoice.classify",
@@ -142,12 +143,34 @@ export const watchReviewQueue = flow({
   },
 })
 
-export const awaitImported = flow({
-  name: "invoice.awaitImported",
-  parse: typed<{ count: number }>(),
+export const intake = flow({
+  name: "invoice.intake",
+  deps: { lines: intakeLines },
+  factory: async (ctx, { lines }): Promise<{ accepted: number; rejected: number }> => {
+    const logger = await ctx.resolve(logging.logger)
+    let accepted = 0
+    let rejected = 0
+    for await (const line of lines) {
+      const invoice = parseIntakeLine(line)
+      if (!invoice) {
+        if (line.trim() !== "") {
+          rejected += 1
+          logger.warn("invoice.intake.rejected", { line })
+        }
+        continue
+      }
+      await ctx.exec({ flow: enqueue, input: { invoices: [invoice] } })
+      accepted += 1
+    }
+    return { accepted, rejected }
+  },
+})
+
+export const awaitDrained = flow({
+  name: "invoice.awaitDrained",
   factory: async (ctx): Promise<number> => {
     for await (const state of ctx.changes(store)) {
-      if (state.invoices.length >= ctx.input.count) return state.invoices.length
+      if (pendingIds(state).length === 0) return state.invoices.length
     }
     return 0
   },
