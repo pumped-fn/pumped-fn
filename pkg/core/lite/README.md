@@ -373,6 +373,12 @@ disposal until that await settles.
 Presets compose with all of it: `preset(orders, fakeFeed)` swaps the producer for a test, and
 `await scope.drain(orders, { take: 3 })` asserts the consumed elements through the same seam.
 
+`resolveStream` views conflate — they are state views, not lossless transports. Elements produced
+while a consumer is busy are superseded, not queued, so a stream must never be the only carrier of
+must-not-drop work. Put such work in state instead: producers append to an atom, and a processor
+loop wakes on `changes(select(...))` and drains everything pending from state. Conflated wakeups
+lose nothing because the state carries the work; conflated data would.
+
 ### Generator Flows
 
 A flow whose factory is an async generator yields elements and still returns one final output. The
