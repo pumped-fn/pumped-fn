@@ -3,9 +3,9 @@ import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { pathToFileURL } from "node:url"
-import { enqueue, registerCron, reviewQueue, runIngest } from "./flows"
+import { enqueue, ingest, registerCron } from "./flows"
+import { reviewIds, type Invoice } from "./domain"
 import { heuristic, store } from "./ports"
-import type { Invoice } from "./domain"
 
 const demo: readonly Invoice[] = [
   {
@@ -43,14 +43,14 @@ export async function main(): Promise<void> {
   process.once("SIGINT", stop)
 
   const log = logReviewQueue(scope)
-  const ingest = runIngest(scope)
   const ctx = scope.createContext()
+  const processing = ctx.exec({ flow: ingest })
   await ctx.exec({ flow: registerCron })
   await ctx.exec({ flow: enqueue, input: { invoices: demo } })
-  await ctx.close({ ok: true })
   await waitForInvoices(scope, demo.length)
+  await ctx.close({ ok: true })
   await scope.dispose()
-  await ingest
+  await processing
   await log
   process.off("SIGINT", stop)
   for (const record of sink.records()) console.log(JSON.stringify(record))
@@ -59,7 +59,10 @@ export async function main(): Promise<void> {
 async function logReviewQueue(scope: ReturnType<typeof createScope>): Promise<void> {
   const ctx = scope.createContext()
   const logger = await ctx.resolve(logging.logger)
-  for await (const count of scope.changes(await reviewQueue(scope))) logger.info("invoice.reviewQueue", { count })
+  await scope.resolve(store)
+  const review = scope.select(store, (state) => reviewIds(state).length)
+  for await (const count of scope.changes(review)) logger.info("invoice.reviewQueue", { count })
+  review.dispose()
   await ctx.close({ ok: true })
 }
 

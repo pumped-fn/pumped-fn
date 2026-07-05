@@ -1,4 +1,4 @@
-import { controller, flow, tags, typed, type Lite } from "@pumped-fn/lite"
+import { controller, flow, tags, typed } from "@pumped-fn/lite"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
 import {
@@ -11,7 +11,6 @@ import {
   pendingIds,
   parseClassification,
   reminderMessage,
-  reviewIds,
   takePending,
   upsertInvoice,
   type Classification,
@@ -111,6 +110,22 @@ export const enqueue = flow({
   },
 })
 
+export const ingest = flow({
+  name: "invoice.ingest",
+  deps: {
+    control: controller(store, { resolve: true }),
+  },
+  factory: async (ctx, { control }): Promise<void> => {
+    for await (const state of ctx.changes(store)) {
+      if (pendingIds(state).length === 0) continue
+      const drained = takePending(control.get())
+      if (drained.invoices.length === 0) continue
+      control.set(drained.state)
+      await ctx.exec({ flow: importBatch, input: { invoices: drained.invoices } })
+    }
+  },
+})
+
 export const dailyReport = flow({
   name: "invoice.dailyReport",
   deps: {
@@ -185,32 +200,3 @@ export const registerCron = flow({
     })),
   }),
 })
-
-export async function runIngest(scope: Lite.Scope): Promise<void> {
-  const control = await scope.controller(store, { resolve: true })
-  const pending = scope.select(store, pendingIds, { eq: sameIds })
-  for await (const ids of scope.changes(pending)) {
-    if (ids.length === 0) continue
-    const drained = takePending(control.get())
-    if (drained.invoices.length === 0) continue
-    control.set(drained.state)
-    const ctx = scope.createContext()
-    try {
-      await ctx.exec({ flow: importBatch, input: { invoices: drained.invoices } })
-      await ctx.close({ ok: true })
-    } catch (error) {
-      await ctx.close({ ok: false, error })
-      throw error
-    }
-  }
-  pending.dispose()
-}
-
-export async function reviewQueue(scope: Lite.Scope): Promise<Lite.SelectHandle<number>> {
-  await scope.resolve(store)
-  return scope.select(store, (state) => reviewIds(state).length)
-}
-
-function sameIds(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index])
-}

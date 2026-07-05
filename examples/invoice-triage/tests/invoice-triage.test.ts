@@ -7,10 +7,9 @@ import { describe, expect, expectTypeOf, it } from "vitest"
 import {
   dailyReport,
   enqueue,
+  ingest,
   importBatch,
   registerCron,
-  reviewQueue,
-  runIngest,
   sendReminders,
   triage,
 } from "../src/flows"
@@ -24,14 +23,15 @@ import {
   reportCron,
   store,
 } from "../src/ports"
-import type {
-  Category,
-  Classification,
-  ImportProgress,
-  ImportSummary,
-  Invoice,
-  Risk,
-  StoredInvoice,
+import {
+  reviewIds,
+  type Category,
+  type Classification,
+  type ImportProgress,
+  type ImportSummary,
+  type Invoice,
+  type Risk,
+  type StoredInvoice,
 } from "../src/domain"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
@@ -348,8 +348,8 @@ describe("invoice triage patterns", () => {
         clock({ now: () => now }),
       ],
     })
-    const ingest = runIngest(scope)
     const ctx = scope.createContext()
+    const processing = ctx.exec({ flow: ingest })
 
     await ctx.exec({ flow: enqueue, input: { invoices: first } })
     await gate.firstStarted
@@ -365,7 +365,7 @@ describe("invoice triage patterns", () => {
     expect(gate.calls()).toBe(all.length)
     await ctx.close({ ok: true })
     await scope.dispose()
-    await ingest
+    await processing
   })
 
   it("pattern: changes ops view conflates review-count observations during import", async () => {
@@ -389,7 +389,9 @@ describe("invoice triage patterns", () => {
     })
     const log = scope.createContext()
     const logger = await log.resolve(logging.logger)
-    const changes = scope.changes(await reviewQueue(scope))[Symbol.asyncIterator]()
+    await scope.resolve(store)
+    const review = scope.select(store, (state) => reviewIds(state).length)
+    const changes = scope.changes(review)[Symbol.asyncIterator]()
     const observations: number[] = []
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "changes", runId: "run-1" })] })
     const first = await changes.next()
@@ -408,6 +410,7 @@ describe("invoice triage patterns", () => {
       logger.info("invoice.reviewQueue", { count: latest.value })
     }
     await changes.return?.()
+    review.dispose()
     expect(observations).toEqual([0, 3])
     expect(sink.records().map((record) => record.fields?.["count"])).toEqual([0, 3])
     await ctx.close({ ok: true })

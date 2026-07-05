@@ -7,7 +7,7 @@ It proves:
 - generator flows with `execStream` progress and `exec` summary consumption
 - `yield*` progress composition from nested generator flows
 - scalar `ctx.exec` steps for model calls, store writes, reports, and mailer sends
-- state-backed ingest queues drained from `scope.changes(scope.select(...))` wakeups
+- state-backed ingest queues drained by an `ingest` flow from `ctx.changes(store)` wakeups
 - `scope.resolveStream(opsHeartbeat)` fan-out feeds plus `scope.drain(opsHeartbeat, { take })`
 - `scope.changes(scope.select(...))` ops views for review queue count
 - scheduler-backed cron registration with deterministic manual ticks in tests
@@ -18,7 +18,7 @@ It proves:
 ```mermaid
 flowchart TD
   Producer["enqueue flow<br/>append invoice batches"] --> Queue["store atom<br/>pending invoices"]
-  Queue --> Ingest["runIngest composition root<br/>changes(select pendingIds) wakeups"]
+  Queue --> Ingest["ingest flow<br/>ctx.changes(store) wakeups"]
   Ingest --> Import["importBatch generator"]
   Import --> Triage["triage generator"]
   Triage --> Classify["ctx.exec classify<br/>scalar SDK step kind=llm"]
@@ -75,7 +75,7 @@ createScope({ tags: [codex({ guard: false })] })
 The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This example needs a lossless ingest queue and cron-capable registration, so it uses:
 
 - `enqueue` to append invoice batches into `store.pending`.
-- `runIngest` to wake on `scope.changes(scope.select(store, pendingIds))`, drain all pending invoices from state, and pass that drained set to `importBatch`.
+- `ingest` to wake on `ctx.changes(store)`, drain all pending invoices from state, and pass that drained set to `importBatch`.
 - `opsHeartbeat` as an async-iterable atom consumed with `scope.resolveStream(opsHeartbeat)` only for conflatable status views.
 - `@pumped-fn/lite-extension-scheduler` for cron registration.
 
@@ -85,7 +85,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 ## Ops Notes
 
-`scope.dispose()` closes change and stream views and ends the ingest loop. The entrypoint also registers a SIGINT handler that disposes the scope.
+The composition root execs `ingest` once during startup. `scope.dispose()` closes change and stream views and ends the ingest flow. The entrypoint also registers a SIGINT handler that disposes the scope.
 
 Reminder idempotency is store-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, preset `store` with a durable persistence adapter or an outbox-backed implementation, preset `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 
