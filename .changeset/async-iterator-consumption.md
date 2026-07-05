@@ -23,3 +23,5 @@ invocation is consumed once, and breaking out cancels the invocation — the
 generator's `finally` runs and `onClose` observes `{ ok: false, aborted: true }`.
 Streaming invocations are marked on the exec target for extensions; the
 suspense extension refuses to replay them until stream journaling exists.
+Flow handles gain `execStream(...)` so streaming composition is deps-declared:
+`deps.child.execStream(input)` + `yield*` + `await stream.result`.

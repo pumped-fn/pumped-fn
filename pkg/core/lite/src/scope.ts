@@ -1089,6 +1089,9 @@ class ScopeImpl implements Lite.Scope {
       exec: (...args: Lite.FlowExecArgs<Input>) => {
         return this.execFlowHandle(flow, ctx, this.mergeFlowOptions(defaults, args[0] ?? {}))
       },
+      execStream: (...args: Lite.FlowExecArgs<Input>) => {
+        return ctx.execStream({ flow, ...this.mergeFlowOptions(defaults, args[0] ?? {}) } as Lite.ExecFlowOptions<Output, Input, Yield>)
+      },
       prepare: (...args: Lite.FlowPrepareArgs<Input>) => {
         const options = this.mergeFlowOptions(defaults, args[0] ?? {})
         const ready = Promise.resolve()

@@ -64,9 +64,10 @@ export const saveInvoice = flow({
 export const triage = flow({
   name: "invoice.triage",
   parse: typed<Invoice>(),
-  factory: async function* (ctx): AsyncGenerator<TriageProgress, Classification, unknown> {
+  deps: { classify: controller(classify) },
+  factory: async function* (ctx, { classify }): AsyncGenerator<TriageProgress, Classification, unknown> {
     yield { invoiceId: ctx.input.id, step: "model:request" }
-    const classification = await ctx.exec({ flow: classify, input: ctx.input })
+    const classification = await classify.exec({ input: ctx.input })
     yield {
       invoiceId: ctx.input.id,
       step: "model:classification",
@@ -80,14 +81,18 @@ export const triage = flow({
 export const importBatch = flow({
   name: "invoice.importBatch",
   parse: typed<{ invoices: readonly Invoice[] }>(),
-  factory: async function* (ctx): AsyncGenerator<ImportProgress, ImportSummary, unknown> {
+  deps: {
+    triage: controller(triage),
+    saveInvoice: controller(saveInvoice),
+  },
+  factory: async function* (ctx, { triage, saveInvoice }): AsyncGenerator<ImportProgress, ImportSummary, unknown> {
     const review: string[] = []
     let imported = 0
     for (const invoice of ctx.input.invoices) {
-      const stream = ctx.execStream({ flow: triage, input: invoice })
+      const stream = triage.execStream({ input: invoice })
       yield* stream
       const classification = await stream.result
-      await ctx.exec({ flow: saveInvoice, input: { invoice, classification } })
+      await saveInvoice.exec({ input: { invoice, classification } })
       imported += 1
       if (classification.risk === "review") review.push(invoice.id)
       yield {
@@ -117,14 +122,15 @@ export const ingest = flow({
   name: "invoice.ingest",
   deps: {
     control: controller(store, { resolve: true }),
+    importBatch: controller(importBatch),
   },
-  factory: async (ctx, { control }): Promise<void> => {
+  factory: async (ctx, { control, importBatch }): Promise<void> => {
     for await (const state of ctx.changes(store)) {
       if (pendingIds(state).length === 0) continue
       const drained = takePending(control.get())
       if (drained.invoices.length === 0) continue
       control.set(drained.state)
-      await ctx.exec({ flow: importBatch, input: { invoices: drained.invoices } })
+      await importBatch.exec({ input: { invoices: drained.invoices } })
     }
   },
 })
@@ -145,8 +151,11 @@ export const watchReviewQueue = flow({
 
 export const intake = flow({
   name: "invoice.intake",
-  deps: { lines: intakeLines },
-  factory: async (ctx, { lines }): Promise<{ accepted: number; rejected: number }> => {
+  deps: {
+    lines: intakeLines,
+    enqueue: controller(enqueue),
+  },
+  factory: async (ctx, { lines, enqueue }): Promise<{ accepted: number; rejected: number }> => {
     const logger = await ctx.resolve(logging.logger)
     let accepted = 0
     let rejected = 0
@@ -159,7 +168,7 @@ export const intake = flow({
         }
         continue
       }
-      await ctx.exec({ flow: enqueue, input: { invoices: [invoice] } })
+      await enqueue.exec({ input: { invoices: [invoice] } })
       accepted += 1
     }
     return { accepted, rejected }
@@ -210,12 +219,13 @@ export const sendReminders = flow({
     store,
     clock: tags.required(clock),
     reminderWindowDays: tags.required(reminderWindowDays),
+    sendReminder: controller(sendReminder),
   },
   tags: [step({ workflow: true, kind: "reminders" })],
-  factory: async (ctx, { store, clock, reminderWindowDays }): Promise<ReminderSummary> => {
+  factory: async (_ctx, { store, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
     const sent: string[] = []
     for (const invoice of dueForReminder(store, clock.now(), reminderWindowDays)) {
-      const result = await ctx.exec({ flow: sendReminder, input: { invoiceId: invoice.id } })
+      const result = await sendReminder.exec({ input: { invoiceId: invoice.id } })
       if (result.sent) sent.push(result.invoiceId)
     }
     return { sent: sent.length, invoiceIds: sent }

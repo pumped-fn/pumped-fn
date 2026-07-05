@@ -148,6 +148,7 @@ export namespace Lite {
   export interface FlowHandle<Output, Input, Yield = never> {
     readonly flow: Flow<Output, Input, any, Yield>
     exec(...args: FlowExecArgs<Input>): Promise<Output>
+    execStream(...args: FlowExecArgs<Input>): FlowStream<Yield, Output>
     prepare(...args: FlowPrepareArgs<Input>): FlowInvocation<Output, Input, Yield>
   }
 

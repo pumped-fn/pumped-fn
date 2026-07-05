@@ -6,7 +6,7 @@ It proves:
 
 - generator flows with `execStream` progress and `exec` summary consumption
 - `yield*` progress composition from nested generator flows
-- scalar `ctx.exec` steps for model calls, store writes, reports, and mailer sends
+- deps-declared scalar flow handles for model calls, store writes, reports, and mailer sends
 - state-backed ingest queues drained by an `ingest` flow from `ctx.changes(store)` wakeups
 - `scope.resolveStream(opsHeartbeat)` fan-out feeds plus `scope.drain(opsHeartbeat, { take })`
 - `scope.changes(scope.select(...))` ops views for review queue count
@@ -21,14 +21,14 @@ flowchart TD
   Queue --> Ingest["ingest flow<br/>ctx.changes(store) wakeups"]
   Ingest --> Import["importBatch generator"]
   Import --> Triage["triage generator"]
-  Triage --> Classify["ctx.exec classify<br/>scalar SDK step kind=llm"]
-  Import --> Save["ctx.exec saveInvoice<br/>scalar SDK step kind=store"]
+  Triage --> Classify["classify.exec<br/>scalar SDK step kind=llm"]
+  Import --> Save["saveInvoice.exec<br/>scalar SDK step kind=store"]
   Save --> Store["store atom<br/>imported invoices"]
   Store --> Ops["scope.changes(select review count)"]
   Heartbeat["opsHeartbeat atom<br/>PushFeed&lt;OpsHeartbeat&gt;"] --> Views["resolveStream fan-out<br/>drain fresh view"]
   Scheduler["scheduler.schedule atoms"] --> Report["dailyReport scalar step"]
   Scheduler --> Reminders["sendReminders scalar step"]
-  Reminders --> SendOne["ctx.exec sendReminder<br/>scalar SDK step kind=email"]
+  Reminders --> SendOne["sendReminder.exec<br/>scalar SDK step kind=email"]
   SendOne --> Mailer["mailer atom"]
   Report --> Store
   Reminders --> Store
@@ -38,7 +38,7 @@ flowchart TD
 
 `triage` and `importBatch` are streaming orchestration flows. They are not tagged with replay, suspend, or workflow policy. The SDK workflow and suspense extensions reject streaming targets through `isStreamingExec`, so durable policy belongs below them.
 
-Every side effect is a scalar flow reached with `ctx.exec`:
+Every side effect is a scalar flow reached through a deps-declared flow handle:
 
 - `classify` owns the model call and output validation.
 - `enqueue` owns appending invoice work into pending state.
@@ -46,7 +46,7 @@ Every side effect is a scalar flow reached with `ctx.exec`:
 - `dailyReport` owns report materialization.
 - `sendReminder` owns idempotent reminder marking and mail delivery.
 
-Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
+`triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
 
 The example uses `yield* stream` to pass nested triage progress through `importBatch`, then reads `stream.result` for the typed classification. The current `FlowStream` type preserves output through `.result`; the `yield*` expression itself does not recover the output type from `AsyncIterable`.
 
@@ -94,4 +94,5 @@ Reminder idempotency is store-backed: `sendReminder` marks an invoice as reminde
 ```sh
 pnpm -F @pumped-fn/invoice-triage test
 pnpm -F @pumped-fn/invoice-triage typecheck
+pnpm -F @pumped-fn/invoice-triage lint
 ```

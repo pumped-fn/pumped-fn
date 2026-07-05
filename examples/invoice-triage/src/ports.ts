@@ -1,4 +1,4 @@
-import { atom, tag } from "@pumped-fn/lite"
+import { atom, tag, type Lite } from "@pumped-fn/lite"
 import { createInterface } from "node:readline"
 import type { Model } from "@pumped-fn/sdk"
 import { classifyHeuristically, emptyStore, type Invoice, type ReminderMessage } from "./domain"
@@ -84,11 +84,7 @@ export const reminderWindowDays = tag<number>({
 })
 
 export const intakeLines = atom({
-  factory: (ctx): AsyncIterable<string> => {
-    const lines = createInterface({ input: process.stdin })
-    ctx.cleanup(() => lines.close())
-    return lines
-  },
+  factory: readlineAdapter,
 })
 
 export const store = atom({
@@ -112,8 +108,8 @@ export const mailer = atom({
   factory: memoryMailer,
 })
 
-export const heuristic: Model = {
-  complete: (_ctx, request) => {
+export const heuristic: Model = Object.freeze({
+  complete: (_ctx: Lite.ExecutionContext, request: Parameters<Model["complete"]>[1]) => {
     const message = request.messages.at(-1)?.content ?? ""
     const marker = "Invoice: "
     const index = message.indexOf(marker)
@@ -123,6 +119,12 @@ export const heuristic: Model = {
       stop: true,
     }
   },
+})
+
+function readlineAdapter(ctx: Lite.ResolveContext): AsyncIterable<string> {
+  const lines = createInterface({ input: process.stdin })
+  ctx.cleanup(() => lines.close())
+  return lines
 }
 
 export function memoryMailer(): Mailer {

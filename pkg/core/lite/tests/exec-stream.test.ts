@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
-import { createScope, flow, FlowFault, isStreamingExec, preset, resource, typed } from "../src/index"
+import { controller, createScope, flow, FlowFault, isStreamingExec, preset, resource, typed } from "../src/index"
 import type { Lite } from "../src/index"
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
@@ -200,6 +200,56 @@ describe("ctx.execStream()", () => {
     await expect(stream.result).resolves.toBe("done")
     expect(seen).toEqual([true, true])
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("composes child streams through flow handles and aborts the child on parent break", async () => {
+    const events: string[] = []
+    const child = flow({
+      factory: async function* (ctx) {
+        ctx.onClose((result) => {
+          events.push(result.ok ? "child:closed" : `child:aborted:${result.aborted === true}`)
+        })
+        try {
+          yield "child:first"
+          yield "child:second"
+          return "child:done"
+        } finally {
+          events.push("child:finally")
+        }
+      },
+    })
+    const parent = flow({
+      deps: { child: controller(child) },
+      factory: async function* (_ctx, { child }) {
+        const stream = child.execStream()
+        yield "parent:start"
+        yield* stream
+        return `parent:${await stream.result}`
+      },
+    })
+    const scope = createScope()
+    const completed = scope.createContext()
+    const completedStream = completed.execStream({ flow: parent })
+
+    expect(await collect(completedStream)).toEqual(["parent:start", "child:first", "child:second"])
+    await expect(completedStream.result).resolves.toBe("parent:child:done")
+    await completed.close()
+    events.length = 0
+
+    const aborted = scope.createContext()
+    const abortedStream = aborted.execStream({ flow: parent })
+    const seen: string[] = []
+
+    for await (const value of abortedStream) {
+      seen.push(value)
+      if (value === "child:first") break
+    }
+
+    await expect(abortedStream.result).rejects.toThrow("Flow stream aborted")
+    expect(seen).toEqual(["parent:start", "child:first"])
+    expect(events).toEqual(["child:finally", "child:aborted:true"])
+    await aborted.close()
     await scope.dispose()
   })
 
