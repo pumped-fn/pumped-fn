@@ -51,6 +51,27 @@ export interface FlowConfig<
  * })
  * ```
  */
+export function flow<Fault = never>(config: {
+  name?: string
+  parse?: undefined
+  deps?: undefined
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>) => never
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<never, void, Fault>
+
+export function flow<
+  const D extends Record<string, Lite.ExecutionDependency>,
+  Fault = never,
+>(config: {
+  name?: string
+  parse?: undefined
+  deps: D
+  faults?: Lite.Typed<Fault>
+  factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => never
+  tags?: Lite.Tagged<any>[]
+}): Lite.Flow<never, void, Fault>
+
 export function flow<Output, Yield, Fault = never>(config: {
   name?: string
   parse?: undefined
@@ -228,7 +249,7 @@ export function flow(config: any): Lite.Flow<any, any, any, any> {
  * }
  * ```
  */
-export function isFlow(value: unknown): value is Lite.Flow<unknown, unknown, unknown, unknown> {
+export function isFlow(value: unknown): value is Lite.Flow<unknown, unknown, never, never> {
   return (
     typeof value === "object" &&
     value !== null &&

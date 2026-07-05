@@ -258,7 +258,7 @@ export namespace Lite {
     resolve<T>(target: Resource<T>): Promise<T>
     release<T>(resource: Resource<T>): Promise<void>
     controller<T>(resource: Resource<T>): ResourceController<T>
-    exec<Output, Input, Yield>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
+    exec<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
     exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
     execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     changes<T>(atom: Atom<T>): AsyncIterable<T>

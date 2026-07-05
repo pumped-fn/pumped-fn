@@ -24,6 +24,7 @@ surfaces for documented patterns, not publishing targets.
 | `parking-lot-tanstack-start/` | `@pumped-fn/parking-lot-tanstack-start` | TanStack Start server-function entrypoint over the parking lot management flows. |
 | `parking-lot-spa/` | `@pumped-fn/parking-lot-spa` | Vite React SPA over the parking lot management flows and state. |
 | `ticket-triage/` | `@pumped-fn/ticket-triage` | Agent workflow examples. |
+| `invoice-triage/` | `@pumped-fn/invoice-triage` | Invoice import and LLM triage over generator flows, execStream, and scheduler cron. |
 
 ## Naming
 

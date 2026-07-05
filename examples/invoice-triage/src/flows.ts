@@ -37,8 +37,11 @@ export const classify = flow({
   parse: typed<Invoice>(),
   deps: { model: bound(tags.required(model)) },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { model }): Promise<Classification> =>
-    parseClassification((await model.complete(classifyRequest(ctx.input))).content, ctx.input),
+  factory: async (ctx, { model }): Promise<Classification> => {
+    const request = classifyRequest(ctx.input)
+    const response = await model.complete(request)
+    return parseClassification(response.content, ctx.input)
+  },
 })
 
 export const saveInvoice = flow({

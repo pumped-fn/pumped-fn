@@ -2150,7 +2150,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.assertOpen()
 
     if ("flow" in options) {
-      const { flow, presetValue, childCtx, streaming } = await this.createChildInvocation(options)
+      const invocation = this.createChildInvocation(options)
+      const { flow, presetValue, childCtx, streaming } = isPromiseLike(invocation)
+        ? await invocation
+        : invocation
       const unregisterStreaming = streaming ? registerStreamingExec(flow, childCtx) : undefined
       try {
         const runFlow = async () => typeof presetValue === 'function'
@@ -2233,7 +2236,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private async createChildInvocation(options: ExecFlowRuntimeOptions): Promise<{
+  private createChildInvocation(options: ExecFlowRuntimeOptions): MaybePromise<{
     flow: Lite.Flow<unknown, unknown, any, unknown>
     presetValue: unknown
     childCtx: ExecutionContextImpl
@@ -2246,40 +2249,49 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       return this.createChildInvocation({ ...options, flow: presetValue })
     }
 
-    const rawValue = rawInput !== undefined ? rawInput : input
-    let parsedInput: unknown = rawValue
-    if (flow.parse) {
-      const label = execName ?? flow.name ?? "anonymous"
-      try {
-        parsedInput = await flow.parse(rawValue)
-      } catch (err) {
-        throw new ParseError(
-          `Failed to parse flow input "${label}"`,
-          "flow-input",
-          label,
-          err
-        )
+    const finish = (parsedInput: unknown) => {
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        input: parsedInput,
+        execName,
+        flowName: flow.name,
+        boundary: false
+      })
+
+      this.seedTags(childCtx, execTags, flow.tags)
+
+      return {
+        flow,
+        presetValue,
+        childCtx,
+        streaming: typeof presetValue === "function"
+          ? isAsyncGeneratorFunction(presetValue)
+          : isAsyncGeneratorFunction(flow.factory),
       }
     }
 
-    const childCtx = new ExecutionContextImpl(this.scope, {
-      parent: this,
-      input: parsedInput,
-      execName,
-      flowName: flow.name,
-      boundary: false
-    })
+    const rawValue = rawInput !== undefined ? rawInput : input
+    if (!flow.parse) return finish(rawValue)
 
-    this.seedTags(childCtx, execTags, flow.tags)
-
-    return {
-      flow,
-      presetValue,
-      childCtx,
-      streaming: typeof presetValue === "function"
-        ? isAsyncGeneratorFunction(presetValue)
-        : isAsyncGeneratorFunction(flow.factory),
+    const label = execName ?? flow.name ?? "anonymous"
+    const wrap = (err: unknown) => new ParseError(
+      `Failed to parse flow input "${label}"`,
+      "flow-input",
+      label,
+      err
+    )
+    let parsed: unknown
+    try {
+      parsed = flow.parse(rawValue)
+    } catch (err) {
+      throw wrap(err)
     }
+    if (isPromiseLike(parsed)) {
+      return Promise.resolve(parsed).then(finish, (err) => {
+        throw wrap(err)
+      })
+    }
+    return finish(parsed)
   }
 
   private async *iterateExecStream(

@@ -1,4 +1,4 @@
-import { atom, flow, typed } from "@pumped-fn/lite"
+import { atom, bound, flow, typed } from "@pumped-fn/lite"
 import { NotFoundError, type HealthCheck } from "./domain"
 import type { CheckExecutor } from "./ports"
 import { detectTransition } from "./incidents"
@@ -21,7 +21,7 @@ export const runCheck = flow({
   name: "run-check",
   parse: typed<{ serviceId: string }>(),
   deps: {
-    checkExecutors,
+    checkExecutors: bound(checkExecutors),
     clock,
     detectTransition,
     ids,
@@ -31,7 +31,7 @@ export const runCheck = flow({
   factory: async (ctx, { checkExecutors, clock, detectTransition, ids, store, tx }) => {
     const service = store.services.get(ctx.input.serviceId)
     if (service === undefined) throw new NotFoundError("service", ctx.input.serviceId)
-    const result = await checkExecutors[service.type](ctx, service)
+    const result = await checkExecutors[service.type](service)
     const check = {
       id: ids.next("check"),
       serviceId: service.id,

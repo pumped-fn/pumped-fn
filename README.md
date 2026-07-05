@@ -324,6 +324,7 @@ The examples are part of the public contract for how code should be shaped:
 | `examples/draft-sync` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
 | `examples/draft-sync-web` | Frontend/backend sync through a web environment gateway and ordinary React observers |
 | `examples/ticket-triage` | Agent workflow, provider, sandbox, tool, subagent, and eval examples over Lite |
+| `examples/invoice-triage` | Invoice import and LLM triage: generator flows, yield* composition, execStream, state-queue ingest, scheduler cron |
 | `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
 | `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
 | `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |
