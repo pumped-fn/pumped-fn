@@ -334,7 +334,7 @@ docs/reports/
 docs/superpowers/
 .agents/
 .claude/
-.okra/
+.okra/*
 .c3/
 troubleshooting.md
 skills-lock.json
@@ -356,3 +356,4 @@ examples/reactivity-bench/
 
 # test fixtures are sources, never binaries
 !pkg/*/*/tests/fixtures/**
+!.okra/candidate-anti-goals.v1.json

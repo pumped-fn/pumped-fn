@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "source_run": "async-iter-consumption (PR 313, 2026-07-04/05)",
+  "note": "Candidate guardrails for future pumped-fn frames. Candidate-only until ratified into a frame; each was learned from a real post-green catch this run.",
+  "anti_goals": [
+    {
+      "id": "lint-zero-gate",
+      "metric": "project lint (pumped-lite-lint) diagnostics == 0 on all produced code, wired as a package script",
+      "type": "tripwire",
+      "context": "any pumped-fn code production (src, examples, tests)",
+      "learned_from": "example passed 11 tests + typecheck while carrying 5 composition errors + 2 port warnings; lint had never been invoked (PKR-8e)",
+      "status": "candidate, user-caught"
+    },
+    {
+      "id": "entrypoint-must-run",
+      "metric": "claimed-runnable entrypoints executed end-to-end at least once before acceptance (exit 0, expected output observed)",
+      "type": "tripwire",
+      "context": "examples, apps, anything labeled production-ready",
+      "learned_from": "main.ts could not execute at all (entry guard + extensionless imports) despite green suites; found only when audited",
+      "status": "candidate"
+    },
+    {
+      "id": "no-embedded-fixtures",
+      "metric": "test/demo data in production entrypoints == 0; fixtures live in fixtures/ and enter through real input boundaries (stdin/files/queues)",
+      "type": "tripwire",
+      "context": "entrypoints and composition roots",
+      "learned_from": "demo invoices hardcoded in main.ts; user: nobody adds test data to main",
+      "status": "candidate, user-caught"
+    },
+    {
+      "id": "graph-nodes-not-scope-functions",
+      "metric": "functions with Scope/ExecutionContext/handle parameters outside composition roots == 0 (grep-verifiable); root privilege = create scope, exec flows, dispose",
+      "type": "tripwire",
+      "context": "all pumped-fn app/example code",
+      "learned_from": "runIngest(scope)/reviewQueue(scope), then the glue re-hid inside main.ts under the composition-root exemption; two rounds to eradicate",
+      "status": "candidate, user-caught twice"
+    },
+    {
+      "id": "deps-declared-composition",
+      "metric": "pumped/no-direct-flow-composition == 0; flows compose via deps handles (exec/execStream), never closure imports",
+      "type": "tripwire",
+      "context": "flows; enforced by lint-zero-gate but worth naming — a missing API for the idiom (FlowHandle.execStream) is a core-gap finding, not an excuse",
+      "learned_from": "5 closure compositions; deps-declared streaming was impossible until execStream was added to FlowHandle",
+      "status": "candidate, user-caught"
+    },
+    {
+      "id": "burst-no-loss",
+      "metric": "every path where a stream carries must-not-drop work has a burst regression test (N pushes mid-consumption, each item lands exactly once)",
+      "type": "tripwire",
+      "context": "any consumer of conflating channels (resolveStream/changes); misuse of ratified semantics, not implementation bugs",
+      "learned_from": "orchestrator-specced ingest over resolveStream silently dropped invoice batches under burst",
+      "status": "candidate, orchestrator-caught"
+    },
+    {
+      "id": "no-test-slop",
+      "metric": "hand-rolled type gymnastics, never-executed scaffolding, manual iterator driving where for await is natural, verbose test names == 0 at acceptance",
+      "type": "tripwire",
+      "context": "all tests; use expectTypeOf (it evaluates its argument — assert on real values)",
+      "learned_from": "typeContracts ceremony + [Symbol.asyncIterator]().next() chains survived A4 because the wall only named source",
+      "status": "candidate, user-caught"
+    },
+    {
+      "id": "style-walls-enumerate-surfaces",
+      "metric": "frame style walls explicitly list: source, tests, type-parameter naming, boundary rules; unenumerated surface == assumed unguarded",
+      "type": "process rule",
+      "context": "frame drafting",
+      "learned_from": "four post-green style catches (test ceremony, iterator driving, T-prefixes, scope functions) all fell outside A4 as written",
+      "status": "candidate"
+    },
+    {
+      "id": "negative-detector-false-positive-review",
+      "metric": "every rejection heuristic gets an explicit false-positive pass (legit inputs it might reject) before acceptance",
+      "type": "process rule",
+      "context": "walls implemented as runtime detectors",
+      "learned_from": "F3 rejected scalar outputs with a .next method; needed two narrowings",
+      "status": "candidate"
+    },
+    {
+      "id": "loc-ceiling-plus-shrink-pass",
+      "metric": "every LOC ceiling paired with a mandatory compression round (discovery sweep + apply, revert-dont-weaken boundary) before acceptance",
+      "type": "process rule",
+      "context": "implementation frames",
+      "learned_from": "387/400 held numerically yet user pushed too-much-code twice; ceiling bounds growth, never demands compression (-99 was available)",
+      "status": "candidate, user-caught"
+    }
+  ]
+}
