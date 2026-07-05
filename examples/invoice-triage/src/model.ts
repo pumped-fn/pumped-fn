@@ -1,8 +1,14 @@
-import type { Category, Classification, Invoice, Risk } from "./types"
+import { z } from "zod"
+import { classification, type Classification, type Invoice } from "./types"
 
-const categories = ["utilities", "saas", "hardware", "other"] as const
-
-const risks = ["auto-approve", "review"] as const
+const classificationOutput = z.string().transform((output, ctx): unknown => {
+  try {
+    return JSON.parse(output)
+  } catch {
+    ctx.addIssue({ code: "custom", message: "Expected classification JSON" })
+    return z.NEVER
+  }
+}).pipe(classification)
 
 export function classificationPrompt(invoice: Invoice): string {
   return [
@@ -14,26 +20,9 @@ export function classificationPrompt(invoice: Invoice): string {
 }
 
 export function parseClassification(output: string, invoice: Invoice): Classification {
-  const parsed = parseJson(output)
-  if (!isRecord(parsed)) return unparseable(invoice)
-  const category = parseCategory(parsed["category"])
-  const risk = parseRisk(parsed["risk"])
-  if (
-    typeof parsed["vendor"] !== "string" ||
-    typeof parsed["amount"] !== "number" ||
-    typeof parsed["dueDate"] !== "string" ||
-    typeof parsed["reason"] !== "string" ||
-    category === undefined ||
-    risk === undefined
-  ) return unparseable(invoice)
-  return {
-    vendor: parsed["vendor"],
-    amount: parsed["amount"],
-    dueDate: parsed["dueDate"],
-    category,
-    risk,
-    reason: parsed["reason"],
-  }
+  const parsed = classificationOutput.safeParse(output)
+  if (!parsed.success) return unparseable(invoice)
+  return parsed.data
 }
 
 export function classifyHeuristically(invoice: Invoice): Classification {
@@ -56,14 +45,6 @@ export function classifyHeuristically(invoice: Invoice): Classification {
   }
 }
 
-function parseJson(output: string): unknown {
-  try {
-    return JSON.parse(output)
-  } catch {
-    return undefined
-  }
-}
-
 function unparseable(invoice: Invoice): Classification {
   return {
     vendor: invoice.vendor,
@@ -73,16 +54,4 @@ function unparseable(invoice: Invoice): Classification {
     risk: "review",
     reason: "unparseable",
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function parseCategory(value: unknown): Category | undefined {
-  return categories.find((category) => category === value)
-}
-
-function parseRisk(value: unknown): Risk | undefined {
-  return risks.find((risk) => risk === value)
 }

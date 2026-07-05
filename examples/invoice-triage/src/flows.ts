@@ -15,18 +15,20 @@ import {
   reportCron,
   reviewCount,
 } from "./ports"
-import type {
-  Category,
-  Classification,
-  DailyReport,
-  EnqueueSummary,
-  ImportProgress,
-  ImportSummary,
-  Invoice,
-  ReminderResult,
-  ReminderSummary,
-  SaveInvoiceInput,
-  TriageProgress,
+import {
+  enqueueInput,
+  type Category,
+  type Classification,
+  type DailyReport,
+  type EnqueueInput,
+  type EnqueueSummary,
+  type ImportProgress,
+  type ImportSummary,
+  type Invoice,
+  type ReminderResult,
+  type ReminderSummary,
+  type SaveInvoiceInput,
+  type TriageProgress,
 } from "./types"
 
 const msPerDay = 86_400_000
@@ -118,7 +120,7 @@ export const importBatch = flow({
 
 export const enqueue = flow({
   name: "invoice.enqueue",
-  parse: parseEnqueue,
+  parse: (input): EnqueueInput => enqueueInput.parse(input),
   deps: {
     queue: controller(queue, { resolve: true }),
   },
@@ -299,47 +301,6 @@ export const registerCron = flow({
     })),
   }),
 })
-
-function parseEnqueue(raw: unknown): { invoices: readonly Invoice[] } {
-  if (typeof raw === "string") return { invoices: parseLine(raw) }
-  if (isRecord(raw) && Array.isArray(raw["lines"])) return { invoices: raw["lines"].flatMap(parseLineValue) }
-  if (isRecord(raw) && Array.isArray(raw["invoices"])) return { invoices: raw["invoices"].map(parseInvoice) }
-  if (Array.isArray(raw)) return { invoices: raw.map(parseInvoice) }
-  return { invoices: [parseInvoice(raw)] }
-}
-
-function parseLineValue(value: unknown): readonly Invoice[] {
-  if (typeof value === "string") return parseLine(value)
-  return [parseInvoice(value)]
-}
-
-function parseLine(line: string): readonly Invoice[] {
-  const trimmed = line.trim()
-  if (trimmed === "") return []
-  return [parseInvoice(JSON.parse(trimmed))]
-}
-
-function parseInvoice(value: unknown): Invoice {
-  if (!isRecord(value)) throw new Error("Expected invoice object")
-  if (
-    typeof value["id"] !== "string" ||
-    typeof value["vendor"] !== "string" ||
-    typeof value["amount"] !== "number" ||
-    typeof value["dueDate"] !== "string" ||
-    typeof value["description"] !== "string"
-  ) throw new Error("Expected invoice fields")
-  return {
-    id: value["id"],
-    vendor: value["vendor"],
-    amount: value["amount"],
-    dueDate: value["dueDate"],
-    description: value["description"],
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
 
 function utcDay(value: string | Date): number {
   const date = typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value

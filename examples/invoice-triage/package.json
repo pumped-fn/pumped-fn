@@ -13,7 +13,8 @@
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-extension-logging": "workspace:*",
     "@pumped-fn/lite-extension-scheduler": "workspace:*",
-    "@pumped-fn/sdk": "workspace:*"
+    "@pumped-fn/sdk": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@pumped-fn/sdk-test": "workspace:*",

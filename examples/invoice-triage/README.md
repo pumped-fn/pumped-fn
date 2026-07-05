@@ -41,6 +41,8 @@ flowchart TD
 
 Business features are flows/resources; free functions are pure calculations; ctx/scope/handles never travel into helpers.
 
+External data is schema-validated with zod at parse and model-output boundaries; graph-internal handoffs stay typed.
+
 Every side effect is a scalar flow reached through a deps-declared flow handle:
 
 - `classify` owns the model call and output validation.

@@ -335,6 +335,9 @@ importers:
       '@pumped-fn/sdk':
         specifier: workspace:*
         version: link:../../pkg/sdk/core
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@pumped-fn/sdk-test':
         specifier: workspace:*

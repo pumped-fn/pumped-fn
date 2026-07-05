@@ -1,22 +1,59 @@
-export type Category = "utilities" | "saas" | "hardware" | "other"
-export type Risk = "auto-approve" | "review"
+import { z } from "zod"
 
-export interface Invoice {
-  id: string
-  vendor: string
-  amount: number
-  dueDate: string
-  description: string
-}
+export const category = z.enum(["utilities", "saas", "hardware", "other"])
 
-export interface Classification {
-  vendor: string
-  amount: number
-  dueDate: string
-  category: Category
-  risk: Risk
-  reason: string
-}
+export const risk = z.enum(["auto-approve", "review"])
+
+export const invoice = z.object({
+  id: z.string(),
+  vendor: z.string(),
+  amount: z.number(),
+  dueDate: z.string(),
+  description: z.string(),
+})
+
+export const classification = z.object({
+  vendor: z.string(),
+  amount: z.number(),
+  dueDate: z.string(),
+  category,
+  risk,
+  reason: z.string(),
+})
+
+const lineInvoices = z.string().transform((line, ctx): unknown => {
+  const trimmed = line.trim()
+  if (trimmed === "") return []
+  try {
+    return [JSON.parse(trimmed)]
+  } catch {
+    ctx.addIssue({ code: "custom", message: "Expected invoice JSON line" })
+    return z.NEVER
+  }
+}).pipe(z.array(invoice))
+
+const lineValue = z.union([
+  lineInvoices,
+  invoice.transform((item) => [item]),
+])
+
+export const enqueueInput = z.union([
+  lineInvoices,
+  z.object({ lines: z.array(lineValue) }).transform(({ lines }) => lines.flat()),
+  z.object({ invoices: z.array(invoice) }).transform(({ invoices }) => invoices),
+  z.array(invoice),
+  invoice.transform((item) => [item]),
+]).transform((invoices) => ({ invoices }))
+
+export type Category = z.infer<typeof category>
+
+export type Risk = z.infer<typeof risk>
+
+export type Invoice = z.infer<typeof invoice>
+
+export type Classification = z.infer<typeof classification>
+
+export type EnqueueInput = z.infer<typeof enqueueInput>
 
 export interface StoredInvoice extends Invoice {
   classification: Classification
