@@ -85,7 +85,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 ## Ops Notes
 
-The composition root execs `ingest` once during startup. `scope.dispose()` closes change and stream views and ends the ingest flow. The entrypoint also registers a SIGINT handler that disposes the scope.
+Run the demo with `pnpm start`; tests with `pnpm test`. The composition root execs `ingest`, `watchReviewQueue`, and `awaitImported` as flows — it holds the scope, but every loop lives in the graph. `scope.dispose()` closes change and stream views and ends the ingest flow. The entrypoint also registers a SIGINT handler that disposes the scope.
 
 Reminder idempotency is store-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, preset `store` with a durable persistence adapter or an outbox-backed implementation, preset `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 

@@ -1,4 +1,5 @@
 import { controller, flow, tags, typed } from "@pumped-fn/lite"
+import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
 import {
@@ -11,6 +12,7 @@ import {
   pendingIds,
   parseClassification,
   reminderMessage,
+  reviewIds,
   takePending,
   upsertInvoice,
   type Classification,
@@ -123,6 +125,31 @@ export const ingest = flow({
       control.set(drained.state)
       await ctx.exec({ flow: importBatch, input: { invoices: drained.invoices } })
     }
+  },
+})
+
+export const watchReviewQueue = flow({
+  name: "invoice.watchReviewQueue",
+  factory: async (ctx): Promise<void> => {
+    const logger = await ctx.resolve(logging.logger)
+    let last = -1
+    for await (const state of ctx.changes(store)) {
+      const count = reviewIds(state).length
+      if (count === last) continue
+      last = count
+      logger.info("invoice.reviewQueue", { count })
+    }
+  },
+})
+
+export const awaitImported = flow({
+  name: "invoice.awaitImported",
+  parse: typed<{ count: number }>(),
+  factory: async (ctx): Promise<number> => {
+    for await (const state of ctx.changes(store)) {
+      if (state.invoices.length >= ctx.input.count) return state.invoices.length
+    }
+    return 0
   },
 })
 
