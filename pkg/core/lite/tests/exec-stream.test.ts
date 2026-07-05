@@ -368,3 +368,44 @@ describe("ctx.execStream()", () => {
     await scope.dispose()
   })
 })
+
+describe("exec sync start", () => {
+  it("starts a parseless flow factory synchronously", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let started = false
+    const job = flow({
+      factory: async () => {
+        started = true
+        return 1
+      },
+    })
+
+    const pending = ctx.exec({ flow: job })
+
+    expect(started).toBe(true)
+    expect(await pending).toBe(1)
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("starts a sync-parse flow factory synchronously", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    let started = false
+    const job = flow({
+      parse: (raw) => raw as number,
+      factory: async (ctx) => {
+        started = true
+        return ctx.input + 1
+      },
+    })
+
+    const pending = ctx.exec({ flow: job, rawInput: 1 })
+
+    expect(started).toBe(true)
+    expect(await pending).toBe(2)
+    await ctx.close()
+    await scope.dispose()
+  })
+})
