@@ -286,6 +286,40 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "classify + reviewCount unnested, 12 tests + lint 0 unchanged",
       "ratification": "user-caught 2026-07-05: no human saves a line of code by sacrificing readability; diff noise"
+    },
+    {
+      "metric_id": "ci_gates_before_merge_command",
+      "threshold": "merge command issued only AFTER checks read green, as a separate invocation \u2014 never compounded with the check",
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "PR 313 merged red: gh pr checks && gh pr merge in one compound command; no branch protection caught it"
+      ],
+      "applies_when": "any PR merge; also: local gates must include the repo's own CI commands (pnpm -r typecheck, lint:check, -r test), not only touched packages",
+      "does_not_apply_when": "never",
+      "invalidates_when": "branch protection enforces checks server-side",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PR 314 merged green after verified checks",
+      "ratification": "orchestrator error 2026-07-05, self-caught post-hoc"
+    },
+    {
+      "metric_id": "sync_start_contract",
+      "threshold": "flow factories start synchronously within the dispatch tick when parse is sync/absent; regression tests pin it",
+      "type": "tripwire",
+      "source_run_id": "async-iter-consumption",
+      "source_refs": [
+        "parking-lot-spa browser hang; bisected to PKR-6 compression; fixed 36f24e2a"
+      ],
+      "applies_when": "any refactor touching exec/invocation paths \u2014 implicit timing contracts (sync start, event ordering) must be named and tested before compression passes; UI frameworks depend on them invisibly",
+      "does_not_apply_when": "explicitly-async seams (parse returning promises)",
+      "invalidates_when": "the contract is deliberately renegotiated with downstream consumers",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.95,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "2 sync-start regression tests, spa browser test green, full workspace sweep green",
+      "ratification": "found via CI browser test + commit bisection 2026-07-05"
     }
   ]
 }
