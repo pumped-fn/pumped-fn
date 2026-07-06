@@ -98,6 +98,11 @@ export interface EnqueueSummary {
   accepted: number
 }
 
+export interface IntakeSummary {
+  accepted: number
+  rejected: number
+}
+
 export type TriageProgress =
   | {
       invoiceId: string

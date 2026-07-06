@@ -39,26 +39,6 @@ export function parseClassification(output: string, invoice: Invoice): Classific
   return parsed.data
 }
 
-export function classifyHeuristically(invoice: Invoice): Classification {
-  const description = `${invoice.vendor} ${invoice.description}`.toLowerCase()
-  const category = description.includes("electric") || description.includes("water") || description.includes("utility")
-    ? "utilities"
-    : description.includes("license") || description.includes("subscription") || description.includes("saas")
-    ? "saas"
-    : description.includes("laptop") || description.includes("server") || description.includes("hardware")
-    ? "hardware"
-    : "other"
-  const risk = invoice.amount <= 1_000 && category !== "hardware" ? "auto-approve" : "review"
-  return {
-    vendor: invoice.vendor,
-    amount: invoice.amount,
-    dueDate: invoice.dueDate,
-    category,
-    risk,
-    reason: risk === "auto-approve" ? "within automatic approval policy" : "amount or category requires review",
-  }
-}
-
 function unparseable(invoice: Invoice): Classification {
   return {
     vendor: invoice.vendor,

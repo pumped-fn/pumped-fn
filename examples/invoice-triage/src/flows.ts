@@ -2,6 +2,7 @@ import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
+import type { AuditEvent } from "./audit"
 import { OperationalFault } from "./errors"
 import { classifyRequest, parseClassification } from "./model"
 import {
@@ -24,6 +25,7 @@ import {
   type EnqueueSummary,
   type ImportProgress,
   type ImportSummary,
+  type IntakeSummary,
   type Invoice,
   type ReminderMessage,
   type ReminderResult,
@@ -203,7 +205,7 @@ export const intake = flow({
     enqueue: controller(enqueue),
     logger: logging.logger,
   },
-  factory: async (_ctx, { lines, enqueue, logger }): Promise<{ accepted: number; rejected: number }> => {
+  factory: async (_ctx, { lines, enqueue, logger }): Promise<IntakeSummary> => {
     let accepted = 0
     let rejected = 0
     for await (const line of lines) {
@@ -217,6 +219,27 @@ export const intake = flow({
     }
     return { accepted, rejected }
   },
+})
+
+export const listPendingInvoices = flow({
+  name: "invoice.pending.list",
+  deps: { database },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: (_ctx, { database }): Promise<readonly Invoice[]> => database.listPending(),
+})
+
+export const listStoredInvoices = flow({
+  name: "invoice.stored.list",
+  deps: { database },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: (_ctx, { database }): Promise<readonly StoredInvoice[]> => database.listStored(),
+})
+
+export const listAuditEvents = flow({
+  name: "invoice.audit.list",
+  deps: { database },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: (_ctx, { database }): Promise<readonly AuditEvent[]> => database.listAudit(),
 })
 
 export const awaitDrained = flow({

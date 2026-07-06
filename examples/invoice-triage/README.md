@@ -13,6 +13,8 @@ It proves:
 - coalesced ops views for review queue count
 - scheduler-backed cron registration with deterministic manual ticks in tests
 - idempotent reminders through durable invoice state
+- REST, CLI, and directory-watcher adapters over the same graph seams
+- Docker Compose wiring for Postgres, the HTTP server, and watched-volume import
 
 ## Architecture
 
@@ -35,7 +37,10 @@ flowchart TD
   Scheduler["scheduler.schedule atoms"] --> Report["dailyReport scalar step"]
   Scheduler --> Reminders["sendReminders scalar step"]
   Reminders --> SendOne["sendReminder.exec<br/>scalar SDK step kind=email"]
-  SendOne --> Mailer["mailer atom"]
+  SendOne --> Mailer["mailer tag"]
+  Rest["REST server"] --> Enqueue["enqueue.exec / importBatch.exec"]
+  Cli["admin CLI"] --> Commands["prepareDatabase.exec / intake.exec / report.exec"]
+  Watcher["directory watcher"] --> Intake["intake.exec<br/>tagged file lines"]
   Stored --> Report
   Stored --> Reminders
 ```
@@ -62,15 +67,15 @@ The example uses `yield* stream` to pass nested triage progress through `importB
 
 ## Providers
 
-The provider seam is the SDK `model` tag. `src/main.ts` wires a deterministic heuristic provider:
+The provider seam is the SDK `model` tag. Production entrypoints wire the lazy Codex CLI provider:
 
 ```ts
-createScope({
-  tags: [model(heuristic)],
-})
+import { codex } from "@pumped-fn/sdk-codex"
+
+createScope({ tags: [codex()] })
 ```
 
-Tests wire scripted fakes through the same tag and use `@pumped-fn/sdk-test` for in-memory workflow logs. Production can swap in the CLI providers without changing the graph:
+Tests wire scripted fakes through the same tag and use `@pumped-fn/sdk-test` for in-memory workflow logs. The graph does not know whether the model is Codex, Claude, or a test double:
 
 ```ts
 import { claude } from "@pumped-fn/sdk-claude"
@@ -98,13 +103,51 @@ The production database adapter uses Drizzle over `pg` and exposes explicit migr
 
 `dailyReportJob` and `sendRemindersJob` are module-level `scheduler.schedule` atoms resolved at the composition root. `mailer`, `reminderWindowDays`, and `reminderRecipient` are tags. Set them at the composition root for each environment.
 
+## Interfaces
+
+The REST server exposes operational endpoints without bypassing flows:
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/health` | Liveness check |
+| POST | `/invoices` | `enqueue.exec` for durable pending work |
+| POST | `/imports` | `importBatch.exec` for immediate classification/import |
+| GET | `/pending` | `listPendingInvoices.exec` |
+| GET | `/invoices` | `listStoredInvoices.exec` |
+| GET | `/audit` | `listAuditEvents.exec` |
+| GET | `/report` | `dailyReport.exec` |
+| POST | `/reminders/send` | `sendReminders.exec` |
+
+The admin CLI uses the same graph:
+
+```sh
+pnpm -F @pumped-fn/invoice-triage cli -- migrate --mode migrate
+pnpm -F @pumped-fn/invoice-triage cli -- import fixtures/demo.ndjson
+pnpm -F @pumped-fn/invoice-triage cli -- report
+pnpm -F @pumped-fn/invoice-triage cli -- audit
+```
+
+The watcher imports every existing file in a directory, then keeps watching for new files:
+
+```sh
+pnpm -F @pumped-fn/invoice-triage watch -- --directory inbox
+```
+
 ## Ops Notes
 
 The operational expansion frame is tracked in `OPERATIONS-OKR.md`. Replay the current gate metrics with `pnpm okr:invoice-triage`.
 
-Run the daemon root with `pnpm start`; tests with `pnpm test`. The composition root execs `prepareDatabase`, `ingest`, `watchReviewQueue`, `dailyReportJob`, and `sendRemindersJob`. It holds the scope, but every loop lives in the graph. Import transports are graph seams: tests tag `intakeLines` directly, while CLI and directory-watcher adapters remain explicit OKR gate work rather than hidden stdin behavior. `intake` consumes its tagged transport by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal.
+Run the daemon root with `pnpm start`; tests with `pnpm test`. The composition root execs `prepareDatabase`, `ingest`, `watchReviewQueue`, `dailyReportJob`, and `sendRemindersJob`. It holds the scope, but every loop lives in the graph. Import transports are graph seams: tests and adapters tag `intakeLines` directly, while CLI and directory-watcher adapters own file IO. `intake` consumes its tagged transport by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal.
 
 Reminder idempotency is database-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, keep `databaseEngine` on the Postgres default or tag it with another engine at the composition root, tag `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
+
+Docker Compose starts Postgres, the HTTP server, and the watched-volume importer:
+
+```sh
+docker compose -f examples/invoice-triage/compose.yaml up
+```
+
+Compose passes the database URL as an entrypoint argument. The application graph still receives the database through the `databaseEngine(postgresDatabase(...))` tag, so test and production seams stay identical.
 
 ## Run
 
@@ -112,4 +155,5 @@ Reminder idempotency is database-backed: `sendReminder` marks an invoice as remi
 pnpm -F @pumped-fn/invoice-triage test
 pnpm -F @pumped-fn/invoice-triage typecheck
 pnpm -F @pumped-fn/invoice-triage lint
+pnpm okr:invoice-triage -- --enforce
 ```

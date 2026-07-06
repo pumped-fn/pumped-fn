@@ -1,10 +1,8 @@
 import { atom, tag, tags } from "@pumped-fn/lite"
-import type { Model } from "@pumped-fn/sdk"
 import { databaseEngine } from "./database"
 import { pushFeed, type PushFeed } from "./feed"
 import type { DatabaseStartupMode } from "./migrations"
-import { classifyHeuristically } from "./model"
-import type { Invoice, ReminderMessage } from "./types"
+import type { ReminderMessage } from "./types"
 
 export interface Clock {
   now(): Date
@@ -69,17 +67,4 @@ export const opsHeartbeat = atom({
 
 export const mailer = tag<Mailer>({
   label: "invoice.mailer",
-})
-
-export const heuristic: Model = Object.freeze({
-  complete: (_ctx: Parameters<Model["complete"]>[0], request: Parameters<Model["complete"]>[1]) => {
-    const message = request.messages.at(-1)?.content ?? ""
-    const marker = "Invoice: "
-    const index = message.indexOf(marker)
-    const invoice = JSON.parse(message.slice(index + marker.length)) as Invoice
-    return {
-      content: JSON.stringify(classifyHeuristically(invoice)),
-      stop: true,
-    }
-  },
 })

@@ -1,11 +1,17 @@
 import { createScope } from "@pumped-fn/lite"
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { model as provider } from "@pumped-fn/sdk"
+import { codex } from "@pumped-fn/sdk-codex"
 import { dailyReportJob, ingest, prepareDatabase, sendRemindersJob, watchReviewQueue } from "./flows"
-import { databaseStartup, heuristic, mailer, type Mailer } from "./ports"
+import { databaseEngine, databaseStartup, mailer, postgresDatabase, type Mailer } from "./ports"
+import type { DatabaseStartupMode } from "./migrations"
 
-export async function main(): Promise<void> {
+export interface MainOptions {
+  databaseUrl?: string
+  startup?: DatabaseStartupMode
+}
+
+export async function main(options: MainOptions = {}): Promise<void> {
   const sink: Logging.Sink = {
     name: "stdout",
     write: (record) => console.log(JSON.stringify(record)),
@@ -25,9 +31,12 @@ export async function main(): Promise<void> {
         flow: "errors",
         fields: { service: "invoice-triage" },
       }),
-      provider(heuristic),
-      databaseStartup("migrate"),
+      codex(),
+      databaseStartup(options.startup ?? "migrate"),
       mailer(reminders),
+      ...(options.databaseUrl === undefined ? [] : [
+        databaseEngine(postgresDatabase({ connectionString: options.databaseUrl })),
+      ]),
     ],
   })
 

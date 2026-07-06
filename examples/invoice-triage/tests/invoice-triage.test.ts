@@ -21,7 +21,6 @@ import {
   database,
   databaseEngine,
   databaseStartup,
-  heuristic,
   intakeLines,
   mailer,
   opsHeartbeat,
@@ -30,6 +29,7 @@ import {
 } from "../src/ports"
 import { memoryDatabase } from "./support/database"
 import { memoryMailer } from "./support/mailer"
+import { heuristic } from "./support/model"
 import {
   type Category,
   type Classification,

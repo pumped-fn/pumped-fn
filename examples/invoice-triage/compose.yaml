@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: invoice_triage
+      POSTGRES_USER: invoice
+      POSTGRES_PASSWORD: invoice
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoice -d invoice_triage"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    image: node:24-slim
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../..:/workspace
+      - pnpm-store:/pnpm/store
+    command: >
+      sh -lc "corepack enable &&
+      pnpm config set store-dir /pnpm/store &&
+      pnpm install --frozen-lockfile &&
+      pnpm -F @pumped-fn/lite-extension-suspense build &&
+      pnpm -F @pumped-fn/invoice-triage server -- --host 0.0.0.0 --port 3000 --database-url postgres://invoice:invoice@postgres:5432/invoice_triage"
+
+  watcher:
+    image: node:24-slim
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../..:/workspace
+      - ./inbox:/inbox
+      - pnpm-store:/pnpm/store
+    command: >
+      sh -lc "corepack enable &&
+      pnpm config set store-dir /pnpm/store &&
+      pnpm install --frozen-lockfile &&
+      pnpm -F @pumped-fn/lite-extension-suspense build &&
+      pnpm -F @pumped-fn/invoice-triage watch -- --directory /inbox --database-url postgres://invoice:invoice@postgres:5432/invoice_triage"
+
+volumes:
+  postgres-data:
+  pnpm-store:
