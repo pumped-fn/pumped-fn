@@ -43,7 +43,6 @@ Current source packages live under one-word lanes in `pkg/`.
 | `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
 | `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
-| `pkg/ui/ui` | `@pumped-fn/ui` | Succinct graph-handle UI authoring over render contracts |
 | `pkg/framework/pumped` | `@pumped-fn/pumped` | Convention-driven scope compiler: discovers flows on disk, assembles a scope, and drives it as a CLI or HTTP server |
 | `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
 | `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |

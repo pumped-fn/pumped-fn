@@ -15,7 +15,6 @@ names so new packages can be added without turning the workspace into a flat lis
 | `ext/` | Optional Lite extensions and development add-ons. |
 | `sdk/` | Generic runtime primitive SDK packages (workflow, sessions, materials, events, guards, sandboxes, agents/models) and provider integrations. |
 | `render/` | Portable render contracts and renderer bindings. |
-| `ui/` | Graph-composed UI authoring packages. |
 | `tool/` | Repository tooling, scanners, and migration CLIs. |
 
 Packages live at `pkg/<lane>/<package>/`. `pnpm-workspace.yaml` includes `pkg/*/*`, so every
