@@ -84,9 +84,9 @@ const runStoreFiles = [
   `.okra/runs/${runStore}/checkins.jsonl`,
 ]
 
-const hasServer = existsSync(pathOf("examples/invoice-triage/src/server.ts"))
-const hasCli = existsSync(pathOf("examples/invoice-triage/src/cli.ts")) || Boolean(manifest.bin)
-const hasWatcher = existsSync(pathOf("examples/invoice-triage/src/watcher.ts")) ||
+const hasServer = existsSync(pathOf("examples/invoice-triage/src/invoice-server.ts"))
+const hasCli = existsSync(pathOf("examples/invoice-triage/src/invoice-cli.ts")) || Boolean(manifest.bin)
+const hasWatcher = existsSync(pathOf("examples/invoice-triage/src/invoice-watcher.ts")) ||
   has(src, /\bfs\.(?:watch|watchFile)\s*\(|\bchokidar\b/)
 const hasDockerCompose = [
   "examples/invoice-triage/compose.yaml",
@@ -96,7 +96,7 @@ const hasDockerCompose = [
 ].some((path) => existsSync(pathOf(path)))
 const hasDrizzle = Boolean(deps["drizzle-orm"]) && (Boolean(deps.pg) || Boolean(deps.postgres))
 const hasCodex = Boolean(deps["@pumped-fn/sdk-codex"]) && !has(src, /\bprovider\(heuristic\)/)
-const hasAudit = existsSync(pathOf("examples/invoice-triage/src/audit.ts")) || has(src, /\baudit\b/i)
+const hasAudit = existsSync(pathOf("examples/invoice-triage/src/invoice-audit.ts")) || has(src, /\baudit\b/i)
 const hasDynamicDatabaseStartup = has(src, /tags\.optional\(databaseStartup\)/) &&
   has(src, /controller\(migrateDatabase\)/) &&
   has(src, /controller\(verifyDatabase\)/) &&
@@ -167,7 +167,7 @@ const metrics = [
     hasDynamicDatabaseStartup ? 0 : 1,
     "==",
     0,
-    "examples/invoice-triage/src/flows.ts",
+    "examples/invoice-triage/src/invoice-database-operations.ts",
     srcEvidence,
   ),
   metric(
@@ -191,7 +191,7 @@ const metrics = [
     hasServer ? 0 : 1,
     "==",
     0,
-    "examples/invoice-triage/src/server.ts",
+    "examples/invoice-triage/src/invoice-server.ts",
     srcEvidence,
   ),
   metric(
@@ -199,7 +199,7 @@ const metrics = [
     hasCli ? 0 : 1,
     "==",
     0,
-    "examples/invoice-triage/src/cli.ts or package bin",
+    "examples/invoice-triage/src/invoice-cli.ts or package bin",
     packageEvidence,
   ),
   metric(
@@ -215,7 +215,7 @@ const metrics = [
     hasAudit ? 0 : 1,
     "==",
     0,
-    "examples/invoice-triage/src/audit.ts or audit references",
+    "examples/invoice-triage/src/invoice-audit.ts or audit references",
     srcEvidence,
   ),
   metric(
@@ -223,8 +223,8 @@ const metrics = [
     hasCodex ? 0 : 1,
     "==",
     0,
-    "examples/invoice-triage/package.json and src/main.ts",
-    [...packageEvidence, sha("examples/invoice-triage/src/main.ts")],
+    "examples/invoice-triage/package.json and src/invoice-main.ts",
+    [...packageEvidence, sha("examples/invoice-triage/src/invoice-main.ts")],
   ),
   metric(
     "docker_compose_gap_count",

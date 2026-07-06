@@ -9,7 +9,7 @@ It proves:
 - deps-declared scalar flow handles for model calls, database appends, database writes, reports, and mailer sends
 - a tag-selected database engine with Postgres/Drizzle as the production default and test engines at the same scope seam
 - audit records emitted by the database operations that enqueue, drain, save, and remind invoices
-- `scope.resolveStream(opsHeartbeat)` fan-out feeds plus `scope.drain(opsHeartbeat, { take })`
+- `scope.resolveStream(opsHeartbeat)` fan-out status streams plus `scope.drain(opsHeartbeat, { take })`
 - coalesced ops views for review queue count
 - scheduler-backed cron registration with deterministic manual ticks in tests
 - idempotent reminders through durable invoice state
@@ -33,7 +33,7 @@ flowchart TD
   Database --> Audit["invoice_audit<br/>append-only operation audit"]
   Stored --> Review["watchReviewCount<br/>coalesced ops view"]
   Review --> Ops["watchReviewQueue flow"]
-  Heartbeat["opsHeartbeat atom<br/>PushFeed&lt;OpsHeartbeat&gt;"] --> Views["resolveStream fan-out<br/>drain fresh view"]
+  Heartbeat["opsHeartbeat atom<br/>status stream"] --> Views["resolveStream fan-out<br/>drain fresh view"]
   Scheduler["scheduler.schedule atoms"] --> Report["dailyReport scalar step"]
   Scheduler --> Reminders["sendReminders scalar step"]
   Reminders --> SendOne["sendReminder.exec<br/>scalar SDK step kind=email"]

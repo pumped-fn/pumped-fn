@@ -2,8 +2,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm"
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 import { Pool, type PoolConfig } from "pg"
 import { tag } from "@pumped-fn/lite"
-import { operationalFault } from "./errors"
-import { latestFeed, pushFeed, type PushFeed } from "./feed"
+import { operationalFault } from "./invoice-errors"
 import {
   completedReport,
   databaseMigrations,
@@ -12,11 +11,11 @@ import {
   type DatabaseMigrationRecord,
   type DatabaseMigrationReport,
   type DatabaseMigrationStatus,
-} from "./migrations"
-import * as schema from "./schema"
-import { auditEvents, pendingInvoices, schemaMigrations, storedInvoices } from "./schema"
-import type { AuditAction, AuditEvent } from "./audit"
-import type { Invoice, SaveInvoiceInput, StoredInvoice } from "./types"
+} from "./invoice-migrations"
+import * as schema from "./invoice-schema"
+import { auditEvents, pendingInvoices, schemaMigrations, storedInvoices } from "./invoice-schema"
+import type { AuditAction, AuditEvent } from "./invoice-audit"
+import type { Invoice, SaveInvoiceInput, StoredInvoice } from "./invoice-types"
 
 export interface SaveInvoiceRecord extends SaveInvoiceInput {
   importedAt: string
@@ -44,6 +43,12 @@ export interface DatabaseEngine {
   open(): InvoiceDatabase
 }
 
+interface InvoiceWatch<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
+  push(value: T): void
+  close(): void
+  return(): Promise<IteratorReturnResult<undefined>>
+}
+
 export const databaseEngine = tag<DatabaseEngine>({
   label: "invoice.databaseEngine",
   default: postgresDatabase(),
@@ -66,9 +71,9 @@ type AuditRow = typeof auditEvents.$inferSelect
 
 function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
   const db: Database = drizzle(pool, { schema })
-  const pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
-  const storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
-  const reviewWatchers = new Set<PushFeed<number>>()
+  const pendingWatchers = new Set<InvoiceWatch<readonly Invoice[]>>()
+  const storedWatchers = new Set<InvoiceWatch<readonly StoredInvoice[]>>()
+  const reviewWatchers = new Set<InvoiceWatch<number>>()
 
   async function readMigrationStatus(): Promise<DatabaseMigrationStatus> {
     if (!await hasMigrationLedger()) return migrationStatus([])
@@ -155,15 +160,15 @@ function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
   }
 
   function watchPending(): AsyncIterable<readonly Invoice[]> {
-    return watch(pendingWatchers, pushFeed(), () => listPending())
+    return watch(pendingWatchers, invoiceWatch(), () => listPending())
   }
 
   function watchStored(): AsyncIterable<readonly StoredInvoice[]> {
-    return watch(storedWatchers, latestFeed(), () => listStored())
+    return watch(storedWatchers, invoiceWatch(), () => listStored())
   }
 
   function watchReviewCount(): AsyncIterable<number> {
-    return watch(reviewWatchers, latestFeed(), () => reviewCount())
+    return watch(reviewWatchers, invoiceWatch(), () => reviewCount())
   }
 
   async function recordAudit(
@@ -248,10 +253,10 @@ function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
   }
 
   function watch<T>(
-    watchers: Set<PushFeed<T>>,
-    feed: PushFeed<T>,
+    watchers: Set<InvoiceWatch<T>>,
+    feed: InvoiceWatch<T>,
     initial: () => Promise<T>
-  ): PushFeed<T> {
+  ): InvoiceWatch<T> {
     watchers.add(feed)
     void initial().then((value) => {
       feed.push(value)
@@ -264,7 +269,7 @@ function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
     return feed
   }
 
-  function closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
+  function closeWatchers<T>(watchers: Set<InvoiceWatch<T>>): void {
     for (const watcher of watchers) watcher.close()
     watchers.clear()
   }
@@ -301,6 +306,52 @@ function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
     listAudit,
     close,
   }
+}
+
+function invoiceWatch<T>(): InvoiceWatch<T> {
+  let value: T | undefined
+  let hasValue = false
+  let pending: ((result: IteratorResult<T, undefined>) => void) | undefined
+  let closed = false
+  const feed = {
+    next(): Promise<IteratorResult<T, undefined>> {
+      if (hasValue) {
+        const current = value as T
+        value = undefined
+        hasValue = false
+        return Promise.resolve({ done: false, value: current })
+      }
+      if (closed) return Promise.resolve({ done: true, value: undefined })
+      return new Promise((resolve) => {
+        pending = resolve
+      })
+    },
+    push(next: T): void {
+      if (closed) throw new Error("Feed is closed")
+      if (pending === undefined) {
+        value = next
+        hasValue = true
+        return
+      }
+      const resolve = pending
+      pending = undefined
+      resolve({ done: false, value: next })
+    },
+    close(): void {
+      closed = true
+      const resolve = pending
+      pending = undefined
+      resolve?.({ done: true, value: undefined })
+    },
+    return(): Promise<IteratorReturnResult<undefined>> {
+      feed.close()
+      return Promise.resolve({ done: true, value: undefined })
+    },
+    [Symbol.asyncIterator](): AsyncIterator<T, undefined> {
+      return feed
+    },
+  } satisfies InvoiceWatch<T>
+  return feed
 }
 
 function storedFromRow(row: StoredRow): StoredInvoice {

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S node --import tsx
-import { runCli } from "../src/cli"
-import { runtimeExtensions, runtimeTags, splitRuntimeArgs } from "./options"
+import { runCli } from "../src/invoice-cli"
+import { runtimeExtensions, runtimeTags, splitRuntimeArgs } from "./invoice-runtime"
 
 const { runtime, rest } = splitRuntimeArgs(process.argv.slice(2))
 

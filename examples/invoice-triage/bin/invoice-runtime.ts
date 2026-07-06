@@ -1,8 +1,8 @@
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { codex } from "@pumped-fn/sdk-codex"
-import { databaseEngine, mailer, postgresDatabase, type Mailer } from "../src/ports"
-import type { DatabaseStartupMode } from "../src/migrations"
+import { databaseEngine, mailer, postgresDatabase, type Mailer } from "../src/invoice-runtime"
+import type { DatabaseStartupMode } from "../src/invoice-migrations"
 
 export interface RuntimeOptions {
   databaseUrl?: string

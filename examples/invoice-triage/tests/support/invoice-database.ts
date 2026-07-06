@@ -1,14 +1,19 @@
-import { latestFeed, pushFeed, type PushFeed } from "../../src/feed"
 import {
   completedReport,
   migrationStatus,
   type DatabaseMigrationRecord,
   type DatabaseMigrationReport,
   type DatabaseMigrationStatus,
-} from "../../src/migrations"
-import type { AuditAction, AuditEvent } from "../../src/audit"
-import type { DatabaseEngine, InvoiceDatabase, SaveInvoiceRecord } from "../../src/database"
-import type { Invoice, StoredInvoice } from "../../src/types"
+} from "../../src/invoice-migrations"
+import type { AuditAction, AuditEvent } from "../../src/invoice-audit"
+import type { DatabaseEngine, InvoiceDatabase, SaveInvoiceRecord } from "../../src/invoice-database"
+import type { Invoice, StoredInvoice } from "../../src/invoice-types"
+
+interface InvoiceWatch<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
+  push(value: T): void
+  close(): void
+  return(): Promise<IteratorReturnResult<undefined>>
+}
 
 export interface DatabaseSeed {
   pending?: readonly Invoice[]
@@ -27,9 +32,9 @@ function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
   let events: AuditEvent[] = []
   let migrations: DatabaseMigrationRecord[] = []
   let sequence = 0
-  const pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
-  const storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
-  const reviewWatchers = new Set<PushFeed<number>>()
+  const pendingWatchers = new Set<InvoiceWatch<readonly Invoice[]>>()
+  const storedWatchers = new Set<InvoiceWatch<readonly StoredInvoice[]>>()
+  const reviewWatchers = new Set<InvoiceWatch<number>>()
 
   async function migrate(appliedAt: string): Promise<DatabaseMigrationReport> {
     const status = migrationStatus(migrations)
@@ -115,15 +120,15 @@ function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
   }
 
   function watchPending(): AsyncIterable<readonly Invoice[]> {
-    return watch(pendingWatchers, pushFeed(), pending.slice())
+    return watch(pendingWatchers, invoiceWatch(), pending.slice())
   }
 
   function watchStored(): AsyncIterable<readonly StoredInvoice[]> {
-    return watch(storedWatchers, latestFeed(), stored.slice())
+    return watch(storedWatchers, invoiceWatch(), stored.slice())
   }
 
   function watchReviewCount(): AsyncIterable<number> {
-    return watch(reviewWatchers, latestFeed(), stored.filter((invoice) => invoice.classification.risk === "review").length)
+    return watch(reviewWatchers, invoiceWatch(), stored.filter((invoice) => invoice.classification.risk === "review").length)
   }
 
   async function recordAudit(
@@ -146,7 +151,7 @@ function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
     closeWatchers(reviewWatchers)
   }
 
-  function watch<T>(watchers: Set<PushFeed<T>>, feed: PushFeed<T>, initial: T): PushFeed<T> {
+  function watch<T>(watchers: Set<InvoiceWatch<T>>, feed: InvoiceWatch<T>, initial: T): InvoiceWatch<T> {
     watchers.add(feed)
     feed.push(initial)
     const close = feed.return.bind(feed)
@@ -157,7 +162,7 @@ function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
     return feed
   }
 
-  function closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
+  function closeWatchers<T>(watchers: Set<InvoiceWatch<T>>): void {
     for (const watcher of watchers) watcher.close()
     watchers.clear()
   }
@@ -194,4 +199,50 @@ function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
     listAudit,
     close,
   }
+}
+
+function invoiceWatch<T>(): InvoiceWatch<T> {
+  let value: T | undefined
+  let hasValue = false
+  let pending: ((result: IteratorResult<T, undefined>) => void) | undefined
+  let closed = false
+  const feed = {
+    next(): Promise<IteratorResult<T, undefined>> {
+      if (hasValue) {
+        const current = value as T
+        value = undefined
+        hasValue = false
+        return Promise.resolve({ done: false, value: current })
+      }
+      if (closed) return Promise.resolve({ done: true, value: undefined })
+      return new Promise((resolve) => {
+        pending = resolve
+      })
+    },
+    push(next: T): void {
+      if (closed) throw new Error("Invoice watch is closed")
+      if (pending === undefined) {
+        value = next
+        hasValue = true
+        return
+      }
+      const resolve = pending
+      pending = undefined
+      resolve({ done: false, value: next })
+    },
+    close(): void {
+      closed = true
+      const resolve = pending
+      pending = undefined
+      resolve?.({ done: true, value: undefined })
+    },
+    return(): Promise<IteratorReturnResult<undefined>> {
+      feed.close()
+      return Promise.resolve({ done: true, value: undefined })
+    },
+    [Symbol.asyncIterator](): AsyncIterator<T, undefined> {
+      return feed
+    },
+  } satisfies InvoiceWatch<T>
+  return feed
 }

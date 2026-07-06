@@ -4,18 +4,19 @@ import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/sdk"
 import { kit } from "@pumped-fn/sdk-test"
 import { describe, expect, expectTypeOf, it } from "vitest"
+import { prepareDatabase } from "../src/invoice-database-operations"
+import {
+  enqueue,
+  ingest,
+  intake,
+} from "../src/invoice-intake"
 import {
   dailyReport,
   dailyReportJob,
-  enqueue,
-  ingest,
-  importBatch,
-  intake,
-  prepareDatabase,
-  sendRemindersJob,
   sendReminders,
-  triage,
-} from "../src/flows"
+  sendRemindersJob,
+} from "../src/invoice-reporting"
+import { importBatch, triage } from "../src/invoice-triage"
 import {
   clock,
   database,
@@ -26,10 +27,10 @@ import {
   opsHeartbeat,
   reminderRecipient,
   reminderWindowDays,
-} from "../src/ports"
-import { memoryDatabase } from "./support/database"
-import { memoryMailer } from "./support/mailer"
-import { heuristic } from "./support/model"
+} from "../src/invoice-runtime"
+import { memoryDatabase } from "./support/invoice-database"
+import { memoryMailer } from "./support/invoice-mailer"
+import { heuristic } from "./support/invoice-model"
 import {
   type Category,
   type Classification,
@@ -38,7 +39,7 @@ import {
   type Invoice,
   type Risk,
   type StoredInvoice,
-} from "../src/types"
+} from "../src/invoice-types"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
 

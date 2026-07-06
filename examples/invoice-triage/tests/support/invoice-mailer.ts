@@ -1,5 +1,5 @@
-import type { Mailer } from "../../src/ports"
-import type { ReminderMessage } from "../../src/types"
+import type { Mailer } from "../../src/invoice-runtime"
+import type { ReminderMessage } from "../../src/invoice-types"
 
 export interface MemoryMailer extends Mailer {
   sent(): readonly ReminderMessage[]
