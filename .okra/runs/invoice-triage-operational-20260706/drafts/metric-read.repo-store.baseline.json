@@ -1,0 +1,15 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "repo_okra_run_store_gap_count",
+  "value": 0,
+  "target": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-06T07:30:00.000Z",
+  "source": "repo OKRA run store files plus okra-store verify",
+  "freshness": "observed_at=2026-07-06T07:30:00.000Z -> status=fresh against max_age=current turn",
+  "decision": "accepted",
+  "evidence_refs_or_hashes": [
+    "sha256:41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f"
+  ]
+}

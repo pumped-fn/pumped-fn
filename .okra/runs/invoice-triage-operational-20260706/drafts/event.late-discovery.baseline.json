@@ -1,0 +1,10 @@
+{
+  "event_type": "late_discovery_event",
+  "unit_id": "dkr.operational-slice-order",
+  "observed_at": "2026-07-06T07:30:00.000Z",
+  "evidence_refs_or_hashes": [
+    "sha256:41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f",
+    "sha256:69020e955668b674b4da3ba715b948b02205879a740668051e089ac33b4efacb"
+  ],
+  "cause": "The repo-wise OKRA store became a required gate after the first baseline frame."
+}

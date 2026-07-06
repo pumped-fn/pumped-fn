@@ -1,0 +1,16 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "raw_bound_dependency_count",
+  "value": 0,
+  "target": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-06T07:52:54.991Z",
+  "source": "pnpm okr:invoice-triage after model work moved to ctx.exec({ fn })",
+  "freshness": "observed_at=2026-07-06T07:52:54.991Z -> status=fresh against max_age=current turn",
+  "decision": "accepted",
+  "evidence_refs_or_hashes": [
+    "examples/invoice-triage/src/flows.ts",
+    "pnpm -F @pumped-fn/invoice-triage lint"
+  ]
+}

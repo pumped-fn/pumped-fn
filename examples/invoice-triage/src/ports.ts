@@ -1,12 +1,11 @@
-import { atom, controller, tag, type Lite } from "@pumped-fn/lite"
-import { createInterface } from "node:readline"
+import { atom, tag, tags } from "@pumped-fn/lite"
+import { createInterface, type Interface } from "node:readline"
 import type { Model } from "@pumped-fn/sdk"
+import { databaseEngine } from "./database"
+import { pushFeed, type PushFeed } from "./feed"
+import type { DatabaseStartupMode } from "./migrations"
 import { classifyHeuristically } from "./model"
-import type { Invoice, ReminderMessage, StoredInvoice } from "./types"
-
-type Pending<T> = {
-  resolve(result: IteratorResult<T, undefined>): void
-}
+import type { Invoice, ReminderMessage } from "./types"
 
 export interface Clock {
   now(): Date
@@ -17,51 +16,9 @@ export interface Mailer {
   sent(): readonly ReminderMessage[]
 }
 
-export interface PushFeed<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
-  push(value: T): void
-  close(): void
-}
-
 export interface OpsHeartbeat {
   source: string
   checkedAt: string
-}
-
-export function pushFeed<T>(): PushFeed<T> {
-  const values: T[] = []
-  let pending: Pending<T> | undefined
-  let closed = false
-  const feed = {
-    next(): Promise<IteratorResult<T, undefined>> {
-      if (values.length > 0) return Promise.resolve({ done: false, value: values.shift()! })
-      if (closed) return Promise.resolve({ done: true, value: undefined })
-      return new Promise((resolve) => {
-        pending = { resolve }
-      })
-    },
-    push(value: T): void {
-      if (closed) throw new Error("Feed is closed")
-      if (!pending) {
-        values.push(value)
-        return
-      }
-      const current = pending
-      pending = undefined
-      current.resolve({ done: false, value })
-    },
-    close(): void {
-      closed = true
-      const current = pending
-      pending = undefined
-      current?.resolve({ done: true, value: undefined })
-    },
-    return(): Promise<IteratorReturnResult<undefined>> {
-      feed.close()
-      return Promise.resolve({ done: true, value: undefined })
-    },
-  } as PushFeed<T>
-  Object.defineProperty(feed, Symbol.asyncIterator, { value: () => feed })
-  return feed
 }
 
 export const clock = tag<Clock>({
@@ -79,27 +36,29 @@ export const reminderRecipient = tag<string>({
   default: "ap@company.local",
 })
 
-export const intakeLines = atom({
-  factory: readlineAdapter,
+export const databaseStartup = tag<DatabaseStartupMode>({
+  label: "invoice.databaseStartup",
 })
 
-export const queue = atom({
+export { databaseEngine, memoryDatabase, postgresDatabase } from "./database"
+
+export const database = atom({
   keepAlive: true,
-  factory: (): readonly Invoice[] => [],
-})
-
-export const ledger = atom({
-  keepAlive: true,
-  factory: (): readonly StoredInvoice[] => [],
-})
-
-export const reviewCount = atom({
   deps: {
-    ledger: controller(ledger, { resolve: true, watch: true }),
+    engine: tags.required(databaseEngine),
   },
-  factory: (_ctx, { ledger }) => {
-    const review = ledger.get().filter((invoice) => invoice.classification.risk === "review")
-    return review.length
+  factory: (ctx, { engine }) => {
+    const opened = engine.open()
+    ctx.cleanup(() => opened.close())
+    return opened
+  },
+})
+
+export const intakeLines = atom({
+  factory: (ctx): AsyncIterable<string> => {
+    const lines = createStdinLines()
+    ctx.cleanup(() => lines.close())
+    return lines
   },
 })
 
@@ -120,7 +79,7 @@ export const mailer = atom({
 })
 
 export const heuristic: Model = Object.freeze({
-  complete: (_ctx: Lite.ExecutionContext, request: Parameters<Model["complete"]>[1]) => {
+  complete: (_ctx: Parameters<Model["complete"]>[0], request: Parameters<Model["complete"]>[1]) => {
     const message = request.messages.at(-1)?.content ?? ""
     const marker = "Invoice: "
     const index = message.indexOf(marker)
@@ -132,10 +91,8 @@ export const heuristic: Model = Object.freeze({
   },
 })
 
-function readlineAdapter(ctx: Lite.ResolveContext): AsyncIterable<string> {
-  const lines = createInterface({ input: process.stdin })
-  ctx.cleanup(() => lines.close())
-  return lines
+function createStdinLines(): Interface {
+  return createInterface({ input: process.stdin })
 }
 
 export function memoryMailer(): Mailer {

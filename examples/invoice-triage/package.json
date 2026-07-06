@@ -14,11 +14,14 @@
     "@pumped-fn/lite-extension-logging": "workspace:*",
     "@pumped-fn/lite-extension-scheduler": "workspace:*",
     "@pumped-fn/sdk": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@pumped-fn/sdk-test": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "@typescript/native-preview": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

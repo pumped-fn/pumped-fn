@@ -1,0 +1,55 @@
+{
+  "type": "steering_checkin",
+  "round": 1,
+  "frame_hash": "sha256:41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f",
+  "tree_hash": "pending:tree-written-by-okra-store",
+  "objective_read": {
+    "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+    "value": 2,
+    "target": 13,
+    "status": "fail"
+  },
+  "anti_goal_read": {
+    "repo_okra_run_store_gap_count": 0,
+    "raw_bound_dependency_count": 1,
+    "single_llm_truth_acceptance_count": 0
+  },
+  "active_dkrs": [
+    "dkr.primitive-surface",
+    "dkr.integration-tags",
+    "dkr.operational-slice-order"
+  ],
+  "active_ckrs": [
+    "ckr.operational-runtime",
+    "ckr.durable-data",
+    "ckr.primitive-alignment",
+    "ckr.verification"
+  ],
+  "active_pkrs": [
+    "pkr.baseline-metrics"
+  ],
+  "worker_progress_refs": [],
+  "pkr_signals": [
+    {
+      "event_type": "late_discovery_event",
+      "unit_id": "dkr.operational-slice-order",
+      "cause": "Repo-wise OKRA store became part of the operational readiness boundary."
+    }
+  ],
+  "inbound_signal": "repo-wise OKRA storage was added as a required operational-readiness boundary after the first baseline frame",
+  "decision_delta": "track .okra/runs/invoice-triage-operational-20260706 as recoverable repo state and keep older ignored OKRA runs out of this diff",
+  "expected_effect": "repo_okra_run_store_gap_count moves to 0 while the objective remains incomplete at 2 of 13 gates",
+  "open_flags": [],
+  "learning_collected": [
+    "The run store must be checked into the repo under the run id rather than kept as ignored flat .okra state.",
+    "The first implementation slice should keep durable evidence in .okra/runs/invoice-triage-operational-20260706."
+  ],
+  "process_context_updates": [
+    "Keep older ignored .okra runs out of this diff.",
+    "Generated status and lock files remain ignored."
+  ],
+  "next_check_at": "next worker finish or 2026-07-06T07:40:00.000Z",
+  "steering_decision": "Promote pkr.baseline-metrics as done only for repo OKRA storage; keep operational runtime and primitive implementation gates open.",
+  "valuable_steering_decision_count": 1,
+  "single_llm_truth_acceptance_count": 0
+}

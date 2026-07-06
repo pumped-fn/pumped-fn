@@ -1,0 +1,316 @@
+# Invoice Triage Operational OKR
+
+Status: ratified for DKR and first implementation gating on 2026-07-06. Core primitive API changes still require a DKR checkpoint and human ratification before implementation.
+
+Model phrasing: GPT-5 detected from the system prompt; Phrasing profile id `RTM-PH6OCQ6MX4`.
+
+The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target, instantiated here as `invoice_triage_operational_showcase_gate_pass_count == invoice_triage_operational_showcase_gate_total`.
+
+Action envelope: allowed moves are source reads, DKR checkpoints, package-local docs, deterministic metric scripts, tests, and scoped implementation in `examples/invoice-triage` or core primitive files after DKR acceptance; forbidden actions are release, publish, broad API churn, weakening lint/tests, module mocks, ctx/scope threading, fake Codex claims, and frame/threshold changes without human ratification; approval gates are core public API changes, new dependencies, real Codex execution, Docker runtime changes, merge, release, and any action outside this frame.
+
+Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it.
+
+## Objective
+
+`invoice_triage_operational_showcase_gate_pass_count == invoice_triage_operational_showcase_gate_total`
+
+Initial gate total: 13 executable metrics read by `pnpm okr:invoice-triage`.
+
+The target means invoice-triage is a production-shaped daemon/server example with PostgreSQL through Drizzle, REST endpoints, CLI admin/import commands, directory watcher import, Docker Compose, audit trail, observability, real Codex-backed processing, tag-selected integration engines, and primitive alignment evidence.
+
+No-cascade rule: a completed PKR does not prove progress; only a direct metric read from `pnpm okr:invoice-triage`, package tests, lint, runtime smoke, and review evidence can move the objective.
+
+## Anti-Goals
+
+| Anti-goal | Metric | Threshold | Type | Source of truth |
+| --- | --- | ---: | --- | --- |
+| OKRA integrity | `anti_goal_bypass_or_dishonesty_count` | `0` | tripwire | artifact review plus deterministic checker output |
+| Invalid anti-goal claims | `invalid_anti_goal_acceptance_count` | `0` | tripwire | executable anti-goal records |
+| Superficial anti-goal claims | `superficial_anti_goal_acceptance_count` | `0` | tripwire | executable anti-goal records |
+| Tautological anti-goal claims | `tautological_anti_goal_acceptance_count` | `0` | tripwire | executable anti-goal records |
+| False-positive anti-goal claims | `false_positive_anti_goal_acceptance_count` | `0` | tripwire | executable anti-goal records |
+| Unsupported claims | `unsupported_claim_acceptance_count` | `0` | tripwire | executable anti-goal records |
+| Single LLM truth | `single_llm_truth_acceptance_count` | `0` | tripwire | deterministic evidence plus independent review |
+| Lint cleanliness | `lint_violation_count` | `0` | tripwire | `pnpm lint` |
+| Scope seam | `module_mock_or_internal_reach_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| No ctx/scope escape | `ctx_scope_escape_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| No raw bound work | `raw_bound_dependency_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Durable state | `volatile_operational_state_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| No test-specific condition leaks | `conditional_test_specific_leak_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Dynamic resource loading | `dynamic_resource_loading_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Non-stdin interface | `stdin_only_intake_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| PostgreSQL and Drizzle | `postgres_drizzle_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| REST server | `rest_server_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| CLI | `cli_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Directory watcher | `directory_watcher_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Audit coverage | `audit_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Real Codex path | `fake_codex_showcase_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Compose readiness | `docker_compose_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Repo OKRA store | `repo_okra_run_store_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| Direct callable operation leak | `direct_callable_service_method_count` | `0` | tripwire | primitive DKR checkpoint and type tests |
+| Primitive role confusion | `primitive_role_confusion_count` | `0` | tripwire | primitive DKR checkpoint and docs/tests |
+| Controller drift | `controller_semantics_drift_count` | `0` | tripwire | primitive DKR checkpoint and docs/tests |
+| Operation metadata loss | `operation_metadata_loss_count` | `0` | tripwire | primitive DKR checkpoint and type tests |
+| Integration seam bypass | `integration_seam_bypass_count` | `0` | tripwire | source scan and integration tests |
+| Preset as primary engine | `preset_as_primary_engine_count` | `0` | tripwire | test/source review |
+| Core API churn without DKR | `core_api_breakage_without_dkr_count` | `0` | tripwire | accepted DKR checkpoint |
+
+Superficial, tautological, false-positive, bypass, dishonest, unsupported, and single-LLM-truth anti-goal claims are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence must fail closed and open `breaking` or a blocking flag.
+
+## DKR
+
+Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+
+| DKR | Decision target | Budget | Risk or anti-goal uncertainty | Evidence |
+| --- | --- | --- | --- | --- |
+| `dkr.primitive-surface` | Decide whether service/resource operation handles belong in core or stay local to invoice-triage for this run. | 1 implementation turn | Avoid direct callable leaks, ctx/scope escape, controller drift, and broad API churn. | `pkg/core/lite/src/scope.ts`, `pkg/core/lite/src/bound.ts`, `pkg/core/lite/src/types.ts`, core tests, README/PATTERNS compile tests |
+| `dkr.integration-tags` | Decide the tag set for database engine, model provider, queue backend, file watcher/store, mailer, scheduler, audit sink, and HTTP client seams. | 1 implementation turn | Avoid preset-as-engine and concrete backend construction inside flows. | invoice source scan, target architecture diagrams, package dependency policy |
+| `dkr.operational-slice-order` | Decide the first implementation slice that can move the most gates without weakening anti-goals. | 1 implementation turn | Avoid building server/CLI/watcher surfaces on volatile in-memory state. | `pnpm okr:invoice-triage` baseline, tests, package manifest |
+
+An empty result is a valid non-accepted decision only when it carries a replayable probe trace.
+
+## CKR
+
+CKRs are measurable contribution context, not worker work.
+
+| CKR | Contribution metric | Target | Measurement |
+| --- | --- | ---: | --- |
+| `ckr.operational-runtime` | `operational_runtime_gate_pass_count` | `>= 5` | server, CLI, watcher, Docker Compose, health/readiness gates |
+| `ckr.durable-data` | `durable_data_gate_pass_count` | `>= 4` | PostgreSQL, Drizzle migrations, optional-tag startup selection, audit trail, idempotent imports/retries |
+| `ckr.primitive-alignment` | `primitive_alignment_gate_pass_count` | `>= 4` | no raw bound work, no ctx/scope escape, controller role holds, operation metadata carries through `.exec` |
+| `ckr.verification` | `verification_gate_pass_count` | `>= 5` | lint, typecheck, tests, runtime smoke, independent review |
+
+CKR-level discovery/delivery balance: `ckr.operational-runtime` discovers daemon interface boundaries and delivers server, CLI, watcher, and Compose paths.
+
+CKR-level discovery/delivery balance: `ckr.durable-data` discovers tag-selected database and audit seams and delivers PostgreSQL/Drizzle-backed state transitions.
+
+CKR-level discovery/delivery balance: `ckr.primitive-alignment` discovers core API blast radius and delivers executable service/resource/flow operation handles only after DKR acceptance.
+
+CKR-level discovery/delivery balance: `ckr.verification` discovers missing proof paths and delivers deterministic checkers, tests, runtime smoke, and independent review.
+
+## PKR Candidates
+
+| PKR | linked_ckr | source_dkr_checkpoint | contribution_metric | Done check | Allowed actions | Forbidden actions |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pkr.baseline-metrics` | `ckr.verification` | `dkr.operational-slice-order` | `invoice_triage_operational_showcase_gate_pass_count` | `pnpm okr:invoice-triage` emits all current gate metrics. | Add deterministic checker and package-local OKR docs. | Claim the objective is done from baseline output. |
+| `pkr.data-foundation` | `ckr.durable-data` | `dkr.integration-tags` | `durable_data_gate_pass_count` | PostgreSQL/Drizzle migrations and audit-backed state tests pass. | Add deps through catalog, Drizzle schema, database tags/resources, tests. | Use presets as the production engine seam or module mocks in tests. |
+| `pkr.runtime-surfaces` | `ckr.operational-runtime` | `dkr.operational-slice-order` | `operational_runtime_gate_pass_count` | REST, CLI, watcher, and Compose smoke pass. | Add server, CLI, watcher, Docker Compose, health/readiness. | Keep stdin/stdout as the only import interface. |
+| `pkr.primitive-alignment` | `ckr.primitive-alignment` | `dkr.primitive-surface` | `primitive_alignment_gate_pass_count` | Type tests prove direct deps expose `.exec` handles and metadata tags propagate. | Edit core primitive code only after DKR acceptance. | Break flow handle semantics or require controller for ordinary direct work. |
+
+progress signals:
+`pkr.baseline-metrics` emits `handback_event` if the checker cannot read a metric, `late_discovery_event` if a new required gate appears, and `ungoverned_write_event` if evidence is edited outside tracked files.
+
+progress signals:
+`pkr.data-foundation` emits `handback_event` on database seam uncertainty, `regression_event` on test/lint regression, `rework_event` on schema/audit redesign, and `late_discovery_event` on new transaction/audit requirements.
+
+progress signals:
+`pkr.runtime-surfaces` emits `handback_event` on transport boundary uncertainty, `regression_event` on runtime smoke failure, `rework_event` on interface redesign, and `late_discovery_event` on operational readiness gaps.
+
+progress signals:
+`pkr.primitive-alignment` emits `handback_event` on API blast-radius uncertainty, `regression_event` on docs/type-test breakage, `rework_event` on handle shape redesign, and `late_discovery_event` on metadata propagation gaps.
+
+PKRs hand back on unknown discovery instead of researching or resolving unknowns inside execution.
+
+## Eval Points
+
+**Admissibility before action**: the orchestrator screens objective moves against fresh anti-goal readings or a dry-run before dispatch.
+
+**Direct read after action**: the loop reads the real objective, CKR, and anti-goal metrics from source records after workers return.
+
+**Paired goal/anti-goal eval**: the loop checks objective progress and anti-goal hold together; success requires both the objective target and every anti-goal threshold to hold.
+
+## Flags
+
+`cannot` opens when DKR budget is exhausted or learning flatlines before a safe implementation path exists.
+
+`breaking` opens when any anti-goal threshold is crossed, evidence is missing/stale/wrong-source/non-replayable/contradicted, or lint/typecheck/test failures are accepted.
+
+Pointless opens when work finished or a CKR metric moved, but the objective metric stays flat / does not move after the lag window. For this run, a nice server skeleton with unchanged `invoice_triage_operational_showcase_gate_pass_count` is pointless and must be re-aimed.
+
+Stalled opens when a branch's computed risk stays flat and at or above the certainty threshold across the trailing check-in window while it keeps committing, never on absolute risk height. It pauses committing moves on that branch while discovery stays allowed and is waived only by a human.
+
+`authority_drift` opens when the loop or worker changes the frame, threshold, metric, action envelope, or approval boundary without human ratification.
+
+## Process Signal Events
+
+Process signals are governed append-only events, not a typed tally. Emit `handback_event`, `regression_event`, `rework_event`, `late_discovery_event`, `dkr_empty_event`, and `ungoverned_write_event` where the signal happens. Each event record carries `event_type`, `unit_id`, `observed_at`, `evidence_refs_or_hashes`, and `cause`. Derived counters are `execution_to_discovery_handback_count`, `regression_count`, `rework_count`, `late_discovery_count`, `dkr_empty_count`, and `ungoverned_write_count`.
+
+Counters are derived by counting events and are never typed or asserted. Recompute with `okra-store.sh counts` when using the full run store. A count that disagrees with the event ledger, or a prose low churn claim contradicted by the events, is rejected.
+
+Worked event record:
+
+```json
+{
+  "event_type": "late_discovery_event",
+  "unit_id": "dkr.operational-slice-order",
+  "observed_at": "2026-07-06T00:00:00.000Z",
+  "evidence_refs_or_hashes": [
+    "sha256:27b1fe9156a7445c95c4e6f592fdb855271818ab1e73514c0cb2c29ecbbdc979",
+    "sha256:6af9404fb7b99aa9e2437ebb653c0f9e4ed1a8dfebd88643261882427a605790"
+  ],
+  "cause": "Current example proves graph patterns but not the newly ratified operational showcase gates."
+}
+```
+
+## Worker Prompt Packet Contract
+
+`frame.objective`, `frame.anti_goals`, `frame.action_envelope`, `frame.human_ratification_boundary`, `current_state`, `previous_dkr_checkpoint`, `assignment`, `budget_and_stop_rule`, `hand_back_rule`, and `output_schema` are required on worker packets.
+
+In-progress worker narrative is not evidence; only worker progress, check-ins, metric reads, flags, or accepted checkpoints can influence the next dispatch.
+
+DKR-to-DKR handoff records must include `previous_dkr_checkpoint`, `decision_target`, `evidence_refs_or_hashes`, `questions_answered`, `questions_unanswered`, `confidence_probability_update`, `risk_or_anti_goal_implications`, `orchestrator_decision`, and `next_dkr_scope`.
+
+Heartbeat cadence and next_check_at: default heartbeat is ten minutes for long-running workers; `next_check_at` is the next worker finish, flag event, or ten minutes after dispatch.
+
+## Executable Anti-Goal Claim Contract
+
+`executable_anti_goal_contract_acceptance_rate >= 0.90`
+
+`anti_goal_bypass_or_dishonesty_count == 0`, `invalid_anti_goal_acceptance_count == 0`, `superficial_anti_goal_acceptance_count == 0`, `tautological_anti_goal_acceptance_count == 0`, `false_positive_anti_goal_acceptance_count == 0`, `unsupported_claim_acceptance_count == 0`, and `single_llm_truth_acceptance_count == 0`.
+
+Required fields: `claim_id`, `anti_goal_id`, `metric_id`, `threshold`, `type`, `source_of_truth`, `read_method`, `observed_at`, `recorded_at`, `max_age`, `freshness_status`, `value`, `evidence_refs_or_hashes`, `replay_command_or_checker`, `admissibility_before_action`, `direct_read_after_action`, `paired_goal_anti_goal_eval`, `decision`, `flag_if_missing_or_stale`, and `reviewer_audit_status`.
+
+Worked executable anti-goal trace:
+
+```json
+{
+  "claim_id": "ag-claim.raw-bound.run-start",
+  "anti_goal_id": "ag.raw-bound-work",
+  "metric_id": "raw_bound_dependency_count",
+  "threshold": 0,
+  "type": "tripwire",
+  "source_of_truth": "examples/invoice-triage/src scanned by scripts/check-invoice-triage-okr.mjs",
+  "read_method": "pnpm okr:invoice-triage",
+  "observed_at": "2026-07-06T00:00:00.000Z",
+  "recorded_at": "2026-07-06T00:00:00.000Z",
+  "max_age": "current turn",
+  "freshness_status": "fresh",
+  "value": 1,
+  "evidence_refs_or_hashes": [
+    "sha256:27b1fe9156a7445c95c4e6f592fdb855271818ab1e73514c0cb2c29ecbbdc979"
+  ],
+  "replay_command_or_checker": "pnpm okr:invoice-triage -- --enforce",
+  "admissibility_before_action": "primitive-alignment implementation is admitted only after this metric can reach value 0 under threshold 0 or the DKR narrows the metric.",
+  "direct_read_after_action": "metric_read raw_bound_dependency_count value 1 threshold 0, so the claim is rejected at run start.",
+  "paired_goal_anti_goal_eval": "objective progress cannot count while raw_bound_dependency_count value 1 exceeds threshold 0.",
+  "decision": "rejected",
+  "flag_if_missing_or_stale": "breaking",
+  "reviewer_audit_status": "replayable"
+}
+```
+
+## Executable Progress Claim Contract
+
+`executable_progress_claim_contract_acceptance_rate >= 0.90`
+
+`unsupported_progress_claim_acceptance_count == 0`, `superficial_progress_acceptance_count == 0`, `tautological_progress_acceptance_count == 0`, `false_positive_progress_acceptance_count == 0`, `single_llm_truth_acceptance_count == 0`, and `cascade_read_acceptance_count == 0`.
+
+Required fields: `claim_id`, `metric_id`, `source_of_truth`, `read_method`, `observed_at`, `recorded_at`, `max_age`, `freshness_status`, `target`, `comparator`, `value`, `evidence_refs_or_hashes`, `replay_command_or_checker`, `decision`, `flag_if_missing_or_stale`, and `reviewer_audit_status`.
+
+Cascade, superficial, tautological, false-positive, unsupported, and single-LLM-truth progress claims are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence fails closed and opens a blocking flag.
+
+Worked Executable Progress Trace:
+
+```json
+{
+  "claim_id": "progress.run-start.objective",
+  "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+  "source_of_truth": "scripts/check-invoice-triage-okr.mjs output",
+  "read_method": "pnpm okr:invoice-triage",
+  "observed_at": "2026-07-06T00:00:00.000Z",
+  "recorded_at": "2026-07-06T00:00:00.000Z",
+  "max_age": "current turn",
+  "freshness_status": "fresh",
+  "target": 13,
+  "comparator": "==",
+  "value": 2,
+  "evidence_refs_or_hashes": [
+    "sha256:e3769086e70f02c1080faca3e69746cd411ace91c81cf7bd3cfff01e018356f3",
+    "sha256:309cc5ac74c6a2e871b40dd9ae2209c585e3b4aba3dc3f7a16101a19196b5f78"
+  ],
+  "replay_command_or_checker": "pnpm okr:invoice-triage",
+  "decision": "rejected",
+  "flag_if_missing_or_stale": "breaking",
+  "reviewer_audit_status": "replayable"
+}
+```
+
+Current Data Foundation Progress Trace:
+
+```json
+{
+  "claim_id": "progress.data-foundation.objective",
+  "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+  "source_of_truth": "scripts/check-invoice-triage-okr.mjs output",
+  "read_method": "pnpm okr:invoice-triage",
+  "observed_at": "2026-07-06T07:52:54.991Z",
+  "recorded_at": "2026-07-06T07:54:15Z",
+  "max_age": "current turn",
+  "freshness_status": "fresh",
+  "target": 13,
+  "comparator": "==",
+  "value": 7,
+  "failed_metrics": [
+    "stdin_only_intake_count",
+    "rest_server_gap_count",
+    "cli_gap_count",
+    "directory_watcher_gap_count",
+    "fake_codex_showcase_count",
+    "docker_compose_gap_count"
+  ],
+  "evidence_refs_or_hashes": [
+    ".okra/runs/invoice-triage-operational-20260706/ledger.jsonl#seq=5",
+    ".okra/runs/invoice-triage-operational-20260706/checkins.jsonl#seq=2"
+  ],
+  "replay_command_or_checker": "pnpm okr:invoice-triage",
+  "decision": "rejected_as_completion",
+  "flag_if_missing_or_stale": "breaking",
+  "reviewer_audit_status": "replayable"
+}
+```
+
+## Executable DKR Checkpoint Contract
+
+`executable_dkr_checkpoint_contract_acceptance_rate >= 0.90`
+
+`unsupported_checkpoint_acceptance_count == 0`, `superficial_checkpoint_acceptance_count == 0`, `tautological_checkpoint_acceptance_count == 0`, `false_positive_checkpoint_acceptance_count == 0`, `single_llm_truth_acceptance_count == 0`, and `fabricated_conclusion_acceptance_count == 0`.
+
+Required fields: `checkpoint_id`, `conclusion_id`, `decision_target`, `source_of_truth`, `read_method`, `observed_at`, `recorded_at`, `max_age`, `freshness_status`, `confidence`, `evidence_refs_or_hashes`, `replay_command_or_checker`, `questions_answered`, `questions_unanswered`, `decision`, `flag_if_missing_or_stale`, and `reviewer_audit_status`.
+
+Superficial, tautological, false-positive, fabricated, unsupported, and single-LLM-truth checkpoints are rejected. Missing, stale, wrong-source, non-replayable, or contradicted probe evidence fails closed and opens a blocking flag.
+
+Worked Executable DKR Checkpoint Trace:
+
+```json
+{
+  "checkpoint_id": "dkr-checkpoint.run-start-baseline",
+  "conclusion_id": "conclusion.invoice-triage-is-not-operational-yet",
+  "decision_target": "Choose the first implementation slice for the operational showcase.",
+  "source_of_truth": "invoice-triage source, package manifest, and OKR metric script",
+  "read_method": "source read plus pnpm okr:invoice-triage",
+  "observed_at": "2026-07-06T00:00:00.000Z",
+  "recorded_at": "2026-07-06T00:00:00.000Z",
+  "max_age": "current turn",
+  "freshness_status": "fresh",
+  "confidence": 0.88,
+  "evidence_refs_or_hashes": [
+    "sha256:27b1fe9156a7445c95c4e6f592fdb855271818ab1e73514c0cb2c29ecbbdc979",
+    "sha256:6af9404fb7b99aa9e2437ebb653c0f9e4ed1a8dfebd88643261882427a605790",
+    "sha256:e3769086e70f02c1080faca3e69746cd411ace91c81cf7bd3cfff01e018356f3"
+  ],
+  "replay_command_or_checker": "pnpm okr:invoice-triage",
+  "questions_answered": [
+    "The current example is not yet server, CLI, watcher, PostgreSQL, Drizzle, audit, Compose, or real Codex operational.",
+    "The current primitive hot spot is raw bound model work in classify."
+  ],
+  "questions_unanswered": [
+    "Whether executable service/resource operation handles should land in core before the database slice.",
+    "Which exact database transaction and audit handle shape best fits the example."
+  ],
+  "decision": "accepted_as_dkr_baseline_not_as_objective_progress",
+  "flag_if_missing_or_stale": "breaking",
+  "reviewer_audit_status": "replayable"
+}
+```

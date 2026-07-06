@@ -1,0 +1,168 @@
+{
+  "ckrs": [
+    {
+      "discovery_delivery_balance": "Discover daemon interface boundaries; deliver server, CLI, watcher, and Compose paths.",
+      "id": "ckr.operational-runtime",
+      "metric_id": "operational_runtime_gate_pass_count",
+      "role": "measurable contribution context, not worker work",
+      "target": 5
+    },
+    {
+      "discovery_delivery_balance": "Discover tag-selected database and audit seams; deliver PostgreSQL and Drizzle-backed state transitions.",
+      "id": "ckr.durable-data",
+      "metric_id": "durable_data_gate_pass_count",
+      "role": "measurable contribution context, not worker work",
+      "target": 4
+    },
+    {
+      "discovery_delivery_balance": "Discover core API blast radius; deliver executable service/resource/flow operation handles only after DKR acceptance.",
+      "id": "ckr.primitive-alignment",
+      "metric_id": "primitive_alignment_gate_pass_count",
+      "role": "measurable contribution context, not worker work",
+      "target": 4
+    },
+    {
+      "discovery_delivery_balance": "Discover missing proof paths; deliver deterministic checks, tests, runtime smoke, and independent review.",
+      "id": "ckr.verification",
+      "metric_id": "verification_gate_pass_count",
+      "role": "measurable contribution context, not worker work",
+      "target": 5
+    }
+  ],
+  "dkrs": [
+    {
+      "budget": "1 implementation turn",
+      "confidence_output": "accepted checkpoint with source evidence and blast-radius assessment",
+      "decision_target": "Decide whether service/resource operation handles belong in core or stay local to invoice-triage for this run.",
+      "id": "dkr.primitive-surface",
+      "risk_or_anti_goal_uncertainty": "Avoid direct callable leaks, ctx/scope escape, controller drift, and broad API churn.",
+      "worker_scope": "discovery"
+    },
+    {
+      "budget": "1 implementation turn",
+      "confidence_output": "accepted checkpoint with integration seam map",
+      "decision_target": "Decide the tag set for database engine, model provider, queue backend, file watcher/store, mailer, scheduler, audit sink, and HTTP client seams.",
+      "id": "dkr.integration-tags",
+      "risk_or_anti_goal_uncertainty": "Avoid preset-as-engine and concrete backend construction inside flows.",
+      "worker_scope": "discovery"
+    },
+    {
+      "budget": "1 implementation turn",
+      "confidence_output": "accepted checkpoint with next PKR promotion",
+      "decision_target": "Decide the first implementation slice that can move the most gates without weakening anti-goals.",
+      "id": "dkr.operational-slice-order",
+      "risk_or_anti_goal_uncertainty": "Avoid building server, CLI, or watcher surfaces on volatile in-memory state.",
+      "worker_scope": "discovery"
+    }
+  ],
+  "frame_version": "invoice-triage-operational-20260706.v1",
+  "orchestrator": {
+    "owner": "main session",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering",
+      "anti-goal admissibility before dispatch",
+      "direct metric reads after moves"
+    ],
+    "stop_rule": "Continue until the objective metric reaches target or a human/blocking flag stops the loop."
+  },
+  "pkrs": [
+    {
+      "allowed_actions": [
+        "add deterministic checker",
+        "add package-local OKR docs",
+        "add repo OKRA run store"
+      ],
+      "contribution_metric": "invoice_triage_operational_showcase_gate_pass_count",
+      "done_check": "pnpm okr:invoice-triage emits all current gate metrics and okra-store verify passes.",
+      "forbidden_actions": [
+        "claim the objective is done from baseline output"
+      ],
+      "hand_back_rule": "Hand back on newly discovered uncertainty instead of resolving discovery inside execution.",
+      "id": "pkr.baseline-metrics",
+      "linked_ckr": "ckr.verification",
+      "progress_signals": [
+        "handback_event if the checker cannot read a metric",
+        "late_discovery_event if a new required gate appears",
+        "ungoverned_write_event if evidence is edited outside tracked files"
+      ],
+      "source_dkr_checkpoint": "dkr.operational-slice-order",
+      "worker_scope": "progression"
+    },
+    {
+      "allowed_actions": [
+        "add dependencies through catalog",
+        "add Drizzle schema",
+        "add database tags and resources",
+        "add tests"
+      ],
+      "contribution_metric": "durable_data_gate_pass_count",
+      "done_check": "PostgreSQL, Drizzle migrations, and audit-backed state tests pass.",
+      "forbidden_actions": [
+        "use presets as the production engine seam",
+        "use module mocks in tests"
+      ],
+      "hand_back_rule": "Hand back on newly discovered uncertainty instead of resolving discovery inside execution.",
+      "id": "pkr.data-foundation",
+      "linked_ckr": "ckr.durable-data",
+      "progress_signals": [
+        "handback_event on database seam uncertainty",
+        "regression_event on test or lint regression",
+        "rework_event on schema or audit redesign",
+        "late_discovery_event on new transaction or audit requirements"
+      ],
+      "source_dkr_checkpoint": "dkr.integration-tags",
+      "worker_scope": "progression"
+    },
+    {
+      "allowed_actions": [
+        "add server",
+        "add CLI",
+        "add watcher",
+        "add Docker Compose",
+        "add health and readiness"
+      ],
+      "contribution_metric": "operational_runtime_gate_pass_count",
+      "done_check": "REST, CLI, watcher, and Compose smoke pass.",
+      "forbidden_actions": [
+        "keep stdin/stdout as the only import interface"
+      ],
+      "hand_back_rule": "Hand back on newly discovered uncertainty instead of resolving discovery inside execution.",
+      "id": "pkr.runtime-surfaces",
+      "linked_ckr": "ckr.operational-runtime",
+      "progress_signals": [
+        "handback_event on transport boundary uncertainty",
+        "regression_event on runtime smoke failure",
+        "rework_event on interface redesign",
+        "late_discovery_event on operational readiness gaps"
+      ],
+      "source_dkr_checkpoint": "dkr.operational-slice-order",
+      "worker_scope": "progression"
+    },
+    {
+      "allowed_actions": [
+        "edit core primitive code only after DKR acceptance"
+      ],
+      "contribution_metric": "primitive_alignment_gate_pass_count",
+      "done_check": "Type tests prove direct deps expose .exec handles and metadata tags propagate.",
+      "forbidden_actions": [
+        "break flow handle semantics",
+        "require controller for ordinary direct work"
+      ],
+      "hand_back_rule": "Hand back on newly discovered uncertainty instead of resolving discovery inside execution.",
+      "id": "pkr.primitive-alignment",
+      "linked_ckr": "ckr.primitive-alignment",
+      "progress_signals": [
+        "handback_event on API blast-radius uncertainty",
+        "regression_event on docs or type-test breakage",
+        "rework_event on handle shape redesign",
+        "late_discovery_event on metadata propagation gaps"
+      ],
+      "source_dkr_checkpoint": "dkr.primitive-surface",
+      "worker_scope": "progression"
+    }
+  ],
+  "tree_version": "invoice-triage-operational-20260706.tree.v1"
+}

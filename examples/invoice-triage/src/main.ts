@@ -3,8 +3,10 @@ import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { pathToFileURL } from "node:url"
-import { awaitDrained, dailyReportJob, ingest, intake, sendRemindersJob, watchReviewQueue } from "./flows"
-import { heuristic } from "./ports"
+import { OperationalFault } from "./errors"
+import { awaitDrained, dailyReportJob, ingest, intake, prepareDatabase, sendRemindersJob, watchReviewQueue } from "./flows"
+import type { DatabaseStartupMode } from "./migrations"
+import { databaseStartup, heuristic } from "./ports"
 
 export async function main(): Promise<void> {
   const sink: Logging.Sink = {
@@ -22,12 +24,14 @@ export async function main(): Promise<void> {
         fields: { service: "invoice-triage" },
       }),
       provider(heuristic),
+      databaseStartup(startupMode()),
     ],
   })
   const stopIntake = () => process.stdin.destroy()
   process.once("SIGINT", stopIntake)
 
   const ctx = scope.createContext()
+  await ctx.exec({ flow: prepareDatabase })
   const processing = ctx.exec({ flow: ingest })
   const watching = ctx.exec({ flow: watchReviewQueue })
   await ctx.resolve(dailyReportJob)
@@ -42,4 +46,11 @@ export async function main(): Promise<void> {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   await main()
+}
+
+function startupMode(): DatabaseStartupMode {
+  const value = process.env["INVOICE_DATABASE_STARTUP"]
+  if (value === undefined || value === "" || value === "migrate") return "migrate"
+  if (value === "verify") return "verify"
+  throw new OperationalFault("unsupported-runtime-config", "read", "INVOICE_DATABASE_STARTUP", { value })
 }

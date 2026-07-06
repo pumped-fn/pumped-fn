@@ -1,0 +1,27 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+  "value": 7,
+  "target": 13,
+  "comparator": "==",
+  "observed_at": "2026-07-06T07:52:54.991Z",
+  "source": "pnpm okr:invoice-triage after data foundation and watcher false-positive correction",
+  "freshness": "observed_at=2026-07-06T07:52:54.991Z -> status=fresh against max_age=current turn",
+  "decision": "rejected_as_completion",
+  "failed_metrics": [
+    "stdin_only_intake_count",
+    "rest_server_gap_count",
+    "cli_gap_count",
+    "directory_watcher_gap_count",
+    "fake_codex_showcase_count",
+    "docker_compose_gap_count"
+  ],
+  "evidence_refs_or_hashes": [
+    "scripts/check-invoice-triage-okr.mjs",
+    "examples/invoice-triage/src/database.ts",
+    "examples/invoice-triage/src/flows.ts",
+    "examples/invoice-triage/tests/invoice-triage.test.ts",
+    "examples/invoice-triage/package.json"
+  ]
+}

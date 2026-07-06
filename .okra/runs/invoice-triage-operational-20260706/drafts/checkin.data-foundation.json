@@ -1,0 +1,90 @@
+{
+  "type": "steering_checkin",
+  "round": 2,
+  "frame_hash": "sha256:41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f",
+  "tree_hash": "sha256:36755dd8848a1b12af05d97f4dbcde5d53b1925717386d4a0213c6edc06665a4",
+  "objective_read": {
+    "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+    "value": 7,
+    "target": 13,
+    "status": "fail",
+    "failed_metrics": [
+      "stdin_only_intake_count",
+      "rest_server_gap_count",
+      "cli_gap_count",
+      "directory_watcher_gap_count",
+      "fake_codex_showcase_count",
+      "docker_compose_gap_count"
+    ]
+  },
+  "anti_goal_read": {
+    "raw_bound_dependency_count": 0,
+    "ctx_scope_escape_count": 0,
+    "volatile_operational_state_count": 0,
+    "module_mock_or_internal_reach_count": 0,
+    "repo_okra_run_store_gap_count": 0,
+    "single_llm_truth_acceptance_count": 0
+  },
+  "active_dkrs": [
+    "dkr.operational-slice-order"
+  ],
+  "active_ckrs": [
+    "ckr.operational-runtime",
+    "ckr.verification"
+  ],
+  "active_pkrs": [
+    "pkr.runtime-surfaces"
+  ],
+  "worker_progress_refs": [],
+  "inbound_signal": "data foundation implementation completed and pnpm okr:invoice-triage exposed a false-positive watcher gate that was corrected",
+  "decision_delta": "mark the data-foundation slice as implemented, keep objective incomplete, and move next execution to runtime surfaces instead of claiming watcher readiness",
+  "direct_effect": "objective metric moved from 2 to 7 of 13 gates while six operational gates remain red",
+  "expected_effect": "next slice should target CLI, server, real directory watcher, real Codex, and Compose without weakening the corrected watcher metric",
+  "open_flags": [],
+  "hallucination_sweep": [
+    {
+      "claim": "The database engine is tag-selected and tests use the same scope seam.",
+      "evidence_ref": "examples/invoice-triage/tests/invoice-triage.test.ts",
+      "verdict": "accepted"
+    },
+    {
+      "claim": "A generic watch method is not a directory watcher.",
+      "evidence_ref": "scripts/check-invoice-triage-okr.mjs",
+      "verdict": "accepted"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "No REST, CLI, real directory watcher, real Codex, or Compose path exists yet.",
+      "evidence_ref": "scripts/check-invoice-triage-okr.mjs",
+      "verdict": "accepted"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "The first data pass made stdin_only_intake_count and directory_watcher_gap_count falsely pass through a generic watch regex.",
+      "evidence_ref": "scripts/check-invoice-triage-okr.mjs",
+      "verdict": "corrected"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "No lint/typecheck/test failure is accepted after the data foundation slice.",
+      "evidence_ref": "examples/invoice-triage/tests/invoice-triage.test.ts",
+      "verdict": "accepted"
+    }
+  ],
+  "uncertainty_5why": {
+    "terminal_metric_or_uncertainty_id": "rest_server_gap_count",
+    "reducing_dkr": "dkr.operational-slice-order",
+    "status": "runtime-surface-next"
+  },
+  "learning_collected": [
+    "Directory watcher detection must be filesystem-specific; generic watcher APIs are not operational intake.",
+    "Model provider execution can move through ctx.exec({ fn }) without reintroducing bound."
+  ],
+  "next_check_at": "next worker finish or 2026-07-06T08:02:54.991Z",
+  "steering_decision": "Proceed to runtime-surface work after broad repo verification.",
+  "valuable_steering_decision_count": 1,
+  "single_llm_truth_acceptance_count": 0
+}

@@ -1,18 +1,19 @@
-import { bound, controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
+import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
+import { OperationalFault } from "./errors"
 import { classifyRequest, parseClassification } from "./model"
 import {
   clock,
+  database,
+  databaseStartup,
   intakeLines,
-  ledger,
   mailer,
-  queue,
   reminderRecipient,
   reminderWindowDays,
-  reviewCount,
 } from "./ports"
+import type { DatabaseMigrationReport, DatabaseMigrationStatus } from "./migrations"
 import {
   categories,
   enqueueInput,
@@ -32,14 +33,59 @@ import {
   type TriageProgress,
 } from "./types"
 
+export const migrateDatabase = flow({
+  name: "invoice.database.migrate",
+  deps: {
+    database,
+    clock: tags.required(clock),
+  },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: async (_ctx, { database, clock }): Promise<DatabaseMigrationReport> =>
+    database.migrate(clock.now().toISOString()),
+})
+
+export const verifyDatabase = flow({
+  name: "invoice.database.verify",
+  deps: {
+    database,
+  },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: async (_ctx, { database }): Promise<DatabaseMigrationStatus> => {
+    const status = await database.migrationStatus()
+    if (status.drift.length > 0 || status.pending.length > 0) {
+      throw new OperationalFault("database-schema-not-current", "verify", "invoice_schema_migrations", {
+        currentVersion: status.currentVersion,
+        targetVersion: status.targetVersion,
+        pending: status.pending.map((item) => item.version),
+        drift: status.drift.map((item) => item.version),
+      })
+    }
+    return status
+  },
+})
+
+export const prepareDatabase = flow({
+  name: "invoice.database.prepare",
+  deps: {
+    startup: tags.optional(databaseStartup),
+    migrate: controller(migrateDatabase),
+    verify: controller(verifyDatabase),
+  },
+  factory: async (_ctx, { startup, migrate, verify }): Promise<DatabaseMigrationReport | undefined> => {
+    if (startup === "migrate") return migrate.exec()
+    if (startup === "verify") return { ...await verify.exec(), appliedNow: [] }
+    return undefined
+  },
+})
+
 export const classify = flow({
   name: "invoice.classify",
   parse: typed<Invoice>(),
-  deps: { model: bound(tags.required(model)) },
+  deps: { model: tags.required(model) },
   tags: [step({ workflow: true, kind: "llm" })],
   factory: async (ctx, { model }): Promise<Classification> => {
     const request = classifyRequest(ctx.input)
-    const response = await model.complete(request)
+    const response = await ctx.exec({ fn: model.complete, params: [request], name: "invoice.model.complete" })
     return parseClassification(response.content, ctx.input)
   },
 })
@@ -48,23 +94,12 @@ export const saveInvoice = flow({
   name: "invoice.save",
   parse: typed<SaveInvoiceInput>(),
   deps: {
-    ledger: controller(ledger, { resolve: true }),
+    database,
     clock: tags.required(clock),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: (ctx, { ledger, clock }): StoredInvoice => {
-    let stored: StoredInvoice = {
-      ...ctx.input.invoice,
-      classification: ctx.input.classification,
-      importedAt: clock.now().toISOString(),
-    }
-    ledger.update((current) => {
-      const found = current.find((item) => item.id === ctx.input.invoice.id)
-      stored = found?.remindedAt === undefined ? stored : { ...stored, remindedAt: found.remindedAt }
-      return found ? current.map((item) => item.id === stored.id ? stored : item) : [...current, stored]
-    })
-    return stored
-  },
+  factory: (ctx, { database, clock }): Promise<StoredInvoice> =>
+    database.saveInvoice({ ...ctx.input, importedAt: clock.now().toISOString() }),
 })
 
 export const triage = flow({
@@ -116,31 +151,31 @@ export const enqueue = flow({
   name: "invoice.enqueue",
   parse: (input): EnqueueInput => enqueueInput.parse(input),
   deps: {
-    queue: controller(queue, { resolve: true }),
+    database,
+    clock: tags.required(clock),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: (ctx, { queue }): EnqueueSummary => {
-    if (ctx.input.invoices.length > 0) queue.update((pending) => [...pending, ...ctx.input.invoices])
-    return { accepted: ctx.input.invoices.length }
-  },
+  factory: async (ctx, { database, clock }): Promise<EnqueueSummary> => ({
+    accepted: await database.enqueue(ctx.input.invoices, clock.now().toISOString()),
+  }),
 })
 
 export const ingest = flow({
   name: "invoice.ingest",
   deps: {
-    control: controller(queue, { resolve: true }),
+    database,
+    clock: tags.required(clock),
     importBatch: controller(importBatch),
   },
-  factory: async (ctx, { control, importBatch }): Promise<void> => {
-    for await (const pending of ctx.changes(queue)) {
+  factory: async (_ctx, { database, clock, importBatch }): Promise<void> => {
+    const drain = async () => {
+      const drained = await database.drainPending(clock.now().toISOString())
+      if (drained.length > 0) await importBatch.exec({ input: { invoices: drained } })
+    }
+    await drain()
+    for await (const pending of database.watchPending()) {
       if (pending.length === 0) continue
-      let drained: readonly Invoice[] = []
-      control.update((current) => {
-        drained = current
-        return []
-      })
-      if (drained.length === 0) continue
-      await importBatch.exec({ input: { invoices: drained } })
+      await drain()
     }
   },
 })
@@ -148,11 +183,12 @@ export const ingest = flow({
 export const watchReviewQueue = flow({
   name: "invoice.watchReviewQueue",
   deps: {
+    database,
     logger: logging.logger,
   },
-  factory: async (ctx, { logger }): Promise<void> => {
+  factory: async (_ctx, { database, logger }): Promise<void> => {
     let last = -1
-    for await (const count of ctx.changes(reviewCount)) {
+    for await (const count of database.watchReviewCount()) {
       if (count === last) continue
       last = count
       logger.info("invoice.reviewQueue", { count })
@@ -185,8 +221,12 @@ export const intake = flow({
 
 export const awaitDrained = flow({
   name: "invoice.awaitDrained",
-  factory: async (ctx): Promise<void> => {
-    for await (const pending of ctx.changes(queue)) {
+  deps: {
+    database,
+  },
+  factory: async (_ctx, { database }): Promise<void> => {
+    if ((await database.listPending()).length === 0) return
+    for await (const pending of database.watchPending()) {
       if (pending.length === 0) return
     }
   },
@@ -206,18 +246,19 @@ function categoryCounts(): Record<Category, number> {
 export const dailyReport = flow({
   name: "invoice.dailyReport",
   deps: {
-    ledger,
+    database,
     clock: tags.required(clock),
   },
   tags: [step({ workflow: true, kind: "report" })],
-  factory: (_ctx, { ledger, clock }): DailyReport => {
+  factory: async (_ctx, { database, clock }): Promise<DailyReport> => {
+    const invoices = await database.listStored()
     const byCategory = categoryCounts()
-    for (const invoice of ledger) byCategory[invoice.classification.category] += 1
+    for (const invoice of invoices) byCategory[invoice.classification.category] += 1
     const today = utcDay(clock.now())
     return {
-      total: ledger.length,
+      total: invoices.length,
       byCategory,
-      overdue: ledger
+      overdue: invoices
         .filter((invoice) => utcDay(invoice.dueDate) < today)
         .map((invoice) => invoice.id),
     }
@@ -228,31 +269,24 @@ export const sendReminder = flow({
   name: "invoice.sendReminder",
   parse: typed<{ invoiceId: string }>(),
   deps: {
-    ledger: controller(ledger, { resolve: true }),
+    database,
     mailer,
     clock: tags.required(clock),
     reminderRecipient: tags.required(reminderRecipient),
   },
   tags: [step({ workflow: true, kind: "email" })],
-  factory: async (ctx, { ledger, mailer, clock, reminderRecipient }): Promise<ReminderResult> => {
-    let message: ReminderMessage | undefined
-    ledger.update((current) => {
-      const invoice = current.find((item) => item.id === ctx.input.invoiceId)
-      if (invoice === undefined || invoice.remindedAt !== undefined) return current
-      message = {
-        invoiceId: invoice.id,
-        vendor: invoice.classification.vendor,
-        dueDate: invoice.classification.dueDate,
-        amount: invoice.classification.amount,
-        to: reminderRecipient,
-        subject: `Invoice ${invoice.id} due ${invoice.classification.dueDate}`,
-        body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
-      }
-      return current.map((item) =>
-        item.id === invoice.id ? { ...item, remindedAt: clock.now().toISOString() } : item
-      )
-    })
-    if (message === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
+  factory: async (ctx, { database, mailer, clock, reminderRecipient }): Promise<ReminderResult> => {
+    const invoice = await database.markReminderSent(ctx.input.invoiceId, clock.now().toISOString())
+    if (invoice === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
+    const message: ReminderMessage = {
+      invoiceId: invoice.id,
+      vendor: invoice.classification.vendor,
+      dueDate: invoice.classification.dueDate,
+      amount: invoice.classification.amount,
+      to: reminderRecipient,
+      subject: `Invoice ${invoice.id} due ${invoice.classification.dueDate}`,
+      body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
+    }
     await mailer.send(message)
     return { invoiceId: message.invoiceId, sent: true }
   },
@@ -261,17 +295,17 @@ export const sendReminder = flow({
 export const sendReminders = flow({
   name: "invoice.sendReminders",
   deps: {
-    ledger,
+    database,
     clock: tags.required(clock),
     reminderWindowDays: tags.required(reminderWindowDays),
     sendReminder: controller(sendReminder),
   },
   tags: [step({ workflow: true, kind: "reminders" })],
-  factory: async (_ctx, { ledger, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
+  factory: async (_ctx, { database, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
     const sent: string[] = []
     const start = utcDay(clock.now())
     const end = start + reminderWindowDays * msPerDay
-    for (const invoice of ledger) {
+    for (const invoice of await database.listStored()) {
       const due = utcDay(invoice.dueDate)
       if (invoice.remindedAt !== undefined || due < start || due > end) continue
       const result = await sendReminder.exec({ input: { invoiceId: invoice.id } })

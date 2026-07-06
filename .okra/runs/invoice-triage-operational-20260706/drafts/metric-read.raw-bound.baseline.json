@@ -1,0 +1,15 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "raw_bound_dependency_count",
+  "value": 1,
+  "target": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-06T07:30:00.000Z",
+  "source": "pnpm okr:invoice-triage",
+  "freshness": "observed_at=2026-07-06T07:30:00.000Z -> status=fresh against max_age=current turn",
+  "decision": "rejected",
+  "evidence_refs_or_hashes": [
+    "sha256:27b1fe9156a7445c95c4e6f592fdb855271818ab1e73514c0cb2c29ecbbdc979"
+  ]
+}

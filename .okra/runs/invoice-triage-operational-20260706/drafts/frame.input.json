@@ -1,0 +1,253 @@
+{
+  "frame_version": "invoice-triage-operational-20260706.v1",
+  "frame_hash": "sha256:41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f",
+  "objective": {
+    "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+    "target": 13,
+    "comparator": "==",
+    "statement": "examples/invoice-triage becomes a production-shaped operational showcase while preserving pumped-fn primitive boundaries."
+  },
+  "anti_goals": [
+    {
+      "anti_goal_id": "ag.okra-integrity",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "repo OKRA run store and deterministic checks"
+    },
+    {
+      "anti_goal_id": "ag.lint",
+      "metric_id": "lint_violation_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm lint"
+    },
+    {
+      "anti_goal_id": "ag.scope-seam",
+      "metric_id": "module_mock_or_internal_reach_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage"
+    },
+    {
+      "anti_goal_id": "ag.no-ctx-scope-escape",
+      "metric_id": "ctx_scope_escape_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage"
+    },
+    {
+      "anti_goal_id": "ag.no-raw-bound-work",
+      "metric_id": "raw_bound_dependency_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage"
+    },
+    {
+      "anti_goal_id": "ag.durable-state",
+      "metric_id": "volatile_operational_state_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage"
+    },
+    {
+      "anti_goal_id": "ag.real-codex",
+      "metric_id": "fake_codex_showcase_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage plus real smoke evidence"
+    },
+    {
+      "anti_goal_id": "ag.repo-okra-store",
+      "metric_id": "repo_okra_run_store_gap_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "pnpm okr:invoice-triage and okra-store verify"
+    },
+    {
+      "anti_goal_id": "ag.no-single-llm-truth",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_of_truth": "deterministic evidence plus independent review"
+    }
+  ],
+  "metric_contracts": [
+    {
+      "metric_id": "invoice_triage_operational_showcase_gate_pass_count",
+      "metric_kind": "objective",
+      "target": 13,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "raw_bound_dependency_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "ctx_scope_escape_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "volatile_operational_state_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "stdin_only_intake_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "postgres_drizzle_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "rest_server_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "cli_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "directory_watcher_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "audit_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "fake_codex_showcase_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "docker_compose_gap_count",
+      "metric_kind": "objective",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "module_mock_or_internal_reach_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    },
+    {
+      "metric_id": "repo_okra_run_store_gap_count",
+      "metric_kind": "anti_goal",
+      "target": 0,
+      "comparator": "==",
+      "read_method": "pnpm okr:invoice-triage and okra-store verify",
+      "max_age": "current turn",
+      "missing_data_policy": "fail closed"
+    }
+  ],
+  "action_envelope": {
+    "allowed_moves": [
+      "source reads",
+      "DKR checkpoints",
+      "repo OKRA run-store updates",
+      "package-local docs",
+      "deterministic metric scripts",
+      "tests",
+      "scoped implementation in examples/invoice-triage",
+      "core primitive edits only after accepted DKR checkpoint"
+    ],
+    "forbidden_actions": [
+      "release",
+      "publish",
+      "broad API churn",
+      "weakening lint or tests",
+      "module mocks",
+      "ctx or scope threading",
+      "fake Codex claims",
+      "frame or threshold changes without human ratification"
+    ],
+    "approval_gates": [
+      "core public API changes",
+      "new dependencies",
+      "real Codex execution",
+      "Docker runtime changes",
+      "merge",
+      "release",
+      "moves outside this frame"
+    ],
+    "human_ratification_boundary": "Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it."
+  },
+  "human_approval": {
+    "ratified_by": "user",
+    "ratified_at": "2026-07-06T00:00:00.000Z",
+    "evidence": [
+      "User approved combining the primitive and invoice-triage work into the running OKR.",
+      "User said to assume the repo-wise .okra needs to be stored and to start working."
+    ]
+  },
+  "source_artifacts": [
+    {
+      "path": "examples/invoice-triage/OPERATIONS-OKR.md",
+      "sha256": "41982d5e64b7a35679eb2e9d17eeb256e656da90261b9aa6a366d0981d722f6f"
+    },
+    {
+      "path": "scripts/check-invoice-triage-okr.mjs",
+      "sha256": "69020e955668b674b4da3ba715b948b02205879a740668051e089ac33b4efacb"
+    }
+  ]
+}

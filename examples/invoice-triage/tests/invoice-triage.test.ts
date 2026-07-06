@@ -8,25 +8,27 @@ import {
   dailyReport,
   dailyReportJob,
   enqueue,
-  ingest,
-  importBatch,
-  intake,
-  sendRemindersJob,
-  sendReminders,
-  triage,
+	  ingest,
+	  importBatch,
+	  intake,
+	  prepareDatabase,
+	  sendRemindersJob,
+	  sendReminders,
+	  triage,
 } from "../src/flows"
 import {
-  clock,
-  heuristic,
-  intakeLines,
-  ledger,
+	  clock,
+	  database,
+	  databaseEngine,
+	  databaseStartup,
+	  heuristic,
+	  intakeLines,
   mailer,
+  memoryDatabase,
   memoryMailer,
   opsHeartbeat,
-  queue,
   reminderRecipient,
   reminderWindowDays,
-  reviewCount,
 } from "../src/ports"
 import {
   type Category,
@@ -109,20 +111,12 @@ function gated(outputs: readonly string[]) {
 }
 
 async function waitForImported(scope: Lite.Scope, count: number): Promise<string[]> {
-  await scope.resolve(ledger)
-  const imported = scope.select(ledger, (invoices) => invoices.map((invoice) => invoice.id), { eq: sameIds })
-  for await (const ids of scope.changes(imported)) {
-    if (ids.length === count) {
-      imported.dispose()
-      return ids
-    }
+  const store = await scope.resolve(database)
+  for await (const invoices of store.watchStored()) {
+    const ids = invoices.map((invoice) => invoice.id)
+    if (ids.length === count) return ids
   }
-  imported.dispose()
   throw new Error("Scope disposed before import completed")
-}
-
-function sameIds(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index])
 }
 
 function stored(
@@ -155,6 +149,7 @@ function scopeWith(model: Model) {
       extensions: runtime.extensions,
       tags: [
         provider(model),
+        databaseEngine(memoryDatabase()),
         clock({ now: () => now }),
       ],
     }),
@@ -197,6 +192,49 @@ class ManualBackend implements Scheduler.Backend {
 }
 
 describe("invoice triage patterns", () => {
+  it("pattern: optional startup tag selects database migration lazily", async () => {
+    const idle = createScope({
+      tags: [
+        databaseEngine({
+          open: () => {
+            throw new Error("database should not open without startup tag")
+          },
+        }),
+      ],
+    })
+    const idleCtx = idle.createContext()
+
+    await expect(idleCtx.exec({ flow: prepareDatabase })).resolves.toBeUndefined()
+    await idleCtx.close({ ok: true })
+    await idle.dispose()
+
+    let opens = 0
+    const active = createScope({
+      tags: [
+        databaseEngine({
+          open: () => {
+            opens += 1
+            return memoryDatabase().open()
+          },
+        }),
+        databaseStartup("migrate"),
+      ],
+    })
+    const activeCtx = active.createContext()
+
+    await expect(activeCtx.exec({ flow: prepareDatabase })).resolves.toMatchObject({
+      currentVersion: 1,
+      targetVersion: 1,
+      pending: [],
+      drift: [],
+      appliedNow: [{ version: 1, name: "create_invoice_store" }],
+    })
+    expect(opens).toBe(1)
+    expect((await (await active.resolve(database)).listAudit()).map((event) => event.action)).toEqual(["database.migrated"])
+    await activeCtx.close({ ok: true })
+    await active.dispose()
+  })
+
   it("pattern: execStream consumption shows progress, interleaved triage steps, and .result summary", async () => {
     const first = invoice("inv-stream-1")
     const second = invoice("inv-stream-2", { vendor: "Contoso Hardware", amount: 4_500, description: "server hardware" })
@@ -229,8 +267,10 @@ describe("invoice triage patterns", () => {
     ])
     const run = await inspect(log, { taskId: "stream", runId: "run-1" })
     expect(run.steps.map((step) => step.targetName)).toEqual([
+      "invoice.model.complete",
       "invoice.classify",
       "invoice.save",
+      "invoice.model.complete",
       "invoice.classify",
       "invoice.save",
     ])
@@ -249,7 +289,7 @@ describe("invoice triage patterns", () => {
       flow: importBatch,
       input: { invoices: [invoice("inv-exec-1"), invoice("inv-exec-2")] },
     })).resolves.toEqual({ imported: 2, review: ["inv-exec-1"] })
-    expect((await scope.resolve(ledger)).map((item) => item.id)).toEqual(["inv-exec-1", "inv-exec-2"])
+    expect((await (await scope.resolve(database)).listStored()).map((item) => item.id)).toEqual(["inv-exec-1", "inv-exec-2"])
     await ctx.close({ ok: true })
     await scope.dispose()
   })
@@ -279,6 +319,7 @@ describe("invoice triage patterns", () => {
           json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
           json({ vendor: second.vendor, amount: second.amount, dueDate: second.dueDate }),
         ])),
+        databaseEngine(memoryDatabase()),
         clock({ now: () => now }),
       ],
     })
@@ -294,7 +335,7 @@ describe("invoice triage patterns", () => {
     await expect(stream.result).rejects.toThrow("Flow stream aborted")
     expect(streaming).toEqual([true])
     expect(seen.at(-1)).toEqual({ invoiceId: "inv-abandon-1", done: 1, total: 2, risk: "auto-approve" })
-    expect((await scope.resolve(ledger)).map((item) => item.id)).toEqual(["inv-abandon-1"])
+    expect((await (await scope.resolve(database)).listStored()).map((item) => item.id)).toEqual(["inv-abandon-1"])
     expect(closes[0]).toMatchObject({ ok: false, aborted: true })
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -350,6 +391,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       tags: [
         provider(gate.model),
+        databaseEngine(memoryDatabase()),
         clock({ now: () => now }),
       ],
     })
@@ -366,7 +408,7 @@ describe("invoice triage patterns", () => {
 
     const imported = await waitForImported(scope, all.length)
     expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
-    expect(await scope.resolve(queue)).toEqual([])
+    expect(await (await scope.resolve(database)).listPending()).toEqual([])
     expect(gate.calls()).toBe(all.length)
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -385,11 +427,13 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       tags: [
         provider(gate.model),
+        databaseEngine(memoryDatabase()),
         clock({ now: () => now }),
       ],
     })
     const ctx = scope.createContext()
-    const changes = scope.changes(queue)[Symbol.asyncIterator]()
+    const store = await scope.resolve(database)
+    const changes = store.watchPending()[Symbol.asyncIterator]()
     const interleave = (async () => {
       for (;;) {
         const next = await changes.next()
@@ -410,7 +454,7 @@ describe("invoice triage patterns", () => {
 
     const imported = await waitForImported(scope, all.length)
     expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
-    expect(await scope.resolve(queue)).toEqual([])
+    expect(await store.listPending()).toEqual([])
     expect(gate.calls()).toBe(all.length)
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -433,14 +477,14 @@ describe("invoice triage patterns", () => {
           json({ risk: "review", reason: "needs approval" }),
           json({ risk: "review", reason: "needs approval" }),
         ])),
+        databaseEngine(memoryDatabase()),
         clock({ now: () => now }),
       ],
     })
     const log = scope.createContext()
     const logger = await log.resolve(logging.logger)
-    await scope.resolve(ledger)
-    await scope.resolve(reviewCount)
-    const changes = scope.changes(reviewCount)[Symbol.asyncIterator]()
+    const store = await scope.resolve(database)
+    const changes = store.watchReviewCount()[Symbol.asyncIterator]()
     const observations: number[] = []
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "changes", runId: "run-1" })] })
     const first = await changes.next()
@@ -470,15 +514,17 @@ describe("invoice triage patterns", () => {
     const messages = memoryMailer()
     const scope = createScope({
       presets: [
-        preset(ledger, [
-          stored("inv-remind-today", "2026-07-05", "utilities", "auto-approve"),
-          stored("inv-remind-horizon", "2026-07-08", "saas", "auto-approve"),
-          stored("inv-remind-beyond", "2026-07-09", "saas", "auto-approve"),
-          stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
-        ]),
         preset(mailer, messages),
       ],
       tags: [
+        databaseEngine(memoryDatabase({
+          stored: [
+            stored("inv-remind-today", "2026-07-05", "utilities", "auto-approve"),
+            stored("inv-remind-horizon", "2026-07-08", "saas", "auto-approve"),
+            stored("inv-remind-beyond", "2026-07-09", "saas", "auto-approve"),
+            stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
+          ],
+        })),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -500,14 +546,16 @@ describe("invoice triage patterns", () => {
 
   it("pattern: dailyReport summarizes totals, categories, and overdue invoices", async () => {
     const scope = createScope({
-      presets: [
-        preset(ledger, [
-          stored("inv-report-overdue", "2026-07-04", "utilities", "auto-approve"),
-          stored("inv-report-today", "2026-07-05", "saas", "auto-approve"),
-          stored("inv-report-review", "2026-07-10", "hardware", "review"),
-        ]),
+      tags: [
+        databaseEngine(memoryDatabase({
+          stored: [
+            stored("inv-report-overdue", "2026-07-04", "utilities", "auto-approve"),
+            stored("inv-report-today", "2026-07-05", "saas", "auto-approve"),
+            stored("inv-report-review", "2026-07-10", "hardware", "review"),
+          ],
+        })),
+        clock({ now: () => now }),
       ],
-      tags: [clock({ now: () => now })],
     })
     const ctx = scope.createContext()
 
@@ -530,10 +578,12 @@ describe("invoice triage patterns", () => {
     const messages = memoryMailer()
     const scope = createScope({
       presets: [
-        preset(ledger, [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")]),
         preset(mailer, messages),
       ],
       tags: [
+        databaseEngine(memoryDatabase({
+          stored: [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")],
+        })),
         scheduler.backend(backend),
         reminderWindowDays(5),
         clock({ now: () => now }),
@@ -563,7 +613,7 @@ describe("invoice triage patterns", () => {
       JSON.stringify({ id: "inv-in-3", vendor: "Contoso Hardware", amount: 300, dueDate: "2026-07-12", description: "cables" }),
     ]
     const scope = createScope({
-      tags: [provider(heuristic), clock({ now: () => now })],
+      tags: [provider(heuristic), databaseEngine(memoryDatabase()), clock({ now: () => now })],
       presets: [preset(intakeLines, (async function* () {
         yield* lines
       })())],
@@ -573,7 +623,7 @@ describe("invoice triage patterns", () => {
     const summary = await ctx.exec({ flow: intake })
 
     expect(summary).toEqual({ accepted: 2, rejected: 2 })
-    expect((await scope.resolve(queue)).map((invoice) => invoice.id)).toEqual(["inv-in-1", "inv-in-3"])
+    expect((await (await scope.resolve(database)).listPending()).map((invoice) => invoice.id)).toEqual(["inv-in-1", "inv-in-3"])
     await ctx.close({ ok: true })
     await scope.dispose()
   })
