@@ -1,4 +1,4 @@
-import { createScope, isStreamingExec, preset, type Lite } from "@pumped-fn/lite"
+import { createScope, isStreamingExec, type Lite } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/sdk"
@@ -8,28 +8,28 @@ import {
   dailyReport,
   dailyReportJob,
   enqueue,
-	  ingest,
-	  importBatch,
-	  intake,
-	  prepareDatabase,
-	  sendRemindersJob,
-	  sendReminders,
-	  triage,
+  ingest,
+  importBatch,
+  intake,
+  prepareDatabase,
+  sendRemindersJob,
+  sendReminders,
+  triage,
 } from "../src/flows"
 import {
-	  clock,
-	  database,
-	  databaseEngine,
-	  databaseStartup,
-	  heuristic,
-	  intakeLines,
+  clock,
+  database,
+  databaseEngine,
+  databaseStartup,
+  heuristic,
+  intakeLines,
   mailer,
-  memoryDatabase,
-  memoryMailer,
   opsHeartbeat,
   reminderRecipient,
   reminderWindowDays,
 } from "../src/ports"
+import { memoryDatabase } from "./support/database"
+import { memoryMailer } from "./support/mailer"
 import {
   type Category,
   type Classification,
@@ -513,9 +513,6 @@ describe("invoice triage patterns", () => {
   it("pattern: reminders are idempotent and include both reminder-window boundaries", async () => {
     const messages = memoryMailer()
     const scope = createScope({
-      presets: [
-        preset(mailer, messages),
-      ],
       tags: [
         databaseEngine(memoryDatabase({
           stored: [
@@ -525,6 +522,7 @@ describe("invoice triage patterns", () => {
             stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
           ],
         })),
+        mailer(messages),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -577,13 +575,11 @@ describe("invoice triage patterns", () => {
     const backend = new ManualBackend()
     const messages = memoryMailer()
     const scope = createScope({
-      presets: [
-        preset(mailer, messages),
-      ],
       tags: [
         databaseEngine(memoryDatabase({
           stored: [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")],
         })),
+        mailer(messages),
         scheduler.backend(backend),
         reminderWindowDays(5),
         clock({ now: () => now }),
@@ -613,8 +609,7 @@ describe("invoice triage patterns", () => {
       JSON.stringify({ id: "inv-in-3", vendor: "Contoso Hardware", amount: 300, dueDate: "2026-07-12", description: "cables" }),
     ]
     const scope = createScope({
-      tags: [provider(heuristic), databaseEngine(memoryDatabase()), clock({ now: () => now })],
-      presets: [preset(intakeLines, (async function* () {
+      tags: [provider(heuristic), databaseEngine(memoryDatabase()), clock({ now: () => now }), intakeLines((async function* () {
         yield* lines
       })())],
     })

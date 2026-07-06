@@ -137,6 +137,22 @@ const metrics = [
     srcEvidence,
   ),
   metric(
+    "production_builtin_leak_count",
+    count(src, /\bprocess\.(?:env|stdin|argv)\b|node:readline/g),
+    "==",
+    0,
+    "examples/invoice-triage/src",
+    srcEvidence,
+  ),
+  metric(
+    "production_test_material_leak_count",
+    count(src, /\b(?:memoryDatabase|MemoryInvoiceDatabase|DatabaseSeed|memoryMailer)\b/g),
+    "==",
+    0,
+    "examples/invoice-triage/src",
+    srcEvidence,
+  ),
+  metric(
     "dynamic_resource_loading_gap_count",
     hasDynamicDatabaseStartup ? 0 : 1,
     "==",

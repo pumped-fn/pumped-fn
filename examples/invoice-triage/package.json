@@ -7,7 +7,7 @@
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit",
     "lint": "node ../../pkg/tool/lint/dist/cli.mjs src tests",
-    "start": "node --import tsx src/main.ts"
+    "start": "node --import tsx src/bin.ts"
   },
   "dependencies": {
     "@pumped-fn/lite": "workspace:*",

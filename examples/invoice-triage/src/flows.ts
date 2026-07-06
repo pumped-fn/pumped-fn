@@ -199,7 +199,7 @@ export const watchReviewQueue = flow({
 export const intake = flow({
   name: "invoice.intake",
   deps: {
-    lines: intakeLines,
+    lines: tags.required(intakeLines),
     enqueue: controller(enqueue),
     logger: logging.logger,
   },
@@ -270,7 +270,7 @@ export const sendReminder = flow({
   parse: typed<{ invoiceId: string }>(),
   deps: {
     database,
-    mailer,
+    mailer: tags.required(mailer),
     clock: tags.required(clock),
     reminderRecipient: tags.required(reminderRecipient),
   },

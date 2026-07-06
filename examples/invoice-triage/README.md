@@ -7,7 +7,7 @@ It proves:
 - generator flows with `execStream` progress and `exec` summary consumption
 - `yield*` progress composition from nested generator flows
 - deps-declared scalar flow handles for model calls, database appends, database writes, reports, and mailer sends
-- a tag-selected database engine with Postgres/Drizzle as the production default and in-memory test engines at the same scope seam
+- a tag-selected database engine with Postgres/Drizzle as the production default and test engines at the same scope seam
 - audit records emitted by the database operations that enqueue, drain, save, and remind invoices
 - `scope.resolveStream(opsHeartbeat)` fan-out feeds plus `scope.drain(opsHeartbeat, { take })`
 - coalesced ops views for review queue count
@@ -19,7 +19,7 @@ It proves:
 ```mermaid
 flowchart TD
   Root["createScope tags<br/>databaseEngine(...) + model(...)"] --> Database["database atom<br/>engine.open()"]
-  Engine["Postgres/Drizzle default<br/>memoryDatabase in tests"] --> Root
+  Engine["Postgres/Drizzle default<br/>test engine tag in tests"] --> Root
   Producer["enqueue flow<br/>parse and append invoice batches"] --> Database
   Database --> Pending["invoice_pending<br/>durable pending invoices"]
   Pending --> Ingest["ingest flow<br/>watchPending + drainPending"]
@@ -84,7 +84,7 @@ createScope({ tags: [codex({ guard: false })] })
 
 The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This example needs a lossless ingest queue and cron-capable registration, so it uses:
 
-- `databaseEngine` as the tag-carried engine seam. `postgresDatabase()` is the default; tests use `databaseEngine(memoryDatabase(...))`.
+- `databaseEngine` as the tag-carried engine seam. `postgresDatabase()` is the default; tests install their support engine through the same tag.
 - `database` as the scoped atom that opens and closes the engine for the current composition root.
 - `databaseStartup` as an optional operational tag read by `prepareDatabase`; that flow holds controllers for `migrateDatabase` and `verifyDatabase` and executes only the selected path.
 - `enqueue` to parse raw lines or invoice objects and append invoice batches with `database.enqueue`.
@@ -94,17 +94,17 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 - `opsHeartbeat` as an async-iterable atom consumed with `scope.resolveStream(opsHeartbeat)` only for conflatable status views.
 - `@pumped-fn/lite-extension-scheduler` for cron registration.
 
-The production database adapter uses Drizzle over `pg` and exposes explicit migration operations. `migrateDatabase` applies ordered, checksum-tracked migrations into `invoice_schema_migrations` and emits `database.migrated` audit records; `verifyDatabase` fails if pending migrations or checksum drift exist. The daemon composition root sets `databaseStartup("migrate")` by default through `INVOICE_DATABASE_STARTUP`, while tests can omit that optional tag and avoid loading migration resources at all. Tests still swap only the `databaseEngine` tag, so inside-out and outside-in tests exercise the same public seam.
+The production database adapter uses Drizzle over `pg` and exposes explicit migration operations. `migrateDatabase` applies ordered, checksum-tracked migrations into `invoice_schema_migrations` and emits `database.migrated` audit records; `verifyDatabase` fails if pending migrations or checksum drift exist. The daemon composition root sets `databaseStartup("migrate")`; alternate roots can tag `databaseStartup("verify")` when a pre-start migration job owns schema mutation. Tests can omit that optional tag and avoid loading migration resources at all. Tests still swap only the `databaseEngine` tag, so inside-out and outside-in tests exercise the same public seam.
 
-`dailyReportJob` and `sendRemindersJob` are module-level `scheduler.schedule` atoms resolved at the composition root. `reminderWindowDays` and `reminderRecipient` are tags. Preset them at the composition root for each environment.
+`dailyReportJob` and `sendRemindersJob` are module-level `scheduler.schedule` atoms resolved at the composition root. `mailer`, `reminderWindowDays`, and `reminderRecipient` are tags. Set them at the composition root for each environment.
 
 ## Ops Notes
 
 The operational expansion frame is tracked in `OPERATIONS-OKR.md`. Replay the current gate metrics with `pnpm okr:invoice-triage`.
 
-Run with `pnpm start < fixtures/demo.ndjson` (invoices arrive as NDJSON on stdin - pipe from any producer); tests with `pnpm test`. The composition root execs `prepareDatabase`, `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows. It holds the scope, but every loop lives in the graph. Set `INVOICE_DATABASE_STARTUP=verify` when a pre-start migration job owns schema mutation. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then drains pending work and disposes.
+Run the daemon root with `pnpm start`; tests with `pnpm test`. The composition root execs `prepareDatabase`, `ingest`, `watchReviewQueue`, `dailyReportJob`, and `sendRemindersJob`. It holds the scope, but every loop lives in the graph. Import transports are graph seams: tests tag `intakeLines` directly, while CLI and directory-watcher adapters remain explicit OKR gate work rather than hidden stdin behavior. `intake` consumes its tagged transport by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal.
 
-Reminder idempotency is database-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, keep `databaseEngine` on the Postgres default or tag it with another engine at the composition root, preset `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
+Reminder idempotency is database-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, keep `databaseEngine` on the Postgres default or tag it with another engine at the composition root, tag `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 
 ## Run
 
