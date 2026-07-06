@@ -2,28 +2,13 @@
 
 ## Purpose
 
-`examples/` holds private workspace packages that show practical pumped-fn usage. They are proof
-surfaces for documented patterns, not publishing targets.
+`examples/` holds the private workspace package that shows practical pumped-fn usage. It is a proof
+surface for documented patterns, not a publishing target.
 
 ## Structure
 
 | Directory | Package | Role |
 | --- | --- | --- |
-| `lite-tour/` | `@pumped-fn/lite-tour` | Backend and framework-neutral Lite patterns. |
-| `lite-react-tour/` | `@pumped-fn/lite-react-tour` | React patterns, capstones, and browser checks. |
-| `service-health-bff/` | `@pumped-fn/service-health-bff` | BFF-style composition examples. |
-| `todo-hono/` | `@pumped-fn/todo-hono` | Hono backend integration for a todo API. |
-| `todo-tanstack-start/` | `@pumped-fn/todo-tanstack-start` | TanStack Start fullstack integration for todos. |
-| `deploy-cli/` | `@pumped-fn/deploy-cli` | CLI parser integrations with per-command Lite scopes. |
-| `draft-sync/` | `@pumped-fn/draft-sync` | Replicated draft state with sync stress metrics. |
-| `draft-sync-web/` | `@pumped-fn/draft-sync-web` | Frontend/backend sync through a web environment gateway. |
-| `parking-lot-shared/` | `@pumped-fn/parking-lot-shared` | Parking lot management business logic and persistence ports shared by every entrypoint. |
-| `parking-lot-cli/` | `@pumped-fn/parking-lot-cli` | CLI entrypoint over the parking lot management flows. |
-| `parking-lot-hono/` | `@pumped-fn/parking-lot-hono` | Hono API entrypoint over the parking lot management flows. |
-| `parking-lot-app/` | `@pumped-fn/parking-lot-app` | Convention-driven `@pumped-fn/app` entrypoint producing a CLI and HTTP server from one manifest over the parking lot management flows. |
-| `parking-lot-tanstack-start/` | `@pumped-fn/parking-lot-tanstack-start` | TanStack Start server-function entrypoint over the parking lot management flows. |
-| `parking-lot-spa/` | `@pumped-fn/parking-lot-spa` | Vite React SPA over the parking lot management flows and state. |
-| `ticket-triage/` | `@pumped-fn/ticket-triage` | Agent workflow examples. |
 | `invoice-triage/` | `@pumped-fn/invoice-triage` | Invoice import and LLM triage over generator flows, execStream, and scheduler cron. |
 
 ## Naming
@@ -35,7 +20,7 @@ with a shared domain package when multiple entrypoints prove the same behavior.
 
 ## Canonical Usage
 
-Examples teach one library shape:
+The canonical example teaches one library shape:
 
 - Composition roots create scopes with the presets, tags, and extensions they need.
 - Tests use the scope seam and public API instead of module mocks or internal reaches.
@@ -69,8 +54,8 @@ canonical side.
 
 ## Content Rules
 
-Examples should be runnable, tested, and tied to real package behavior. Prefer small focused examples
-plus capstones over decorative demos.
+Examples should be runnable, tested, and tied to real package behavior. Keep the canonical example
+deep enough to carry product-shaped requirements instead of spreading shallow demos across domains.
 
 ## Boundaries
 

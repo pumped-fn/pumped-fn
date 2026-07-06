@@ -480,20 +480,16 @@ sequenceDiagram
 
 ## Practical Examples
 
-Runnable practical examples under `examples/` cover import-time singletons, ambient request tags, preset substitution, lifecycle cleanup, transaction resources, watch-based derived state, extensions, request-scoped resources, tenant scopes, and a service health monitor capstone.
+The runnable practical example under `examples/` is `invoice-triage`. It carries the canonical app
+surface for generator flows, `execStream`, child-flow composition, state-backed ingest queues,
+scheduler cron, provider tags, and test substitution through the scope seam.
 
-Frontend and BFF practical examples show logic moving across backend, BFF, and React tiers while tests
-keep the same scope seam. Some spectrum slices are intentionally backlog, and the comparison docs scope
-implemented claims to the slices that exist.
-
-The practical examples use the same boundary vocabulary as the package docs. React bootstrap files are
-adapter/composition roots tested through real `ScopeProvider`/`ExecutionContextProvider` wiring, and
-observers execute graph work through `useFlow` instead of accepting `scope` or hand-rolling
-`createContext`/`close` wrappers. Backend and BFF entry points keep route/job work behind flows or
-`ctx.exec`, own root execution lifecycle at the composition root, and dispose scopes explicitly. Raw IO is
-kept in transport atoms or composition-root adapters; capability atoms depend on transports and remain
-presettable; feature atoms depend on capabilities. Public example claims are guarded by structural tests
-for ambient IO, test substitution, provider wiring, route boundaries, and derived inventories.
+The practical example uses the same boundary vocabulary as the package docs. Entry points keep
+transport work at the composition root, graph work behind flows or `ctx.exec`, root execution lifecycle
+owned by the root, and scope disposal explicit. Raw IO is kept in transport atoms or composition-root
+adapters; capability atoms depend on transports and remain presettable; feature flows depend on
+capabilities. Public example claims are guarded by structural tests for provider wiring, state queues,
+streaming progress, cron registration, and idempotent side effects.
 
 `@pumped-fn/lite-lint` turns those boundary rules into a lint-like scanner. It catches module mocks,
 test-only product branches, definition-handle suffixes, product helpers that accept `scope`, raw ambient IO

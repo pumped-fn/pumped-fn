@@ -311,26 +311,11 @@ feature components using scope directly, and local state mirrors.
 
 ## Practical Examples
 
-The examples are part of the public contract for how code should be shaped:
+`invoice-triage` is the canonical practical example for how code should be shaped:
 
 | Path | What it shows |
 | --- | --- |
-| `examples/lite-tour` | Backend and service-style patterns, plus a service health capstone |
-| `examples/lite-react-tour` | React observer patterns, provider-owned execution, scoped drafts, json-render, complex Kanban |
-| `examples/service-health-bff` | BFF transport/capability/feature layering and HTTP-shaped flow boundaries |
-| `examples/todo-hono` | Hono todo backend that keeps framework routing at the edge and executes Lite flows through middleware |
-| `examples/todo-tanstack-start` | TanStack Start todo surface with Lite request middleware and server-function handlers |
-| `examples/deploy-cli` | Commander, Yargs, and CAC parser integrations with per-command Lite scopes |
-| `examples/draft-sync` | Strict replicated state, runtime validation, conflict reporting, and stress metrics |
-| `examples/draft-sync-web` | Frontend/backend sync through a web environment gateway and ordinary React observers |
-| `examples/ticket-triage` | Agent workflow, provider, sandbox, tool, subagent, and eval examples over Lite |
 | `examples/invoice-triage` | Invoice import and LLM triage: generator flows, yield* composition, execStream, state-queue ingest, scheduler cron |
-| `examples/parking-lot-shared` | Shared parking lot business logic with roles, booking, payment pairing, receipts, refunds, disputes, reports, and SQLite-backed persistence behind a store port |
-| `examples/parking-lot-cli` | CLI entrypoint that creates per-command scopes and executes parking lot flows |
-| `examples/parking-lot-hono` | Hono API entrypoint through per-request Lite execution contexts |
-| `examples/parking-lot-app` | Convention-driven `@pumped-fn/pumped` entrypoint producing a CLI and HTTP server from one manifest over parking lot flows |
-| `examples/parking-lot-tanstack-start` | TanStack Start server-function handlers over parking lot flows |
-| `examples/parking-lot-spa` | Vite React SPA that observes and dispatches parking lot flows through Lite React providers |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
 
 ## Local Development

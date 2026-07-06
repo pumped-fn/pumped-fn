@@ -107,10 +107,8 @@ error it saw, if any.
 from one of two places: the scope's own ambient `tags` (set once, e.g. in `app.ts`'s `tags` array,
 and visible to every tick and every request alike) or `schedule({ tags })` — an optional
 `() => Lite.Tagged<any>[]` applied to that job's own tick contexts on top of the scope's ambient
-tags. Reaching into `app.context()`'s request-only branch for a job's identity/config is a bug (see
-`examples/parking-lot-app`'s `src/app.ts`, whose actor tag is derived from env vars once at the scope
-level precisely so job ticks see the same actor identity requests do, instead of a job-only
-hardcoded stand-in).
+tags. Reaching into `app.context()`'s request-only branch for a job's identity/config is a bug. Derive
+job-visible tags once at the scope level so ticks and requests see the same identity/config.
 
 ```ts
 // src/jobs/nightly-sweep.ts
@@ -135,9 +133,10 @@ nodes, below). Don't object-spread the handle — spreading forks the flow's nod
 presets targeting the original shared flow silently miss the copy.
 
 ```ts
-// src/server/receipts.ts
-export { listReceipts as default } from "@pumped-fn/parking-lot-shared"
 import { route } from "@pumped-fn/pumped"
+import { listInvoices } from "../domain/invoices"
+
+export { listInvoices as default }
 
 export const meta = route({ method: "GET" })
 ```
@@ -150,14 +149,13 @@ Jobs are different: a schedule is behavior, not naming. `src/jobs/*.ts` default-
 `schedule()` node from `@pumped-fn/lite-extension-scheduler`:
 
 ```ts
-// src/jobs/expire-bookings.ts
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { expireBookings } from "@pumped-fn/parking-lot-shared"
+import { expireInvoices } from "../domain/invoices"
 
 export default scheduler.schedule({
-  name: "expire-bookings",
+  name: "expire-invoices",
   cadence: { cron: "*/5 * * * *" },
-  flow: expireBookings,
+  flow: expireInvoices,
   input: () => ({}),
 })
 ```
@@ -219,8 +217,7 @@ function mapError(error: unknown): { status: number; body: unknown } | undefined
 ```
 
 Declaring `faultStatus` with `satisfies Record<Fault["kind"], number>` makes a missing fault kind a
-compile error instead of a silent `undefined` status. See `examples/parking-lot-app/src/app.ts` for
-a full worked example.
+compile error instead of a silent `undefined` status.
 
 ## Quick start
 
@@ -255,19 +252,22 @@ pumped build --target all   # emits dist/server.mjs and dist/cli.mjs
 
 ## Testing
 
-The scope is the single seam. Domain flows never import `@pumped-fn/pumped` — tests preset the scope
-directly and exec flows through it, mirroring `examples/parking-lot-app/tests/booking.test.ts`:
+The scope is the single seam. Domain flows never import `@pumped-fn/pumped`; tests preset the scope
+directly and exec flows through it:
 
 ```ts
 import { createScope, preset } from "@pumped-fn/lite"
-import { store, createMemoryStore, actor, configureLot } from "@pumped-fn/parking-lot-shared"
+import { actor, configureAccount, createMemoryStore, store } from "./domain"
 
 const scope = createScope({
   presets: [preset(store, createMemoryStore())],
-  tags: [actor({ id: "manager-1", role: "manager" })],
+  tags: [actor({ id: "ops-1", role: "operator" })],
 })
 
-const lot = await scope.createContext().exec({ flow: configureLot, input: { name: "Downtown", capacity: 10, /* ... */ } })
+const account = await scope.createContext().exec({
+  flow: configureAccount,
+  input: { name: "Acme", limit: 10 },
+})
 ```
 
 No plugin, no discovery, no generated manifest — just the public `@pumped-fn/lite` API against the
