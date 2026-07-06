@@ -2,7 +2,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm"
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 import { Pool, type PoolConfig } from "pg"
 import { tag } from "@pumped-fn/lite"
-import { OperationalFault } from "./errors"
+import { operationalFault } from "./errors"
 import { latestFeed, pushFeed, type PushFeed } from "./feed"
 import {
   completedReport,
@@ -52,7 +52,7 @@ export const databaseEngine = tag<DatabaseEngine>({
 export function postgresDatabase(config: PoolConfig = {}): DatabaseEngine {
   const connectionString = config.connectionString ?? "postgres://invoice:invoice@localhost:5432/invoice_triage"
   return {
-    open: () => new PostgresInvoiceDatabase(new Pool({
+    open: () => openPostgresInvoiceDatabase(new Pool({
       ...config,
       connectionString,
     })),
@@ -64,60 +64,52 @@ type MigrationRow = typeof schemaMigrations.$inferSelect
 type StoredRow = typeof storedInvoices.$inferSelect
 type AuditRow = typeof auditEvents.$inferSelect
 
-class PostgresInvoiceDatabase implements InvoiceDatabase {
-  private db: Database
-  private pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
-  private storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
-  private reviewWatchers = new Set<PushFeed<number>>()
+function openPostgresInvoiceDatabase(pool: Pool): InvoiceDatabase {
+  const db: Database = drizzle(pool, { schema })
+  const pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
+  const storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
+  const reviewWatchers = new Set<PushFeed<number>>()
 
-  constructor(private readonly pool: Pool) {
-    this.db = drizzle(pool, { schema })
+  async function readMigrationStatus(): Promise<DatabaseMigrationStatus> {
+    if (!await hasMigrationLedger()) return migrationStatus([])
+    return migrationStatus((await db.select().from(schemaMigrations).orderBy(asc(schemaMigrations.version))).map(migrationFromRow))
   }
 
-  async migrate(appliedAt: string): Promise<DatabaseMigrationReport> {
-    return this.applyMigrations(appliedAt)
-  }
-
-  async migrationStatus(): Promise<DatabaseMigrationStatus> {
-    if (!await this.hasMigrationLedger()) return migrationStatus([])
-    return migrationStatus((await this.db.select().from(schemaMigrations).orderBy(asc(schemaMigrations.version))).map(migrationFromRow))
-  }
-
-  async enqueue(invoices: readonly Invoice[], enqueuedAt: string): Promise<number> {
+  async function enqueue(invoices: readonly Invoice[], enqueuedAt: string): Promise<number> {
     if (invoices.length === 0) return 0
-    await this.db.insert(pendingInvoices).values(invoices.map((invoice) => ({
+    await db.insert(pendingInvoices).values(invoices.map((invoice) => ({
       id: invoice.id,
       invoice,
       enqueuedAt: new Date(enqueuedAt),
     }))).onConflictDoNothing()
     for (const invoice of invoices) {
-      await this.audit("invoice.enqueued", invoice.id, enqueuedAt, { invoice })
+      await recordAudit("invoice.enqueued", invoice.id, enqueuedAt, { invoice })
     }
-    await this.notifyPending()
+    await notifyPending()
     return invoices.length
   }
 
-  async drainPending(occurredAt: string): Promise<readonly Invoice[]> {
-    const invoices = await this.db.transaction(async (tx) => {
+  async function drainPending(occurredAt: string): Promise<readonly Invoice[]> {
+    const invoices = await db.transaction(async (tx) => {
       const rows = await tx.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
       if (rows.length === 0) return []
       await tx.delete(pendingInvoices).where(inArray(pendingInvoices.id, rows.map((row) => row.id)))
       return rows.map((row) => row.invoice)
     })
     if (invoices.length > 0) {
-      await this.audit("invoice.drained", "pending", occurredAt, { invoiceIds: invoices.map((invoice) => invoice.id) })
+      await recordAudit("invoice.drained", "pending", occurredAt, { invoiceIds: invoices.map((invoice) => invoice.id) })
     }
-    await this.notifyPending()
+    await notifyPending()
     return invoices
   }
 
-  async listPending(): Promise<readonly Invoice[]> {
-    const rows = await this.db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
+  async function listPending(): Promise<readonly Invoice[]> {
+    const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
     return rows.map((row) => row.invoice)
   }
 
-  async saveInvoice(input: SaveInvoiceRecord): Promise<StoredInvoice> {
-    const row = await this.db.transaction(async (tx): Promise<StoredRow> => {
+  async function saveInvoice(input: SaveInvoiceRecord): Promise<StoredInvoice> {
+    const row = await db.transaction(async (tx): Promise<StoredRow> => {
       const [existing] = await tx.select().from(storedInvoices).where(eq(storedInvoices.id, input.invoice.id)).limit(1)
       const next = {
         id: input.invoice.id,
@@ -130,22 +122,22 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
       await tx.insert(storedInvoices).values(next)
       return next
     })
-    await this.audit("invoice.saved", row.id, input.importedAt, {
+    await recordAudit("invoice.saved", row.id, input.importedAt, {
       risk: row.classification.risk,
       category: row.classification.category,
     })
-    await this.notifyStored()
-    await this.notifyReviewCount()
+    await notifyStored()
+    await notifyReviewCount()
     return storedFromRow(row)
   }
 
-  async listStored(): Promise<readonly StoredInvoice[]> {
-    const rows = await this.db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
+  async function listStored(): Promise<readonly StoredInvoice[]> {
+    const rows = await db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
     return rows.map(storedFromRow)
   }
 
-  async markReminderSent(invoiceId: string, remindedAt: string): Promise<StoredInvoice | undefined> {
-    const row = await this.db.transaction(async (tx): Promise<StoredRow | undefined> => {
+  async function markReminderSent(invoiceId: string, remindedAt: string): Promise<StoredInvoice | undefined> {
+    const row = await db.transaction(async (tx): Promise<StoredRow | undefined> => {
       const [existing] = await tx.select().from(storedInvoices).where(eq(storedInvoices.id, invoiceId)).limit(1)
       if (existing === undefined || existing.remindedAt !== null) return undefined
       const next = { ...existing, remindedAt: new Date(remindedAt) }
@@ -153,34 +145,34 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
       return next
     })
     if (row === undefined) return undefined
-    await this.audit("invoice.reminded", invoiceId, remindedAt, { dueDate: row.classification.dueDate })
-    await this.notifyStored()
+    await recordAudit("invoice.reminded", invoiceId, remindedAt, { dueDate: row.classification.dueDate })
+    await notifyStored()
     return storedFromRow(row)
   }
 
-  async reviewCount(): Promise<number> {
-    return (await this.listStored()).filter((invoice) => invoice.classification.risk === "review").length
+  async function reviewCount(): Promise<number> {
+    return (await listStored()).filter((invoice) => invoice.classification.risk === "review").length
   }
 
-  watchPending(): AsyncIterable<readonly Invoice[]> {
-    return this.watch(this.pendingWatchers, pushFeed(), () => this.listPending())
+  function watchPending(): AsyncIterable<readonly Invoice[]> {
+    return watch(pendingWatchers, pushFeed(), () => listPending())
   }
 
-  watchStored(): AsyncIterable<readonly StoredInvoice[]> {
-    return this.watch(this.storedWatchers, latestFeed(), () => this.listStored())
+  function watchStored(): AsyncIterable<readonly StoredInvoice[]> {
+    return watch(storedWatchers, latestFeed(), () => listStored())
   }
 
-  watchReviewCount(): AsyncIterable<number> {
-    return this.watch(this.reviewWatchers, latestFeed(), () => this.reviewCount())
+  function watchReviewCount(): AsyncIterable<number> {
+    return watch(reviewWatchers, latestFeed(), () => reviewCount())
   }
 
-  async audit(
+  async function recordAudit(
     action: AuditAction,
     entityId: string,
     occurredAt: string,
     payload: Record<string, unknown>
   ): Promise<void> {
-    await this.db.insert(auditEvents).values({
+    await db.insert(auditEvents).values({
       action,
       entityId,
       occurredAt: new Date(occurredAt),
@@ -188,20 +180,20 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
     })
   }
 
-  async listAudit(): Promise<readonly AuditEvent[]> {
-    const rows = await this.db.select().from(auditEvents).orderBy(asc(auditEvents.sequence))
+  async function listAudit(): Promise<readonly AuditEvent[]> {
+    const rows = await db.select().from(auditEvents).orderBy(asc(auditEvents.sequence))
     return rows.map(auditFromRow)
   }
 
-  async close(): Promise<void> {
-    this.closeWatchers(this.pendingWatchers)
-    this.closeWatchers(this.storedWatchers)
-    this.closeWatchers(this.reviewWatchers)
-    await this.pool.end()
+  async function close(): Promise<void> {
+    closeWatchers(pendingWatchers)
+    closeWatchers(storedWatchers)
+    closeWatchers(reviewWatchers)
+    await pool.end()
   }
 
-  private async applyMigrations(appliedAt: string): Promise<DatabaseMigrationReport> {
-    return this.db.transaction(async (tx) => {
+  async function applyMigrations(appliedAt: string): Promise<DatabaseMigrationReport> {
+    return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(932851774)`)
       await tx.execute(sql`
         CREATE TABLE IF NOT EXISTS invoice_schema_migrations (
@@ -214,7 +206,7 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
       const existing = (await tx.select().from(schemaMigrations).orderBy(asc(schemaMigrations.version))).map(migrationFromRow)
       const status = migrationStatus(existing)
       if (status.drift.length > 0) {
-        throw new OperationalFault("database-schema-drift", "migrate", "invoice_schema_migrations", {
+        throw operationalFault("database-schema-drift", "migrate", "invoice_schema_migrations", {
           versions: status.drift.map((item) => item.version),
         })
       }
@@ -243,8 +235,8 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
     })
   }
 
-  private async hasMigrationLedger(): Promise<boolean> {
-    const result = await this.db.execute<{ exists: boolean }>(sql`
+  async function hasMigrationLedger(): Promise<boolean> {
+    const result = await db.execute<{ exists: boolean }>(sql`
       SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables
@@ -255,7 +247,7 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
     return result.rows[0]?.exists === true
   }
 
-  private watch<T>(
+  function watch<T>(
     watchers: Set<PushFeed<T>>,
     feed: PushFeed<T>,
     initial: () => Promise<T>
@@ -272,24 +264,42 @@ class PostgresInvoiceDatabase implements InvoiceDatabase {
     return feed
   }
 
-  private closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
+  function closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
     for (const watcher of watchers) watcher.close()
     watchers.clear()
   }
 
-  private async notifyPending(): Promise<void> {
-    const pending = await this.listPending()
-    for (const watcher of this.pendingWatchers) watcher.push(pending)
+  async function notifyPending(): Promise<void> {
+    const pending = await listPending()
+    for (const watcher of pendingWatchers) watcher.push(pending)
   }
 
-  private async notifyStored(): Promise<void> {
-    const stored = await this.listStored()
-    for (const watcher of this.storedWatchers) watcher.push(stored)
+  async function notifyStored(): Promise<void> {
+    const stored = await listStored()
+    for (const watcher of storedWatchers) watcher.push(stored)
   }
 
-  private async notifyReviewCount(): Promise<void> {
-    const count = await this.reviewCount()
-    for (const watcher of this.reviewWatchers) watcher.push(count)
+  async function notifyReviewCount(): Promise<void> {
+    const count = await reviewCount()
+    for (const watcher of reviewWatchers) watcher.push(count)
+  }
+
+  return {
+    migrate: applyMigrations,
+    migrationStatus: readMigrationStatus,
+    enqueue,
+    drainPending,
+    listPending,
+    saveInvoice,
+    listStored,
+    markReminderSent,
+    reviewCount,
+    watchPending,
+    watchStored,
+    watchReviewCount,
+    audit: recordAudit,
+    listAudit,
+    close,
   }
 }
 

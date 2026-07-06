@@ -6,7 +6,7 @@ Model phrasing: GPT-5 detected from the system prompt; Phrasing profile id `RTM-
 
 The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target, instantiated here as `invoice_triage_operational_showcase_gate_pass_count == invoice_triage_operational_showcase_gate_total`.
 
-Action envelope: allowed moves are source reads, DKR checkpoints, package-local docs, deterministic metric scripts, tests, and scoped implementation in `examples/invoice-triage` or core primitive files after DKR acceptance; forbidden actions are release, publish, broad API churn, weakening lint/tests, module mocks, ctx/scope threading, fake Codex claims, and frame/threshold changes without human ratification; approval gates are core public API changes, new dependencies, real Codex execution, Docker runtime changes, merge, release, and any action outside this frame.
+Action envelope: allowed moves are source reads, DKR checkpoints, package-local docs, deterministic metric scripts, tests, and scoped implementation in `examples/invoice-triage` or core primitive files after DKR acceptance; forbidden actions are release, publish, broad API churn, weakening lint/tests, module mocks, ctx/scope threading, user-defined classes, fake Codex claims, and frame/threshold changes without human ratification; approval gates are core public API changes, new dependencies, real Codex execution, Docker runtime changes, merge, release, and any action outside this frame.
 
 Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it.
 
@@ -14,7 +14,7 @@ Reject any attempted frame, guardrail, metric, threshold, or action-envelope cha
 
 `invoice_triage_operational_showcase_gate_pass_count == invoice_triage_operational_showcase_gate_total`
 
-Initial gate total: 13 executable metrics read by `pnpm okr:invoice-triage`.
+Current gate total: 18 executable metrics read by `pnpm okr:invoice-triage`.
 
 The target means invoice-triage is a production-shaped daemon/server example with PostgreSQL through Drizzle, REST endpoints, CLI admin/import commands, directory watcher import, Docker Compose, audit trail, observability, real Codex-backed processing, tag-selected integration engines, and primitive alignment evidence.
 
@@ -37,6 +37,7 @@ No-cascade rule: a completed PKR does not prove progress; only a direct metric r
 | No raw bound work | `raw_bound_dependency_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
 | Durable state | `volatile_operational_state_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
 | No test-specific condition leaks | `conditional_test_specific_leak_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
+| No user-defined classes | `user_defined_class_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
 | Dynamic resource loading | `dynamic_resource_loading_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
 | Non-stdin interface | `stdin_only_intake_count` | `0` | tripwire | `pnpm okr:invoice-triage` |
 | PostgreSQL and Drizzle | `postgres_drizzle_gap_count` | `0` | tripwire | `pnpm okr:invoice-triage` |

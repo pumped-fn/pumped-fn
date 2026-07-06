@@ -3,7 +3,7 @@ import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model, step } from "@pumped-fn/sdk"
 import type { AuditEvent } from "./audit"
-import { OperationalFault } from "./errors"
+import { operationalFault } from "./errors"
 import { classifyRequest, parseClassification } from "./model"
 import {
   clock,
@@ -55,7 +55,7 @@ export const verifyDatabase = flow({
   factory: async (_ctx, { database }): Promise<DatabaseMigrationStatus> => {
     const status = await database.migrationStatus()
     if (status.drift.length > 0 || status.pending.length > 0) {
-      throw new OperationalFault("database-schema-not-current", "verify", "invoice_schema_migrations", {
+      throw operationalFault("database-schema-not-current", "verify", "invoice_schema_migrations", {
         currentVersion: status.currentVersion,
         targetVersion: status.targetVersion,
         pending: status.pending.map((item) => item.version),

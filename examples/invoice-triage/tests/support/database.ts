@@ -17,31 +17,26 @@ export interface DatabaseSeed {
 
 export function memoryDatabase(seed: DatabaseSeed = {}): DatabaseEngine {
   return {
-    open: () => new MemoryInvoiceDatabase(seed),
+    open: () => openMemoryInvoiceDatabase(seed),
   }
 }
 
-class MemoryInvoiceDatabase implements InvoiceDatabase {
-  private pending: Invoice[]
-  private stored: StoredInvoice[]
-  private events: AuditEvent[] = []
-  private migrations: DatabaseMigrationRecord[] = []
-  private sequence = 0
-  private pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
-  private storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
-  private reviewWatchers = new Set<PushFeed<number>>()
+function openMemoryInvoiceDatabase(seed: DatabaseSeed): InvoiceDatabase {
+  let pending = [...seed.pending ?? []]
+  let stored = [...seed.stored ?? []]
+  let events: AuditEvent[] = []
+  let migrations: DatabaseMigrationRecord[] = []
+  let sequence = 0
+  const pendingWatchers = new Set<PushFeed<readonly Invoice[]>>()
+  const storedWatchers = new Set<PushFeed<readonly StoredInvoice[]>>()
+  const reviewWatchers = new Set<PushFeed<number>>()
 
-  constructor(seed: DatabaseSeed) {
-    this.pending = [...seed.pending ?? []]
-    this.stored = [...seed.stored ?? []]
-  }
-
-  async migrate(appliedAt: string): Promise<DatabaseMigrationReport> {
-    const status = migrationStatus(this.migrations)
+  async function migrate(appliedAt: string): Promise<DatabaseMigrationReport> {
+    const status = migrationStatus(migrations)
     const appliedNow = status.pending.map((item): DatabaseMigrationRecord => {
-      this.sequence += 1
-      this.events = [...this.events, {
-        sequence: this.sequence,
+      sequence += 1
+      events = [...events, {
+        sequence,
         action: "database.migrated",
         entityId: `schema:${item.version}`,
         occurredAt: appliedAt,
@@ -49,109 +44,109 @@ class MemoryInvoiceDatabase implements InvoiceDatabase {
       }]
       return { ...item, appliedAt }
     })
-    this.migrations = [...this.migrations, ...appliedNow]
-    return completedReport(this.migrations, appliedNow)
+    migrations = [...migrations, ...appliedNow]
+    return completedReport(migrations, appliedNow)
   }
 
-  async migrationStatus(): Promise<DatabaseMigrationStatus> {
-    return migrationStatus(this.migrations)
+  async function readMigrationStatus(): Promise<DatabaseMigrationStatus> {
+    return migrationStatus(migrations)
   }
 
-  async enqueue(invoices: readonly Invoice[], enqueuedAt: string): Promise<number> {
+  async function enqueue(invoices: readonly Invoice[], enqueuedAt: string): Promise<number> {
     if (invoices.length === 0) return 0
-    this.pending = [...this.pending, ...invoices]
+    pending = [...pending, ...invoices]
     for (const invoice of invoices) {
-      await this.audit("invoice.enqueued", invoice.id, enqueuedAt, { invoice })
+      await recordAudit("invoice.enqueued", invoice.id, enqueuedAt, { invoice })
     }
-    this.notifyPending()
+    notifyPending()
     return invoices.length
   }
 
-  async drainPending(occurredAt: string): Promise<readonly Invoice[]> {
-    const drained = this.pending
-    this.pending = []
+  async function drainPending(occurredAt: string): Promise<readonly Invoice[]> {
+    const drained = pending
+    pending = []
     if (drained.length > 0) {
-      await this.audit("invoice.drained", "pending", occurredAt, { invoiceIds: drained.map((invoice) => invoice.id) })
+      await recordAudit("invoice.drained", "pending", occurredAt, { invoiceIds: drained.map((invoice) => invoice.id) })
     }
-    this.notifyPending()
+    notifyPending()
     return drained
   }
 
-  async listPending(): Promise<readonly Invoice[]> {
-    return this.pending.slice()
+  async function listPending(): Promise<readonly Invoice[]> {
+    return pending.slice()
   }
 
-  async saveInvoice(input: SaveInvoiceRecord): Promise<StoredInvoice> {
-    const found = this.stored.find((item) => item.id === input.invoice.id)
-    const stored: StoredInvoice = {
+  async function saveInvoice(input: SaveInvoiceRecord): Promise<StoredInvoice> {
+    const found = stored.find((item) => item.id === input.invoice.id)
+    const invoice: StoredInvoice = {
       ...input.invoice,
       classification: input.classification,
       importedAt: input.importedAt,
       ...(found?.remindedAt === undefined ? {} : { remindedAt: found.remindedAt }),
     }
-    this.stored = found === undefined
-      ? [...this.stored, stored]
-      : this.stored.map((item) => item.id === stored.id ? stored : item)
-    await this.audit("invoice.saved", stored.id, input.importedAt, {
-      risk: stored.classification.risk,
-      category: stored.classification.category,
+    stored = found === undefined
+      ? [...stored, invoice]
+      : stored.map((item) => item.id === invoice.id ? invoice : item)
+    await recordAudit("invoice.saved", invoice.id, input.importedAt, {
+      risk: invoice.classification.risk,
+      category: invoice.classification.category,
     })
-    this.notifyStored()
-    this.notifyReviewCount()
-    return stored
+    notifyStored()
+    notifyReviewCount()
+    return invoice
   }
 
-  async listStored(): Promise<readonly StoredInvoice[]> {
-    return this.stored.slice()
+  async function listStored(): Promise<readonly StoredInvoice[]> {
+    return stored.slice()
   }
 
-  async markReminderSent(invoiceId: string, remindedAt: string): Promise<StoredInvoice | undefined> {
-    const invoice = this.stored.find((item) => item.id === invoiceId)
+  async function markReminderSent(invoiceId: string, remindedAt: string): Promise<StoredInvoice | undefined> {
+    const invoice = stored.find((item) => item.id === invoiceId)
     if (invoice === undefined || invoice.remindedAt !== undefined) return undefined
-    const stored = { ...invoice, remindedAt }
-    this.stored = this.stored.map((item) => item.id === invoiceId ? stored : item)
-    await this.audit("invoice.reminded", invoiceId, remindedAt, { dueDate: stored.classification.dueDate })
-    this.notifyStored()
-    return stored
+    const next = { ...invoice, remindedAt }
+    stored = stored.map((item) => item.id === invoiceId ? next : item)
+    await recordAudit("invoice.reminded", invoiceId, remindedAt, { dueDate: next.classification.dueDate })
+    notifyStored()
+    return next
   }
 
-  async reviewCount(): Promise<number> {
-    return this.stored.filter((invoice) => invoice.classification.risk === "review").length
+  async function reviewCount(): Promise<number> {
+    return stored.filter((invoice) => invoice.classification.risk === "review").length
   }
 
-  watchPending(): AsyncIterable<readonly Invoice[]> {
-    return this.watch(this.pendingWatchers, pushFeed(), this.pending.slice())
+  function watchPending(): AsyncIterable<readonly Invoice[]> {
+    return watch(pendingWatchers, pushFeed(), pending.slice())
   }
 
-  watchStored(): AsyncIterable<readonly StoredInvoice[]> {
-    return this.watch(this.storedWatchers, latestFeed(), this.stored.slice())
+  function watchStored(): AsyncIterable<readonly StoredInvoice[]> {
+    return watch(storedWatchers, latestFeed(), stored.slice())
   }
 
-  watchReviewCount(): AsyncIterable<number> {
-    return this.watch(this.reviewWatchers, latestFeed(), this.stored.filter((invoice) => invoice.classification.risk === "review").length)
+  function watchReviewCount(): AsyncIterable<number> {
+    return watch(reviewWatchers, latestFeed(), stored.filter((invoice) => invoice.classification.risk === "review").length)
   }
 
-  async audit(
+  async function recordAudit(
     action: AuditAction,
     entityId: string,
     occurredAt: string,
     payload: Record<string, unknown>
   ): Promise<void> {
-    this.sequence += 1
-    this.events = [...this.events, { sequence: this.sequence, action, entityId, occurredAt, payload }]
+    sequence += 1
+    events = [...events, { sequence, action, entityId, occurredAt, payload }]
   }
 
-  async listAudit(): Promise<readonly AuditEvent[]> {
-    return this.events.slice()
+  async function listAudit(): Promise<readonly AuditEvent[]> {
+    return events.slice()
   }
 
-  async close(): Promise<void> {
-    this.closeWatchers(this.pendingWatchers)
-    this.closeWatchers(this.storedWatchers)
-    this.closeWatchers(this.reviewWatchers)
+  async function close(): Promise<void> {
+    closeWatchers(pendingWatchers)
+    closeWatchers(storedWatchers)
+    closeWatchers(reviewWatchers)
   }
 
-  private watch<T>(watchers: Set<PushFeed<T>>, feed: PushFeed<T>, initial: T): PushFeed<T> {
+  function watch<T>(watchers: Set<PushFeed<T>>, feed: PushFeed<T>, initial: T): PushFeed<T> {
     watchers.add(feed)
     feed.push(initial)
     const close = feed.return.bind(feed)
@@ -162,23 +157,41 @@ class MemoryInvoiceDatabase implements InvoiceDatabase {
     return feed
   }
 
-  private closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
+  function closeWatchers<T>(watchers: Set<PushFeed<T>>): void {
     for (const watcher of watchers) watcher.close()
     watchers.clear()
   }
 
-  private notifyPending(): void {
-    const pending = this.pending.slice()
-    for (const watcher of this.pendingWatchers) watcher.push(pending)
+  function notifyPending(): void {
+    const current = pending.slice()
+    for (const watcher of pendingWatchers) watcher.push(current)
   }
 
-  private notifyStored(): void {
-    const stored = this.stored.slice()
-    for (const watcher of this.storedWatchers) watcher.push(stored)
+  function notifyStored(): void {
+    const current = stored.slice()
+    for (const watcher of storedWatchers) watcher.push(current)
   }
 
-  private notifyReviewCount(): void {
-    const count = this.stored.filter((invoice) => invoice.classification.risk === "review").length
-    for (const watcher of this.reviewWatchers) watcher.push(count)
+  function notifyReviewCount(): void {
+    const count = stored.filter((invoice) => invoice.classification.risk === "review").length
+    for (const watcher of reviewWatchers) watcher.push(count)
+  }
+
+  return {
+    migrate,
+    migrationStatus: readMigrationStatus,
+    enqueue,
+    drainPending,
+    listPending,
+    saveInvoice,
+    listStored,
+    markReminderSent,
+    reviewCount,
+    watchPending,
+    watchStored,
+    watchReviewCount,
+    audit: recordAudit,
+    listAudit,
+    close,
   }
 }

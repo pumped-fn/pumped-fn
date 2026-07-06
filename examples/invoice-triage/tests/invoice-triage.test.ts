@@ -156,38 +156,45 @@ function scopeWith(model: Model) {
   }
 }
 
-class ManualRegistration implements Scheduler.Registration {
-  private stopped = false
+interface ManualRegistration extends Scheduler.Registration {
+  readonly spec: Parameters<Scheduler.Backend["register"]>[0]
+  trigger(dedupKey?: string): Promise<void>
+}
 
-  constructor(
-    readonly spec: Parameters<Scheduler.Backend["register"]>[0],
-    private readonly tick: Parameters<Scheduler.Backend["register"]>[1]
-  ) {}
+interface ManualBackend extends Scheduler.Backend {
+  readonly registrations: ManualRegistration[]
+}
 
-  async trigger(dedupKey = "manual"): Promise<void> {
-    if (this.stopped) throw new Error("Registration stopped")
-    await this.tick({ key: `${this.spec.name}:${dedupKey}`, scheduledAt: now })
-  }
-
-  next(): Date | undefined {
-    return undefined
-  }
-
-  async stop(): Promise<void> {
-    this.stopped = true
+function manualRegistration(
+  spec: Parameters<Scheduler.Backend["register"]>[0],
+  tick: Parameters<Scheduler.Backend["register"]>[1]
+): ManualRegistration {
+  let stopped = false
+  return {
+    spec,
+    async trigger(dedupKey = "manual"): Promise<void> {
+      if (stopped) throw new Error("Registration stopped")
+      await tick({ key: `${spec.name}:${dedupKey}`, scheduledAt: now })
+    },
+    next: () => undefined,
+    async stop(): Promise<void> {
+      stopped = true
+    },
   }
 }
 
-class ManualBackend implements Scheduler.Backend {
-  readonly registrations: ManualRegistration[] = []
-
-  register(
-    spec: Parameters<Scheduler.Backend["register"]>[0],
-    tick: Parameters<Scheduler.Backend["register"]>[1]
-  ): Scheduler.Registration {
-    const registration = new ManualRegistration(spec, tick)
-    this.registrations.push(registration)
-    return registration
+function manualBackend(): ManualBackend {
+  const registrations: ManualRegistration[] = []
+  return {
+    registrations,
+    register(
+      spec: Parameters<Scheduler.Backend["register"]>[0],
+      tick: Parameters<Scheduler.Backend["register"]>[1]
+    ): Scheduler.Registration {
+      const registration = manualRegistration(spec, tick)
+      registrations.push(registration)
+      return registration
+    },
   }
 }
 
@@ -572,7 +579,7 @@ describe("invoice triage patterns", () => {
   })
 
   it("pattern: cron registration uses deterministic manual ticks without sleeps", async () => {
-    const backend = new ManualBackend()
+    const backend = manualBackend()
     const messages = memoryMailer()
     const scope = createScope({
       tags: [

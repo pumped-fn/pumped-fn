@@ -69,9 +69,11 @@ function metric(metricId, value, comparator, threshold, source, evidence) {
 
 const src = collect("examples/invoice-triage/src", (path) => path.endsWith(".ts")).sort()
 const tests = collect("examples/invoice-triage/tests", (path) => path.endsWith(".ts")).sort()
+const bin = collect("examples/invoice-triage/bin", (path) => path.endsWith(".ts")).sort()
 const manifest = readJson("examples/invoice-triage/package.json")
 const deps = dependencies(manifest)
 const srcEvidence = src.map(sha)
+const exampleEvidence = [...src, ...tests, ...bin].map(sha)
 const packageEvidence = [sha("examples/invoice-triage/package.json")]
 const runStore = "invoice-triage-operational-20260706"
 const runStoreFiles = [
@@ -151,6 +153,14 @@ const metrics = [
     0,
     "examples/invoice-triage/src",
     srcEvidence,
+  ),
+  metric(
+    "user_defined_class_count",
+    count([...src, ...tests, ...bin], /\bclass\s+[A-Z][A-Za-z0-9_]*/g),
+    "==",
+    0,
+    "examples/invoice-triage src/tests/bin",
+    exampleEvidence,
   ),
   metric(
     "dynamic_resource_loading_gap_count",
