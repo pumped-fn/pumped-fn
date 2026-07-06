@@ -1,11 +1,11 @@
 import { createScope, type Lite } from "@pumped-fn/lite"
 import { cac } from "cac"
 import { readFile } from "node:fs/promises"
-import { prepareDatabase } from "./invoice-database-operations"
-import { enqueue, intake, listAuditEvents } from "./invoice-intake"
-import { dailyReport } from "./invoice-reporting"
-import { databaseStartup, intakeLines } from "./invoice-runtime"
-import type { DatabaseStartupMode } from "./invoice-migrations"
+import { prepareDatabase } from "./database-lifecycle"
+import { enqueue, intake, listAuditEvents } from "./intake"
+import { dailyReport } from "./reporting"
+import { databaseStartup, intakeLines } from "./runtime"
+import type { DatabaseStartupMode } from "./migrations"
 
 export interface CliIo {
   out(line: string): void

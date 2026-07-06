@@ -3,18 +3,18 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { runCli } from "../src/invoice-cli"
-import { createInvoiceServer } from "../src/invoice-server"
-import { importInvoiceDirectory } from "../src/invoice-watcher"
+import { runCli } from "../src/cli"
+import { createInvoiceServer } from "../src/server"
+import { importInvoiceDirectory } from "../src/watcher"
 import {
   clock,
   databaseEngine,
   mailer,
-} from "../src/invoice-runtime"
-import { memoryDatabase } from "./support/invoice-database"
-import { memoryMailer } from "./support/invoice-mailer"
-import { heuristic } from "./support/invoice-model"
-import type { Invoice } from "../src/invoice-types"
+} from "../src/runtime"
+import { memoryDatabase } from "./support/database"
+import { memoryMailer } from "./support/mailer"
+import { heuristic } from "./support/model"
+import type { Invoice } from "../src/types"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
 

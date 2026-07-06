@@ -2,11 +2,11 @@ import { createScope } from "@pumped-fn/lite"
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { codex } from "@pumped-fn/sdk-codex"
-import { prepareDatabase } from "./invoice-database-operations"
-import { ingest } from "./invoice-intake"
-import { dailyReportJob, sendRemindersJob, watchReviewQueue } from "./invoice-reporting"
-import { databaseEngine, databaseStartup, mailer, postgresDatabase, type Mailer } from "./invoice-runtime"
-import type { DatabaseStartupMode } from "./invoice-migrations"
+import { prepareDatabase } from "./database-lifecycle"
+import { ingest } from "./intake"
+import { dailyReportJob, sendRemindersJob, watchReviewQueue } from "./reporting"
+import { databaseEngine, databaseStartup, mailer, postgresDatabase, type Mailer } from "./runtime"
+import type { DatabaseStartupMode } from "./migrations"
 
 export interface MainOptions {
   databaseUrl?: string

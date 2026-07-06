@@ -8,7 +8,7 @@ import {
   mailer,
   reminderRecipient,
   reminderWindowDays,
-} from "./invoice-runtime"
+} from "./runtime"
 import {
   categories,
   type Category,
@@ -16,7 +16,7 @@ import {
   type ReminderMessage,
   type ReminderResult,
   type ReminderSummary,
-} from "./invoice-types"
+} from "./types"
 
 const msPerDay = 86_400_000
 

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { Model } from "@pumped-fn/sdk"
-import { categories, classification, type Classification, type Invoice } from "./invoice-types"
+import { categories, classification, type Classification, type Invoice } from "./types"
 
 const classificationOutput = z.string().transform((output, ctx): unknown => {
   try {

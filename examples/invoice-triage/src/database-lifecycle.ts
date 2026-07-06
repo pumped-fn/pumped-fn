@@ -1,8 +1,8 @@
 import { controller, flow, tags } from "@pumped-fn/lite"
 import { step } from "@pumped-fn/sdk"
-import { operationalFault } from "./invoice-errors"
-import type { DatabaseMigrationReport, DatabaseMigrationStatus } from "./invoice-migrations"
-import { clock, database, databaseStartup } from "./invoice-runtime"
+import { operationalFault } from "./errors"
+import type { DatabaseMigrationReport, DatabaseMigrationStatus } from "./migrations"
+import { clock, database, databaseStartup } from "./runtime"
 
 export const migrateDatabase = flow({
   name: "invoice.database.migrate",

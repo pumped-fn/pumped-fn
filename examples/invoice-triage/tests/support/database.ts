@@ -4,10 +4,10 @@ import {
   type DatabaseMigrationRecord,
   type DatabaseMigrationReport,
   type DatabaseMigrationStatus,
-} from "../../src/invoice-migrations"
-import type { AuditAction, AuditEvent } from "../../src/invoice-audit"
-import type { DatabaseEngine, InvoiceDatabase, SaveInvoiceRecord } from "../../src/invoice-database"
-import type { Invoice, StoredInvoice } from "../../src/invoice-types"
+} from "../../src/migrations"
+import type { AuditAction, AuditEvent } from "../../src/audit"
+import type { DatabaseEngine, InvoiceDatabase, SaveInvoiceRecord } from "../../src/database"
+import type { Invoice, StoredInvoice } from "../../src/types"
 
 interface InvoiceWatch<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
   push(value: T): void

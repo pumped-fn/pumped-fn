@@ -1,7 +1,7 @@
 import { atom, tag, tags } from "@pumped-fn/lite"
-import { databaseEngine } from "./invoice-database"
-import type { DatabaseStartupMode } from "./invoice-migrations"
-import type { ReminderMessage } from "./invoice-types"
+import { databaseEngine } from "./database"
+import type { DatabaseStartupMode } from "./migrations"
+import type { ReminderMessage } from "./types"
 
 type HeartbeatPending<T> = {
   resolve(result: IteratorResult<T, undefined>): void
@@ -45,7 +45,7 @@ export const databaseStartup = tag<DatabaseStartupMode>({
   label: "invoice.databaseStartup",
 })
 
-export { databaseEngine, postgresDatabase } from "./invoice-database"
+export { databaseEngine, postgresDatabase } from "./database"
 
 export const database = atom({
   keepAlive: true,

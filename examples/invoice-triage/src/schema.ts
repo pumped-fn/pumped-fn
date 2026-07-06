@@ -1,6 +1,6 @@
 import { integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core"
-import type { AuditAction } from "./invoice-audit"
-import type { Classification, Invoice } from "./invoice-types"
+import type { AuditAction } from "./audit"
+import type { Classification, Invoice } from "./types"
 
 export const schemaMigrations = pgTable("invoice_schema_migrations", {
   version: integer("version").primaryKey(),

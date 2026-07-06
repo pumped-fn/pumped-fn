@@ -1,7 +1,7 @@
 import { controller, flow, tags, typed } from "@pumped-fn/lite"
 import { model, step } from "@pumped-fn/sdk"
-import { classifyRequest, parseClassification } from "./invoice-model"
-import { clock, database } from "./invoice-runtime"
+import { classifyRequest, parseClassification } from "./model"
+import { clock, database } from "./runtime"
 import type {
   Classification,
   ImportProgress,
@@ -10,7 +10,7 @@ import type {
   SaveInvoiceInput,
   StoredInvoice,
   TriageProgress,
-} from "./invoice-types"
+} from "./types"
 
 export const classify = flow({
   name: "invoice.classify",

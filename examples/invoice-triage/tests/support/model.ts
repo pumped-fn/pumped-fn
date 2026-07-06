@@ -1,5 +1,5 @@
 import type { Model } from "@pumped-fn/sdk"
-import type { Classification, Invoice } from "../../src/invoice-types"
+import type { Classification, Invoice } from "../../src/types"
 
 export const heuristic: Model = Object.freeze({
   complete: (_ctx: Parameters<Model["complete"]>[0], request: Parameters<Model["complete"]>[1]) => {
