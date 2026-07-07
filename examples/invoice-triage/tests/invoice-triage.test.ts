@@ -1,5 +1,7 @@
 import { atom, createScope, flow, isStreamingExec, preset, typed, type Lite } from "@pumped-fn/lite"
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
+import { observable } from "@pumped-fn/lite-extension-observable"
+import { otel, type Otel } from "@pumped-fn/lite-extension-observable-otel"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/sdk"
 import { kit, modelStub } from "@pumped-fn/sdk-test"
@@ -17,6 +19,7 @@ import {
   listPending,
   listStored,
   markReminderSent,
+  reviewCount,
   saveInvoice,
   sendReminders,
   sendRemindersJob,
@@ -45,6 +48,7 @@ import {
   type Risk,
   type StoredInvoice,
 } from "../src/types"
+import { createApp } from "../src/server"
 import { pgliteDatabase } from "./support/database"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
@@ -255,6 +259,34 @@ function recordingSink() {
         checks.push(probe)
       })
     },
+  }
+}
+
+interface RecordedSpan {
+  readonly name: string
+  ended: boolean
+}
+
+function recordingTracer() {
+  const spans: RecordedSpan[] = []
+  const tracer: Otel.Tracer = {
+    startSpan(name) {
+      const record: RecordedSpan = { name, ended: false }
+      const span: Otel.Span = {
+        setAttributes: () => span,
+        setStatus: () => span,
+        recordException: () => {},
+        end: () => {
+          record.ended = true
+        },
+      }
+      spans.push(record)
+      return span
+    },
+  }
+  return {
+    tracer,
+    names: () => [...new Set(spans.filter((span) => span.ended).map((span) => span.name))].sort(),
   }
 }
 
@@ -851,6 +883,129 @@ describe("invoice triage patterns", () => {
 
     expect(summary).toEqual({ accepted: 2, rejected: 2 })
     expect((await ctx.exec({ flow: listPending })).map((item) => item.id)).toEqual(["inv-in-1", "inv-in-3"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
+  it("observability: OTel spans cover intake, store, model, review, and reminder edges", async () => {
+    const recorded = recordingTracer()
+    const messages: ReminderMessage[] = []
+    const source = invoice("inv-otel-1", {
+      vendor: "Northwind Utilities",
+      amount: 420,
+      dueDate: "2026-07-06",
+      description: "electric utility service",
+    })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      presets: [preset(database, await pgliteDatabase())],
+      tags: [
+        observable.runtime({ sinks: [otel.sink({ tracer: recorded.tracer })] }),
+        provider(scripted([json({
+          vendor: source.vendor,
+          amount: source.amount,
+          dueDate: source.dueDate,
+          category: "utilities",
+        })])),
+        mailer(collecting(messages)),
+        clock({ now: () => now }),
+        reminderRecipient("ap-test@company.local"),
+        reminderWindowDays(3),
+      ],
+    })
+    const ctx = scope.createContext()
+    const processing = ctx.exec({ flow: ingest })
+
+    await ctx.exec({ flow: enqueue, input: { invoices: [source] } })
+    await ctx.exec({ flow: awaitDrained })
+    await ctx.exec({ flow: reviewCount })
+    await ctx.exec({ flow: sendReminders })
+
+    expect(messages.map((message) => message.invoiceId)).toEqual(["inv-otel-1"])
+    expect(recorded.names()).toEqual(expect.arrayContaining([
+      "invoice.deliver",
+      "invoice.enqueue",
+      "invoice.reviewCount",
+      "invoice.save",
+      "invoice.sendReminders",
+      "model.complete",
+      "model.stub",
+      "store.claimReminder",
+      "store.drainPending",
+      "store.enqueuePending",
+      "store.upsertStored",
+    ].sort()))
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
+  it("server: app.request imports invoices, maps parse errors, and reports health", async () => {
+    const source = invoice("inv-server-1", {
+      vendor: "Northwind Utilities",
+      amount: 420,
+      dueDate: "2026-07-04",
+      description: "electric utility service",
+    })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      presets: [preset(database, await pgliteDatabase())],
+      tags: [
+        observable.runtime({ sinks: [otel.sink()] }),
+        provider(scripted([json({
+          vendor: source.vendor,
+          amount: source.amount,
+          dueDate: source.dueDate,
+          category: "utilities",
+        })])),
+        clock({ now: () => now }),
+      ],
+    })
+    const ctx = scope.createContext()
+    const processing = ctx.exec({ flow: ingest })
+    const app = createApp({ scope })
+
+    const accepted = await app.request("/invoices", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(source),
+    })
+    const rejected = await app.request("/invoices", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "bad" }),
+    })
+    await ctx.exec({ flow: awaitDrained })
+    const report = await app.request("/report")
+    const audit = await app.request("/audit")
+    const health = await app.request("/health")
+
+    expect(accepted.status).toBe(200)
+    expect(await accepted.json()).toEqual({ accepted: 1, rejected: 0 })
+    expect(rejected.status).toBe(400)
+    expect(await rejected.json()).toEqual({ accepted: 0, rejected: 1 })
+    expect(report.status).toBe(200)
+    expect(await report.json()).toEqual({
+      total: 1,
+      byCategory: {
+        utilities: 1,
+        saas: 0,
+        hardware: 0,
+        other: 0,
+      },
+      overdue: ["inv-server-1"],
+    })
+    expect(audit.status).toBe(200)
+    expect(await audit.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "enqueued", entityId: "pending" }),
+      expect.objectContaining({ action: "drained", entityId: "pending" }),
+      expect.objectContaining({ action: "imported", entityId: "inv-server-1" }),
+    ]))
+    expect(health.status).toBe(200)
+    expect(await health.json()).toEqual({ ok: true, pending: 0 })
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
   })
