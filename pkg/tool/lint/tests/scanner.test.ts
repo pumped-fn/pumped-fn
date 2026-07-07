@@ -980,6 +980,19 @@ describe("lite lint scanner", () => {
     `)).toBe(1)
   })
 
+  it("flags resolve when controller is not the lite import", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { controller, dns } from "./ports"
+
+      const lookup = flow({
+        name: "lookup",
+        deps: { dns: controller(dns) },
+        factory: async (ctx, { dns }) => await dns.resolve(ctx.input),
+      })
+    `)).toBe(1)
+  })
+
   it("allows resolve through an undestructured deps parameter backed by a controller", () => {
     expect(unattributedAwaitCount(`
       import { controller, flow } from "@pumped-fn/lite"

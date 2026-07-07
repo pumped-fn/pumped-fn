@@ -802,14 +802,14 @@ function depKey(expression: ts.Expression, root: ts.Identifier, bound: string | 
   return above && above !== expression ? above.name.text : null
 }
 
-function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null): boolean {
+function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
   const deps = config && objectProperty(config, "deps")
   if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
   const property = objectProperty(deps.initializer, key)
   return property !== null
     && ts.isCallExpression(property.initializer)
     && ts.isIdentifier(property.initializer.expression)
-    && property.initializer.expression.text === "controller"
+    && imports.controller.has(property.initializer.expression.text)
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -904,7 +904,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       const method = call.expression.name.text
       if (method === "resolve") {
         const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
-        if (depIsController(enclosingUnitConfig(call, imports), key)) return
+        if (depIsController(enclosingUnitConfig(call, imports), key, imports)) return
       } else if (graphMachineryMethods.has(method)) {
         return
       }
