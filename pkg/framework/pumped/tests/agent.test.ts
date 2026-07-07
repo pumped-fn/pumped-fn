@@ -1,18 +1,20 @@
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import { agent, model, tool, type Model } from "@pumped-fn/sdk"
+import { agent, model, tool, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import { kit } from "@pumped-fn/sdk-test"
 import { normalizeAgentEntry } from "../src/runtime/agent"
 import { createServer } from "../src/runtime/serve"
 import { runCli } from "../src/runtime/cli"
 import type { Manifest } from "../src/runtime/manifest"
 
-const scripted: Model = {
-  complete: (_ctx, request) => ({
-    content: `reply:${request.messages.at(-1)?.content ?? ""}`,
+const scripted: Model = flow({
+  name: "scripted-model",
+  parse: typed<ModelRequest>(),
+  factory: (ctx) => ({
+    content: `reply:${ctx.input.messages.at(-1)?.content ?? ""}`,
     stop: true,
   }),
-}
+})
 
 const greeter = agent({
   name: "greeter",
