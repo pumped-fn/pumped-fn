@@ -1,5 +1,67 @@
 # @pumped-fn/lite
 
+## 3.4.0
+
+### Minor Changes
+
+- 90854f7: Async-iterator consumption of the graph. `scope.changes(atom | selectHandle)` and
+  `ctx.changes(...)` iterate value changes conflated to latest, with
+  `{ states: true }` yielding state transitions and errors as data. Atoms whose
+  value is an async iterable get `scope.resolveStream(atom)` /
+  `ctx.resolveStream(atom)`: the scope drives the producer once and fans out
+  per-consumer conflating views, calls `iterator.return()` on dispose, release,
+  and invalidation (re-driving the new iterable into the same views), and never
+  lets a slow or absent consumer block the producer. `scope.drain(atom, { take })`
+  collects a view into an array. Context-bound iteration ends at `ctx.close()`;
+  scope-level iteration ends at `scope.dispose()`; abandoning an iterator
+  detaches only that view.
+
+  Generator flows: a flow factory that is an async generator yields elements and
+  returns a final output. `ctx.exec` drains to the output unchanged;
+  `ctx.execStream` returns the yields as an `AsyncIterable` plus a `result`
+  promise. The consumer pulls directly (inherent backpressure, no drops), each
+  invocation is consumed once, and breaking out cancels the invocation — the
+  generator's `finally` runs and `onClose` observes `{ ok: false, aborted: true }`.
+  Streaming invocations are marked on the exec target for extensions; the
+  suspense extension refuses to replay them until stream journaling exists.
+  Flow handles gain `execStream(...)` so streaming composition is deps-declared:
+  `deps.child.execStream(input)` + `yield*` + `await stream.result`.
+
+  `bound(dep)` curries the executing invocation's context into ctx-first
+  functions (or objects of them) resolved from tags, atoms, or resources —
+  `deps: { model: bound(tags.required(model)) }` then `model.complete(request)`.
+  ctx is a receiver, never an argument; the new lint rule
+  `pumped/no-ctx-argument` enforces it.
+
+- 444e524: Role tags and port flows. A tag can carry a flow; in deps position it projects
+  to a context-bound `FlowHandle` (`tags.optional` yields handle-or-undefined,
+  `tags.all` an array of handles), mirroring the bare-flow-dep rule. The sdk
+  `Model` contract is now `Lite.Flow<ModelResponse, ModelRequest>`: implementors
+  are graph nodes selected via the `model` tag, and the new `complete` port flow
+  owns the `kind: "llm"` step span once for every consumer. `bound()` is removed
+  from lite — value-level ctx currying is replaced by graph-native composition
+  (it never shipped in a published release). `@pumped-fn/sdk-claude` /
+  `@pumped-fn/sdk-codex` validate harness configuration eagerly at binding.
+  `@pumped-fn/sdk-test` gains `modelStub` to lift a plain responder into an
+  implementor flow. lite-lint gains `pumped/no-unattributed-await` (awaited
+  foreign calls must sit inside a step-tagged flow or go through a port flow)
+  and the `no-ctx-argument` remedy now points at port flows.
+
+  Also fixes lost controller writes: `set`/`update` on a resolved atom now apply
+  immediately even while an invalidation chain is active (previously they were
+  deferred into a single pending slot — concurrent `update` callbacks were
+  silently dropped and capture-inside-updater read stale state whenever a
+  `watch: true` derived atom was subscribed). Updates queued during `resolving`
+  now compose instead of overwriting.
+
+### Patch Changes
+
+- 36f24e2: exec() starts a flow's factory synchronously again when parsing is synchronous
+  or absent — an internal refactor had deferred invocation start by a microtask,
+  which let execution contexts close between a UI dispatch and the factory
+  starting (silent drop under React provider re-renders). Regression tests pin
+  the sync-start contract.
+
 ## 3.3.0
 
 ### Minor Changes
