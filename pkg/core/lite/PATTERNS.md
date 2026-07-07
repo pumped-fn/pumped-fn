@@ -306,7 +306,7 @@ sequenceDiagram
 
 ### Ambient Context (Tags)
 
-Propagate values without wiring parameters. Tags serve two roles: scope-level config (consumed by atoms via `tags.required()`) and per-context ambient data (requestId, locale). Use `tags.required()` in deps to declare that an atom or flow needs an ambient value (e.g., a transacted connection) — extensions or context setup provide the value, the consumer just depends on it.
+Propagate values without wiring parameters. Tags serve three roles: scope-level config (consumed by atoms via `tags.required()`), per-context ambient data (requestId, locale), and role selection — a tag carrying a flow arrives in deps position as a context-bound `FlowHandle`, so composition roots pick which implementation fills a port (`tags.optional` yields handle-or-undefined, `tags.all` an array of handles). Use `tags.required()` in deps to declare that an atom or flow needs an ambient value (e.g., a transacted connection) — extensions or context setup provide the value, the consumer just depends on it.
 
 Use `tag({ eq })` only to define value equality inside that tag family. `tag.same(a, b)` compares two already-created tagged records; it does not change lookup, source precedence, defaults, parsing, `tags.all()` multiplicity, tag discovery, or cache identity. Equal values should be fully substitutable for every consumer of that tag.
 
