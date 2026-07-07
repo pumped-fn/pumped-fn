@@ -83,6 +83,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 - `enqueue` to parse raw lines or invoice objects and append invoice batches into `queue`.
 - `ingest` to wake on `ctx.changes(queue)`, drain all pending invoices from queue state, and pass that drained set to `importBatch`.
 - `saveInvoice` to upsert completed classifications into `ledger`.
+- `importing` as an in-flight batch count incremented before each drain, and `drained` as a derived atom over `queue` and `importing` — `awaitDrained` resolves only when the queue is empty and no batch is mid-import.
 - `reviewCount` as a derived atom over `ledger`.
 - `opsHeartbeat` as an async-iterable atom consumed with `scope.resolveStream(opsHeartbeat)` only for conflatable status views.
 - `@pumped-fn/lite-extension-scheduler` for cron registration.
@@ -93,7 +94,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 ## Ops Notes
 
-Run with `pnpm start < fixtures/demo.ndjson` (invoices arrive as NDJSON on stdin — pipe from any producer); tests with `pnpm test`. The composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows — it holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless, the correct shape for must-not-drop transport (contrast with the conflated `changes()` wakeup that drives `ingest` from queue state). Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then drains pending work and disposes — shutdown is the graph closing, not a kill.
+Run with `pnpm start < fixtures/demo.ndjson` (invoices arrive as NDJSON on stdin — pipe from any producer); tests with `pnpm test`. The composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows — it holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless, the correct shape for must-not-drop transport (contrast with the conflated `changes()` wakeup that drives `ingest` from queue state). Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then waits for `drained` — queue empty and no batch in flight — and disposes, so a slow provider cannot lose the final batch. Shutdown is the graph closing, not a kill.
 
 Reminder idempotency is ledger-backed: `sendReminder` marks an invoice as reminded before sending. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, preset `ledger` with durable data, preset `mailer` with the real delivery sink, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 

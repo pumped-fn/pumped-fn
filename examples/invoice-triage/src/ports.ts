@@ -93,6 +93,19 @@ export const ledger = atom({
   factory: (): readonly StoredInvoice[] => [],
 })
 
+export const importing = atom({
+  keepAlive: true,
+  factory: (): number => 0,
+})
+
+export const drained = atom({
+  deps: {
+    queue: controller(queue, { resolve: true, watch: true }),
+    importing: controller(importing, { resolve: true, watch: true }),
+  },
+  factory: (_ctx, { queue, importing }) => queue.get().length === 0 && importing.get() === 0,
+})
+
 export const reviewCount = atom({
   deps: {
     ledger: controller(ledger, { resolve: true, watch: true }),

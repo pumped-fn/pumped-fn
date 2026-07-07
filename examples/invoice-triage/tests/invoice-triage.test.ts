@@ -5,6 +5,7 @@ import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/
 import { kit, modelStub } from "@pumped-fn/sdk-test"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import {
+  awaitDrained,
   dailyReport,
   dailyReportJob,
   enqueue,
@@ -102,23 +103,6 @@ function gated(outputs: readonly string[]) {
     releaseFirst,
     calls: () => calls,
   }
-}
-
-async function waitForImported(scope: Lite.Scope, count: number): Promise<string[]> {
-  await scope.resolve(ledger)
-  const imported = scope.select(ledger, (invoices) => invoices.map((invoice) => invoice.id), { eq: sameIds })
-  for await (const ids of scope.changes(imported)) {
-    if (ids.length === count) {
-      imported.dispose()
-      return ids
-    }
-  }
-  imported.dispose()
-  throw new Error("Scope disposed before import completed")
-}
-
-function sameIds(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index])
 }
 
 function stored(
@@ -362,8 +346,8 @@ describe("invoice triage patterns", () => {
     ])
     gate.releaseFirst()
 
-    const imported = await waitForImported(scope, all.length)
-    expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
+    await ctx.exec({ flow: awaitDrained })
+    expect((await scope.resolve(ledger)).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await scope.resolve(queue)).toEqual([])
     expect(gate.calls()).toBe(all.length)
     await ctx.close({ ok: true })
@@ -406,10 +390,46 @@ describe("invoice triage patterns", () => {
     await gate.firstStarted
     gate.releaseFirst()
 
-    const imported = await waitForImported(scope, all.length)
-    expect([...imported].sort()).toEqual(all.map((item) => item.id).sort())
+    await ctx.exec({ flow: awaitDrained })
+    expect((await scope.resolve(ledger)).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await scope.resolve(queue)).toEqual([])
     expect(gate.calls()).toBe(all.length)
+    await ctx.close({ ok: true })
+    await scope.dispose()
+    await processing
+  })
+
+  it("shutdown: awaitDrained resolves only after the in-flight batch lands", async () => {
+    const batch = [invoice("inv-shutdown-1"), invoice("inv-shutdown-2")]
+    const gate = gated(batch.map((item) => json({
+      vendor: item.vendor,
+      amount: item.amount,
+      dueDate: item.dueDate,
+    })))
+    const scope = createScope({
+      tags: [
+        provider(gate.model),
+        clock({ now: () => now }),
+      ],
+    })
+    const ctx = scope.createContext()
+    const processing = ctx.exec({ flow: ingest })
+
+    await ctx.exec({ flow: enqueue, input: { invoices: batch } })
+    await gate.firstStarted
+    expect(await scope.resolve(queue)).toEqual([])
+
+    let settled = false
+    const waiting = ctx.exec({ flow: awaitDrained }).then(() => {
+      settled = true
+    })
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(settled).toBe(false)
+
+    gate.releaseFirst()
+    await waiting
+    expect((await scope.resolve(ledger)).map((item) => item.id)).toEqual(batch.map((item) => item.id))
+    expect(gate.calls()).toBe(batch.length)
     await ctx.close({ ok: true })
     await scope.dispose()
     await processing
