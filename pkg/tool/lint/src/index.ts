@@ -23,6 +23,7 @@ export type RuleId =
   | "pumped/no-shared-scope-factory"
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-unattributed-await"
   | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
 
@@ -122,6 +123,7 @@ type Imports = {
   nodeBuiltins: Map<string, string>
   reactNamespaces: Set<string>
   render: Set<string>
+  stepLocals: Set<string>
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
@@ -155,6 +157,8 @@ const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
+const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
+const graphMachineryMethods = new Set(["exec", "execStream", "prepare", "resolve"])
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -298,6 +302,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     nodeBuiltins: new Map(),
     reactNamespaces: new Set(),
     render: new Set(),
+    stepLocals: new Set(),
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
@@ -355,6 +360,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@testing-library/react" && imported === "render") {
         imports.render.add(local)
+      }
+      if (moduleName === "@pumped-fn/sdk" && imported === "step") {
+        imports.stepLocals.add(local)
       }
       if (moduleName === "@pumped-fn/lite-react" && imported === "useScope") {
         imports.useScope.add(local)
@@ -754,6 +762,37 @@ function factoryCtxName(factory: ts.ArrowFunction | ts.FunctionExpression | null
   return parameter && ts.isIdentifier(parameter.name) ? parameter.name.text : null
 }
 
+function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
+  if (ts.isIdentifier(expression)) return expression
+  if (ts.isPropertyAccessExpression(expression)) return rootIdentifier(expression.expression)
+  return null
+}
+
+function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Set<string> {
+  const names = new Set<string>()
+  const parameter = factory.parameters[1]
+  if (!parameter) return names
+  if (ts.isIdentifier(parameter.name)) {
+    names.add(parameter.name.text)
+    return names
+  }
+  if (ts.isObjectBindingPattern(parameter.name)) {
+    for (const element of parameter.name.elements) {
+      if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue
+      names.add(element.name.text)
+    }
+  }
+  return names
+}
+
+function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
+  const tagsProperty = config && objectProperty(config, "tags")
+  if (!tagsProperty || !ts.isArrayLiteralExpression(tagsProperty.initializer)) return false
+  return tagsProperty.initializer.elements.some((element) =>
+    ts.isCallExpression(element) && ts.isIdentifier(element.expression) && imports.stepLocals.has(element.expression.text)
+  )
+}
+
 function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
@@ -790,6 +829,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
@@ -817,6 +857,25 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
   function isDirectCtxExpression(expression: ts.Expression, ctxName: string): expression is ts.Identifier {
     return ts.isIdentifier(expression) && expression.text === ctxName
+  }
+
+  function factoryDepsAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; names: Set<string> } | null {
+    const factory = enclosingUnitFactory(node, imports)
+    if (!factory) return null
+    const names = depsBindingNames(factory)
+    return names.size > 0 ? { factory, names } : null
+  }
+
+  function checkUnattributedAwait(call: ts.CallExpression, reportNode: ts.Node): void {
+    if (allowUnattributedAwait) return
+    const depsBinding = factoryDepsAt(call)
+    if (!depsBinding) return
+    const root = rootIdentifier(call.expression)
+    if (!root || !depsBinding.names.has(root.text)) return
+    if (shadowsName(root, depsBinding.factory, root.text)) return
+    if (ts.isPropertyAccessExpression(call.expression) && graphMachineryMethods.has(call.expression.name.text)) return
+    if (hasStepTag(enclosingUnitConfig(call, imports), imports)) return
+    pushNodeDiagnostic(diagnostics, sourceFile, filePath, "pumped/no-unattributed-await", reportNode, unattributedAwaitMessage)
   }
 
   function visit(node: ts.Node): void {
@@ -877,6 +936,19 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           }
         }
       }
+    }
+
+    if (ts.isAwaitExpression(node) && ts.isCallExpression(node.expression)) {
+      checkUnattributedAwait(node.expression, node.expression)
+    }
+
+    if (
+      ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === "then"
+      && ts.isCallExpression(node.expression.expression)
+    ) {
+      checkUnattributedAwait(node.expression.expression, node.expression.expression)
     }
 
     if (ts.isCallExpression(node)) {

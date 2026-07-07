@@ -879,4 +879,186 @@ describe("lite lint scanner", () => {
       const job = flow({ name: "job", factory: () => "ok" })
     `)).toEqual([])
   })
+
+  function unattributedAwaitCount(source: string, filePath = "src/example.ts") {
+    return ids(source, filePath).filter((id) => id === "pumped/no-unattributed-await").length
+  }
+
+  it("finds an awaited call on a destructured deps binding with no step tag", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const sendReminder = flow({
+        name: "sendReminder",
+        factory: async (ctx, { mailer }) => {
+          await mailer.send(ctx.input)
+        },
+      })
+    `)).toEqual(["pumped/no-unattributed-await"])
+  })
+
+  it("finds an awaited member call rooted at a plain deps identifier param", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const sendReminder = flow({
+        name: "sendReminder",
+        factory: async (ctx, deps) => {
+          await deps.mailer.send(ctx.input)
+        },
+      })
+    `)).toBe(1)
+  })
+
+  it("finds an awaited member call in an atom factory's deps binding", () => {
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const cache = atom({
+        factory: async (ctx, { source }) => {
+          await source.warm()
+        },
+      })
+    `)).toEqual(["pumped/no-unattributed-await"])
+  })
+
+  it("finds a .then() chained directly on a deps-rooted call with no step tag", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: (ctx, { mailer }) => {
+          return mailer.send(ctx.input).then(() => "done")
+        },
+      })
+    `)).toEqual(["pumped/no-unattributed-await"])
+  })
+
+  it("allows an awaited deps call inside a step-tagged flow", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { step } from "@pumped-fn/sdk"
+
+      const sendReminder = flow({
+        name: "sendReminder",
+        tags: [step({ workflow: true, kind: "email" })],
+        factory: async (ctx, { mailer }) => {
+          await mailer.send(ctx.input)
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows graph machinery ops (exec/execStream/resolve) on deps handles untagged", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: async (ctx, { handle, ctrl }) => {
+          await handle.exec({ input: ctx.input })
+          await handle.execStream({ input: ctx.input })
+          await ctrl.resolve()
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows for-await iteration over a deps-bound iterable", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const intake = flow({
+        name: "intake",
+        factory: async (ctx, { lines }) => {
+          for await (const line of lines) {
+            void line
+          }
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows Promise.all over handle execs mapped from a deps binding", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: async (ctx, { models }) => {
+          await Promise.all(models.map((handle) => handle.exec({ input: ctx.input })))
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows ctx.exec since ctx is a receiver, not a deps binding", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: async (ctx, { childFlow }) => {
+          await ctx.exec({ input: ctx.input })
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows an awaited call on an imported helper", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { parse } from "./util"
+
+      const run = flow({
+        name: "run",
+        factory: async (ctx, { mailer }) => {
+          await parse(ctx.input)
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows a sync call on a deps binding", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: (ctx, { ledger }) => {
+          return ledger.find((item) => item.id === ctx.input.id)
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("allows an awaited call when the deps binding is shadowed by a nested function parameter", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({
+        name: "run",
+        factory: async (ctx, { mailer }) => {
+          async function relay(mailer) {
+            await mailer.send(ctx.input)
+          }
+          await relay({ send: async () => {} })
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("exempts test paths from no-unattributed-await", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+
+      const sendReminder = flow({
+        name: "sendReminder",
+        factory: async (ctx, { mailer }) => {
+          await mailer.send(ctx.input)
+        },
+      })
+    `, "tests/example.test.ts")).toBe(0)
+  })
 })
