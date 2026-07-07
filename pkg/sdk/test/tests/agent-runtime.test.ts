@@ -24,6 +24,7 @@ import {
   delegated,
   used,
   type Model,
+  type ModelRequest,
 } from "@pumped-fn/sdk"
 import { kit, MemoryWorkflowLog } from "../src/index"
 
@@ -37,20 +38,24 @@ describe("agent application runtime", () => {
         factory: (ctx) => ({ id: ctx.input.id, title: `ticket:${ctx.input.id}` }),
       }),
     })
-    const summarizeModel: Model = {
-      complete: (_ctx, request) => ({
-        content: `summary:${request.messages.at(-1)?.content ?? ""}`,
+    const summarizeModel: Model = flow({
+      name: "summarize-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `summary:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
+    })
     const summarize = agent({
       name: "summarize-ticket",
       instructions: "Summarize ticket context.",
       tags: [agentModel(summarizeModel)],
     })
-    const triageModel: Model = {
-      complete: (_ctx, request) => {
-        if (request.round === 0) {
+    const triageModel: Model = flow({
+      name: "triage-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => {
+        if (ctx.input.round === 0) {
           return {
             content: "checking",
             toolCalls: [{ name: "lookup-ticket", input: { id: "42" } }],
@@ -58,11 +63,11 @@ describe("agent application runtime", () => {
           }
         }
         return {
-          content: `ready:${request.messages.map((message) => message.content).join("|")}`,
+          content: `ready:${ctx.input.messages.map((message) => message.content).join("|")}`,
           stop: true,
         }
       },
-    }
+    })
     const triage = agent({
       name: "triage-ticket",
       instructions: "Triage tickets with tools and delegated summaries.",
@@ -125,8 +130,14 @@ describe("agent application runtime", () => {
       "agent_end",
     ])
     expect(log.entries().filter((entry) => entry.status === "completed").map((entry) => entry.targetName)).toEqual([
+      "triage-model",
+      "model.complete",
       "lookup-ticket",
+      "summarize-model",
+      "model.complete",
       "summarize-ticket",
+      "triage-model",
+      "model.complete",
       "triage-ticket",
     ])
 
@@ -135,18 +146,20 @@ describe("agent application runtime", () => {
   })
 
   it("reads model providers from tags", async () => {
-    const taggedModel: Model = {
-      complete: (_ctx, request) => ({
-        content: `tagged:${request.messages.at(-1)?.content ?? ""}`,
+    const taggedModel: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `tagged:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
-    const overrideModel: Model = {
-      complete: (_ctx, request) => ({
-        content: `override:${request.messages.at(-1)?.content ?? ""}`,
+    })
+    const overrideModel: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `override:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
+    })
     const target = agent({
       name: "tagged-model-agent",
       tags: [agentModel(taggedModel)],
@@ -174,12 +187,13 @@ describe("agent application runtime", () => {
   })
 
   it("runs evals with deterministic checks and a judge quorum", async () => {
-    const model: Model = {
-      complete: () => ({
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: () => ({
         content: "approved after lookup",
         stop: true,
       }),
-    }
+    })
     const reviewer = agent({
       name: "reviewer",
       tags: [agentModel(model)],
@@ -225,9 +239,10 @@ describe("agent application runtime", () => {
   })
 
   it("rejects a single judge as a quality gate", async () => {
-    const model: Model = {
-      complete: () => ({ content: "ok", stop: true }),
-    }
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: () => ({ content: "ok", stop: true }),
+    })
     const target = agent({
       name: "single-judge-target",
       tags: [agentModel(model)],
@@ -258,17 +273,19 @@ describe("agent application runtime", () => {
   })
 
   it("loads skills on model request through a replayable step", async () => {
-    const model: Model = {
-      complete: (_ctx, request) => request.loadedSkills.length === 0
+    const model: Model = flow({
+      name: "skill-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ctx.input.loadedSkills.length === 0
         ? {
             content: "need policy",
             skillCalls: [{ name: "policy" }],
           }
         : {
-            content: `policy:${request.loadedSkills[0]?.content}`,
+            content: `policy:${ctx.input.loadedSkills[0]?.content}`,
             stop: true,
           },
-    }
+    })
     const target = agent({
       name: "skill-agent",
       tags: [agentModel(model)],
@@ -292,7 +309,11 @@ describe("agent application runtime", () => {
     expect(result.content).toBe("policy:route to support")
     expect(result.skillResults).toEqual([{ name: "policy", content: "route to support" }])
     expect(log.entries().filter((entry) => entry.status === "completed").map((entry) => entry.targetName)).toEqual([
+      "skill-model",
+      "model.complete",
       "policy",
+      "skill-model",
+      "model.complete",
       "skill-agent",
     ])
 
@@ -312,17 +333,19 @@ describe("agent application runtime", () => {
         },
       }),
     })
-    const model: Model = {
-      complete: (_ctx, request) => request.round === 0
+    const model: Model = flow({
+      name: "remote-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ctx.input.round === 0
         ? {
             content: "routing",
             toolCalls: [{ name: "remote-tool", input: { id: "42" } }],
           }
         : {
-            content: `done:${request.messages.at(-1)?.content ?? ""}`,
+            content: `done:${ctx.input.messages.at(-1)?.content ?? ""}`,
             stop: true,
           },
-    }
+    })
     const target = agent({
       name: "remote-agent",
       tags: [agentModel(model)],
@@ -350,7 +373,11 @@ describe("agent application runtime", () => {
       })
     expect(routed).toEqual([{ workflow: true, remote: true, timeoutMs: 500, kind: "code" }])
     expect(log.entries().filter((entry) => entry.status === "completed").map((entry) => entry.targetName)).toEqual([
+      "remote-model",
+      "model.complete",
       "remote-tool",
+      "remote-model",
+      "model.complete",
       "remote-agent",
     ])
 
@@ -379,8 +406,9 @@ describe("agent application runtime", () => {
         },
       }),
     })
-    const model: Model = {
-      complete: (_ctx, request) => request.round === 0
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ctx.input.round === 0
         ? {
             content: "collecting",
             toolCalls: [
@@ -389,10 +417,10 @@ describe("agent application runtime", () => {
             ],
           }
         : {
-            content: `done:${request.messages.filter((message) => message.role === "tool").map((message) => message.content).join("|")}`,
+            content: `done:${ctx.input.messages.filter((message) => message.role === "tool").map((message) => message.content).join("|")}`,
             stop: true,
           },
-    }
+    })
     const target = agent({
       name: "string-safe-agent",
       tags: [agentModel(model)],
@@ -460,12 +488,14 @@ describe("agent application runtime", () => {
   })
 
   it("routes channel and schedule adapters through agent turns", async () => {
-    const model: Model = {
-      complete: (_ctx, request) => ({
-        content: `seen:${request.messages.at(-1)?.content ?? ""}`,
+    const model: Model = flow({
+      name: "channel-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `seen:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
+    })
     const target = agent({
       name: "channel-target",
       tags: [agentModel(model)],
@@ -490,8 +520,12 @@ describe("agent application runtime", () => {
     await expect(ctx.exec({ flow: daily }))
       .resolves.toMatchObject({ content: "seen:daily digest" })
     expect(log.entries().filter((entry) => entry.status === "completed").map((entry) => entry.targetName)).toEqual([
+      "channel-model",
+      "model.complete",
       "channel-target",
       "slack-message",
+      "channel-model",
+      "model.complete",
       "channel-target",
       "daily-digest",
     ])
@@ -501,12 +535,13 @@ describe("agent application runtime", () => {
   })
 
   it("adapts fetch requests into agent turns", async () => {
-    const model: Model = {
-      complete: (_ctx, request) => ({
-        content: `http:${request.messages.at(-1)?.content ?? ""}`,
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `http:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
+    })
     const target = agent({
       name: "http-agent",
       tags: [agentModel(model)],
@@ -573,17 +608,18 @@ describe("agent application runtime", () => {
         factory: (ctx, deps) => deps.sandbox.readFile(ctx.input.path),
       }),
     })
-    const model: Model = {
-      complete: (_ctx, request) => request.round === 0
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ctx.input.round === 0
         ? {
             content: "reading",
             toolCalls: [{ name: "read-workspace", input: { path: "README.md" } }],
           }
         : {
-            content: `read:${request.messages.at(-1)?.content ?? ""}`,
+            content: `read:${ctx.input.messages.at(-1)?.content ?? ""}`,
             stop: true,
           },
-    }
+    })
     const target = agent({
       name: "sandbox-agent",
       tags: [agentModel(model)],
@@ -618,12 +654,13 @@ describe("agent application runtime", () => {
   })
 
   it("stores continuing session messages as a material", async () => {
-    const model: Model = {
-      complete: (_ctx, request) => ({
-        content: `turn:${request.messages.at(-1)?.content ?? ""}`,
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: (ctx) => ({
+        content: `turn:${ctx.input.messages.at(-1)?.content ?? ""}`,
         stop: true,
       }),
-    }
+    })
     const target = agent({
       name: "session-agent",
       tags: [agentModel(model)],
@@ -654,12 +691,13 @@ describe("agent application runtime", () => {
   })
 
   it("summarizes eval reports as json-safe artifacts", async () => {
-    const model: Model = {
-      complete: () => ({
+    const model: Model = flow({
+      parse: typed<ModelRequest>(),
+      factory: () => ({
         content: "ready",
         stop: true,
       }),
-    }
+    })
     const target = agent({
       name: "summary-agent",
       tags: [agentModel(model)],

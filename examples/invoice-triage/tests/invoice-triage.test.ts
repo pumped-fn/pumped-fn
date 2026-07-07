@@ -2,7 +2,7 @@ import { createScope, isStreamingExec, preset, type Lite } from "@pumped-fn/lite
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/sdk"
-import { kit } from "@pumped-fn/sdk-test"
+import { kit, modelStub } from "@pumped-fn/sdk-test"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import {
   dailyReport,
@@ -69,12 +69,10 @@ function json(options: Partial<Classification> = {}): string {
 
 function scripted(outputs: readonly string[]): Model {
   let index = 0
-  return {
-    complete: () => ({
-      content: outputs[index++] ?? outputs.at(-1) ?? json(),
-      stop: true,
-    }),
-  }
+  return modelStub(() => ({
+    content: outputs[index++] ?? outputs.at(-1) ?? json(),
+    stop: true,
+  }))
 }
 
 function gated(outputs: readonly string[]) {
@@ -88,20 +86,18 @@ function gated(outputs: readonly string[]) {
     releaseFirst = resolve
   })
   return {
-    model: {
-      complete: async () => {
-        const index = calls
-        calls += 1
-        if (index === 0) {
-          startFirst()
-          await firstReleased
-        }
-        return {
-          content: outputs[index] ?? outputs.at(-1) ?? json(),
-          stop: true,
-        }
-      },
-    } satisfies Model,
+    model: modelStub(async () => {
+      const index = calls
+      calls += 1
+      if (index === 0) {
+        startFirst()
+        await firstReleased
+      }
+      return {
+        content: outputs[index] ?? outputs.at(-1) ?? json(),
+        stop: true,
+      }
+    }),
     firstStarted,
     releaseFirst,
     calls: () => calls,
@@ -229,9 +225,11 @@ describe("invoice triage patterns", () => {
     ])
     const run = await inspect(log, { taskId: "stream", runId: "run-1" })
     expect(run.steps.map((step) => step.targetName)).toEqual([
-      "invoice.classify",
+      "model.stub",
+      "model.complete",
       "invoice.save",
-      "invoice.classify",
+      "model.stub",
+      "model.complete",
       "invoice.save",
     ])
     await ctx.close({ ok: true })

@@ -920,19 +920,21 @@ function cliHarnessModel(
   worker: Lite.Flow<string, PromptInput>,
   config: CliHarnessConfig
 ): Model {
-  return {
-    complete: async (ctx, request) => {
+  return flow({
+    name: worker.name,
+    parse: typed<ModelRequest>(),
+    deps: { worker },
+    factory: async (ctx, { worker }) => {
       const current = config.guard ? await ctx.resolve(config.guard) : undefined
       const state = current?.state ?? { text: "" }
-      const output = await ctx.exec({
-        flow: worker,
-        input: { prompt: config.prompt ? config.prompt(request, state) : modelPrompt(request, state) },
+      const output = await worker.exec({
+        input: { prompt: config.prompt ? config.prompt(ctx.input, state) : modelPrompt(ctx.input, state) },
       })
       const response = config.parse ? config.parse(output) : parseModelOutput(output)
       if (config.guard && current) await collectGuard(ctx, config.guard, current, response)
       return response
     },
-  }
+  })
 }
 
 async function collectGuard(
@@ -1116,9 +1118,7 @@ export interface ModelRequest {
   round: number
 }
 
-export interface Model {
-  complete(ctx: Lite.ExecutionContext, request: ModelRequest): MaybePromise<ModelResponse>
-}
+export type Model = Lite.Flow<ModelResponse, ModelRequest>
 
 export interface SandboxExecResult {
   stdout: string
@@ -1291,6 +1291,13 @@ export const events = resource<EventBuffer>({
 })
 
 export const model = tag<Model>({ label: "agent.model" })
+export const complete = flow({
+  name: "model.complete",
+  parse: typed<ModelRequest>(),
+  deps: { impl: tags.required(model) },
+  tags: [step({ workflow: true, kind: "llm" })],
+  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+})
 export const sandbox = tag<Sandbox>({ label: "agent.sandbox" })
 
 export function session(name: string, options: SessionOptions = {}): Lite.Atom<MaterialState<SessionState>> {
@@ -1364,9 +1371,9 @@ export function agent(options: AgentOptions): Agent {
   const turn = flow({
     name: options.name,
     parse: typed<TurnInput>(),
-    deps: { model: tags.required(model) },
+    deps: { complete },
     tags: agentStepTags({ workflow: true, kind: "agent" }, options.tags),
-    factory: (ctx, deps) => executeAgentTurn(ctx, agent, deps.model),
+    factory: (ctx, deps) => executeAgentTurn(ctx, agent, deps.complete),
   })
   agent = {
     name: options.name,
@@ -1641,7 +1648,7 @@ export function http(options: HttpOptions): Lite.Flow<Response, Request> {
 async function executeAgentTurn(
   ctx: Lite.ExecutionContext & { readonly input: TurnInput },
   agent: Agent,
-  model: Model
+  complete: Lite.FlowHandle<ModelResponse, ModelRequest>
 ): Promise<TurnResult> {
   const messages = initialMessages(ctx.input)
   const loadedSkills: LoadedSkill[] = []
@@ -1667,15 +1674,17 @@ async function executeAgentTurn(
       round,
       input: messages,
     })
-    const response = await model.complete(ctx, {
-      agentName: agent.name,
-      instructions: agent.instructions,
-      messages,
-      tools: agent.tools.map(agentToolCapability),
-      skills: agent.skills.map(agentSkillCapability),
-      loadedSkills,
-      subagents: agent.subagents.map(agentSubagentCapability),
-      round,
+    const response = await complete.exec({
+      input: {
+        agentName: agent.name,
+        instructions: agent.instructions,
+        messages,
+        tools: agent.tools.map(agentToolCapability),
+        skills: agent.skills.map(agentSkillCapability),
+        loadedSkills,
+        subagents: agent.subagents.map(agentSubagentCapability),
+        round,
+      },
     })
     content = response.content
     await recordAgentEvent(ctx, {

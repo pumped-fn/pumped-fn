@@ -2,6 +2,9 @@ import {
   extension as agentExtension,
   workflowExtension,
   type ExtensionOptions,
+  type Model,
+  type ModelRequest,
+  type ModelResponse,
   type RemoteRunner,
   type RunLog,
   type RunQuery,
@@ -16,7 +19,13 @@ import {
   type SuspenseStepEntry,
   type SuspenseStepKey,
 } from "@pumped-fn/lite-extension-suspense"
-import type { Lite } from "@pumped-fn/lite"
+import { flow, typed, type Lite } from "@pumped-fn/lite"
+
+type MaybePromise<T> = T | Promise<T>
+
+export function modelStub(respond: (request: ModelRequest) => MaybePromise<ModelResponse>): Model {
+  return flow({ name: "model.stub", parse: typed<ModelRequest>(), factory: (ctx) => respond(ctx.input) })
+}
 
 export class MemorySuspenseLog implements SuspenseEventLog {
   private readonly store = new Map<string, SuspenseStepEntry>()

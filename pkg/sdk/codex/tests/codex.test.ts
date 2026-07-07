@@ -1,9 +1,9 @@
-import { createScope } from "@pumped-fn/lite"
-import { agent, model, type Model } from "@pumped-fn/sdk"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { agent, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import { expect, it } from "vitest"
 import { codex } from "../src/index"
 
-it("provides Codex through a lazy agent model tag", async () => {
+it("provides Codex through the agent model tag", async () => {
   const target = agent({ name: "review" })
   const scope = createScope({
     tags: [
@@ -29,9 +29,10 @@ it("provides Codex through a lazy agent model tag", async () => {
 
 it("can be replaced per execution context without rebuilding the agent", async () => {
   const target = agent({ name: "review" })
-  const replacement: Model = {
-    complete: () => ({ content: "provider=fake", stop: true }),
-  }
+  const replacement: Model = flow({
+    parse: typed<ModelRequest>(),
+    factory: () => ({ content: "provider=fake", stop: true }),
+  })
   const scope = createScope({
     tags: [
       codex({

@@ -21,7 +21,8 @@ flowchart TD
   Queue --> Ingest["ingest flow<br/>ctx.changes(queue) wakeups"]
   Ingest --> Import["importBatch generator"]
   Import --> Triage["triage generator"]
-  Triage --> Classify["classify.exec<br/>scalar SDK step kind=llm"]
+  Triage --> Classify["classify.exec<br/>builds request, parses response"]
+  Classify --> Complete["sdk complete port flow<br/>owns scalar SDK step kind=llm"]
   Import --> Save["saveInvoice.exec<br/>scalar SDK step kind=store"]
   Save --> Ledger["ledger atom<br/>stored invoices"]
   Ledger --> Review["reviewCount atom<br/>derived from ledger"]
@@ -45,13 +46,13 @@ External data is schema-validated with zod at parse and model-output boundaries;
 
 Every side effect is a scalar flow reached through a deps-declared flow handle:
 
-- `classify` owns the model call and output validation.
+- `classify` builds the model request and validates the response; it execs the SDK `complete` port flow (a bare flow dep, projected to a handle) rather than owning the llm span itself.
 - `enqueue` owns intake validation and appending invoice work into queue state.
 - `saveInvoice` owns the ledger write.
 - `dailyReport` owns report materialization.
 - `sendReminder` owns idempotent reminder marking and mail delivery.
 
-`triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
+`triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag — the SDK `complete` port flow owns that span. A completed workflow run now shows the model implementor's step followed by `model.complete` where `invoice.classify` used to appear; `invoice.classify` itself is untracked plumbing around that call. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
 
 The example uses `yield* stream` to pass nested triage progress through `importBatch`, then reads `stream.result` for the typed classification. The current `FlowStream` type preserves output through `.result`; the `yield*` expression itself does not recover the output type from `AsyncIterable`.
 
@@ -65,7 +66,7 @@ createScope({
 })
 ```
 
-Tests wire scripted fakes through the same tag and use `@pumped-fn/sdk-test` for in-memory workflow logs. Production can swap in the CLI providers without changing the graph:
+Tests wire scripted fakes built with `@pumped-fn/sdk-test`'s `modelStub` through the same tag and use `@pumped-fn/sdk-test`'s `kit()` for in-memory workflow logs. Production can swap in the CLI providers without changing the graph:
 
 ```ts
 import { claude } from "@pumped-fn/sdk-claude"

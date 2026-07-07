@@ -1,7 +1,7 @@
-import { bound, controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
+import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { model, step } from "@pumped-fn/sdk"
+import { complete, step } from "@pumped-fn/sdk"
 import { classifyRequest, parseClassification } from "./model"
 import {
   clock,
@@ -35,11 +35,10 @@ import {
 export const classify = flow({
   name: "invoice.classify",
   parse: typed<Invoice>(),
-  deps: { model: bound(tags.required(model)) },
-  tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { model }): Promise<Classification> => {
+  deps: { complete },
+  factory: async (ctx, { complete }): Promise<Classification> => {
     const request = classifyRequest(ctx.input)
-    const response = await model.complete(request)
+    const response = await complete.exec({ input: request })
     return parseClassification(response.content, ctx.input)
   },
 })

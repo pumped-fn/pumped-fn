@@ -118,7 +118,7 @@ describe("CLI workers", () => {
       round: 0,
     } satisfies ModelRequest
 
-    await expect(codexHarness({ command, isolate: false, guard: store }).complete(ctx, request))
+    await expect(ctx.exec({ flow: codexHarness({ command, isolate: false, guard: store }), input: request }))
       .resolves.toMatchObject({
         content: "ready",
         guard: "Keep changes scoped",
@@ -161,8 +161,8 @@ describe("CLI workers", () => {
         : { content: "ready", stop: true },
     })
 
-    await model.complete(ctx, request)
-    await model.complete(ctx, request)
+    await ctx.exec({ flow: model, input: request })
+    await ctx.exec({ flow: model, input: request })
     expect(seen).toEqual(["", "Avoid single-model truth"])
 
     await ctx.close()
@@ -183,12 +183,12 @@ describe("CLI workers", () => {
       round: 0,
     } satisfies ModelRequest
 
-    await expect(claudeHarness({ command: "echo", isolate: false }).complete(ctx, request))
+    await expect(ctx.exec({ flow: claudeHarness({ command: "echo", isolate: false }), input: request }))
       .resolves.toMatchObject({
         content: expect.stringContaining("-p --no-session-persistence -- Return JSON only."),
         stop: true,
       })
-    await expect(codexHarness({ command: "echo", isolate: false }).complete(ctx, request))
+    await expect(ctx.exec({ flow: codexHarness({ command: "echo", isolate: false }), input: request }))
       .resolves.toMatchObject({
         content: expect.stringContaining("exec -s read-only --ephemeral --ignore-user-config -- Return JSON only."),
         stop: true,
