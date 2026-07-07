@@ -154,7 +154,7 @@ const tagExecutorModes = new Set(["required", "optional", "all"])
 const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
-const ctxArgumentMessage = "ctx is a receiver, never an argument; wrap ctx-taking contracts with bound() in deps."
+const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")

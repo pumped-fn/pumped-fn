@@ -27,7 +27,7 @@ pnpm lint
 | `pumped/no-test-only-branches` | Product branches keyed on test mode; use presets instead. |
 | `pumped/no-definition-handle-suffix` | `fooAtom`, `runFlow`, `txResource`, `requestTag`; rely on inference. |
 | `pumped/no-direct-flow-composition` | Flows calling child flows with hidden `ctx.exec({ flow })` or raw same-file flow deps; use `controller(childFlow)` deps. |
-| `pumped/no-ctx-argument` | Factory context parameters passed as call arguments or embedded directly in object/array literals/spreads; `ctx` is a receiver, and ctx-taking contracts belong behind `bound()` deps. Direct parameter tracking only in v1; aliases are not followed. |
+| `pumped/no-ctx-argument` | Factory context parameters passed as call arguments or embedded directly in object/array literals/spreads; `ctx` is a receiver, and ctx-taking contracts should be reified as a flow reached via deps. Direct parameter tracking only in v1; aliases are not followed. |
 | `pumped/no-shared-scope-factory` | Helpers that return preconfigured `createScope(...)`; each use site should own tags, presets, and extensions. |
 | `pumped/no-scope-argument` | Exported product helpers accepting `scope`; composition roots and tests own scope. |
 | `pumped/no-render-outside-browser-test` | Testing Library `render` outside `*.browser.test.tsx`; DOM observer tests run in browser mode. |

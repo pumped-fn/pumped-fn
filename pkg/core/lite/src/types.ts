@@ -8,7 +8,6 @@ export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/contr
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
 export const typedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/typed")
 export const resourceSymbol: unique symbol = Symbol.for("@pumped-fn/lite/resource")
-export const boundDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/bound-dep")
 
 export class ParseError extends Error {
   override readonly name = "ParseError"
@@ -160,23 +159,6 @@ export namespace Lite {
     readonly tags?: Tagged<any>[]
     readonly ownership?: ResourceOwnership
     readonly factory: ResourceFactory<T, D>
-  }
-
-  export type Bound<T> = T extends undefined
-    ? undefined
-    : T extends (ctx: ExecutionContext<any>, ...args: infer Args) => infer R
-      ? (...args: Args) => R
-      : T extends object
-        ? {
-            [K in keyof T]: T[K] extends (ctx: ExecutionContext<any>, ...args: infer Args) => infer R
-              ? (...args: Args) => R
-              : T[K]
-          }
-        : never
-
-  export interface BoundDep<T> {
-    readonly [boundDepSymbol]: true
-    readonly dep: Atom<T> | Resource<T> | TagExecutor<T, any>
   }
 
   export type ResourceOwnership = "boundary" | "current"
@@ -549,7 +531,6 @@ export namespace Lite {
     | Atom<unknown>
     | Flow<any, any, any, any>
     | ControllerDep<unknown>
-    | BoundDep<any>
     | TagExecutor<any>
     | Resource<unknown>
 
@@ -561,7 +542,6 @@ export namespace Lite {
     | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | NonWatchResourceControllerDep<unknown>
-    | BoundDep<any>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
@@ -571,7 +551,6 @@ export namespace Lite {
     | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | ResourceControllerDep<unknown>
-    | BoundDep<any>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
@@ -591,8 +570,6 @@ export namespace Lite {
       ? Controller<T>
       : D extends ResourceControllerDep<infer T>
       ? ResourceController<T>
-      : D extends BoundDep<infer T>
-        ? Bound<T>
       : D extends TagExecutor<infer Output, infer _Value>
         ? Projected<Output>
         : D extends Resource<infer T>

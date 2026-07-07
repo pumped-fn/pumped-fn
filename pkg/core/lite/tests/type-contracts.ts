@@ -1,5 +1,4 @@
 import { atom, controller, service } from "../src/atom"
-import { bound } from "../src/bound"
 import { flow, typed } from "../src/flow"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
@@ -79,61 +78,6 @@ const illegalAtomDep: Lite.AtomDependency = { mode: "required" }
 void legalExecutionDep
 void illegalExecutionDep
 void illegalAtomDep
-
-const ctxFirst = atom({
-  factory: () => async (_ctx: Lite.ExecutionContext, value: number) => value + 1,
-})
-
-const serviceTag = tag<{
-  readonly label: string
-  complete(ctx: Lite.ExecutionContext, prompt: string): string
-}>({ label: "service" })
-
-const optionalService = bound(tags.optional(serviceTag))
-const legalBoundExecutionDep: Lite.ExecutionDependency = optionalService
-const legalBoundResourceDep: Lite.ResourceDependency = optionalService
-
-// @ts-expect-error bound deps require an execution context
-const illegalBoundAtomDep: Lite.AtomDependency = optionalService
-
-flow({
-  deps: {
-    call: bound(ctxFirst),
-    service: bound(tags.required(serviceTag)),
-    optionalService,
-  },
-  factory: async (_ctx, { call, service, optionalService }) => {
-    const value: number = await call(1)
-    const text: string = service.complete("hello")
-    const optionalText: string | undefined = optionalService?.complete("hello")
-
-    // @ts-expect-error bound function deps strip the ctx parameter
-    await call(_ctx, 1)
-
-    return { value, text, optionalText }
-  },
-})
-
-const badFunction = atom({
-  factory: () => (value: string) => value,
-})
-
-// @ts-expect-error bound function deps must accept ctx first
-bound(badFunction)
-
-const mixedService = atom({
-  factory: () => ({
-    ok: (_ctx: Lite.ExecutionContext) => 1,
-    bad: (value: string) => value,
-  }),
-})
-
-// @ts-expect-error function-valued object members must accept ctx first
-bound(mixedService)
-
-void legalBoundExecutionDep
-void legalBoundResourceDep
-void illegalBoundAtomDep
 
 flow({
   factory: (ctx) => {

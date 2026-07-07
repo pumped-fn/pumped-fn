@@ -143,10 +143,6 @@ like a bare flow dependency; `tags.optional(model)` yields the handle or `undefi
 yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
 for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
 
-Use `bound(dep)` when a tag, atom, or resource resolves to a ctx-first function or to an object whose
-function members are ctx-first. Flow deps receive the same value with the ctx parameter already bound to
-the executing invocation, so call sites use `model.complete(request)` instead of passing `ctx`.
-
 ```ts
 const auditUserLoad = flow({
   parse: typed<{ id: string }>(),
@@ -487,7 +483,6 @@ Extension hooks run around graph work, so they see the same seams as tests and c
 | `tags.required/optional/all` | Request tags as dependencies |
 | `preset(target, value)` | Replace an atom, flow, or resource in one scope |
 | `controller(target, options?)` | Request an atom/resource controller dependency, or preconfigure flow-handle defaults |
-| `bound(target)` | Request a tag/atom/resource dependency with ctx-first functions bound to the executing invocation |
 | `scope.controller(atom)` | Observe and control atom state from the boundary |
 | `scope.select(atom, selector, options?)` | Subscribe to a derived slice |
 | `scope.changes(target, options?)` / `ctx.changes(...)` | Async-iterate atom values, select slices, or state transitions, conflated to latest |
