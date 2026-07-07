@@ -158,7 +158,7 @@ const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "N
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
-const graphMachineryMethods = new Set(["exec", "execStream", "prepare", "resolve"])
+const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -768,21 +768,48 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
   return null
 }
 
-function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Set<string> {
-  const names = new Set<string>()
+function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Map<string, string | null> {
+  const names = new Map<string, string | null>()
   const parameter = factory.parameters[1]
   if (!parameter) return names
   if (ts.isIdentifier(parameter.name)) {
-    names.add(parameter.name.text)
+    names.set(parameter.name.text, null)
     return names
   }
   if (ts.isObjectBindingPattern(parameter.name)) {
     for (const element of parameter.name.elements) {
       if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue
-      names.add(element.name.text)
+      const key = element.propertyName && ts.isIdentifier(element.propertyName)
+        ? element.propertyName.text
+        : element.name.text
+      names.set(element.name.text, key)
     }
   }
   return names
+}
+
+function depKey(expression: ts.Expression, root: ts.Identifier, bound: string | null): string | null {
+  if (bound !== null) return bound
+  let current = expression
+  let above: ts.PropertyAccessExpression | null = null
+  while (ts.isPropertyAccessExpression(current)) {
+    if (current.expression === root) {
+      above = current
+      break
+    }
+    current = current.expression
+  }
+  return above && above !== expression ? above.name.text : null
+}
+
+function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null): boolean {
+  const deps = config && objectProperty(config, "deps")
+  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
+  const property = objectProperty(deps.initializer, key)
+  return property !== null
+    && ts.isCallExpression(property.initializer)
+    && ts.isIdentifier(property.initializer.expression)
+    && property.initializer.expression.text === "controller"
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -859,7 +886,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return ts.isIdentifier(expression) && expression.text === ctxName
   }
 
-  function factoryDepsAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; names: Set<string> } | null {
+  function factoryDepsAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; names: Map<string, string | null> } | null {
     const factory = enclosingUnitFactory(node, imports)
     if (!factory) return null
     const names = depsBindingNames(factory)
@@ -873,7 +900,15 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     const root = rootIdentifier(call.expression)
     if (!root || !depsBinding.names.has(root.text)) return
     if (shadowsName(root, depsBinding.factory, root.text)) return
-    if (ts.isPropertyAccessExpression(call.expression) && graphMachineryMethods.has(call.expression.name.text)) return
+    if (ts.isPropertyAccessExpression(call.expression)) {
+      const method = call.expression.name.text
+      if (method === "resolve") {
+        const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
+        if (depIsController(enclosingUnitConfig(call, imports), key)) return
+      } else if (graphMachineryMethods.has(method)) {
+        return
+      }
+    }
     if (hasStepTag(enclosingUnitConfig(call, imports), imports)) return
     pushNodeDiagnostic(diagnostics, sourceFile, filePath, "pumped/no-unattributed-await", reportNode, unattributedAwaitMessage)
   }

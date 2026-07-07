@@ -36,8 +36,9 @@ export async function main(): Promise<void> {
   await ctx.exec({ flow: awaitDrained })
   await ctx.close({ ok: true })
   await scope.dispose()
-  await Promise.allSettled([processing, watching])
+  const [ingestOutcome] = await Promise.allSettled([processing, watching])
   process.off("SIGINT", stopIntake)
+  if (ingestOutcome.status === "rejected") throw ingestOutcome.reason
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

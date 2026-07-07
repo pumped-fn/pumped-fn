@@ -142,8 +142,11 @@ export const ingest = flow({
         batch = current
         return []
       })
-      if (batch.length > 0) await importBatch.exec({ input: { invoices: batch } })
-      progress.update((count) => count - 1)
+      try {
+        if (batch.length > 0) await importBatch.exec({ input: { invoices: batch } })
+      } finally {
+        progress.update((count) => count - 1)
+      }
     }
   },
 })

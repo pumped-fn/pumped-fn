@@ -952,14 +952,44 @@ describe("lite lint scanner", () => {
 
   it("allows graph machinery ops (exec/execStream/resolve) on deps handles untagged", () => {
     expect(unattributedAwaitCount(`
-      import { flow } from "@pumped-fn/lite"
+      import { controller, flow } from "@pumped-fn/lite"
+      import { store, worker } from "./ports"
 
       const run = flow({
         name: "run",
+        deps: { handle: controller(worker), ctrl: controller(store, { resolve: true }) },
         factory: async (ctx, { handle, ctrl }) => {
           await handle.exec({ input: ctx.input })
           await handle.execStream({ input: ctx.input })
           await ctrl.resolve()
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("flags resolve on a dep that is not a controller", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { dns } from "./ports"
+
+      const lookup = flow({
+        name: "lookup",
+        deps: { dns },
+        factory: async (ctx, { dns }) => await dns.resolve(ctx.input),
+      })
+    `)).toBe(1)
+  })
+
+  it("allows resolve through an undestructured deps parameter backed by a controller", () => {
+    expect(unattributedAwaitCount(`
+      import { controller, flow } from "@pumped-fn/lite"
+      import { store } from "./ports"
+
+      const run = flow({
+        name: "run",
+        deps: { ctrl: controller(store, { resolve: true }) },
+        factory: async (_ctx, deps) => {
+          await deps.ctrl.resolve()
         },
       })
     `)).toBe(0)

@@ -435,6 +435,27 @@ describe("invoice triage patterns", () => {
     await processing
   })
 
+  it("shutdown: a failed import surfaces through ingest and never wedges awaitDrained", async () => {
+    const scope = createScope({
+      tags: [
+        provider(modelStub(() => {
+          throw new Error("provider down")
+        })),
+        clock({ now: () => now }),
+      ],
+    })
+    const ctx = scope.createContext()
+    const processing = ctx.exec({ flow: ingest })
+
+    await ctx.exec({ flow: enqueue, input: { invoices: [invoice("inv-fail-1")] } })
+    await ctx.exec({ flow: awaitDrained })
+    expect(await scope.resolve(ledger)).toEqual([])
+    expect(await scope.resolve(queue)).toEqual([])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+    await expect(processing).rejects.toThrow("provider down")
+  })
+
   it("pattern: changes ops view conflates review-count observations during import", async () => {
     const runtime = kit()
     const sink = logging.memory()
