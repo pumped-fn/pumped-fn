@@ -23,6 +23,7 @@ export type RuleId =
   | "pumped/no-shared-scope-factory"
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-unattributed-await"
   | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
 
@@ -122,6 +123,7 @@ type Imports = {
   nodeBuiltins: Map<string, string>
   reactNamespaces: Set<string>
   render: Set<string>
+  stepLocals: Set<string>
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
@@ -154,7 +156,9 @@ const tagExecutorModes = new Set(["required", "optional", "all"])
 const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
-const ctxArgumentMessage = "ctx is a receiver, never an argument; wrap ctx-taking contracts with bound() in deps."
+const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
+const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
+const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -298,6 +302,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     nodeBuiltins: new Map(),
     reactNamespaces: new Set(),
     render: new Set(),
+    stepLocals: new Set(),
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
@@ -355,6 +360,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@testing-library/react" && imported === "render") {
         imports.render.add(local)
+      }
+      if (moduleName === "@pumped-fn/sdk" && imported === "step") {
+        imports.stepLocals.add(local)
       }
       if (moduleName === "@pumped-fn/lite-react" && imported === "useScope") {
         imports.useScope.add(local)
@@ -754,6 +762,64 @@ function factoryCtxName(factory: ts.ArrowFunction | ts.FunctionExpression | null
   return parameter && ts.isIdentifier(parameter.name) ? parameter.name.text : null
 }
 
+function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
+  if (ts.isIdentifier(expression)) return expression
+  if (ts.isPropertyAccessExpression(expression)) return rootIdentifier(expression.expression)
+  return null
+}
+
+function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Map<string, string | null> {
+  const names = new Map<string, string | null>()
+  const parameter = factory.parameters[1]
+  if (!parameter) return names
+  if (ts.isIdentifier(parameter.name)) {
+    names.set(parameter.name.text, null)
+    return names
+  }
+  if (ts.isObjectBindingPattern(parameter.name)) {
+    for (const element of parameter.name.elements) {
+      if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue
+      const key = element.propertyName && ts.isIdentifier(element.propertyName)
+        ? element.propertyName.text
+        : element.name.text
+      names.set(element.name.text, key)
+    }
+  }
+  return names
+}
+
+function depKey(expression: ts.Expression, root: ts.Identifier, bound: string | null): string | null {
+  if (bound !== null) return bound
+  let current = expression
+  let above: ts.PropertyAccessExpression | null = null
+  while (ts.isPropertyAccessExpression(current)) {
+    if (current.expression === root) {
+      above = current
+      break
+    }
+    current = current.expression
+  }
+  return above && above !== expression ? above.name.text : null
+}
+
+function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const deps = config && objectProperty(config, "deps")
+  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
+  const property = objectProperty(deps.initializer, key)
+  return property !== null
+    && ts.isCallExpression(property.initializer)
+    && ts.isIdentifier(property.initializer.expression)
+    && imports.controller.has(property.initializer.expression.text)
+}
+
+function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
+  const tagsProperty = config && objectProperty(config, "tags")
+  if (!tagsProperty || !ts.isArrayLiteralExpression(tagsProperty.initializer)) return false
+  return tagsProperty.initializer.elements.some((element) =>
+    ts.isCallExpression(element) && ts.isIdentifier(element.expression) && imports.stepLocals.has(element.expression.text)
+  )
+}
+
 function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
@@ -790,6 +856,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
@@ -817,6 +884,33 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
   function isDirectCtxExpression(expression: ts.Expression, ctxName: string): expression is ts.Identifier {
     return ts.isIdentifier(expression) && expression.text === ctxName
+  }
+
+  function factoryDepsAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; names: Map<string, string | null> } | null {
+    const factory = enclosingUnitFactory(node, imports)
+    if (!factory) return null
+    const names = depsBindingNames(factory)
+    return names.size > 0 ? { factory, names } : null
+  }
+
+  function checkUnattributedAwait(call: ts.CallExpression, reportNode: ts.Node): void {
+    if (allowUnattributedAwait) return
+    const depsBinding = factoryDepsAt(call)
+    if (!depsBinding) return
+    const root = rootIdentifier(call.expression)
+    if (!root || !depsBinding.names.has(root.text)) return
+    if (shadowsName(root, depsBinding.factory, root.text)) return
+    if (ts.isPropertyAccessExpression(call.expression)) {
+      const method = call.expression.name.text
+      if (method === "resolve") {
+        const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
+        if (depIsController(enclosingUnitConfig(call, imports), key, imports)) return
+      } else if (graphMachineryMethods.has(method)) {
+        return
+      }
+    }
+    if (hasStepTag(enclosingUnitConfig(call, imports), imports)) return
+    pushNodeDiagnostic(diagnostics, sourceFile, filePath, "pumped/no-unattributed-await", reportNode, unattributedAwaitMessage)
   }
 
   function visit(node: ts.Node): void {
@@ -877,6 +971,19 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           }
         }
       }
+    }
+
+    if (ts.isAwaitExpression(node) && ts.isCallExpression(node.expression)) {
+      checkUnattributedAwait(node.expression, node.expression)
+    }
+
+    if (
+      ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === "then"
+      && ts.isCallExpression(node.expression.expression)
+    ) {
+      checkUnattributedAwait(node.expression.expression, node.expression.expression)
     }
 
     if (ts.isCallExpression(node)) {

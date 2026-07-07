@@ -109,7 +109,7 @@ The same seam works for backend and frontend:
 | `atom` | Scope-owned values | Transports, capabilities, state, derived data, caches |
 | `flow` | Short-lived execution | Commands, request handlers, actions with typed input |
 | `resource` | Execution-context-owned values | Transactions, request loggers, spans, per-action buffers, form drafts |
-| `tag` | Typed ambient values | Tenant, request id, locale, runtime config, equality-aware boundary identity |
+| `tag` | Typed ambient values and role selection | Tenant, request id, locale, runtime config, equality-aware boundary identity; a tag carrying a flow projects to a handle in deps, so roots choose the implementation |
 | `preset` | Replacement at the seam | Unit radius tests, outside-in adapter tests, tenant-specific implementation swaps |
 | `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
 | `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |

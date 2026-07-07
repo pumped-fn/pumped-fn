@@ -95,6 +95,7 @@ import {
   sub,
   tool,
   type Model,
+  type ModelRequest,
 } from "@pumped-fn/sdk"
 
 const lookupTicket = tool({
@@ -106,12 +107,14 @@ const lookupTicket = tool({
   }),
 })
 
-const summarizeModel: Model = {
-  complete: (_ctx, request) => ({
-    content: `summary:${request.messages.at(-1)?.content ?? ""}`,
+const summarizeModel: Model = flow({
+  name: "summarize-model",
+  parse: typed<ModelRequest>(),
+  factory: (ctx) => ({
+    content: `summary:${ctx.input.messages.at(-1)?.content ?? ""}`,
     stop: true,
   }),
-}
+})
 
 const summarize = agent({
   name: "summarize-ticket",
@@ -119,23 +122,25 @@ const summarize = agent({
   instructions: "Summarize the ticket context.",
 })
 
-const triageModel: Model = {
-  complete: (_ctx, request) => request.loadedSkills.length === 0
+const triageModel: Model = flow({
+  name: "triage-model",
+  parse: typed<ModelRequest>(),
+  factory: (ctx) => ctx.input.loadedSkills.length === 0
     ? {
         content: "need policy",
         skillCalls: [{ name: "triage-policy" }],
       }
-    : request.round === 1
+    : ctx.input.round === 1
     ? {
         content: "checking",
         toolCalls: [{ name: "lookup-ticket", input: { id: "42" } }],
         subagentCalls: [{ name: "summarize-ticket", input: { prompt: "ticket 42" } }],
       }
     : {
-        content: `ready:${request.messages.map((message) => message.content).join("|")}`,
+        content: `ready:${ctx.input.messages.map((message) => message.content).join("|")}`,
         stop: true,
       },
-}
+})
 
 const triage = agent({
   name: "triage-ticket",
@@ -410,39 +415,47 @@ const result = await ctx.exec({ flow: processIssue, input: { body: "..." } })
 
 ## AI Is Just A Provider
 
-Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all fit behind the same shape: a flow calls an injected provider or a CLI helper.
+Claude, Codex, Anthropic SDK, OpenAI SDK, local model, and test fake should all fit behind the same shape: an implementor flow carried by the `model` tag. Consumers exec the `complete` port flow, which owns the `kind: "llm"` step span once — no consumer tagging, no ctx passed to providers.
 
 ```ts
-import { createScope, flow, preset, service, typed, type Lite } from "@pumped-fn/lite"
-import { step } from "@pumped-fn/sdk"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import { modelStub } from "@pumped-fn/sdk-test"
 
-interface Model {
-  complete(ctx: Lite.ExecutionContext, prompt: string): Promise<string>
-}
-
-const model = service<Model>({
-  factory: () => ({
-    complete: async (_ctx, prompt) => runRealModel(prompt),
+const live: Model = flow({
+  name: "live-model",
+  parse: typed<ModelRequest>(),
+  factory: async (ctx) => ({
+    content: await runRealModel(ctx.input.messages.at(-1)?.content ?? ""),
+    stop: true,
   }),
 })
 
 export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
-  deps: { model },
-  tags: [step({ kind: "llm" })],
-  factory: async (ctx, { model }) => {
-    const answer = await model.complete(ctx, `Classify:\n${ctx.input.text}`)
-    return JSON.parse(answer) as { label: string }
+  deps: { complete },
+  factory: async (ctx, { complete }) => {
+    const response = await complete.exec({
+      input: {
+        agentName: "classify",
+        instructions: "Classify the text.",
+        messages: [{ role: "user", content: `Classify:\n${ctx.input.text}` }],
+        tools: [],
+        skills: [],
+        loadedSkills: [],
+        subagents: [],
+        round: 0,
+      },
+    })
+    return JSON.parse(response.content) as { label: string }
   },
 })
 
-const fakeModel: Model = {
-  complete: async () => JSON.stringify({ label: "test" }),
-}
+const scope = createScope({ tags: [model(live)] })
 
 const testScope = createScope({
-  presets: [preset(model, fakeModel)],
+  tags: [model(modelStub(() => ({ content: JSON.stringify({ label: "test" }), stop: true })))],
 })
 ```
 

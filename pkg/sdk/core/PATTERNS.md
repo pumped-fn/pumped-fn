@@ -110,44 +110,50 @@ export const lint = flow({
 
 ## 3. LLM Provider
 
-Prefer AI provider as a service. The flow owns prompt shape and output parsing.
+Providers are implementor flows carried by the `model` tag. Consumers exec the `complete` port flow, which owns the `kind: "llm"` step span; the consuming flow owns prompt shape and output parsing.
 
 ```ts
-import { service, type Lite } from "@pumped-fn/lite"
+import { flow, typed } from "@pumped-fn/lite"
+import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
 
-interface Model {
-  complete(ctx: Lite.ExecutionContext, input: { system: string; prompt: string }): Promise<string>
-}
-
-export const model = service<Model>({
-  factory: () => {
-    const client = new ClaudeModel()
-    return {
-      complete: async (_ctx, input) => client.complete(input),
-    }
-  },
+const live: Model = flow({
+  name: "live-model",
+  parse: typed<ModelRequest>(),
+  factory: async (ctx) => ({
+    content: await new ClaudeModel().complete(ctx.input.messages),
+    stop: true,
+  }),
 })
 
 export const classify = flow({
   name: "classify",
   parse: typed<{ text: string }>(),
-  deps: { model },
-  tags: [step({ kind: "llm" })],
-  factory: async (ctx, { model }) => {
-    const raw = await model.complete(ctx, {
-      system: "Return JSON only.",
-      prompt: ctx.input.text,
+  deps: { complete },
+  factory: async (ctx, { complete }) => {
+    const response = await complete.exec({
+      input: {
+        agentName: "classify",
+        instructions: "Return JSON only.",
+        messages: [{ role: "user", content: ctx.input.text }],
+        tools: [],
+        skills: [],
+        loadedSkills: [],
+        subagents: [],
+        round: 0,
+      },
     })
-    return JSON.parse(raw) as { label: string }
+    return JSON.parse(response.content) as { label: string }
   },
 })
 ```
 
-Test by preset, not by special agent hooks:
+Test by rebinding the tag, not by special agent hooks:
 
 ```ts
+import { modelStub } from "@pumped-fn/sdk-test"
+
 const scope = createScope({
-  presets: [preset(model, { complete: async () => '{"label":"test"}' })],
+  tags: [model(modelStub(() => ({ content: '{"label":"test"}', stop: true })))],
 })
 ```
 
@@ -165,13 +171,15 @@ const loadTicket = tool({
   }),
 })
 
-const provider: Model = {
-  complete: (_ctx, request) => request.loadedSkills.length === 0
+const provider: Model = flow({
+  name: "triage-model",
+  parse: typed<ModelRequest>(),
+  factory: (ctx) => ctx.input.loadedSkills.length === 0
     ? {
         content: "need routing policy",
         skillCalls: [{ name: "routing-policy" }],
       }
-    : request.round === 1
+    : ctx.input.round === 1
     ? {
         content: "loading",
         toolCalls: [{ name: "load-ticket", input: { id: "42" } }],
@@ -180,7 +188,7 @@ const provider: Model = {
         content: "ready",
         stop: true,
       },
-}
+})
 
 const triage = agent({
   name: "triage",

@@ -1,10 +1,12 @@
-import { bound, controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
+import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { model, step } from "@pumped-fn/sdk"
+import { complete, step } from "@pumped-fn/sdk"
 import { classifyRequest, parseClassification } from "./model"
 import {
   clock,
+  drained,
+  importing,
   intakeLines,
   ledger,
   mailer,
@@ -35,11 +37,10 @@ import {
 export const classify = flow({
   name: "invoice.classify",
   parse: typed<Invoice>(),
-  deps: { model: bound(tags.required(model)) },
-  tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { model }): Promise<Classification> => {
+  deps: { complete },
+  factory: async (ctx, { complete }): Promise<Classification> => {
     const request = classifyRequest(ctx.input)
-    const response = await model.complete(request)
+    const response = await complete.exec({ input: request })
     return parseClassification(response.content, ctx.input)
   },
 })
@@ -129,18 +130,23 @@ export const ingest = flow({
   name: "invoice.ingest",
   deps: {
     control: controller(queue, { resolve: true }),
+    progress: controller(importing, { resolve: true }),
     importBatch: controller(importBatch),
   },
-  factory: async (ctx, { control, importBatch }): Promise<void> => {
+  factory: async (ctx, { control, progress, importBatch }): Promise<void> => {
     for await (const pending of ctx.changes(queue)) {
       if (pending.length === 0) continue
-      let drained: readonly Invoice[] = []
+      progress.update((count) => count + 1)
+      let batch: readonly Invoice[] = []
       control.update((current) => {
-        drained = current
+        batch = current
         return []
       })
-      if (drained.length === 0) continue
-      await importBatch.exec({ input: { invoices: drained } })
+      try {
+        if (batch.length > 0) await importBatch.exec({ input: { invoices: batch } })
+      } finally {
+        progress.update((count) => count - 1)
+      }
     }
   },
 })
@@ -186,8 +192,8 @@ export const intake = flow({
 export const awaitDrained = flow({
   name: "invoice.awaitDrained",
   factory: async (ctx): Promise<void> => {
-    for await (const pending of ctx.changes(queue)) {
-      if (pending.length === 0) return
+    for await (const idle of ctx.changes(drained)) {
+      if (idle) return
     }
   },
 })

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { Model } from "@pumped-fn/sdk"
+import type { ModelRequest } from "@pumped-fn/sdk"
 import { categories, classification, type Classification, type Invoice } from "./types"
 
 const classificationOutput = z.string().transform((output, ctx): unknown => {
@@ -20,7 +20,7 @@ export function classificationPrompt(invoice: Invoice): string {
   ].join("\n")
 }
 
-export function classifyRequest(invoice: Invoice): Parameters<Model["complete"]>[1] {
+export function classifyRequest(invoice: Invoice): ModelRequest {
   return {
     agentName: "invoice-triage",
     instructions: "Classify invoices for accounts-payable automation.",

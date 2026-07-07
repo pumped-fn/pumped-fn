@@ -1,9 +1,9 @@
-import { createScope } from "@pumped-fn/lite"
-import { agent, model, type Model } from "@pumped-fn/sdk"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { agent, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import { expect, it } from "vitest"
 import { claude } from "../src/index"
 
-it("provides Claude through a lazy agent model tag", async () => {
+it("provides Claude through the agent model tag", async () => {
   const target = agent({ name: "planner" })
   const scope = createScope({
     tags: [
@@ -27,27 +27,18 @@ it("provides Claude through a lazy agent model tag", async () => {
   await scope.dispose()
 })
 
-it("defers Claude harness validation until the model is used", async () => {
-  const target = agent({ name: "planner" })
-  const scope = createScope({
-    tags: [claude({ command: "echo", isolate: false, extraArgs: ["--bare"] })],
-  })
-  const ctx = scope.createContext()
-
-  await expect(ctx.exec({
-    flow: target.turn,
-    input: { prompt: "plan" },
-  })).rejects.toThrow("Claude harness must not use --bare")
-
-  await ctx.close({ ok: false, error: new Error("expected") })
-  await scope.dispose()
+it("validates Claude harness configuration eagerly", () => {
+  expect(() => claude({ command: "echo", isolate: false, extraArgs: ["--bare"] })).toThrow(
+    "Claude harness must not use --bare"
+  )
 })
 
 it("can be replaced per execution context without rebuilding the agent", async () => {
   const target = agent({ name: "planner" })
-  const replacement: Model = {
-    complete: () => ({ content: "provider=fake", stop: true }),
-  }
+  const replacement: Model = flow({
+    parse: typed<ModelRequest>(),
+    factory: () => ({ content: "provider=fake", stop: true }),
+  })
   const scope = createScope({
     tags: [
       claude({

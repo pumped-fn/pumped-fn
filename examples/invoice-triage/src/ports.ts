@@ -1,6 +1,6 @@
-import { atom, controller, tag, type Lite } from "@pumped-fn/lite"
+import { atom, controller, flow, tag, typed, type Lite } from "@pumped-fn/lite"
 import { createInterface } from "node:readline"
-import type { Model } from "@pumped-fn/sdk"
+import type { Model, ModelRequest } from "@pumped-fn/sdk"
 import { classifyHeuristically } from "./model"
 import type { Invoice, ReminderMessage, StoredInvoice } from "./types"
 
@@ -93,6 +93,19 @@ export const ledger = atom({
   factory: (): readonly StoredInvoice[] => [],
 })
 
+export const importing = atom({
+  keepAlive: true,
+  factory: (): number => 0,
+})
+
+export const drained = atom({
+  deps: {
+    queue: controller(queue, { resolve: true, watch: true }),
+    importing: controller(importing, { resolve: true, watch: true }),
+  },
+  factory: (_ctx, { queue, importing }) => queue.get().length === 0 && importing.get() === 0,
+})
+
 export const reviewCount = atom({
   deps: {
     ledger: controller(ledger, { resolve: true, watch: true }),
@@ -119,9 +132,11 @@ export const mailer = atom({
   factory: memoryMailer,
 })
 
-export const heuristic: Model = Object.freeze({
-  complete: (_ctx: Lite.ExecutionContext, request: Parameters<Model["complete"]>[1]) => {
-    const message = request.messages.at(-1)?.content ?? ""
+export const heuristic: Model = flow({
+  name: "invoice.heuristic",
+  parse: typed<ModelRequest>(),
+  factory: (ctx) => {
+    const message = ctx.input.messages.at(-1)?.content ?? ""
     const marker = "Invoice: "
     const index = message.indexOf(marker)
     const invoice = JSON.parse(message.slice(index + marker.length)) as Invoice

@@ -10,13 +10,11 @@ export {
   tagExecutorSymbol,
   typedSymbol,
   resourceSymbol,
-  boundDepSymbol,
   ParseError,
   FlowFault,
 } from "./types"
 export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags } from "./tag"
 export { atom, isAtom, controller, isControllerDep, service } from "./atom"
-export { bound, isBoundDep } from "./bound"
 export { flow, isFlow, typed, isFault } from "./flow"
 export { preset, isPreset } from "./preset"
 export { resource, isResource } from "./resource"

@@ -293,6 +293,7 @@ Tag executor (dependency wiring):
   tags.required(tag)   → T        resolves tag or throws (atom deps: scope, flow deps: hierarchy)
   tags.optional(tag)   → T | undefined   resolves or undefined
   tags.all(tag)        → T[]      collects from all levels of hierarchy
+  A tag carrying a Flow projects: required/optional → FlowHandle (| undefined), all → FlowHandle[]
 
 Introspection:
   tag.atoms()          → Atom[] with this tag attached

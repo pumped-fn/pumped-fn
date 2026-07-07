@@ -1,4 +1,4 @@
-import { controllerSymbol, tagExecutorSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
+import { controllerSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
@@ -188,6 +188,16 @@ function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.Atom
 function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
   const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
   return iterate ? iterate.call(source) : source as AsyncIterator<T>
+}
+
+function composeUpdate<T>(
+  pending: { value: T } | { fn: (prev: T) => T } | undefined,
+  fn: (prev: T) => T
+): { fn: (prev: T) => T } {
+  if (!pending) return { fn }
+  if ('value' in pending) return { fn: () => fn(pending.value) }
+  const prior = pending.fn
+  return { fn: (prev) => fn(prior(prev)) }
 }
 
 function notifyListeners(listeners: Set<() => void> | undefined): void {
@@ -667,20 +677,28 @@ class ScopeImpl implements Lite.Scope {
         case "required": {
           const value = tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
+            if (isFlow(value)) return null
             result[key] = value
           } else if (tagExecutor.tag.hasDefault) {
+            if (isFlow(tagExecutor.tag.defaultValue)) return null
             result[key] = tagExecutor.tag.defaultValue
           } else {
             return null
           }
           break
         }
-        case "optional":
-          result[key] = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
+        case "optional": {
+          const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
+          if (isFlow(value)) return null
+          result[key] = value
           break
-        case "all":
-          result[key] = tagExecutor.tag.collect(this.tags)
+        }
+        case "all": {
+          const values = tagExecutor.tag.collect(this.tags)
+          if (values.some(isFlow)) return null
+          result[key] = values
           break
+        }
       }
     }
 
@@ -1034,19 +1052,6 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
-    for (let i = 0; i < graph.bound.length; i++) {
-      if (!ctx) throw new Error("Bound deps require an ExecutionContext")
-      const [key, dep] = graph.bound[i]!
-      const value = this.resolveBoundDep(dep, ctx, dependentAtom, resourcePath)
-      if (isPromiseLike(value)) {
-        parallel.push(Promise.resolve(value).then((boundValue) => {
-          result[key] = boundValue
-        }))
-      } else {
-        result[key] = value
-      }
-    }
-
     for (let i = 0; i < graph.tags.length; i++) {
       const [key, tagExecutor] = graph.tags[i]!
       switch (tagExecutor.mode) {
@@ -1055,9 +1060,9 @@ class ScopeImpl implements Lite.Scope {
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
-            result[key] = value
+            result[key] = this.projectTagValue(value, ctx)
           } else if (tagExecutor.tag.hasDefault) {
-            result[key] = tagExecutor.tag.defaultValue
+            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx)
           } else {
             throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
           }
@@ -1067,13 +1072,14 @@ class ScopeImpl implements Lite.Scope {
           const value = ctx
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
-          result[key] = value ?? tagExecutor.tag.defaultValue
+          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx)
           break
         }
         case "all": {
-          result[key] = ctx
+          const values = ctx
             ? this.collectFromHierarchy(ctx, tagExecutor.tag)
             : tagExecutor.tag.collect(this.tags)
+          result[key] = values.map((value) => this.projectTagValue(value, ctx))
           break
         }
       }
@@ -1090,6 +1096,12 @@ class ScopeImpl implements Lite.Scope {
     if (parallel.length === 0) return result
     if (parallel.length === 1) return parallel[0]!.then(() => result)
     return Promise.all(parallel).then(() => result)
+  }
+
+  private projectTagValue(value: unknown, ctx: Lite.ExecutionContext | undefined): unknown {
+    if (!isFlow(value)) return value
+    if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+    return this.createFlowHandle(value, ctx)
   }
 
   private createFlowHandle<Output, Input, Yield>(
@@ -1179,72 +1191,6 @@ class ScopeImpl implements Lite.Scope {
       prev = next
     })
     dependent.entry.cleanups.push(unsub)
-  }
-
-  private bindBoundValue(value: unknown, ctx: Lite.ExecutionContext): unknown {
-    if (value === undefined) return undefined
-    if (typeof value === "function") {
-      const fn = value as (ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown
-      return (...args: unknown[]) => fn(ctx, ...args)
-    }
-    if (typeof value !== "object" || value === null) {
-      throw new Error("bound() deps must resolve to a function or object")
-    }
-    const source = value as Record<PropertyKey, unknown>
-    const result: Record<PropertyKey, unknown> = {}
-    for (const property of Reflect.ownKeys(source)) {
-      if (!Object.prototype.propertyIsEnumerable.call(source, property)) continue
-      const member = source[property]
-      result[property] = typeof member === "function"
-        ? (...args: unknown[]) => (member as (ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown)(ctx, ...args)
-        : member
-    }
-    return result
-  }
-
-  private resolveBoundTag(tagExecutor: Lite.TagExecutor<unknown, unknown>, ctx: Lite.ExecutionContext): unknown {
-    switch (tagExecutor.mode) {
-      case "required": {
-        const value = ctx.data.seekTag(tagExecutor.tag)
-        if (value !== undefined) return value
-        if (tagExecutor.tag.hasDefault) return tagExecutor.tag.defaultValue
-        throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
-      }
-      case "optional": {
-        const value = ctx.data.seekTag(tagExecutor.tag)
-        return value ?? tagExecutor.tag.defaultValue
-      }
-      case "all":
-        throw new Error("bound() tag deps support tags.required and tags.optional")
-    }
-  }
-
-  private resolveBoundDep(
-    dep: Lite.BoundDep<unknown>,
-    ctx: Lite.ExecutionContext,
-    dependentAtom: Lite.Atom<unknown> | undefined,
-    resourcePath?: Set<Lite.Resource<unknown>>,
-  ): unknown | Promise<unknown> {
-    const source = dep.dep
-    if (isAtom(source)) {
-      const cachedEntry = this.cache.get(source)
-      if (cachedEntry?.state === "resolved") {
-        this.trackDependent(source, dependentAtom)
-        return this.bindBoundValue(cachedEntry.value, ctx)
-      }
-      return this.resolve(source).then((value) => {
-        this.trackDependent(source, dependentAtom)
-        return this.bindBoundValue(value, ctx)
-      })
-    }
-    if (isResource(source)) {
-      assertExecutionContextImpl(ctx)
-      return this.resolveResource(source, ctx, resourcePath).then((value) => this.bindBoundValue(value, ctx))
-    }
-    if (typeof source === "object" && source !== null && tagExecutorSymbol in source) {
-      return this.bindBoundValue(this.resolveBoundTag(source as Lite.TagExecutor<unknown, unknown>, ctx), ctx)
-    }
-    throw new Error("bound() deps can wrap tags.required, tags.optional, atom, or resource")
   }
 
   private async resolveResourceDeps(
@@ -1692,20 +1638,14 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
-      entry.value = value
-      entry.state = 'resolved'
-      entry.hasValue = true
-      entry.error = undefined
-      entry.pendingInvalidate = false
-      entry.resolvedPromise = undefined
-      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-      return
-    }
-
-    entry.pendingSet = { value }
-    this.scheduleInvalidation(atom, entry)
+    entry.value = value
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    entry.resolvedPromise = undefined
+    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
   scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T, cachedEntry?: AtomEntry<T>): void {
@@ -1718,24 +1658,18 @@ class ScopeImpl implements Lite.Scope {
     }
 
     if (entry.state === 'resolving') {
-      entry.pendingSet = { fn }
+      entry.pendingSet = composeUpdate(entry.pendingSet, fn)
       return
     }
 
-    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
-      entry.value = fn(entry.value as T)
-      entry.state = 'resolved'
-      entry.hasValue = true
-      entry.error = undefined
-      entry.pendingInvalidate = false
-      entry.resolvedPromise = undefined
-      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-      return
-    }
-
-    entry.pendingSet = { fn }
-    this.scheduleInvalidation(atom, entry)
+    entry.value = fn(entry.value as T)
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    entry.resolvedPromise = undefined
+    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
   private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
