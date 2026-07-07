@@ -895,7 +895,14 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
         || ts.isArrowFunction(current)
         || ts.isMethodDeclaration(current)
         || ts.isConstructorDeclaration(current))
-      && current.parameters.some((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === name)
+      && current.parameters.some((parameter) => bindingNameHas(parameter.name, name))
+    ) {
+      return true
+    }
+    if (
+      ts.isCatchClause(current)
+      && current.variableDeclaration !== undefined
+      && bindingNameHas(current.variableDeclaration.name, name)
     ) {
       return true
     }

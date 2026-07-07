@@ -50,6 +50,11 @@ export const queries = atom({
     },
     async settleImport(input: SaveInvoiceInput): Promise<StoredInvoice> {
       return db.transaction(async (tx) => {
+        const claimed = await tx.delete(pendingInvoices).where(eq(pendingInvoices.id, input.invoice.id)).returning({ id: pendingInvoices.id })
+        if (claimed.length === 0) {
+          const existing = await tx.select().from(storedInvoices).where(eq(storedInvoices.id, input.invoice.id))
+          if (existing[0] !== undefined) return storedFromRow(existing[0])
+        }
         const rows = await tx.insert(storedInvoices).values({
           id: input.invoice.id,
           invoice: input.invoice,
@@ -64,7 +69,6 @@ export const queries = atom({
             remindedAt: sql`${storedInvoices.remindedAt}`,
           },
         }).returning()
-        await tx.delete(pendingInvoices).where(eq(pendingInvoices.id, input.invoice.id))
         await tx.insert(auditEvents).values({
           action: "imported",
           entityId: input.invoice.id,

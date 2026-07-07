@@ -874,6 +874,28 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
+  it("concurrent-settle: a second worker settling the same invoice cannot overwrite or double-audit", async () => {
+    const db = await pgliteDatabase()
+    const winner = createScope({ presets: [preset(database, db)], tags: [clock({ now: () => now })] })
+    const loser = createScope({ presets: [preset(database, db)], tags: [clock({ now: () => now })] })
+    const winnerCtx = winner.createContext()
+    const loserCtx = loser.createContext()
+    const item = invoice("inv-race-settle")
+
+    await winnerCtx.exec({ flow: enqueue, input: { invoices: [item] } })
+    const first = await winnerCtx.exec({ flow: saveInvoice, input: { invoice: item, classification: classification({ risk: "auto-approve", reason: "winner" }) } })
+    const second = await loserCtx.exec({ flow: saveInvoice, input: { invoice: item, classification: classification({ risk: "review", reason: "loser" }) } })
+
+    expect(first.classification.reason).toBe("winner")
+    expect(second.classification.reason).toBe("winner")
+    expect((await winnerCtx.exec({ flow: listStored })).map((row) => row.classification.reason)).toEqual(["winner"])
+    expect((await winnerCtx.exec({ flow: listAudit })).filter((event) => event.action === "imported")).toHaveLength(1)
+    await winnerCtx.close({ ok: true })
+    await loserCtx.close({ ok: true })
+    await winner.dispose()
+    await loser.dispose()
+  })
+
   it("reminder-retry: failed delivery releases the claim for a later run", async () => {
     const db = await pgliteDatabase()
     const messages: ReminderMessage[] = []
