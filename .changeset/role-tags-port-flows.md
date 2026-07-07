@@ -20,3 +20,10 @@ from lite — value-level ctx currying is replaced by graph-native composition
 implementor flow. lite-lint gains `pumped/no-unattributed-await` (awaited
 foreign calls must sit inside a step-tagged flow or go through a port flow)
 and the `no-ctx-argument` remedy now points at port flows.
+
+Also fixes lost controller writes: `set`/`update` on a resolved atom now apply
+immediately even while an invalidation chain is active (previously they were
+deferred into a single pending slot — concurrent `update` callbacks were
+silently dropped and capture-inside-updater read stale state whenever a
+`watch: true` derived atom was subscribed). Updates queued during `resolving`
+now compose instead of overwriting.

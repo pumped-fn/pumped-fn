@@ -4487,3 +4487,92 @@ describe("listener replacement between dispatches", () => {
     await scope.dispose()
   })
 })
+
+describe("pending update composition", () => {
+  it("composes same-tick updates while a watch chain is active", async () => {
+    const trigger = atom({ keepAlive: true, factory: (): number => 0 })
+    const counter = atom({ keepAlive: true, factory: (): number => 0 })
+    const idle = atom({
+      deps: {
+        trigger: controller(trigger, { resolve: true, watch: true }),
+        counter: controller(counter, { resolve: true, watch: true }),
+      },
+      factory: (_ctx, { trigger, counter }) => trigger.get() > 0 && counter.get() === 0,
+    })
+    const applied: string[] = []
+    const loop = flow({
+      deps: { count: controller(counter, { resolve: true }) },
+      factory: async (ctx, { count }): Promise<void> => {
+        for await (const value of ctx.changes(trigger)) {
+          if (value === 0) continue
+          count.update((current) => {
+            applied.push(`inc:${current}`)
+            return current + 1
+          })
+          count.update((current) => {
+            applied.push(`dec:${current}`)
+            return current - 1
+          })
+          if (value >= 3) return
+        }
+      },
+    })
+    const scope = createScope()
+    const watcher = (async () => {
+      for await (const _ of scope.changes(idle)) void _
+    })()
+    const ctx = scope.createContext()
+    const running = ctx.exec({ flow: loop })
+    const ctrl = scope.controller(trigger)
+    await ctrl.resolve()
+    for (const round of [1, 2, 3]) {
+      ctrl.update(() => round)
+      await new Promise((resolve) => setTimeout(resolve))
+    }
+    await running
+
+    expect(await scope.resolve(counter)).toBe(0)
+    expect(applied).toEqual(["inc:0", "dec:1", "inc:0", "dec:1", "inc:0", "dec:1"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+    await Promise.allSettled([watcher])
+  })
+
+  it("applies an update on top of a same-tick set while a watch chain is active", async () => {
+    const trigger = atom({ keepAlive: true, factory: (): number => 0 })
+    const counter = atom({ keepAlive: true, factory: (): number => 0 })
+    const idle = atom({
+      deps: {
+        trigger: controller(trigger, { resolve: true, watch: true }),
+        counter: controller(counter, { resolve: true, watch: true }),
+      },
+      factory: (_ctx, { trigger, counter }) => trigger.get() > 0 && counter.get() === 0,
+    })
+    const loop = flow({
+      deps: { count: controller(counter, { resolve: true }) },
+      factory: async (ctx, { count }): Promise<void> => {
+        for await (const value of ctx.changes(trigger)) {
+          if (value === 0) continue
+          count.set(10)
+          count.update((current) => current + 1)
+          return
+        }
+      },
+    })
+    const scope = createScope()
+    const watcher = (async () => {
+      for await (const _ of scope.changes(idle)) void _
+    })()
+    const ctx = scope.createContext()
+    const running = ctx.exec({ flow: loop })
+    const ctrl = scope.controller(trigger)
+    await ctrl.resolve()
+    ctrl.update(() => 1)
+    await running
+
+    expect(await scope.resolve(counter)).toBe(11)
+    await ctx.close({ ok: true })
+    await scope.dispose()
+    await Promise.allSettled([watcher])
+  })
+})

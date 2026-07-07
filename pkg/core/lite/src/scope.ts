@@ -190,6 +190,16 @@ function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
   return iterate ? iterate.call(source) : source as AsyncIterator<T>
 }
 
+function composeUpdate<T>(
+  pending: { value: T } | { fn: (prev: T) => T } | undefined,
+  fn: (prev: T) => T
+): { fn: (prev: T) => T } {
+  if (!pending) return { fn }
+  if ('value' in pending) return { fn: () => fn(pending.value) }
+  const prior = pending.fn
+  return { fn: (prev) => fn(prior(prev)) }
+}
+
 function notifyListeners(listeners: Set<() => void> | undefined): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
@@ -1628,20 +1638,14 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
-      entry.value = value
-      entry.state = 'resolved'
-      entry.hasValue = true
-      entry.error = undefined
-      entry.pendingInvalidate = false
-      entry.resolvedPromise = undefined
-      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-      return
-    }
-
-    entry.pendingSet = { value }
-    this.scheduleInvalidation(atom, entry)
+    entry.value = value
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    entry.resolvedPromise = undefined
+    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
   scheduleUpdate<T>(atom: Lite.Atom<T>, fn: (prev: T) => T, cachedEntry?: AtomEntry<T>): void {
@@ -1654,24 +1658,18 @@ class ScopeImpl implements Lite.Scope {
     }
 
     if (entry.state === 'resolving') {
-      entry.pendingSet = { fn }
+      entry.pendingSet = composeUpdate(entry.pendingSet, fn)
       return
     }
 
-    if (this.invalidationQueue.length === 0 && !this.chainPromise) {
-      entry.value = fn(entry.value as T)
-      entry.state = 'resolved'
-      entry.hasValue = true
-      entry.error = undefined
-      entry.pendingInvalidate = false
-      entry.resolvedPromise = undefined
-      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
-      return
-    }
-
-    entry.pendingSet = { fn }
-    this.scheduleInvalidation(atom, entry)
+    entry.value = fn(entry.value as T)
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = false
+    entry.resolvedPromise = undefined
+    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
   private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
