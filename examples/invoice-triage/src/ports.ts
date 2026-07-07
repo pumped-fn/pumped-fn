@@ -39,6 +39,11 @@ export const storedSignal = atom({
   factory: (): number => 0,
 })
 
+export const stopping = atom({
+  keepAlive: true,
+  factory: (): boolean => false,
+})
+
 export const importing = atom({
   keepAlive: true,
   factory: (): number => 0,

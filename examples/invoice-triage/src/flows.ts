@@ -13,6 +13,7 @@ import {
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
+  stopping,
   storedSignal,
 } from "./ports"
 import {
@@ -109,11 +110,13 @@ export const ingest = flow({
   deps: {
     outstanding: controller(outstanding, { resolve: true }),
     importing: controller(importing, { resolve: true }),
+    stopping: controller(stopping, { resolve: true }),
     drainPending: controller(drainPending),
     importBatch: controller(importBatch),
   },
-  factory: async (ctx, { outstanding, importing, drainPending, importBatch }): Promise<void> => {
+  factory: async (ctx, { outstanding, importing, stopping, drainPending, importBatch }): Promise<void> => {
     for await (const _signal of ctx.changes(queueSignal)) {
+      if (stopping.get()) return
       const batch = await drainPending.exec()
       if (batch.length === 0) continue
       importing.update((count) => count + 1)
@@ -130,12 +133,14 @@ export const ingest = flow({
 export const watchReviewQueue = flow({
   name: "invoice.watchReviewQueue",
   deps: {
+    stopping: controller(stopping, { resolve: true }),
     reviewCount: controller(reviewCount),
     logger: logging.logger,
   },
-  factory: async (ctx, { reviewCount, logger }): Promise<void> => {
+  factory: async (ctx, { stopping, reviewCount, logger }): Promise<void> => {
     let last = -1
     for await (const _signal of ctx.changes(storedSignal)) {
+      if (stopping.get()) return
       const count = await reviewCount.exec()
       if (count === last) continue
       last = count

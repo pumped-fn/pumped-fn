@@ -49,14 +49,14 @@ Business features are flows/resources; free functions are pure calculations; ctx
 
 External data is schema-validated with zod at parse and model-output boundaries; graph-internal handoffs stay typed.
 
-Every side effect is a scalar flow reached through a deps-declared flow handle:
+Database side effects are scalar store flows backed by a `queries` atom through `traced()`. The public flow names remain workflow store steps, and each database operation runs as a named traced exec edge. Multi-statement aggregates that pair table writes with audit rows run in one transaction.
 
 - `classify` builds the model request and validates the response; it execs the SDK `complete` port flow (a bare flow dep, projected to a handle) rather than owning the llm span itself.
-- `enqueue` owns intake validation and inserting invoice work into `invoice_pending`.
-- `drainPending` owns the atomic pending drain with `delete returning`.
-- `saveInvoice` owns the `invoice_stored` upsert.
+- `enqueue` owns intake validation, calls `store.enqueuePending`, and wakes the queue when rows are accepted.
+- `drainPending` calls `store.drainPending` for the pending drain with `delete returning`.
+- `saveInvoice` calls `store.upsertStored` for the `invoice_stored` upsert and wakes ops views.
 - `dailyReport` owns report materialization.
-- `markReminderSent` owns the idempotent reminder claim.
+- `markReminderSent` calls `store.claimReminder` for the idempotent reminder claim.
 - `deliver` owns mail delivery through the `mailer` role tag.
 
 `triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag — the SDK `complete` port flow owns that span. A completed workflow run now shows the model implementor's step followed by `model.complete` where `invoice.classify` used to appear; `invoice.classify` itself is untracked plumbing around that call. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
@@ -101,7 +101,7 @@ The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This examp
 
 ## Ops Notes
 
-Run Postgres with `docker compose -f examples/invoice-triage/compose.yaml up -d postgres`, then run `pnpm start < fixtures/demo.ndjson` from the example package. The composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows — it holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then waits for `drained` — accepted work settled and no batch in flight — and disposes, so a slow provider cannot lose the final batch. Shutdown is the graph closing, not a kill.
+Run Postgres with `docker compose -f examples/invoice-triage/compose.yaml up -d postgres`, then run `pnpm start < fixtures/demo.ndjson` from the example package. The composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows — it holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. SIGINT ends intake; the root then waits for `drained` — accepted work settled and no batch in flight — sets `stopping`, bumps `queueSignal` and `storedSignal` to wake both loops, waits for them to settle, then closes the context and disposes the scope. Nothing runs during teardown.
 
 Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, bind `mailer` to a real delivery implementor, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 

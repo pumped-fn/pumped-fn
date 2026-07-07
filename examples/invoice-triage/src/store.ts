@@ -1,4 +1,4 @@
-import { controller, flow, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, tags, traced, typed } from "@pumped-fn/lite"
 import { step } from "@pumped-fn/sdk"
 import { and, asc, count, eq, isNull, sql } from "drizzle-orm"
 import { database } from "./database"
@@ -17,176 +17,201 @@ import {
 type StoredRow = typeof storedInvoices.$inferSelect
 type AuditRow = typeof auditEvents.$inferSelect
 
+export const queries = atom({
+  keepAlive: true,
+  deps: {
+    db: database,
+    clock: tags.required(clock),
+  },
+  factory: (_ctx, { db, clock }) => ({
+    async enqueuePending(invoices: readonly Invoice[]): Promise<readonly string[]> {
+      return db.transaction(async (tx) => {
+        const rows = invoices.map((invoice) => ({
+          id: invoice.id,
+          invoice,
+          enqueuedAt: clock.now(),
+        }))
+        const inserted = rows.length === 0
+          ? []
+          : await tx.insert(pendingInvoices).values(rows).onConflictDoNothing().returning({ id: pendingInvoices.id })
+        const ids = inserted.map((row) => row.id)
+        await tx.insert(auditEvents).values({
+          action: "enqueued",
+          entityId: "pending",
+          occurredAt: clock.now(),
+          payload: { count: ids.length, ids },
+        })
+        return ids
+      })
+    },
+    async drainPending(): Promise<readonly Invoice[]> {
+      return db.transaction(async (tx) => {
+        const rows = await tx.delete(pendingInvoices).returning()
+        rows.sort((left, right) => left.enqueuedAt.getTime() - right.enqueuedAt.getTime() || left.id.localeCompare(right.id))
+        const ids = rows.map((row) => row.id)
+        if (ids.length > 0) {
+          await tx.insert(auditEvents).values({
+            action: "drained",
+            entityId: "pending",
+            occurredAt: clock.now(),
+            payload: { count: ids.length, ids },
+          })
+        }
+        return rows.map((row) => row.invoice)
+      })
+    },
+    async upsertStored(input: SaveInvoiceInput): Promise<StoredInvoice> {
+      return db.transaction(async (tx) => {
+        const rows = await tx.insert(storedInvoices).values({
+          id: input.invoice.id,
+          invoice: input.invoice,
+          classification: input.classification,
+          importedAt: clock.now(),
+        }).onConflictDoUpdate({
+          target: storedInvoices.id,
+          set: {
+            invoice: sql`excluded.invoice`,
+            classification: sql`excluded.classification`,
+            importedAt: sql`excluded.imported_at`,
+            remindedAt: sql`${storedInvoices.remindedAt}`,
+          },
+        }).returning()
+        await tx.insert(auditEvents).values({
+          action: "imported",
+          entityId: input.invoice.id,
+          occurredAt: clock.now(),
+          payload: {
+            risk: input.classification.risk,
+            category: input.classification.category,
+          },
+        })
+        return storedFromRow(rows[0]!)
+      })
+    },
+    async claimReminder(invoiceId: string): Promise<StoredInvoice | undefined> {
+      return db.transaction(async (tx) => {
+        const [row] = await tx.update(storedInvoices)
+          .set({ remindedAt: clock.now() })
+          .where(and(eq(storedInvoices.id, invoiceId), isNull(storedInvoices.remindedAt)))
+          .returning()
+        if (row === undefined) return undefined
+        await tx.insert(auditEvents).values({
+          action: "reminded",
+          entityId: row.id,
+          occurredAt: clock.now(),
+          payload: { dueDate: row.classification.dueDate },
+        })
+        return storedFromRow(row)
+      })
+    },
+    async listStored(): Promise<readonly StoredInvoice[]> {
+      const rows = await db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
+      return rows.map(storedFromRow)
+    },
+    async listPending(): Promise<readonly Invoice[]> {
+      const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
+      return rows.map((row) => row.invoice)
+    },
+    async reviewCount(): Promise<number> {
+      const [row] = await db.select({ value: count() }).from(storedInvoices)
+        .where(sql`${storedInvoices.classification}->>'risk' = 'review'`)
+      return row?.value ?? 0
+    },
+    async listAudit(): Promise<readonly AuditEvent[]> {
+      const rows = await db.select().from(auditEvents).orderBy(asc(auditEvents.sequence))
+      return rows.map(auditFromRow)
+    },
+  }),
+})
+
 export const enqueue = flow({
   name: "invoice.enqueue",
   parse: (input): EnqueueInput => enqueueInput.parse(input),
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
     queueSignal: controller(queueSignal, { resolve: true }),
     outstanding: controller(outstanding, { resolve: true }),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (ctx, { db, clock, queueSignal, outstanding }): Promise<EnqueueSummary> => {
-    const rows = ctx.input.invoices.map((invoice) => ({
-      id: invoice.id,
-      invoice,
-      enqueuedAt: clock.now(),
-    }))
-    const inserted = rows.length === 0
-      ? []
-      : await db.insert(pendingInvoices).values(rows).onConflictDoNothing().returning({ id: pendingInvoices.id })
-    const ids = inserted.map((row) => row.id)
-    await db.insert(auditEvents).values({
-      action: "enqueued",
-      entityId: "pending",
-      occurredAt: clock.now(),
-      payload: { count: ids.length, ids },
-    })
-    if (ids.length > 0) {
-      outstanding.update((value) => value + ids.length)
+  factory: async (ctx, { store, queueSignal, outstanding }): Promise<EnqueueSummary> => {
+    const ids = await store.enqueuePending.exec({ params: [ctx.input.invoices] })
+    const accepted = ids.length
+    if (accepted > 0) {
+      outstanding.update((value) => value + accepted)
       queueSignal.update((value) => value + 1)
     }
-    return { accepted: ids.length }
+    return { accepted }
   },
 })
 
 export const drainPending = flow({
   name: "invoice.drainPending",
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (_ctx, { db, clock }): Promise<readonly Invoice[]> => {
-    const rows = await db.delete(pendingInvoices).returning()
-    rows.sort((left, right) => left.enqueuedAt.getTime() - right.enqueuedAt.getTime() || left.id.localeCompare(right.id))
-    const ids = rows.map((row) => row.id)
-    if (ids.length > 0) {
-      await db.insert(auditEvents).values({
-        action: "drained",
-        entityId: "pending",
-        occurredAt: clock.now(),
-        payload: { count: ids.length, ids },
-      })
-    }
-    return rows.map((row) => row.invoice)
-  },
+  factory: (_ctx, { store }): Promise<readonly Invoice[]> => store.drainPending.exec(),
 })
 
 export const saveInvoice = flow({
   name: "invoice.save",
   parse: typed<SaveInvoiceInput>(),
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
     storedSignal: controller(storedSignal, { resolve: true }),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (ctx, { db, clock, storedSignal }): Promise<StoredInvoice> => {
-    const rows = await db.insert(storedInvoices).values({
-      id: ctx.input.invoice.id,
-      invoice: ctx.input.invoice,
-      classification: ctx.input.classification,
-      importedAt: clock.now(),
-    }).onConflictDoUpdate({
-      target: storedInvoices.id,
-      set: {
-        invoice: sql`excluded.invoice`,
-        classification: sql`excluded.classification`,
-        importedAt: sql`excluded.imported_at`,
-        remindedAt: sql`${storedInvoices.remindedAt}`,
-      },
-    }).returning()
-    await db.insert(auditEvents).values({
-      action: "imported",
-      entityId: ctx.input.invoice.id,
-      occurredAt: clock.now(),
-      payload: {
-        risk: ctx.input.classification.risk,
-        category: ctx.input.classification.category,
-      },
-    })
+  factory: async (ctx, { store, storedSignal }): Promise<StoredInvoice> => {
+    const row = await store.upsertStored.exec({ params: [ctx.input] })
     storedSignal.update((value) => value + 1)
-    return storedFromRow(rows[0]!)
+    return row
   },
 })
 
 export const listStored = flow({
   name: "invoice.listStored",
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (_ctx, { db }): Promise<readonly StoredInvoice[]> => {
-    const rows = await db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
-    return rows.map(storedFromRow)
-  },
+  factory: (_ctx, { store }): Promise<readonly StoredInvoice[]> => store.listStored.exec(),
 })
 
 export const listPending = flow({
   name: "invoice.listPending",
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (_ctx, { db }): Promise<readonly Invoice[]> => {
-    const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
-    return rows.map((row) => row.invoice)
-  },
+  factory: (_ctx, { store }): Promise<readonly Invoice[]> => store.listPending.exec(),
 })
 
 export const reviewCount = flow({
   name: "invoice.reviewCount",
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (_ctx, { db }): Promise<number> => {
-    const [row] = await db.select({ value: count() }).from(storedInvoices)
-      .where(sql`${storedInvoices.classification}->>'risk' = 'review'`)
-    return row?.value ?? 0
-  },
+  factory: (_ctx, { store }): Promise<number> => store.reviewCount.exec(),
 })
 
 export const listAudit = flow({
   name: "invoice.listAudit",
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (_ctx, { db }): Promise<readonly AuditEvent[]> => {
-    const rows = await db.select().from(auditEvents).orderBy(asc(auditEvents.sequence))
-    return rows.map(auditFromRow)
-  },
+  factory: (_ctx, { store }): Promise<readonly AuditEvent[]> => store.listAudit.exec(),
 })
 
 export const markReminderSent = flow({
   name: "invoice.markReminderSent",
   parse: typed<{ invoiceId: string }>(),
   deps: {
-    db: database,
-    clock: tags.required(clock),
+    store: traced(queries),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (ctx, { db, clock }): Promise<StoredInvoice | undefined> => {
-    const [row] = await db.update(storedInvoices)
-      .set({ remindedAt: clock.now() })
-      .where(and(eq(storedInvoices.id, ctx.input.invoiceId), isNull(storedInvoices.remindedAt)))
-      .returning()
-    if (row === undefined) return undefined
-    await db.insert(auditEvents).values({
-      action: "reminded",
-      entityId: row.id,
-      occurredAt: clock.now(),
-      payload: { dueDate: row.classification.dueDate },
-    })
-    return storedFromRow(row)
-  },
+  factory: (ctx, { store }): Promise<StoredInvoice | undefined> => store.claimReminder.exec({ params: [ctx.input.invoiceId] }),
 })
 
 function storedFromRow(row: StoredRow): StoredInvoice {

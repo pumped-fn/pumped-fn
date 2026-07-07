@@ -13,6 +13,7 @@ import {
   ingest,
   importBatch,
   intake,
+  listAudit,
   listPending,
   listStored,
   markReminderSent,
@@ -30,6 +31,8 @@ import {
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
+  stopping,
+  storedSignal,
 } from "../src/ports"
 import {
   type Category,
@@ -149,6 +152,16 @@ async function seedStored(ctx: Lite.ExecutionContext, invoices: readonly StoredI
     })
     if (item.remindedAt !== undefined) await ctx.exec({ flow: markReminderSent, input: { invoiceId: item.id } })
   }
+}
+
+async function stopLoop(scope: Lite.Scope, loop: Promise<void>): Promise<PromiseSettledResult<void>> {
+  const stop = await scope.controller(stopping, { resolve: true })
+  const queue = await scope.controller(queueSignal, { resolve: true })
+  const stored = await scope.controller(storedSignal, { resolve: true })
+  stop.update(() => true)
+  queue.update((value) => value + 1)
+  stored.update((value) => value + 1)
+  return (await Promise.allSettled([loop]))[0]!
 }
 
 function collecting(messages: ReminderMessage[]) {
@@ -323,9 +336,11 @@ describe("invoice triage patterns", () => {
     expect(run.steps.map((step) => step.targetName)).toEqual([
       "model.stub",
       "model.complete",
+      "store.upsertStored",
       "invoice.save",
       "model.stub",
       "model.complete",
+      "store.upsertStored",
       "invoice.save",
     ])
     await ctx.close({ ok: true })
@@ -494,9 +509,10 @@ describe("invoice triage patterns", () => {
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await ctx.exec({ flow: listPending })).toEqual([])
     expect(gate.calls()).toBe(all.length)
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
-    await processing
   })
 
   it("drain-race: enqueue interleaved after wakeup is drained without loss", async () => {
@@ -539,9 +555,10 @@ describe("invoice triage patterns", () => {
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await ctx.exec({ flow: listPending })).toEqual([])
     expect(gate.calls()).toBe(all.length)
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
-    await processing
   })
 
   it("shutdown: awaitDrained resolves only after the in-flight batch lands", async () => {
@@ -576,9 +593,10 @@ describe("invoice triage patterns", () => {
     await waiting
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
     expect(gate.calls()).toBe(batch.length)
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
-    await processing
   })
 
   it("shutdown: a failed import surfaces through ingest and never wedges awaitDrained", async () => {
@@ -598,9 +616,90 @@ describe("invoice triage patterns", () => {
     await ctx.exec({ flow: awaitDrained })
     expect(await ctx.exec({ flow: listStored })).toEqual([])
     expect(await ctx.exec({ flow: listPending })).toEqual([])
+    const ingestOutcome = await stopLoop(scope, processing)
+    expect(ingestOutcome.status).toBe("rejected")
+    if (ingestOutcome.status !== "rejected") throw new Error("ingest did not reject")
+    expect(ingestOutcome.reason).toEqual(expect.any(Error))
+    expect((ingestOutcome.reason as Error).message).toBe("provider down")
     await ctx.close({ ok: true })
     await scope.dispose()
-    await expect(processing).rejects.toThrow("provider down")
+  })
+
+  it("crash-recovery: pending rows from a prior scope import in the next scope", async () => {
+    const db = await pgliteDatabase()
+    const batch = [invoice("inv-recover-1"), invoice("inv-recover-2", { vendor: "Contoso Hardware", amount: 4_500 })]
+    const first = createScope({
+      presets: [preset(database, db)],
+      tags: [clock({ now: () => now })],
+    })
+    const firstCtx = first.createContext()
+
+    await expect(firstCtx.exec({ flow: enqueue, input: { invoices: batch } })).resolves.toEqual({ accepted: 2 })
+    expect((await firstCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
+    await firstCtx.close({ ok: true })
+    await first.dispose()
+
+    const gate = gated(batch.map((item) => json({
+      vendor: item.vendor,
+      amount: item.amount,
+      dueDate: item.dueDate,
+    })))
+    const second = createScope({
+      presets: [preset(database, db)],
+      tags: [
+        provider(gate.model),
+        clock({ now: () => now }),
+      ],
+    })
+    const secondCtx = second.createContext()
+    const processing = secondCtx.exec({ flow: ingest })
+
+    await gate.firstStarted
+    gate.releaseFirst()
+    await secondCtx.exec({ flow: awaitDrained })
+
+    const ingestOutcome = await stopLoop(second, processing)
+    expect(ingestOutcome.status).toBe("fulfilled")
+    expect((await secondCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
+    expect(await secondCtx.exec({ flow: listPending })).toEqual([])
+    await secondCtx.close({ ok: true })
+    await second.dispose()
+  })
+
+  it("aggregate-atomicity: enqueue rolls back pending rows when audit timestamp fails", async () => {
+    const db = await pgliteDatabase()
+    let calls = 0
+    const failingClock = {
+      now(): Date {
+        calls += 1
+        if (calls === 2) throw new Error("clock failed")
+        return now
+      },
+    }
+    const first = createScope({
+      presets: [preset(database, db)],
+      tags: [clock(failingClock)],
+    })
+    const firstCtx = first.createContext()
+
+    await expect(firstCtx.exec({ flow: enqueue, input: { invoices: [invoice("inv-atomic-1")] } })).rejects.toThrow("clock failed")
+    expect(calls).toBe(2)
+    expect(await firstCtx.exec({ flow: listPending })).toEqual([])
+    expect(await firstCtx.exec({ flow: listAudit })).toEqual([])
+    await firstCtx.close({ ok: true })
+    await first.dispose()
+
+    const second = createScope({
+      presets: [preset(database, db)],
+      tags: [clock({ now: () => now })],
+    })
+    const secondCtx = second.createContext()
+
+    await expect(secondCtx.exec({ flow: enqueue, input: { invoices: [invoice("inv-atomic-2")] } })).resolves.toEqual({ accepted: 1 })
+    expect((await secondCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual(["inv-atomic-2"])
+    expect((await secondCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued"])
+    await secondCtx.close({ ok: true })
+    await second.dispose()
   })
 
   it("pattern: changes ops view conflates review-count observations during import", async () => {
@@ -637,10 +736,11 @@ describe("invoice triage patterns", () => {
     expect(counts[0]).toBe(0)
     expect(counts.at(-1)).toBe(3)
     expect(counts).toEqual([...new Set(counts)].sort((left, right) => left - right))
+    const watchOutcome = await stopLoop(scope, watching)
+    expect(watchOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await log.close({ ok: true })
     await scope.dispose()
-    await watching
   })
 
   it("pattern: reminders are idempotent and include both reminder-window boundaries", async () => {
