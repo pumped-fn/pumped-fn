@@ -35,8 +35,8 @@ export async function main(): Promise<void> {
   await ctx.exec({ flow: intake })
   await ctx.exec({ flow: awaitDrained })
   await ctx.close({ ok: true })
-  await scope.dispose()
   const [ingestOutcome] = await Promise.allSettled([processing, watching])
+  await scope.dispose()
   process.off("SIGINT", stopIntake)
   if (ingestOutcome.status === "rejected") throw ingestOutcome.reason
 }

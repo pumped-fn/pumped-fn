@@ -359,3 +359,6 @@ examples/reactivity-bench/
 !.okra/memory/
 .okra/memory/*/*
 !.okra/memory/*/candidate-anti-goals.v1.json
+!.okra/runs/
+.okra/runs/*
+!.okra/runs/example-operational-20260707/

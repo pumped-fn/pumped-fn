@@ -318,7 +318,7 @@
       "recertify_by": "2027-01-05",
       "confidence": 0.85,
       "candidate_status": "candidate",
-      "no_regression_evidence": "none yet — pre-implementation guardrail",
+      "no_regression_evidence": "none yet \u2014 pre-implementation guardrail",
       "ratification": "proposed in design session 2026-07-07, pending user ratification"
     },
     {
@@ -335,7 +335,7 @@
       "recertify_by": "2027-01-05",
       "confidence": 0.85,
       "candidate_status": "candidate",
-      "no_regression_evidence": "none yet — pre-implementation guardrail",
+      "no_regression_evidence": "none yet \u2014 pre-implementation guardrail",
       "ratification": "proposed in design session 2026-07-07, pending user ratification"
     },
     {
@@ -353,7 +353,7 @@
       "recertify_by": "2027-01-05",
       "confidence": 0.85,
       "candidate_status": "candidate",
-      "no_regression_evidence": "none yet — lands with the migration sequence",
+      "no_regression_evidence": "none yet \u2014 lands with the migration sequence",
       "ratification": "proposed in design session 2026-07-07, pending user ratification"
     },
     {
@@ -372,6 +372,24 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "2 sync-start regression tests, spa browser test green, full workspace sweep green",
       "ratification": "found via CI browser test + commit bisection 2026-07-05"
+    },
+    {
+      "metric_id": "teardown_settles_inflight_execs",
+      "threshold": "every exec in flight at ctx.close/scope.dispose settles (resolves or rejects) deterministically; changes iterators bound to a root context end at that context's close",
+      "type": "tripwire",
+      "source_run_id": "example-operational-20260707",
+      "source_refs": [
+        "D2 checkpoint d2-teardown-gaps",
+        "session repro probes 2026-07-07"
+      ],
+      "applies_when": "any lite work touching context close, scope dispose, changes/resolveStream lifetimes, or exec pipeline teardown",
+      "does_not_apply_when": "cooperative-stop application patterns that quiesce before teardown",
+      "invalidates_when": "core teardown semantics are redesigned with tests pinning settle-on-teardown",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "none yet - recorded finding; example ships cooperative stop instead",
+      "ratification": "recorded per ratified D2 decision 2026-07-07; core fix deferred to a dedicated run"
     }
   ]
 }

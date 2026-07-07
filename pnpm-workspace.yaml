@@ -70,13 +70,17 @@ catalog:
   "@types/estree": 1.0.9
   "@types/jscodeshift": 17.3.0
   "@types/node": 25.9.1
+  "@types/pg": 8.20.0
   "@types/react": 19.2.15
   "@typescript/native-preview": 7.0.0-dev.20260526.1
   "@vitest/browser-playwright": 4.1.8
   "@vitest/coverage-v8": 4.1.8
+  "@electric-sql/pglite": 0.3.14
   acorn: 8.16.0
   cac: 7.0.0
   croner: 10.0.1
+  drizzle-kit: 0.31.8
+  drizzle-orm: 0.45.2
   estree-walker: 3.0.3
   github-actionlint: 1.7.12
   hono: 4.12.27
@@ -84,6 +88,7 @@ catalog:
   just-bash: 3.0.2
   magic-string: 0.30.21
   pino: 10.3.1
+  pg: 8.22.0
   playwright: 1.61.0
   react: 19.2.6
   react-dom: 19.2.6

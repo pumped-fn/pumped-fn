@@ -1,0 +1,1 @@
+{"event_type":"handback_event","unit_id":"stage-1-codex","observed_at":"2026-07-07T10:55:00Z","evidence_refs_or_hashes":["probe traces in session; scratch-main repro"],"cause":"execution surfaced core teardown unknowns (dispose-vs-in-flight-exec, changes-close cascade) -> handed to D2 instead of silent workaround"}

@@ -1,0 +1,30 @@
+{
+  "tree_version": 1,
+  "frame_version": 1,
+  "orchestrator": {
+    "owner": "claude-main-thread",
+    "owns": "objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target (operational_gate_pass_count == 10 of 10) or a human/blocking flag stops the loop",
+    "notes": "codex xhigh progression workers implement via worker prompt packets; claude reviews line-by-line and runs gates; user ratifies frame and merges"
+  },
+  "dkrs": [
+    { "id": "D1", "scope": "traced() design residuals: ExecFnOptions tags support confirmed in types; remaining: execStream variant scope (staged or now), member-handle type spelling, lint exemption shape", "decision_target": "freeze traced() packet for PKR-1", "budget": "1 short probe", "status": "mostly-resolved-by-user-direction (exec-format handles ratified in principle)" },
+    { "id": "D2", "scope": "core teardown semantics: in-flight exec during dispose never settles; child-ctx changes streams only end at dispose not at root close", "decision_target": "fix-now in core vs record as candidate anti-goal + cooperative-stop pattern only", "budget": "1 probe, already partially characterized with repro evidence", "risk_reduced": "shutdown hangs class; lite_core_regression wall" },
+    { "id": "D3", "scope": "OTel wiring shape: observable extension + otel.sink through scope; span export read method for G6 manifest", "decision_target": "G6 gate read method + stage-2 packet content", "budget": "1 short probe" }
+  ],
+  "ckrs": [
+    { "id": "C1", "statement": "traced() operator in lite core", "metric": "G5: lite suite green with traced tests; example store call sites carry zero ctx.exec ceremony", "balance": "discovery: D1 residuals; delivery: PKR-1 then PKR-3" },
+    { "id": "C2", "statement": "durable pg/drizzle store with atomic aggregates and recovery", "metric": "G1,G2,G4,G7,G8", "balance": "discovery: none open (schema landed, failures diagnosed); delivery: PKR-2..4" },
+    { "id": "C3", "statement": "operational surface: otel + entrypoints + compose", "metric": "G3,G6,G9", "balance": "discovery: D3; delivery: PKR-5" },
+    { "id": "C4", "statement": "docs and review-clean PR", "metric": "G10 + codex review findings == 0 open", "balance": "discovery: none; delivery: PKR-6..7" }
+  ],
+  "pkrs": [
+    { "id": "PKR-1", "linked_ckr": "C1", "source_dkr_checkpoint": "D1", "assignment": "lite traced(): marker + resolution arm producing handle-shaped members over fn-exec, identity types, tests, docs; lint no-unattributed-await exemption for traced deps", "contribution_metric": "G5", "progress_signals": "handback on any core semantic surprise; lint 0; lite suite count" },
+    { "id": "PKR-2", "linked_ckr": "C2", "source_dkr_checkpoint": "stage-1 diagnosis", "assignment": "store.ts rebuilt on traced queries atom with transactional aggregates; cooperative-stop shutdown (stopping atom, loop guards, main stop sequence)", "contribution_metric": "G1,G3,G7", "progress_signals": "test suite green on pglite; no wedge in gated tests" },
+    { "id": "PKR-3", "linked_ckr": "C2", "source_dkr_checkpoint": "D2", "assignment": "crash-recovery test + pg entrypoint verification (G2,G4,G8)", "contribution_metric": "G2,G4,G8", "progress_signals": "psql table reads; exit codes" },
+    { "id": "PKR-5", "linked_ckr": "C3", "source_dkr_checkpoint": "D3", "assignment": "otel extension wiring + span manifest gate; daemon/server/cli entrypoints; compose docs", "contribution_metric": "G6,G9", "progress_signals": "span manifest diff; per-entrypoint verification" },
+    { "id": "PKR-6", "linked_ckr": "C4", "source_dkr_checkpoint": "none", "assignment": "docs: example README+diagram, lite traced docs, lint docs, root alignment", "contribution_metric": "G10", "progress_signals": "root lint 0; alignment checker ok" },
+    { "id": "PKR-7", "linked_ckr": "C4", "source_dkr_checkpoint": "none", "assignment": "codex adversarial review rounds until 0 open findings; PR; merge on green", "contribution_metric": "review findings 0; checks green", "progress_signals": "findings per round; CI status" }
+  ],
+  "promotion_rule": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
+  "handback_rule": "PKRs hand back on unknown discovery instead of researching or resolving unknowns inside execution."
+}

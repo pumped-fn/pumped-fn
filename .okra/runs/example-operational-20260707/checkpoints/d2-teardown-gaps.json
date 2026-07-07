@@ -1,0 +1,14 @@
+{
+  "checkpoint_id": "d2-teardown-gaps",
+  "conclusion_id": "core-teardown-two-gaps-recorded",
+  "decision_target": "fix-now in core vs cooperative-stop + candidate recording",
+  "source_of_truth": "session repro probes vs dockerized pg: in-flight exec during dispose never settles (watching:PENDING with completed body impossible to distinguish); child-ctx changes streams end at scope.dispose, not root ctx.close (loop-end printed only after dispose)",
+  "read_method": "scratch-main.ts marked probes, three runs, per-promise race probes",
+  "observed_at": "2026-07-07T11:00:00Z",
+  "confidence": 0.85,
+  "questions_answered": ["both orderings of close/dispose/allSettled deadlock via different paths", "latest.ts next()-after-close is correct; gap is above it", "cooperative stop (stop flag + wake + await loops before teardown) eliminates the race class at example level"],
+  "questions_unanswered": ["exact core path that drops the in-flight exec settle during dispose", "whether root ctx.close should cascade to child-ctx streams"],
+  "risk_or_anti_goal_implications": "lite_core_regression wall: fixing in core mid-run expands surface; ratified decision defers to dedicated core run; two candidate findings appended to memory library",
+  "decision": "accepted per ratification: cooperative-stop in example (PKR-2); core gaps recorded as candidates",
+  "replay_command_or_checker": "probe scripts reproducible from session transcript; candidate entries in .okra/memory/pumped-fn-lite/candidate-anti-goals.v1.json after append"
+}
