@@ -575,6 +575,12 @@ export namespace Lite {
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
+  export type Projected<V> = V extends readonly (infer E)[]
+    ? Projected<E>[]
+    : V extends Flow<infer Output, infer Input, any, infer Yield>
+      ? FlowHandle<Output, Input, Yield>
+      : V
+
   export type InferDep<D> = D extends Atom<infer T>
     ? T
     : D extends Flow<infer Output, infer Input, any, infer Yield>
@@ -588,7 +594,7 @@ export namespace Lite {
       : D extends BoundDep<infer T>
         ? Bound<T>
       : D extends TagExecutor<infer Output, infer _Value>
-        ? Output
+        ? Projected<Output>
         : D extends Resource<infer T>
           ? T
           : never

@@ -305,6 +305,58 @@
       "ratification": "orchestrator error 2026-07-05, self-caught post-hoc"
     },
     {
+      "metric_id": "role_tags_require_multiplicity",
+      "threshold": 0,
+      "type": "drift",
+      "source_run_id": "bound-design-review",
+      "source_refs": [
+        ".okra/packets/role-tags-and-port-flows.md doctrine 4"
+      ],
+      "applies_when": "node-carrying tags: justified only by genuine implementation multiplicity (provider, tenant, environment, plugin); count = node-typed tags with one production binding and no declared variability reason; single-implementation edges stay static deps, their test substitution stays preset",
+      "does_not_apply_when": "value-carrying tags (config, trace ids)",
+      "invalidates_when": "preset gains per-context binding",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "none yet — pre-implementation guardrail",
+      "ratification": "proposed in design session 2026-07-07, pending user ratification"
+    },
+    {
+      "metric_id": "spans_declared_at_owning_layer",
+      "threshold": 0,
+      "type": "drift",
+      "source_run_id": "bound-design-review",
+      "source_refs": [
+        ".okra/packets/role-tags-and-port-flows.md doctrine 1-2"
+      ],
+      "applies_when": "step/port tags live in the package owning the foreign effect (sdk owns kind llm); count = consumer flows step-tagged for an effect a port flow already spans, plus foreign awaits outside any declared span once pumped/no-unattributed-await lands",
+      "does_not_apply_when": "app-local one-off effects spanned by their single owning flow (mailer.send inside sendReminder)",
+      "invalidates_when": "exec pipeline stops being the tracing spine",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "none yet — pre-implementation guardrail",
+      "ratification": "proposed in design session 2026-07-07, pending user ratification"
+    },
+    {
+      "metric_id": "port_impl_contracts_ctx_free",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "bound-design-review",
+      "source_refs": [
+        ".okra/packets/role-tags-and-port-flows.md",
+        "probe 2026-07-07: bound() drops prototype methods and this"
+      ],
+      "applies_when": "implementor contracts across package boundaries: implementations ship as nodes (flows via role tags); count = exported contracts with an ExecutionContext-typed parameter; succeeds ctx_never_an_argument's bound() mechanism clause once bound() is removed (its invalidates_when fires)",
+      "does_not_apply_when": "lite internals implementing dispatch itself",
+      "invalidates_when": "role-tag flow projection is rejected or reverted",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.85,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "none yet — lands with the migration sequence",
+      "ratification": "proposed in design session 2026-07-07, pending user ratification"
+    },
+    {
       "metric_id": "sync_start_contract",
       "threshold": "flow factories start synchronously within the dispatch tick when parse is sync/absent; regression tests pin it",
       "type": "tripwire",

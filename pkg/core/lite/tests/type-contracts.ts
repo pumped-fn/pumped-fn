@@ -389,3 +389,23 @@ type AtomDepsResult = Lite.Utils.DepsOf<typeof atomWithDeps>
 declare const _atomDeps: NonNullable<AtomDepsResult>
 const _atomSource: Lite.Atom<number> = _atomDeps['source'] as Lite.Atom<number>
 void _atomSource
+
+// D1: tag-carried flows project to FlowHandle in deps position
+const profileFlowTag = tag<typeof readProfile>({ label: "profile-flow" })
+type ProfileOutput = Lite.Utils.FlowOutput<typeof readProfile>
+type ProfileInput = Lite.Utils.FlowInput<typeof readProfile>
+
+flow({
+  deps: {
+    required: tags.required(profileFlowTag),
+    optional: tags.optional(profileFlowTag),
+    all: tags.all(profileFlowTag),
+  },
+  factory: async (_ctx, { required, optional, all }) => {
+    const requiredHandle: Lite.FlowHandle<ProfileOutput, ProfileInput> = required
+    const optionalHandle: Lite.FlowHandle<ProfileOutput, ProfileInput> | undefined = optional
+    const allHandles: Lite.FlowHandle<ProfileOutput, ProfileInput>[] = all
+    const profile = await requiredHandle.exec({ input: { id: "role-tag-profile" } })
+    return { profile, optionalHandle, allHandles }
+  },
+})

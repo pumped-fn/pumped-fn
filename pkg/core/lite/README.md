@@ -137,6 +137,12 @@ Flows compose through dependencies. The dependency value is a context-bound hand
 keeps the `ctx.exec` options shape, parsing, presets, extensions, tags, and resource cleanup while making
 the flow edge visible.
 
+A tag can carry a flow instead of a plain value, letting composition roots pick which implementation
+fills a role. In deps position `tags.required(model)` arrives as a context-bound `FlowHandle`, exactly
+like a bare flow dependency; `tags.optional(model)` yields the handle or `undefined`; `tags.all(model)`
+yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
+for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
+
 Use `bound(dep)` when a tag, atom, or resource resolves to a ctx-first function or to an object whose
 function members are ctx-first. Flow deps receive the same value with the ctx parameter already bound to
 the executing invocation, so call sites use `model.complete(request)` instead of passing `ctx`.

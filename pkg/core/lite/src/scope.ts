@@ -667,20 +667,28 @@ class ScopeImpl implements Lite.Scope {
         case "required": {
           const value = tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
+            if (isFlow(value)) return null
             result[key] = value
           } else if (tagExecutor.tag.hasDefault) {
+            if (isFlow(tagExecutor.tag.defaultValue)) return null
             result[key] = tagExecutor.tag.defaultValue
           } else {
             return null
           }
           break
         }
-        case "optional":
-          result[key] = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
+        case "optional": {
+          const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
+          if (isFlow(value)) return null
+          result[key] = value
           break
-        case "all":
-          result[key] = tagExecutor.tag.collect(this.tags)
+        }
+        case "all": {
+          const values = tagExecutor.tag.collect(this.tags)
+          if (values.some(isFlow)) return null
+          result[key] = values
           break
+        }
       }
     }
 
@@ -1055,9 +1063,9 @@ class ScopeImpl implements Lite.Scope {
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
-            result[key] = value
+            result[key] = this.projectTagValue(value, ctx)
           } else if (tagExecutor.tag.hasDefault) {
-            result[key] = tagExecutor.tag.defaultValue
+            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx)
           } else {
             throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
           }
@@ -1067,13 +1075,14 @@ class ScopeImpl implements Lite.Scope {
           const value = ctx
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
-          result[key] = value ?? tagExecutor.tag.defaultValue
+          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx)
           break
         }
         case "all": {
-          result[key] = ctx
+          const values = ctx
             ? this.collectFromHierarchy(ctx, tagExecutor.tag)
             : tagExecutor.tag.collect(this.tags)
+          result[key] = values.map((value) => this.projectTagValue(value, ctx))
           break
         }
       }
@@ -1090,6 +1099,12 @@ class ScopeImpl implements Lite.Scope {
     if (parallel.length === 0) return result
     if (parallel.length === 1) return parallel[0]!.then(() => result)
     return Promise.all(parallel).then(() => result)
+  }
+
+  private projectTagValue(value: unknown, ctx: Lite.ExecutionContext | undefined): unknown {
+    if (!isFlow(value)) return value
+    if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+    return this.createFlowHandle(value, ctx)
   }
 
   private createFlowHandle<Output, Input, Yield>(
