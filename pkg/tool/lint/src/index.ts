@@ -113,7 +113,7 @@ function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Dia
 
 type Imports = {
   createScope: Set<string>
-  controller: Set<string>
+  controller: Map<string, number>
   creatorKinds: Map<string, CreatorKind>
   creators: Set<string>
   flow: Set<string>
@@ -127,7 +127,7 @@ type Imports = {
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
-  traced: Set<string>
+  traced: Map<string, number>
   useExecutionContext: Set<string>
   useScope: Set<string>
   useState: Set<string>
@@ -293,7 +293,7 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
 function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
     createScope: new Set(),
-    controller: new Set(),
+    controller: new Map(),
     creatorKinds: new Map(),
     creators: new Set(),
     flow: new Set(),
@@ -307,7 +307,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
-    traced: new Set(),
+    traced: new Map(),
     useExecutionContext: new Set(),
     useScope: new Set(),
     useState: new Set(),
@@ -351,10 +351,10 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
         imports.createScope.add(local)
       }
       if (moduleName === "@pumped-fn/lite" && imported === "controller") {
-        imports.controller.add(local)
+        imports.controller.set(local, specifier.name.getEnd())
       }
       if (moduleName === "@pumped-fn/lite" && imported === "traced") {
-        imports.traced.add(local)
+        imports.traced.set(local, specifier.name.getEnd())
       }
       if (moduleName === "@pumped-fn/lite" && imported === "flow") {
         imports.flow.add(local)
@@ -823,6 +823,39 @@ function isDirectDepMethod(expression: ts.PropertyAccessExpression, root: ts.Ide
   return bound !== null ? depth === 1 : depth === 2
 }
 
+function bindingNameHas(name: ts.BindingName, text: string): boolean {
+  if (ts.isIdentifier(name)) return name.text === text
+  return name.elements.some((element) => ts.isBindingElement(element) && !element.dotDotDotToken && bindingNameHas(element.name, text))
+}
+
+function statementDeclaresName(statement: ts.Statement, name: string): boolean {
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.some((declaration) => bindingNameHas(declaration.name, name))
+  }
+  if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) {
+    return statement.name?.text === name
+  }
+  return false
+}
+
+function scopeStatements(node: ts.Node): readonly ts.Statement[] {
+  if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node)) return Array.from(node.statements)
+  if (ts.isCaseClause(node) || ts.isDefaultClause(node)) return Array.from(node.statements)
+  return []
+}
+
+function scopeDeclaresNameBefore(scope: ts.Node, position: number, name: string, afterPosition: number, sourceFile: ts.SourceFile): boolean {
+  return scopeStatements(scope).some((statement) => {
+    const start = statement.getStart(sourceFile)
+    return start > afterPosition && start < position && statementDeclaresName(statement, name)
+  })
+}
+
+function importedCallee(callee: ts.Identifier, imports: Map<string, number>): boolean {
+  const importEnd = imports.get(callee.text)
+  return importEnd !== undefined && !shadowsName(callee, callee.getSourceFile(), callee.text, importEnd)
+}
+
 function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
   const deps = config && objectProperty(config, "deps")
   if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
@@ -830,7 +863,7 @@ function depIsController(config: ts.ObjectLiteralExpression | null, key: string 
   return property !== null
     && ts.isCallExpression(property.initializer)
     && ts.isIdentifier(property.initializer.expression)
-    && imports.controller.has(property.initializer.expression.text)
+    && importedCallee(property.initializer.expression, imports.controller)
 }
 
 function depIsTraced(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
@@ -840,7 +873,7 @@ function depIsTraced(config: ts.ObjectLiteralExpression | null, key: string | nu
   return property !== null
     && ts.isCallExpression(property.initializer)
     && ts.isIdentifier(property.initializer.expression)
-    && imports.traced.has(property.initializer.expression.text)
+    && importedCallee(property.initializer.expression, imports.traced)
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -851,7 +884,9 @@ function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports)
   )
 }
 
-function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
+function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPosition = -1): boolean {
+  const sourceFile = node.getSourceFile()
+  const position = node.getStart(sourceFile)
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
     if (
@@ -864,7 +899,17 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
     ) {
       return true
     }
+    if (
+      (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isClassDeclaration(current))
+      && current.name?.text === name
+    ) {
+      return true
+    }
+    if (scopeDeclaresNameBefore(current, position, name, afterPosition, sourceFile)) return true
     current = current.parent
+  }
+  if (current === boundary && ts.isSourceFile(boundary)) {
+    return scopeDeclaresNameBefore(boundary, position, name, afterPosition, sourceFile)
   }
   return false
 }

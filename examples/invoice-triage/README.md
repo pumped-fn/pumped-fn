@@ -37,15 +37,17 @@ flowchart TD
   QueueSignal --> Ingest["ingest flow<br/>ctx.changes(queueSignal)"]
   Stopping["stopping atom"] --> Ingest
   Ingest --> Store
-  Store --> Drain["store.drainPending<br/>delete returning"]
-  Pending --> Drain
-  Drain --> Import["importBatch generator"]
+  Store --> PendingRead["store.listPending<br/>ordered read"]
+  Pending --> PendingRead
+  PendingRead --> Import["importBatch generator"]
   Importing["importing atom<br/>in-flight batch count"] <--> Import
   Import --> Triage["triage generator"]
   Triage --> Classify["classify.exec<br/>builds request, parses response"]
   Classify --> Complete["sdk complete port flow<br/>model tag implementation"]
   Import --> Save["saveInvoice flow"]
   Save --> Store
+  Store --> Settle["store.settleImport<br/>upsert + pending delete + audit"]
+  Pending --> Settle
   Store --> Stored["invoice_stored<br/>Postgres table"]
   Save --> StoredSignal["storedSignal atom<br/>ops wakeup"]
   Outstanding --> Drained["drained atom"]
@@ -78,14 +80,15 @@ Business features are flows/resources; free functions are pure calculations; ctx
 
 External data is schema-validated with zod at parse and model-output boundaries; graph-internal handoffs stay typed.
 
-Transport capability records are traced edges; business features stay flows. Database side effects are scalar store flows backed by a `queries` atom through `traced(queries)`. The public flow names remain workflow store steps, and each database operation runs as a named traced exec edge such as `store.enqueuePending`, `store.drainPending`, or `store.upsertStored`. Multi-statement aggregates that pair table writes with audit rows run in one transaction.
+Transport capability records are traced edges; business features stay flows. Database side effects are scalar store flows backed by a `queries` atom through `traced(queries)`. The public flow names remain workflow store steps, and each database operation runs as a named traced exec edge such as `store.enqueuePending`, `store.listPending`, `store.settleImport`, `store.claimReminder`, or `store.releaseReminder`. Multi-statement aggregates that pair table writes with audit rows run in one transaction.
 
 - `classify` builds the model request and validates the response; it execs the SDK `complete` port flow (a bare flow dep, projected to a handle) rather than owning the llm span itself.
 - `enqueue` owns intake validation, calls `store.enqueuePending`, and wakes the queue when rows are accepted.
-- `drainPending` calls `store.drainPending` for the pending drain with `delete returning`.
-- `saveInvoice` calls `store.upsertStored` for the `invoice_stored` upsert and wakes ops views.
+- `listPending` calls `store.listPending` for the ordered pending read.
+- `saveInvoice` calls `store.settleImport` to upsert `invoice_stored`, delete that invoice from `invoice_pending`, and write the `imported` audit row in one transaction before waking ops views.
 - `dailyReport` owns report materialization.
 - `markReminderSent` calls `store.claimReminder` for the idempotent reminder claim.
+- `releaseReminder` calls `store.releaseReminder` when delivery fails after a reminder claim.
 - `deliver` owns mail delivery through the `mailer` role tag.
 
 `triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag — the SDK `complete` port flow owns that span. A completed workflow run now shows the model implementor's step followed by `model.complete` where `invoice.classify` used to appear; `invoice.classify` itself is untracked plumbing around that call. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
@@ -118,9 +121,9 @@ Other provider seams are tags too:
 The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This example needs a lossless ingest queue and cron-capable registration, so it uses:
 
 - `enqueue` to parse raw lines or invoice objects and insert invoice batches into `invoice_pending`.
-- `ingest` to run a recovery drain once, wake on `ctx.changes(queueSignal)`, drain pending rows, and pass each drained set to `importBatch`.
-- `saveInvoice` to upsert completed classifications into `invoice_stored`.
-- `outstanding` as the invoices accepted by this process and not settled, `importing` as an in-flight batch count, and `drained` as a derived atom over both — `awaitDrained` resolves only when accepted work is settled and no batch is mid-import.
+- `ingest` to run a recovery read once, wake on `ctx.changes(queueSignal)`, read pending rows in deterministic order, and pass each batch to `importBatch`.
+- `saveInvoice` to settle each completed classification into `invoice_stored` and remove only that invoice from `invoice_pending`.
+- `outstanding` as the invoices accepted by this process for its current ingest wakeups, `importing` as an in-flight batch count, and `drained` as a derived atom over both — `awaitDrained` resolves only when the current process has no accepted work outstanding and no batch is mid-import.
 - `reviewCount` as a Postgres jsonb query over `invoice_stored.classification`.
 - `storedSignal` as the conflated ops wakeup for `watchReviewQueue`.
 - `@pumped-fn/lite-extension-scheduler` for cron registration.
@@ -158,7 +161,9 @@ The daemon composition root execs `intake`, `ingest`, `watchReviewQueue`, and `a
 
 `createInvoiceScope()` registers `observable.extension()` and `otel.sink()` by default. The sink emits real OpenTelemetry spans when the process has an OTel SDK/tracer provider registered; tests prove the names by injecting a recording tracer.
 
-Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. Re-running `sendReminders` skips marked invoices, so the second run sends zero messages. In production, bind `mailer` to a real delivery implementor, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
+Import settlement is per invoice: pending rows remain in `invoice_pending` while `ingest` imports the batch, and `saveInvoice` removes each row only inside the same `store.settleImport` transaction that upserts the stored invoice and writes the `imported` audit event. If a model call or process fails after one invoice settles, the next invoice remains pending for the next scope. Re-importing an already-settled id is safe because `store.settleImport` upserts idempotently while preserving `reminded_at`, and deleting a missing pending row is a no-op.
+
+Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. If `deliver` rejects, `sendReminder` calls `releaseReminder`, which clears `reminded_at` in the same transaction that writes `reminder_failed`, then rethrows so the invoice appears in a later `sendReminders` run. A process crash between the SQL claim and delivery completion can still leave the claim set without a sent message; that window is intentionally at-most-once. In production, bind `mailer` to a real delivery implementor, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 
 ## Run
 

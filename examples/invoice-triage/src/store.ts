@@ -1,6 +1,6 @@
 import { atom, controller, flow, tags, traced, typed } from "@pumped-fn/lite"
 import { step } from "@pumped-fn/sdk"
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm"
+import { and, asc, count, eq, isNotNull, isNull, sql } from "drizzle-orm"
 import { database } from "./database"
 import { clock, outstanding, queueSignal, storedSignal } from "./ports"
 import { auditEvents, pendingInvoices, storedInvoices } from "./schema"
@@ -44,23 +44,11 @@ export const queries = atom({
         return ids
       })
     },
-    async drainPending(): Promise<readonly Invoice[]> {
-      return db.transaction(async (tx) => {
-        const rows = await tx.delete(pendingInvoices).returning()
-        rows.sort((left, right) => left.enqueuedAt.getTime() - right.enqueuedAt.getTime() || left.id.localeCompare(right.id))
-        const ids = rows.map((row) => row.id)
-        if (ids.length > 0) {
-          await tx.insert(auditEvents).values({
-            action: "drained",
-            entityId: "pending",
-            occurredAt: clock.now(),
-            payload: { count: ids.length, ids },
-          })
-        }
-        return rows.map((row) => row.invoice)
-      })
+    async listPending(): Promise<readonly Invoice[]> {
+      const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
+      return rows.map((row) => row.invoice)
     },
-    async upsertStored(input: SaveInvoiceInput): Promise<StoredInvoice> {
+    async settleImport(input: SaveInvoiceInput): Promise<StoredInvoice> {
       return db.transaction(async (tx) => {
         const rows = await tx.insert(storedInvoices).values({
           id: input.invoice.id,
@@ -76,6 +64,7 @@ export const queries = atom({
             remindedAt: sql`${storedInvoices.remindedAt}`,
           },
         }).returning()
+        await tx.delete(pendingInvoices).where(eq(pendingInvoices.id, input.invoice.id))
         await tx.insert(auditEvents).values({
           action: "imported",
           entityId: input.invoice.id,
@@ -104,13 +93,27 @@ export const queries = atom({
         return storedFromRow(row)
       })
     },
+    async releaseReminder(invoiceId: string): Promise<void> {
+      return db.transaction(async (tx) => {
+        const [row] = await tx.update(storedInvoices)
+          .set({ remindedAt: null })
+          .where(and(eq(storedInvoices.id, invoiceId), isNotNull(storedInvoices.remindedAt)))
+          .returning({
+            id: storedInvoices.id,
+            classification: storedInvoices.classification,
+          })
+        if (row === undefined) return
+        await tx.insert(auditEvents).values({
+          action: "reminder_failed",
+          entityId: row.id,
+          occurredAt: clock.now(),
+          payload: { dueDate: row.classification.dueDate },
+        })
+      })
+    },
     async listStored(): Promise<readonly StoredInvoice[]> {
       const rows = await db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
       return rows.map(storedFromRow)
-    },
-    async listPending(): Promise<readonly Invoice[]> {
-      const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
-      return rows.map((row) => row.invoice)
     },
     async reviewCount(): Promise<number> {
       const [row] = await db.select({ value: count() }).from(storedInvoices)
@@ -144,15 +147,6 @@ export const enqueue = flow({
   },
 })
 
-export const drainPending = flow({
-  name: "invoice.drainPending",
-  deps: {
-    store: traced(queries),
-  },
-  tags: [step({ workflow: true, kind: "store" })],
-  factory: (_ctx, { store }): Promise<readonly Invoice[]> => store.drainPending.exec(),
-})
-
 export const saveInvoice = flow({
   name: "invoice.save",
   parse: typed<SaveInvoiceInput>(),
@@ -162,7 +156,7 @@ export const saveInvoice = flow({
   },
   tags: [step({ workflow: true, kind: "store" })],
   factory: async (ctx, { store, storedSignal }): Promise<StoredInvoice> => {
-    const row = await store.upsertStored.exec({ params: [ctx.input] })
+    const row = await store.settleImport.exec({ params: [ctx.input] })
     storedSignal.update((value) => value + 1)
     return row
   },
@@ -212,6 +206,16 @@ export const markReminderSent = flow({
   },
   tags: [step({ workflow: true, kind: "store" })],
   factory: (ctx, { store }): Promise<StoredInvoice | undefined> => store.claimReminder.exec({ params: [ctx.input.invoiceId] }),
+})
+
+export const releaseReminder = flow({
+  name: "invoice.releaseReminder",
+  parse: typed<{ invoiceId: string }>(),
+  deps: {
+    store: traced(queries),
+  },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: (ctx, { store }): Promise<void> => store.releaseReminder.exec({ params: [ctx.input.invoiceId] }),
 })
 
 function storedFromRow(row: StoredRow): StoredInvoice {

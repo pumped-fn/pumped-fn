@@ -325,6 +325,12 @@ class ManualBackend implements Scheduler.Backend {
   }
 }
 
+class ReminderDeliveryFailure extends Error {
+  readonly kind = "reminder_delivery_failed"
+  readonly op = "deliver"
+  readonly entity = "invoice"
+}
+
 describe("invoice triage patterns", () => {
   it("pattern: execStream consumption shows progress, interleaved triage steps, and .result summary", async () => {
     const first = invoice("inv-stream-1")
@@ -368,11 +374,11 @@ describe("invoice triage patterns", () => {
     expect(run.steps.map((step) => step.targetName)).toEqual([
       "model.stub",
       "model.complete",
-      "store.upsertStored",
+      "store.settleImport",
       "invoice.save",
       "model.stub",
       "model.complete",
-      "store.upsertStored",
+      "store.settleImport",
       "invoice.save",
     ])
     await ctx.close({ ok: true })
@@ -612,7 +618,7 @@ describe("invoice triage patterns", () => {
 
     await ctx.exec({ flow: enqueue, input: { invoices: batch } })
     await gate.firstStarted
-    expect(await ctx.exec({ flow: listPending })).toEqual([])
+    expect((await ctx.exec({ flow: listPending })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
 
     let settled = false
     const waiting = ctx.exec({ flow: awaitDrained }).then(() => {
@@ -647,7 +653,7 @@ describe("invoice triage patterns", () => {
     await ctx.exec({ flow: enqueue, input: { invoices: [invoice("inv-fail-1")] } })
     await ctx.exec({ flow: awaitDrained })
     expect(await ctx.exec({ flow: listStored })).toEqual([])
-    expect(await ctx.exec({ flow: listPending })).toEqual([])
+    expect((await ctx.exec({ flow: listPending })).map((item) => item.id)).toEqual(["inv-fail-1"])
     const ingestOutcome = await stopLoop(scope, processing)
     expect(ingestOutcome.status).toBe("rejected")
     if (ingestOutcome.status !== "rejected") throw new Error("ingest did not reject")
@@ -655,6 +661,68 @@ describe("invoice triage patterns", () => {
     expect((ingestOutcome.reason as Error).message).toBe("provider down")
     await ctx.close({ ok: true })
     await scope.dispose()
+  })
+
+  it("killed-after-drain recovery: settled invoices stay stored and failed invoices remain pending", async () => {
+    const db = await pgliteDatabase()
+    const first = invoice("inv-kill-a")
+    const second = invoice("inv-kill-b", { vendor: "Contoso Hardware", amount: 4_500 })
+    let calls = 0
+    const failing = createScope({
+      presets: [preset(database, db)],
+      tags: [
+        provider(modelStub(() => {
+          calls += 1
+          if (calls === 1) {
+            return {
+              content: json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
+              stop: true,
+            }
+          }
+          throw new Error("provider down")
+        })),
+        clock({ now: () => now }),
+      ],
+    })
+    const failingCtx = failing.createContext()
+    const processing = failingCtx.exec({ flow: ingest })
+
+    await failingCtx.exec({ flow: enqueue, input: { invoices: [first, second] } })
+    await expect(processing).rejects.toThrow("provider down")
+    expect(calls).toBe(2)
+    expect((await failingCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual([first.id])
+    expect((await failingCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual([second.id])
+    expect(await failingCtx.exec({ flow: reviewCount })).toBe(0)
+    expect((await failingCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued", "imported"])
+    await failingCtx.close({ ok: true })
+    await failing.dispose()
+
+    const gate = gated([json({
+      vendor: second.vendor,
+      amount: second.amount,
+      dueDate: second.dueDate,
+      category: "hardware",
+    })])
+    const recovered = createScope({
+      presets: [preset(database, db)],
+      tags: [
+        provider(gate.model),
+        clock({ now: () => now }),
+      ],
+    })
+    const recoveredCtx = recovered.createContext()
+    const recoveredProcessing = recoveredCtx.exec({ flow: ingest })
+
+    await gate.firstStarted
+    gate.releaseFirst()
+    await recoveredCtx.exec({ flow: awaitDrained })
+    expect((await recoveredCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual([first.id, second.id])
+    expect(await recoveredCtx.exec({ flow: listPending })).toEqual([])
+    expect((await recoveredCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued", "imported", "imported"])
+    const ingestOutcome = await stopLoop(recovered, recoveredProcessing)
+    expect(ingestOutcome.status).toBe("fulfilled")
+    await recoveredCtx.close({ ok: true })
+    await recovered.dispose()
   })
 
   it("crash-recovery: pending rows from a prior scope import in the next scope", async () => {
@@ -806,6 +874,63 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
+  it("reminder-retry: failed delivery releases the claim for a later run", async () => {
+    const db = await pgliteDatabase()
+    const messages: ReminderMessage[] = []
+    let attempts = 0
+    const failing = flow({
+      name: "test.failReminder",
+      parse: typed<ReminderMessage>(),
+      factory: (ctx): ReminderResult => {
+        attempts += 1
+        messages.push(ctx.input)
+        throw new ReminderDeliveryFailure("smtp down")
+      },
+    })
+    const first = createScope({
+      presets: [preset(database, db)],
+      tags: [
+        mailer(failing),
+        clock({ now: () => now }),
+        reminderRecipient("ap-test@company.local"),
+        reminderWindowDays(3),
+      ],
+    })
+    const firstCtx = first.createContext()
+    await seedStored(firstCtx, [stored("inv-remind-retry", "2026-07-06", "saas", "auto-approve")])
+
+    await expect(firstCtx.exec({ flow: sendReminders })).rejects.toThrow("smtp down")
+    expect(attempts).toBe(1)
+    expect(messages.map((message) => message.invoiceId)).toEqual(["inv-remind-retry"])
+    expect((await firstCtx.exec({ flow: listStored }))[0]?.remindedAt).toBeUndefined()
+    expect((await firstCtx.exec({ flow: listAudit }))
+      .filter((item) => item.action === "reminded" || item.action === "reminder_failed")
+      .map((item) => item.action)).toEqual(["reminded", "reminder_failed"])
+    await firstCtx.close({ ok: true })
+    await first.dispose()
+
+    const second = createScope({
+      presets: [preset(database, db)],
+      tags: [
+        mailer(collecting(messages)),
+        clock({ now: () => now }),
+        reminderRecipient("ap-test@company.local"),
+        reminderWindowDays(3),
+      ],
+    })
+    const secondCtx = second.createContext()
+    await expect(secondCtx.exec({ flow: sendReminders })).resolves.toEqual({
+      sent: 1,
+      invoiceIds: ["inv-remind-retry"],
+    })
+    expect(messages.map((message) => message.invoiceId)).toEqual(["inv-remind-retry", "inv-remind-retry"])
+    expect((await secondCtx.exec({ flow: listAudit }))
+      .filter((item) => item.action === "reminded" || item.action === "reminder_failed")
+      .map((item) => item.action)).toEqual(["reminded", "reminder_failed", "reminded"])
+    await secondCtx.close({ ok: true })
+    await second.dispose()
+  })
+
   it("pattern: dailyReport summarizes totals, categories, and overdue invoices", async () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
@@ -931,9 +1056,9 @@ describe("invoice triage patterns", () => {
       "model.complete",
       "model.stub",
       "store.claimReminder",
-      "store.drainPending",
+      "store.listPending",
       "store.enqueuePending",
-      "store.upsertStored",
+      "store.settleImport",
     ].sort()))
     const ingestOutcome = await stopLoop(scope, processing)
     expect(ingestOutcome.status).toBe("fulfilled")
@@ -999,7 +1124,6 @@ describe("invoice triage patterns", () => {
     expect(audit.status).toBe(200)
     expect(await audit.json()).toEqual(expect.arrayContaining([
       expect.objectContaining({ action: "enqueued", entityId: "pending" }),
-      expect.objectContaining({ action: "drained", entityId: "pending" }),
       expect.objectContaining({ action: "imported", entityId: "inv-server-1" }),
     ]))
     expect(health.status).toBe(200)

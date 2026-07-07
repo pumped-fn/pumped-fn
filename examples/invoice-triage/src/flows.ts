@@ -17,10 +17,11 @@ import {
   storedSignal,
 } from "./ports"
 import {
-  drainPending,
   enqueue,
+  listPending,
   listStored,
   markReminderSent,
+  releaseReminder,
   reviewCount,
   saveInvoice,
 } from "./store"
@@ -39,12 +40,12 @@ import {
 } from "./types"
 
 export {
-  drainPending,
   enqueue,
   listAudit,
   listPending,
   listStored,
   markReminderSent,
+  releaseReminder,
   reviewCount,
   saveInvoice,
 } from "./store"
@@ -111,13 +112,13 @@ export const ingest = flow({
     outstanding: controller(outstanding, { resolve: true }),
     importing: controller(importing, { resolve: true }),
     stopping: controller(stopping, { resolve: true }),
-    drainPending: controller(drainPending),
+    listPending: controller(listPending),
     importBatch: controller(importBatch),
   },
-  factory: async (ctx, { outstanding, importing, stopping, drainPending, importBatch }): Promise<void> => {
+  factory: async (ctx, { outstanding, importing, stopping, listPending, importBatch }): Promise<void> => {
     for await (const _signal of ctx.changes(queueSignal)) {
       if (stopping.get()) return
-      const batch = await drainPending.exec()
+      const batch = await listPending.exec()
       if (batch.length === 0) continue
       importing.update((count) => count + 1)
       try {
@@ -219,10 +220,11 @@ export const sendReminder = flow({
   parse: typed<{ invoiceId: string }>(),
   deps: {
     markReminderSent: controller(markReminderSent),
+    releaseReminder: controller(releaseReminder),
     deliver: controller(deliver),
     reminderRecipient: tags.required(reminderRecipient),
   },
-  factory: async (ctx, { markReminderSent, deliver, reminderRecipient }): Promise<ReminderResult> => {
+  factory: async (ctx, { markReminderSent, releaseReminder, deliver, reminderRecipient }): Promise<ReminderResult> => {
     const invoice = await markReminderSent.exec({ input: { invoiceId: ctx.input.invoiceId } })
     if (invoice === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
     const message: ReminderMessage = {
@@ -234,7 +236,12 @@ export const sendReminder = flow({
       subject: `Invoice ${invoice.id} due ${invoice.classification.dueDate}`,
       body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
     }
-    return deliver.exec({ input: message })
+    try {
+      return await deliver.exec({ input: message })
+    } catch (error) {
+      await releaseReminder.exec({ input: { invoiceId: invoice.id } })
+      throw error
+    }
   },
 })
 

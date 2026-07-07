@@ -997,6 +997,23 @@ describe("lite lint scanner", () => {
     `)).toBe(1)
   })
 
+  it("flags traced dep member exec calls when the lite import is shadowed", () => {
+    expect(unattributedAwaitCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { gateway } from "./ports"
+
+      const traced = (value) => value
+
+      const run = flow({
+        name: "run",
+        deps: { gateway: traced(gateway) },
+        factory: async (ctx, { gateway }) => {
+          await gateway.send.exec({ params: [ctx.input] })
+        },
+      })
+    `)).toBe(1)
+  })
+
   it("flags plain dep member exec calls untagged", () => {
     expect(unattributedAwaitCount(`
       import { flow } from "@pumped-fn/lite"
@@ -1029,6 +1046,21 @@ describe("lite lint scanner", () => {
     expect(unattributedAwaitCount(`
       import { flow } from "@pumped-fn/lite"
       import { controller, dns } from "./ports"
+
+      const lookup = flow({
+        name: "lookup",
+        deps: { dns: controller(dns) },
+        factory: async (ctx, { dns }) => await dns.resolve(ctx.input),
+      })
+    `)).toBe(1)
+  })
+
+  it("flags resolve when the lite controller import is shadowed", () => {
+    expect(unattributedAwaitCount(`
+      import { controller, flow } from "@pumped-fn/lite"
+      import { dns } from "./ports"
+
+      const controller = (value) => value
 
       const lookup = flow({
         name: "lookup",
