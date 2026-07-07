@@ -261,14 +261,14 @@
         "lint rule pumped/no-ctx-argument",
         "user design discussion 2026-07-05"
       ],
-      "applies_when": "all node factories: ctx is a receiver, never a call argument or literal-embedded value; ctx-taking third-party contracts are wrapped via bound() in deps, which curries the per-invocation ctx (FlowHandle precedent). Enforcement: pumped/no-ctx-argument at error level",
-      "does_not_apply_when": "receiver usage (ctx.exec/ctx.input/ctx.changes); lite/sdk internals implementing the binding machinery itself",
-      "invalidates_when": "bound() semantics change",
+      "applies_when": "all node factories: ctx is a receiver, never a call argument or literal-embedded value; effectful contracts are reified as flows reached via deps (role tags carry implementor flows; port flows own the span). Enforcement: pumped/no-ctx-argument at error level",
+      "does_not_apply_when": "receiver usage (ctx.exec/ctx.input/ctx.changes); lite internals implementing dispatch itself",
+      "invalidates_when": "role-tag flow projection is reverted",
       "recertify_by": "2027-01-05",
       "confidence": 0.9,
       "candidate_status": "candidate",
-      "no_regression_evidence": "PKR-12b: bound() shipped with per-invocation rebinding test, lint rule live, example migrated; 186 lite + 42 lint + 12 example green, lint 0",
-      "ratification": "user-ratified rule + mechanism 2026-07-05; earlier resource-wrapper approach rejected for ctx misattribution (would capture owning ctx, not per-invocation ctx)"
+      "no_regression_evidence": "recertified 2026-07-07: bound() removed (probed defects: prototype methods dropped, this unbound); mechanism now role tags + sdk complete port flow per .okra/packets/role-tags-and-port-flows.md; 195 lite + 55 lint + 12 example green, lint 0, entrypoint exit 0. Prior bound() mechanism record (PKR-12b, user-ratified 2026-07-05) preserved in git history",
+      "ratification": "user-ratified rule 2026-07-05; mechanism recertified via ratified packet 2026-07-07 (invalidates_when fired: bound() semantics maximally changed by removal); earlier resource-wrapper approach rejected for ctx misattribution (would capture owning ctx, not per-invocation ctx)"
     },
     {
       "metric_id": "no_nested_call_chains",
