@@ -907,6 +907,14 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
       return true
     }
     if (
+      (ts.isForStatement(current) || ts.isForOfStatement(current) || ts.isForInStatement(current))
+      && current.initializer !== undefined
+      && ts.isVariableDeclarationList(current.initializer)
+      && current.initializer.declarations.some((declaration) => bindingNameHas(declaration.name, name))
+    ) {
+      return true
+    }
+    if (
       (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isClassDeclaration(current))
       && current.name?.text === name
     ) {

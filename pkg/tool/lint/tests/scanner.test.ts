@@ -982,6 +982,22 @@ describe("lite lint scanner", () => {
     `)).toBe(0)
   })
 
+  it("flags traced dep exec when a loop binding shadows the lite import", () => {
+    expect(unattributedAwaitCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { gateway, helpers } from "./ports"
+
+      export function makeAll() {
+        for (const traced of helpers) {
+          flow({
+            deps: { gateway: traced(gateway) },
+            factory: async (_ctx, { gateway }) => await gateway.send.exec({ params: ["x"] }),
+          })
+        }
+      }
+    `)).toBe(1)
+  })
+
   it("flags traced dep exec when a parameter binding pattern shadows the lite import", () => {
     expect(unattributedAwaitCount(`
       import { flow, traced } from "@pumped-fn/lite"
