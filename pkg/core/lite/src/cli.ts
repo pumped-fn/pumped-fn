@@ -131,7 +131,8 @@ service({ factory, deps? })
   Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.
 
 traced(atom) → TracedDep
-  Wrap a capability-record atom so each method arrives as handle.exec({ params, tags }) with a named exec edge.`,
+  Wrap a transport capability-record atom so each enumerable function member arrives as depKey.method.exec({ params, tags }).
+  The exec edge name comes from the deps key plus member key, and non-record, empty-record, or non-function members reject.`,
   },
 
   scope: {

@@ -16,7 +16,7 @@ Use this checklist before adding helpers around the graph.
 | composition root | Scope, root execution context, providers, route/job mounting, and disposal | Keep it thin and tested; do not hide flows behind facade objects or shared preconfigured scope factories |
 | public docs | Architectural claims, inventories, run commands, and implemented slices | Strong claims need structural guards, and counts must be derived or explicitly scoped |
 
-Use `traced()` when a capability atom exposes a function record over a foreign API and each method call must become a named exec edge with per-call tags; keep business behavior in flows.
+Use `traced()` when a transport capability atom exposes a non-empty record of enumerable functions over a foreign API and each method call must become a named `depKey.method.exec({ params, tags })` edge with per-call tags; keep business behavior in flows. Non-record, empty-record, and non-function members reject when the dependency resolves.
 
 ## A. Fundamental Usage
 
