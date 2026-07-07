@@ -1052,6 +1052,21 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
+    for (let i = 0; i < graph.traced.length; i++) {
+      if (!ctx) throw new Error("Traced deps require an ExecutionContext")
+      const [key, dep] = graph.traced[i]!
+      const cachedEntry = this.cache.get(dep.atom)
+      if (cachedEntry?.state === 'resolved') {
+        result[key] = this.createTracedHandles(key, cachedEntry.value, ctx)
+      } else {
+        parallel.push(
+          this.resolve(dep.atom).then(value => {
+            result[key] = this.createTracedHandles(key, value, ctx)
+          })
+        )
+      }
+    }
+
     for (let i = 0; i < graph.tags.length; i++) {
       const [key, tagExecutor] = graph.tags[i]!
       switch (tagExecutor.mode) {
@@ -1161,6 +1176,41 @@ class ScopeImpl implements Lite.Scope {
       flow,
       ...execOptions,
     } as Lite.ExecFlowOptions<Output, Input>)
+  }
+
+  private createTracedHandles<T>(
+    depKey: string,
+    value: T,
+    ctx: Lite.ExecutionContext
+  ): Lite.Traced<T> {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("traced() deps must resolve to a record of functions")
+    }
+
+    const source = value as Record<PropertyKey, unknown>
+    const result: Record<PropertyKey, { exec(options?: { params?: unknown[]; tags?: Lite.Tagged<unknown>[] }): Promise<unknown> }> = {}
+    const keys = Reflect.ownKeys(source).filter((key) => Object.prototype.propertyIsEnumerable.call(source, key))
+    if (keys.length === 0) {
+      throw new Error("traced() deps must resolve to a record of functions")
+    }
+
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i]!
+      const member = source[key]
+      if (typeof member !== "function") {
+        throw new Error(`traced() deps must resolve to a record of functions: ${String(key)}`)
+      }
+      result[key] = {
+        exec: (options = {}) => ctx.exec({
+          name: `${depKey}.${String(key)}`,
+          params: options.params ?? [],
+          tags: options.tags,
+          fn: (_ctx, ...args: unknown[]) => member.apply(value, args),
+        }),
+      }
+    }
+
+    return result as Lite.Traced<T>
   }
 
   private wireWatch(dep: Lite.AtomControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {

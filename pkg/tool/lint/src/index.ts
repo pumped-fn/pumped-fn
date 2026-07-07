@@ -127,6 +127,7 @@ type Imports = {
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
+  traced: Set<string>
   useExecutionContext: Set<string>
   useScope: Set<string>
   useState: Set<string>
@@ -306,6 +307,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
+    traced: new Set(),
     useExecutionContext: new Set(),
     useScope: new Set(),
     useState: new Set(),
@@ -350,6 +352,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@pumped-fn/lite" && imported === "controller") {
         imports.controller.add(local)
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "traced") {
+        imports.traced.add(local)
       }
       if (moduleName === "@pumped-fn/lite" && imported === "flow") {
         imports.flow.add(local)
@@ -802,6 +807,22 @@ function depKey(expression: ts.Expression, root: ts.Identifier, bound: string | 
   return above && above !== expression ? above.name.text : null
 }
 
+function depMethodDepth(expression: ts.Expression, root: ts.Identifier): number | null {
+  let current = expression
+  let depth = 0
+  while (ts.isPropertyAccessExpression(current)) {
+    depth++
+    if (current.expression === root) return depth
+    current = current.expression
+  }
+  return null
+}
+
+function isDirectDepMethod(expression: ts.PropertyAccessExpression, root: ts.Identifier, bound: string | null): boolean {
+  const depth = depMethodDepth(expression, root)
+  return bound !== null ? depth === 1 : depth === 2
+}
+
 function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
   const deps = config && objectProperty(config, "deps")
   if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
@@ -810,6 +831,16 @@ function depIsController(config: ts.ObjectLiteralExpression | null, key: string 
     && ts.isCallExpression(property.initializer)
     && ts.isIdentifier(property.initializer.expression)
     && imports.controller.has(property.initializer.expression.text)
+}
+
+function depIsTraced(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const deps = config && objectProperty(config, "deps")
+  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
+  const property = objectProperty(deps.initializer, key)
+  return property !== null
+    && ts.isCallExpression(property.initializer)
+    && ts.isIdentifier(property.initializer.expression)
+    && imports.traced.has(property.initializer.expression.text)
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -902,11 +933,14 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (shadowsName(root, depsBinding.factory, root.text)) return
     if (ts.isPropertyAccessExpression(call.expression)) {
       const method = call.expression.name.text
+      const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
       if (method === "resolve") {
-        const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
         if (depIsController(enclosingUnitConfig(call, imports), key, imports)) return
       } else if (graphMachineryMethods.has(method)) {
-        return
+        const config = enclosingUnitConfig(call, imports)
+        if (isDirectDepMethod(call.expression, root, depsBinding.names.get(root.text) ?? null)) return
+        if (depIsController(config, key, imports)) return
+        if (method === "exec" && depIsTraced(config, key, imports)) return
       }
     }
     if (hasStepTag(enclosingUnitConfig(call, imports), imports)) return

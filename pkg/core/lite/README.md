@@ -143,6 +143,10 @@ like a bare flow dependency; `tags.optional(model)` yields the handle or `undefi
 yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
 for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
 
+`traced()` is for capability records over foreign APIs. Business features stay as flows; each capability
+method arrives as a named `.exec({ params, tags })` edge, so transport calls keep per-call tags and remain
+visible to extensions without hiding feature behavior behind facade methods.
+
 ```ts
 const auditUserLoad = flow({
   parse: typed<{ id: string }>(),

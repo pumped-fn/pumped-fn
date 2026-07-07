@@ -4,6 +4,7 @@ import { preset } from "../src/preset"
 import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
 import { tag, tags } from "../src/tag"
+import { traced } from "../src/traced"
 import type { Lite } from "../src/types"
 
 const sourceAtom = atom({
@@ -353,3 +354,44 @@ flow({
     return { profile, optionalHandle, allHandles }
   },
 })
+
+// D1: traced capability records project function members to exec handles
+const gateway = atom({
+  factory: () => ({
+    fetch: async (id: string, count: number) => ({ id, count }),
+    ping: () => "pong",
+  }),
+})
+
+const gatewayDep = traced(gateway)
+type GatewayProjection = Lite.InferDep<typeof gatewayDep>
+declare const _gateway: GatewayProjection
+const _fetchResult: Promise<{ id: string; count: number }> = _gateway.fetch.exec({ params: ["profile-1", 1] })
+const _pingResult: Promise<string> = _gateway.ping.exec()
+const _pingTaggedResult: Promise<string> = _gateway.ping.exec({ tags: [] })
+
+// @ts-expect-error traced method params are passed as the original tuple
+_gateway.fetch.exec({ params: ["profile-1"] })
+
+// @ts-expect-error empty-arg traced methods only accept tags
+_gateway.ping.exec({ params: [] })
+
+const rejectedGateway = atom({
+  factory: () => ({
+    ping: () => "pong",
+    status: "idle",
+  }),
+})
+
+// @ts-expect-error traced accepts records of functions only
+traced(rejectedGateway)
+
+type RejectedProjection = Lite.Traced<{ ping(): string; status: string }>
+declare const _rejected: RejectedProjection
+
+// @ts-expect-error non-function members project to never
+_rejected.status.exec()
+
+void _fetchResult
+void _pingResult
+void _pingTaggedResult

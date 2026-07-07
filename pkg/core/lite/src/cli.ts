@@ -128,7 +128,10 @@ preset(target, value)
 service({ factory, deps? })
   Convenience wrapper for atom whose value is an object of methods.
   Each method MUST have (ctx: ExecutionContext, ...args) as signature.
-  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.`,
+  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.
+
+traced(atom) → TracedDep
+  Wrap a capability-record atom so each method arrives as handle.exec({ params, tags }) with a named exec edge.`,
   },
 
   scope: {
@@ -536,6 +539,7 @@ Type guards:
   isTagged(v)           → v is Tagged
   isPreset(v)           → v is Preset
   isControllerDep(v)    → v is ControllerDep
+  isTracedDep(v)        → v is TracedDep
   isTagExecutor(v)      → v is TagExecutor
 
 Convenience types:
@@ -546,7 +550,7 @@ Convenience types:
 
 Symbols (advanced, for library authors):
   atomSymbol, flowSymbol, resourceSymbol, tagSymbol, taggedSymbol,
-  presetSymbol, controllerSymbol, controllerDepSymbol,
+  presetSymbol, controllerSymbol, controllerDepSymbol, tracedDepSymbol,
   tagExecutorSymbol, typedSymbol`,
   },
 }

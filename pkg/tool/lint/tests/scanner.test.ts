@@ -967,6 +967,51 @@ describe("lite lint scanner", () => {
     `)).toBe(0)
   })
 
+  it("allows traced dep member exec calls untagged", () => {
+    expect(unattributedAwaitCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { gateway } from "./ports"
+
+      const run = flow({
+        name: "run",
+        deps: { gateway: traced(gateway) },
+        factory: async (ctx, { gateway }) => {
+          await gateway.send.exec({ params: [ctx.input] })
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("flags traced dep member exec calls when traced is not the lite import", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { gateway, traced } from "./ports"
+
+      const run = flow({
+        name: "run",
+        deps: { gateway: traced(gateway) },
+        factory: async (ctx, { gateway }) => {
+          await gateway.send.exec({ params: [ctx.input] })
+        },
+      })
+    `)).toBe(1)
+  })
+
+  it("flags plain dep member exec calls untagged", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { gateway } from "./ports"
+
+      const run = flow({
+        name: "run",
+        deps: { gateway },
+        factory: async (ctx, { gateway }) => {
+          await gateway.send.exec({ params: [ctx.input] })
+        },
+      })
+    `)).toBe(1)
+  })
+
   it("flags resolve on a dep that is not a controller", () => {
     expect(unattributedAwaitCount(`
       import { flow } from "@pumped-fn/lite"
