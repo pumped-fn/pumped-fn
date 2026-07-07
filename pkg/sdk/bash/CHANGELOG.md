@@ -1,5 +1,12 @@
 # @pumped-fn/agent-sdk-just-bash
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [444e524]
+  - @pumped-fn/sdk@2.0.0
+
 ## 1.2.0
 
 ### Minor Changes
