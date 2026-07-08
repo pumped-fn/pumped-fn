@@ -1,4 +1,4 @@
-import { atom, tag, tags } from "@pumped-fn/lite"
+import { tag } from "@pumped-fn/lite"
 import type { ReminderMessage, ReminderResult } from "./types"
 
 export interface Notifier {
@@ -15,8 +15,3 @@ export function consoleNotifier(): Notifier {
 }
 
 export const notifier = tag<Notifier>({ label: "invoice.notifier" })
-
-export const notifierClient = atom({
-  deps: { impl: tags.required(notifier) },
-  factory: (_ctx, { impl }): Notifier => impl,
-})

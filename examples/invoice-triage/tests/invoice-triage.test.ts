@@ -1153,7 +1153,7 @@ describe("invoice triage patterns", () => {
       "invoice.reviewCount",
       "invoice.save",
       "invoice.sendReminders",
-      "client.send",
+      "notifier.send",
       "model.complete",
       "model.stub",
     ].sort()))

@@ -1,11 +1,11 @@
-import { controller, flow, ParseError, tags, traced, typed } from "@pumped-fn/lite"
+import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { complete, step } from "@pumped-fn/sdk"
 import { and, eq, isNotNull } from "drizzle-orm"
 import { database } from "./database"
 import { classifyRequest, parseClassification } from "./model"
-import { notifierClient } from "./notifier"
+import { notifier } from "./notifier"
 import {
   clock,
   drained,
@@ -241,11 +241,11 @@ export const sendReminder = flow({
     db: database,
     clock: tags.required(clock),
     markReminderSent: controller(markReminderSent),
-    client: traced(notifierClient),
+    notifier: tags.required(notifier),
     reminderRecipient: tags.required(reminderRecipient),
   },
   tags: [step({ workflow: true, kind: "store" })],
-  factory: async (ctx, { db, clock, markReminderSent, client, reminderRecipient }): Promise<ReminderResult> => {
+  factory: async (ctx, { db, clock, markReminderSent, notifier, reminderRecipient }): Promise<ReminderResult> => {
     const invoice = await markReminderSent.exec({ input: { invoiceId: ctx.input.invoiceId } })
     if (invoice === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
     const message: ReminderMessage = {
@@ -258,7 +258,7 @@ export const sendReminder = flow({
       body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
     }
     try {
-      return await client.send.exec({ params: [message], tags: [step({ workflow: true, kind: "email" })] })
+      return await ctx.exec({ fn: () => notifier.send(message), params: [], name: "notifier.send", tags: [step({ workflow: true, kind: "email" })] })
     } catch (error) {
       const failedAt = clock.now()
       await db.transaction(async (tx) => {
