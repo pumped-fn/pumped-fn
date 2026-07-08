@@ -4576,3 +4576,64 @@ describe("pending update composition", () => {
     await Promise.allSettled([watcher])
   })
 })
+
+describe("close settlement", () => {
+  it("ok-close rejects when a settlement callback throws", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    ctx.onClose(() => {
+      throw new Error("commit failed")
+    })
+
+    await expect(ctx.close({ ok: true })).rejects.toThrow("commit failed")
+    await expect(ctx.close({ ok: true })).resolves.toBeUndefined()
+    await scope.dispose()
+  })
+
+  it("aggregates multiple settlement failures", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    ctx.onClose(() => {
+      throw new Error("first")
+    })
+    ctx.onClose(() => {
+      throw new Error("second")
+    })
+
+    await expect(ctx.close({ ok: true })).rejects.toThrow("close settlement failed")
+    await scope.dispose()
+  })
+
+  it("failed close never masks the primary error", async () => {
+    const scope = createScope()
+    const ctx = scope.createContext()
+    ctx.onClose(() => {
+      throw new Error("secondary")
+    })
+
+    await expect(ctx.close({ ok: false, error: new Error("primary") })).resolves.toBeUndefined()
+    await scope.dispose()
+  })
+
+  it("exec rejects when the child ok-close settlement fails", async () => {
+    const settling = resource({
+      ownership: "current",
+      factory: (ctx) => {
+        ctx.onClose((result) => {
+          if (result.ok) throw new Error("settlement failed")
+        })
+        return "value"
+      },
+    })
+    const run = flow({
+      deps: { settling },
+      factory: (_ctx, { settling }) => settling,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run })).rejects.toThrow("settlement failed")
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+})

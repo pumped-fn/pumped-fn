@@ -2497,19 +2497,32 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   private async runCloseCleanups(result: Lite.CloseResult): Promise<void> {
+    const failures: unknown[] = []
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
-      try { await this.cleanups[i]?.(result) } catch {}
+      try { await this.cleanups[i]?.(result) } catch (error) {
+        if (result.ok) failures.push(error)
+      }
     }
     const resources = Array.from(this.resources.keys())
     for (let i = resources.length - 1; i >= 0; i--) {
       const entry = this.resources.get(resources[i]!)
       this.resources.delete(resources[i]!)
       if (entry && entry.cleanups.length > 0) {
-        await runCleanupsSafe(entry.cleanups)
+        if (result.ok) {
+          for (let j = entry.cleanups.length - 1; j >= 0; j--) {
+            try { await entry.cleanups[j]!() } catch (error) {
+              failures.push(error)
+            }
+          }
+        } else {
+          await runCleanupsSafe(entry.cleanups)
+        }
         entry.cleanups = []
       }
       this.emitResourceState(resources[i]!, "idle")
     }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, "close settlement failed")
   }
 }
 

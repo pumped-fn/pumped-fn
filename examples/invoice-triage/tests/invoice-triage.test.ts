@@ -32,6 +32,7 @@ import {
   heuristic,
   intakeLines,
   mailer,
+  outstanding,
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
@@ -807,6 +808,42 @@ describe("invoice triage patterns", () => {
     expect((await secondCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued"])
     await secondCtx.close({ ok: true })
     await second.dispose()
+  })
+
+  it("commit-failure: close does not lie and signals stay silent", async () => {
+    const db = await pgliteDatabase()
+    let armed = true
+    const failing = new Proxy(db as object, {
+      get(target, property) {
+        const member = Reflect.get(target, property)
+        if (property === "transaction" && armed) {
+          return (run: (tx: unknown) => Promise<unknown>, options?: unknown) => {
+            armed = false
+            return (target as { transaction(run: (tx: unknown) => Promise<unknown>, options?: unknown): Promise<unknown> })
+              .transaction(async (conn) => {
+                await run(conn)
+                throw new Error("commit failed")
+              }, options)
+          }
+        }
+        return typeof member === "function" ? member.bind(target) : member
+      },
+    }) as typeof db
+    const scope = createScope({
+      presets: [preset(database, failing)],
+      tags: [provider(scripted([json()])), clock({ now: () => now })],
+    })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: enqueue, input: { invoices: [invoice("inv-commit-fail")] } })).rejects.toThrow("commit failed")
+    expect(await scope.resolve(queueSignal)).toBe(0)
+    expect(await scope.resolve(outstanding)).toBe(0)
+    expect(await ctx.exec({ flow: listPending })).toEqual([])
+
+    await expect(ctx.exec({ flow: enqueue, input: { invoices: [invoice("inv-commit-ok")] } })).resolves.toEqual({ accepted: 1 })
+    expect(await scope.resolve(queueSignal)).toBe(1)
+    await ctx.close({ ok: true })
+    await scope.dispose()
   })
 
   it("wake-after-commit: queueSignal fires only after pending row is visible", async () => {

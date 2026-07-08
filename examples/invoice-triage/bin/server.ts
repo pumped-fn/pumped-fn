@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server"
-import { createScope, ParseError } from "@pumped-fn/lite"
+import { createScope, ParseError, type Lite } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import { otel } from "@pumped-fn/lite-extension-observable-otel"
@@ -32,7 +32,24 @@ const scope = createScope({
   ],
 })
 
-export const app = new Hono()
+export const app = new Hono<{ Variables: { ctx: Lite.ExecutionContext } }>()
+
+app.use(async (context, next) => {
+  const ctx = scope.createContext({ tags: [requestId(randomUUID())] })
+  context.set("ctx", ctx)
+  try {
+    await next()
+    await ctx.close(context.error === undefined ? { ok: true } : { ok: false, error: context.error })
+  } catch (error) {
+    await ctx.close({ ok: false, error })
+    throw error
+  }
+})
+
+app.onError((error, context) => {
+  if (error instanceof ParseError) return context.json({ accepted: 0, rejected: 1 }, 400)
+  return context.json({ error: "internal" }, 500)
+})
 
 app.post("/invoices", async (context) => {
   let body: unknown
@@ -41,52 +58,17 @@ app.post("/invoices", async (context) => {
   } catch {
     return context.json({ accepted: 0, rejected: 1 }, 400)
   }
-  const request = scope.createContext({ tags: [requestId(randomUUID())] })
-  try {
-    const summary = await request.exec({ flow: enqueue, rawInput: body })
-    await request.close({ ok: true })
-    return context.json({ accepted: summary.accepted, rejected: 0 })
-  } catch (error) {
-    await request.close({ ok: false, error })
-    if (error instanceof ParseError) return context.json({ accepted: 0, rejected: 1 }, 400)
-    throw error
-  }
+  const summary = await context.var.ctx.exec({ flow: enqueue, rawInput: body })
+  return context.json({ accepted: summary.accepted, rejected: 0 })
 })
 
-app.get("/report", async (context) => {
-  const request = scope.createContext({ tags: [requestId(randomUUID())] })
-  try {
-    const report = await request.exec({ flow: dailyReport })
-    await request.close({ ok: true })
-    return context.json(report)
-  } catch (error) {
-    await request.close({ ok: false, error })
-    throw error
-  }
-})
+app.get("/report", async (context) => context.json(await context.var.ctx.exec({ flow: dailyReport })))
 
-app.get("/audit", async (context) => {
-  const request = scope.createContext({ tags: [requestId(randomUUID())] })
-  try {
-    const audit = await request.exec({ flow: listAudit })
-    await request.close({ ok: true })
-    return context.json(audit)
-  } catch (error) {
-    await request.close({ ok: false, error })
-    throw error
-  }
-})
+app.get("/audit", async (context) => context.json(await context.var.ctx.exec({ flow: listAudit })))
 
 app.get("/health", async (context) => {
-  const request = scope.createContext({ tags: [requestId(randomUUID())] })
-  try {
-    const pending = await request.exec({ flow: listPending })
-    await request.close({ ok: true })
-    return context.json({ ok: true, pending: pending.length })
-  } catch (error) {
-    await request.close({ ok: false, error })
-    throw error
-  }
+  const pending = await context.var.ctx.exec({ flow: listPending })
+  return context.json({ ok: true, pending: pending.length })
 })
 
 async function main(): Promise<void> {

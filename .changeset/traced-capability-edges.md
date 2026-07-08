@@ -25,3 +25,10 @@ lite `controller()` initializer; both exemptions are shadow-aware — local
 declarations, function/class names, binding-pattern parameters, catch bindings,
 and loop-initializer bindings that shadow the lite imports disqualify the
 exemption.
+
+Close must not lie: `ctx.close({ ok: true })` now rejects when a registered
+settlement callback (onClose/cleanup, including resource teardown) throws —
+the error propagates through the enclosing `exec` like any other failure. A
+failed close still swallows secondary teardown errors so the primary error is
+never masked. This makes transaction-boundary middleware sound: a failed
+commit rejects the owning execution instead of vanishing.
