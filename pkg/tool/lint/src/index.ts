@@ -776,6 +776,7 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
 }
 
 function propertyChain(expression: ts.Expression): { root: ts.Identifier; names: string[] } | null {
+  if (ts.isParenthesizedExpression(expression)) return propertyChain(expression.expression)
   if (ts.isIdentifier(expression)) return { root: expression, names: [] }
   if (!ts.isPropertyAccessExpression(expression)) return null
   const chain = propertyChain(expression.expression)
@@ -1036,8 +1037,12 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
   function isSanctionedTracedCalleePart(node: ts.Node): boolean {
     let current: ts.Node = node
-    while (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current)) {
+    while (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current) || ts.isParenthesizedExpression(current)) {
       const parent = current.parent
+      if (ts.isParenthesizedExpression(parent)) {
+        current = parent
+        continue
+      }
       if (ts.isPropertyAccessExpression(parent) && parent.expression === current) {
         current = parent
         continue
@@ -1059,6 +1064,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (ts.isArrayLiteralExpression(parent) && parent.elements.some((element) => element === expression)) return true
     if (ts.isSpreadAssignment(parent) && parent.expression === expression) return true
     if (ts.isSpreadElement(parent) && parent.expression === expression) return true
+    if (ts.isElementAccessExpression(parent) && parent.expression === expression) return true
     return false
   }
 

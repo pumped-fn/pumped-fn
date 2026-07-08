@@ -1094,6 +1094,45 @@ describe("lite lint scanner", () => {
     `, "tests/example.test.ts")).toBe(0)
   })
 
+  it("flags computed member access on traced handles", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const settle = flow({
+        deps: { store: traced(queries) },
+        factory: async (_ctx, { store }) => {
+          const claim = store["settleImport"]
+          return claim
+        },
+      })
+    `)).toBeGreaterThan(0)
+  })
+
+  it("flags computed member exec on traced handles", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const settle = flow({
+        deps: { store: traced(queries) },
+        factory: async (_ctx, { store }) => await store["settleImport"].exec({ params: [] }),
+      })
+    `)).toBeGreaterThan(0)
+  })
+
+  it("allows parenthesized sanctioned traced exec", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const settle = flow({
+        deps: { store: traced(queries) },
+        factory: async (_ctx, { store }) => await (store.settleImport).exec({ params: [] }),
+      })
+    `)).toBe(0)
+  })
+
   it("flags traced dep exec when a loop binding shadows the lite import", () => {
     expect(unattributedAwaitCount(`
       import { flow, traced } from "@pumped-fn/lite"

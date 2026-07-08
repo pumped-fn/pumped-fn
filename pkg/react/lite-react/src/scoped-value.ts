@@ -5,7 +5,7 @@ import { resource, type Lite } from '@pumped-fn/lite'
 import { createStore, type PatchValue } from './store'
 
 type ScopedValueActions = object
-type ScopedValueDeps = Record<string, Lite.ExecutionDependency>
+type ScopedValueDeps = Record<string, Lite.ResourceDependency>
 
 type ScopedValueHelpers<State> = {
   readonly ctx: Lite.ExecutionContext
