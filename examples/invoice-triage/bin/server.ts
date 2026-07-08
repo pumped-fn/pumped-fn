@@ -9,6 +9,7 @@ import { Hono } from "hono"
 import { randomUUID } from "node:crypto"
 import { pathToFileURL } from "node:url"
 import { dailyReport, dailyReportJob, enqueue, ingest, listAudit, listPending, sendRemindersJob, stop, watchReviewQueue } from "../src/flows"
+import { consoleNotifier, notifier } from "../src/notifier"
 import { heuristic, requestId } from "../src/ports"
 
 const port = Number(process.env["PORT"] ?? 3000)
@@ -29,6 +30,7 @@ const scope = createScope({
       sinks: [otel.sink()],
     }),
     provider(heuristic),
+    notifier(consoleNotifier()),
   ],
 })
 

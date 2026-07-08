@@ -6,9 +6,9 @@ It proves:
 
 - generator flows with `execStream` progress and `exec` summary consumption
 - `yield*` progress composition from nested generator flows
-- deps-declared scalar flow handles for model calls, durable queue writes, Postgres upserts, reports, review reads, and mail delivery
+- three capability-projection primitives side by side: `traced()` over a foreign notifier client, `serviceValue()` for the tag-supplied transactional store, and role-tag flow projection for the classification model
 - unit-of-work middleware through a `txBoundary` resource that commits or rolls back from the execution close result
-- tag-supplied executable store records through `serviceValue(txStore(conn))`, projected as `store.method.exec({ params, tags })`
+- tag-supplied executable store records through `serviceValue(txStore(conn))`, projected as `store.method.exec({ params, tags })`; a foreign notifier instrumented through `traced(notifierClient)`, projected as `client.send.exec({ params, tags })`
 - a Postgres-backed ingest queue with Drizzle migrations from the `database` atom and PGlite preset in tests
 - signal-driven ingest using `queueSignal`, `storedSignal`, `outstanding`, `importing`, `drained`, and `stopping`
 - `scope.resolveStream(...)` fan-out feeds plus `scope.drain(..., { take })` shown in tests with a local status feed
@@ -73,7 +73,7 @@ flowchart TD
   SendOne --> Claim["markReminderSent<br/>write unit"]
   SendOne --> Deliver["deliver port flow<br/>scalar SDK step kind=email"]
   SendOne --> Release["releaseReminder<br/>write unit"]
-  Deliver --> Mailer["mailer role tag<br/>flow implementor"]
+  Deliver --> Notifier["traced(notifierClient)<br/>foreign send() edge"]
   StoreExec -.-> OTel
   Complete -.-> OTel
   Deliver -.-> OTel
@@ -109,7 +109,7 @@ Database access is confined to `src/unit.ts` and `src/tx.ts`. `database` is an a
 - `dailyReport` owns report materialization over `listStored`.
 - `markReminderSent` calls `store.claimReminder` for the idempotent reminder claim.
 - `releaseReminder` calls `store.releaseReminder` when delivery fails after a reminder claim.
-- `deliver` owns mail delivery through the `mailer` role tag.
+- `deliver` owns mail delivery through `traced(notifierClient)`, calling `client.send.exec(...)` so the foreign transport becomes a named `client.send` edge.
 
 `triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag - the SDK `complete` port flow owns that span. A completed workflow run shows the model implementor's step followed by `model.complete`; `invoice.classify` itself is untracked plumbing around that call. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
 
@@ -133,7 +133,7 @@ Tests wire scripted fakes built with `@pumped-fn/sdk-test`'s `modelStub` through
 
 Other provider seams are tags too:
 
-- `mailer` selects the delivery implementation. The default `logDelivery` flow writes a log record; tests bind a collecting flow.
+- `notifier` supplies the foreign delivery client. Roots bind `consoleNotifier()`; tests bind a plain-object client whose `send` routes through `this.record`, proving `traced` preserves the receiver. `traced()` requires a record of enumerable functions, so class-instance SDKs need a thin plain-object facade.
 - `clock`, `reminderWindowDays`, `reminderRecipient`, and `requestId` carry runtime policy or ambient request data.
 - `databaseUrl` carries the Postgres connection string. Its default is `postgres://invoice:invoice@localhost:5432/invoice_triage`, matching `compose.yaml`.
 - `database` creates the pg pool, runs Drizzle migrations, and is preset to PGlite in tests, but product flows never import or depend on it directly.
@@ -187,7 +187,7 @@ Each runnable root registers `observable.extension()` and `otel.sink()` by defau
 
 Batch settlement is atomic: pending rows remain in `invoice_pending` while `ingest` imports the batch, and `importBatch` owns one `txBoundary` for the whole batch. If a model call or process fails before the batch closes successfully, all rows from that batch remain pending, no stored rows land, and no imported audit rows commit. Recovery is the next wake or restart re-importing the whole batch. Re-importing an already-settled id is safe because `store.settleImport` claims by deleting pending rows first, upserts idempotently, and preserves `reminded_at`.
 
-Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. If `deliver` rejects, `sendReminder` calls `releaseReminder`, which clears `reminded_at` and writes `reminder_failed` in a write unit, then rethrows so the invoice appears in a later `sendReminders` run. A process crash between the SQL claim and delivery completion can still leave the claim set without a sent message; that window is intentionally at-most-once. In production, bind `mailer` to a real delivery implementor, set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
+Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. If `deliver` rejects, `sendReminder` calls `releaseReminder`, which clears `reminded_at` and writes `reminder_failed` in a write unit, then rethrows so the invoice appears in a later `sendReminders` run. A process crash between the SQL claim and delivery completion can still leave the claim set without a sent message; that window is intentionally at-most-once. In production, bind `notifier` to a real transport client (SES/SendGrid/Twilio wrapped as a plain-object record), set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 
 ## Run
 

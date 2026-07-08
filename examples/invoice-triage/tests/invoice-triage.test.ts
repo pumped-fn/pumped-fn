@@ -31,13 +31,13 @@ import {
   clock,
   heuristic,
   intakeLines,
-  mailer,
   outstanding,
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
   storedSignal,
 } from "../src/ports"
+import { notifier, type Notifier } from "../src/notifier"
 import {
   type Category,
   type Classification,
@@ -165,15 +165,21 @@ const seedStored = flow({
   },
 })
 
-function collecting(messages: ReminderMessage[]) {
-  return flow({
-    name: "test.collectReminder",
-    parse: typed<ReminderMessage>(),
-    factory: (ctx): ReminderResult => {
-      messages.push(ctx.input)
-      return { invoiceId: ctx.input.invoiceId, sent: true }
+interface CollectingNotifier extends Notifier {
+  record(message: ReminderMessage): Promise<ReminderResult>
+}
+
+function collecting(messages: ReminderMessage[]): Notifier {
+  const client: CollectingNotifier = {
+    async send(message: ReminderMessage): Promise<ReminderResult> {
+      return this.record(message)
     },
-  })
+    async record(message: ReminderMessage): Promise<ReminderResult> {
+      messages.push(message)
+      return { invoiceId: message.invoiceId, sent: true }
+    },
+  }
+  return client
 }
 
 interface Feed<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
@@ -922,7 +928,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        mailer(collecting(messages)),
+        notifier(collecting(messages)),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -974,19 +980,17 @@ describe("invoice triage patterns", () => {
     const db = await pgliteDatabase()
     const messages: ReminderMessage[] = []
     let attempts = 0
-    const failing = flow({
-      name: "test.failReminder",
-      parse: typed<ReminderMessage>(),
-      factory: (ctx): ReminderResult => {
+    const failing: Notifier = {
+      async send(message: ReminderMessage): Promise<ReminderResult> {
         attempts += 1
-        messages.push(ctx.input)
+        messages.push(message)
         throw new ReminderDeliveryFailure("smtp down")
       },
-    })
+    }
     const first = createScope({
       presets: [preset(database, db)],
       tags: [
-        mailer(failing),
+        notifier(failing),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -1008,7 +1012,7 @@ describe("invoice triage patterns", () => {
     const second = createScope({
       presets: [preset(database, db)],
       tags: [
-        mailer(collecting(messages)),
+        notifier(collecting(messages)),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -1059,7 +1063,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        mailer(collecting(messages)),
+        notifier(collecting(messages)),
         scheduler.backend(backend),
         reminderWindowDays(5),
         clock({ now: () => now }),
@@ -1128,7 +1132,7 @@ describe("invoice triage patterns", () => {
           dueDate: source.dueDate,
           category: "utilities",
         })])),
-        mailer(collecting(messages)),
+        notifier(collecting(messages)),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
         reminderWindowDays(3),
@@ -1149,6 +1153,7 @@ describe("invoice triage patterns", () => {
       "invoice.reviewCount",
       "invoice.save",
       "invoice.sendReminders",
+      "client.send",
       "model.complete",
       "model.stub",
       "store.claimReminder",

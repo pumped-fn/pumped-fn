@@ -1,8 +1,8 @@
-import { atom, controller, flow, tag, tags, typed } from "@pumped-fn/lite"
-import { logging } from "@pumped-fn/lite-extension-logging"
+import { atom, controller, flow, tag, tags, traced, typed } from "@pumped-fn/lite"
 import type { Model, ModelRequest } from "@pumped-fn/sdk"
 import { step } from "@pumped-fn/sdk"
 import { classifyHeuristically } from "./model"
+import { notifierClient } from "./notifier"
 import type { Invoice, ReminderMessage, ReminderResult } from "./types"
 
 export { intakeLines } from "./adapters/stdin"
@@ -78,29 +78,10 @@ export const heuristic: Model = flow({
   },
 })
 
-export const logDelivery = flow({
-  name: "invoice.logDelivery",
-  parse: typed<ReminderMessage>(),
-  deps: { logger: logging.logger },
-  factory: (ctx, { logger }): ReminderResult => {
-    logger.info("invoice.reminder.delivered", {
-      invoiceId: ctx.input.invoiceId,
-      to: ctx.input.to,
-      subject: ctx.input.subject,
-    })
-    return { invoiceId: ctx.input.invoiceId, sent: true }
-  },
-})
-
-export const mailer = tag<typeof logDelivery>({
-  label: "invoice.mailer",
-  default: logDelivery,
-})
-
 export const deliver = flow({
   name: "invoice.deliver",
   parse: typed<ReminderMessage>(),
-  deps: { impl: tags.required(mailer) },
+  deps: { client: traced(notifierClient) },
   tags: [step({ workflow: true, kind: "email" })],
-  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+  factory: (ctx, { client }): Promise<ReminderResult> => client.send.exec({ params: [ctx.input] }),
 })

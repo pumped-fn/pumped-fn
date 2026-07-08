@@ -7,6 +7,7 @@ import { model as provider } from "@pumped-fn/sdk"
 import { cac } from "cac"
 import { pathToFileURL } from "node:url"
 import { dailyReport, listAudit, listPending, sendReminders } from "../src/flows"
+import { consoleNotifier, notifier } from "../src/notifier"
 import { heuristic } from "../src/ports"
 
 type Command = typeof dailyReport | typeof listAudit | typeof listPending | typeof sendReminders
@@ -42,6 +43,7 @@ async function execute<Output, Flow extends Command & Lite.Flow<Output, void>>(f
         sinks: [otel.sink()],
       }),
       provider(heuristic),
+      notifier(consoleNotifier()),
     ],
   })
   const ctx = scope.createContext()

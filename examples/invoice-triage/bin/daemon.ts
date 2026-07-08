@@ -6,6 +6,7 @@ import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { pathToFileURL } from "node:url"
 import { awaitDrained, dailyReportJob, ingest, intake, sendRemindersJob, stop, watchReviewQueue } from "../src/flows"
+import { consoleNotifier, notifier } from "../src/notifier"
 import { heuristic } from "../src/ports"
 
 async function main(): Promise<void> {
@@ -26,6 +27,7 @@ async function main(): Promise<void> {
         sinks: [otel.sink()],
       }),
       provider(heuristic),
+      notifier(consoleNotifier()),
     ],
   })
   const ctx = scope.createContext()
