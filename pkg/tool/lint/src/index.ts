@@ -159,6 +159,7 @@ const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
+const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
 const tracedHandleEscapeMessage = "traced handles are one-depth exec edges; aliasing, passing, or returning them loses execution-time attribution."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
@@ -464,6 +465,14 @@ function hasScopeParameter(parameters: ts.NodeArray<ts.ParameterDeclaration>): b
     if (ts.isIdentifier(parameter.name) && parameter.name.text === "scope") return true
     if (!parameter.type) return false
     return /\b(?:Lite\.)?Scope\b/.test(parameter.type.getText())
+  })
+}
+
+function hasScopeOrExecutionContextParameter(parameters: ts.NodeArray<ts.ParameterDeclaration>): boolean {
+  return parameters.some((parameter) => {
+    if (ts.isIdentifier(parameter.name) && parameter.name.text === "scope") return true
+    if (!parameter.type) return false
+    return /\b(?:Lite\.)?(?:Scope|ExecutionContext)\b/.test(parameter.type.getText())
   })
 }
 
@@ -1642,8 +1651,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
     }
 
-    if (!allowScopeArgument) {
-      if (ts.isFunctionDeclaration(node) && exported(node) && hasScopeParameter(node.parameters)) {
+    if (ts.isFunctionDeclaration(node) && exported(node)) {
+      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.parameters)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-scope-argument",
+          node.name ?? node,
+          exportedScopeGlueMessage,
+        )
+      } else if (!allowScopeArgument && hasScopeParameter(node.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,
@@ -1653,14 +1671,24 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Product helpers should not accept scope; composition roots and tests own scope creation.",
         )
       }
+    }
 
-      if (
-        ts.isVariableDeclaration(node)
-        && node.initializer
-        && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
-        && hasScopeParameter(node.initializer.parameters)
-        && exported(variableStatement(node) ?? node)
-      ) {
+    if (
+      ts.isVariableDeclaration(node)
+      && node.initializer
+      && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+      && exported(variableStatement(node) ?? node)
+    ) {
+      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.initializer.parameters)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-scope-argument",
+          node.name,
+          exportedScopeGlueMessage,
+        )
+      } else if (!allowScopeArgument && hasScopeParameter(node.initializer.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,

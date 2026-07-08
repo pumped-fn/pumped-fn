@@ -266,6 +266,31 @@ describe("lite lint scanner", () => {
     `, "src/main.tsx")).toEqual([])
   })
 
+  it("flags exported scope or context glue in composition roots while allowing local root glue", () => {
+    const flagged = diagnostics(`
+      import type { Lite } from "@pumped-fn/lite"
+
+      export function startWorkers(scope: Lite.Scope) {
+        return scope.createContext()
+      }
+    `, "src/main.ts")
+
+    expect(flagged.map((diagnostic) => diagnostic.ruleId)).toEqual(["pumped/no-scope-argument"])
+    expect(flagged[0]?.message).toBe("exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph.")
+
+    expect(ids(`
+      import type { Lite } from "@pumped-fn/lite"
+
+      const startWorkers = (scope: Lite.Scope) => scope.createContext()
+    `, "bin/server.ts")).toEqual([])
+
+    expect(ids(`
+      import type { Lite } from "@pumped-fn/lite"
+
+      export const runRequest = (ctx: Lite.ExecutionContext) => ctx.name
+    `, "src/server.ts")).toEqual(["pumped/no-scope-argument"])
+  })
+
   it("finds stale public vocabulary and JSDOM backend markers in text files", () => {
     expect(ids(`
       # ${["Gol", "den"].join("")} example

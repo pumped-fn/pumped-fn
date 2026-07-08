@@ -21,7 +21,7 @@ It proves:
 
 ```mermaid
 flowchart TD
-  Root["daemon/server/cli roots<br/>createInvoiceScope"] --> Scope["scope<br/>logging + observable + scheduler"]
+  Root["daemon/server/cli roots<br/>inline createScope"] --> Scope["scope<br/>logging + observable + scheduler"]
   Scope --> OTel["otel.sink()<br/>exports spans when SDK is registered"]
   Scope --> DB["database atom<br/>pg pool + Drizzle migrations"]
   DB --> Queries["queries atom<br/>record of functions"]
@@ -97,7 +97,9 @@ The example uses `yield* stream` to pass nested triage progress through `importB
 
 ## Providers
 
-`src/main.ts` is the composition root for the runnable entrypoints. `createInvoiceScope()` installs the observable, logging, and scheduler extensions; binds the in-process scheduler backend; sends logs to stdout; sends observable events to `otel.sink()`; and binds the deterministic heuristic model provider.
+`bin/daemon.ts`, `bin/server.ts`, and `bin/cli.ts` are the composition roots for the runnable entrypoints. Each root calls `createScope` inline with the observable, logging, and scheduler extensions; binds the in-process scheduler backend; sends logs to stdout; sends observable events to `otel.sink()`; and binds the deterministic heuristic model provider.
+
+The Hono server is the `app` atom in `src/server.ts`. Its factory builds the routes and captures `ctx.scope` inside the node. Each request creates its own execution context, execs the target flow, closes ok or failed, and maps parse errors to HTTP 400.
 
 The model seam is the SDK `model` tag:
 
@@ -157,9 +159,9 @@ pnpm -F @pumped-fn/invoice-triage cli pending
 pnpm -F @pumped-fn/invoice-triage cli remind
 ```
 
-The daemon composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows. It holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. EOF or SIGINT ends intake; the daemon waits for `drained` - accepted work settled and no batch in flight - then sets `stopping`, bumps `queueSignal` and `storedSignal` to wake both loops, waits for them to settle, closes the context, and disposes the scope. The server SIGINT/SIGTERM path closes the HTTP server, sets `stopping`, wakes the worker loops, waits for them to settle, and disposes the scope.
+The daemon composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows. It holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. EOF or SIGINT ends intake; the daemon waits for `drained` - accepted work settled and no batch in flight - then execs `invoice.stop`, waits for both loops to settle, closes the context, and disposes the scope. The server SIGINT/SIGTERM path execs `invoice.stop`, waits for the worker loops to settle, closes the HTTP server and execution context, and disposes the scope.
 
-`createInvoiceScope()` registers `observable.extension()` and `otel.sink()` by default. The sink emits real OpenTelemetry spans when the process has an OTel SDK/tracer provider registered; tests prove the names by injecting a recording tracer.
+Each runnable root registers `observable.extension()` and `otel.sink()` by default. The sink emits real OpenTelemetry spans when the process has an OTel SDK/tracer provider registered; tests prove the names by injecting a recording tracer.
 
 Import settlement is per invoice: pending rows remain in `invoice_pending` while `ingest` imports the batch, and `saveInvoice` removes each row only inside the same `store.settleImport` transaction that upserts the stored invoice and writes the `imported` audit event. If a model call or process fails after one invoice settles, the next invoice remains pending for the next scope. Re-importing an already-settled id is safe because `store.settleImport` upserts idempotently while preserving `reminded_at`, and deleting a missing pending row is a no-op.
 

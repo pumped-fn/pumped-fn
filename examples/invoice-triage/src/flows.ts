@@ -182,6 +182,20 @@ export const awaitDrained = flow({
   },
 })
 
+export const stop = flow({
+  name: "invoice.stop",
+  deps: {
+    stopping: controller(stopping, { resolve: true }),
+    queueSignal: controller(queueSignal, { resolve: true }),
+    storedSignal: controller(storedSignal, { resolve: true }),
+  },
+  factory: (_ctx, { stopping, queueSignal, storedSignal }): void => {
+    stopping.update(() => true)
+    queueSignal.update((value) => value + 1)
+    storedSignal.update((value) => value + 1)
+  },
+})
+
 const msPerDay = 86_400_000
 
 function utcDay(value: string | Date): number {

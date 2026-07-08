@@ -1,4 +1,4 @@
-import { atom, createScope, flow, isStreamingExec, preset, typed, type Lite } from "@pumped-fn/lite"
+import { atom, controller, createScope, flow, isStreamingExec, preset, typed, type Lite } from "@pumped-fn/lite"
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import { otel, type Otel } from "@pumped-fn/lite-extension-observable-otel"
@@ -23,6 +23,7 @@ import {
   saveInvoice,
   sendReminders,
   sendRemindersJob,
+  stop,
   triage,
   watchReviewQueue,
 } from "../src/flows"
@@ -34,8 +35,6 @@ import {
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
-  stopping,
-  storedSignal,
 } from "../src/ports"
 import {
   type Category,
@@ -48,7 +47,7 @@ import {
   type Risk,
   type StoredInvoice,
 } from "../src/types"
-import { createApp } from "../src/server"
+import { app } from "../src/server"
 import { pgliteDatabase } from "./support/database"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
@@ -139,34 +138,31 @@ function stored(
   }
 }
 
-async function seedStored(ctx: Lite.ExecutionContext, invoices: readonly StoredInvoice[]): Promise<void> {
-  for (const item of invoices) {
-    await ctx.exec({
-      flow: saveInvoice,
-      input: {
-        invoice: {
-          id: item.id,
-          vendor: item.vendor,
-          amount: item.amount,
-          dueDate: item.dueDate,
-          description: item.description,
+const seedStored = flow({
+  name: "test.seedStored",
+  parse: typed<readonly StoredInvoice[]>(),
+  deps: {
+    saveInvoice: controller(saveInvoice),
+    markReminderSent: controller(markReminderSent),
+  },
+  factory: async (ctx, { saveInvoice, markReminderSent }): Promise<void> => {
+    for (const item of ctx.input) {
+      await saveInvoice.exec({
+        input: {
+          invoice: {
+            id: item.id,
+            vendor: item.vendor,
+            amount: item.amount,
+            dueDate: item.dueDate,
+            description: item.description,
+          },
+          classification: item.classification,
         },
-        classification: item.classification,
-      },
-    })
-    if (item.remindedAt !== undefined) await ctx.exec({ flow: markReminderSent, input: { invoiceId: item.id } })
-  }
-}
-
-async function stopLoop(scope: Lite.Scope, loop: Promise<void>): Promise<PromiseSettledResult<void>> {
-  const stop = await scope.controller(stopping, { resolve: true })
-  const queue = await scope.controller(queueSignal, { resolve: true })
-  const stored = await scope.controller(storedSignal, { resolve: true })
-  stop.update(() => true)
-  queue.update((value) => value + 1)
-  stored.update((value) => value + 1)
-  return (await Promise.allSettled([loop]))[0]!
-}
+      })
+      if (item.remindedAt !== undefined) await markReminderSent.exec({ input: { invoiceId: item.id } })
+    }
+  },
+})
 
 function collecting(messages: ReminderMessage[]) {
   return flow({
@@ -547,7 +543,8 @@ describe("invoice triage patterns", () => {
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await ctx.exec({ flow: listPending })).toEqual([])
     expect(gate.calls()).toBe(all.length)
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -593,7 +590,8 @@ describe("invoice triage patterns", () => {
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
     expect(await ctx.exec({ flow: listPending })).toEqual([])
     expect(gate.calls()).toBe(all.length)
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -631,7 +629,8 @@ describe("invoice triage patterns", () => {
     await waiting
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
     expect(gate.calls()).toBe(batch.length)
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -654,7 +653,8 @@ describe("invoice triage patterns", () => {
     await ctx.exec({ flow: awaitDrained })
     expect(await ctx.exec({ flow: listStored })).toEqual([])
     expect((await ctx.exec({ flow: listPending })).map((item) => item.id)).toEqual(["inv-fail-1"])
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("rejected")
     if (ingestOutcome.status !== "rejected") throw new Error("ingest did not reject")
     expect(ingestOutcome.reason).toEqual(expect.any(Error))
@@ -719,7 +719,8 @@ describe("invoice triage patterns", () => {
     expect((await recoveredCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual([first.id, second.id])
     expect(await recoveredCtx.exec({ flow: listPending })).toEqual([])
     expect((await recoveredCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued", "imported", "imported"])
-    const ingestOutcome = await stopLoop(recovered, recoveredProcessing)
+    await recoveredCtx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([recoveredProcessing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await recoveredCtx.close({ ok: true })
     await recovered.dispose()
@@ -758,7 +759,8 @@ describe("invoice triage patterns", () => {
     gate.releaseFirst()
     await secondCtx.exec({ flow: awaitDrained })
 
-    const ingestOutcome = await stopLoop(second, processing)
+    await secondCtx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     expect((await secondCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
     expect(await secondCtx.exec({ flow: listPending })).toEqual([])
@@ -836,7 +838,8 @@ describe("invoice triage patterns", () => {
     expect(counts[0]).toBe(0)
     expect(counts.at(-1)).toBe(3)
     expect(counts).toEqual([...new Set(counts)].sort((left, right) => left - right))
-    const watchOutcome = await stopLoop(scope, watching)
+    await log.exec({ flow: stop })
+    const [watchOutcome] = await Promise.allSettled([watching])
     expect(watchOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await log.close({ ok: true })
@@ -855,12 +858,12 @@ describe("invoice triage patterns", () => {
       ],
     })
     const ctx = scope.createContext()
-    await seedStored(ctx, [
+    await ctx.exec({ flow: seedStored, input: [
       stored("inv-remind-today", "2026-07-05", "utilities", "auto-approve"),
       stored("inv-remind-horizon", "2026-07-08", "saas", "auto-approve"),
       stored("inv-remind-beyond", "2026-07-09", "saas", "auto-approve"),
       stored("inv-remind-done", "2026-07-06", "hardware", "review", "2026-07-04T00:00:00.000Z"),
-    ])
+    ] })
 
     await expect(ctx.exec({ flow: sendReminders })).resolves.toEqual({
       sent: 2,
@@ -919,7 +922,7 @@ describe("invoice triage patterns", () => {
       ],
     })
     const firstCtx = first.createContext()
-    await seedStored(firstCtx, [stored("inv-remind-retry", "2026-07-06", "saas", "auto-approve")])
+    await firstCtx.exec({ flow: seedStored, input: [stored("inv-remind-retry", "2026-07-06", "saas", "auto-approve")] })
 
     await expect(firstCtx.exec({ flow: sendReminders })).rejects.toThrow("smtp down")
     expect(attempts).toBe(1)
@@ -959,11 +962,11 @@ describe("invoice triage patterns", () => {
       tags: [clock({ now: () => now })],
     })
     const ctx = scope.createContext()
-    await seedStored(ctx, [
+    await ctx.exec({ flow: seedStored, input: [
       stored("inv-report-overdue", "2026-07-04", "utilities", "auto-approve"),
       stored("inv-report-today", "2026-07-05", "saas", "auto-approve"),
       stored("inv-report-review", "2026-07-10", "hardware", "review"),
-    ])
+    ] })
 
     await expect(ctx.exec({ flow: dailyReport })).resolves.toEqual({
       total: 3,
@@ -992,7 +995,7 @@ describe("invoice triage patterns", () => {
       ],
     })
     const ctx = scope.createContext()
-    await seedStored(ctx, [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")])
+    await ctx.exec({ flow: seedStored, input: [stored("inv-cron-reminder", "2026-07-06", "saas", "auto-approve")] })
 
     await ctx.resolve(dailyReportJob)
     await ctx.resolve(sendRemindersJob)
@@ -1082,7 +1085,8 @@ describe("invoice triage patterns", () => {
       "store.enqueuePending",
       "store.settleImport",
     ].sort()))
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -1111,22 +1115,22 @@ describe("invoice triage patterns", () => {
     })
     const ctx = scope.createContext()
     const processing = ctx.exec({ flow: ingest })
-    const app = createApp({ scope })
+    const routes = await scope.resolve(app)
 
-    const accepted = await app.request("/invoices", {
+    const accepted = await routes.request("/invoices", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(source),
     })
-    const rejected = await app.request("/invoices", {
+    const rejected = await routes.request("/invoices", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id: "bad" }),
     })
     await ctx.exec({ flow: awaitDrained })
-    const report = await app.request("/report")
-    const audit = await app.request("/audit")
-    const health = await app.request("/health")
+    const report = await routes.request("/report")
+    const audit = await routes.request("/audit")
+    const health = await routes.request("/health")
 
     expect(accepted.status).toBe(200)
     expect(await accepted.json()).toEqual({ accepted: 1, rejected: 0 })
@@ -1150,7 +1154,8 @@ describe("invoice triage patterns", () => {
     ]))
     expect(health.status).toBe(200)
     expect(await health.json()).toEqual({ ok: true, pending: 0 })
-    const ingestOutcome = await stopLoop(scope, processing)
+    await ctx.exec({ flow: stop })
+    const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")
     await ctx.close({ ok: true })
     await scope.dispose()

@@ -390,6 +390,24 @@
       "candidate_status": "candidate",
       "no_regression_evidence": "none yet - recorded finding; example ships cooperative stop instead",
       "ratification": "recorded per ratified D2 decision 2026-07-07; core fix deferred to a dedicated run"
+    },
+    {
+      "metric_id": "path_exemption_masked_export_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "source_run_id": "example-operational-20260707",
+      "source_refs": [
+        "PKR-9 user catch 2026-07-08",
+        "lint no-scope-argument refinement: exported composition-path scope/ctx-takers flagged"
+      ],
+      "applies_when": "any lint rule with path-based exemptions: exemptions cover local inline root privilege only, never exported reusable functions; review rounds hand-check ratified walls instead of trusting lint coverage",
+      "does_not_apply_when": "non-exported root-local glue in bin/ and composition roots",
+      "invalidates_when": "never",
+      "recertify_by": "2027-01-05",
+      "confidence": 0.9,
+      "candidate_status": "candidate",
+      "no_regression_evidence": "PKR-9: startWorkers/requestStop/createApp/withContext/createInvoiceScope all dissolved graph-natively; 21+77 green, three roots re-verified vs real pg",
+      "ratification": "user-caught 2026-07-08; lint refinement live"
     }
   ],
   "prime_rationale": "Always fully traceable and fully testable: no implicits, no uncontrolled side effects (user-ratified 2026-07-08). Every anti-goal below is an enforcement face of this invariant."
