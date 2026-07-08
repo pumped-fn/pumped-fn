@@ -16,7 +16,7 @@ Use this checklist before adding helpers around the graph.
 | composition root | Scope, root execution context, providers, route/job mounting, and disposal | Keep it thin and tested; do not hide flows behind facade objects or shared preconfigured scope factories |
 | public docs | Architectural claims, inventories, run commands, and implemented slices | Strong claims need structural guards, and counts must be derived or explicitly scoped |
 
-Use `traced()` when a transport capability atom exposes a non-empty record of enumerable functions over a foreign API and each method call must become a named `depKey.method.exec({ params, tags })` edge with per-call tags; keep business behavior in flows. Use `serviceValue()` when a resource or root supplies a tag-carried executable record whose ctx-first members should project to the same one-depth exec handles with the live child ctx supplied by the pipeline. Non-record, empty-record, and non-function traced members reject when the dependency resolves.
+For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ fn: () => client.method(args), name: "client.method", tags })` — one named, tag-able edge per call. `fn`-exec is the one way to trace a specific call; a flow is the one way for a capability that is a graph node. `traced()` and `serviceValue()` are **deprecated** (both are only loops over `ctx.exec({ fn })`, and they duplicate each other); prefer `ctx.exec({ fn })` and flows. Removal is planned for the next major.
 
 ## A. Fundamental Usage
 
