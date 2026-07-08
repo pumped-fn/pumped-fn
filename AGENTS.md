@@ -4,6 +4,9 @@
 - `dependencies`/`devDependencies`: `catalog:` version specifier (add to `pnpm-workspace.yaml` first)
 - `peerDependencies`: explicit ranges (e.g. `^19.0.0`) — not catalog-managed
 
+## Prime Rationale
+Always fully traceable and fully testable: no implicits, no uncontrolled side effects. Effects exist only as controlled graph edges — visible to the exec pipeline (flows, port flows, role-tag implementors, one-depth traced members) and substitutable through the scope seam.
+
 ## Code Style (No Slop)
 No:
 - Inline or block comments (TSDoc on public interfaces only)

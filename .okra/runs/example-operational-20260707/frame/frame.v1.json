@@ -1,6 +1,6 @@
 {
   "frame_version": 1,
-  "frame_hash": "sha256:6a1f46212c7b67123aec098e2461fb091f1a61601114edbabc28388145e31e59",
+  "frame_hash": "sha256:198230a07571564ffbe33255fa5283458bb291339da184b0949a7adec6254625",
   "status": "ratified",
   "run_id": "example-operational-20260707",
   "mission": "Rebuild examples/invoice-triage into a production/operational-grade example on the new pumped-fn API, including the lite core traced() dep operator (handle-shaped capability edges over ctx.exec fn-exec, exec-format options with tags; execStream variant staged).",
@@ -116,6 +116,16 @@
       "execStream_variant": "staged to follow-up run",
       "d2_core_teardown": "cooperative-stop pattern in example; two core gaps recorded as candidate findings for a dedicated core run",
       "run_store": "committed as we go (.gitignore exception)"
+    }
+  },
+  "prime_rationale": {
+    "statement": "Always fully traceable and fully testable: no implicits, no uncontrolled side effects. Effects are permitted only as controlled graph edges \u2014 visible to the exec pipeline (traceable) and substitutable through the scope seam (testable).",
+    "ratified": "user 2026-07-08 in session; umbrella rationale the anti-goal set serves",
+    "mechanism_map": {
+      "traceable": "exec pipeline spans every edge: flows, port flows, role-tag implementors, traced capability members; no-unattributed-await walls the escape routes",
+      "testable": "scope is the single seam: preset substitutes values, role tags select implementations, failure injection through public tags only",
+      "no_implicits": "ctx is a receiver never ambient (no ALS); tags are declared deps; shadow-aware lint kills name-based spoofing",
+      "no_uncontrolled_side_effects": "foreign calls live inside step-tagged flows or one-depth traced edges bound to the calling invocation; aggregates transactional; escapes linted"
     }
   }
 }

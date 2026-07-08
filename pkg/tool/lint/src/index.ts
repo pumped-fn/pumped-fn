@@ -23,6 +23,7 @@ export type RuleId =
   | "pumped/no-shared-scope-factory"
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-traced-handle-escape"
   | "pumped/no-unattributed-await"
   | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
@@ -158,6 +159,7 @@ const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
+const tracedHandleEscapeMessage = "traced handles are one-depth exec edges; aliasing, passing, or returning them loses execution-time attribution."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
@@ -773,6 +775,17 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
   return null
 }
 
+function propertyChain(expression: ts.Expression): { root: ts.Identifier; names: string[] } | null {
+  if (ts.isIdentifier(expression)) return { root: expression, names: [] }
+  if (!ts.isPropertyAccessExpression(expression)) return null
+  const chain = propertyChain(expression.expression)
+  return chain ? { root: chain.root, names: [...chain.names, expression.name.text] } : null
+}
+
+function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
+  return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment
+}
+
 function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Map<string, string | null> {
   const names = new Map<string, string | null>()
   const parameter = factory.parameters[1]
@@ -947,8 +960,10 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const allowTracedHandleEscape = isTestPath(filePath) || isCompositionPath(filePath)
   const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
+  const tracedHandleEscapeReports = new Set<number>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
   const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
@@ -984,6 +999,81 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return names.size > 0 ? { factory, names } : null
   }
 
+  function tracedHandlePathAt(expression: ts.Expression): string[] | null {
+    const depsBinding = factoryDepsAt(expression)
+    if (!depsBinding) return null
+    const config = enclosingUnitConfig(expression, imports)
+    const chain = propertyChain(expression)
+    if (!chain || shadowsName(chain.root, depsBinding.factory, chain.root.text)) return null
+    const bound = depsBinding.names.get(chain.root.text)
+    if (bound === undefined) return null
+    if (bound !== null) {
+      return depIsTraced(config, bound, imports) ? chain.names : null
+    }
+    const key = chain.names[0]
+    return key && depIsTraced(config, key, imports) ? chain.names.slice(1) : null
+  }
+
+  function pushTracedHandleEscape(node: ts.Node): void {
+    const position = node.getStart(sourceFile)
+    if (tracedHandleEscapeReports.has(position)) return
+    tracedHandleEscapeReports.add(position)
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-traced-handle-escape",
+      node,
+      tracedHandleEscapeMessage,
+    )
+  }
+
+  function isSanctionedTracedExecCall(call: ts.CallExpression): boolean {
+    if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "exec") return false
+    const path = tracedHandlePathAt(call.expression)
+    return path !== null && path.length === 2 && path[1] === "exec"
+  }
+
+  function isSanctionedTracedCalleePart(node: ts.Node): boolean {
+    let current: ts.Node = node
+    while (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current)) {
+      const parent = current.parent
+      if (ts.isPropertyAccessExpression(parent) && parent.expression === current) {
+        current = parent
+        continue
+      }
+      return ts.isCallExpression(parent) && parent.expression === current && isSanctionedTracedExecCall(parent)
+    }
+    return false
+  }
+
+  function isBareTracedHandleEscape(expression: ts.Expression): boolean {
+    const parent = expression.parent
+    if (ts.isCallExpression(parent) && parent.arguments.some((argument) => argument === expression)) return true
+    if (ts.isArrowFunction(parent) && parent.body === expression) return true
+    if (ts.isReturnStatement(parent) && parent.expression === expression) return true
+    if (ts.isVariableDeclaration(parent) && parent.initializer === expression) return true
+    if (ts.isBinaryExpression(parent) && parent.right === expression && isAssignmentOperator(parent.operatorToken.kind)) return true
+    if (ts.isPropertyAssignment(parent) && parent.initializer === expression) return true
+    if (ts.isShorthandPropertyAssignment(parent) && parent.name === expression) return true
+    if (ts.isArrayLiteralExpression(parent) && parent.elements.some((element) => element === expression)) return true
+    if (ts.isSpreadAssignment(parent) && parent.expression === expression) return true
+    if (ts.isSpreadElement(parent) && parent.expression === expression) return true
+    return false
+  }
+
+  function checkTracedHandleEscape(node: ts.Node): void {
+    if (allowTracedHandleEscape) return
+    if (!ts.isIdentifier(node) && !ts.isPropertyAccessExpression(node)) return
+    const path = tracedHandlePathAt(node)
+    if (path === null || isSanctionedTracedCalleePart(node)) return
+    if (path.length === 0) {
+      if (isBareTracedHandleEscape(node)) pushTracedHandleEscape(node)
+      return
+    }
+    if (ts.isPropertyAccessExpression(node)) pushTracedHandleEscape(node)
+  }
+
   function checkUnattributedAwait(call: ts.CallExpression, reportNode: ts.Node): void {
     if (allowUnattributedAwait) return
     const depsBinding = factoryDepsAt(call)
@@ -1008,6 +1098,8 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   }
 
   function visit(node: ts.Node): void {
+    checkTracedHandleEscape(node)
+
     const ctxBinding = factoryCtxAt(node)
     if (ctxBinding) {
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) {

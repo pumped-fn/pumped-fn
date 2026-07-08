@@ -13,7 +13,13 @@ resolution. This is the transport-capability complement to port flows: business
 features stay flows, foreign-API call sites become visible, spannable graph
 edges.
 
-lite-lint: `pumped/no-unattributed-await` exempts deps initialized with the lite
+`traced()` deps are execution-position only: a resource dep would capture the
+owning boundary's context instead of the calling invocation's (misattribution),
+so it is rejected at the type level and at resolution.
+
+lite-lint: new `pumped/no-traced-handle-escape` — traced handles are one-depth
+exec edges; aliasing, passing, returning, spreading, or deep-chaining them loses
+execution-time attribution and is an error. `pumped/no-unattributed-await` exempts deps initialized with the lite
 `traced()` (attributed by construction) and its `resolve` exemption requires a
 lite `controller()` initializer; both exemptions are shadow-aware — local
 declarations, function/class names, binding-pattern parameters, catch bindings,

@@ -972,6 +972,9 @@ class ScopeImpl implements Lite.Scope {
     const graph = classifyDeps(deps)
     const result: Record<string, unknown> = {}
     const parallel: Promise<void>[] = []
+    if (dependentResource && graph.traced.length > 0) {
+      throw new Error("Traced deps are execution deps; resources capture the owning context")
+    }
 
     for (let i = 0; i < graph.atoms.length; i++) {
       const [key, dep] = graph.atoms[i]!

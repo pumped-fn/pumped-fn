@@ -391,5 +391,6 @@
       "no_regression_evidence": "none yet - recorded finding; example ships cooperative stop instead",
       "ratification": "recorded per ratified D2 decision 2026-07-07; core fix deferred to a dedicated run"
     }
-  ]
+  ],
+  "prime_rationale": "Always fully traceable and fully testable: no implicits, no uncontrolled side effects (user-ratified 2026-07-08). Every anti-goal below is an enforcement face of this invariant."
 }

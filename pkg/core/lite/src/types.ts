@@ -579,7 +579,6 @@ export namespace Lite {
     | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | ResourceControllerDep<unknown>
-    | TracedDep<unknown>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 

@@ -884,6 +884,10 @@ describe("lite lint scanner", () => {
     return ids(source, filePath).filter((id) => id === "pumped/no-unattributed-await").length
   }
 
+  function tracedHandleEscapeCount(source: string, filePath = "src/example.ts") {
+    return ids(source, filePath).filter((id) => id === "pumped/no-traced-handle-escape").length
+  }
+
   it("finds an awaited call on a destructured deps binding with no step tag", () => {
     expect(ids(`
       import { flow } from "@pumped-fn/lite"
@@ -980,6 +984,114 @@ describe("lite lint scanner", () => {
         },
       })
     `)).toBe(0)
+  })
+
+  it("allows sanctioned traced usage across two members", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: async (_ctx, { store }) => {
+          await store.enqueuePending.exec({ params: [[]] })
+          return store.settleImport.exec({ params: [{ id: "inv-1" }] })
+        },
+      })
+    `)).toBe(0)
+  })
+
+  it("flags a traced root passed to a helper", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      declare function helper(value: unknown): unknown
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => helper(store),
+      })
+    `)).toBe(1)
+  })
+
+  it("flags a traced member alias", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => {
+          const settle = store.settleImport
+          return settle
+        },
+      })
+    `)).toBe(1)
+  })
+
+  it("flags a traced root returned from a factory", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => store,
+      })
+    `)).toBe(1)
+  })
+
+  it("flags a traced root spread into an object", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => ({ ...store }),
+      })
+    `)).toBe(1)
+  })
+
+  it("flags a traced member passed as a callback", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      declare function register(value: unknown): unknown
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => register(store.settleImport),
+      })
+    `)).toBe(1)
+  })
+
+  it("flags traced property chains deeper than member exec", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => store.settleImport.exec.call(undefined),
+      })
+    `)).toBe(1)
+  })
+
+  it("exempts test paths from traced handle escape checks", () => {
+    expect(tracedHandleEscapeCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { queries } from "./ports"
+
+      declare function helper(value: unknown): unknown
+
+      const run = flow({
+        deps: { store: traced(queries) },
+        factory: (_ctx, { store }) => helper(store),
+      })
+    `, "tests/example.test.ts")).toBe(0)
   })
 
   it("flags traced dep exec when a loop binding shadows the lite import", () => {

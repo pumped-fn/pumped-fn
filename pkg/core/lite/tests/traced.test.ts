@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
-import { atom, createScope, flow, tag, traced, type Lite } from "../src/index"
+import { atom, createScope, flow, resource, tag, traced, type Lite } from "../src/index"
 
 describe("traced capability deps", () => {
   it("routes member exec through the pipeline with names, tags, receiver, and identity", async () => {
@@ -114,6 +114,24 @@ describe("traced capability deps", () => {
     const scope = createScope()
 
     await expect(scope.resolve(broken)).rejects.toThrow("Traced deps require an ExecutionContext")
+    await scope.dispose()
+  })
+
+  it("rejects traced deps erased into resource deps", async () => {
+    const gateway = atom({
+      factory: () => ({
+        ping: () => "pong",
+      }),
+    })
+    const tx = resource({
+      deps: { gateway: traced(gateway) } as unknown as Record<string, Lite.ResourceDependency>,
+      factory: () => "never",
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.resolve(tx)).rejects.toThrow("Traced deps are execution deps; resources capture the owning context")
+    await ctx.close({ ok: true })
     await scope.dispose()
   })
 

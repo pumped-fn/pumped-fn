@@ -370,6 +370,14 @@ const _fetchResult: Promise<{ id: string; count: number }> = _gateway.fetch.exec
 const _pingResult: Promise<string> = _gateway.ping.exec()
 const _pingTaggedResult: Promise<string> = _gateway.ping.exec({ tags: [] })
 
+resource({
+  deps: {
+    // @ts-expect-error traced deps are execution-only
+    store: traced(gateway),
+  },
+  factory: (_ctx, { store }) => store.fetch.exec({ params: ["profile-1", 1] }),
+})
+
 // @ts-expect-error traced method params are passed as the original tuple
 _gateway.fetch.exec({ params: ["profile-1"] })
 

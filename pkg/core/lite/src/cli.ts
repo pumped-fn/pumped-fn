@@ -132,6 +132,7 @@ service({ factory, deps? })
 
 traced(atom) → TracedDep
   Wrap a transport capability-record atom so each enumerable function member arrives as depKey.method.exec({ params, tags }).
+  Traced deps are flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they are rejected.
   The exec edge name comes from the deps key plus member key, and non-record, empty-record, or non-function members reject.`,
   },
 

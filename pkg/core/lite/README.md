@@ -146,8 +146,9 @@ for the default implementation, `scope.createContext({ tags })` to rebind for a 
 `traced()` is for transport capability records over foreign APIs. Business features stay as flows. It
 accepts an atom whose resolved value is a non-empty record of enumerable functions. Each method arrives as
 `depKey.method.exec({ params, tags })`, named from the dependency key, so transport calls keep per-call tags
-and remain visible to extensions without hiding feature behavior behind facade methods. Non-record,
-empty-record, and non-function members reject when the dependency resolves.
+and remain visible to extensions without hiding feature behavior behind facade methods. Traced deps are
+flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they
+are rejected. Non-record, empty-record, and non-function members reject when the dependency resolves.
 
 ```ts
 const auditUserLoad = flow({
