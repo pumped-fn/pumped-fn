@@ -26,7 +26,7 @@ export function pumpedHmr(options: PumpedHmrOptions = {}): Plugin {
     enforce: "pre",
 
     transform(code, id) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env["NODE_ENV"] === "production") {
         return null
       }
 
