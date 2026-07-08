@@ -908,33 +908,42 @@ function importedCallee(callee: ts.Identifier, imports: Map<string, number>): bo
   return importEnd !== undefined && !shadowsName(callee, callee.getSourceFile(), callee.text, importEnd)
 }
 
-function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+function depInitializer(config: ts.ObjectLiteralExpression | null, key: string | null): ts.Expression | null {
   const deps = config && objectProperty(config, "deps")
-  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
-  const property = objectProperty(deps.initializer, key)
-  return property !== null
-    && ts.isCallExpression(property.initializer)
-    && ts.isIdentifier(property.initializer.expression)
-    && importedCallee(property.initializer.expression, imports.controller)
+  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return null
+  for (const property of deps.initializer.properties) {
+    if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === key) return property.initializer
+    if (ts.isShorthandPropertyAssignment(property) && property.name.text === key) return property.name
+  }
+  return null
+}
+
+function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && ts.isIdentifier(initializer.expression)
+    && importedCallee(initializer.expression, imports.controller)
 }
 
 function depIsTraced(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
-  const deps = config && objectProperty(config, "deps")
-  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
-  const property = objectProperty(deps.initializer, key)
-  return property !== null
-    && ts.isCallExpression(property.initializer)
-    && ts.isIdentifier(property.initializer.expression)
-    && importedCallee(property.initializer.expression, imports.traced)
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && ts.isIdentifier(initializer.expression)
+    && importedCallee(initializer.expression, imports.traced)
 }
 
 function depIsTagExecutor(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
-  const deps = config && objectProperty(config, "deps")
-  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
-  const property = objectProperty(deps.initializer, key)
-  return property !== null
-    && ts.isCallExpression(property.initializer)
-    && tagExecutorModeOf(property.initializer.expression, imports) !== null
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && tagExecutorModeOf(initializer.expression, imports) !== null
+}
+
+function depIsPlainIdentifier(config: ts.ObjectLiteralExpression | null, key: string | null): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null && ts.isIdentifier(initializer)
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -1066,6 +1075,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   }
 
   const tagExecutorServiceKeysCache = new WeakMap<ts.ArrowFunction | ts.FunctionExpression, Set<string>>()
+  const plainIdentifierServiceKeysCache = new WeakMap<ts.ArrowFunction | ts.FunctionExpression, Set<string>>()
 
   function serviceExecDepKey(expression: ts.Expression, depsBinding: { factory: ts.ArrowFunction | ts.FunctionExpression; names: Map<string, string | null> }): string | null {
     if (!ts.isPropertyAccessExpression(expression) || expression.name.text !== "exec") return null
@@ -1118,6 +1128,27 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return keys
   }
 
+  function plainIdentifierServiceKeys(factory: ts.ArrowFunction | ts.FunctionExpression, config: ts.ObjectLiteralExpression | null): Set<string> {
+    const cached = plainIdentifierServiceKeysCache.get(factory)
+    if (cached) return cached
+    const keys = new Set<string>()
+    const depsBinding = { factory, names: depsBindingNames(factory) }
+    if (depsBinding.names.size === 0) {
+      plainIdentifierServiceKeysCache.set(factory, keys)
+      return keys
+    }
+    function walk(node: ts.Node): void {
+      if (ts.isCallExpression(node)) {
+        const key = serviceExecDepKey(node.expression, depsBinding)
+        if (key && depIsPlainIdentifier(config, key)) keys.add(key)
+      }
+      ts.forEachChild(node, walk)
+    }
+    walk(factory.body)
+    plainIdentifierServiceKeysCache.set(factory, keys)
+    return keys
+  }
+
   function projectedHandlePathAt(expression: ts.Expression): string[] | null {
     const depsBinding = factoryDepsAt(expression)
     if (!depsBinding) return null
@@ -1129,12 +1160,14 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (bound !== null) {
       if (depIsTraced(config, bound, imports)) return chain.names
       if (depIsTagExecutor(config, bound, imports) && tagExecutorServiceKeys(depsBinding.factory, config).has(bound)) return chain.names
+      if (depIsPlainIdentifier(config, bound) && plainIdentifierServiceKeys(depsBinding.factory, config).has(bound)) return chain.names
       return null
     }
     const key = chain.names[0]
     if (!key) return null
     if (depIsTraced(config, key, imports)) return chain.names.slice(1)
     if (depIsTagExecutor(config, key, imports) && tagExecutorServiceKeys(depsBinding.factory, config).has(key)) return chain.names.slice(1)
+    if (depIsPlainIdentifier(config, key) && plainIdentifierServiceKeys(depsBinding.factory, config).has(key)) return chain.names.slice(1)
     return null
   }
 

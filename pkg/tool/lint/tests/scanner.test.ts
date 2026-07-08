@@ -1126,6 +1126,201 @@ describe("lite lint scanner", () => {
     `)).toBe(0)
   })
 
+  it("allows sanctioned resource service usage across two members", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.enqueuePending.exec({ params: [[]] })
+          return store.settleImport.exec({ params: [{ id: "inv-1" }] })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("flags a resource service root alias once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          const alias = store
+          return alias
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags a resource service root passed to a helper once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      declare function helper(value: unknown): unknown
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          return helper(store)
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags a resource service root returned once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          return store
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags a resource service root spread once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          return { ...store }
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags a resource service member alias once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          const settle = store.settleImport
+          return settle
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags a resource service member passed to a helper once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      declare function helper(value: unknown): unknown
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          return helper(store.settleImport)
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags computed access on resource service handles once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          const settle = store["settleImport"]
+          return settle
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("flags deep chains on resource service handles once service-shaped", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          return store.settleImport.exec.call(undefined)
+        },
+      })
+    `)).toEqual(["pumped/no-traced-handle-escape"])
+  })
+
+  it("allows parenthesized sanctioned resource service exec", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => await (store.settleImport).exec({ params: [] }),
+      })
+    `)).toEqual([])
+  })
+
+  it("leaves value tags outside the resource service escape wall", () => {
+    expect(ids(`
+      import { flow, tags } from "@pumped-fn/lite"
+      import { clock } from "./ports"
+
+      const run = flow({
+        deps: { clock: tags.required(clock) },
+        factory: (_ctx, { clock }) => clock.now(),
+      })
+    `)).toEqual([])
+  })
+
+  it("leaves plain atom deps outside the resource service escape wall", () => {
+    expect(ids(`
+      import { atom, flow } from "@pumped-fn/lite"
+
+      const settings = atom({ factory: () => ({ format: (value: string) => value }) })
+
+      const run = flow({
+        deps: { settings },
+        factory: (ctx, { settings }) => settings.format(ctx.input),
+      })
+    `)).toEqual([])
+  })
+
+  it("keeps resource service projection shadow-aware", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { txBoundary } from "./ports"
+
+      const run = flow({
+        deps: { store: txBoundary },
+        factory: async (_ctx, { store }) => {
+          await store.listStored.exec()
+          const inspect = (store: { settleImport: unknown }) => store.settleImport
+          return inspect({ settleImport: "local" })
+        },
+      })
+    `)).toEqual([])
+  })
+
   it("flags a traced root passed to a helper", () => {
     expect(tracedHandleEscapeCount(`
       import { flow, traced } from "@pumped-fn/lite"
@@ -1386,14 +1581,14 @@ describe("lite lint scanner", () => {
     `)).toBe(1)
   })
 
-  it("flags plain dep member exec calls untagged", () => {
+  it("flags non-projected dep member exec calls untagged", () => {
     expect(unattributedAwaitCount(`
       import { flow } from "@pumped-fn/lite"
-      import { gateway } from "./ports"
+      import { createGateway } from "./ports"
 
       const run = flow({
         name: "run",
-        deps: { gateway },
+        deps: { gateway: createGateway() },
         factory: async (ctx, { gateway }) => {
           await gateway.send.exec({ params: [ctx.input] })
         },
