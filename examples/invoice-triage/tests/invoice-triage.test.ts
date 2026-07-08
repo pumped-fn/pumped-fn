@@ -377,11 +377,9 @@ describe("invoice triage patterns", () => {
     expect(run.steps.map((step) => step.targetName)).toEqual([
       "model.stub",
       "model.complete",
-      "store.settleImport",
       "invoice.save",
       "model.stub",
       "model.complete",
-      "store.settleImport",
       "invoice.save",
     ])
     await ctx.close({ ok: true })
@@ -412,7 +410,7 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
-  it("pattern: abandonment aborts a streaming batch and rolls back the unit", async () => {
+  it("pattern: abandonment aborts a streaming batch after the completed invoice commits", async () => {
     const closes: Lite.CloseResult[] = []
     const streaming: boolean[] = []
     const first = invoice("inv-abandon-1")
@@ -453,8 +451,8 @@ describe("invoice triage patterns", () => {
     await expect(stream.result).rejects.toThrow("Flow stream aborted")
     expect(streaming).toEqual([true])
     expect(seen.at(-1)).toEqual({ invoiceId: "inv-abandon-1", done: 1, total: 2, risk: "auto-approve" })
-    expect(await ctx.exec({ flow: listStored })).toEqual([])
-    expect(await ctx.exec({ flow: listAudit })).toEqual([])
+    expect((await ctx.exec({ flow: listStored })).map((item) => item.id)).toEqual(["inv-abandon-1"])
+    expect((await ctx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["imported"])
     expect(closes[0]).toMatchObject({ ok: false, aborted: true })
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -671,7 +669,7 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
-  it("killed-after-drain recovery: failed batch rolls back and remains pending", async () => {
+  it("killed-after-drain recovery: settled invoices persist and the failed one remains pending", async () => {
     const db = await pgliteDatabase()
     const first = invoice("inv-kill-a")
     const second = invoice("inv-kill-b", { vendor: "Contoso Hardware", amount: 4_500 })
@@ -698,10 +696,10 @@ describe("invoice triage patterns", () => {
     await failingCtx.exec({ flow: enqueue, input: { invoices: [first, second] } })
     await expect(processing).rejects.toThrow("provider down")
     expect(calls).toBe(2)
-    expect(await failingCtx.exec({ flow: listStored })).toEqual([])
-    expect((await failingCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual([first.id, second.id])
+    expect((await failingCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual([first.id])
+    expect((await failingCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual([second.id])
     expect(await failingCtx.exec({ flow: reviewCount })).toBe(0)
-    expect((await failingCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued"])
+    expect((await failingCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued", "imported"])
     await failingCtx.close({ ok: true })
     await failing.dispose()
 
@@ -1148,18 +1146,16 @@ describe("invoice triage patterns", () => {
 
     expect(messages.map((message) => message.invoiceId)).toEqual(["inv-otel-1"])
     expect(recorded.names()).toEqual(expect.arrayContaining([
-      "invoice.deliver",
       "invoice.enqueue",
+      "invoice.listPending",
+      "invoice.listStored",
+      "invoice.markReminderSent",
       "invoice.reviewCount",
       "invoice.save",
       "invoice.sendReminders",
-      "client.send",
+      "notifier.send",
       "model.complete",
       "model.stub",
-      "store.claimReminder",
-      "store.listPending",
-      "store.enqueuePending",
-      "store.settleImport",
     ].sort()))
     await ctx.exec({ flow: stop })
     const [ingestOutcome] = await Promise.allSettled([processing])

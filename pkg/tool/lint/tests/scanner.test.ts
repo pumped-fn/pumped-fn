@@ -1748,4 +1748,63 @@ describe("lite lint scanner", () => {
       })
     `, "tests/example.test.ts")).toBe(0)
   })
+
+  function tracedServiceValueCount(source: string, filePath = "src/example.ts") {
+    return ids(source, filePath).filter((id) => id === "pumped/no-traced-service-value").length
+  }
+
+  it("flags a traced() factory dep in a non-lite file", () => {
+    expect(tracedServiceValueCount(`
+      import { flow, traced } from "@pumped-fn/lite"
+      import { gateway } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(gateway) },
+        factory: async (_ctx, { store }) => await store.send.exec({ params: [] }),
+      })
+    `)).toBe(1)
+  })
+
+  it("flags serviceValue() in a non-lite file", () => {
+    expect(tracedServiceValueCount(`
+      import { serviceValue } from "@pumped-fn/lite"
+
+      const store = serviceValue({ async m(ctx) { return 1 } })
+    `)).toBe(1)
+  })
+
+  it("does not flag the sanctioned ctx.exec({ fn }) form", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", params: [] }),
+      })
+    `)).toEqual([])
+  })
+
+  it("exempts traced() inside the defining lite package", () => {
+    const source = `
+      import { flow, traced } from "@pumped-fn/lite"
+      import { gateway } from "./ports"
+
+      const run = flow({
+        deps: { store: traced(gateway) },
+        factory: async (_ctx, { store }) => await store.send.exec({ params: [] }),
+      })
+    `
+    expect(tracedServiceValueCount(source, "pkg/core/lite/src/traced.ts")).toBe(0)
+    expect(tracedServiceValueCount(source, "pkg/core/lite/tests/traced.test.ts")).toBe(0)
+  })
+
+  it("does not flag a local traced function with no lite import", () => {
+    expect(tracedServiceValueCount(`
+      function traced(x) { return x }
+
+      const y = 1
+      traced(y)
+    `)).toBe(0)
+  })
 })

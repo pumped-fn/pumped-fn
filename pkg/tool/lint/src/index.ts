@@ -25,6 +25,7 @@ export type RuleId =
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
   | "pumped/no-traced-handle-escape"
+  | "pumped/no-traced-service-value"
   | "pumped/no-unattributed-await"
   | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
@@ -128,6 +129,7 @@ type Imports = {
   stepLocals: Set<string>
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
+  serviceValue: Map<string, number>
   testLibraryNamespaces: Set<string>
   traced: Map<string, number>
   useExecutionContext: Set<string>
@@ -164,6 +166,7 @@ const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the cont
 const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
 const scopeReachMessage = "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots."
 const tracedHandleEscapeMessage = "projected exec handles are one-depth exec edges; aliasing, passing, or returning them loses execution-time attribution."
+const tracedServiceValueMessage = "traced() and serviceValue() are deprecated; wrap a foreign client in an adapter atom and call it via ctx.exec({ fn: () => client.method(args), name, tags }), and use flows for graph capabilities."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
@@ -309,6 +312,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     nodeBuiltins: new Map(),
     reactNamespaces: new Set(),
     render: new Set(),
+    serviceValue: new Map(),
     stepLocals: new Set(),
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
@@ -361,6 +365,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@pumped-fn/lite" && imported === "traced") {
         imports.traced.set(local, specifier.name.getEnd())
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "serviceValue") {
+        imports.serviceValue.set(local, specifier.name.getEnd())
       }
       if (moduleName === "@pumped-fn/lite" && imported === "flow") {
         imports.flow.add(local)
@@ -1019,6 +1026,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const allowScopeFactory = isCompositionPath(filePath)
   const allowScopeReach = isTestPath(filePath)
   const allowTracedHandleEscape = isTestPath(filePath) || isCompositionPath(filePath)
+  const allowTracedServiceValue = normalizePath(filePath).includes("pkg/core/lite/")
   const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
   const tracedHandleEscapeReports = new Set<number>()
@@ -1359,6 +1367,21 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
     if (ts.isCallExpression(node)) {
       const name = calledName(node.expression)
+      if (
+        !allowTracedServiceValue
+        && ts.isIdentifier(node.expression)
+        && (imports.traced.has(node.expression.text) || imports.serviceValue.has(node.expression.text))
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-traced-service-value",
+          node.expression,
+          tracedServiceValueMessage,
+        )
+      }
+
       if (
         ts.isPropertyAccessExpression(node.expression)
         && ts.isIdentifier(node.expression.expression)

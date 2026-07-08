@@ -2,10 +2,12 @@ import { controller, flow, ParseError, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { complete, step } from "@pumped-fn/sdk"
+import { and, eq, isNotNull } from "drizzle-orm"
+import { database } from "./database"
 import { classifyRequest, parseClassification } from "./model"
+import { notifier } from "./notifier"
 import {
   clock,
-  deliver,
   drained,
   importing,
   intakeLines,
@@ -16,36 +18,40 @@ import {
   stopping,
   storedSignal,
 } from "./ports"
+import { auditEvents, storedInvoices } from "./schema"
 import {
-  claimReminder,
-  countReviews,
-  enqueueRows,
-  readAudit,
-  readPending,
-  readStored,
-  releaseReminderClaim,
+  enqueue,
+  listAudit,
+  listPending,
+  listStored,
+  markReminderSent,
+  reviewCount,
+  saveInvoice,
   settleInvoice,
 } from "./store"
-import { txBoundary } from "./unit"
 import {
-  enqueueInput,
   categories,
-  type AuditEvent,
   type Category,
   type Classification,
   type DailyReport,
-  type EnqueueInput,
-  type EnqueueSummary,
   type ImportProgress,
   type ImportSummary,
   type Invoice,
   type ReminderMessage,
   type ReminderResult,
   type ReminderSummary,
-  type SaveInvoiceInput,
-  type StoredInvoice,
   type TriageProgress,
 } from "./types"
+
+export {
+  enqueue,
+  listAudit,
+  listPending,
+  listStored,
+  markReminderSent,
+  reviewCount,
+  saveInvoice,
+}
 
 export const classify = flow({
   name: "invoice.classify",
@@ -75,93 +81,10 @@ export const triage = flow({
   },
 })
 
-export const enqueue = flow({
-  name: "invoice.enqueue",
-  parse: (input): EnqueueInput => enqueueInput.parse(input),
-  deps: {
-    enqueueRows: controller(enqueueRows),
-    outstanding: controller(outstanding, { resolve: true }),
-    queueSignal: controller(queueSignal, { resolve: true }),
-  },
-  factory: async (ctx, { enqueueRows, outstanding, queueSignal }): Promise<EnqueueSummary> => {
-    const summary = await enqueueRows.exec({ input: ctx.input })
-    if (summary.accepted > 0) {
-      outstanding.update((value) => value + summary.accepted)
-      queueSignal.update((value) => value + 1)
-    }
-    return summary
-  },
-})
-
-export const saveInvoice = flow({
-  name: "invoice.save",
-  parse: typed<SaveInvoiceInput>(),
-  deps: {
-    settleInvoice: controller(settleInvoice),
-    storedSignal: controller(storedSignal, { resolve: true }),
-  },
-  factory: async (ctx, { settleInvoice, storedSignal }): Promise<StoredInvoice> => {
-    const row = await settleInvoice.exec({ input: ctx.input })
-    storedSignal.update((value) => value + 1)
-    return row
-  },
-})
-
-export const listStored = flow({
-  name: "invoice.listStored",
-  deps: {
-    readStored: controller(readStored),
-  },
-  factory: (_ctx, { readStored }): Promise<readonly StoredInvoice[]> => readStored.exec(),
-})
-
-export const listPending = flow({
-  name: "invoice.listPending",
-  deps: {
-    readPending: controller(readPending),
-  },
-  factory: (_ctx, { readPending }): Promise<readonly Invoice[]> => readPending.exec(),
-})
-
-export const reviewCount = flow({
-  name: "invoice.reviewCount",
-  deps: {
-    countReviews: controller(countReviews),
-  },
-  factory: (_ctx, { countReviews }): Promise<number> => countReviews.exec(),
-})
-
-export const listAudit = flow({
-  name: "invoice.listAudit",
-  deps: {
-    readAudit: controller(readAudit),
-  },
-  factory: (_ctx, { readAudit }): Promise<readonly AuditEvent[]> => readAudit.exec(),
-})
-
-export const markReminderSent = flow({
-  name: "invoice.markReminderSent",
-  parse: typed<{ invoiceId: string }>(),
-  deps: {
-    claimReminder: controller(claimReminder),
-  },
-  factory: (ctx, { claimReminder }): Promise<StoredInvoice | undefined> => claimReminder.exec({ input: ctx.input }),
-})
-
-export const releaseReminder = flow({
-  name: "invoice.releaseReminder",
-  parse: typed<{ invoiceId: string }>(),
-  deps: {
-    releaseReminderClaim: controller(releaseReminderClaim),
-  },
-  factory: (ctx, { releaseReminderClaim }): Promise<void> => releaseReminderClaim.exec({ input: ctx.input }),
-})
-
 export const importBatch = flow({
   name: "invoice.importBatch",
   parse: typed<{ invoices: readonly Invoice[] }>(),
   deps: {
-    unit: txBoundary,
     triage: controller(triage),
     settleInvoice: controller(settleInvoice),
   },
@@ -315,12 +238,14 @@ export const sendReminder = flow({
   name: "invoice.sendReminder",
   parse: typed<{ invoiceId: string }>(),
   deps: {
+    db: database,
+    clock: tags.required(clock),
     markReminderSent: controller(markReminderSent),
-    releaseReminder: controller(releaseReminder),
-    deliver: controller(deliver),
+    notifier: tags.required(notifier),
     reminderRecipient: tags.required(reminderRecipient),
   },
-  factory: async (ctx, { markReminderSent, releaseReminder, deliver, reminderRecipient }): Promise<ReminderResult> => {
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: async (ctx, { db, clock, markReminderSent, notifier, reminderRecipient }): Promise<ReminderResult> => {
     const invoice = await markReminderSent.exec({ input: { invoiceId: ctx.input.invoiceId } })
     if (invoice === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
     const message: ReminderMessage = {
@@ -333,9 +258,25 @@ export const sendReminder = flow({
       body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
     }
     try {
-      return await deliver.exec({ input: message })
+      return await ctx.exec({ fn: () => notifier.send(message), params: [], name: "notifier.send", tags: [step({ workflow: true, kind: "email" })] })
     } catch (error) {
-      await releaseReminder.exec({ input: { invoiceId: invoice.id } })
+      const failedAt = clock.now()
+      await db.transaction(async (tx) => {
+        const [row] = await tx.update(storedInvoices)
+          .set({ remindedAt: null })
+          .where(and(eq(storedInvoices.id, invoice.id), isNotNull(storedInvoices.remindedAt)))
+          .returning({
+            id: storedInvoices.id,
+            classification: storedInvoices.classification,
+          })
+        if (row === undefined) return
+        await tx.insert(auditEvents).values({
+          action: "reminder_failed",
+          entityId: row.id,
+          occurredAt: failedAt,
+          payload: { dueDate: row.classification.dueDate },
+        })
+      })
       throw error
     }
   },

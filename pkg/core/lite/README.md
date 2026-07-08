@@ -143,18 +143,16 @@ like a bare flow dependency; `tags.optional(model)` yields the handle or `undefi
 yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
 for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
 
-`traced()` is for transport capability records over foreign APIs. Business features stay as flows. It
-accepts an atom whose resolved value is a non-empty record of enumerable functions. Each method arrives as
-`depKey.method.exec({ params, tags })`, named from the dependency key, so transport calls keep per-call tags
-and remain visible to extensions without hiding feature behavior behind facade methods. Traced deps are
-flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they
-are rejected. Non-record, empty-record, and non-function members reject when the dependency resolves.
+**Foreign integration** is an adapter atom plus `ctx.exec({ fn })`. Wrap the foreign client in an atom
+(the substitution seam — presets swap it in tests), then instrument each call at its use site with
+`ctx.exec({ fn: () => client.send(message), name: "client.send", tags })` — one named, tag-able edge per
+call, receiver preserved by ordinary method-call syntax, and it works on class-instance SDKs. `fn`-exec is
+the one primitive; a flow is the other, for capabilities that are graph nodes.
 
-`serviceValue(record)` brands an executable service record carried by a tag. In execution deps,
-`tags.required(serviceTag)` projects each ctx-first member to `depKey.method.exec({ params, tags })`; the
-caller supplies only the member params, while the pipeline supplies the live child execution context at
-call time. Use this for values a resource or root installs into the current context, such as a transaction
-store. Plain records are not projected.
+> `traced()` and `serviceValue()` are **deprecated**. Both are only loops that emit `ctx.exec({ fn })` per
+> record member, and they duplicate each other (foreign vs first-party). Use `ctx.exec({ fn })` for a call
+> and a flow for a graph capability; a record closed over a runtime value is expressed as flows over that
+> value's atom/tag. Removal is planned for the next major.
 
 ```ts
 const auditUserLoad = flow({
