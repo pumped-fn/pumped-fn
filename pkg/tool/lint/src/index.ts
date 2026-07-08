@@ -20,9 +20,11 @@ export type RuleId =
   | "pumped/no-react-use-execution-context"
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
+  | "pumped/no-scope-reach"
   | "pumped/no-shared-scope-factory"
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
+  | "pumped/no-traced-handle-escape"
   | "pumped/no-unattributed-await"
   | "pumped/no-untyped-throw"
   | "pumped/prefer-destructured-deps"
@@ -113,7 +115,7 @@ function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Dia
 
 type Imports = {
   createScope: Set<string>
-  controller: Set<string>
+  controller: Map<string, number>
   creatorKinds: Map<string, CreatorKind>
   creators: Set<string>
   flow: Set<string>
@@ -127,6 +129,7 @@ type Imports = {
   tagExecutorLocals: Map<string, string>
   tagsNamespaceLocals: Set<string>
   testLibraryNamespaces: Set<string>
+  traced: Map<string, number>
   useExecutionContext: Set<string>
   useScope: Set<string>
   useState: Set<string>
@@ -136,6 +139,7 @@ type Imports = {
 type CreatorKind = "atom" | "flow" | "resource" | "tag" | "scopedValue"
 
 const creatorNames = new Set(["atom", "flow", "resource", "tag", "scopedValue"])
+const graphNodeCreatorKinds = new Set<CreatorKind>(["atom", "flow", "resource"])
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])
 const textExtensions = new Set([...sourceExtensions, ".json", ".md", ".mdx"])
 const ignoredNames = new Set(["node_modules", ".git", "dist", "coverage", ".next", ".turbo"])
@@ -157,6 +161,9 @@ const nodeBuiltinModulePattern = /^(?:node:)?(?:fs|fs\/promises|child_process)$/
 const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "Number", "structuredClone", "URL", "Math"])
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
+const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
+const scopeReachMessage = "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots."
+const tracedHandleEscapeMessage = "projected exec handles are one-depth exec edges; aliasing, passing, or returning them loses execution-time attribution."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
@@ -292,7 +299,7 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
 function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
     createScope: new Set(),
-    controller: new Set(),
+    controller: new Map(),
     creatorKinds: new Map(),
     creators: new Set(),
     flow: new Set(),
@@ -306,6 +313,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     tagExecutorLocals: new Map(),
     tagsNamespaceLocals: new Set(),
     testLibraryNamespaces: new Set(),
+    traced: new Map(),
     useExecutionContext: new Set(),
     useScope: new Set(),
     useState: new Set(),
@@ -349,7 +357,10 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
         imports.createScope.add(local)
       }
       if (moduleName === "@pumped-fn/lite" && imported === "controller") {
-        imports.controller.add(local)
+        imports.controller.set(local, specifier.name.getEnd())
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "traced") {
+        imports.traced.set(local, specifier.name.getEnd())
       }
       if (moduleName === "@pumped-fn/lite" && imported === "flow") {
         imports.flow.add(local)
@@ -460,6 +471,14 @@ function hasScopeParameter(parameters: ts.NodeArray<ts.ParameterDeclaration>): b
   })
 }
 
+function hasScopeOrExecutionContextParameter(parameters: ts.NodeArray<ts.ParameterDeclaration>): boolean {
+  return parameters.some((parameter) => {
+    if (ts.isIdentifier(parameter.name) && parameter.name.text === "scope") return true
+    if (!parameter.type) return false
+    return /\b(?:Lite\.)?(?:Scope|ExecutionContext)\b/.test(parameter.type.getText())
+  })
+}
+
 function declarationName(node: ts.Node): string | null {
   let current: ts.Node | undefined = node
   while (current) {
@@ -567,6 +586,13 @@ function unitCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLit
   return config && ts.isObjectLiteralExpression(config) ? config : null
 }
 
+function graphNodeCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
+  const kind = creatorKind(node.expression, imports)
+  if (kind === null || !graphNodeCreatorKinds.has(kind)) return null
+  const config = node.arguments[0]
+  return config && ts.isObjectLiteralExpression(config) ? config : null
+}
+
 function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
   let current: ts.Node | undefined = node
   while (current) {
@@ -578,6 +604,25 @@ function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction
       const config = current.parent
       const call = config.parent
       if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && unitCallObject(call, imports) === config) {
+        return current.initializer
+      }
+    }
+    current = current.parent
+  }
+  return null
+}
+
+function enclosingGraphNodeFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
+  let current: ts.Node | undefined = node
+  while (current) {
+    if (
+      ts.isPropertyAssignment(current)
+      && propertyNameText(current.name) === "factory"
+      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
+    ) {
+      const config = current.parent
+      const call = config.parent
+      if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && graphNodeCallObject(call, imports) === config) {
         return current.initializer
       }
     }
@@ -768,6 +813,18 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
   return null
 }
 
+function propertyChain(expression: ts.Expression): { root: ts.Identifier; names: string[] } | null {
+  if (ts.isParenthesizedExpression(expression)) return propertyChain(expression.expression)
+  if (ts.isIdentifier(expression)) return { root: expression, names: [] }
+  if (!ts.isPropertyAccessExpression(expression)) return null
+  const chain = propertyChain(expression.expression)
+  return chain ? { root: chain.root, names: [...chain.names, expression.name.text] } : null
+}
+
+function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
+  return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment
+}
+
 function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Map<string, string | null> {
   const names = new Map<string, string | null>()
   const parameter = factory.parameters[1]
@@ -802,14 +859,91 @@ function depKey(expression: ts.Expression, root: ts.Identifier, bound: string | 
   return above && above !== expression ? above.name.text : null
 }
 
-function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+function depMethodDepth(expression: ts.Expression, root: ts.Identifier): number | null {
+  let current = expression
+  let depth = 0
+  while (ts.isPropertyAccessExpression(current)) {
+    depth++
+    if (current.expression === root) return depth
+    current = current.expression
+  }
+  return null
+}
+
+function isDirectDepMethod(expression: ts.PropertyAccessExpression, root: ts.Identifier, bound: string | null): boolean {
+  const depth = depMethodDepth(expression, root)
+  return bound !== null ? depth === 1 : depth === 2
+}
+
+function bindingNameHas(name: ts.BindingName, text: string): boolean {
+  if (ts.isIdentifier(name)) return name.text === text
+  return name.elements.some((element) => ts.isBindingElement(element) && !element.dotDotDotToken && bindingNameHas(element.name, text))
+}
+
+function statementDeclaresName(statement: ts.Statement, name: string): boolean {
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.some((declaration) => bindingNameHas(declaration.name, name))
+  }
+  if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) {
+    return statement.name?.text === name
+  }
+  return false
+}
+
+function scopeStatements(node: ts.Node): readonly ts.Statement[] {
+  if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node)) return Array.from(node.statements)
+  if (ts.isCaseClause(node) || ts.isDefaultClause(node)) return Array.from(node.statements)
+  return []
+}
+
+function scopeDeclaresNameBefore(scope: ts.Node, position: number, name: string, afterPosition: number, sourceFile: ts.SourceFile): boolean {
+  return scopeStatements(scope).some((statement) => {
+    const start = statement.getStart(sourceFile)
+    return start > afterPosition && start < position && statementDeclaresName(statement, name)
+  })
+}
+
+function importedCallee(callee: ts.Identifier, imports: Map<string, number>): boolean {
+  const importEnd = imports.get(callee.text)
+  return importEnd !== undefined && !shadowsName(callee, callee.getSourceFile(), callee.text, importEnd)
+}
+
+function depInitializer(config: ts.ObjectLiteralExpression | null, key: string | null): ts.Expression | null {
   const deps = config && objectProperty(config, "deps")
-  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return false
-  const property = objectProperty(deps.initializer, key)
-  return property !== null
-    && ts.isCallExpression(property.initializer)
-    && ts.isIdentifier(property.initializer.expression)
-    && imports.controller.has(property.initializer.expression.text)
+  if (!key || !deps || !ts.isObjectLiteralExpression(deps.initializer)) return null
+  for (const property of deps.initializer.properties) {
+    if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === key) return property.initializer
+    if (ts.isShorthandPropertyAssignment(property) && property.name.text === key) return property.name
+  }
+  return null
+}
+
+function depIsController(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && ts.isIdentifier(initializer.expression)
+    && importedCallee(initializer.expression, imports.controller)
+}
+
+function depIsTraced(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && ts.isIdentifier(initializer.expression)
+    && importedCallee(initializer.expression, imports.traced)
+}
+
+function depIsTagExecutor(config: ts.ObjectLiteralExpression | null, key: string | null, imports: Imports): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null
+    && ts.isCallExpression(initializer)
+    && tagExecutorModeOf(initializer.expression, imports) !== null
+}
+
+function depIsPlainIdentifier(config: ts.ObjectLiteralExpression | null, key: string | null): boolean {
+  const initializer = depInitializer(config, key)
+  return initializer !== null && ts.isIdentifier(initializer)
 }
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
@@ -820,7 +954,9 @@ function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports)
   )
 }
 
-function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
+function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPosition = -1): boolean {
+  const sourceFile = node.getSourceFile()
+  const position = node.getStart(sourceFile)
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
     if (
@@ -829,11 +965,36 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string): boolean {
         || ts.isArrowFunction(current)
         || ts.isMethodDeclaration(current)
         || ts.isConstructorDeclaration(current))
-      && current.parameters.some((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === name)
+      && current.parameters.some((parameter) => bindingNameHas(parameter.name, name))
     ) {
       return true
     }
+    if (
+      ts.isCatchClause(current)
+      && current.variableDeclaration !== undefined
+      && bindingNameHas(current.variableDeclaration.name, name)
+    ) {
+      return true
+    }
+    if (
+      (ts.isForStatement(current) || ts.isForOfStatement(current) || ts.isForInStatement(current))
+      && current.initializer !== undefined
+      && ts.isVariableDeclarationList(current.initializer)
+      && current.initializer.declarations.some((declaration) => bindingNameHas(declaration.name, name))
+    ) {
+      return true
+    }
+    if (
+      (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isClassDeclaration(current))
+      && current.name?.text === name
+    ) {
+      return true
+    }
+    if (scopeDeclaresNameBefore(current, position, name, afterPosition, sourceFile)) return true
     current = current.parent
+  }
+  if (current === boundary && ts.isSourceFile(boundary)) {
+    return scopeDeclaresNameBefore(boundary, position, name, afterPosition, sourceFile)
   }
   return false
 }
@@ -856,8 +1017,11 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const allowScopeReach = isTestPath(filePath)
+  const allowTracedHandleEscape = isTestPath(filePath) || isCompositionPath(filePath)
   const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
+  const tracedHandleEscapeReports = new Set<number>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
   const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
@@ -867,6 +1031,12 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
   function factoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
     const factory = enclosingUnitFactory(node, imports)
+    const name = factoryCtxName(factory)
+    return factory && name ? { factory, name } : null
+  }
+
+  function graphFactoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
+    const factory = enclosingGraphNodeFactory(node, imports)
     const name = factoryCtxName(factory)
     return factory && name ? { factory, name } : null
   }
@@ -882,6 +1052,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     )
   }
 
+  function pushScopeReachDiagnostic(node: ts.Node): void {
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-scope-reach",
+      node,
+      scopeReachMessage,
+    )
+  }
+
   function isDirectCtxExpression(expression: ts.Expression, ctxName: string): expression is ts.Identifier {
     return ts.isIdentifier(expression) && expression.text === ctxName
   }
@@ -893,6 +1074,168 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return names.size > 0 ? { factory, names } : null
   }
 
+  const tagExecutorServiceKeysCache = new WeakMap<ts.ArrowFunction | ts.FunctionExpression, Set<string>>()
+  const plainIdentifierServiceKeysCache = new WeakMap<ts.ArrowFunction | ts.FunctionExpression, Set<string>>()
+
+  function serviceExecDepKey(expression: ts.Expression, depsBinding: { factory: ts.ArrowFunction | ts.FunctionExpression; names: Map<string, string | null> }): string | null {
+    if (!ts.isPropertyAccessExpression(expression) || expression.name.text !== "exec") return null
+    const direct = propertyChain(expression)
+    if (direct && !shadowsName(direct.root, depsBinding.factory, direct.root.text)) {
+      const bound = depsBinding.names.get(direct.root.text)
+      if (bound !== undefined) {
+        const key = bound ?? direct.names[0] ?? null
+        const path = bound !== null ? direct.names : direct.names.slice(1)
+        if (key && path.length === 2 && path[1] === "exec") return key
+      }
+    }
+
+    const receiver = ts.isParenthesizedExpression(expression.expression)
+      ? expression.expression.expression
+      : expression.expression
+    if (!ts.isElementAccessExpression(receiver)) return null
+    const base = ts.isParenthesizedExpression(receiver.expression)
+      ? receiver.expression.expression
+      : receiver.expression
+    if (ts.isIdentifier(base) && !shadowsName(base, depsBinding.factory, base.text)) {
+      const bound = depsBinding.names.get(base.text)
+      return bound ?? null
+    }
+    const baseChain = propertyChain(base)
+    if (!baseChain || shadowsName(baseChain.root, depsBinding.factory, baseChain.root.text)) return null
+    const bound = depsBinding.names.get(baseChain.root.text)
+    if (bound !== null || baseChain.names.length !== 1) return null
+    return baseChain.names[0] ?? null
+  }
+
+  function tagExecutorServiceKeys(factory: ts.ArrowFunction | ts.FunctionExpression, config: ts.ObjectLiteralExpression | null): Set<string> {
+    const cached = tagExecutorServiceKeysCache.get(factory)
+    if (cached) return cached
+    const keys = new Set<string>()
+    const depsBinding = { factory, names: depsBindingNames(factory) }
+    if (depsBinding.names.size === 0) {
+      tagExecutorServiceKeysCache.set(factory, keys)
+      return keys
+    }
+    function walk(node: ts.Node): void {
+      if (ts.isCallExpression(node)) {
+        const key = serviceExecDepKey(node.expression, depsBinding)
+        if (key && depIsTagExecutor(config, key, imports)) keys.add(key)
+      }
+      ts.forEachChild(node, walk)
+    }
+    walk(factory.body)
+    tagExecutorServiceKeysCache.set(factory, keys)
+    return keys
+  }
+
+  function plainIdentifierServiceKeys(factory: ts.ArrowFunction | ts.FunctionExpression, config: ts.ObjectLiteralExpression | null): Set<string> {
+    const cached = plainIdentifierServiceKeysCache.get(factory)
+    if (cached) return cached
+    const keys = new Set<string>()
+    const depsBinding = { factory, names: depsBindingNames(factory) }
+    if (depsBinding.names.size === 0) {
+      plainIdentifierServiceKeysCache.set(factory, keys)
+      return keys
+    }
+    function walk(node: ts.Node): void {
+      if (ts.isCallExpression(node)) {
+        const key = serviceExecDepKey(node.expression, depsBinding)
+        if (key && depIsPlainIdentifier(config, key)) keys.add(key)
+      }
+      ts.forEachChild(node, walk)
+    }
+    walk(factory.body)
+    plainIdentifierServiceKeysCache.set(factory, keys)
+    return keys
+  }
+
+  function projectedHandlePathAt(expression: ts.Expression): string[] | null {
+    const depsBinding = factoryDepsAt(expression)
+    if (!depsBinding) return null
+    const config = enclosingUnitConfig(expression, imports)
+    const chain = propertyChain(expression)
+    if (!chain || shadowsName(chain.root, depsBinding.factory, chain.root.text)) return null
+    const bound = depsBinding.names.get(chain.root.text)
+    if (bound === undefined) return null
+    if (bound !== null) {
+      if (depIsTraced(config, bound, imports)) return chain.names
+      if (depIsTagExecutor(config, bound, imports) && tagExecutorServiceKeys(depsBinding.factory, config).has(bound)) return chain.names
+      if (depIsPlainIdentifier(config, bound) && plainIdentifierServiceKeys(depsBinding.factory, config).has(bound)) return chain.names
+      return null
+    }
+    const key = chain.names[0]
+    if (!key) return null
+    if (depIsTraced(config, key, imports)) return chain.names.slice(1)
+    if (depIsTagExecutor(config, key, imports) && tagExecutorServiceKeys(depsBinding.factory, config).has(key)) return chain.names.slice(1)
+    if (depIsPlainIdentifier(config, key) && plainIdentifierServiceKeys(depsBinding.factory, config).has(key)) return chain.names.slice(1)
+    return null
+  }
+
+  function pushTracedHandleEscape(node: ts.Node): void {
+    const position = node.getStart(sourceFile)
+    if (tracedHandleEscapeReports.has(position)) return
+    tracedHandleEscapeReports.add(position)
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-traced-handle-escape",
+      node,
+      tracedHandleEscapeMessage,
+    )
+  }
+
+  function isSanctionedTracedExecCall(call: ts.CallExpression): boolean {
+    if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "exec") return false
+    const path = projectedHandlePathAt(call.expression)
+    return path !== null && path.length === 2 && path[1] === "exec"
+  }
+
+  function isSanctionedTracedCalleePart(node: ts.Node): boolean {
+    let current: ts.Node = node
+    while (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current) || ts.isParenthesizedExpression(current)) {
+      const parent = current.parent
+      if (ts.isParenthesizedExpression(parent)) {
+        current = parent
+        continue
+      }
+      if (ts.isPropertyAccessExpression(parent) && parent.expression === current) {
+        current = parent
+        continue
+      }
+      return ts.isCallExpression(parent) && parent.expression === current && isSanctionedTracedExecCall(parent)
+    }
+    return false
+  }
+
+  function isBareTracedHandleEscape(expression: ts.Expression): boolean {
+    const parent = expression.parent
+    if (ts.isCallExpression(parent) && parent.arguments.some((argument) => argument === expression)) return true
+    if (ts.isArrowFunction(parent) && parent.body === expression) return true
+    if (ts.isReturnStatement(parent) && parent.expression === expression) return true
+    if (ts.isVariableDeclaration(parent) && parent.initializer === expression) return true
+    if (ts.isBinaryExpression(parent) && parent.right === expression && isAssignmentOperator(parent.operatorToken.kind)) return true
+    if (ts.isPropertyAssignment(parent) && parent.initializer === expression) return true
+    if (ts.isShorthandPropertyAssignment(parent) && parent.name === expression) return true
+    if (ts.isArrayLiteralExpression(parent) && parent.elements.some((element) => element === expression)) return true
+    if (ts.isSpreadAssignment(parent) && parent.expression === expression) return true
+    if (ts.isSpreadElement(parent) && parent.expression === expression) return true
+    if (ts.isElementAccessExpression(parent) && parent.expression === expression) return true
+    return false
+  }
+
+  function checkTracedHandleEscape(node: ts.Node): void {
+    if (allowTracedHandleEscape) return
+    if (!ts.isIdentifier(node) && !ts.isPropertyAccessExpression(node)) return
+    const path = projectedHandlePathAt(node)
+    if (path === null || isSanctionedTracedCalleePart(node)) return
+    if (path.length === 0) {
+      if (isBareTracedHandleEscape(node)) pushTracedHandleEscape(node)
+      return
+    }
+    if (ts.isPropertyAccessExpression(node)) pushTracedHandleEscape(node)
+  }
+
   function checkUnattributedAwait(call: ts.CallExpression, reportNode: ts.Node): void {
     if (allowUnattributedAwait) return
     const depsBinding = factoryDepsAt(call)
@@ -902,11 +1245,14 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (shadowsName(root, depsBinding.factory, root.text)) return
     if (ts.isPropertyAccessExpression(call.expression)) {
       const method = call.expression.name.text
+      const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
       if (method === "resolve") {
-        const key = depKey(call.expression, root, depsBinding.names.get(root.text) ?? null)
         if (depIsController(enclosingUnitConfig(call, imports), key, imports)) return
       } else if (graphMachineryMethods.has(method)) {
-        return
+        const config = enclosingUnitConfig(call, imports)
+        if (isDirectDepMethod(call.expression, root, depsBinding.names.get(root.text) ?? null)) return
+        if (depIsController(config, key, imports)) return
+        if (method === "exec" && isSanctionedTracedExecCall(call)) return
       }
     }
     if (hasStepTag(enclosingUnitConfig(call, imports), imports)) return
@@ -914,6 +1260,31 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   }
 
   function visit(node: ts.Node): void {
+    checkTracedHandleEscape(node)
+
+    if (!allowScopeReach) {
+      const ctxBinding = graphFactoryCtxAt(node)
+      if (
+        ctxBinding
+        && ts.isPropertyAccessExpression(node)
+        && node.name.text === "scope"
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === ctxBinding.name
+        && !shadowsName(node.expression, ctxBinding.factory, ctxBinding.name)
+      ) {
+        pushScopeReachDiagnostic(node)
+      }
+
+      if (
+        ts.isCallExpression(node)
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "createContext"
+        && enclosingGraphNodeFactory(node, imports)
+      ) {
+        pushScopeReachDiagnostic(node.expression)
+      }
+    }
+
     const ctxBinding = factoryCtxAt(node)
     if (ctxBinding) {
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
@@ -1450,8 +1821,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
     }
 
-    if (!allowScopeArgument) {
-      if (ts.isFunctionDeclaration(node) && exported(node) && hasScopeParameter(node.parameters)) {
+    if (ts.isFunctionDeclaration(node) && exported(node)) {
+      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.parameters)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-scope-argument",
+          node.name ?? node,
+          exportedScopeGlueMessage,
+        )
+      } else if (!allowScopeArgument && hasScopeParameter(node.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,
@@ -1461,14 +1841,24 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Product helpers should not accept scope; composition roots and tests own scope creation.",
         )
       }
+    }
 
-      if (
-        ts.isVariableDeclaration(node)
-        && node.initializer
-        && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
-        && hasScopeParameter(node.initializer.parameters)
-        && exported(variableStatement(node) ?? node)
-      ) {
+    if (
+      ts.isVariableDeclaration(node)
+      && node.initializer
+      && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+      && exported(variableStatement(node) ?? node)
+    ) {
+      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.initializer.parameters)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-scope-argument",
+          node.name,
+          exportedScopeGlueMessage,
+        )
+      } else if (!allowScopeArgument && hasScopeParameter(node.initializer.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,

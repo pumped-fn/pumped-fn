@@ -1,0 +1,14 @@
+{
+  "checkpoint_id": "d1-traced-design",
+  "conclusion_id": "traced-operator-shape-frozen",
+  "decision_target": "freeze traced() packet for PKR-1",
+  "source_of_truth": "pkg/core/lite/src/types.ts ExecFnOptions (name, params, tags fields confirmed present); user design ratification in-session",
+  "read_method": "types.ts read at lines ~289-296; user messages",
+  "observed_at": "2026-07-07T11:30:00Z",
+  "confidence": 0.9,
+  "questions_answered": ["call format: handle-shaped members .exec({params, tags}) mirroring FlowHandle grammar", "tags per call supported by ExecFnOptions", "name: traced", "type mapping: member signatures preserved inside handle projection"],
+  "questions_unanswered": ["execStream variant (staged to follow-up by ratification)", "exact member-handle type spelling (PKR-1 implementation detail)"],
+  "risk_or_anti_goal_implications": "observability_blind_edge_count enforcement becomes structural for capability records; lint exemption must be traced-initializer-scoped to avoid weakening no-unattributed-await",
+  "decision": "accepted; PKR-1 promoted",
+  "replay_command_or_checker": "grep -n 'tags?: Tagged' pkg/core/lite/src/types.ts"
+}

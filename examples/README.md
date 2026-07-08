@@ -9,7 +9,7 @@ surface for documented patterns, not a publishing target.
 
 | Directory | Package | Role |
 | --- | --- | --- |
-| `invoice-triage/` | `@pumped-fn/invoice-triage` | Invoice import and LLM triage over generator flows, execStream, and scheduler cron. |
+| `invoice-triage/` | `@pumped-fn/invoice-triage` | Postgres-backed invoice import, LLM triage, traced database capabilities, daemon/server/CLI entrypoints, and scheduler cron. |
 
 ## Naming
 

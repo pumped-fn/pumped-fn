@@ -128,7 +128,12 @@ preset(target, value)
 service({ factory, deps? })
   Convenience wrapper for atom whose value is an object of methods.
   Each method MUST have (ctx: ExecutionContext, ...args) as signature.
-  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.`,
+  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.
+
+traced(atom) → TracedDep
+  Wrap a transport capability-record atom so each enumerable function member arrives as depKey.method.exec({ params, tags }).
+  Traced deps are flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they are rejected.
+  The exec edge name comes from the deps key plus member key, and non-record, empty-record, or non-function members reject.`,
   },
 
   scope: {
@@ -374,8 +379,10 @@ Cleanup:
   const ctx = scope.createContext({ tags: [request(req)] })
   try {
     const result = await ctx.exec({ flow: handleRequest, rawInput: req.body })
-  } finally {
-    await ctx.close()
+    await ctx.close({ ok: true })
+  } catch (error) {
+    await ctx.close({ ok: false, error })
+    throw error
   }
 
 Service pattern:
@@ -441,9 +448,12 @@ Execution context middleware — per-request lifecycle:
     .server(async ({ next, context: { scope } }) => {
       const execContext = scope.createContext({})
       try {
-        return await next({ context: { execContext } })
-      } finally {
-        await execContext.close()
+        const result = await next({ context: { execContext } })
+        await execContext.close({ ok: true })
+        return result
+      } catch (error) {
+        await execContext.close({ ok: false, error })
+        throw error
       }
     })
 
@@ -536,6 +546,8 @@ Type guards:
   isTagged(v)           → v is Tagged
   isPreset(v)           → v is Preset
   isControllerDep(v)    → v is ControllerDep
+  isTracedDep(v)        → v is TracedDep
+  isServiceValue(v)     → v is ServiceValue
   isTagExecutor(v)      → v is TagExecutor
 
 Convenience types:
@@ -546,8 +558,8 @@ Convenience types:
 
 Symbols (advanced, for library authors):
   atomSymbol, flowSymbol, resourceSymbol, tagSymbol, taggedSymbol,
-  presetSymbol, controllerSymbol, controllerDepSymbol,
-  tagExecutorSymbol, typedSymbol`,
+  presetSymbol, controllerSymbol, controllerDepSymbol, tracedDepSymbol,
+  serviceValueSymbol, tagExecutorSymbol, typedSymbol`,
   },
 }
 

@@ -1,0 +1,131 @@
+{
+  "frame_version": 1,
+  "frame_hash": "sha256:198230a07571564ffbe33255fa5283458bb291339da184b0949a7adec6254625",
+  "status": "ratified",
+  "run_id": "example-operational-20260707",
+  "mission": "Rebuild examples/invoice-triage into a production/operational-grade example on the new pumped-fn API, including the lite core traced() dep operator (handle-shaped capability edges over ctx.exec fn-exec, exec-format options with tags; execStream variant staged).",
+  "objective": {
+    "metric_id": "operational_gate_pass_count",
+    "target": "10 of 10",
+    "candidate": true,
+    "gates": [
+      "G1 example test suite green on pglite (all semantics preserved: burst-no-loss, drain-race, gated shutdown, failed-import-never-wedges, idempotent reminders, cron manual ticks, intake rejection)",
+      "G2 entrypoint end-to-end vs dockerized pg: exit 0, submitted == stored count, pending drained to 0, audit trail coherent",
+      "G3 graceful shutdown: cooperative stop, no hang, loops settle before dispose",
+      "G4 crash recovery: rows left pending by a killed process are imported by the next start",
+      "G5 traced() landed in lite: capability-record members are named exec edges, handle-shaped (.exec({params, tags})), identity types, lite suite green",
+      "G6 observability: OTel spans present for every named db.* edge, model.complete, deliver, and store step flows in one demo run (span manifest read from exporter)",
+      "G7 aggregate atomicity: pending+audit, upsert+audit, drain+audit each commit in one transaction (tested)",
+      "G8 migrations auto-run from a clean database on first resolve (pg and pglite)",
+      "G9 daemon, server, and CLI entrypoints each verified end-to-end",
+      "G10 docs complete and drift-free: example README + diagram, lite docs for traced(), lint rule docs; root pnpm lint 0"
+    ],
+    "read_method": "gate manifest replayed per gate: test run outputs, entrypoint runs against compose pg, span export dump, psql table reads; each gate pass recorded as ledger metric_read with evidence refs"
+  },
+  "anti_goals": [
+    {
+      "metric_id": "lint_diagnostics",
+      "threshold": 0,
+      "type": "tripwire",
+      "statement": "pumped-lite-lint reports 0 diagnostics at every commit point (example, root, and any touched package); a firing rule changes the design, never gets suppressed",
+      "source_of_truth": "pnpm lint / pnpm -F @pumped-fn/invoice-triage lint stdout",
+      "user_stated": true
+    },
+    {
+      "metric_id": "production_test_leak_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "statement": "no memory fakes, test doubles, or test-only branches in src/ production paths; substitution happens only via preset (test seam) or role tags (production seam)",
+      "source_of_truth": "semantic diff review + grep sweep per commit",
+      "user_stated": true
+    },
+    {
+      "metric_id": "observability_blind_edge_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "statement": "every effectful edge (db operation, mail delivery, model call) is a named exec-pipeline edge visible to wrapExec/OTel; no awaited foreign call outside a declared span",
+      "source_of_truth": "pumped/no-unattributed-await lint + G6 span manifest diff"
+    },
+    {
+      "metric_id": "lite_core_regression_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "statement": "core changes (traced()) keep lite suite and all workspace non-browser suites green; newly discovered core semantic gaps are handed back as events, never worked around silently",
+      "source_of_truth": "pnpm -F @pumped-fn/lite test, filtered pnpm -r test, CI browser suites"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "type": "tripwire",
+      "statement": "inner integrity: no bypassing, weakening, hiding, or dishonestly satisfying the anti-goal machinery",
+      "source_of_truth": "ledger + review"
+    }
+  ],
+  "library_candidates_proposed_for_ratification": [
+    "entrypoint_executed",
+    "burst_no_loss_test_present",
+    "atomic_state_mutations",
+    "semantic_diff_review_every_round",
+    "ctx_never_an_argument",
+    "naming_succinct_lib_style",
+    "business_features_are_nodes",
+    "ci_gates_before_merge_command",
+    "role_tags_require_multiplicity",
+    "spans_declared_at_owning_layer"
+  ],
+  "metric_contracts": {
+    "operational_gate_pass_count": {
+      "source": "gate manifest replay",
+      "max_age": "per commit point",
+      "missing_policy": "gate counts as failed"
+    },
+    "lint_diagnostics": {
+      "source": "lint CLI stdout",
+      "max_age": "current working tree",
+      "missing_policy": "treat as failed, block commit"
+    }
+  },
+  "action_envelope": {
+    "allowed": [
+      "codex xhigh write-sandbox implementation inside the worktree",
+      "claude review/gates/commits after line-by-line review",
+      "docker compose up/down for local pg",
+      "drizzle-kit generate",
+      "lite core changes for traced() and lint exemption via reviewed packets"
+    ],
+    "forbidden": [
+      "worker commits or pushes",
+      "suppressing or weakening lint rules",
+      "editing the frame or thresholds",
+      "merging without green checks read in a separate invocation",
+      "silent workarounds of core semantic gaps"
+    ],
+    "approval_gates": [
+      "frame ratification before further state-changing moves",
+      "PR merge",
+      "release cut",
+      "any core semantic change beyond traced()+lint exemption"
+    ],
+    "human_ratification_boundary": "objective gates, anti-goal set, traced() naming/shape, frame changes, goal switching"
+  },
+  "human_ratification": {
+    "status": "ratified",
+    "evidence": "user reply 'good, 5, commit as we go' 2026-07-07T~11:30Z in session 01629971; ratifies objective 10 gates, anti-goal set (5 + 10 library candidates), traced() name, execStream staged, D2 = cooperative-stop + core gaps as candidates, run store committed",
+    "decisions": {
+      "traced_name": "traced",
+      "execStream_variant": "staged to follow-up run",
+      "d2_core_teardown": "cooperative-stop pattern in example; two core gaps recorded as candidate findings for a dedicated core run",
+      "run_store": "committed as we go (.gitignore exception)"
+    }
+  },
+  "prime_rationale": {
+    "statement": "Always fully traceable and fully testable: no implicits, no uncontrolled side effects. Effects are permitted only as controlled graph edges \u2014 visible to the exec pipeline (traceable) and substitutable through the scope seam (testable).",
+    "ratified": "user 2026-07-08 in session; umbrella rationale the anti-goal set serves",
+    "mechanism_map": {
+      "traceable": "exec pipeline spans every edge: flows, port flows, role-tag implementors, traced capability members; no-unattributed-await walls the escape routes",
+      "testable": "scope is the single seam: preset substitutes values, role tags select implementations, failure injection through public tags only",
+      "no_implicits": "ctx is a receiver never ambient (no ALS); tags are declared deps; shadow-aware lint kills name-based spoofing",
+      "no_uncontrolled_side_effects": "foreign calls live inside step-tagged flows or one-depth traced edges bound to the calling invocation; aggregates transactional; escapes linted"
+    }
+  }
+}

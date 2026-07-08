@@ -98,6 +98,14 @@ export interface EnqueueSummary {
   accepted: number
 }
 
+export interface AuditEvent {
+  sequence: number
+  action: string
+  entityId: string
+  occurredAt: string
+  payload: Record<string, unknown>
+}
+
 export type TriageProgress =
   | {
       invoiceId: string

@@ -15,11 +15,13 @@
     "paths": {
       "@pumped-fn/lite": ["../../pkg/core/lite/src/index.ts"],
       "@pumped-fn/lite-extension-logging": ["../../pkg/ext/logging/src/index.ts"],
+      "@pumped-fn/lite-extension-observable": ["../../pkg/ext/observable/src/index.ts"],
+      "@pumped-fn/lite-extension-observable-otel": ["../../pkg/ext/observable-otel/src/index.ts"],
       "@pumped-fn/lite-extension-scheduler": ["../../pkg/ext/scheduler/src/index.ts"],
       "@pumped-fn/sdk": ["../../pkg/sdk/core/src/index.ts"],
       "@pumped-fn/sdk-test": ["../../pkg/sdk/test/src/index.ts"]
     }
   },
-  "include": ["vitest.config.ts", "src/**/*", "tests/**/*"],
+  "include": ["vitest.config.ts", "src/**/*", "tests/**/*", "bin/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,2 +1,5 @@
 {"id":"inv-demo-1","vendor":"Northwind Utilities","amount":420,"dueDate":"2026-07-08","description":"electric utility service"}
-{"id":"inv-demo-2","vendor":"Contoso Hardware","amount":4800,"dueDate":"2026-07-11","description":"server replacement hardware"}
+{"id":"inv-demo-2","vendor":"Fabrikam SaaS","amount":760,"dueDate":"2026-07-09","description":"team subscription license"}
+{"id":"inv-demo-3","vendor":"Contoso Hardware","amount":4800,"dueDate":"2026-07-11","description":"server replacement hardware"}
+{"id":"inv-demo-4","vendor":"Tailspin Office","amount":315,"dueDate":"2026-07-12","description":"onsite catering and supplies"}
+{"id":"inv-demo-bad","vendor":"Broken Input","amount":"oops"}

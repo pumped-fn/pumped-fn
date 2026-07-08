@@ -1,67 +1,14 @@
-import { atom, controller, flow, tag, typed, type Lite } from "@pumped-fn/lite"
-import { createInterface } from "node:readline"
+import { atom, controller, flow, tag, tags, traced, typed } from "@pumped-fn/lite"
 import type { Model, ModelRequest } from "@pumped-fn/sdk"
+import { step } from "@pumped-fn/sdk"
 import { classifyHeuristically } from "./model"
-import type { Invoice, ReminderMessage, StoredInvoice } from "./types"
+import { notifierClient } from "./notifier"
+import type { Invoice, ReminderMessage, ReminderResult } from "./types"
 
-type Pending<T> = {
-  resolve(result: IteratorResult<T, undefined>): void
-}
+export { intakeLines } from "./adapters/stdin"
 
 export interface Clock {
   now(): Date
-}
-
-export interface Mailer {
-  send(message: ReminderMessage): Promise<void>
-  sent(): readonly ReminderMessage[]
-}
-
-export interface PushFeed<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {
-  push(value: T): void
-  close(): void
-}
-
-export interface OpsHeartbeat {
-  source: string
-  checkedAt: string
-}
-
-export function pushFeed<T>(): PushFeed<T> {
-  const values: T[] = []
-  let pending: Pending<T> | undefined
-  let closed = false
-  const feed = {
-    next(): Promise<IteratorResult<T, undefined>> {
-      if (values.length > 0) return Promise.resolve({ done: false, value: values.shift()! })
-      if (closed) return Promise.resolve({ done: true, value: undefined })
-      return new Promise((resolve) => {
-        pending = { resolve }
-      })
-    },
-    push(value: T): void {
-      if (closed) throw new Error("Feed is closed")
-      if (!pending) {
-        values.push(value)
-        return
-      }
-      const current = pending
-      pending = undefined
-      current.resolve({ done: false, value })
-    },
-    close(): void {
-      closed = true
-      const current = pending
-      pending = undefined
-      current?.resolve({ done: true, value: undefined })
-    },
-    return(): Promise<IteratorReturnResult<undefined>> {
-      feed.close()
-      return Promise.resolve({ done: true, value: undefined })
-    },
-  } as PushFeed<T>
-  Object.defineProperty(feed, Symbol.asyncIterator, { value: () => feed })
-  return feed
 }
 
 export const clock = tag<Clock>({
@@ -79,18 +26,23 @@ export const reminderRecipient = tag<string>({
   default: "ap@company.local",
 })
 
-export const intakeLines = atom({
-  factory: readlineAdapter,
+export const requestId = tag<string>({
+  label: "invoice.requestId",
 })
 
-export const queue = atom({
+export const queueSignal = atom({
   keepAlive: true,
-  factory: (): readonly Invoice[] => [],
+  factory: (): number => 0,
 })
 
-export const ledger = atom({
+export const storedSignal = atom({
   keepAlive: true,
-  factory: (): readonly StoredInvoice[] => [],
+  factory: (): number => 0,
+})
+
+export const stopping = atom({
+  keepAlive: true,
+  factory: (): boolean => false,
 })
 
 export const importing = atom({
@@ -98,38 +50,17 @@ export const importing = atom({
   factory: (): number => 0,
 })
 
+export const outstanding = atom({
+  keepAlive: true,
+  factory: (): number => 0,
+})
+
 export const drained = atom({
   deps: {
-    queue: controller(queue, { resolve: true, watch: true }),
+    outstanding: controller(outstanding, { resolve: true, watch: true }),
     importing: controller(importing, { resolve: true, watch: true }),
   },
-  factory: (_ctx, { queue, importing }) => queue.get().length === 0 && importing.get() === 0,
-})
-
-export const reviewCount = atom({
-  deps: {
-    ledger: controller(ledger, { resolve: true, watch: true }),
-  },
-  factory: (_ctx, { ledger }) => {
-    const review = ledger.get().filter((invoice) => invoice.classification.risk === "review")
-    return review.length
-  },
-})
-
-export const opsHeartbeat = atom({
-  keepAlive: true,
-  factory: (ctx): PushFeed<OpsHeartbeat> => {
-    const feed = pushFeed<OpsHeartbeat>()
-    ctx.cleanup(() => {
-      feed.close()
-    })
-    return feed
-  },
-})
-
-export const mailer = atom({
-  keepAlive: true,
-  factory: memoryMailer,
+  factory: (_ctx, { outstanding, importing }) => outstanding.get() === 0 && importing.get() === 0,
 })
 
 export const heuristic: Model = flow({
@@ -147,20 +78,10 @@ export const heuristic: Model = flow({
   },
 })
 
-function readlineAdapter(ctx: Lite.ResolveContext): AsyncIterable<string> {
-  const lines = createInterface({ input: process.stdin })
-  ctx.cleanup(() => lines.close())
-  return lines
-}
-
-export function memoryMailer(): Mailer {
-  const messages: ReminderMessage[] = []
-  return {
-    async send(message) {
-      messages.push(message)
-    },
-    sent() {
-      return messages.slice()
-    },
-  }
-}
+export const deliver = flow({
+  name: "invoice.deliver",
+  parse: typed<ReminderMessage>(),
+  deps: { client: traced(notifierClient) },
+  tags: [step({ workflow: true, kind: "email" })],
+  factory: (ctx, { client }): Promise<ReminderResult> => client.send.exec({ params: [ctx.input] }),
+})

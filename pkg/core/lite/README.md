@@ -143,6 +143,19 @@ like a bare flow dependency; `tags.optional(model)` yields the handle or `undefi
 yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
 for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
 
+`traced()` is for transport capability records over foreign APIs. Business features stay as flows. It
+accepts an atom whose resolved value is a non-empty record of enumerable functions. Each method arrives as
+`depKey.method.exec({ params, tags })`, named from the dependency key, so transport calls keep per-call tags
+and remain visible to extensions without hiding feature behavior behind facade methods. Traced deps are
+flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they
+are rejected. Non-record, empty-record, and non-function members reject when the dependency resolves.
+
+`serviceValue(record)` brands an executable service record carried by a tag. In execution deps,
+`tags.required(serviceTag)` projects each ctx-first member to `depKey.method.exec({ params, tags })`; the
+caller supplies only the member params, while the pipeline supplies the live child execution context at
+call time. Use this for values a resource or root installs into the current context, such as a transaction
+store. Plain records are not projected.
+
 ```ts
 const auditUserLoad = flow({
   parse: typed<{ id: string }>(),
