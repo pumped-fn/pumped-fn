@@ -1,0 +1,100 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@pumped-fn/codemod": [
+        "./pkg/tool/codemod/src/index.ts"
+      ],
+      "@pumped-fn/lite": [
+        "./pkg/core/lite/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-logging": [
+        "./pkg/ext/logging/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-logging-pino": [
+        "./pkg/ext/logging-pino/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-observable": [
+        "./pkg/ext/observable/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-observable-otel": [
+        "./pkg/ext/observable-otel/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-scheduler": [
+        "./pkg/ext/scheduler/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-scheduler-nats": [
+        "./pkg/ext/scheduler-nats/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-suspense": [
+        "./pkg/ext/suspense/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-sync": [
+        "./pkg/ext/sync/src/index.ts"
+      ],
+      "@pumped-fn/lite-extension-sync-nats": [
+        "./pkg/ext/sync-nats/src/index.ts"
+      ],
+      "@pumped-fn/lite-hmr": [
+        "./pkg/ext/hmr/src/index.ts"
+      ],
+      "@pumped-fn/lite-hono": [
+        "./pkg/framework/hono/src/index.ts"
+      ],
+      "@pumped-fn/lite-lint": [
+        "./pkg/tool/lint/src/index.ts"
+      ],
+      "@pumped-fn/lite-react": [
+        "./pkg/react/lite-react/src/index.ts"
+      ],
+      "@pumped-fn/lite-react-json-render": [
+        "./pkg/react/json/src/index.ts"
+      ],
+      "@pumped-fn/lite-render-core": [
+        "./pkg/render/core/src/index.ts"
+      ],
+      "@pumped-fn/lite-render-react": [
+        "./pkg/render/react/src/index.ts"
+      ],
+      "@pumped-fn/lite-tanstack-start": [
+        "./pkg/framework/tanstack-start/src/index.ts"
+      ],
+      "@pumped-fn/pumped": [
+        "./pkg/framework/pumped/src/index.ts"
+      ],
+      "@pumped-fn/sdk": [
+        "./pkg/sdk/core/src/index.ts"
+      ],
+      "@pumped-fn/sdk-claude": [
+        "./pkg/sdk/claude/src/index.ts"
+      ],
+      "@pumped-fn/sdk-codex": [
+        "./pkg/sdk/codex/src/index.ts"
+      ],
+      "@pumped-fn/sdk-just-bash": [
+        "./pkg/sdk/bash/src/index.ts"
+      ],
+      "@pumped-fn/sdk-test": [
+        "./pkg/sdk/test/src/index.ts"
+      ],
+      "@pumped-fn/lite/*": [
+        "./pkg/core/lite/src/*"
+      ]
+    },
+    "noEmit": true,
+    "jsx": "react-jsx"
+  }
+}
