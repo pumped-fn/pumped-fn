@@ -30,6 +30,7 @@ pnpm lint
 | `pumped/no-ctx-argument` | Factory context parameters passed as call arguments or embedded directly in object/array literals/spreads; `ctx` is a receiver, and ctx-taking contracts should be reified as a flow reached via deps. Direct parameter tracking only in v1; aliases are not followed. |
 | `pumped/no-shared-scope-factory` | Helpers that return preconfigured `createScope(...)`; each use site should own tags, presets, and extensions. |
 | `pumped/no-scope-argument` | Exported product helpers accepting `scope`; composition roots and tests own scope. |
+| `pumped/no-scope-reach` | Atom/flow/resource factories reaching `ctx.scope` or calling `.createContext(...)`; execution contexts are owned by composition roots. |
 | `pumped/no-render-outside-browser-test` | Testing Library `render` outside `*.browser.test.tsx`; DOM observer tests run in browser mode. |
 | `pumped/no-ambient-io-outside-boundary` | Raw `fetch`, timers, DOM/storage, random, and clock access outside transport/root declarations. |
 | `pumped/no-react-use-scope` | Feature components calling `useScope`; use graph hooks and `useFlow`. |

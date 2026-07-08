@@ -158,6 +158,76 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("finds graph nodes reaching scope or creating execution contexts", () => {
+    const scopeReach = (source: string, filePath = "src/example.ts") =>
+      diagnostics(source, filePath).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-reach")
+
+    const ctxScopeCreateContext = scopeReach(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        factory: (ctx) => ctx.scope.createContext(),
+      })
+    `)
+
+    expect(ctxScopeCreateContext).toHaveLength(2)
+    expect(ctxScopeCreateContext.map((diagnostic) => diagnostic.message)).toEqual([
+      "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots.",
+      "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots.",
+    ])
+
+    expect(scopeReach(`
+      import { flow } from "@pumped-fn/lite"
+
+      declare const someScope: { createContext(): unknown }
+
+      const run = flow({
+        factory: () => someScope.createContext(),
+      })
+    `)).toHaveLength(1)
+
+    expect(scopeReach(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        factory: (ctx) => ctx.scope.resolve(other),
+      })
+    `)).toHaveLength(1)
+
+    expect(ids(`
+      import type { Lite } from "@pumped-fn/lite"
+
+      const execute = (scope: Lite.Scope) => scope.createContext()
+    `, "src/main.ts")).toEqual([])
+
+    expect(ids(`
+      import type { Lite } from "@pumped-fn/lite"
+
+      const execute = (scope: Lite.Scope) => scope.createContext()
+    `, "bin/server.ts")).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({
+        factory: (ctx) => ctx.scope.createContext(),
+      })
+    `, "tests/example.test.ts")).toEqual([])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const store = atom({ factory: () => 0 })
+      const runner = atom({
+        factory: (ctx) => {
+          void ctx.exec({})
+          void ctx.changes(store)
+          return ctx.name
+        },
+      })
+    `)).toEqual([])
+  })
+
   it("finds aliased module mocks and rendered node observer tests", () => {
     expect(ids(`
       import { render } from "@testing-library/react"
@@ -360,7 +430,7 @@ describe("lite lint scanner", () => {
         name: "withOther",
         factory: (ctx) => ctx.scope.resolve(other),
       })
-    `)).toEqual(["pumped/no-implicit-tag-read"])
+    `)).toEqual(["pumped/no-implicit-tag-read", "pumped/no-scope-reach"])
   })
 
   it("flags implicit tag reads regardless of destructured deps in the factory signature", () => {

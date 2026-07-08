@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server"
-import { createScope } from "@pumped-fn/lite"
+import { createScope, type Lite } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import { otel } from "@pumped-fn/lite-extension-observable-otel"
@@ -7,7 +7,7 @@ import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { dailyReportJob, ingest, sendRemindersJob, stop, watchReviewQueue } from "../src/flows"
 import { heuristic } from "../src/ports"
-import { app } from "../src/server"
+import { buildApp } from "../src/server"
 
 const port = Number(process.env["PORT"] ?? 3000)
 const scope = createScope({
@@ -29,7 +29,20 @@ const scope = createScope({
     provider(heuristic),
   ],
 })
-const routes = await scope.resolve(app)
+const execute = async <Output, Input, Yield = never>(
+  options: Lite.ExecFlowOptions<Output, Input, Yield>
+): Promise<Output> => {
+  const request = scope.createContext()
+  try {
+    const output = await request.exec(options)
+    await request.close({ ok: true })
+    return output
+  } catch (error) {
+    await request.close({ ok: false, error })
+    throw error
+  }
+}
+const app = buildApp(execute)
 const ctx = scope.createContext()
 const ingesting = ctx.exec({ flow: ingest })
 const watching = ctx.exec({ flow: watchReviewQueue })
@@ -37,7 +50,7 @@ const watching = ctx.exec({ flow: watchReviewQueue })
 await ctx.resolve(dailyReportJob)
 await ctx.resolve(sendRemindersJob)
 
-const server = serve({ fetch: routes.fetch, port })
+const server = serve({ fetch: app.fetch, port })
 let closing: Promise<void> | undefined
 
 async function shutdown(): Promise<void> {

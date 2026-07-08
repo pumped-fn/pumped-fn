@@ -47,7 +47,7 @@ import {
   type Risk,
   type StoredInvoice,
 } from "../src/types"
-import { app } from "../src/server"
+import { buildApp } from "../src/server"
 import { pgliteDatabase } from "./support/database"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
@@ -1115,22 +1115,35 @@ describe("invoice triage patterns", () => {
     })
     const ctx = scope.createContext()
     const processing = ctx.exec({ flow: ingest })
-    const routes = await scope.resolve(app)
+    const execute = async <Output, Input, Yield = never>(
+      options: Lite.ExecFlowOptions<Output, Input, Yield>
+    ): Promise<Output> => {
+      const request = scope.createContext()
+      try {
+        const output = await request.exec(options)
+        await request.close({ ok: true })
+        return output
+      } catch (error) {
+        await request.close({ ok: false, error })
+        throw error
+      }
+    }
+    const app = buildApp(execute)
 
-    const accepted = await routes.request("/invoices", {
+    const accepted = await app.request("/invoices", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(source),
     })
-    const rejected = await routes.request("/invoices", {
+    const rejected = await app.request("/invoices", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id: "bad" }),
     })
     await ctx.exec({ flow: awaitDrained })
-    const report = await routes.request("/report")
-    const audit = await routes.request("/audit")
-    const health = await routes.request("/health")
+    const report = await app.request("/report")
+    const audit = await app.request("/audit")
+    const health = await app.request("/health")
 
     expect(accepted.status).toBe(200)
     expect(await accepted.json()).toEqual({ accepted: 1, rejected: 0 })

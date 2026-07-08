@@ -20,6 +20,7 @@ export type RuleId =
   | "pumped/no-react-use-execution-context"
   | "pumped/no-react-use-scope"
   | "pumped/no-scope-argument"
+  | "pumped/no-scope-reach"
   | "pumped/no-shared-scope-factory"
   | "pumped/no-swallowed-error"
   | "pumped/no-test-only-branches"
@@ -138,6 +139,7 @@ type Imports = {
 type CreatorKind = "atom" | "flow" | "resource" | "tag" | "scopedValue"
 
 const creatorNames = new Set(["atom", "flow", "resource", "tag", "scopedValue"])
+const graphNodeCreatorKinds = new Set<CreatorKind>(["atom", "flow", "resource"])
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])
 const textExtensions = new Set([...sourceExtensions, ".json", ".md", ".mdx"])
 const ignoredNames = new Set(["node_modules", ".git", "dist", "coverage", ".next", ".turbo"])
@@ -160,6 +162,7 @@ const nakedGlobalDefaultAllow = new Set(["JSON", "Object", "Array", "String", "N
 const containerCreators = new Set(["Map", "Set"])
 const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the contract as a flow reached via deps."
 const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
+const scopeReachMessage = "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots."
 const tracedHandleEscapeMessage = "traced handles are one-depth exec edges; aliasing, passing, or returning them loses execution-time attribution."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
@@ -583,6 +586,13 @@ function unitCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLit
   return config && ts.isObjectLiteralExpression(config) ? config : null
 }
 
+function graphNodeCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
+  const kind = creatorKind(node.expression, imports)
+  if (kind === null || !graphNodeCreatorKinds.has(kind)) return null
+  const config = node.arguments[0]
+  return config && ts.isObjectLiteralExpression(config) ? config : null
+}
+
 function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
   let current: ts.Node | undefined = node
   while (current) {
@@ -594,6 +604,25 @@ function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction
       const config = current.parent
       const call = config.parent
       if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && unitCallObject(call, imports) === config) {
+        return current.initializer
+      }
+    }
+    current = current.parent
+  }
+  return null
+}
+
+function enclosingGraphNodeFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
+  let current: ts.Node | undefined = node
+  while (current) {
+    if (
+      ts.isPropertyAssignment(current)
+      && propertyNameText(current.name) === "factory"
+      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
+    ) {
+      const config = current.parent
+      const call = config.parent
+      if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && graphNodeCallObject(call, imports) === config) {
         return current.initializer
       }
     }
@@ -970,6 +999,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const reactFeature = isReactFeaturePath(filePath)
   const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
   const allowScopeFactory = isCompositionPath(filePath)
+  const allowScopeReach = isTestPath(filePath)
   const allowTracedHandleEscape = isTestPath(filePath) || isCompositionPath(filePath)
   const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
   const localFlows = new Set<string>()
@@ -987,6 +1017,12 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return factory && name ? { factory, name } : null
   }
 
+  function graphFactoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
+    const factory = enclosingGraphNodeFactory(node, imports)
+    const name = factoryCtxName(factory)
+    return factory && name ? { factory, name } : null
+  }
+
   function pushCtxDiagnostic(node: ts.Node): void {
     pushNodeDiagnostic(
       diagnostics,
@@ -995,6 +1031,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       "pumped/no-ctx-argument",
       node,
       ctxArgumentMessage,
+    )
+  }
+
+  function pushScopeReachDiagnostic(node: ts.Node): void {
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-scope-reach",
+      node,
+      scopeReachMessage,
     )
   }
 
@@ -1114,6 +1161,29 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
   function visit(node: ts.Node): void {
     checkTracedHandleEscape(node)
+
+    if (!allowScopeReach) {
+      const ctxBinding = graphFactoryCtxAt(node)
+      if (
+        ctxBinding
+        && ts.isPropertyAccessExpression(node)
+        && node.name.text === "scope"
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === ctxBinding.name
+        && !shadowsName(node.expression, ctxBinding.factory, ctxBinding.name)
+      ) {
+        pushScopeReachDiagnostic(node)
+      }
+
+      if (
+        ts.isCallExpression(node)
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "createContext"
+        && enclosingGraphNodeFactory(node, imports)
+      ) {
+        pushScopeReachDiagnostic(node.expression)
+      }
+    }
 
     const ctxBinding = factoryCtxAt(node)
     if (ctxBinding) {

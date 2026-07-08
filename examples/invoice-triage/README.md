@@ -21,13 +21,18 @@ It proves:
 
 ```mermaid
 flowchart TD
-  Root["daemon/server/cli roots<br/>inline createScope"] --> Scope["scope<br/>logging + observable + scheduler"]
+  Root["daemon/server/cli roots<br/>inline createScope<br/>root-owned execution contexts"] --> Scope["scope<br/>logging + observable + scheduler"]
+  Root --> ServerBoundary["server root<br/>buildApp(execute)"]
   Scope --> OTel["otel.sink()<br/>exports spans when SDK is registered"]
   Scope --> DB["database atom<br/>pg pool + Drizzle migrations"]
   DB --> Queries["queries atom<br/>record of functions"]
   Queries --> Store["traced(queries)<br/>store.method.exec({ params, tags })"]
 
-  Intake["intake/server enqueue"] --> Producer["enqueue flow<br/>parse invoice input"]
+  Intake["intake"] --> Producer["enqueue flow<br/>parse invoice input"]
+  ServerBoundary --> Producer
+  ServerBoundary --> Report
+  ServerBoundary --> OpsTrail
+  ServerBoundary --> PendingRead
   Producer --> Store
   Store --> Pending["invoice_pending<br/>Postgres table"]
   Store --> Audit["invoice_audit<br/>Postgres table"]
@@ -78,6 +83,8 @@ flowchart TD
 
 Business features are flows/resources; free functions are pure calculations; ctx/scope/handles never travel into helpers.
 
+Outbound and pull capabilities such as `intakeLines` are atoms because the graph controls when it consumes them. Anything that creates execution contexts is root-owned: the server root creates request contexts, while `buildApp(execute)` is pure route wiring over an injected executor.
+
 External data is schema-validated with zod at parse and model-output boundaries; graph-internal handoffs stay typed.
 
 Transport capability records are traced edges; business features stay flows. Database side effects are scalar store flows backed by a `queries` atom through `traced(queries)`. The public flow names remain workflow store steps, and each database operation runs as a named traced exec edge such as `store.enqueuePending`, `store.listPending`, `store.settleImport`, `store.claimReminder`, or `store.releaseReminder`. Multi-statement aggregates that pair table writes with audit rows run in one transaction.
@@ -99,7 +106,7 @@ The example uses `yield* stream` to pass nested triage progress through `importB
 
 `bin/daemon.ts`, `bin/server.ts`, and `bin/cli.ts` are the composition roots for the runnable entrypoints. Each root calls `createScope` inline with the observable, logging, and scheduler extensions; binds the in-process scheduler backend; sends logs to stdout; sends observable events to `otel.sink()`; and binds the deterministic heuristic model provider.
 
-The Hono server is the `app` atom in `src/server.ts`. Its factory builds the routes and captures `ctx.scope` inside the node. Each request creates its own execution context, execs the target flow, closes ok or failed, and maps parse errors to HTTP 400.
+The Hono server boundary is root-owned. `bin/server.ts` defines an inline executor that creates a fresh execution context for each request, execs the target flow, closes ok or failed, and rethrows failures. `src/server.ts` exports `buildApp(execute)`, a pure route builder with no scope, ctx, or atom; it maps invalid JSON and `ParseError` to HTTP 400.
 
 The model seam is the SDK `model` tag:
 
@@ -159,7 +166,7 @@ pnpm -F @pumped-fn/invoice-triage cli pending
 pnpm -F @pumped-fn/invoice-triage cli remind
 ```
 
-The daemon composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows. It holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. EOF or SIGINT ends intake; the daemon waits for `drained` - accepted work settled and no batch in flight - then execs `invoice.stop`, waits for both loops to settle, closes the context, and disposes the scope. The server SIGINT/SIGTERM path execs `invoice.stop`, waits for the worker loops to settle, closes the HTTP server and execution context, and disposes the scope.
+The daemon composition root execs `intake`, `ingest`, `watchReviewQueue`, and `awaitDrained` as flows. It holds the scope, but every loop lives in the graph. `intake` consumes the stdin transport atom by direct pull and sends raw lines to `enqueue`; exactly one flow owns the iterator, so it is backpressured and lossless. Malformed lines are logged and rejected, never fatal. EOF or SIGINT ends intake; the daemon waits for `drained` - accepted work settled and no batch in flight - then execs `invoice.stop`, waits for both loops to settle, closes the context, and disposes the scope. The server SIGINT/SIGTERM path execs `invoice.stop`, waits for the worker loops to settle, closes the HTTP server and execution context, and disposes the scope. Per-request contexts are also created and closed by the server root executor, not by a graph node.
 
 Each runnable root registers `observable.extension()` and `otel.sink()` by default. The sink emits real OpenTelemetry spans when the process has an OTel SDK/tracer provider registered; tests prove the names by injecting a recording tracer.
 
