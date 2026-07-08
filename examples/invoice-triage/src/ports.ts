@@ -1,9 +1,7 @@
-import { atom, controller, flow, tag, tags, traced, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, tag, typed } from "@pumped-fn/lite"
 import type { Model, ModelRequest } from "@pumped-fn/sdk"
-import { step } from "@pumped-fn/sdk"
 import { classifyHeuristically } from "./model"
-import { notifierClient } from "./notifier"
-import type { Invoice, ReminderMessage, ReminderResult } from "./types"
+import type { Invoice } from "./types"
 
 export { intakeLines } from "./adapters/stdin"
 
@@ -78,10 +76,3 @@ export const heuristic: Model = flow({
   },
 })
 
-export const deliver = flow({
-  name: "invoice.deliver",
-  parse: typed<ReminderMessage>(),
-  deps: { client: traced(notifierClient) },
-  tags: [step({ workflow: true, kind: "email" })],
-  factory: (ctx, { client }): Promise<ReminderResult> => client.send.exec({ params: [ctx.input] }),
-})
