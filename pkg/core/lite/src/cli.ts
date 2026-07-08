@@ -379,8 +379,10 @@ Cleanup:
   const ctx = scope.createContext({ tags: [request(req)] })
   try {
     const result = await ctx.exec({ flow: handleRequest, rawInput: req.body })
-  } finally {
-    await ctx.close()
+    await ctx.close({ ok: true })
+  } catch (error) {
+    await ctx.close({ ok: false, error })
+    throw error
   }
 
 Service pattern:
@@ -446,9 +448,12 @@ Execution context middleware — per-request lifecycle:
     .server(async ({ next, context: { scope } }) => {
       const execContext = scope.createContext({})
       try {
-        return await next({ context: { execContext } })
-      } finally {
-        await execContext.close()
+        const result = await next({ context: { execContext } })
+        await execContext.close({ ok: true })
+        return result
+      } catch (error) {
+        await execContext.close({ ok: false, error })
+        throw error
       }
     })
 

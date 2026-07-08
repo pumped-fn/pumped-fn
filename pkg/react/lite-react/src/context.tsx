@@ -74,7 +74,9 @@ function closeEntry(map: Map<string, ManagedEntry>, id: string, entry: ManagedEn
     entry.orphanTimer = null
   }
   if (map.get(id) === entry) map.delete(id)
-  void entry.ctx.close()
+  void entry.ctx.close().catch((error: unknown) => {
+    console.error("managed context settlement failed", error)
+  })
 }
 
 function scheduleOrphanCheck(map: Map<string, ManagedEntry>, id: string, entry: ManagedEntry): void {

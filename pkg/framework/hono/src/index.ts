@@ -63,7 +63,11 @@ function bindAdapter<const Key extends string>(key: Key): HonoAdapter<Key> & Lit
           throw error
         }
 
-        if (close) await execution.close({ ok: true })
+        if (close) {
+          await execution.close(context.error === undefined
+            ? { ok: true }
+            : { ok: false, error: context.error })
+        }
       })
     },
   }
