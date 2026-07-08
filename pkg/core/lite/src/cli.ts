@@ -542,6 +542,7 @@ Type guards:
   isPreset(v)           → v is Preset
   isControllerDep(v)    → v is ControllerDep
   isTracedDep(v)        → v is TracedDep
+  isServiceValue(v)     → v is ServiceValue
   isTagExecutor(v)      → v is TagExecutor
 
 Convenience types:
@@ -553,7 +554,7 @@ Convenience types:
 Symbols (advanced, for library authors):
   atomSymbol, flowSymbol, resourceSymbol, tagSymbol, taggedSymbol,
   presetSymbol, controllerSymbol, controllerDepSymbol, tracedDepSymbol,
-  tagExecutorSymbol, typedSymbol`,
+  serviceValueSymbol, tagExecutorSymbol, typedSymbol`,
   },
 }
 

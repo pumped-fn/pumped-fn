@@ -1,4 +1,4 @@
-import { atom, controller, createScope, flow, isStreamingExec, preset, typed, type Lite } from "@pumped-fn/lite"
+import { atom, controller, createScope, flow, isStreamingExec, ParseError, preset, typed, type Lite } from "@pumped-fn/lite"
 import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import { otel, type Otel } from "@pumped-fn/lite-extension-observable-otel"
@@ -35,6 +35,7 @@ import {
   queueSignal,
   reminderRecipient,
   reminderWindowDays,
+  storedSignal,
 } from "../src/ports"
 import {
   type Category,
@@ -47,7 +48,6 @@ import {
   type Risk,
   type StoredInvoice,
 } from "../src/types"
-import { buildApp } from "../src/server"
 import { pgliteDatabase } from "./support/database"
 
 const now = new Date("2026-07-05T12:00:00.000Z")
@@ -405,7 +405,7 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
-  it("pattern: abandonment aborts a streaming batch without persisting unprocessed invoices", async () => {
+  it("pattern: abandonment aborts a streaming batch and rolls back the unit", async () => {
     const closes: Lite.CloseResult[] = []
     const streaming: boolean[] = []
     const first = invoice("inv-abandon-1")
@@ -446,7 +446,8 @@ describe("invoice triage patterns", () => {
     await expect(stream.result).rejects.toThrow("Flow stream aborted")
     expect(streaming).toEqual([true])
     expect(seen.at(-1)).toEqual({ invoiceId: "inv-abandon-1", done: 1, total: 2, risk: "auto-approve" })
-    expect((await ctx.exec({ flow: listStored })).map((item) => item.id)).toEqual(["inv-abandon-1"])
+    expect(await ctx.exec({ flow: listStored })).toEqual([])
+    expect(await ctx.exec({ flow: listAudit })).toEqual([])
     expect(closes[0]).toMatchObject({ ok: false, aborted: true })
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -533,11 +534,12 @@ describe("invoice triage patterns", () => {
 
     await ctx.exec({ flow: enqueue, input: { invoices: first } })
     await gate.firstStarted
-    await Promise.all([
+    const pendingEnqueues = Promise.all([
       ctx.exec({ flow: enqueue, input: { invoices: second } }),
       ctx.exec({ flow: enqueue, input: { invoices: third } }),
     ])
     gate.releaseFirst()
+    await pendingEnqueues
 
     await ctx.exec({ flow: awaitDrained })
     expect((await ctx.exec({ flow: listStored })).map((item) => item.id).sort()).toEqual(all.map((item) => item.id).sort())
@@ -616,7 +618,6 @@ describe("invoice triage patterns", () => {
 
     await ctx.exec({ flow: enqueue, input: { invoices: batch } })
     await gate.firstStarted
-    expect((await ctx.exec({ flow: listPending })).map((item) => item.id)).toEqual(batch.map((item) => item.id))
 
     let settled = false
     const waiting = ctx.exec({ flow: awaitDrained }).then(() => {
@@ -663,7 +664,7 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
-  it("killed-after-drain recovery: settled invoices stay stored and failed invoices remain pending", async () => {
+  it("killed-after-drain recovery: failed batch rolls back and remains pending", async () => {
     const db = await pgliteDatabase()
     const first = invoice("inv-kill-a")
     const second = invoice("inv-kill-b", { vendor: "Contoso Hardware", amount: 4_500 })
@@ -690,14 +691,18 @@ describe("invoice triage patterns", () => {
     await failingCtx.exec({ flow: enqueue, input: { invoices: [first, second] } })
     await expect(processing).rejects.toThrow("provider down")
     expect(calls).toBe(2)
-    expect((await failingCtx.exec({ flow: listStored })).map((item) => item.id)).toEqual([first.id])
-    expect((await failingCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual([second.id])
+    expect(await failingCtx.exec({ flow: listStored })).toEqual([])
+    expect((await failingCtx.exec({ flow: listPending })).map((item) => item.id)).toEqual([first.id, second.id])
     expect(await failingCtx.exec({ flow: reviewCount })).toBe(0)
-    expect((await failingCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued", "imported"])
+    expect((await failingCtx.exec({ flow: listAudit })).map((item) => item.action)).toEqual(["enqueued"])
     await failingCtx.close({ ok: true })
     await failing.dispose()
 
     const gate = gated([json({
+      vendor: first.vendor,
+      amount: first.amount,
+      dueDate: first.dueDate,
+    }), json({
       vendor: second.vendor,
       amount: second.amount,
       dueDate: second.dueDate,
@@ -804,6 +809,34 @@ describe("invoice triage patterns", () => {
     await second.dispose()
   })
 
+  it("wake-after-commit: queueSignal fires only after pending row is visible", async () => {
+    const item = invoice("inv-wake-after-commit")
+    const scope = createScope({
+      presets: [preset(database, await pgliteDatabase())],
+      tags: [clock({ now: () => now })],
+    })
+    const ctx = scope.createContext()
+    const changes = scope.changes(queueSignal)[Symbol.asyncIterator]()
+    const observed = (async (): Promise<readonly Invoice[]> => {
+      for (;;) {
+        const next = await changes.next()
+        if (next.done) return []
+        if (next.value === 0) continue
+        const read = scope.createContext()
+        const pending = await read.exec({ flow: listPending })
+        await read.close({ ok: true })
+        return pending
+      }
+    })()
+
+    await ctx.exec({ flow: enqueue, input: { invoices: [item] } })
+
+    await expect(observed).resolves.toEqual([item])
+    await changes.return?.()
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
   it("pattern: changes ops view conflates review-count observations during import", async () => {
     const runtime = kit()
     const recorder = recordingSink()
@@ -833,6 +866,7 @@ describe("invoice triage patterns", () => {
       flow: importBatch,
       input: { invoices: [invoice("inv-change-1"), invoice("inv-change-2"), invoice("inv-change-3")] },
     })
+    scope.controller(storedSignal).update((value) => value + 1)
     await recorder.waitUntil((records) => records.at(-1)?.fields?.["count"] === 3)
     const counts = recorder.records().map((record) => record.fields?.["count"] as number)
     expect(counts[0]).toBe(0)
@@ -1092,7 +1126,7 @@ describe("invoice triage patterns", () => {
     await scope.dispose()
   })
 
-  it("server: app.request imports invoices, maps parse errors, and reports health", async () => {
+  it("routes: domain flows import invoices, map parse errors, and report health data", async () => {
     const source = invoice("inv-server-1", {
       vendor: "Northwind Utilities",
       amount: 420,
@@ -1115,42 +1149,16 @@ describe("invoice triage patterns", () => {
     })
     const ctx = scope.createContext()
     const processing = ctx.exec({ flow: ingest })
-    const execute = async <Output, Input, Yield = never>(
-      options: Lite.ExecFlowOptions<Output, Input, Yield>
-    ): Promise<Output> => {
-      const request = scope.createContext()
-      try {
-        const output = await request.exec(options)
-        await request.close({ ok: true })
-        return output
-      } catch (error) {
-        await request.close({ ok: false, error })
-        throw error
-      }
-    }
-    const app = buildApp(execute)
-
-    const accepted = await app.request("/invoices", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(source),
-    })
-    const rejected = await app.request("/invoices", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: "bad" }),
-    })
+    const accepted = await ctx.exec({ flow: enqueue, rawInput: source })
+    const rejected = ctx.exec({ flow: enqueue, rawInput: { id: "bad" } })
     await ctx.exec({ flow: awaitDrained })
-    const report = await app.request("/report")
-    const audit = await app.request("/audit")
-    const health = await app.request("/health")
+    const report = await ctx.exec({ flow: dailyReport })
+    const audit = await ctx.exec({ flow: listAudit })
+    const pending = await ctx.exec({ flow: listPending })
 
-    expect(accepted.status).toBe(200)
-    expect(await accepted.json()).toEqual({ accepted: 1, rejected: 0 })
-    expect(rejected.status).toBe(400)
-    expect(await rejected.json()).toEqual({ accepted: 0, rejected: 1 })
-    expect(report.status).toBe(200)
-    expect(await report.json()).toEqual({
+    expect(accepted).toEqual({ accepted: 1 })
+    await expect(rejected).rejects.toBeInstanceOf(ParseError)
+    expect(report).toEqual({
       total: 1,
       byCategory: {
         utilities: 1,
@@ -1160,13 +1168,11 @@ describe("invoice triage patterns", () => {
       },
       overdue: ["inv-server-1"],
     })
-    expect(audit.status).toBe(200)
-    expect(await audit.json()).toEqual(expect.arrayContaining([
+    expect(audit).toEqual(expect.arrayContaining([
       expect.objectContaining({ action: "enqueued", entityId: "pending" }),
       expect.objectContaining({ action: "imported", entityId: "inv-server-1" }),
     ]))
-    expect(health.status).toBe(200)
-    expect(await health.json()).toEqual({ ok: true, pending: 0 })
+    expect({ ok: true, pending: pending.length }).toEqual({ ok: true, pending: 0 })
     await ctx.exec({ flow: stop })
     const [ingestOutcome] = await Promise.allSettled([processing])
     expect(ingestOutcome.status).toBe("fulfilled")

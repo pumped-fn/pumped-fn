@@ -6,6 +6,7 @@ export {
   taggedSymbol,
   controllerDepSymbol,
   tracedDepSymbol,
+  serviceValueSymbol,
   presetSymbol,
   controllerSymbol,
   tagExecutorSymbol,
@@ -17,6 +18,7 @@ export {
 export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags } from "./tag"
 export { atom, isAtom, controller, isControllerDep, service } from "./atom"
 export { traced, isTracedDep } from "./traced"
+export { serviceValue, isServiceValue } from "./service-value"
 export { flow, isFlow, typed, isFault } from "./flow"
 export { preset, isPreset } from "./preset"
 export { resource, isResource } from "./resource"

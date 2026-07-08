@@ -4,6 +4,7 @@ export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag")
 export const taggedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tagged")
 export const controllerDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller-dep")
 export const tracedDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/traced-dep")
+export const serviceValueSymbol: unique symbol = Symbol.for("@pumped-fn/lite/service-value")
 export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/lite/preset")
 export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller")
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
@@ -445,6 +446,16 @@ export namespace Lite {
       : never
   }
 
+  export type ServiceValue<T extends ServiceMethods> = T & {
+    readonly [serviceValueSymbol]: true
+  }
+
+  export type Serviced<T extends ServiceMethods> = {
+    [K in keyof T]: T[K] extends (ctx: ExecutionContext, ...args: infer Args extends unknown[]) => infer Output
+      ? { exec(...args: TracedExecArgs<Args>): Promise<Awaited<Output>> }
+      : never
+  }
+
   export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T> | FlowControllerDep<any, any, any>
 
   export type WatchControllerDep<T> = AtomControllerDep<T> & {
@@ -584,6 +595,8 @@ export namespace Lite {
 
   export type Projected<V> = V extends readonly (infer E)[]
     ? Projected<E>[]
+    : V extends ServiceValue<infer M>
+      ? Serviced<M>
     : V extends Flow<infer Output, infer Input, any, infer Yield>
       ? FlowHandle<Output, Input, Yield>
       : V
@@ -598,12 +611,12 @@ export namespace Lite {
       ? Traced<T>
     : D extends AtomControllerDep<infer T>
       ? Controller<T>
-      : D extends ResourceControllerDep<infer T>
+    : D extends ResourceControllerDep<infer T>
       ? ResourceController<T>
-      : D extends TagExecutor<infer Output, infer _Value>
-        ? Projected<Output>
+    : D extends TagExecutor<infer Output, infer _Value>
+        ? Output extends ServiceValue<infer M> ? Serviced<M> : Projected<Output>
         : D extends Resource<infer T>
-          ? T
+          ? T extends ServiceValue<infer M> ? Serviced<M> : T
           : never
 
   export type InferDeps<D> = { [K in keyof D]: InferDep<D[K]> }

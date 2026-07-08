@@ -3,6 +3,7 @@ import { flow, typed } from "../src/flow"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
+import { serviceValue } from "../src/service-value"
 import { tag, tags } from "../src/tag"
 import { traced } from "../src/traced"
 import type { Lite } from "../src/types"
@@ -154,7 +155,7 @@ flow({
     // @ts-expect-error watched resource controller deps are resource-only
     source: controller(sourceResource, { resolve: true, watch: true }),
   },
-  factory: (_ctx, { source }) => source.get(),
+  factory: () => 1,
 })
 
 atom({
@@ -162,7 +163,7 @@ atom({
     // @ts-expect-error resource controller deps require an ExecutionContext
     source: controller(sourceResource),
   },
-  factory: (_ctx, { source }) => source.get(),
+  factory: () => 1,
 })
 
 // @ts-expect-error resource controller watch requires resolve:true
@@ -375,7 +376,7 @@ resource({
     // @ts-expect-error traced deps are execution-only
     store: traced(gateway),
   },
-  factory: (_ctx, { store }) => store.fetch.exec({ params: ["profile-1", 1] }),
+  factory: () => 1,
 })
 
 // @ts-expect-error traced method params are passed as the original tuple
@@ -403,3 +404,39 @@ _rejected.status.exec()
 void _fetchResult
 void _pingResult
 void _pingTaggedResult
+
+type ServiceGateway = {
+  fetch(ctx: Lite.ExecutionContext, id: string, count: number): Promise<{ id: string; count: number }>
+  ping(ctx: Lite.ExecutionContext): string
+}
+
+const serviceGateway = serviceValue<ServiceGateway>({
+  fetch: async (_ctx, id, count) => ({ id, count }),
+  ping: () => "pong",
+})
+
+const serviceGatewayTag = tag<Lite.ServiceValue<ServiceGateway>>({ label: "service-gateway" })
+const serviceGatewayDep = tags.required(serviceGatewayTag)
+type ServiceGatewayProjection = Lite.InferDep<typeof serviceGatewayDep>
+declare const _serviceGateway: ServiceGatewayProjection
+const _serviceFetchResult: Promise<{ id: string; count: number }> = _serviceGateway.fetch.exec({ params: ["profile-1", 1] })
+const _servicePingResult: Promise<string> = _serviceGateway.ping.exec()
+const serviceGatewayResource = resource({
+  factory: () => serviceGateway,
+})
+type ServiceGatewayResourceProjection = Lite.InferDep<typeof serviceGatewayResource>
+declare const _serviceGatewayResource: ServiceGatewayResourceProjection
+const _serviceResourceFetchResult: Promise<{ id: string; count: number }> = _serviceGatewayResource.fetch.exec({ params: ["profile-1", 1] })
+const _serviceResourcePingResult: Promise<string> = _serviceGatewayResource.ping.exec()
+
+// @ts-expect-error service ctx is supplied by the execution pipeline, not params
+_serviceGateway.fetch.exec({ params: [scope.createContext(), "profile-1", 1] })
+
+// @ts-expect-error service method params are passed as the original tuple after ctx
+_serviceGateway.fetch.exec({ params: ["profile-1"] })
+
+void serviceGateway
+void _serviceFetchResult
+void _servicePingResult
+void _serviceResourceFetchResult
+void _serviceResourcePingResult

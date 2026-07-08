@@ -150,6 +150,12 @@ and remain visible to extensions without hiding feature behavior behind facade m
 flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they
 are rejected. Non-record, empty-record, and non-function members reject when the dependency resolves.
 
+`serviceValue(record)` brands an executable service record carried by a tag. In execution deps,
+`tags.required(serviceTag)` projects each ctx-first member to `depKey.method.exec({ params, tags })`; the
+caller supplies only the member params, while the pipeline supplies the live child execution context at
+call time. Use this for values a resource or root installs into the current context, such as a transaction
+store. Plain records are not projected.
+
 ```ts
 const auditUserLoad = flow({
   parse: typed<{ id: string }>(),

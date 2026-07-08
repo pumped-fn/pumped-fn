@@ -17,38 +17,35 @@ import {
   storedSignal,
 } from "./ports"
 import {
-  enqueue,
-  listPending,
-  listStored,
-  markReminderSent,
-  releaseReminder,
-  reviewCount,
-  saveInvoice,
+  claimReminder,
+  countReviews,
+  enqueueRows,
+  readAudit,
+  readPending,
+  readStored,
+  releaseReminderClaim,
+  settleInvoice,
 } from "./store"
+import { txBoundary } from "./unit"
 import {
+  enqueueInput,
   categories,
+  type AuditEvent,
   type Category,
   type Classification,
   type DailyReport,
+  type EnqueueInput,
+  type EnqueueSummary,
   type ImportProgress,
   type ImportSummary,
   type Invoice,
   type ReminderMessage,
   type ReminderResult,
   type ReminderSummary,
+  type SaveInvoiceInput,
+  type StoredInvoice,
   type TriageProgress,
 } from "./types"
-
-export {
-  enqueue,
-  listAudit,
-  listPending,
-  listStored,
-  markReminderSent,
-  releaseReminder,
-  reviewCount,
-  saveInvoice,
-} from "./store"
 
 export const classify = flow({
   name: "invoice.classify",
@@ -78,21 +75,104 @@ export const triage = flow({
   },
 })
 
+export const enqueue = flow({
+  name: "invoice.enqueue",
+  parse: (input): EnqueueInput => enqueueInput.parse(input),
+  deps: {
+    enqueueRows: controller(enqueueRows),
+    outstanding: controller(outstanding, { resolve: true }),
+    queueSignal: controller(queueSignal, { resolve: true }),
+  },
+  factory: async (ctx, { enqueueRows, outstanding, queueSignal }): Promise<EnqueueSummary> => {
+    const summary = await enqueueRows.exec({ input: ctx.input })
+    if (summary.accepted > 0) {
+      outstanding.update((value) => value + summary.accepted)
+      queueSignal.update((value) => value + 1)
+    }
+    return summary
+  },
+})
+
+export const saveInvoice = flow({
+  name: "invoice.save",
+  parse: typed<SaveInvoiceInput>(),
+  deps: {
+    settleInvoice: controller(settleInvoice),
+    storedSignal: controller(storedSignal, { resolve: true }),
+  },
+  factory: async (ctx, { settleInvoice, storedSignal }): Promise<StoredInvoice> => {
+    const row = await settleInvoice.exec({ input: ctx.input })
+    storedSignal.update((value) => value + 1)
+    return row
+  },
+})
+
+export const listStored = flow({
+  name: "invoice.listStored",
+  deps: {
+    readStored: controller(readStored),
+  },
+  factory: (_ctx, { readStored }): Promise<readonly StoredInvoice[]> => readStored.exec(),
+})
+
+export const listPending = flow({
+  name: "invoice.listPending",
+  deps: {
+    readPending: controller(readPending),
+  },
+  factory: (_ctx, { readPending }): Promise<readonly Invoice[]> => readPending.exec(),
+})
+
+export const reviewCount = flow({
+  name: "invoice.reviewCount",
+  deps: {
+    countReviews: controller(countReviews),
+  },
+  factory: (_ctx, { countReviews }): Promise<number> => countReviews.exec(),
+})
+
+export const listAudit = flow({
+  name: "invoice.listAudit",
+  deps: {
+    readAudit: controller(readAudit),
+  },
+  factory: (_ctx, { readAudit }): Promise<readonly AuditEvent[]> => readAudit.exec(),
+})
+
+export const markReminderSent = flow({
+  name: "invoice.markReminderSent",
+  parse: typed<{ invoiceId: string }>(),
+  deps: {
+    claimReminder: controller(claimReminder),
+  },
+  factory: (ctx, { claimReminder }): Promise<StoredInvoice | undefined> => claimReminder.exec({ input: ctx.input }),
+})
+
+export const releaseReminder = flow({
+  name: "invoice.releaseReminder",
+  parse: typed<{ invoiceId: string }>(),
+  deps: {
+    releaseReminderClaim: controller(releaseReminderClaim),
+  },
+  factory: (ctx, { releaseReminderClaim }): Promise<void> => releaseReminderClaim.exec({ input: ctx.input }),
+})
+
 export const importBatch = flow({
   name: "invoice.importBatch",
   parse: typed<{ invoices: readonly Invoice[] }>(),
   deps: {
+    unit: txBoundary,
     triage: controller(triage),
-    saveInvoice: controller(saveInvoice),
+    settleInvoice: controller(settleInvoice),
   },
-  factory: async function* (ctx, { triage, saveInvoice }): AsyncGenerator<ImportProgress, ImportSummary, unknown> {
+  factory: async function* (ctx, { triage, settleInvoice }): AsyncGenerator<ImportProgress, ImportSummary, unknown> {
     const review: string[] = []
     let imported = 0
     for (const invoice of ctx.input.invoices) {
       const stream = triage.execStream({ input: invoice })
       yield* stream
       const classification = await stream.result
-      await saveInvoice.exec({ input: { invoice, classification } })
+      await settleInvoice.exec({ input: { invoice, classification } })
       imported += 1
       if (classification.risk === "review") review.push(invoice.id)
       yield {
@@ -114,8 +194,9 @@ export const ingest = flow({
     stopping: controller(stopping, { resolve: true }),
     listPending: controller(listPending),
     importBatch: controller(importBatch),
+    storedSignal: controller(storedSignal, { resolve: true }),
   },
-  factory: async (ctx, { outstanding, importing, stopping, listPending, importBatch }): Promise<void> => {
+  factory: async (ctx, { outstanding, importing, stopping, listPending, importBatch, storedSignal }): Promise<void> => {
     for await (const _signal of ctx.changes(queueSignal)) {
       if (stopping.get()) return
       const batch = await listPending.exec()
@@ -123,6 +204,7 @@ export const ingest = flow({
       importing.update((count) => count + 1)
       try {
         await importBatch.exec({ input: { invoices: batch } })
+        storedSignal.update((value) => value + 1)
       } finally {
         importing.update((count) => count - 1)
         outstanding.update((count) => Math.max(0, count - batch.length))

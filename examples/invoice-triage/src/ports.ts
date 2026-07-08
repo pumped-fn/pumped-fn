@@ -1,10 +1,11 @@
-import { atom, controller, flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { atom, controller, flow, tag, tags, typed } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"
-import { createInterface } from "node:readline"
 import type { Model, ModelRequest } from "@pumped-fn/sdk"
 import { step } from "@pumped-fn/sdk"
 import { classifyHeuristically } from "./model"
 import type { Invoice, ReminderMessage, ReminderResult } from "./types"
+
+export { intakeLines } from "./adapters/stdin"
 
 export interface Clock {
   now(): Date
@@ -25,8 +26,8 @@ export const reminderRecipient = tag<string>({
   default: "ap@company.local",
 })
 
-export const intakeLines = atom({
-  factory: readlineAdapter,
+export const requestId = tag<string>({
+  label: "invoice.requestId",
 })
 
 export const queueSignal = atom({
@@ -103,9 +104,3 @@ export const deliver = flow({
   tags: [step({ workflow: true, kind: "email" })],
   factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
 })
-
-function readlineAdapter(ctx: Lite.ResolveContext): AsyncIterable<string> {
-  const lines = createInterface({ input: process.stdin })
-  ctx.cleanup(() => lines.close())
-  return lines
-}

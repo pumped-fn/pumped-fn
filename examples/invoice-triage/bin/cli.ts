@@ -5,21 +5,24 @@ import { otel } from "@pumped-fn/lite-extension-observable-otel"
 import { scheduler } from "@pumped-fn/lite-extension-scheduler"
 import { model as provider } from "@pumped-fn/sdk"
 import { cac } from "cac"
+import { pathToFileURL } from "node:url"
 import { dailyReport, listAudit, listPending, sendReminders } from "../src/flows"
 import { heuristic } from "../src/ports"
 
-const program = cac("invoice-triage")
-
-program.command("report", "Print the daily report").action(() => execute(dailyReport))
-program.command("audit", "Print the audit trail").action(() => execute(listAudit))
-program.command("pending", "Print pending invoices").action(() => execute(listPending))
-program.command("remind", "Send due reminders").action(() => execute(sendReminders))
-
-program.help()
-program.parse(process.argv, { run: false })
-await program.runMatchedCommand()
-
 type Command = typeof dailyReport | typeof listAudit | typeof listPending | typeof sendReminders
+
+async function main(): Promise<void> {
+  const program = cac("invoice-triage")
+
+  program.command("report", "Print the daily report").action(() => execute(dailyReport))
+  program.command("audit", "Print the audit trail").action(() => execute(listAudit))
+  program.command("pending", "Print pending invoices").action(() => execute(listPending))
+  program.command("remind", "Send due reminders").action(() => execute(sendReminders))
+
+  program.help()
+  program.parse(process.argv, { run: false })
+  await program.runMatchedCommand()
+}
 
 async function execute<Output, Flow extends Command & Lite.Flow<Output, void>>(flow: Flow): Promise<void> {
   const scope = createScope({
@@ -54,4 +57,11 @@ async function execute<Output, Flow extends Command & Lite.Flow<Output, void>>(f
   } finally {
     await scope.dispose()
   }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  void main().catch((error: unknown) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    process.exitCode = 1
+  })
 }
