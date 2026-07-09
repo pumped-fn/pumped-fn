@@ -315,7 +315,7 @@ feature components using scope directly, and local state mirrors.
 
 | Path | What it shows |
 | --- | --- |
-| `examples/invoice-triage` | Postgres-backed invoice import and LLM triage: generator flows, `yield*` composition, `execStream`, traced database capabilities, signal-driven ingest, scheduler cron, daemon/server/CLI entrypoints |
+| `examples/invoice-triage` | Postgres-backed invoice import and LLM triage: generator flows, `yield*` composition, `execStream`, database capabilities, signal-driven ingest, scheduler cron, daemon/server/CLI entrypoints |
 | `benchmarks/lite-perf` | Runtime and React observer performance checks |
 
 ## Local Development

@@ -1,11 +1,9 @@
-import { atom, controller, service } from "../src/atom"
+import { atom, controller } from "../src/atom"
 import { flow, typed } from "../src/flow"
 import { preset } from "../src/preset"
 import { resource } from "../src/resource"
 import { createScope } from "../src/scope"
-import { serviceValue } from "../src/service-value"
 import { tag, tags } from "../src/tag"
-import { traced } from "../src/traced"
 import type { Lite } from "../src/types"
 
 const sourceAtom = atom({
@@ -356,87 +354,3 @@ flow({
   },
 })
 
-// D1: traced capability records project function members to exec handles
-const gateway = atom({
-  factory: () => ({
-    fetch: async (id: string, count: number) => ({ id, count }),
-    ping: () => "pong",
-  }),
-})
-
-const gatewayDep = traced(gateway)
-type GatewayProjection = Lite.InferDep<typeof gatewayDep>
-declare const _gateway: GatewayProjection
-const _fetchResult: Promise<{ id: string; count: number }> = _gateway.fetch.exec({ params: ["profile-1", 1] })
-const _pingResult: Promise<string> = _gateway.ping.exec()
-const _pingTaggedResult: Promise<string> = _gateway.ping.exec({ tags: [] })
-
-resource({
-  deps: {
-    // @ts-expect-error traced deps are execution-only
-    store: traced(gateway),
-  },
-  factory: () => 1,
-})
-
-// @ts-expect-error traced method params are passed as the original tuple
-_gateway.fetch.exec({ params: ["profile-1"] })
-
-// @ts-expect-error empty-arg traced methods only accept tags
-_gateway.ping.exec({ params: [] })
-
-const rejectedGateway = atom({
-  factory: () => ({
-    ping: () => "pong",
-    status: "idle",
-  }),
-})
-
-// @ts-expect-error traced accepts records of functions only
-traced(rejectedGateway)
-
-type RejectedProjection = Lite.Traced<{ ping(): string; status: string }>
-declare const _rejected: RejectedProjection
-
-// @ts-expect-error non-function members project to never
-_rejected.status.exec()
-
-void _fetchResult
-void _pingResult
-void _pingTaggedResult
-
-type ServiceGateway = {
-  fetch(ctx: Lite.ExecutionContext, id: string, count: number): Promise<{ id: string; count: number }>
-  ping(ctx: Lite.ExecutionContext): string
-}
-
-const serviceGateway = serviceValue<ServiceGateway>({
-  fetch: async (_ctx, id, count) => ({ id, count }),
-  ping: () => "pong",
-})
-
-const serviceGatewayTag = tag<Lite.ServiceValue<ServiceGateway>>({ label: "service-gateway" })
-const serviceGatewayDep = tags.required(serviceGatewayTag)
-type ServiceGatewayProjection = Lite.InferDep<typeof serviceGatewayDep>
-declare const _serviceGateway: ServiceGatewayProjection
-const _serviceFetchResult: Promise<{ id: string; count: number }> = _serviceGateway.fetch.exec({ params: ["profile-1", 1] })
-const _servicePingResult: Promise<string> = _serviceGateway.ping.exec()
-const serviceGatewayResource = resource({
-  factory: () => serviceGateway,
-})
-type ServiceGatewayResourceProjection = Lite.InferDep<typeof serviceGatewayResource>
-declare const _serviceGatewayResource: ServiceGatewayResourceProjection
-const _serviceResourceFetchResult: Promise<{ id: string; count: number }> = _serviceGatewayResource.fetch.exec({ params: ["profile-1", 1] })
-const _serviceResourcePingResult: Promise<string> = _serviceGatewayResource.ping.exec()
-
-// @ts-expect-error service ctx is supplied by the execution pipeline, not params
-_serviceGateway.fetch.exec({ params: [scope.createContext(), "profile-1", 1] })
-
-// @ts-expect-error service method params are passed as the original tuple after ctx
-_serviceGateway.fetch.exec({ params: ["profile-1"] })
-
-void serviceGateway
-void _serviceFetchResult
-void _servicePingResult
-void _serviceResourceFetchResult
-void _serviceResourcePingResult

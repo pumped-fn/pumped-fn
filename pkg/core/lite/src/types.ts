@@ -3,8 +3,6 @@ export const flowSymbol: unique symbol = Symbol.for("@pumped-fn/lite/flow")
 export const tagSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag")
 export const taggedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tagged")
 export const controllerDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller-dep")
-export const tracedDepSymbol: unique symbol = Symbol.for("@pumped-fn/lite/traced-dep")
-export const serviceValueSymbol: unique symbol = Symbol.for("@pumped-fn/lite/service-value")
 export const presetSymbol: unique symbol = Symbol.for("@pumped-fn/lite/preset")
 export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/controller")
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
@@ -421,41 +419,6 @@ export namespace Lite {
     readonly key?: string
   }
 
-  export interface TracedDep<T> {
-    readonly [tracedDepSymbol]: true
-    readonly atom: Atom<T>
-  }
-
-  export type TracedMethod = (...args: never[]) => unknown
-
-  export type TracedAccept<T> = T extends object
-    ? Exclude<keyof T, {
-        [K in keyof T]-?: T[K] extends TracedMethod ? K : never
-      }[keyof T]> extends never
-      ? unknown
-      : never
-    : never
-
-  export type TracedExecArgs<Args extends unknown[]> = Args extends []
-    ? [] | [options: { tags?: Tagged<any>[] }]
-    : [options: { params: Args; tags?: Tagged<any>[] }]
-
-  export type Traced<T> = {
-    [K in keyof T]: T[K] extends (...args: infer Args extends unknown[]) => infer Output
-      ? { exec(...args: TracedExecArgs<Args>): Promise<Awaited<Output>> }
-      : never
-  }
-
-  export type ServiceValue<T extends ServiceMethods> = T & {
-    readonly [serviceValueSymbol]: true
-  }
-
-  export type Serviced<T extends ServiceMethods> = {
-    [K in keyof T]: T[K] extends (ctx: ExecutionContext, ...args: infer Args extends unknown[]) => infer Output
-      ? { exec(...args: TracedExecArgs<Args>): Promise<Awaited<Output>> }
-      : never
-  }
-
   export type ControllerDep<T> = AtomControllerDep<T> | ResourceControllerDep<T> | FlowControllerDep<any, any, any>
 
   export type WatchControllerDep<T> = AtomControllerDep<T> & {
@@ -568,7 +531,6 @@ export namespace Lite {
     | Atom<unknown>
     | Flow<any, any, any, any>
     | ControllerDep<unknown>
-    | TracedDep<unknown>
     | TagExecutor<any>
     | Resource<unknown>
 
@@ -580,7 +542,6 @@ export namespace Lite {
     | FlowControllerDep<any, any, any>
     | NonWatchControllerDep<unknown>
     | NonWatchResourceControllerDep<unknown>
-    | TracedDep<unknown>
     | TagExecutor<any, any>
     | Resource<unknown, Record<string, Dependency>>
 
@@ -595,8 +556,6 @@ export namespace Lite {
 
   export type Projected<V> = V extends readonly (infer E)[]
     ? Projected<E>[]
-    : V extends ServiceValue<infer M>
-      ? Serviced<M>
     : V extends Flow<infer Output, infer Input, any, infer Yield>
       ? FlowHandle<Output, Input, Yield>
       : V
@@ -607,16 +566,14 @@ export namespace Lite {
       ? FlowHandle<Output, Input, Yield>
     : D extends FlowControllerDep<infer Output, infer Input, infer Yield>
       ? FlowHandle<Output, Input, Yield>
-    : D extends TracedDep<infer T>
-      ? Traced<T>
     : D extends AtomControllerDep<infer T>
       ? Controller<T>
     : D extends ResourceControllerDep<infer T>
       ? ResourceController<T>
     : D extends TagExecutor<infer Output, infer _Value>
-        ? Output extends ServiceValue<infer M> ? Serviced<M> : Projected<Output>
+        ? Projected<Output>
         : D extends Resource<infer T>
-          ? T extends ServiceValue<infer M> ? Serviced<M> : T
+          ? T
           : never
 
   export type InferDeps<D> = { [K in keyof D]: InferDep<D[K]> }
@@ -640,10 +597,6 @@ export namespace Lite {
     keyof D extends never
       ? (ctx: ResourceContext) => MaybePromise<T>
       : (ctx: ResourceContext, deps: InferDeps<D>) => MaybePromise<T>
-
-  export type ServiceMethod = (ctx: ExecutionContext, ...args: any[]) => unknown
-
-  export type ServiceMethods = Record<string, ServiceMethod>
 
   /**
    * Any atom regardless of value type.

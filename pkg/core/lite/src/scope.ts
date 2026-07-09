@@ -3,7 +3,6 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
-import { isServiceValue } from "./service-value"
 import { latest, type Latest } from "./latest"
 import { consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
@@ -678,10 +677,10 @@ class ScopeImpl implements Lite.Scope {
         case "required": {
           const value = tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
-            if (isFlow(value) || isServiceValue(value)) return null
+            if (isFlow(value)) return null
             result[key] = value
           } else if (tagExecutor.tag.hasDefault) {
-            if (isFlow(tagExecutor.tag.defaultValue) || isServiceValue(tagExecutor.tag.defaultValue)) return null
+            if (isFlow(tagExecutor.tag.defaultValue)) return null
             result[key] = tagExecutor.tag.defaultValue
           } else {
             return null
@@ -690,13 +689,13 @@ class ScopeImpl implements Lite.Scope {
         }
         case "optional": {
           const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
-          if (isFlow(value) || isServiceValue(value)) return null
+          if (isFlow(value)) return null
           result[key] = value
           break
         }
         case "all": {
           const values = tagExecutor.tag.collect(this.tags)
-          if (values.some((value) => isFlow(value) || isServiceValue(value))) return null
+          if (values.some((value) => isFlow(value))) return null
           result[key] = values
           break
         }
@@ -973,9 +972,6 @@ class ScopeImpl implements Lite.Scope {
     const graph = classifyDeps(deps)
     const result: Record<string, unknown> = {}
     const parallel: Promise<void>[] = []
-    if (dependentResource && graph.traced.length > 0) {
-      throw new Error("Traced deps are execution deps; resources capture the owning context")
-    }
 
     for (let i = 0; i < graph.atoms.length; i++) {
       const [key, dep] = graph.atoms[i]!
@@ -1056,21 +1052,6 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
-    for (let i = 0; i < graph.traced.length; i++) {
-      if (!ctx) throw new Error("Traced deps require an ExecutionContext")
-      const [key, dep] = graph.traced[i]!
-      const cachedEntry = this.cache.get(dep.atom)
-      if (cachedEntry?.state === 'resolved') {
-        result[key] = this.createTracedHandles(key, cachedEntry.value, ctx)
-      } else {
-        parallel.push(
-          this.resolve(dep.atom).then(value => {
-            result[key] = this.createTracedHandles(key, value, ctx)
-          })
-        )
-      }
-    }
-
     for (let i = 0; i < graph.tags.length; i++) {
       const [key, tagExecutor] = graph.tags[i]!
       switch (tagExecutor.mode) {
@@ -1079,9 +1060,9 @@ class ScopeImpl implements Lite.Scope {
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
-            result[key] = this.projectTagValue(key, value, ctx)
+            result[key] = this.projectTagValue(value, ctx)
           } else if (tagExecutor.tag.hasDefault) {
-            result[key] = this.projectTagValue(key, tagExecutor.tag.defaultValue, ctx)
+            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx)
           } else {
             throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
           }
@@ -1091,14 +1072,14 @@ class ScopeImpl implements Lite.Scope {
           const value = ctx
             ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
-          result[key] = this.projectTagValue(key, value ?? tagExecutor.tag.defaultValue, ctx)
+          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx)
           break
         }
         case "all": {
           const values = ctx
             ? this.collectFromHierarchy(ctx, tagExecutor.tag)
             : tagExecutor.tag.collect(this.tags)
-          result[key] = values.map((value) => this.projectTagValue(key, value, ctx))
+          result[key] = values.map((value) => this.projectTagValue(value, ctx))
           break
         }
       }
@@ -1117,11 +1098,7 @@ class ScopeImpl implements Lite.Scope {
     return Promise.all(parallel).then(() => result)
   }
 
-  private projectTagValue(depKey: string, value: unknown, ctx: Lite.ExecutionContext | undefined): unknown {
-    if (isServiceValue(value)) {
-      if (!ctx) throw new Error("Service value deps require an ExecutionContext")
-      return this.createServiceHandles(depKey, value, ctx)
-    }
+  private projectTagValue(value: unknown, ctx: Lite.ExecutionContext | undefined): unknown {
     if (!isFlow(value)) return value
     if (!ctx) throw new Error("Flow deps require an ExecutionContext")
     return this.createFlowHandle(value, ctx)
@@ -1186,72 +1163,6 @@ class ScopeImpl implements Lite.Scope {
     } as Lite.ExecFlowOptions<Output, Input>)
   }
 
-  private createTracedHandles<T>(
-    depKey: string,
-    value: T,
-    ctx: Lite.ExecutionContext
-  ): Lite.Traced<T> {
-    if (typeof value !== "object" || value === null) {
-      throw new Error("traced() deps must resolve to a record of functions")
-    }
-
-    const source = value as Record<PropertyKey, unknown>
-    const result: Record<PropertyKey, { exec(options?: { params?: unknown[]; tags?: Lite.Tagged<unknown>[] }): Promise<unknown> }> = {}
-    const keys = Reflect.ownKeys(source).filter((key) => Object.prototype.propertyIsEnumerable.call(source, key))
-    if (keys.length === 0) {
-      throw new Error("traced() deps must resolve to a record of functions")
-    }
-
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i]!
-      const member = source[key]
-      if (typeof member !== "function") {
-        throw new Error(`traced() deps must resolve to a record of functions: ${String(key)}`)
-      }
-      result[key] = {
-        exec: (options = {}) => ctx.exec({
-          name: `${depKey}.${String(key)}`,
-          params: options.params ?? [],
-          tags: options.tags,
-          fn: (_ctx, ...args: unknown[]) => member.apply(value, args),
-        }),
-      }
-    }
-
-    return result as Lite.Traced<T>
-  }
-
-  private createServiceHandles<T extends Lite.ServiceMethods>(
-    depKey: string,
-    value: Lite.ServiceValue<T>,
-    ctx: Lite.ExecutionContext
-  ): Lite.Serviced<T> {
-    const source = value as Record<PropertyKey, unknown>
-    const result: Record<PropertyKey, { exec(options?: { params?: unknown[]; tags?: Lite.Tagged<unknown>[] }): Promise<unknown> }> = {}
-    const keys = Reflect.ownKeys(source).filter((key) => Object.prototype.propertyIsEnumerable.call(source, key))
-    if (keys.length === 0) {
-      throw new Error("serviceValue() records must contain enumerable function members")
-    }
-
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i]!
-      const member = source[key]
-      if (typeof member !== "function") {
-        throw new Error(`serviceValue() records must contain enumerable function members: ${String(key)}`)
-      }
-      result[key] = {
-        exec: (options = {}) => ctx.exec({
-          name: `${depKey}.${String(key)}`,
-          params: options.params ?? [],
-          tags: options.tags,
-          fn: (childCtx, ...args: unknown[]) => member.apply(value, [childCtx, ...args]),
-        }),
-      }
-    }
-
-    return result as Lite.Serviced<T>
-  }
-
   private wireWatch(dep: Lite.AtomControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {
     const eq = dep.eq ?? shallowEqual
     let prev = ctrl.get() as unknown
@@ -1295,7 +1206,7 @@ class ScopeImpl implements Lite.Scope {
     for (let i = 0; i < graph.resources.length; i++) {
       const [key, resource] = graph.resources[i]!
       const value = await this.resolveResource(resource, ctx, resourcePath)
-      result[key] = isServiceValue(value) ? this.createServiceHandles(key, value, ctx) : value
+      result[key] = value
     }
 
     return result
