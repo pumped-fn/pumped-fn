@@ -2,7 +2,7 @@
 
 Vite HMR plugin for `@pumped-fn/lite` that preserves atom state across hot module reloads.
 
-**Dev only** · **Zero overhead in production** · **Vite plugin**
+**Dev only** · **Production transform returns `null`** · **Vite plugin**
 
 ## How It Works
 
@@ -86,7 +86,7 @@ pumpedHmr({
 
 ## Production
 
-The plugin is automatically disabled in production builds (`NODE_ENV=production`).
+When `NODE_ENV=production`, the plugin transform returns `null` and does not inject the HMR helper.
 
 ## License
 

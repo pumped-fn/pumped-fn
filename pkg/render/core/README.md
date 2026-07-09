@@ -1,5 +1,7 @@
 # @pumped-fn/lite-render-core
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 Platform-neutral strict spec/catalog render contract for `@pumped-fn/lite`.
 
 This is the **core** half of a core/react split (mirroring json-render): it owns the portable spec types, the

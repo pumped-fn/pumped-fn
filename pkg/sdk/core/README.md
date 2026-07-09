@@ -4,6 +4,8 @@ Generic runtime primitives on top of `@pumped-fn/lite`: durable workflow steps, 
 materials, event buffers, guards, sandboxes, CLI workers, and an eval harness. Agents and models
 are one primitive family built on the same seam, not the headline.
 
+> **Note:** Durability is delegated to the `WorkflowEventLog` backend you provide. The in-repo `MemoryWorkflowLog` is in-memory and for tests; bring a persistent backend for real durability.
+
 `@pumped-fn/sdk` is the counterpart to `@pumped-fn/pumped`: this package provides the primitives —
 `pumped` discovers, assembles, and runs them as an application.
 

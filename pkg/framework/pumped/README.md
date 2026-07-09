@@ -1,5 +1,7 @@
 # @pumped-fn/pumped
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 A scope compiler, not a runtime. `pumped` discovers flows on disk, assembles them into one
 `@pumped-fn/lite` scope, and drives that scope under a run mode — dev server, test, or production
 build. One graph, three projections:
