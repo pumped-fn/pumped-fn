@@ -118,13 +118,13 @@ Read the full guide: [OpenTelemetry spans without editing business functions](do
 
 ## TypeScript DI without decorators
 
-pumped-fn is not a decorator container. Imports define graph units, dependency records define edges, and a scope materializes one graph with substitutions. Role tags let the root choose an implementation while feature code depends on the role.
+Use this comparison when the issue is not "decorators or no decorators" but where the footguns go. It walks through hidden IO, async providers, the single `createScope({ presets, tags, extensions })` access point, and static deps versus dynamic tags.
 
 Read the comparison: [TypeScript DI without decorators](docs/vs-di-containers.md).
 
 ## pumped-fn vs Effect
 
-Use pumped-fn when adoption should stay close to normal `async` TypeScript. Flows return values or promises; streaming flows use async generators only when the result is a stream. Typed faults exist, with the documented limit that `isFault` narrows by `FlowFault` plus flow name.
+Use this comparison when you are choosing between a small scope seam and a full Effect program model. It walks through hidden effects and typed faults, async dependency ownership, the scope entry point, and static dependencies versus dynamic request facts. Effect is still the pick when you want its typed effect combinators, ecosystem, and fiber model.
 
 Read the comparison: [pumped-fn vs Effect](docs/vs-effect.md).
 
