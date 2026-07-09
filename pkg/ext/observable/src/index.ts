@@ -14,6 +14,7 @@ export namespace Observable {
 
   export interface Event {
     readonly id: string
+    readonly parentId?: string
     readonly phase: Phase
     readonly kind: Kind
     readonly name: string
@@ -90,7 +91,7 @@ function extension(options?: Observable.Options): Lite.Extension {
       const current = event.kind === "resource"
         ? contextRuntime(owners, event.ctx)
         : normalize(rootRuntime(event.scope))
-      return trace(current, event.kind, getResolveName(event), undefined, run)
+      return trace(current, event.kind, getResolveName(event), undefined, run, event.kind === "resource" ? event.ctx : undefined)
     },
     wrapExec: async (run, target, ctx) => {
       return trace(
@@ -98,7 +99,8 @@ function extension(options?: Observable.Options): Lite.Extension {
         getExecKind(target),
         getExecName(target, ctx),
         ctx.input,
-        run
+        run,
+        ctx
       )
     },
     async dispose(scope) {
@@ -178,19 +180,25 @@ export const observable = {
   memory,
 } as const
 
+const spanKey = Symbol("observable.spanId")
+
 async function trace<T>(
   current: ActiveRuntime,
   kind: Observable.Kind,
   name: string,
   input: unknown,
-  run: () => Promise<T>
+  run: () => Promise<T>,
+  ctx?: Lite.ExecutionContext
 ): Promise<T> {
   if (current.sinks.length === 0 || skipped(current, kind)) return run()
 
   const id = current.id()
+  const parentId = ctx?.data.seek(spanKey) as string | undefined
+  ctx?.data.set(spanKey, id)
   const startedAt = current.now()
   const start = withInput(current, {
     id,
+    parentId,
     phase: "start",
     kind,
     name,
@@ -204,6 +212,7 @@ async function trace<T>(
     const at = current.now()
     const success = withOutput(current, {
       id,
+      parentId,
       phase: "success",
       kind,
       name,
@@ -217,6 +226,7 @@ async function trace<T>(
     const at = current.now()
     emit(current, {
       id,
+      parentId,
       phase: "error",
       kind,
       name,
