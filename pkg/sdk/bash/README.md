@@ -1,5 +1,7 @@
 # @pumped-fn/sdk-just-bash
 
+> **Status: early.** Small surface, expect changes.
+
 `just-bash` sandbox provider for `@pumped-fn/sdk`.
 
 ```ts

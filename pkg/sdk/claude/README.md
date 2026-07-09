@@ -1,5 +1,7 @@
 # @pumped-fn/sdk-claude
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 Claude CLI model provider for `@pumped-fn/sdk`.
 
 ```ts

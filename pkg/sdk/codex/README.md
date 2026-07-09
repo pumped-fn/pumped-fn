@@ -1,5 +1,7 @@
 # @pumped-fn/sdk-codex
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 Codex CLI model provider for `@pumped-fn/sdk`.
 
 ```ts

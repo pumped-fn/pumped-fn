@@ -1,5 +1,7 @@
 # @pumped-fn/lite-render-react
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 React adapter for the `@pumped-fn/lite-render-core` render contract.
 
 This is the **react** half of a core/react split (mirroring json-render): core owns the portable spec, the
