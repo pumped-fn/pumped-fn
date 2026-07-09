@@ -434,12 +434,15 @@ It also exports:
 - `useResource`
 - `useScopedValue`
 
-Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
+Complete type reference: [`dist/index.d.mts`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/react/lite-react/dist/index.d.mts)
 
-Patterns and guardrails: [`PATTERNS.md`](./PATTERNS.md)
+Patterns and guardrails: [`PATTERNS.md`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/react/lite-react/PATTERNS.md)
 
-Core runtime: [`@pumped-fn/lite`](../../core/lite/README.md)
+Core runtime: [`@pumped-fn/lite`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/core/lite/README.md)
 
 ## License
 
 MIT
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

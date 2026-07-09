@@ -518,3 +518,9 @@ BFF practical examples:
 pnpm test
 pnpm typecheck
 ```
+
+## Next
+
+- [Lite README](./README.md)
+- [Mental model](../../../docs/mental-model.md)
+- [Invoice triage example](../../../examples/invoice-triage/README.md)

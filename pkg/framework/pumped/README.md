@@ -287,3 +287,6 @@ same flows the app serves.
 Deps are declared, never dynamically registered. A flow's `deps` and a resource's shape are static
 and readable without running anything. That's what keeps the graph compilable ahead of time instead
 of only inspectable at runtime.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

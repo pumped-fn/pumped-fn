@@ -148,37 +148,38 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 
 | Path | What it shows |
 | --- | --- |
-| `examples/invoice-triage` | Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges. |
+| [examples](examples/README.md) | Examples index. |
+| [examples/invoice-triage](examples/invoice-triage/README.md) | Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges. |
 
 ## Package inventory
 
 | Path | Package |
 | --- | --- |
-| `pkg/core/lite` | `@pumped-fn/lite` |
-| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` |
-| `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` |
-| `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` |
-| `pkg/ext/observable` | `@pumped-fn/lite-extension-observable` |
-| `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` |
-| `pkg/ext/scheduler` | `@pumped-fn/lite-extension-scheduler` |
-| `pkg/ext/scheduler-nats` | `@pumped-fn/lite-extension-scheduler-nats` |
-| `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` |
-| `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` |
-| `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` |
-| `pkg/framework/hono` | `@pumped-fn/lite-hono` |
-| `pkg/framework/pumped` | `@pumped-fn/pumped` |
-| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` |
-| `pkg/react/json` | `@pumped-fn/lite-react-json-render` |
-| `pkg/react/lite-react` | `@pumped-fn/lite-react` |
-| `pkg/render/core` | `@pumped-fn/lite-render-core` |
-| `pkg/render/react` | `@pumped-fn/lite-render-react` |
-| `pkg/sdk/bash` | `@pumped-fn/sdk-just-bash` |
-| `pkg/sdk/claude` | `@pumped-fn/sdk-claude` |
-| `pkg/sdk/codex` | `@pumped-fn/sdk-codex` |
-| `pkg/sdk/core` | `@pumped-fn/sdk` |
-| `pkg/sdk/test` | `@pumped-fn/sdk-test` |
-| `pkg/tool/codemod` | `@pumped-fn/codemod` |
-| `pkg/tool/lint` | `@pumped-fn/lite-lint` |
+| [pkg/core/lite](pkg/core/lite/README.md) | `@pumped-fn/lite` |
+| [pkg/ext/hmr](pkg/ext/hmr/README.md) | `@pumped-fn/lite-hmr` |
+| [pkg/ext/logging](pkg/ext/logging/README.md) | `@pumped-fn/lite-extension-logging` |
+| [pkg/ext/logging-pino](pkg/ext/logging-pino/README.md) | `@pumped-fn/lite-extension-logging-pino` |
+| [pkg/ext/observable](pkg/ext/observable/README.md) | `@pumped-fn/lite-extension-observable` |
+| [pkg/ext/observable-otel](pkg/ext/observable-otel/README.md) | `@pumped-fn/lite-extension-observable-otel` |
+| [pkg/ext/scheduler](pkg/ext/scheduler/README.md) | `@pumped-fn/lite-extension-scheduler` |
+| [pkg/ext/scheduler-nats](pkg/ext/scheduler-nats/README.md) | `@pumped-fn/lite-extension-scheduler-nats` |
+| [pkg/ext/suspense](pkg/ext/suspense/README.md) | `@pumped-fn/lite-extension-suspense` |
+| [pkg/ext/sync](pkg/ext/sync/README.md) | `@pumped-fn/lite-extension-sync` |
+| [pkg/ext/sync-nats](pkg/ext/sync-nats/README.md) | `@pumped-fn/lite-extension-sync-nats` |
+| [pkg/framework/hono](pkg/framework/hono/README.md) | `@pumped-fn/lite-hono` |
+| [pkg/framework/pumped](pkg/framework/pumped/README.md) | `@pumped-fn/pumped` |
+| [pkg/framework/tanstack-start](pkg/framework/tanstack-start/README.md) | `@pumped-fn/lite-tanstack-start` |
+| [pkg/react/json](pkg/react/json/README.md) | `@pumped-fn/lite-react-json-render` |
+| [pkg/react/lite-react](pkg/react/lite-react/README.md) | `@pumped-fn/lite-react` |
+| [pkg/render/core](pkg/render/core/README.md) | `@pumped-fn/lite-render-core` |
+| [pkg/render/react](pkg/render/react/README.md) | `@pumped-fn/lite-render-react` |
+| [pkg/sdk/bash](pkg/sdk/bash/README.md) | `@pumped-fn/sdk-just-bash` |
+| [pkg/sdk/claude](pkg/sdk/claude/README.md) | `@pumped-fn/sdk-claude` |
+| [pkg/sdk/codex](pkg/sdk/codex/README.md) | `@pumped-fn/sdk-codex` |
+| [pkg/sdk/core](pkg/sdk/core/README.md) | `@pumped-fn/sdk` |
+| [pkg/sdk/test](pkg/sdk/test/README.md) | `@pumped-fn/sdk-test` |
+| [pkg/tool/codemod](pkg/tool/codemod/README.md) | `@pumped-fn/codemod` |
+| [pkg/tool/lint](pkg/tool/lint/README.md) | `@pumped-fn/lite-lint` |
 
 ## Documentation
 

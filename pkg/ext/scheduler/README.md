@@ -89,3 +89,6 @@ registration.next() // next scheduled Date, or undefined
 await registration.trigger() // run one tick immediately, awaiting it
 await scope.dispose() // stops the registration
 ```
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

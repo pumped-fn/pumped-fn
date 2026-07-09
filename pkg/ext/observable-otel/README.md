@@ -38,3 +38,6 @@ observable.runtime -> otel.sink -> OpenTelemetry SDK -> OTLP exporter -> Collect
 Use the same `otel.sink()` in application code, then configure the OpenTelemetry SDK or Collector
 for the backend endpoint. Grafana Tempo, VictoriaTraces, and Jaeger are compatible examples when
 their OTLP receiver or Collector export path is enabled.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

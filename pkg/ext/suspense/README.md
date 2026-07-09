@@ -30,3 +30,6 @@ await ctx.exec({ flow: waitForCommit })
 ```
 
 Marked steps get key `(taskId, runId, step)`. Completed steps replay from the log. Suspended steps write pending entries and throw `SuspendSignal` until a resolver stores a value.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

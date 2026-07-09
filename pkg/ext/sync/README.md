@@ -26,3 +26,6 @@ const right = createScope({
 
 `sync(...)` returns an atom-like value. Plain JSON-safe state is inferred. Non-JSON state must use a
 codec, and every inbound value is decoded before it can be applied.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

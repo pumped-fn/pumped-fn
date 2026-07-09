@@ -56,3 +56,6 @@ import or ship those backends. Use
 `@pumped-fn/lite-extension-observable-otel` when the runtime sink should map events to
 OpenTelemetry spans. The OTEL adapter stays backend-generic: Grafana, Victoria, and Jaeger
 compatibility comes from standard OTLP configuration.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).
