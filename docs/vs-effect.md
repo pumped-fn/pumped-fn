@@ -1,12 +1,6 @@
 # Should I use pumped-fn instead of Effect for DI and typed errors?
 
-Reader question: "Can I get a typed DI/test seam and typed errors without adopting an Effect runtime?"
-
-Pillar proven: readability without giving up the test and trace seam.
-
-Entry arena: first-party comparison, `pumped-fn vs Effect`.
-
-Use pumped-fn when the unit of adoption should stay a plain TypeScript function behind a scope. Scalar flows return `MaybePromise<Output>`; streaming flows use async generators only when the result is a stream.
+Use pumped-fn when the unit of adoption should stay a plain TypeScript function behind a scope.
 
 ```ts
 import { createScope, flow, isFault, typed } from "@pumped-fn/lite"
@@ -34,23 +28,28 @@ await ctx.close()
 await scope.dispose()
 ```
 
+The flow returns through normal `await`, and typed faults move through `ctx.fail`. Scalar flows return `MaybePromise<Output>`; streaming flows use async generators only when the result is a stream.
+
+> **Note:** `isFault` narrows by `FlowFault` plus flow name. It does not check exact flow-instance identity.
+
 ## Decision Table
 
 | Pick | Cost | When to Pick |
 | --- | --- | --- |
 | pumped-fn | Learn scopes, lifetimes, and dependency kinds | You want graph seams, presets, tags, and extension hooks while product code remains ordinary `async` TypeScript. |
-| Effect | Needs external citation before this page claims details | Pick it when you want Effect's own typed effect combinators, ecosystem, and fiber concurrency model. Do not make repo-uncited claims about Effect here. |
+| Effect | Adopt the Effect runtime and combinator style throughout your codebase | Pick it when you want Effect's own typed effect combinators, ecosystem, and fiber concurrency model. |
 
-## Claim -> Citation
+The scope seam is still there when you use typed faults: `ctx.exec({ flow, input })` runs the same flow object through the execution context.
 
-Flow factories are normal functions returning `MaybePromise<Output>` or async generators: `[pkg/core/lite/src/flow.ts:146-212](../pkg/core/lite/src/flow.ts#L146-L212)`, `[pkg/core/lite/src/types.ts:586-594](../pkg/core/lite/src/types.ts#L586-L594)`.
 
-`typed<T>()` is a type marker for flow input and faults: `[pkg/core/lite/src/flow.ts:4-20](../pkg/core/lite/src/flow.ts#L4-L20)`, `[pkg/core/lite/src/flow.ts:260-284](../pkg/core/lite/src/flow.ts#L260-L284)`.
+## Source
 
-`ctx.fail` throws a `FlowFault` carrying a fault payload: `[pkg/core/lite/src/types.ts:25-35](../pkg/core/lite/src/types.ts#L25-L35)`, `[pkg/core/lite/src/types.ts:233-254](../pkg/core/lite/src/types.ts#L233-L254)`, `[pkg/core/lite/tests/flow-fault.test.ts:8-21](../pkg/core/lite/tests/flow-fault.test.ts#L8-L21)`.
+- [Flow implementation](../pkg/core/lite/src/flow.ts)
+- [Flow and context types](../pkg/core/lite/src/types.ts)
+- [Flow fault tests](../pkg/core/lite/tests/flow-fault.test.ts)
+- [Scope execution](../pkg/core/lite/src/scope.ts)
 
-`isFault` narrows by `FlowFault` plus flow name. It does not prove exact flow-instance identity: `[pkg/core/lite/src/flow.ts:260-290](../pkg/core/lite/src/flow.ts#L260-L290)`.
+## Next
 
-The scope seam is still available with typed faults because `ctx.exec({ flow, input })` runs the same flow object through the execution context: `[pkg/core/lite/src/types.ts:233-245](../pkg/core/lite/src/types.ts#L233-L245)`, `[pkg/core/lite/src/scope.ts:2084-2131](../pkg/core/lite/src/scope.ts#L2084-L2131)`.
-
-No performance or bundle-size claim belongs on this page.
+- [TypeScript DI without decorators](vs-di-containers.md)
+- [Mental model](mental-model.md)
