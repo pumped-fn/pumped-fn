@@ -1,11 +1,5 @@
 # Can I adopt pumped-fn one route at a time in my existing server?
 
-Reader question: "Can I keep my server and move one route at a time?"
-
-Pillar proven: readability during adoption.
-
-Entry arena: incremental backend adoption, DI hub support.
-
 Pattern shown with a plain handler and Hono; Express/Nest examples pending.
 
 Start at one composition boundary. Keep the existing server. Create or reuse a scope in the route module, create one execution context for the request, pass request facts as tags, and execute one flow.
@@ -149,22 +143,22 @@ export async function testRoute(id: string): Promise<{ id: string } | undefined>
 
 Then repeat with the next leaf dependency. The route boundary does not have to move again; each leaf moves when a graph consumer needs it.
 
-## Claim -> Citation
+## Proven in the source
 
-Framework packages do not own application scope construction; adapters install through `createScope({ extensions })` and pass execution contexts through framework-native surfaces: `[pkg/framework/README.md:3-11](../pkg/framework/README.md#L3-L11)`.
+- Framework packages do not own application scope construction; adapters install through `createScope({ extensions })` and pass execution contexts through framework-native surfaces: [pkg/framework/README.md:3-11](../pkg/framework/README.md#L3-L11).
 
-The Hono adapter stores the scope during extension init, creates a request execution context in middleware, writes it to `context.var`, and closes it after request handling: `[pkg/framework/hono/src/index.ts:41-76](../pkg/framework/hono/src/index.ts#L41-L76)`.
+- The Hono adapter stores the scope during extension init, creates a request execution context in middleware, writes it to `context.var`, and closes it after request handling: [pkg/framework/hono/src/index.ts:41-76](../pkg/framework/hono/src/index.ts#L41-L76).
 
-The Hono test creates one execution context per request and injects `requestId` from headers through tags: `[pkg/framework/hono/tests/hono.test.ts:22-80](../pkg/framework/hono/tests/hono.test.ts#L22-L80)`.
+- The Hono test creates one execution context per request and injects `requestId` from headers through tags: [pkg/framework/hono/tests/hono.test.ts:22-80](../pkg/framework/hono/tests/hono.test.ts#L22-L80).
 
-Framework rules reject shared scope factories, global registries, framework-shaped copies of Lite primitives, public helpers accepting `scope`, and hidden framework request reads inside units: `[pkg/framework/README.md:18-27](../pkg/framework/README.md#L18-L27)`.
+- Framework rules reject shared scope factories, global registries, framework-shaped copies of Lite primitives, public helpers accepting `scope`, and hidden framework request reads inside units: [pkg/framework/README.md:18-27](../pkg/framework/README.md#L18-L27).
 
-Composition roots should create scopes, root contexts, route/job mounts, and disposal; feature units should stay graph nodes or pure helpers called by graph nodes: `[pkg/core/lite/README.md:38-48](../pkg/core/lite/README.md#L38-L48)`, `[README.md:129-133](../README.md#L129-L133)`.
+- Composition roots should create scopes, root contexts, route/job mounts, and disposal; feature units should stay declared in the graph or stay pure helpers called by declared graph units: [pkg/core/lite/README.md:38-48](../pkg/core/lite/README.md#L38-L48), [README.md:129-133](../README.md#L129-L133).
 
-The incremental leaf-dependency snippet uses the repo-exported `atom`, `flow`, `typed`, `preset`, and `createScope` APIs: `[pkg/core/lite/src/index.ts:17-21](../pkg/core/lite/src/index.ts#L17-L21)`, `[pkg/core/lite/src/atom.ts:29-44](../pkg/core/lite/src/atom.ts#L29-L44)`, `[pkg/core/lite/src/flow.ts:18-20](../pkg/core/lite/src/flow.ts#L18-L20)`, `[pkg/core/lite/src/flow.ts:200-212](../pkg/core/lite/src/flow.ts#L200-L212)`, `[pkg/core/lite/src/preset.ts:25-28](../pkg/core/lite/src/preset.ts#L25-L28)`, `[pkg/core/lite/src/scope.ts:2452-2478](../pkg/core/lite/src/scope.ts#L2452-L2478)`.
+- The incremental leaf-dependency snippet uses the repo-exported `atom`, `flow`, `typed`, `preset`, and `createScope` APIs: [pkg/core/lite/src/index.ts:17-21](../pkg/core/lite/src/index.ts#L17-L21), [pkg/core/lite/src/atom.ts:29-44](../pkg/core/lite/src/atom.ts#L29-L44), [pkg/core/lite/src/flow.ts:18-20](../pkg/core/lite/src/flow.ts#L18-L20), [pkg/core/lite/src/flow.ts:200-212](../pkg/core/lite/src/flow.ts#L200-L212), [pkg/core/lite/src/preset.ts:25-28](../pkg/core/lite/src/preset.ts#L25-L28), [pkg/core/lite/src/scope.ts:2452-2478](../pkg/core/lite/src/scope.ts#L2452-L2478).
 
-Scope presets are stored on scope construction and atom preset values are returned during atom resolution: `[pkg/core/lite/src/scope.ts:441-449](../pkg/core/lite/src/scope.ts#L441-L449)`, `[pkg/core/lite/src/scope.ts:819-853](../pkg/core/lite/src/scope.ts#L819-L853)`.
+- Scope presets are stored on scope construction and atom preset values are returned during atom resolution: [pkg/core/lite/src/scope.ts:441-449](../pkg/core/lite/src/scope.ts#L441-L449), [pkg/core/lite/src/scope.ts:819-853](../pkg/core/lite/src/scope.ts#L819-L853).
 
-Execution contexts are created from scopes and execute flows through `ctx.exec({ flow, input })`: `[pkg/core/lite/src/scope.ts:1814-1842](../pkg/core/lite/src/scope.ts#L1814-L1842)`, `[pkg/core/lite/src/types.ts:233-245](../pkg/core/lite/src/types.ts#L233-L245)`, `[pkg/core/lite/src/scope.ts:2084-2101](../pkg/core/lite/src/scope.ts#L2084-L2101)`.
+- Execution contexts are created from scopes and execute flows through `ctx.exec({ flow, input })`: [pkg/core/lite/src/scope.ts:1814-1842](../pkg/core/lite/src/scope.ts#L1814-L1842), [pkg/core/lite/src/types.ts:233-245](../pkg/core/lite/src/types.ts#L233-L245), [pkg/core/lite/src/scope.ts:2084-2101](../pkg/core/lite/src/scope.ts#L2084-L2101).
 
-External Express and Nest examples need framework-specific citations before publication. Pattern shown with a plain handler and Hono; Express/Nest examples pending.
+Express and Nest examples are not yet covered here. This page covers a plain handler and Hono.

@@ -116,7 +116,7 @@ Read the full guide: [OpenTelemetry spans without editing business functions](do
 
 ## TypeScript DI without decorators
 
-pumped-fn is not a decorator container. Imports define graph nodes, dependency records define edges, and a scope materializes one graph with substitutions. Role tags let the root choose an implementation while feature code depends on the role.
+pumped-fn is not a decorator container. Imports define graph units, dependency records define edges, and a scope materializes one graph with substitutions. Role tags let the root choose an implementation while feature code depends on the role.
 
 Read the comparison: [TypeScript DI without decorators](docs/vs-di-containers.md).
 
