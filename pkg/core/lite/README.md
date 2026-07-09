@@ -149,11 +149,6 @@ for the default implementation, `scope.createContext({ tags })` to rebind for a 
 call, receiver preserved by ordinary method-call syntax, and it works on class-instance SDKs. `fn`-exec is
 the one primitive; a flow is the other, for capabilities that are graph nodes.
 
-> `traced()` and `serviceValue()` are **deprecated**. Both are only loops that emit `ctx.exec({ fn })` per
-> record member, and they duplicate each other (foreign vs first-party). Use `ctx.exec({ fn })` for a call
-> and a flow for a graph capability; a record closed over a runtime value is expressed as flows over that
-> value's atom/tag. Removal is planned for the next major.
-
 ```ts
 const auditUserLoad = flow({
   parse: typed<{ id: string }>(),

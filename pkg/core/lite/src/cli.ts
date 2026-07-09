@@ -123,17 +123,7 @@ preset(target, value)
   value can be: a literal, another atom/flow/resource (redirect), or a function (flows and resources).
 
   import { preset } from "@pumped-fn/lite"
-  const mockDb = preset(db, fakeDatabaseInstance)
-
-service({ factory, deps? })
-  Convenience wrapper for atom whose value is an object of methods.
-  Each method MUST have (ctx: ExecutionContext, ...args) as signature.
-  Called via ctx.exec({ fn: svc.method, params: [args] }) for lifecycle/tracing.
-
-traced(atom) → TracedDep
-  Wrap a transport capability-record atom so each enumerable function member arrives as depKey.method.exec({ params, tags }).
-  Traced deps are flow/execution deps; resources would capture the owning boundary's context and misattribute calls, so they are rejected.
-  The exec edge name comes from the deps key plus member key, and non-record, empty-record, or non-function members reject.`,
+  const mockDb = preset(db, fakeDatabaseInstance)`,
   },
 
   scope: {
@@ -385,15 +375,6 @@ Cleanup:
     throw error
   }
 
-Service pattern:
-  const userService = service({
-    deps: { db },
-    factory: (ctx, { db }) => ({
-      getUser: (ctx, id) => db.findUser(id),
-      updateUser: (ctx, id, data) => db.updateUser(id, data),
-    }),
-  })
-
 Typed flow input:
   const getUser = flow({
     parse: typed<{ id: string }>(),
@@ -546,8 +527,6 @@ Type guards:
   isTagged(v)           → v is Tagged
   isPreset(v)           → v is Preset
   isControllerDep(v)    → v is ControllerDep
-  isTracedDep(v)        → v is TracedDep
-  isServiceValue(v)     → v is ServiceValue
   isTagExecutor(v)      → v is TagExecutor
 
 Convenience types:
@@ -558,8 +537,8 @@ Convenience types:
 
 Symbols (advanced, for library authors):
   atomSymbol, flowSymbol, resourceSymbol, tagSymbol, taggedSymbol,
-  presetSymbol, controllerSymbol, controllerDepSymbol, tracedDepSymbol,
-  serviceValueSymbol, tagExecutorSymbol, typedSymbol`,
+  presetSymbol, controllerSymbol, controllerDepSymbol,
+  tagExecutorSymbol, typedSymbol`,
   },
 }
 

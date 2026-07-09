@@ -239,34 +239,3 @@ export function isControllerDep(value: unknown): value is Lite.ControllerDep<unk
 export function isFlowControllerDep(value: unknown): value is Lite.FlowControllerDep<unknown, unknown, never> {
   return isControllerDep(value) && "flow" in value
 }
-
-/** Creates an atom with methods constrained to (ctx: ExecutionContext, ...args) => result. */
-export function service<T extends Lite.ServiceMethods>(config: {
-  deps?: undefined
-  factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Atom<T>
-
-export function service<
-  T extends Lite.ServiceMethods,
-  const D extends Record<string, Lite.Atom<unknown> | Lite.ControllerDep<unknown> | Lite.TagExecutor<any>>,
->(config: {
-  deps: D
-  factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
-}): Lite.Atom<T>
-
-export function service(config: any): Lite.Atom<any> {
-  const atomInstance: Lite.Atom<any> = {
-    [atomSymbol]: true,
-    factory: config.factory,
-    deps: config.deps,
-    tags: config.tags,
-  }
-
-  if (config.tags?.length) {
-    registerAtomToTags(atomInstance, config.tags)
-  }
-
-  return atomInstance
-}

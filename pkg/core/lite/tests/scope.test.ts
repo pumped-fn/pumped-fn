@@ -18,7 +18,6 @@ import {
   resource,
   setControllerReadHook,
   shallowEqual,
-  service,
   tag,
   tags,
   typed,
@@ -3217,12 +3216,12 @@ describe("Triage regression tests", () => {
     await scope.dispose()
   })
 
-  it("Fix 6: service with tags — tag.atoms() returns the service atom", () => {
+  it("Fix 6: atom with tags — tag.atoms() returns the atom", () => {
     const myTag = tag<string>({ label: "svc-tag" })
-    const svcAtom = service({
+    const svcAtom = atom({
       tags: [myTag("svc-value")],
       factory: () => ({
-        greet: async (_ctx: Lite.ExecutionContext, name: string) => `hello ${name}`,
+        greet: async (name: string) => `hello ${name}`,
       }),
     })
 
@@ -3866,10 +3865,10 @@ describe("public helper coverage", () => {
     }
   })
 
-  it("covers service without tags and extension-driven scope execution branches", async () => {
-    const plainService = service({
+  it("covers atom without tags and extension-driven scope execution branches", async () => {
+    const plainService = atom({
       factory: () => ({
-        greet: async (_ctx: Lite.ExecutionContext, name: string) => `hi ${name}`,
+        greet: async (name: string) => `hi ${name}`,
       }),
     })
     expect(isAtom(plainService)).toBe(true)
