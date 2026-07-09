@@ -1,354 +1,196 @@
-# pumped-fn
+# Test without mocking modules
 
 [![npm version](https://img.shields.io/npm/v/@pumped-fn/lite)](https://www.npmjs.com/package/@pumped-fn/lite)
+[![npm downloads](https://img.shields.io/npm/dm/@pumped-fn/lite)](https://www.npmjs.com/package/@pumped-fn/lite)
+[![license](https://img.shields.io/npm/l/@pumped-fn/lite)](LICENSE)
+[![minzip](https://img.shields.io/bundlephobia/minzip/@pumped-fn/lite)](https://bundlephobia.com/package/@pumped-fn/lite)
 
-`pumped-fn` is a TypeScript package family for building application systems around explicit boundaries.
-It gives you a small core runtime for dependency graphs, execution-scoped work, lifecycle cleanup,
-reactive state, and test seams, plus React bindings and structural guardrails for larger codebases.
-
-The main idea is simple: put the system behind a scope. Product code declares atoms, flows, resources,
-tags, and extensions. Composition roots create scopes. Tests create scopes with different presets. UI
-components observe the graph instead of owning business logic.
-
-## Install
-
-```bash
-npm install @pumped-fn/lite
-npm install @pumped-fn/lite-react
-```
-
-Use only `@pumped-fn/lite` for backend, workers, command-line tools, and framework-neutral graph logic.
-Add `@pumped-fn/lite-react` when React should observe that graph.
-
-## Why This Exists
-
-Most application code has the same hidden problems in different forms:
-
-- Import-time singletons connect early and close late.
-- Request state leaks through globals or parameter drilling.
-- Frontend components grow validation, async work, derived state, and IO.
-- Tests patch modules or browser globals because there is no honest seam.
-- Cross-cutting behavior like tracing, auth, logging, and transactions is repeated by hand.
-
-`pumped-fn` makes those concerns explicit without turning the app into a framework. A scope owns the graph.
-An execution context owns one request, job, action, or UI boundary. Presets change the radius of a test.
-Extensions wrap execution. React is an observer layer.
-
-## Package Map
-
-Current source packages live under one-word lanes in `pkg/`.
-
-| Lane | Package | Role |
-| --- | --- | --- |
-| `pkg/core/lite` | `@pumped-fn/lite` | Core runtime: scopes, atoms, flows, resources, tags, presets, controllers, extensions |
-| `pkg/react/lite-react` | `@pumped-fn/lite-react` | React integration: providers, Suspense/ErrorBoundary-aware observers, scoped frontend state |
-| `pkg/react/json` | `@pumped-fn/lite-react-json-render` | json-render state and action adapters for Lite React scoped values and flows |
-| `pkg/framework/pumped` | `@pumped-fn/pumped` | Convention-driven scope compiler: discovers flows on disk, assembles a scope, and drives it as a CLI or HTTP server |
-| `pkg/framework/hono` | `@pumped-fn/lite-hono` | Hono middleware and request helpers for per-request Lite execution contexts |
-| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | TanStack Start request/function middleware and server-function flow helpers |
-| `pkg/render/core` | `@pumped-fn/lite-render-core` | Platform-neutral strict spec and catalog render contract |
-| `pkg/render/react` | `@pumped-fn/lite-render-react` | React renderer for verified render specs over Lite scopes |
-| `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | Replay and external-resolution extension support |
-| `pkg/ext/observable` | `@pumped-fn/lite-extension-observable` | Structured lifecycle events with tag-injected sinks |
-| `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` | OpenTelemetry sink adapter for observable events |
-| `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` | Execution-scoped logger resource and flow logs with tag-injected sinks |
-| `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | Pino sink adapter for logging records |
-| `pkg/ext/scheduler` | `@pumped-fn/lite-extension-scheduler` | Recurring schedule() atom against a pluggable SchedulerBackend, with an in-process croner-based default |
-| `pkg/ext/scheduler-nats` | `@pumped-fn/lite-extension-scheduler-nats` | NATS JetStream KV distributed backend for the scheduler: exactly-once locking while the holder completes within `lockTtlMs` (at-least-once across a lease expiry), catch-up, and run history |
-| `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | Strict replicated state primitive with tag-injected transports |
-| `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | NATS JetStream KV transport adapter for sync |
-| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` | HMR helpers for preserving atom state during development |
-| `pkg/sdk/core` | `@pumped-fn/sdk` | Generic runtime primitives over lite: durable workflow steps, sessions, materials, events, guards, sandboxes, CLI workers, eval harness, and agents/models as one primitive family |
-| `pkg/sdk/codex` | `@pumped-fn/sdk-codex` | Lazy Codex CLI model provider tag for sdk |
-| `pkg/sdk/claude` | `@pumped-fn/sdk-claude` | Lazy Claude CLI model provider tag for sdk |
-| `pkg/sdk/bash` | `@pumped-fn/sdk-just-bash` | Lazy just-bash sandbox provider tag for sdk |
-| `pkg/sdk/test` | `@pumped-fn/sdk-test` | In-memory agent workflow logs, fake routing, and test helpers |
-| `pkg/tool/lint` | `@pumped-fn/lite-lint` | Static scanner for the documented lite and lite-react anti-patterns |
-| `pkg/tool/codemod` | `@pumped-fn/codemod` | Migration helpers for older pumped-fn code |
-
-## Mental Model
+pumped-fn puts your app behind the scope: fully testable, fully traceable, without compromising readability.
 
 ```text
-composition root
-  createScope({ presets, tags, extensions })
-        |
-        v
-scope
-  long-lived graph boundary
-  atoms: cached capabilities, state, derived data, infrastructure
-  controllers/select: opt-in reactivity
-  changes/resolveStream/drain: async-iterator consumption of graph state and iterable atoms
-        |
-        v
-execution context
-  request, job, action, route, or UI boundary
-  flows: input/output work; generator flows stream yields via execStream
-  resources: transactions, request loggers, form drafts, spans
-  tags: tenant, locale, trace id, runtime config
-        |
-        v
-sdk primitives (@pumped-fn/sdk)
-  durable workflow steps, sessions, materials, guards, sandboxes, CLI workers, eval harness
-  agents and models are one primitive family: providers as tags, tools/subagents as ctx.exec flow steps
-  events as a boundary resource
+createScope({ presets, tags, extensions })
+  -> scope-owned graph
+  -> execution context per request, job, action, or test
+  -> flows, resources, tags, and wrapped execution edges
 ```
 
-The same seam works for backend and frontend:
-
-- Backend handlers create or receive an execution context and run flows.
-- Workers create scopes for process lifetime and contexts per job.
-- React roots render `ScopeProvider` and `ExecutionContextProvider`.
-- Edge renderers such as json-render can bind to Lite-owned scoped values and emit actions into Lite flows.
-- Tests use `createScope({ presets, tags, extensions })` and public APIs.
-
-## Core Primitives
-
-| Primitive | Owns | Use it for |
-| --- | --- | --- |
-| `createScope` | The composition and test boundary | App roots, server mounts, worker processes, isolated tests |
-| `atom` | Scope-owned values | Transports, capabilities, state, derived data, caches |
-| `flow` | Short-lived execution | Commands, request handlers, actions with typed input |
-| `resource` | Execution-context-owned values | Transactions, request loggers, spans, per-action buffers, form drafts |
-| `tag` | Typed ambient values and role selection | Tenant, request id, locale, runtime config, equality-aware boundary identity; a tag carrying a flow projects to a handle in deps, so roots choose the implementation |
-| `preset` | Replacement at the seam | Unit radius tests, outside-in adapter tests, tenant-specific implementation swaps |
-| `extension` | Cross-cutting wrappers | Logging, tracing, auth, metrics, transactions |
-| `controller` / `select` | Opt-in reactivity | UI state, live config, derived subscriptions, invalidation |
-| `changes` / `resolveStream` / `drain` | Async-iterator consumption | `for await` over atom changes, fan-out over async-iterable atoms, bounded collection |
-| generator `flow` / `execStream` | Streaming execution | Flows that yield progress or elements and return a final output; break cancels with cleanup |
-
-## Extension Runtime Options
-
-Extensions are static composition. Runtime backend choices are tags.
-
-Install cross-cutting behavior once at the composition root, then inject sinks and policy through
-tags at the scope, request context, or individual flow execution boundary.
+Production code declares graph edges. Tests replace those edges at `createScope`, then execute the same public flow the app uses.
 
 ```ts
-import { createScope } from "@pumped-fn/lite"
-import { logging } from "@pumped-fn/lite-extension-logging"
-import { observable } from "@pumped-fn/lite-extension-observable"
+import { atom, createScope, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
 
-const events = observable.memory()
-const records = logging.memory()
+interface Db {
+  save(id: string, at: Date): Promise<{ id: string; at: Date }>
+}
 
-const scope = createScope({
-  extensions: [observable.extension(), logging.extension()],
-  tags: [
-    observable.runtime({ sinks: [events], only: ["flow", "resource"] }),
-    logging.runtime({ sinks: [records], level: "info", flow: "errors" }),
-  ],
-})
+interface Clock {
+  now(): Date
+}
 
-const request = scope.createContext({
-  tags: [logging.runtime({ sinks: [records], fields: { requestId: "req-1" } })],
-})
+const clock = tag<Clock>({ label: "clock" })
 
-const logger = await request.resolve(logging.logger)
-logger.info("request.accepted")
-```
-
-This split keeps the package set small: backend integrations can live outside the core extension
-packages and pass a sink through a tag. Tests use the same seam by injecting memory sinks.
-OpenTelemetry and OTLP collectors are integration targets for those sinks, not dependencies of the
-core extension packages.
-Optional backend packages such as `@pumped-fn/lite-extension-observable-otel` and
-`@pumped-fn/lite-extension-logging-pino` prove the adapter shape without changing base package size.
-The OTEL adapter is standard OTLP-oriented; the same sink can feed Grafana, Victoria, and Jaeger
-setups when the application or Collector is configured for their OTLP endpoints.
-
-## Architectural Shape
-
-`pumped-fn` code usually falls into four layers:
-
-| Layer | Responsibility | Rule of thumb |
-| --- | --- | --- |
-| Transport atom | Wrap raw ambient IO such as fetch, storage, timers, clock, random, process APIs | Its own unit test may fake the platform below the seam |
-| Capability atom | Expose domain/application operations over transports | No raw IO, no token/session plumbing in feature nodes |
-| Feature atom or flow | Own application state, decisions, derived data, and use-case execution | Depends on capabilities and resources |
-| Composition root | Create scopes, root contexts, providers, route/job mounts, and disposal | Thin, tested adapter; no service-locator helper that accepts `scope` |
-
-That shape lets you test inside-out or outside-in without changing product code. Inside-out tests preset a
-unit's direct dependencies. Outside-in tests preset only edge adapters. Needing module mocks, product
-branches for test mode, or global patches above a raw transport wrapper is a design smell.
-
-## Backend, BFF, Worker
-
-Use `@pumped-fn/lite` directly when there is no UI.
-
-```ts
-import { atom, createScope, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
-
-const tenantId = tag<string>({ label: "tenant.id" })
-
-const http = atom({
-  factory: () => ({
-    get: async (path: string) => ({ path, ok: true }),
+const db = atom({
+  factory: (): Db => ({
+    save: async (id, at) => ({ id, at }),
   }),
 })
 
-const audit = resource({
-  name: "audit",
-  ownership: "boundary",
-  factory: (ctx) => {
-    const events: string[] = []
-    ctx.cleanup(() => {
-      events.length = 0
-    })
-    return {
-      record(event: string) {
-        events.push(event)
-      },
-      snapshot: () => [...events],
-    }
-  },
+export const saveInvoice = flow({
+  parse: typed<{ id: string }>(),
+  deps: { db, clock: tags.required(clock) },
+  factory: (ctx, { db, clock }) => db.save(ctx.input.id, clock.now()),
 })
 
-const loadDashboard = flow({
-  parse: typed<{ userId: string }>(),
-  deps: { http, audit, tenantId: tags.required(tenantId) },
-  factory: async (ctx, deps) => {
-    deps.audit.record(`dashboard:${ctx.input.userId}`)
-    return deps.http.get(`/tenants/${deps.tenantId}/users/${ctx.input.userId}/dashboard`)
-  },
+const scope = createScope({
+  tags: [clock({ now: () => new Date() })],
 })
 
-const scope = createScope({ tags: [tenantId("acme")] })
 const ctx = scope.createContext()
-const dashboard = await ctx.exec({ flow: loadDashboard, input: { userId: "u1" } })
+await ctx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
+await ctx.close()
+await scope.dispose()
+
+const calls: string[] = []
+const fake: Db = {
+  async save(id, at) {
+    calls.push(`${id}:${at.toISOString()}`)
+    return { id, at }
+  },
+}
+
+const testScope = createScope({
+  presets: [preset(db, fake)],
+  tags: [clock({ now: () => new Date("2026-07-05T12:00:00.000Z") })],
+})
+
+const testCtx = testScope.createContext()
+const result = await testCtx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
+
+if (result.id !== "inv-1" || calls.length !== 1) throw new Error("unexpected save")
+
+await testCtx.close()
+await testScope.dispose()
+```
+
+## Quickstart
+
+```bash
+pnpm add @pumped-fn/lite
+npm install @pumped-fn/lite
+```
+
+```ts
+import { createScope, flow, typed } from "@pumped-fn/lite"
+
+const greet = flow({
+  parse: typed<{ name: string }>(),
+  factory: (ctx) => `hello ${ctx.input.name}`,
+})
+
+const scope = createScope()
+const ctx = scope.createContext()
+
+console.log(await ctx.exec({ flow: greet, input: { name: "Ada" } }))
+
 await ctx.close()
 await scope.dispose()
 ```
 
-The same structure works for HTTP handlers, BFF endpoints, scheduled jobs, command handlers, and CLIs.
-Adapters translate the outside world into flow input and tags; the graph owns application behavior.
+The core package has zero runtime dependencies and ~12 kB min+gzip.
 
-## React
+## Mental model
 
-React components should observe and dispatch. They should not create dependencies, mirror graph state, or
-own execution lifecycles.
+A `scope` is the composition and test boundary. `atom` values live in the scope. `flow` executions live in an execution context. `resource` values are owned by that context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution. Streaming flows use `execStream`.
 
-```tsx
-import { atom, createScope, flow } from "@pumped-fn/lite"
-import { ExecutionContextProvider, ScopeProvider, useAtom, useFlow } from "@pumped-fn/lite-react"
+## Request context without AsyncLocalStorage
 
-const dashboardState = atom({
-  factory: () => ({ title: "Dashboard" }),
-})
+Use tags and execution contexts instead of ambient request storage. Middleware creates one context for the request, seeds request facts as tags, runs flows, then closes the context. Product code declares `tags.required(requestId)` and fails during dependency resolution if the boundary forgot it.
 
-const refreshDashboard = flow({
-  factory: () => undefined,
-})
+Read the full guide: [Request context without AsyncLocalStorage](docs/request-context-without-als.md).
 
-const scope = createScope()
+## OpenTelemetry spans without touching business code
 
-function App() {
-  return (
-    <ScopeProvider scope={scope}>
-      <ExecutionContextProvider>
-        <Dashboard />
-      </ExecutionContextProvider>
-    </ScopeProvider>
-  )
-}
+Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ fn, params, name, tags })` so traces show the edge.
 
-function Dashboard() {
-  const dashboard = useAtom(dashboardState)
-  const refresh = useFlow(refreshDashboard)
+Read the full guide: [OpenTelemetry spans without editing business functions](docs/observability.md).
 
-  return (
-    <button onClick={() => refresh.execute()}>
-      {dashboard.title}
-    </button>
-  )
-}
-```
+## TypeScript DI without decorators
 
-For forms, modals, editors, and nested UI boundaries, `@pumped-fn/lite-react` provides `scopedValue`.
-That state is backed by a current-owned resource, so it is testable without React and resets when the
-owning execution context unmounts or is released.
+pumped-fn is not a decorator container. Imports define graph nodes, dependency records define edges, and a scope materializes one graph with substitutions. Role tags let the root choose an implementation while feature code depends on the role.
 
-When generated UI needs json-render controlled state, `@pumped-fn/lite-react-json-render` adapts a
-`scopedValue` access object to json-render's external `StateStore` shape and adapts json-render action
-handlers to Lite flows. The graph still owns state and behavior; json-render observes, writes, and emits
-through its normal `JSONUIProvider` contracts. Use it at genuine json-render boundaries such as generated
-specs, server-authored forms, or schema-driven editors; hand-authored React should keep using the normal
-Lite React hooks directly.
+Read the comparison: [TypeScript DI without decorators](docs/vs-di-containers.md).
 
-## Tests
+## pumped-fn vs Effect
 
-The scope is the single seam:
+Use pumped-fn when adoption should stay close to normal `async` TypeScript. Flows return values or promises; streaming flows use async generators only when the result is a stream. Typed faults exist, with the documented caveat that `isFault` narrows by `FlowFault` plus flow name.
 
-```ts
-import { atom, createScope, preset } from "@pumped-fn/lite"
+Read the comparison: [pumped-fn vs Effect](docs/vs-effect.md).
 
-const clock = atom({
-  factory: () => ({ now: () => Date.now() }),
-})
+## Adopt one route at a time
 
-const timestamp = atom({
-  deps: { clock },
-  factory: (_ctx, deps) => deps.clock.now(),
-})
+Keep the existing server. Add a scope at one composition boundary, move one leaf dependency into an atom, and run one flow from the route. Existing consumers can keep the old function while new graph consumers get the preset seam.
 
-const scope = createScope({
-  presets: [preset(clock, { now: () => 42 })],
-})
+Read the guide: [Adopt pumped-fn one route at a time](docs/adopt-incrementally.md).
 
-const value = await scope.resolve(timestamp)
-if (value !== 42) throw new Error("expected preset clock")
+## Durable workflows and streaming
 
-await scope.dispose()
-```
+Durable work replays via the suspense extension. Marked steps can replay from the log or suspend for external resolution. Streaming flows are not replayable yet, so do not put streaming progress behind durable replay.
 
-Frontend tests split by responsibility. Graph logic stays in node tests and uses the same scope seam.
-Rendered observer tests run in Vitest Browser Mode under `ScopeProvider` and `ExecutionContextProvider`.
-Browser mode proves React wiring; it does not replace node logic tests. CI also runs a Lightpanda
-smoke against a Vite-served `useFlow` page so browser-runtime drift is caught before release.
+## Code review guide
 
-`@pumped-fn/lite-lint` codifies the common mistakes: module mocks, stale browser-emulator markers,
-definition-handle suffixes, scope-as-argument helpers, shared scope factories, inline ambient IO, React
-feature components using scope directly, and local state mirrors.
+Review for hidden edges: module mocks, global patches, helper functions that accept `scope`, raw IO inside feature factories, child flows hidden behind same-file `ctx.exec`, and awaited dep calls that are not named execution edges.
 
-## Practical Examples
+Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 
-`invoice-triage` is the canonical practical example for how code should be shaped:
+## Practical examples
 
 | Path | What it shows |
 | --- | --- |
-| `examples/invoice-triage` | Postgres-backed invoice import and LLM triage: generator flows, `yield*` composition, `execStream`, database capabilities, signal-driven ingest, scheduler cron, daemon/server/CLI entrypoints |
-| `benchmarks/lite-perf` | Runtime and React observer performance checks |
+| `examples/invoice-triage` | Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges. |
 
-## Local Development
+## Package inventory
 
-```bash
-pnpm install
-pnpm build
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm verify
-```
-
-Useful package commands:
-
-```bash
-pnpm -F @pumped-fn/lite test
-pnpm -F @pumped-fn/lite-react test
-pnpm -F @pumped-fn/lite-lint test
-```
+| Path | Package |
+| --- | --- |
+| `pkg/core/lite` | `@pumped-fn/lite` |
+| `pkg/ext/hmr` | `@pumped-fn/lite-hmr` |
+| `pkg/ext/logging` | `@pumped-fn/lite-extension-logging` |
+| `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` |
+| `pkg/ext/observable` | `@pumped-fn/lite-extension-observable` |
+| `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` |
+| `pkg/ext/scheduler` | `@pumped-fn/lite-extension-scheduler` |
+| `pkg/ext/scheduler-nats` | `@pumped-fn/lite-extension-scheduler-nats` |
+| `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` |
+| `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` |
+| `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` |
+| `pkg/framework/hono` | `@pumped-fn/lite-hono` |
+| `pkg/framework/pumped` | `@pumped-fn/pumped` |
+| `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` |
+| `pkg/react/json` | `@pumped-fn/lite-react-json-render` |
+| `pkg/react/lite-react` | `@pumped-fn/lite-react` |
+| `pkg/render/core` | `@pumped-fn/lite-render-core` |
+| `pkg/render/react` | `@pumped-fn/lite-render-react` |
+| `pkg/sdk/bash` | `@pumped-fn/sdk-just-bash` |
+| `pkg/sdk/claude` | `@pumped-fn/sdk-claude` |
+| `pkg/sdk/codex` | `@pumped-fn/sdk-codex` |
+| `pkg/sdk/core` | `@pumped-fn/sdk` |
+| `pkg/sdk/test` | `@pumped-fn/sdk-test` |
+| `pkg/tool/codemod` | `@pumped-fn/codemod` |
+| `pkg/tool/lint` | `@pumped-fn/lite-lint` |
 
 ## Documentation
 
-- Core runtime: [`pkg/core/lite/README.md`](pkg/core/lite/README.md)
-- Core patterns: [`pkg/core/lite/PATTERNS.md`](pkg/core/lite/PATTERNS.md)
-- React runtime: [`pkg/react/lite-react/README.md`](pkg/react/lite-react/README.md)
-- React patterns: [`pkg/react/lite-react/PATTERNS.md`](pkg/react/lite-react/PATTERNS.md)
-- json-render adapter: [`pkg/react/json/README.md`](pkg/react/json/README.md)
-- Framework lane: [`pkg/framework/README.md`](pkg/framework/README.md)
-- Hono adapter: [`pkg/framework/hono/README.md`](pkg/framework/hono/README.md)
-- TanStack Start adapter: [`pkg/framework/tanstack-start/README.md`](pkg/framework/tanstack-start/README.md)
-- Anti-pattern scanner: [`pkg/tool/lint/README.md`](pkg/tool/lint/README.md)
+- [Mental model](docs/mental-model.md)
+- [Test without mocking modules](docs/test-without-mocks.md)
+- [Docs index and caveats](docs/README.md)
+- [Core runtime README](pkg/core/lite/README.md)
+- [Core patterns](pkg/core/lite/PATTERNS.md)
+- [Anti-pattern scanner](pkg/tool/lint/README.md)
+
+## What this is not
+
+pumped-fn is not a full application framework, an ORM, or a queue. The render packages (`@pumped-fn/lite-render-core`, `@pumped-fn/lite-render-react`) and `@pumped-fn/sdk-claude` are experimental. You also have to learn scopes, lifetimes, tags, resources, and dependency kinds; the payoff is one explicit seam for production wiring, tracing, and tests.
 
 ## License
 
-MIT
+[MIT](LICENSE)
