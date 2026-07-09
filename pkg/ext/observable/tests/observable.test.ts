@@ -448,3 +448,32 @@ describe("observable extension", () => {
     expect(captured).toHaveLength(1)
   })
 })
+
+describe("parent linking", () => {
+  it("nested exec spans carry the parent span id (fn-exec under a flow)", async () => {
+    const sink = observable.memory()
+    const outer = flow({
+      name: "outer",
+      factory: async (ctx): Promise<string> => {
+        return ctx.exec({ name: "inner", params: [], fn: () => Promise.resolve("v") })
+      },
+    })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink] })],
+    })
+    const ctx = scope.createContext()
+
+    await ctx.exec({ flow: outer })
+
+    const starts = sink.events().filter((event) => event.phase === "start")
+    const outerStart = starts.find((event) => event.name === "outer")
+    const innerStart = starts.find((event) => event.name === "inner")
+    expect(outerStart).toBeDefined()
+    expect(innerStart).toBeDefined()
+    expect(outerStart!.parentId).toBeUndefined()
+    expect(innerStart!.parentId).toBe(outerStart!.id)
+
+    await scope.dispose()
+  })
+})

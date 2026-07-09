@@ -1,4 +1,4 @@
-import { SpanStatusCode, trace, type Attributes, type TimeInput } from "@opentelemetry/api"
+import { SpanStatusCode, context, trace, type Attributes, type Context, type Span as OtelSpan, type TimeInput } from "@opentelemetry/api"
 import type { Observable } from "@pumped-fn/lite-extension-observable"
 
 export namespace Otel {
@@ -18,7 +18,8 @@ export namespace Otel {
   export interface Tracer {
     startSpan(
       name: string,
-      options?: { readonly attributes?: Attributes; readonly startTime?: TimeInput }
+      options?: { readonly attributes?: Attributes; readonly startTime?: TimeInput },
+      context?: Context
     ): Span
   }
 
@@ -70,10 +71,14 @@ function start(
 ): void {
   const current = spans.get(event.id)
   if (current) current.end(event.at)
+  const parent = event.parentId ? spans.get(event.parentId) : undefined
+  const parentContext = parent
+    ? trace.setSpan(context.active(), parent as unknown as OtelSpan)
+    : undefined
   spans.set(event.id, tracer.startSpan(spanName(options, event), {
     attributes: spanAttributes(options, event),
     startTime: event.at,
-  }))
+  }, parentContext))
 }
 
 function finish(
