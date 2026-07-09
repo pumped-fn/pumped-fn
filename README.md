@@ -1,11 +1,11 @@
-# Test without mocking modules
+# pumped-fn
 
 [![npm version](https://img.shields.io/npm/v/@pumped-fn/lite)](https://www.npmjs.com/package/@pumped-fn/lite)
 [![npm downloads](https://img.shields.io/npm/dm/@pumped-fn/lite)](https://www.npmjs.com/package/@pumped-fn/lite)
 [![license](https://img.shields.io/npm/l/@pumped-fn/lite)](LICENSE)
 [![minzip](https://img.shields.io/bundlephobia/minzip/@pumped-fn/lite)](https://bundlephobia.com/package/@pumped-fn/lite)
 
-pumped-fn puts your app behind the scope: fully testable, fully traceable, without compromising readability.
+Put your app behind a scope, and it becomes fully testable, fully traceable, without compromising readability. One graph carries your backend handlers, scheduled jobs, workflows, and React components — the same nodes swap for fakes in tests and light up as spans in production.
 
 ```text
 createScope({ presets, tags, extensions })
@@ -14,7 +14,9 @@ createScope({ presets, tags, extensions })
   -> flows, resources, tags, and wrapped execution edges
 ```
 
-Production code declares graph edges. Tests replace those edges at `createScope`, then execute the same public flow the app uses.
+## Test without mocking modules
+
+The clearest place to start is testing. Production code declares graph edges; tests replace those edges at `createScope`, then execute the same public flow the app uses — no `vi.mock`, no module interception.
 
 ```ts
 import { atom, createScope, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
