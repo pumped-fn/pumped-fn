@@ -1,5 +1,13 @@
 # @pumped-fn/agent-sdk-claude
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [174cd70]
+  - @pumped-fn/lite@4.0.0
+  - @pumped-fn/sdk@3.0.0
+
 ## 2.0.0
 
 ### Major Changes

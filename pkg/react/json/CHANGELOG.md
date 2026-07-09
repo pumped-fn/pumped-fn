@@ -1,5 +1,11 @@
 # @pumped-fn/lite-react-json-render
 
+## 1.0.0
+
+### Patch Changes
+
+- @pumped-fn/lite-react@3.0.0
+
 ## 0.1.1
 
 ### Patch Changes

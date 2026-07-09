@@ -1,5 +1,14 @@
 # @pumped-fn/lite-render-react
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [174cd70]
+  - @pumped-fn/lite@4.0.0
+  - @pumped-fn/lite-react@3.0.0
+  - @pumped-fn/lite-render-core@1.0.0
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @pumped-fn/lite-extension-logging-pino
 
+## 2.0.0
+
+### Patch Changes
+
+- @pumped-fn/lite-extension-logging@1.0.0
+
 ## 1.0.0
 
 ### Patch Changes

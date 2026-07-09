@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-suspense",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "private": false,
   "description": "Replay and suspend extension for @pumped-fn/lite",
   "type": "module",
@@ -34,7 +34,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/lite": "^4.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

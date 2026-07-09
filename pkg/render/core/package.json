@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-render-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Platform-neutral strict spec/catalog render contract for @pumped-fn/lite",
   "type": "module",
   "sideEffects": false,
@@ -32,7 +32,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/lite": "^4.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

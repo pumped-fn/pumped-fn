@@ -1,5 +1,11 @@
 # @pumped-fn/lite-extension-observable-otel
 
+## 3.0.0
+
+### Patch Changes
+
+- @pumped-fn/lite-extension-observable@1.0.0
+
 ## 2.0.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-just-bash",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "just-bash sandbox provider for @pumped-fn/sdk",
   "type": "module",
@@ -34,8 +34,8 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/sdk": "^2.0.0",
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/sdk": "^3.0.0",
+    "@pumped-fn/lite": "^4.0.0"
   },
   "dependencies": {
     "just-bash": "catalog:"

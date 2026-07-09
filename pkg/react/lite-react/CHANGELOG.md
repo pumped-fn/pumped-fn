@@ -1,5 +1,12 @@
 # @pumped-fn/lite-react
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [174cd70]
+  - @pumped-fn/lite@4.0.0
+
 ## 2.3.1
 
 ### Patch Changes

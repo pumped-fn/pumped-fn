@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "Agent workflow and app helpers for @pumped-fn/lite",
   "type": "module",
@@ -35,7 +35,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/lite": "^4.0.0"
   },
   "dependencies": {
     "@pumped-fn/lite-extension-suspense": "workspace:^"

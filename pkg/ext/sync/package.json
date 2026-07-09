@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-extension-sync",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": false,
   "description": "Strict replicated state primitive and sync extension for @pumped-fn/lite",
   "type": "module",
@@ -33,7 +33,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.2.0"
+    "@pumped-fn/lite": "^4.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

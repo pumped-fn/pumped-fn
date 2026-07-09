@@ -1,5 +1,12 @@
 # @pumped-fn/lite-extension-suspense
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [174cd70]
+  - @pumped-fn/lite@4.0.0
+
 ## 1.1.1
 
 ### Patch Changes

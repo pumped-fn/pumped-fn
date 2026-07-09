@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-tanstack-start",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "private": false,
   "description": "TanStack Start middleware helpers for @pumped-fn/lite execution contexts",
   "type": "module",
@@ -35,7 +35,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0",
+    "@pumped-fn/lite": "^4.0.0",
     "@tanstack/react-start": "^1.168.0"
   },
   "devDependencies": {

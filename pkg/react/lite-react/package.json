@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-react",
-  "version": "2.3.1",
+  "version": "3.0.0",
   "description": "React integration for @pumped-fn/lite",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -33,7 +33,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0",
+    "@pumped-fn/lite": "^4.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {

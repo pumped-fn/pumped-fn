@@ -1,5 +1,11 @@
 # @pumped-fn/lite-extension-scheduler-nats
 
+## 2.0.0
+
+### Patch Changes
+
+- @pumped-fn/lite-extension-scheduler@1.0.0
+
 ## 1.0.0
 
 ### Minor Changes
