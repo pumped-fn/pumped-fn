@@ -5,6 +5,8 @@ Static anti-pattern scanner for `@pumped-fn/lite` and `@pumped-fn/lite-react` co
 It is lint-like, but intentionally small: it uses the TypeScript parser directly and checks the boundary
 rules that the lite and lite-react docs teach. The CLI exits nonzero when diagnostics are found.
 
+The rules encode the [code review guide](../../../docs/code-review-guide.md).
+
 ## Usage
 
 ```sh
@@ -12,11 +14,7 @@ pumped-lite-lint src tests
 pumped-lite-lint --json src tests
 ```
 
-In this monorepo, root `pnpm lint` builds the tool and scans the public docs plus practical examples:
-
-```sh
-pnpm lint
-```
+> **Note:** In this repo, root `pnpm lint` builds the tool and scans the public docs plus practical examples.
 
 ## Rules
 
@@ -52,15 +50,9 @@ directories where examples intentionally contain bad shapes or third-party code.
 
 ## Severity
 
-Every diagnostic carries a `severity` of `"error"` or `"warn"`. The CLI exits nonzero only when at
-least one `"error"` diagnostic is found; `"warn"` diagnostics still print (and show up in `--json`
-output) but never fail the process. `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`,
-`pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`,
-`pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` because root `pnpm lint` only scans docs and the
-practical example packages today (not the whole monorepo), and turning them into hard failures for
-every existing example in one pass isn't the goal of adding them — treat their output as an
-inventory to clean up incrementally. All other rules default to `"error"`, matching current
-behavior.
+Every diagnostic carries a `severity` of `"error"` or `"warn"`.
+
+> **Note:** The CLI exits nonzero only when at least one `"error"` diagnostic is found. `"warn"` diagnostics still print and appear in `--json`, but they do not fail the process; `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, `pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, `pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` as an incremental cleanup inventory, while all other rules default to `"error"`.
 
 ## Config
 

@@ -1,20 +1,16 @@
 # Patterns
 
-Usage patterns as sequences. For API details, see `pkg/core/lite/dist/index.d.mts`.
+This is a sequence-diagram tour of Lite runtime behavior. Use it when you want to see how scopes,
+contexts, resources, controllers, tags, service calls, and extensions move at runtime. For API details,
+see `pkg/core/lite/dist/index.d.mts`.
 
-## Boundary Ownership Checklist
+## Boundary Ownership
 
-Use this checklist before adding helpers around the graph.
-
-| Boundary | Owns | Guard |
-|----------|------|-------|
-| Scope seam | `createScope({ presets, tags, extensions })` at composition and test boundaries | Product helpers should not accept `scope`; graph work enters through atoms, flows, resources, tags, atom controllers when reactivity is intentional, flow handles for child flow composition, and `ctx.exec` at execution boundaries |
-| Test radius | inside-out tests preset a unit's direct deps; outside-in tests preset only edge adapters | No module mocks, no global stubs above raw transport wrappers, no internal reaches, no test-only product branches |
-| transport atom | Raw ambient IO such as network, clock, storage, random, and process APIs | Transport-owned tests may fake the platform API below the seam |
-| capability atom | Domain/application operations built on transport atom deps | Capability atoms stay ambient-free and are presettable at a wider radius |
-| feature atom | User-facing state, derived data, and application decisions | Feature atoms depend on capability atom ports, not raw transports plus auth/session/token plumbing |
-| composition root | Scope, root execution context, providers, route/job mounting, and disposal | Keep it thin and tested; do not hide flows behind facade objects or shared preconfigured scope factories |
-| public docs | Architectural claims, inventories, run commands, and implemented slices | Strong claims need structural guards, and counts must be derived or explicitly scoped |
+Before adding helpers around the graph, keep ownership at the real boundary: composition roots and tests
+own `createScope({ presets, tags, extensions })`; product work enters through atoms, flows, resources,
+tags, controllers, flow handles, or `ctx.exec`; transport atoms wrap raw ambient IO; capability atoms
+depend on transports; feature nodes depend on capabilities. For review rules, see the
+[code review guide](../../../docs/code-review-guide.md).
 
 For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ fn: () => client.method(args), name: "client.method", tags })` — one named, tag-able edge per call. `fn`-exec is the one way to trace a specific call; a flow is the one way for a capability that is a graph node.
 
@@ -128,9 +124,7 @@ const settlePayment = flow({
 })
 ```
 
-Use `controller(flow, { name, tags, key })` only to preconfigure child-flow execution defaults. Do not mix
-flow controller options with atom/resource controller options: flows never accept `resolve`, `watch`, or
-`eq`; atoms and resources never accept flow execution defaults.
+> **Note:** Use `controller(flow, { name, tags, key })` only to preconfigure child-flow execution defaults. Do not mix flow controller options with atom/resource controller options: flows never accept `resolve`, `watch`, or `eq`; atoms and resources never accept flow execution defaults.
 
 `prepare()` creates an invocation object for resumability, loops, fanout, policy checks, or retries.
 `step.ready` is an optional prep point; `step.exec()` awaits readiness internally, then delegates to the
@@ -156,9 +150,7 @@ sequenceDiagram
     Flow-->>Parent: output
 ```
 
-Extension authors should not need a second hook or wrapper-specific span logic. Normal `wrapExec` must
-still see one child execution per child-flow `exec()` call; sequential and parallel child flow work should
-remain visible through ordinary child span parentage and timing.
+> **Note:** Extension authors should not need a second hook or wrapper-specific span logic. Normal `wrapExec` must still see one child execution per child-flow `exec()` call; sequential and parallel child flow work should remain visible through ordinary child span parentage and timing.
 
 ### Scoped Isolation + Testing
 
@@ -370,7 +362,9 @@ sequenceDiagram
 
 ### Service Pattern
 
-Constrain atom methods to ExecutionContext-first signature. Always invoke via `ctx.exec` so a child context is created — extensions can observe the call, and cleanup is scoped.
+Constrain atom methods to ExecutionContext-first signature.
+
+> **Note:** Invoke service methods through `ctx.exec` so a child context is created — extensions can observe the call, and cleanup is scoped.
 
 ```mermaid
 sequenceDiagram
@@ -480,44 +474,16 @@ sequenceDiagram
     Note over Scope: await invalidation chain only
 ```
 
-## Practical Examples
+## Practical Example
 
-The runnable practical example under `examples/` is `invoice-triage`. It carries the canonical app
-surface for generator flows, `execStream`, child-flow composition, state-backed ingest queues,
-scheduler cron, provider tags, and test substitution through the scope seam.
-
-The practical example uses the same boundary vocabulary as the package docs. Entry points keep
-transport work at the composition root, graph work behind flows or `ctx.exec`, root execution lifecycle
-owned by the root, and scope disposal explicit. Raw IO is kept in transport atoms or composition-root
-adapters; capability atoms depend on transports and remain presettable; feature flows depend on
-capabilities. Public example claims are guarded by structural tests for provider wiring, state queues,
-streaming progress, cron registration, and idempotent side effects.
+The runnable practical example is [invoice-triage](../../../examples/invoice-triage/README.md). It carries
+the canonical app surface for generator flows, `execStream`, child-flow composition, state-backed ingest
+queues, scheduler cron, provider tags, and test substitution through the scope seam.
 
 `@pumped-fn/lite-lint` turns those boundary rules into a lint-like scanner. It catches module mocks,
 test-only product branches, definition-handle suffixes, product helpers that accept `scope`, raw ambient IO
 outside transport/root declarations, stale example vocabulary, and React observer violations from
 `@pumped-fn/lite-react`.
-
-Backend practical examples:
-
-```bash
-pnpm test
-pnpm typecheck
-```
-
-React practical examples:
-
-```bash
-pnpm test
-pnpm typecheck
-```
-
-BFF practical examples:
-
-```bash
-pnpm test
-pnpm typecheck
-```
 
 ## Next
 

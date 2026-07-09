@@ -1,21 +1,30 @@
 # Invoice Triage
 
-Runnable `@pumped-fn/sdk` example for Postgres-backed invoice import, LLM classification, cron reports, reminder delivery, and request routes over the same graph.
+This example imports invoices into Postgres and classifies them with an LLM provider. It runs the same graph from a daemon, HTTP server, and CLI. Durable store steps, cron jobs, and tests show how the pieces recover and stay observable.
 
-It proves:
+## Run
 
-- generator flows with `execStream` progress and `exec` summary consumption
-- `yield*` progress composition from nested generator flows
-- direct data-access flows: each store operation is a plain flow that deps the `database` atom and runs its SQL inline, wrapping multi-write operations in `db.transaction` for per-operation atomicity
-- foreign integration and graph projection side by side: a `notifier` client (an adapter behind a tag) instrumented at its call site with `ctx.exec({ fn: () => notifier.send(msg), name: "notifier.send", tags })`, and role-tag flow projection for the classification model
-- a Postgres-backed ingest queue with Drizzle migrations from the `database` atom and PGlite preset in tests
-- signal-driven ingest using `queueSignal`, `storedSignal`, `outstanding`, `importing`, `drained`, and `stopping`
-- `scope.resolveStream(...)` fan-out feeds plus `scope.drain(..., { take })` shown in tests with a local status feed
-- signal-backed ops views for review queue count from a Postgres jsonb query
-- scheduler-backed cron registration with deterministic manual ticks in tests
-- idempotent reminders through ledger state
-- Hono server, daemon, and CLI entrypoints over the same graph
-- OpenTelemetry spans for flow exec edges when an OTel SDK or test tracer is registered
+```sh
+docker compose -f examples/invoice-triage/compose.yaml up -d postgres
+```
+
+```sh
+pnpm -F @pumped-fn/invoice-triage start < examples/invoice-triage/fixtures/demo.ndjson
+```
+
+```sh
+PORT=3000 pnpm -F @pumped-fn/invoice-triage server
+```
+
+```sh
+pnpm -F @pumped-fn/invoice-triage cli report
+```
+
+```sh
+pnpm -F @pumped-fn/invoice-triage test
+pnpm -F @pumped-fn/invoice-triage typecheck
+pnpm -F @pumped-fn/invoice-triage lint
+```
 
 ## Architecture
 
@@ -76,9 +85,18 @@ flowchart TD
   Deliver -.-> OTel
 ```
 
+## What it shows
+
+- Streaming invoice import with generator flows, `execStream` progress, nested `yield*`, and final `exec` summaries.
+- Postgres-backed ingest through Drizzle migrations, store flows, and PGlite presets in tests.
+- Signal-driven workers and ops views using `queueSignal`, `storedSignal`, `outstanding`, `importing`, `drained`, and `stopping`.
+- Provider seams for the model tag, notifier client, clock, request id, reminder policy, and database URL.
+- Scheduler-backed cron registration, idempotent reminder claims, release-on-failure SQL, and deterministic manual ticks in tests.
+- Hono server, daemon, CLI, and OpenTelemetry spans over the same graph.
+
 ## Canonical Shape
 
-`triage` and `importBatch` are streaming orchestration flows. They are not tagged with replay, suspend, or workflow policy. The SDK workflow and suspense extensions reject streaming targets through `isStreamingExec`, so durable policy belongs below them.
+Keep durable policy below `triage` and `importBatch`. They are streaming orchestration flows, while the scalar store/model/delivery steps carry replay, suspend, or workflow policy. The SDK workflow and suspense extensions reject streaming targets through `isStreamingExec`.
 
 Business features are flows/resources; free functions are pure calculations; ctx/scope/handles never travel into helpers.
 
@@ -108,7 +126,7 @@ Long-lived loop flows such as `ingest` or `watchReviewQueue` never hold a transa
 - `sendReminder` runs the release-on-failure SQL inline: when delivery rejects, it clears `reminded_at` and writes `reminder_failed` in one transaction, then rethrows.
 - `deliver` owns mail delivery through the `notifier` client, wrapping the foreign call in `ctx.exec({ fn: () => notifier.send(message), name: "notifier.send" })` so the foreign transport becomes a named `notifier.send` edge.
 
-`triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag - the SDK `complete` port flow owns that span. A completed workflow run shows the model implementor's step followed by `model.complete`; `invoice.classify` itself is untracked plumbing around that call. Do not put `step({ workflow: true })`, replay, suspend, or durable tags on `triage` or `importBatch`.
+`triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag - the SDK `complete` port flow owns that span. A completed workflow run shows the model implementor's step followed by `model.complete`; `invoice.classify` itself is untracked plumbing around that call. When you build similar flows, put `step({ workflow: true })`, replay, suspend, and durable tags on the scalar child steps, not on streaming orchestration flows like `triage` or `importBatch`.
 
 The example uses `yield* stream` to pass nested triage progress through `importBatch`, then reads `stream.result` for the typed classification. The current `FlowStream` type preserves output through `.result`; the `yield*` expression itself does not recover the output type from `AsyncIterable`.
 
@@ -186,26 +204,15 @@ Settlement is atomic per invoice: `settleInvoice` claims, upserts, and audits in
 
 Reminder idempotency is SQL-backed: `sendReminder` claims an invoice through `markReminderSent`, which updates `reminded_at` only when it is still null, then calls `deliver`. If `deliver` rejects, `sendReminder` runs the release SQL inline — clearing `reminded_at` and writing `reminder_failed` in one transaction — then rethrows so the invoice appears in a later `sendReminders` run. A process crash between the SQL claim and delivery completion can still leave the claim set without a sent message; that window is intentionally at-most-once. In production, bind `notifier` to a real transport client (SES/SendGrid/Twilio wrapped as a plain-object record), set `clock` for deterministic tests, and wire a durable workflow event log for scalar steps.
 
-## Run
+## Source
 
-```sh
-docker compose -f examples/invoice-triage/compose.yaml up -d postgres
-```
+- [flows.ts](./src/flows.ts)
+- [store.ts](./src/store.ts)
+- [database.ts](./src/database.ts)
+- [server.ts](./bin/server.ts)
+- [invoice-triage.test.ts](./tests/invoice-triage.test.ts)
 
-```sh
-pnpm -F @pumped-fn/invoice-triage start < examples/invoice-triage/fixtures/demo.ndjson
-```
+## Next
 
-```sh
-PORT=3000 pnpm -F @pumped-fn/invoice-triage server
-```
-
-```sh
-pnpm -F @pumped-fn/invoice-triage cli report
-```
-
-```sh
-pnpm -F @pumped-fn/invoice-triage test
-pnpm -F @pumped-fn/invoice-triage typecheck
-pnpm -F @pumped-fn/invoice-triage lint
-```
+- [Examples index](../README.md)
+- [Lite patterns](../../pkg/core/lite/PATTERNS.md)
