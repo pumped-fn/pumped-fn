@@ -1,5 +1,12 @@
 # @pumped-fn/lite-lint
 
+## 1.0.0
+
+### Major Changes
+
+- Removed the `pumped/no-traced-service-value` and `pumped/no-traced-handle-escape` rules and the traced/serviceValue exemptions in `no-unattributed-await`, following the removal of those primitives from `@pumped-fn/lite` 4.0.0.
+
+
 ## 0.7.0
 
 ### Minor Changes
