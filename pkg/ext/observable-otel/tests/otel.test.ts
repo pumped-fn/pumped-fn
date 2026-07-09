@@ -16,8 +16,10 @@ interface RecordedSpan {
 
 function recorder() {
   const spans: RecordedSpan[] = []
+  const contexts: (unknown)[] = []
   const tracer: Otel.Tracer = {
-    startSpan(name, options) {
+    startSpan(name, options, context) {
+      contexts.push(context)
       const record: RecordedSpan = {
         name,
         startTime: options?.startTime,
@@ -47,7 +49,7 @@ function recorder() {
       return span
     },
   }
-  return { spans, tracer }
+  return { spans, tracer, contexts }
 }
 
 function clock(values: readonly number[]): () => number {
@@ -208,5 +210,28 @@ describe("otel sink", () => {
     expect(sink.pending()).toBe(1)
     sink.close?.()
     expect(sink.pending()).toBe(0)
+  })
+
+  it("nests a child span under its parent via parentId", async () => {
+    const recorded = recorder()
+    const sink = otel.sink({ name: "nest", tracer: recorded.tracer })
+    let n = 0
+    const outer = flow({
+      name: "outer",
+      factory: async (ctx): Promise<string> =>
+        ctx.exec({ name: "inner", params: [], fn: () => Promise.resolve("v") }),
+    })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink], id: () => `s-${n++}` })],
+    })
+
+    await scope.createContext().exec({ flow: outer })
+
+    expect(recorded.spans.map((s) => s.name)).toEqual(["outer", "inner"])
+    expect(recorded.contexts[0]).toBeUndefined()
+    expect(recorded.contexts[1]).toBeDefined()
+
+    await scope.dispose()
   })
 })
