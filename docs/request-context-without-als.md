@@ -1,6 +1,6 @@
 # Why is AsyncLocalStorage `getStore()` undefined, and what should I use instead?
 
-Use an explicit `ExecutionContext`. Middleware creates it, stores it in the framework context, seeds request tags, and closes it after the request.
+Use an explicit `ExecutionContext`. Middleware creates it, seeds request tags, stores it in the framework context, and closes it after the request.
 
 ```ts
 import { Hono } from "hono"
@@ -38,11 +38,9 @@ export async function closeApp(): Promise<void> {
 }
 ```
 
-## Why This Answers the ALS Query
-
 The request state is not discovered from ambient storage inside product code. It is declared as a tag dependency and supplied by the request boundary.
 
-The flow can run in a test with the same API:
+The same flow can run in a test with the same API.
 
 ```ts
 const scope = createScope()
@@ -54,16 +52,18 @@ await scope.dispose()
 if (id !== "test-request") throw new Error("unexpected request id")
 ```
 
-## Proven in the source
+The public execution context carries `input`, `scope`, `parent`, `data`, `resolve`, `release`, `controller`, `exec`, `execStream`, `changes`, close hooks, and failure helpers. Context data supports raw keys and tag methods, including parent-chain tag lookup. `scope.createContext({ tags, parent })` seeds context tags and then scope tags.
 
-- `ExecutionContext` is a public interface with `input`, `scope`, `parent`, `data`, `resolve`, `release`, `controller`, `exec`, `execStream`, `changes`, `onClose`, `close`, and `fail`: [pkg/core/lite/src/types.ts:233-254](../pkg/core/lite/src/types.ts#L233-L254).
+> **Note:** AsyncLocalStorage internals are not covered here. The supported control surface is explicit execution contexts plus declared tag deps.
 
-- Context data supports raw keys and tag methods, including parent-chain lookup through `seekTag`: [pkg/core/lite/src/types.ts:166-218](../pkg/core/lite/src/types.ts#L166-L218), [pkg/core/lite/src/scope.ts:42-115](../pkg/core/lite/src/scope.ts#L42-L115).
+## Source
 
-- `scope.createContext({ tags, parent })` seeds context tags and then scope tags: [pkg/core/lite/src/scope.ts:1814-1842](../pkg/core/lite/src/scope.ts#L1814-L1842).
+- [ExecutionContext types](../pkg/core/lite/src/types.ts)
+- [Context tag lookup](../pkg/core/lite/src/scope.ts)
+- [Hono adapter](../pkg/framework/hono/src/index.ts)
+- [Hono adapter tests](../pkg/framework/hono/tests/hono.test.ts)
 
-- The Hono adapter creates the execution context from the request and stores it in `context.var`: [pkg/framework/hono/src/index.ts:49-71](../pkg/framework/hono/src/index.ts#L49-L71).
+## Next
 
-- The Hono test proves separate request IDs, per-call tag override, JSON input execution, and context close settlement: [pkg/framework/hono/tests/hono.test.ts:22-80](../pkg/framework/hono/tests/hono.test.ts#L22-L80).
-
-AsyncLocalStorage internals are not covered here. The repo-backed claim is the alternative control surface: explicit execution contexts plus declared tag deps.
+- [Adopt one route at a time](adopt-incrementally.md)
+- [Test without mocking modules](test-without-mocks.md)

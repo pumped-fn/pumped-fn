@@ -1,16 +1,6 @@
 # How do I review pumped-fn code?
 
-## Review Rules
-
-| If You See | Flag | Fix |
-| --- | --- | --- |
-| `new Date()`, `Date.now()`, `Math.random()`, `process.env`, `fetch`, timers, or raw platform modules inside a factory | Hidden side effect | Move it to a tag, transport atom, resource, or composition root |
-| Module-level DB/client singleton used by a flow | Unsubstitutable edge | Wrap the client in an atom and preset that atom in tests |
-| Exported shared scope or helper that accepts `scope` | Service-locator shape | Create scopes at composition roots and run flows through contexts |
-| Child flow called through hidden same-file `ctx.exec({ flow })` | Invisible graph edge | Put child flow in `deps`, usually with `controller(child)` |
-| Awaited foreign call on a dep without `ctx.exec({ fn, name })` or a workflow step tag | Unattributed effect | Give the call a named execution edge |
-
-Bad shape:
+Start by looking for edges the graph cannot see. This shape hides the DB client and the clock from the scope seam.
 
 ```ts
 import { flow, typed } from "@pumped-fn/lite"
@@ -25,7 +15,7 @@ const save = flow({
 })
 ```
 
-Good shape:
+Move those edges into declared dependencies. Now the clock is a tag, the client is an atom, and a test or composition root can replace either one.
 
 ```ts
 import { atom, createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
@@ -62,16 +52,31 @@ await ctx.close()
 await scope.dispose()
 ```
 
-## Proven in the source
+That is the review move: find the uncontrolled edge, then ask where the graph should see it.
 
-- The boundary checklist says scope is owned at composition/test boundaries, raw IO belongs in transport atoms, and composition roots stay thin: [pkg/core/lite/PATTERNS.md:5-19](../pkg/core/lite/PATTERNS.md#L5-L19).
+## Review Rules
 
-- The README says a test needing module mocks, global patches above raw transport wrappers, internal reaches, or test-only product branches means the boundary leaked: [pkg/core/lite/README.md:38-48](../pkg/core/lite/README.md#L38-L48).
+| If You See | Flag | Fix |
+| --- | --- | --- |
+| `new Date()`, `Date.now()`, `Math.random()`, `process.env`, `fetch`, timers, or raw platform modules inside a factory | Hidden side effect | Move it to a tag, transport atom, resource, or composition root |
+| Module-level DB/client singleton used by a flow | Unsubstitutable edge | Wrap the client in an atom and preset that atom in tests |
+| Exported shared scope or helper that accepts `scope` | Service-locator shape | Create scopes at composition roots and run flows through contexts |
+| Child flow called through hidden same-file `ctx.exec({ flow })` | Invisible graph edge | Put child flow in `deps`, usually with `controller(child)` |
+| Awaited foreign call on a dep without `ctx.exec({ fn, name })` or a workflow step tag | Unattributed effect | Give the call a named execution edge |
 
-- The lint rule list covers module mocks, shared scope factories, helpers accepting scope, scope reach, naked globals, implicit tag reads, module state, unattributed awaits, and swallowed errors: [pkg/tool/lint/README.md:23-48](../pkg/tool/lint/README.md#L23-L48).
+For foreign SDK calls, prefer an adapter atom plus `ctx.exec({ fn, name, tags })`. That gives tracing and workflow tags a named edge instead of an anonymous promise.
 
-- The rule implementation includes `pumped/no-module-mocks`, `pumped/no-naked-globals`, `pumped/no-shared-scope-factory`, `pumped/no-scope-argument`, and `pumped/no-unattributed-await`: [pkg/tool/lint/src/index.ts:5-29](../pkg/tool/lint/src/index.ts#L5-L29), [pkg/tool/lint/src/index.ts:1160-1179](../pkg/tool/lint/src/index.ts#L1160-L1179), [pkg/tool/lint/src/index.ts:1389-1464](../pkg/tool/lint/src/index.ts#L1389-L1464), [pkg/tool/lint/src/index.ts:1591-1660](../pkg/tool/lint/src/index.ts#L1591-L1660).
+> **Note:** This guide does not replace `@pumped-fn/lite-lint`. Use the scanner too; it exposes diagnostics through `scanPaths` and `scanText`.
 
-- Foreign calls should be adapter atoms plus `ctx.exec({ fn, name, tags })` so the call is named and taggable: [pkg/core/lite/PATTERNS.md:19-19](../pkg/core/lite/PATTERNS.md#L19-L19), [examples/invoice-triage/src/flows.ts:260-262](../examples/invoice-triage/src/flows.ts#L260-L262).
+## Source
 
-- This guide does not replace `@pumped-fn/lite-lint`; the scanner exposes diagnostics through `scanPaths` and `scanText`: [pkg/tool/lint/README.md:88-95](../pkg/tool/lint/README.md#L88-L95).
+- [Lite patterns](../pkg/core/lite/PATTERNS.md)
+- [Lite README testing boundary](../pkg/core/lite/README.md)
+- [Lint rule list](../pkg/tool/lint/README.md)
+- [Lint implementation](../pkg/tool/lint/src/index.ts)
+- [Invoice triage flow edges](../examples/invoice-triage/src/flows.ts)
+
+## Next
+
+- [Test without mocking modules](test-without-mocks.md)
+- [Mental model](mental-model.md)

@@ -122,7 +122,7 @@ Read the comparison: [TypeScript DI without decorators](docs/vs-di-containers.md
 
 ## pumped-fn vs Effect
 
-Use pumped-fn when adoption should stay close to normal `async` TypeScript. Flows return values or promises; streaming flows use async generators only when the result is a stream. Typed faults exist, with the documented caveat that `isFault` narrows by `FlowFault` plus flow name.
+Use pumped-fn when adoption should stay close to normal `async` TypeScript. Flows return values or promises; streaming flows use async generators only when the result is a stream. Typed faults exist, with the documented limit that `isFault` narrows by `FlowFault` plus flow name.
 
 Read the comparison: [pumped-fn vs Effect](docs/vs-effect.md).
 
@@ -182,7 +182,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 
 - [Mental model](docs/mental-model.md)
 - [Test without mocking modules](docs/test-without-mocks.md)
-- [Docs index and caveats](docs/README.md)
+- [Docs index and limits](docs/README.md)
 - [Core runtime README](pkg/core/lite/README.md)
 - [Core patterns](pkg/core/lite/PATTERNS.md)
 - [Anti-pattern scanner](pkg/tool/lint/README.md)

@@ -1,6 +1,6 @@
 # How do I test TypeScript code without `vi.mock`?
 
-The answer is the scope seam. Replace the graph edge at `createScope`, then execute the same public flow the app uses.
+Replace the graph edge at `createScope`, then execute the same public flow the app uses.
 
 ```ts
 import { atom, createScope, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
@@ -49,7 +49,9 @@ await ctx.close()
 await scope.dispose()
 ```
 
-Real database recipe, from the canonical invoice example:
+The test replaces the `db` atom with `preset(db, fake)` and supplies the clock through a tag. The flow body does not know it is running in a test.
+
+For a real database test, use the same pattern with the canonical invoice example's PGlite database.
 
 ```ts
 const scope = createScope({
@@ -61,7 +63,7 @@ const scope = createScope({
 })
 ```
 
-PGlite support builds a Drizzle database, runs migrations, and returns the same `Database` type as production:
+The helper builds a Drizzle database, runs migrations, and returns the same `Database` type as production.
 
 ```ts
 export async function pgliteDatabase(): Promise<Database> {
@@ -72,20 +74,20 @@ export async function pgliteDatabase(): Promise<Database> {
 }
 ```
 
-## Proven in the source
+`createScope` accepts presets, tags, and extensions. `preset` can replace atoms, flows, and resources. Required tag deps are declared in the `deps` object with `tags.required(tag)`.
 
-- `createScope` accepts `presets`, `tags`, and `extensions`: [pkg/core/lite/src/types.ts:78-83](../pkg/core/lite/src/types.ts#L78-L83).
+> **Note:** External `vi.mock` pain points such as hoisting, type loss, and per-file setup are not covered here. This page shows the pumped-fn seam.
 
-- `preset` can replace atoms, flows, and resources: [pkg/core/lite/src/preset.ts:25-67](../pkg/core/lite/src/preset.ts#L25-L67).
+## Source
 
-- Flow input can be typed with `typed<T>()`: [pkg/core/lite/src/flow.ts:18-20](../pkg/core/lite/src/flow.ts#L18-L20), [pkg/core/lite/src/flow.ts:164-212](../pkg/core/lite/src/flow.ts#L164-L212).
+- [Scope options](../pkg/core/lite/src/types.ts)
+- [Preset API](../pkg/core/lite/src/preset.ts)
+- [Flow typing](../pkg/core/lite/src/flow.ts)
+- [Required tag deps](../pkg/core/lite/src/tag.ts)
+- [Invoice triage tests](../examples/invoice-triage/tests/invoice-triage.test.ts)
+- [PGlite database helper](../examples/invoice-triage/tests/support/database.ts)
 
-- Required tag deps are declared in the deps object with `tags.required(tag)`: [pkg/core/lite/src/tag.ts:253-273](../pkg/core/lite/src/tag.ts#L253-L273).
+## Next
 
-- The invoice tests use `createScope`, `preset(database, await pgliteDatabase())`, model provider tags, and deterministic clock tags: [examples/invoice-triage/tests/invoice-triage.test.ts:337-360](../examples/invoice-triage/tests/invoice-triage.test.ts#L337-L360), [examples/invoice-triage/tests/invoice-triage.test.ts:389-408](../examples/invoice-triage/tests/invoice-triage.test.ts#L389-L408), [examples/invoice-triage/tests/invoice-triage.test.ts:520-555](../examples/invoice-triage/tests/invoice-triage.test.ts#L520-L555).
-
-- The PGlite test database helper returns the production `Database` type after migrations: [examples/invoice-triage/tests/support/database.ts:1-15](../examples/invoice-triage/tests/support/database.ts#L1-L15).
-
-- The lint rule rejects module mocks and points tests to scope presets: [pkg/tool/lint/README.md:23-31](../pkg/tool/lint/README.md#L23-L31), [pkg/tool/lint/src/index.ts:1160-1179](../pkg/tool/lint/src/index.ts#L1160-L1179).
-
-External `vi.mock` pain points such as hoisting, type loss, and per-file setup are not covered here. This repo proves the alternative seam.
+- [Mental model](mental-model.md)
+- [Code review guide](code-review-guide.md)

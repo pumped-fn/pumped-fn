@@ -1,8 +1,6 @@
 # Can I adopt pumped-fn one route at a time in my existing server?
 
-Pattern shown with a plain handler and Hono; Express/Nest examples pending.
-
-Start at one composition boundary. Keep the existing server. Create or reuse a scope in the route module, create one execution context for the request, pass request facts as tags, and execute one flow.
+Yes. Start at one composition boundary and leave the rest of the server alone.
 
 ```ts
 import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
@@ -35,7 +33,11 @@ export async function handleUser(request: Request): Promise<Response> {
 }
 ```
 
-Use the Hono adapter as the template for framework integration:
+The route owns the request context. It seeds request facts as tags, runs one flow, and closes the context in `finally`.
+
+> **Note:** Express and Nest examples are not covered here yet. This page shows a plain handler and Hono.
+
+If you are using Hono, put the adapter on the scope and let middleware create the context for each request.
 
 ```ts
 import { Hono } from "hono"
@@ -73,9 +75,9 @@ export async function closeApp(): Promise<void> {
 }
 ```
 
-## Phase 2: Move One Leaf Dependency At A Time
+The adapter keeps the app scope in the extension, writes the request execution context to `context.var`, and closes it after request handling. Application scope construction still belongs to your composition root.
 
-Start by adding an atom beside the old module singleton. Existing consumers keep importing the old function. New graph consumers depend on the atom. Tests or new roots can preset that atom without changing the legacy export.
+## Move One Leaf
 
 ```ts
 import { atom, createScope, flow, preset, typed } from "@pumped-fn/lite"
@@ -141,24 +143,26 @@ export async function testRoute(id: string): Promise<{ id: string } | undefined>
 }
 ```
 
+Add an atom beside the old module singleton first. Existing callers can keep importing the old function, while new graph code depends on the atom. Tests and new roots can preset that atom without changing the legacy export.
+
 Then repeat with the next leaf dependency. The route boundary does not have to move again; each leaf moves when a graph consumer needs it.
 
-## Proven in the source
+## Keep The Boundary Thin
 
-- Framework packages do not own application scope construction; adapters install through `createScope({ extensions })` and pass execution contexts through framework-native surfaces: [pkg/framework/README.md:3-11](../pkg/framework/README.md#L3-L11).
+Create scopes, root contexts, route mounts, job mounts, and disposal at composition roots. Keep feature units declared in the graph, or keep helpers pure and call them from declared graph units.
 
-- The Hono adapter stores the scope during extension init, creates a request execution context in middleware, writes it to `context.var`, and closes it after request handling: [pkg/framework/hono/src/index.ts:41-76](../pkg/framework/hono/src/index.ts#L41-L76).
+Avoid shared scope factories, global registries, framework-shaped copies of Lite primitives, public helpers that accept `scope`, and hidden framework request reads inside units. Those shapes make the seam harder to test and harder to replace one route at a time.
 
-- The Hono test creates one execution context per request and injects `requestId` from headers through tags: [pkg/framework/hono/tests/hono.test.ts:22-80](../pkg/framework/hono/tests/hono.test.ts#L22-L80).
+## Source
 
-- Framework rules reject shared scope factories, global registries, framework-shaped copies of Lite primitives, public helpers accepting `scope`, and hidden framework request reads inside units: [pkg/framework/README.md:18-27](../pkg/framework/README.md#L18-L27).
+- [Framework package rules](../pkg/framework/README.md)
+- [Hono adapter](../pkg/framework/hono/src/index.ts)
+- [Hono adapter tests](../pkg/framework/hono/tests/hono.test.ts)
+- [Lite README boundary rules](../pkg/core/lite/README.md)
+- [Preset API](../pkg/core/lite/src/preset.ts)
+- [Scope implementation](../pkg/core/lite/src/scope.ts)
 
-- Composition roots should create scopes, root contexts, route/job mounts, and disposal; feature units should stay declared in the graph or stay pure helpers called by declared graph units: [pkg/core/lite/README.md:38-48](../pkg/core/lite/README.md#L38-L48), [README.md:129-133](../README.md#L129-L133).
+## Next
 
-- The incremental leaf-dependency snippet uses the repo-exported `atom`, `flow`, `typed`, `preset`, and `createScope` APIs: [pkg/core/lite/src/index.ts:17-21](../pkg/core/lite/src/index.ts#L17-L21), [pkg/core/lite/src/atom.ts:29-44](../pkg/core/lite/src/atom.ts#L29-L44), [pkg/core/lite/src/flow.ts:18-20](../pkg/core/lite/src/flow.ts#L18-L20), [pkg/core/lite/src/flow.ts:200-212](../pkg/core/lite/src/flow.ts#L200-L212), [pkg/core/lite/src/preset.ts:25-28](../pkg/core/lite/src/preset.ts#L25-L28), [pkg/core/lite/src/scope.ts:2452-2478](../pkg/core/lite/src/scope.ts#L2452-L2478).
-
-- Scope presets are stored on scope construction and atom preset values are returned during atom resolution: [pkg/core/lite/src/scope.ts:441-449](../pkg/core/lite/src/scope.ts#L441-L449), [pkg/core/lite/src/scope.ts:819-853](../pkg/core/lite/src/scope.ts#L819-L853).
-
-- Execution contexts are created from scopes and execute flows through `ctx.exec({ flow, input })`: [pkg/core/lite/src/scope.ts:1814-1842](../pkg/core/lite/src/scope.ts#L1814-L1842), [pkg/core/lite/src/types.ts:233-245](../pkg/core/lite/src/types.ts#L233-L245), [pkg/core/lite/src/scope.ts:2084-2101](../pkg/core/lite/src/scope.ts#L2084-L2101).
-
-Express and Nest examples are not yet covered here. This page covers a plain handler and Hono.
+- [Request context without AsyncLocalStorage](request-context-without-als.md)
+- [Test without mocking modules](test-without-mocks.md)

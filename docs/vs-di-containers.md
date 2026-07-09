@@ -1,6 +1,6 @@
 # TypeScript DI without decorators: why use pumped-fn instead of a container?
 
-The repo-backed claim is about pumped-fn's shape: imports define graph units; dependency records define edges; a scope materializes one graph with substitutions.
+pumped-fn's core API is imports, dependency records, and scopes. Imports define graph units, dependency records define edges, and a scope materializes one graph with substitutions.
 
 ```ts
 import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
@@ -35,7 +35,11 @@ await ctx.close()
 await scope.dispose()
 ```
 
-## What This Proves
+The root chooses the model by setting a tag. The feature flow depends on the role, not on a decorator container or a global registry. In a request or test, you can rebind the role by creating a context with different tags.
+
+> **Note:** Required tag deps do not fail at scope creation today. Missing required tags throw during dependency resolution before the unit factory runs.
+
+## What You Get
 
 | Need | pumped-fn Shape |
 | --- | --- |
@@ -45,22 +49,18 @@ await scope.dispose()
 | Context override | Context tags can rebind a role for one request or test |
 | Async deps | Atom, flow, and resource factories accept `MaybePromise` values |
 
-## Caveat
+This page does not document tsyringe or InversifyJS internals. The comparison here is limited to pumped-fn's core exports: they expose primitives such as `atom`, `flow`, `tag`, `preset`, `resource`, and `createScope`, not a decorator or registration surface.
 
-Required tag deps do not fail at scope creation today. Current source proves a narrower and still useful claim: missing required tags throw during dependency resolution before the unit factory runs.
+## Source
 
-This page does not document tsyringe or InversifyJS internals. The repo-backed comparison is: pumped-fn's public API does not expose a decorator or registration surface in its core exports.
+- [Core exports](../pkg/core/lite/src/index.ts)
+- [Dependency classification](../pkg/core/lite/src/deps-graph.ts)
+- [Dependency types](../pkg/core/lite/src/types.ts)
+- [Role tag tests](../pkg/core/lite/tests/role-tags.test.ts)
+- [Scope implementation](../pkg/core/lite/src/scope.ts)
+- [Required tag timing](../pkg/core/lite/src/scope.ts)
 
-## Proven in the source
+## Next
 
-- No decorator-shaped public API: [pkg/core/lite/src/index.ts:16-22](../pkg/core/lite/src/index.ts#L16-L22).
-
-- Inference-carried dependency values: [pkg/core/lite/src/deps-graph.ts:16-49](../pkg/core/lite/src/deps-graph.ts#L16-L49), [pkg/core/lite/src/types.ts:530-579](../pkg/core/lite/src/types.ts#L530-L579).
-
-- Role selection: [pkg/core/lite/tests/role-tags.test.ts:10-26](../pkg/core/lite/tests/role-tags.test.ts#L10-L26), [pkg/core/lite/tests/role-tags.test.ts:59-71](../pkg/core/lite/tests/role-tags.test.ts#L59-L71).
-
-- Context override: [pkg/core/lite/tests/role-tags.test.ts:128-142](../pkg/core/lite/tests/role-tags.test.ts#L128-L142), [pkg/core/lite/src/scope.ts:1814-1842](../pkg/core/lite/src/scope.ts#L1814-L1842).
-
-- Async deps: [pkg/core/lite/src/atom.ts:29-44](../pkg/core/lite/src/atom.ts#L29-L44), [pkg/core/lite/src/flow.ts:146-212](../pkg/core/lite/src/flow.ts#L146-L212), [pkg/core/lite/src/resource.ts:25-42](../pkg/core/lite/src/resource.ts#L25-L42).
-
-- Required tag timing: [pkg/core/lite/src/scope.ts:1055-1068](../pkg/core/lite/src/scope.ts#L1055-L1068).
+- [Mental model](mental-model.md)
+- [Test without mocking modules](test-without-mocks.md)
