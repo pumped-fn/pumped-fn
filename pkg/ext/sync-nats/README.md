@@ -31,3 +31,6 @@ Watch failures resubscribe from the last delivered KV revision by default. Use
 `nats.kv(kv, { prefix, onError, retry })` to customize the KV subject prefix, receive watch-loop
 failures from the adapter boundary with retry metadata, or disable adapter-level retry with
 `retry: false`.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

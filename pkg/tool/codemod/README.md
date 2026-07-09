@@ -145,3 +145,6 @@ const fetchUser = controller(async (ctx, id: string) => {
 ```bash
 git checkout .
 ```
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

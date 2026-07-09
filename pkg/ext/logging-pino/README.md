@@ -23,3 +23,6 @@ const scope = createScope({
 
 Use `map` when a Pino schema needs different field names. Use `flush` or `close` when the selected
 Pino destination needs explicit lifecycle handling.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

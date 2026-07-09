@@ -113,3 +113,6 @@ await scope.resolve(nightlySweep)
 
 `catchUp: "skip"` never reads `last.<name>` at all. With no `last.<name>` key present (first
 deployment), `catchUp: "last"`/`"all"` run nothing — there is nothing to catch up from.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

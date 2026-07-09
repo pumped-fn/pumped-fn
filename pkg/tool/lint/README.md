@@ -93,3 +93,11 @@ import { scanPaths, scanText } from "@pumped-fn/lite-lint"
 const result = await scanPaths(["src", "tests"])
 const diagnostics = scanText(source, "src/file.ts")
 ```
+
+## Next
+
+- [Code review guide](../../../docs/code-review-guide.md)
+- [pumped-fn README](../../../README.md)
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

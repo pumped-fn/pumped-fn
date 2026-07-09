@@ -52,3 +52,6 @@ middleware seeds tags at the framework boundary and handlers execute public Lite
 
 Pass `key` to use another context property. Pass `close: false` when another boundary owns
 `ctx.close(...)`.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

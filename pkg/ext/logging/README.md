@@ -54,3 +54,6 @@ The `logging.logger` resource is execution-owned and flushes sinks on context cl
 OpenTelemetry logs and OTLP collectors are adapter targets for `Logging.Sink`; this package does not
 import or ship those backends. Use `@pumped-fn/lite-extension-logging-pino` when the runtime sink
 should write records to Pino.
+
+---
+Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).
