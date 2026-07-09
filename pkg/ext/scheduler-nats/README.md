@@ -5,6 +5,35 @@ KV. Multiple process instances can register the same schedule and coordinate thr
 bucket: only one instance runs any given scheduled tick, and a `last:` key lets late-joining or
 restarted instances catch up on what they missed.
 
+## Install
+
+Install the NATS backend next to Lite, the scheduler extension, and the NATS client packages: `pnpm add @pumped-fn/lite @pumped-fn/lite-extension-scheduler @pumped-fn/lite-extension-scheduler-nats @nats-io/kv @nats-io/transport-node`.
+
+## Usage
+
+```ts
+import { connect } from "@nats-io/transport-node"
+import { createScope } from "@pumped-fn/lite"
+import { scheduler } from "@pumped-fn/lite-extension-scheduler"
+import { nats } from "@pumped-fn/lite-extension-scheduler-nats"
+import { sweepExpired } from "./flows"
+
+const connection = await connect({ servers: "nats://localhost:4222" })
+
+const nightlySweep = scheduler.schedule({
+  name: "nightly-sweep",
+  cadence: { cron: "0 2 * * *" },
+  catchUp: "last",
+  flow: sweepExpired,
+  input: () => undefined,
+})
+
+const scope = createScope({
+  tags: [scheduler.backend(nats({ connection, bucket: "scheduler", history: { ttlMs: 7 * 24 * 60 * 60 * 1000 } }))],
+})
+await scope.resolve(nightlySweep)
+```
+
 ## Semantics
 
 | What NATS gives | What stays local |
@@ -53,31 +82,6 @@ run key only while the holder completes within `lockTtlMs`**; across a lease exp
 in practice. There is no heartbeat/lease-renewal mechanism today — a holder cannot extend its lock by
 signaling it is still alive; adding one (so a live holder renews before `lockTtlMs` elapses and a
 takeover only ever targets a truly dead holder) is possible future work.
-
-## Usage
-
-```ts
-import { connect } from "@nats-io/transport-node"
-import { createScope } from "@pumped-fn/lite"
-import { scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { nats } from "@pumped-fn/lite-extension-scheduler-nats"
-import { sweepExpired } from "./flows"
-
-const connection = await connect({ servers: "nats://localhost:4222" })
-
-const nightlySweep = scheduler.schedule({
-  name: "nightly-sweep",
-  cadence: { cron: "0 2 * * *" },
-  catchUp: "last",
-  flow: sweepExpired,
-  input: () => undefined,
-})
-
-const scope = createScope({
-  tags: [scheduler.backend(nats({ connection, bucket: "scheduler", history: { ttlMs: 7 * 24 * 60 * 60 * 1000 } }))],
-})
-await scope.resolve(nightlySweep)
-```
 
 ## `nats(options)`
 

@@ -32,28 +32,19 @@ Lite owns the application boundary below framework adapters:
 - `tag()` carries typed ambient values such as tenant, trace id, locale, config, and equality-aware boundary identity.
 - `preset()` swaps atoms, flows, and resources at the scope seam for tests or composition.
 - Extensions wrap resolve and exec for logging, tracing, auth, metrics, and transactional policy.
-- Controllers and selects add reactivity where it is intentional. `controller(flow, defaults)` only
-  preconfigures child-flow execution; it is not reactive.
+- Controllers and selects add reactivity where it is intentional.
+
+> **Note:** `controller(flow, defaults)` only preconfigures child-flow execution; it is not reactive.
 
 ## Boundary Ownership
 
 Scope is the composition and test seam. Composition roots, tests, and boundary adapters call
-`createScope({ presets, tags, extensions })`.
+`createScope({ presets, tags, extensions })`; product helpers do not accept `scope`.
+Tests use the same seam: preset direct deps for an inside-out radius, or only edge adapters for
+outside-in coverage. Raw ambient IO belongs in transport atoms or composition-root adapters; capability
+atoms depend on transports, and feature nodes depend on capabilities.
 
-Composition roots are thin, tested adapters. They create scopes, root contexts, providers, route/job
-mounts, and disposal. `scope` is not a product helper argument; that turns the graph into a service
-locator. Make the behavior an atom, flow, resource, pure helper called by a graph node, or route it
-through flows, `ctx.exec`, resources, or providers.
-
-Tests use the same seam. Inside-out tests preset direct dependencies. Outside-in tests preset only edge
-adapters. A test that needs module mocks, global patches above raw transport wrappers, internal reaches,
-or test-only product branches means the boundary leaked.
-
-Raw ambient IO belongs in transport atoms or composition-root adapters. Capability atoms depend on transports.
-Feature atoms depend on capabilities.
-
-Public examples with strong architectural claims need structural guards, and inventories or implemented
-slice claims should be derived or explicitly scoped.
+See [Mental model](../../../docs/mental-model.md) and [Test without mocks](../../../docs/test-without-mocks.md).
 
 ## Shape
 
@@ -84,7 +75,7 @@ The usual layering is:
 | Feature atom or flow | User-facing state, decisions, derived data, and use-case execution |
 | Composition root | Scope creation, root execution context, providers, route/job mounting, disposal |
 
-Feature nodes should depend on capabilities, not raw transports plus auth/session/token plumbing.
+> **Note:** Feature nodes should depend on capabilities, not raw transports plus auth/session/token plumbing.
 
 ## First Graph
 
@@ -237,9 +228,7 @@ await scope.dispose()
 if (events.join(",") !== "commit,release") throw new Error("unexpected lifecycle")
 ```
 
-`ctx.release(resource)` is an owner-local reset. It runs the resource cleanup for that owner, but `onClose`
-handlers registered by that resource still belong to the execution context. Use it when you intentionally
-need a fresh resource instance inside an open context.
+> **Note:** `ctx.release(resource)` is an owner-local reset. It runs the resource cleanup for that owner, but `onClose` handlers registered by that resource still belong to the execution context. Use it when you intentionally need a fresh resource instance inside an open context.
 
 Resource controllers are infrastructure handles for observing a resource visible from one execution
 context. Prefer direct resource dependencies, flows, or domain actions in product APIs. `watch: true` for
@@ -317,9 +306,7 @@ selected.dispose()
 await scope.dispose()
 ```
 
-Use `controller(dep, { resolve: true, watch: true, eq })` in atom dependencies for derived atoms that
-should invalidate when a dependency changes. That replaces manual subscription wiring and automatically
-cleans up on re-resolve, release, and dispose.
+> **Note:** Use `controller(dep, { resolve: true, watch: true, eq })` in atom dependencies for derived atoms that should invalidate when a dependency changes. That replaces manual subscription wiring and automatically cleans up on re-resolve, release, and dispose.
 
 ### Async Iteration
 
@@ -379,19 +366,14 @@ for await (const order of scope.resolveStream(orders)) {
 ```
 
 `scope.drain(atom, { take })` collects a fresh view into an array — until the producer completes, or after
-`take` elements. Without `take` it only returns when the producer ends, so do not drain an infinite feed
-unbounded. One producer-side caveat: `scope.dispose()` awaits `iterator.return()`, and JavaScript queues
-that behind a pending `await` inside the generator, so a producer blocked on IO without yielding delays
-disposal until that await settles.
+`take` elements.
+
+> **Note:** Without `take`, `scope.drain` only returns when the producer ends, so do not drain an infinite feed unbounded. `scope.dispose()` awaits `iterator.return()`, and JavaScript queues that behind a pending `await` inside the generator, so a producer blocked on IO without yielding delays disposal until that await settles.
 
 Presets compose with all of it: `preset(orders, fakeFeed)` swaps the producer for a test, and
 `await scope.drain(orders, { take: 3 })` asserts the consumed elements through the same seam.
 
-`resolveStream` views conflate — they are state views, not lossless transports. Elements produced
-while a consumer is busy are superseded, not queued, so a stream must never be the only carrier of
-must-not-drop work. Put such work in state instead: producers append to an atom, and a processor
-loop wakes on `changes(select(...))` and drains everything pending from state. Conflated wakeups
-lose nothing because the state carries the work; conflated data would.
+> **Note:** `resolveStream` views conflate — they are state views, not lossless transports. Elements produced while a consumer is busy are superseded, not queued, so a stream must never be the only carrier of must-not-drop work. Put such work in state instead: producers append to an atom, and a processor loop wakes on `changes(select(...))` and drains everything pending from state. Conflated wakeups lose nothing because the state carries the work; conflated data would.
 
 ### Generator Flows
 
@@ -432,15 +414,12 @@ await scope.dispose()
 
 The consumer pulls the generator directly: the flow body does not advance past a `yield` until the
 caller asks, so backpressure is inherent and no element is dropped. Each invocation is consumed once.
-Breaking out of the loop cancels the invocation — the generator's `finally` runs, resources clean up,
-and `onClose` observes `{ ok: false, aborted: true }`, distinguishable from success and failure; a
-transaction resource should roll back on both error and abandonment. Reading `stream.result` before
-iterating throws — a caller that only wants the final output uses `exec`. A non-generator factory
-whose output is an async iterable fails the execution: returned iterables would outlive their context;
-yield from a generator flow or use an iterable atom with `resolveStream` instead.
 
-Streaming invocations are visible to extensions as `streaming` on the exec target. The suspense
-extension refuses to journal them (`replay` throws) until stream replay semantics exist.
+> **Note:** Breaking out of the loop cancels the invocation — the generator's `finally` runs, resources clean up, and `onClose` observes `{ ok: false, aborted: true }`, distinguishable from success and failure. A transaction resource should roll back on both error and abandonment.
+
+> **Note:** Reading `stream.result` before iterating throws — a caller that only wants the final output uses `exec`. A non-generator factory whose output is an async iterable fails the execution: returned iterables would outlive their context; yield from a generator flow or use an iterable atom with `resolveStream` instead.
+
+> **Note:** Streaming invocations are visible to extensions as `streaming` on the exec target. The suspense extension refuses to journal them (`replay` throws) until stream replay semantics exist.
 
 ## Presets And Tests
 
@@ -473,11 +452,9 @@ spies, or test-only branches.
 
 ## Extensions
 
-Extensions wrap atom/resource resolution and flow/function execution. Use them for cross-cutting behavior
-that should be complete and auditable: logging, metrics, auth checks, trace spans, transactions, and
-runtime tag injection.
-
-Extension hooks run around graph work, so they see the same seams as tests and composition roots.
+Extensions wrap atom/resource resolution and flow/function execution for logging, metrics, auth checks,
+trace spans, transactions, and runtime tag injection. Extension hooks see the same seams as tests and
+composition roots. See [Observability](../../../docs/observability.md).
 
 ## API Summary
 
@@ -500,13 +477,19 @@ Extension hooks run around graph work, so they see the same seams as tests and c
 
 Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
 
-Patterns and guardrails: [`PATTERNS.md`](./PATTERNS.md)
+Patterns: [`PATTERNS.md`](./PATTERNS.md)
 
 React integration: [`@pumped-fn/lite-react`](../../react/lite-react/README.md)
 
 ## License
 
 MIT
+
+## Next
+
+- [Docs index](../../../docs/README.md)
+- [Patterns](./PATTERNS.md)
+- [Invoice triage example](../../../examples/invoice-triage/README.md)
 
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).
