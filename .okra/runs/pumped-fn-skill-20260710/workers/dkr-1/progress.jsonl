@@ -1,3 +1,5 @@
 {"ts":"2026-07-10T03:07:32Z","worker":"dkr-1","event":"start","detail":"begin idiom inventory probe"}
 {"ts":"2026-07-10T03:08:05Z","worker":"dkr-1","event":"source_done","detail":"lite PATTERNS.md + README.md read; note: PATTERNS.md lives at pkg/core/lite/PATTERNS.md not pkg/core/PATTERNS.md"}
 {"ts":"2026-07-10T03:08:40Z","worker":"dkr-1","event":"source_done","detail":"invoice-triage src/bin/tests fully read (2461 loc)"}
+{"ts":"2026-07-10T03:09:22Z","worker":"dkr-1","event":"source_done","detail":"docs + lint rules enumerated (24 rules via src RuleId union + README table)"}
+{"ts":"2026-07-10T03:11:59Z","worker":"dkr-1","event":"finish","detail":"idiom-register.md written: 12-row primitive table, 32 idioms in 5 rings, 16 coverage risks, 8 rubric dims"}
