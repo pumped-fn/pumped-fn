@@ -1,4 +1,12 @@
 {
+  "challengers": [
+    {
+      "artifact": "workers/chal-1/verdicts.md",
+      "id": "CHAL-1",
+      "model": "gpt-5.6-sol",
+      "status": "returned: 0 intact, 1 drifted, 11 dead"
+    }
+  ],
   "ckrs": [
     {
       "id": "CKR-1",
@@ -35,7 +43,7 @@
       "budget_min": 25,
       "decision_unlocked": "eval set candidate for human ratification (denominator freeze)",
       "id": "DKR-3",
-      "status": "dispatched",
+      "status": "checkpoint accepted; artifact eval-suite-candidate.md DECOMMISSIONED (dead hypothesis per CHAL-1: 0 intact, 1 drifted, 11 dead) \u2014 salvage carried into DKR-3b",
       "title": "eval-suite design \u2014 novel domains, difficulty ladder, rubric weights"
     },
     {
@@ -43,8 +51,16 @@
       "budget_min": 15,
       "decision_unlocked": "AG-1 readability in eval workspaces; AG-3 executability",
       "id": "DKR-4",
-      "status": "dispatched",
+      "status": "checkpoint accepted (ledger dkr_checkpoint_acceptance)",
       "title": "lint-gate integrity outside repo + codex model-id availability"
+    },
+    {
+      "artifact": "workers/dkr-3b/eval-suite-candidate-v2.md",
+      "budget_min": 30,
+      "decision_unlocked": "denominator candidate v2 -> sol re-challenge -> human ratification sheet",
+      "id": "DKR-3b",
+      "status": "dispatched",
+      "title": "eval-suite redesign under CHAL-1 verdicts \u2014 differentiator pass-gates (G6)"
     }
   ],
   "frame_version": 1,
@@ -60,5 +76,5 @@
   },
   "pkrs": [],
   "promotion_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
-  "tree_version": 2
+  "tree_version": 3
 }
