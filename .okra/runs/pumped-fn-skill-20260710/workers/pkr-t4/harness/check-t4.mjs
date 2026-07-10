@@ -22,9 +22,17 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { isFlow, isTag } from "@pumped-fn/lite"
 
-const telemetry = await import("./src/telemetry.ts")
-const audit = await import("./src/audit.ts")
-const wire = await import("./src/wire.ts")
+const load = async (path) => {
+  try {
+    return await import(path)
+  } catch (error) {
+    return { __loadError: String(error?.message ?? error) }
+  }
+}
+
+const telemetry = await load("./src/telemetry.ts")
+const audit = await load("./src/audit.ts")
+const wire = await load("./src/wire.ts")
 
 const checks = {}
 const errors = {}
@@ -107,6 +115,9 @@ const errorMentions = (error, field) => {
 }
 
 await check("decl-exports", async () => {
+  assert(!telemetry.__loadError, `src/telemetry.ts failed to load: ${telemetry.__loadError}`)
+  assert(!audit.__loadError, `src/audit.ts failed to load: ${audit.__loadError}`)
+  assert(!wire.__loadError, `src/wire.ts failed to load: ${wire.__loadError}`)
   assert(isFlow(telemetry.reportPosition), "export reportPosition is not an executable flow")
   assert(isFlow(telemetry.lowBatterySweep), "export lowBatterySweep is not an executable flow")
   assert(isTag(telemetry.fleetOps), "export fleetOps is not a tag (client injection point)")

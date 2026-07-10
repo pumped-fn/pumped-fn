@@ -1,0 +1,18 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-shipped-root-observes-public-ops": "fail",
+    "b2-boundary-parse-names-field": "pass",
+    "b3-nested-failure-dual-entries": "fail",
+    "b4-resolve-entries-distinct": "fail",
+    "b5-ring-evicts-oldest": "fail",
+    "s1-zod-union-at-boundary": "pass"
+  },
+  "errors": {
+    "b1-shipped-root-observes-public-ops": "trail exec entries must be exactly the operations the checker drove, in completion order: expected [{\"name\":\"report-position\",\"parent\":null,\"ok\":true},{\"name\":\"report-position\",\"parent\":null,\"ok\":true},{\"name\":\"report-position\",\"parent\":null,\"ok\":true},{\"name\":\"fleetops.dispatchPickup\",\"parent\":\"low-battery-sweep\",\"ok\":true},{\"name\":\"fleetops.dispatchPickup\",\"parent\":\"low-battery-sweep\",\"ok\":true},{\"name\":\"low-battery-sweep\",\"parent\":null,\"ok\":true}], got []",
+    "b3-nested-failure-dual-entries": "BOTH dispatch entries recorded: the succeeding one ok, the rejected one failed: expected [true,false], got []",
+    "b4-resolve-entries-distinct": "at least one atom/resource resolution must appear in the trail (kind: 'resolve')",
+    "b5-ring-evicts-oldest": "sentinel sweep entry present before overflow"
+  },
+  "failed": 4
+}
