@@ -41,6 +41,17 @@ Gates per task, in order (fail-fast): lint (`pumped-lite-lint --max-warnings 0 s
 tests`), tsgo (`--noEmit`), vitest, smoke (`tsx bin/<entry>.ts`), checker
 (`node --import tsx check.mjs`). `admitted_score = 1` iff all 5 exit 0.
 
+Fail-closed results (pkr-fix, closes chal-3 H3-FORMULA): `run-suite.sh` clears every
+`<results-root>/T-n` dir and `suite.json` before the run; `run-task.sh` clears its own
+result dir and writes a failed `verdict.json` (`admitted_score: 0` + `reason`) up front,
+replaced only by a completed gate verdict — every early exit (INSTANTIATE_FAILED,
+ENTRYPOINT_AMBIGUOUS) leaves an explicit failed verdict. A reused results-root can never
+inherit stale passing verdicts. pkr-fix also machine-bound two residuals: T-4's checker
+now executes `bin/daemon.ts` and asserts the audit trail in its stdout dump
+(`b6-daemon-runs-shipped-audited-root`), and T-3's checker fires a recorded `clock.every`
+tick and asserts the production capture flow runs from a natural tick
+(`b8-natural-clock-tick-runs-production-capture`). Evidence: `workers/pkr-fix/gates/`.
+
 ## Scoring formula (ratified)
 
 `suite_% = 100 * Σ(multiplier × admitted_score) / Σ(multiplier)`

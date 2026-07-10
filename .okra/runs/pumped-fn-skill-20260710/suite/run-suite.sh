@@ -7,6 +7,10 @@ RESULTS_ROOT="${2:-$HERE/results}"
 mkdir -p "$RESULTS_ROOT"
 
 TASKS="T-1 T-2 T-3 T-4 T-5 T-6 T-7 T-8 T-9 T-10"
+rm -f "$RESULTS_ROOT/suite.json"
+for task in $TASKS; do
+  rm -rf "${RESULTS_ROOT:?}/$task"
+done
 for task in $TASKS; do
   echo "=== suite task: $task ==="
   if [ -d "$SOLUTIONS/$task" ]; then
@@ -15,7 +19,7 @@ for task in $TASKS; do
     mkdir -p "$RESULTS_ROOT/$task"
     node -e '
       const [out, t] = process.argv.slice(1)
-      require("fs").writeFileSync(out, JSON.stringify({ task: t, missing_solution: true, gates: null, checker_exit: null, admitted_score: 0 }, null, 2) + "\n")
+      require("fs").writeFileSync(out, JSON.stringify({ task: t, missing_solution: true, gates: null, checker_exit: null, admitted_score: 0, reason: "MISSING_SOLUTION" }, null, 2) + "\n")
     ' "$RESULTS_ROOT/$task/verdict.json" "$task"
     echo "MISSING_SOLUTION: $task" >&2
   fi
