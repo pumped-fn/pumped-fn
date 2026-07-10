@@ -103,6 +103,8 @@ const check = async (id, run) => {
 
 let capEvery = 0
 let upEvery = 0
+const capStep = () => (capEvery > 0 ? capEvery : 3_600_000)
+const upStep = () => (upEvery > 0 ? upEvery : 600_000)
 
 await check("decl-jobs-register-opposite-policies", async () => {
   const captured = []
@@ -121,14 +123,14 @@ await check("decl-jobs-register-opposite-policies", async () => {
   const upload = captured.find((entry) => entry.spec.name === "archive-upload")
   assert(capture, "decl: no registration named nightly-capture")
   assert(upload, "decl: no registration named archive-upload")
+  capEvery = "every" in capture.spec.cadence ? Number(capture.spec.cadence.every) : 0
+  upEvery = "every" in upload.spec.cadence ? Number(upload.spec.cadence.every) : 0
   eq(capture.spec.overlap, "skip", "decl: capture overlap")
   eq(capture.spec.catchUp, "skip", "decl: capture catchUp")
   eq(upload.spec.overlap, "queue", "decl: upload overlap")
   eq(upload.spec.catchUp, "all", "decl: upload catchUp")
   assert("every" in capture.spec.cadence, "decl: capture cadence must be { every }")
   assert("every" in upload.spec.cadence, "decl: upload cadence must be { every }")
-  capEvery = Number(capture.spec.cadence.every)
-  upEvery = Number(upload.spec.cadence.every)
   assert(capEvery > 0 && upEvery > 0, "decl: cadence.every must be positive ms")
   await scope.dispose()
 })
@@ -213,7 +215,7 @@ await check("b2-upload-overlap-queues-strictly", async () => {
 await check("b3-upload-catchup-runs-all-missed-windows", async () => {
   const store = memStore({
     "nightly-capture": { lastRunMs: T0 },
-    "archive-upload": { lastRunMs: T0 - 3 * upEvery },
+    "archive-upload": { lastRunMs: T0 - 3 * upStep() },
   })
   const ports = recorders()
   const scope = productionScope({ store, ports })
@@ -232,7 +234,7 @@ await check("b3-upload-catchup-runs-all-missed-windows", async () => {
 })
 
 await check("b3b-catchup-is-idempotent-across-restart", async () => {
-  const store = memStore({ "archive-upload": { lastRunMs: T0 - 2 * upEvery } })
+  const store = memStore({ "archive-upload": { lastRunMs: T0 - 2 * upStep() } })
   const firstPorts = recorders()
   const firstScope = productionScope({ store, ports: firstPorts })
   const firstUpload = await firstScope.resolve(obs.uploadJob)
@@ -248,7 +250,7 @@ await check("b3b-catchup-is-idempotent-across-restart", async () => {
 })
 
 await check("b4-capture-missed-windows-are-lost", async () => {
-  const store = memStore({ "nightly-capture": { lastRunMs: T0 - 3 * capEvery } })
+  const store = memStore({ "nightly-capture": { lastRunMs: T0 - 3 * capStep() } })
   const ports = recorders()
   const scope = productionScope({ store, ports })
   await scope.resolve(obs.captureJob)
