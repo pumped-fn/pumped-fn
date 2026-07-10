@@ -31,7 +31,7 @@ await ctx.exec({ fn: () => client.send(message), params: [], name: "client.send"
 
 The scheduler backend is a tag. `scheduler.schedule(...)` returns a keep-alive atom. Resolve it at the root; production supplies a durable backend, tests supply a manual backend and drive ticks without timers.
 
-Install caveat: today the published scheduler package peers on Lite 3 and its npm tarball retains `catalog:` dependencies. In a cold Lite-4 workspace, pnpm-pack the scheduler from this repository, then add that tarball with `--legacy-peer-deps`; a plain registry install does not resolve.
+Install caveat: today the published scheduler package peers on Lite 3, so a plain install next to Lite 4 fails with ERESOLVE — add `--legacy-peer-deps` (`npm install @pumped-fn/lite-extension-scheduler --legacy-peer-deps`). If you instead pack the scheduler from the monorepo yourself, use `pnpm pack` (not `npm pack`), which resolves the workspace `catalog:` dependency ranges.
 
 ```ts
 import { createScope, flow, typed } from "@pumped-fn/lite"
