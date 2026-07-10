@@ -1,15 +1,13 @@
-import { createScope, flow, typed } from "@pumped-fn/lite"
-import { channel, issueAlert, quietHours, type Alert, type ChannelReceipt } from "../src/alerts.ts"
+import { createScope } from "@pumped-fn/lite"
+import { channel, issueAlert, quietHours, type Channel } from "../src/alerts.ts"
 
-const consoleChannel = (label: string) =>
-  flow({
-    name: `channel.${label}`,
-    parse: typed<Alert>(),
-    factory: (ctx): ChannelReceipt => {
-      console.log(`[${label}] ${ctx.input.severity}: ${ctx.input.text}`)
-      return { delivered: true }
-    },
-  })
+const consoleChannel = (name: string): Channel => ({
+  name,
+  send: (alert) => {
+    console.log(`[${name}] ${alert.severity}: ${alert.text}`)
+    return { delivered: true }
+  },
+})
 
 const scope = createScope({
   tags: [

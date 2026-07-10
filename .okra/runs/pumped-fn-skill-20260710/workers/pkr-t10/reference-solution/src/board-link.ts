@@ -13,7 +13,6 @@ export interface BoardLink {
 }
 
 export const boardLink = atom({
-  name: "boardLink",
   factory: (): BoardLink => ({
     open: (address) => ({
       address,

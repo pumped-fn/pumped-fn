@@ -1,6 +1,6 @@
 import { atom, controller, flow, resource, typed } from "@pumped-fn/lite"
 
-export type HoldStatus = "pending" | "claimed" | "printed" | "rejected"
+export type HoldStatus = "pending" | "printed" | "rejected"
 export type Hold = { holdId: number; isbn: string; copyId: string; status: HoldStatus }
 export type Slip = { holdId: number; copyId: string }
 export type SessionRecord = { session: number; slips: Slip[]; closed: "clean" | "dirty" }
@@ -31,9 +31,7 @@ const printerLog = atom({
 })
 
 const unfulfilled = (shelf: Shelf, copyId: string) =>
-  shelf.holds.some(
-    (hold) => hold.copyId === copyId && (hold.status === "pending" || hold.status === "claimed"),
-  )
+  shelf.holds.some((hold) => hold.copyId === copyId && hold.status === "pending")
 
 const printerSession = resource({
   name: "printer-session",
@@ -42,49 +40,14 @@ const printerSession = resource({
   factory: (ctx, { printerLog }) => {
     const session = printerLog.nextSession
     printerLog.nextSession += 1
-    const claimed: Hold[] = []
-    const slips: Slip[] = []
-    let jammedHoldId: number | null = null
+    let settled = false
     ctx.onClose((result) => {
-      if (result.ok) {
-        for (const hold of claimed) hold.status = "printed"
-        printerLog.sessions.push({ session, slips: [...slips], closed: "clean" })
-        return
-      }
-      for (const hold of claimed) {
-        hold.status = hold.holdId === jammedHoldId ? "rejected" : "pending"
-      }
-      printerLog.sessions.push({ session, slips: [], closed: "dirty" })
+      settled = result.ok
     })
     return {
       session,
-      claim: (hold: Hold) => {
-        hold.status = "claimed"
-        claimed.push(hold)
-      },
-      print: (slip: Slip) => {
-        slips.push(slip)
-      },
-      jam: (holdId: number) => {
-        jammedHoldId = holdId
-      },
+      settled: () => settled,
     }
-  },
-})
-
-const printSlip = flow({
-  name: "print-slip",
-  parse: typed<{ holdId: number; isbn: string; copyId: string }>(),
-  faults: typed<Fault>(),
-  deps: { session: printerSession },
-  factory: (ctx, { session }) => {
-    const { holdId, isbn, copyId } = ctx.input
-    if (isbn.length > 13) {
-      session.jam(holdId)
-      return ctx.fail({ code: "PRINTER_JAM", holdId })
-    }
-    session.print({ holdId, copyId })
-    return { holdId }
   },
 })
 
@@ -106,8 +69,8 @@ export const recordReturn = flow({
 
 export const recordReturns = flow({
   name: "record-returns",
-  faults: typed<Fault>(),
   parse: typed<{ returns: Return[] }>(),
+  faults: typed<Fault>(),
   deps: { shelf, signal: controller(holdSignal, { resolve: true }) },
   factory: (ctx, { shelf, signal }) => {
     const staged: Hold[] = []
@@ -133,14 +96,26 @@ export const drainPass = flow({
   name: "drain-pass",
   parse: typed<void>(),
   faults: typed<Fault>(),
-  deps: { shelf, session: printerSession, print: controller(printSlip) },
-  factory: async (ctx, { shelf, session, print }) => {
+  deps: { shelf, printerLog, session: printerSession },
+  factory: async (ctx, { shelf, printerLog, session }) => {
+    const record: SessionRecord = { session: session.session, slips: [], closed: "clean" }
+    printerLog.sessions.push(record)
     const batch = shelf.holds.filter((hold) => hold.status === "pending")
-    for (const hold of batch) session.claim(hold)
     for (const hold of batch) {
-      await print.exec({ input: { holdId: hold.holdId, isbn: hold.isbn, copyId: hold.copyId } })
+      if (hold.isbn.length > 13) {
+        record.closed = "dirty"
+        hold.status = "rejected"
+        return ctx.fail({ code: "PRINTER_JAM", holdId: hold.holdId })
+      }
+      await ctx.exec({
+        fn: () => {
+          record.slips.push({ holdId: hold.holdId, copyId: hold.copyId })
+          hold.status = "printed"
+        },
+        name: "printer.print",
+      })
     }
-    return { session: session.session, printed: batch.length }
+    return { session: session.session, printed: record.slips.length }
   },
 })
 
@@ -156,9 +131,8 @@ export const runDispatcher = flow({
   factory: async (ctx, { shelf, stop, drain }) => {
     let passes = 0
     let printed = 0
-    const pending = () => shelf.holds.some((hold) => hold.status === "pending")
     for await (const _wake of ctx.changes(holdSignal)) {
-      while (pending()) {
+      while (shelf.holds.some((hold) => hold.status === "pending")) {
         const pass = await drain.exec()
         passes += 1
         printed += pass.printed

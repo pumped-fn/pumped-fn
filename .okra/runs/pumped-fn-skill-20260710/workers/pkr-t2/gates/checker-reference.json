@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-record-commits-pending": "pass",
+    "b2-drain-prints-and-flushes-at-close": "pass",
+    "b3-fresh-session-per-sequential-sibling-pass": "pass",
+    "b4-concurrent-sibling-passes-exactly-once": "pass",
+    "b5-empty-pass-still-isolated-session": "pass",
+    "b6-failing-batch-invisible-to-awake-dispatcher": "pass",
+    "b7-jam-closes-dirty-and-discards": "pass",
+    "b7b-recovery-pass-after-jam": "pass",
+    "b8-stop-finishes-current-drain-exactly-once": "pass",
+    "n1-duplicate-hold-and-refulfil": "pass",
+    "n2-racing-duplicates-single-winner": "pass",
+    "p1-shelf-outlives-daemon-context": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

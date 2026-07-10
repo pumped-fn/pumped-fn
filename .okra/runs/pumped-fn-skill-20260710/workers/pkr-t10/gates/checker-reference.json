@@ -1,0 +1,15 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-lazy-single-session": "pass",
+    "b2-retarget-closes-old-first": "pass",
+    "b3-no-eager-reopen": "pass",
+    "b4-same-address-retarget-keeps-session": "pass",
+    "b5-shutdown-closes-live-session": "pass",
+    "b6-retarget-before-first-render": "pass",
+    "b7-multi-retarget-order": "pass",
+    "n1-fresh-scope-isolation": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

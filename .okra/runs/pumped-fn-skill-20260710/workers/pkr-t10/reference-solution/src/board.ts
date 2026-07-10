@@ -4,7 +4,6 @@ import { boardLink } from "./board-link.ts"
 import type { Departure } from "./board-link.ts"
 
 export const displayAddress = atom({
-  name: "displayAddress",
   factory: () => "harbor-main",
 })
 

@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-record-commits-pending": "pass",
+    "b2-drain-prints-and-flushes-at-close": "fail",
+    "b3-fresh-session-per-sequential-sibling-pass": "fail",
+    "b4-concurrent-sibling-passes-exactly-once": "fail",
+    "b5-empty-pass-still-isolated-session": "pass",
+    "b6-failing-batch-invisible-to-awake-dispatcher": "fail",
+    "b7-jam-closes-dirty-and-discards": "fail",
+    "b7b-recovery-pass-after-jam": "fail",
+    "b8-stop-finishes-current-drain-exactly-once": "fail",
+    "n1-duplicate-hold-and-refulfil": "fail",
+    "n2-racing-duplicates-single-winner": "pass",
+    "p1-shelf-outlives-daemon-context": "pass"
+  },
+  "errors": {
+    "b2-drain-prints-and-flushes-at-close": "params is not iterable (cannot read property undefined)",
+    "b3-fresh-session-per-sequential-sibling-pass": "params is not iterable (cannot read property undefined)",
+    "b4-concurrent-sibling-passes-exactly-once": "params is not iterable (cannot read property undefined)",
+    "b6-failing-batch-invisible-to-awake-dispatcher": "dispatcher failed: params is not iterable (cannot read property undefined)",
+    "b7-jam-closes-dirty-and-discards": "jammed pass: rejection does not carry PRINTER_JAM: params is not iterable (cannot read property undefined)",
+    "b7b-recovery-pass-after-jam": "jammed pass: rejection does not carry PRINTER_JAM: params is not iterable (cannot read property undefined)",
+    "b8-stop-finishes-current-drain-exactly-once": "dispatcher failed: params is not iterable (cannot read property undefined)",
+    "n1-duplicate-hold-and-refulfil": "params is not iterable (cannot read property undefined)"
+  },
+  "failed": 8
+}
