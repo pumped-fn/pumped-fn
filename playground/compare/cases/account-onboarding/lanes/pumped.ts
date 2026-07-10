@@ -1,9 +1,10 @@
-import { atom, createScope, flow, isFault, resource, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, createScope, flow, isFault, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import type { Database, DuplicateEmail, Fixture, Lane, Outcome, ProvisionInput, RequestFacts } from "../contract"
+import type { Trace } from "../trace"
 
-const caseFixture = tag<Fixture>({ label: "comparison.fixture" })
-const actorId = tag<string>({ label: "request.actor-id" })
-const requestId = tag<string>({ label: "request.id" })
+export const caseFixture = tag<Fixture>({ label: "comparison.fixture" })
+export const actorId = tag<string>({ label: "request.actor-id" })
+export const requestId = tag<string>({ label: "request.id" })
 
 const clock = atom({
   deps: { caseFixture: tags.required(caseFixture) },
@@ -15,7 +16,7 @@ const uuid = atom({
   factory: (_, { caseFixture }) => ({ next: () => caseFixture.nextId() }),
 })
 
-const database = resource({
+export const database = resource({
   name: "comparison.database",
   ownership: "boundary",
   deps: { caseFixture: tags.required(caseFixture) },
@@ -30,7 +31,7 @@ const database = resource({
   },
 })
 
-const provision = flow({
+export const provision = flow({
   name: "account.provision.pumped",
   parse: typed<ProvisionInput>(),
   faults: typed<DuplicateEmail>(),
@@ -59,32 +60,41 @@ const provision = flow({
   },
 })
 
+export async function startPumped(fixture: Fixture, trace?: Trace): Promise<Awaited<ReturnType<Lane["start"]>>> {
+  const extensions: Lite.Extension[] = trace === undefined ? [] : [{
+    name: "comparison.trace",
+    async wrapExec(next, _target, ctx) {
+      trace.record(ctx.name ?? "anonymous")
+      return next()
+    },
+  }]
+  const scope = createScope({ extensions, tags: [caseFixture(fixture)] })
+  const root = scope.createContext()
+  await root.resolve(database)
+
+  return {
+    async provision(input: ProvisionInput, facts: RequestFacts): Promise<Outcome> {
+      const ctx = scope.createContext({
+        parent: root,
+        tags: [actorId(facts.actorId), requestId(facts.requestId)],
+      })
+      try {
+        return { ok: true, user: await ctx.exec({ flow: provision, input }) }
+      } catch (error) {
+        if (isFault(provision, error)) return { ok: false, error: error.fault }
+        throw error
+      } finally {
+        await ctx.close()
+      }
+    },
+    async close() {
+      await root.close()
+      await scope.dispose()
+    },
+  }
+}
+
 export const pumped = {
   id: "pumped-fn",
-  async start(fixture) {
-    const scope = createScope({ tags: [caseFixture(fixture)] })
-    const root = scope.createContext()
-    await root.resolve(database)
-
-    return {
-      async provision(input: ProvisionInput, facts: RequestFacts): Promise<Outcome> {
-        const ctx = scope.createContext({
-          parent: root,
-          tags: [actorId(facts.actorId), requestId(facts.requestId)],
-        })
-        try {
-          return { ok: true, user: await ctx.exec({ flow: provision, input }) }
-        } catch (error) {
-          if (isFault(provision, error)) return { ok: false, error: error.fault }
-          throw error
-        } finally {
-          await ctx.close()
-        }
-      },
-      async close() {
-        await root.close()
-        await scope.dispose()
-      },
-    }
-  },
+  start: startPumped,
 } satisfies Lane

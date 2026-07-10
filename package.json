@@ -25,7 +25,9 @@
     "test:release": "pnpm act -W .github/workflows/release.yml -j release --secret-file .secrets",
     "compare:verify": "pnpm -F @pumped-fn/compare verify",
     "pages:dry-run": "pnpm -F @pumped-fn/compare pages:dry-run",
-    "pages:verify:public": "pnpm -F @pumped-fn/compare pages:verify:public"
+    "pages:verify:public": "pnpm -F @pumped-fn/compare pages:verify:public",
+    "pages:rollback:dry-run": "pnpm -F @pumped-fn/compare pages:rollback:dry-run",
+    "pages:verify:public:rollback": "pnpm -F @pumped-fn/compare pages:verify:public:rollback"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",

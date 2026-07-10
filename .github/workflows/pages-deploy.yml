@@ -2,6 +2,15 @@ name: Deploy Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Pages artifact to publish
+        required: true
+        default: homepage
+        type: choice
+        options:
+          - homepage
+          - baseline-rollback
 
 concurrency:
   group: pages
@@ -30,10 +39,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
+        if: inputs.mode == 'homepage'
         run: pnpm -F @pumped-fn/compare exec playwright install --with-deps chromium
 
-      - name: Stage and verify Pages artifact
+      - name: Stage and verify homepage artifact
+        if: inputs.mode == 'homepage'
         run: pnpm pages:dry-run
+
+      - name: Stage and verify baseline rollback artifact
+        if: inputs.mode == 'baseline-rollback'
+        run: pnpm pages:rollback:dry-run
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -87,7 +102,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
+        if: inputs.mode == 'homepage'
         run: pnpm -F @pumped-fn/compare exec playwright install --with-deps chromium
 
-      - name: Verify deployed Pages
+      - name: Verify deployed homepage
+        if: inputs.mode == 'homepage'
         run: pnpm pages:verify:public
+
+      - name: Verify deployed baseline rollback
+        if: inputs.mode == 'baseline-rollback'
+        run: pnpm pages:verify:public:rollback

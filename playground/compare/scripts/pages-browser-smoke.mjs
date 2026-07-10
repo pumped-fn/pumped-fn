@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs"
 import { readFile, stat } from "node:fs/promises"
 import { createServer } from "node:http"
 import { extname, join, normalize, sep } from "node:path"
+import { startWatchdog } from "./adapters/watchdog.mjs"
 import { stageRoot } from "./pages-lib.mjs"
 
 const types = new Map([
@@ -21,7 +22,7 @@ const server = createServer(async (request, response) => {
       return
     }
     const requestPath = decodeURIComponent(url.pathname.slice("/pumped-fn/".length))
-    const relativePath = requestPath.endsWith("/") ? `${requestPath}index.html` : requestPath
+    const relativePath = requestPath === "" || requestPath.endsWith("/") ? `${requestPath}index.html` : requestPath
     const safePath = normalize(relativePath).split(sep).join("/")
     if (safePath.startsWith("../") || safePath === "..") {
       response.writeHead(400).end()
@@ -37,14 +38,32 @@ const server = createServer(async (request, response) => {
   }
 })
 
-await new Promise((resolve) => server.listen(4179, "127.0.0.1", resolve))
+function phase(name, details = {}) {
+  process.stdout.write(`${JSON.stringify({ pagesSmokePhase: name, ...details })}\n`)
+}
+
+const stopWatchdog = startWatchdog(180000, () => {
+  process.stderr.write(`${JSON.stringify({ pagesSmokePhase: "timeout", timeoutMs: 180000 })}\n`)
+  server.closeAllConnections()
+  process.exit(124)
+}, 180000)
+
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
 
 try {
-  const revision = JSON.parse(await readFile(join(stageRoot, "compare", "revision.json"), "utf8"))
-  process.env.PAGES_PUBLIC_BASE_URL = "http://127.0.0.1:4179/pumped-fn/"
+  const revision = JSON.parse(await readFile(join(stageRoot, "revision.json"), "utf8"))
+  const address = server.address()
+  if (!address || typeof address === "string") throw new Error("local Pages server has no TCP address")
+  phase("server-ready", { port: address.port })
+  process.env.PAGES_PUBLIC_BASE_URL = `http://127.0.0.1:${address.port}/pumped-fn/`
   process.env.PAGES_EXPECTED_REVISION = revision.sourceRevision
   process.env.PAGES_EXPECTED_TREE_STATE = revision.sourceTreeState
+  process.env.PAGES_VERIFY_TIMEOUT_MS = "170000"
+  phase("public-verifier-start")
   await import("./adapters/pages-public.mjs")
+  phase("public-verifier-complete")
 } finally {
+  stopWatchdog()
+  server.closeAllConnections()
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
 }
