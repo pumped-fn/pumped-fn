@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-basic-pairing": "pass",
+    "b2-bye-staged-with-round": "pass",
+    "b3-sibling-staging-reset": "pass",
+    "b4-commit-before-session-close": "pass",
+    "b5-standalone-pairing-no-publish": "pass",
+    "b5b-standalone-bye-no-publish": "pass",
+    "b6-crash-path-discard": "pass",
+    "b6b-no-phantom-state-after-crash": "pass",
+    "b8-concurrent-siblings-distinct": "pass",
+    "n1-invalid-entrants": "pass",
+    "p1-record-outlives-session-context": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}
+exit 0

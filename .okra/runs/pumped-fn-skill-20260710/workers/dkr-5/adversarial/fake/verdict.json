@@ -1,0 +1,23 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-basic-pairing": "pass",
+    "b2-bye-staged-with-round": "pass",
+    "b3-sibling-staging-reset": "pass",
+    "b4-commit-before-session-close": "pass",
+    "b5-standalone-pairing-no-publish": "pass",
+    "b5b-standalone-bye-no-publish": "pass",
+    "b6-crash-path-discard": "fail",
+    "b6b-no-phantom-state-after-crash": "fail",
+    "b8-concurrent-siblings-distinct": "fail",
+    "n1-invalid-entrants": "pass",
+    "p1-record-outlives-session-context": "pass"
+  },
+  "errors": {
+    "b6-crash-path-discard": "round 1 intact: expected 2, got 4",
+    "b6b-no-phantom-state-after-crash": "recovery staged only its own records: expected 2, got 4",
+    "b8-concurrent-siblings-distinct": "concurrent sibling A staged: expected 2, got 0"
+  },
+  "failed": 3
+}
+exit 1

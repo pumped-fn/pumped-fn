@@ -1,0 +1,30 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-basic-pairing": "pass",
+    "b2-bye-staged-with-round": "fail",
+    "b3-sibling-staging-reset": "fail",
+    "b4-commit-before-session-close": "fail",
+    "b5-standalone-pairing-no-publish": "fail",
+    "b5b-standalone-bye-no-publish": "fail",
+    "b6-crash-path-discard": "fail",
+    "b6b-no-phantom-state-after-crash": "fail",
+    "b8-concurrent-siblings-distinct": "fail",
+    "n1-invalid-entrants": "fail",
+    "p1-record-outlives-session-context": "fail"
+  },
+  "errors": {
+    "b2-bye-staged-with-round": "published record: expected [{\"round\":1,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":\"elke\"}], got [{\"round\":1,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":2,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":\"elke\"}]",
+    "b3-sibling-staging-reset": "round numbers: expected [1,2], got [1,2,3,4]",
+    "b4-commit-before-session-close": "round visible while session still open: expected 1, got 5",
+    "b5-standalone-pairing-no-publish": "pairEntrants must not return pairing details",
+    "b5b-standalone-bye-no-publish": "standalone bye published nothing: expected [], got [{\"round\":1,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":2,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":\"elke\"},{\"round\":3,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":4,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":5,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null}]",
+    "b6-crash-path-discard": "BYE_EXHAUSTED: elke",
+    "b6b-no-phantom-state-after-crash": "BYE_EXHAUSTED: elke",
+    "b8-concurrent-siblings-distinct": "distinct consecutive round numbers: expected [1,2], got [1,2,3,4,5,6,7,8,9]",
+    "n1-invalid-entrants": "invalid generations published nothing: expected [], got [{\"round\":1,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":2,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":\"elke\"},{\"round\":3,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":4,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":5,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":6,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":7,\"pairings\":[[\"anna\",\"boris\"],[\"carl\",\"dina\"]],\"bye\":null},{\"round\":8,\"pairings\":[[\"a1\",\"a2\"],[\"a3\",\"a4\"]],\"bye\":null},{\"round\":9,\"pairings\":[[\"b1\",\"b2\"],[\"b3\",\"b4\"]],\"bye\":null}]",
+    "p1-record-outlives-session-context": "record visible from a fresh session context: expected 1, got 10"
+  },
+  "failed": 10
+}
+exit 1
