@@ -52,6 +52,8 @@ root/test -> createScope({ presets, tags, extensions })
 
 Use `atom` for scope-lived state/capability, `flow` for per-action work, `resource` for context-owned values, `tag` for contextual facts/roles, `controller` for child flows or intentional state control, and extensions for cross-cutting policy.
 
+Decide by where the value comes FROM: an atom's factory CONSTRUCTS its value inside the graph; a value SUPPLIED from outside (composition root, deployment, request) is a tag — an injected foreign client/capability is always a tag (or port flow), never an atom.
+
 `resource({ ownership: "current" })` is private to a top-level action and shared by its nested executions. `ownership: "boundary"` is shared by a boundary and descendants. Register transactional outcome behavior in the resource factory: `ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())`; `ctx.release(resource)` releases the owner-local value but does not replace an honest later close result.
 
 Use `scope.select(atom, selector, { eq })`, never a top-level `select` import. `eq` suppresses subscriber notification, not selector recomputation. Atom controllers may `set`/`update`; resource controllers only resolve/release/observe. Put atom `watch: true` only in atom deps and resource `watch: true` only in resource deps.
@@ -70,6 +72,7 @@ Before the final gate run, diff each exported flow's return value against every 
 
 ## Trap corpus
 
+- Injected client as atom: if the composition root hands you the implementation, wrapping it in an atom hides the injection point — declare a `tag<ClientType>()` and bind it at the root; deps take `tags.required(client)`.
 - Fn edges require `params` even at arity zero: `ctx.exec({ fn: ping, params: [], name: "client.ping" })`; omitting it throws `params is not iterable`.
 - A foreign edge fails two ways: a domain "no" in its return AND a rejected promise. Catch at the exec site and convert both into the flow's declared fault carrying the domain id: `try { await ctx.exec({ fn: () => ops.dispatch(id), params: [], name: "ops.dispatch" }) } catch (error) { return ctx.fail({ code: "dispatch-failed", id, message: String(error) }) }`. A rejection that escapes raw loses the id and is untyped to callers.
 - Retry only a declared flow's fault: `if (isFault(transcribeEpisode, error) && error.fault.code === "busy")`. The test is `error.flow === flow.name`; a deps handle or `controller(child, { name })` rename misclassifies it.

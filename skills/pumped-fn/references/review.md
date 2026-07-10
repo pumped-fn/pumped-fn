@@ -40,6 +40,7 @@ Run lint with `pumped-lite-lint` from the `@pumped-fn/lite-lint` package.
 | Layers | Raw IO is in a transport atom; a capability mediates it; feature depends only on capability. A preset can replace the transport. |
 | Root ownership | Each root/test spells out `createScope` and boundary context; no product composition helper owns either. |
 | Ports | Multiple implementations arrive through a tag carrying a flow/interface; root selects implementation and test supplies a collecting one. |
+| Injected capability is a tag | Reviewer checks that a foreign client/capability supplied by the composition root, deployment, or request is a tag (or port flow), never an atom; lint cannot see this. |
 | Tag behavior | Required/optional/all is chosen deliberately; required absence is tested as a loud resolution failure. |
 | State and wakes | Durable/state queue holds work; a signal only wakes drainers. Burst wakeups cannot lose jobs. |
 | Commit ordering | Transaction commits before signal. A commit failure proves no consumer observes uncommitted work. |
