@@ -19,7 +19,7 @@ const waterPlant = flow({
   parse: typed<{ ml: number }>(),
   deps: { hose },
   factory: async (ctx, { hose }) => {
-    await ctx.exec({ fn: () => hose.water(ctx.input.ml), name: "hose.water" })
+    await ctx.exec({ fn: () => hose.water(ctx.input.ml), params: [], name: "hose.water" })
     return { watered: ctx.input.ml }
   },
 })
@@ -113,7 +113,7 @@ A tag carrying a flow becomes a context-bound `FlowHandle` in deps. `required` f
 ## Controllers, select, and scope
 
 ```ts
-import { atom, controller, createScope, preset, select } from "@pumped-fn/lite"
+import { atom, controller, createScope, preset } from "@pumped-fn/lite"
 
 const moisture = atom({ factory: () => ({ percent: 40, sensorAt: 1 }) })
 const display = atom({

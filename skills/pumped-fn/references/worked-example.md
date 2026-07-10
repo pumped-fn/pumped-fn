@@ -1,6 +1,6 @@
 # Worked example: garden watering controller
 
-This is one complete small composition. `pump` is a transport atom; `plot` is a contextual tag; `wateringSession` is a current-owned resource; `recordWatering` is a child flow; `waterBed` composes it through a controller dependency. The root owns logging. The test replaces only the pump through the scope seam.
+This is one complete small composition. `pump` is a transport atom; `plot` is a contextual tag; `wateringSession` is a current-owned resource; `recordWatering` is a child flow; `waterBed` composes it through a controller dependency. The root owns an inline extension, so the template needs no extra tarball or package.
 
 ## `src/garden.ts`
 
@@ -48,7 +48,7 @@ export const waterBed = flow({
     recordWatering: controller(recordWatering, { name: "record-watering" }),
   },
   factory: async (ctx, { plot, pump, recordWatering }) => {
-    await ctx.exec({ fn: () => pump.deliver(ctx.input.ml), name: "pump.deliver" })
+    await ctx.exec({ fn: () => pump.deliver(ctx.input.ml), params: [], name: "pump.deliver" })
     const entries = await recordWatering.exec({ input: { plot, ml: ctx.input.ml } })
     return { entries, plot, watered: ctx.input.ml }
   },
@@ -60,14 +60,21 @@ export const waterBed = flow({
 ## `bin/main.ts`
 
 ```ts
-import { createScope } from "@pumped-fn/lite"
-import { logging } from "@pumped-fn/lite-extension-logging"
+import { createScope, type Lite } from "@pumped-fn/lite"
 import { plot, waterBed } from "../src/garden.js"
 
-const sink = { write: (record: { level: string; message: string }) => console.log(record.level, record.message) }
+const logging: Lite.Extension = {
+  name: "logging",
+  async wrapExec(next, target, ctx) {
+    const name = ctx.name ?? target.name
+    console.log("start", name)
+    ctx.onClose((result) => console.log("end", name, result.ok))
+    return next()
+  },
+}
 const scope = createScope({
-  extensions: [logging.extension()],
-  tags: [plot("herbs"), logging.runtime({ flow: "all", sinks: [sink] })],
+  extensions: [logging],
+  tags: [plot("herbs")],
 })
 const ctx = scope.createContext()
 console.log(await ctx.exec({ flow: waterBed, input: { ml: 300 } }))

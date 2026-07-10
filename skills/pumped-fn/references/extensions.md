@@ -8,12 +8,13 @@ import { createScope, type Lite } from "@pumped-fn/lite"
 const logging: Lite.Extension = {
   name: "logging",
   wrapExec(next, target, ctx) {
-    console.log("start", target.name)
-    ctx.onClose((result) => console.log("end", target.name, result.ok))
-    return next
+    const name = ctx.name ?? target.name
+    console.log("start", name)
+    ctx.onClose((result) => console.log("end", name, result.ok))
+    return next()
   },
   wrapResolve(next) {
-    return next
+    return next()
   },
 }
 
@@ -23,7 +24,7 @@ const scope = createScope({ extensions: [logging] })
 Use package extensions such as `logging.extension()` / `observable.extension()` and supply their sinks/runtime tags at the root. A business factory names each foreign SDK call:
 
 ```ts
-await ctx.exec({ fn: () => client.send(message), name: "client.send", tags: [] })
+await ctx.exec({ fn: () => client.send(message), params: [], name: "client.send", tags: [] })
 ```
 
 ## Scheduler

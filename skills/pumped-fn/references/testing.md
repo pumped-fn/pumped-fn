@@ -14,8 +14,9 @@ describe("waterPlant", () => {
       presets: [preset(hose, { water: async (ml: number) => { calls.push(ml) } })],
     })
     const ctx = scope.createContext()
-    await expect(ctx.exec({ flow: waterPlant, input: { ml: 250 } })).resolves.toEqual({ watered: 250 })
-    expectTypeOf(ctx.exec({ flow: waterPlant, input: { ml: 250 } })).toEqualTypeOf<Promise<{ watered: number }>>()
+    const run = ctx.exec({ flow: waterPlant, input: { ml: 250 } })
+    expectTypeOf(run).toEqualTypeOf<Promise<{ watered: number }>>()
+    await expect(run).resolves.toEqual({ watered: 250 })
     expect(calls).toEqual([250])
     await ctx.close({ ok: true })
     await scope.dispose()
@@ -50,11 +51,11 @@ Await `entered.wait`, assert the intermediate observable state, call `release.op
 
 ## Lifecycle and recovery
 
-- Assert close outcomes. A successful invocation is not successful if the parent closes `{ ok: false, error }`.
+- Assert close outcomes for resources owned by the parent/boundary. A completed `current`-owned child cannot be retroactively failed by a later parent close.
 - For a stream abandoned with `break`, assert `{ ok: false, aborted: true }` at the close recorder; its resource must roll back/cleanup.
 - Test crash recovery with two scopes sharing the same durable fake/preset: scope one leaves pending state then closes unsuccessfully; scope two runs public recovery and proves persisted work is recovered exactly once.
 - Always call `await ctx.close({ ok: true })` only after the whole boundary succeeded. In a catch, close `{ ok: false, error }`, then rethrow. Always `await scope.dispose()`.
 
 Concurrency correctness comes from controlled edges, not elapsed time.
 
-For commit ordering, make a fake durable store expose `commit` and `signal` calls, run the public flow, and assert `commit` precedes `signal`; put the work item in that store, not in the wakeup iterator. For graceful shutdown, execute a public `stop` flow that flips a state atom and signals loops, then await loop results before closing the root context.
+For a resource-backed transaction, put awaited `commit` and the subsequent `signal` in the same successful `ctx.onClose` callback; assert that order through a fake durable store. For an inline store transaction, commit then signal in the flow. Put the work item in state, not in the wakeup iterator. For graceful shutdown, execute a public `stop` flow that flips a state atom and signals loops, then await loop results before closing the root context.

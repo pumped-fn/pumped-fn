@@ -1,56 +1,61 @@
-# Design-trace rubric
+# Review rubric
 
-For every edge ask: where is it declared, who owns it, how does a test replace it, and how does it close? Lint catches syntax-shaped violations; the rest is reviewer judgment.
+Trace each edge: declaration, owner, scope substitution, and close behavior. This file has two tiers. `lint:` is only a mapping to one machine rule; `preference:` is human review only.
 
-## Machine-checked DON'Ts
+## lint:
 
-| Rule | Why | Violation |
-|---|---|---|
-| `pumped/no-ambient-io-outside-boundary` | effects stay controlled | `fetch`/timer/random in feature factory |
-| `pumped/no-ctx-argument` | ctx is not a hidden helper parameter | passing `ctx` to a product helper |
-| `pumped/no-definition-handle-suffix` | kind is inferred | `queueAtom`, `sendFlow` |
-| `pumped/no-direct-flow-composition` | child edge stays visible/presettable | flow-body `ctx.exec({ flow: child })` |
-| `pumped/no-handle-spread` | preserve handle identity/presets | `{ ...flow, tags }` |
-| `pumped/no-implicit-tag-read` | ambient input is declared | undeclared `ctx.data.seekTag(x)` |
-| `pumped/no-internal-example-label` | public vocabulary stays current | stale internal example label |
-| `pumped/no-jsdom-backend` | browser tests use supported mode | jsdom observer backend |
-| `pumped/no-module-mocks` | scope is one seam | `vi.mock`, `jest.mock`, `vi.spyOn` |
-| `pumped/no-module-state` | state is materialized/presettable | mutable module variable closed over by node |
-| `pumped/no-naked-globals` | ambient effects become edges | `Date.now`, env, fs in factory |
-| `pumped/no-render-outside-browser-test` | browser test boundary is explicit | Testing Library render in node test |
-| `pumped/no-react-local-state` | graph owns graph state | `useState` mirroring an atom |
-| `pumped/no-react-manual-execution-context` | UI boundary owns context | component creates/closes context |
-| `pumped/no-react-use-execution-context` | UI invokes flows declaratively | feature calls `useExecutionContext` |
-| `pumped/no-react-use-scope` | feature does not own composition | feature calls `useScope` |
-| `pumped/no-scope-argument` | roots own scope | exported helper accepts scope |
-| `pumped/no-scope-reach` | factories do not create boundaries | `ctx.scope.createContext()` in factory |
-| `pumped/no-shared-scope-factory` | each root declares composition | `makeScope()` helper |
-| `pumped/no-swallowed-error` | failure remains observable | empty/discarding catch |
-| `pumped/no-test-only-branches` | tests substitute edges | `if (isTest)` product branch |
-| `pumped/no-unattributed-await` | foreign effects get spans | `await deps.client.send()` |
-| `pumped/no-untyped-throw` | planned faults are structured | `throw new Error()` in factory |
-| `pumped/prefer-destructured-deps` | edges scan at the signature | `factory: (_, deps) => deps.db` |
+| Rule | Reject when |
+|---|---|
+| `pumped/no-ambient-io-outside-boundary` | a feature factory calls network, timer, random, or filesystem APIs |
+| `pumped/no-ctx-argument` | product helper accepts `ctx` |
+| `pumped/no-definition-handle-suffix` | definition is named `cacheAtom` or `sendFlow` |
+| `pumped/no-direct-flow-composition` | a flow body calls `ctx.exec({ flow: child })` instead of controller dep |
+| `pumped/no-handle-spread` | a handle is spread to retrofit tags/options |
+| `pumped/no-implicit-tag-read` | factory reads undeclared contextual tag data |
+| `pumped/no-internal-example-label` | stale internal example label appears |
+| `pumped/no-jsdom-backend` | browser observer test selects jsdom backend |
+| `pumped/no-module-mocks` | test uses `vi.mock`, `jest.mock`, or module spy |
+| `pumped/no-module-state` | graph module closes over mutable module state |
+| `pumped/no-naked-globals` | product factory reads global environment/time/filesystem directly |
+| `pumped/no-render-outside-browser-test` | node test renders a browser component |
+| `pumped/no-react-local-state` | React component mirrors graph state with local state |
+| `pumped/no-react-manual-execution-context` | React component creates/closes execution context |
+| `pumped/no-react-use-execution-context` | React feature calls `useExecutionContext` |
+| `pumped/no-react-use-scope` | React feature calls `useScope` |
+| `pumped/no-scope-argument` | exported product helper accepts a scope |
+| `pumped/no-scope-reach` | factory reaches `ctx.scope.createContext()` |
+| `pumped/no-shared-scope-factory` | shared helper preconfigures a scope |
+| `pumped/no-swallowed-error` | caught failure is discarded |
+| `pumped/no-test-only-branches` | production logic checks test mode |
+| `pumped/no-unattributed-await` | adapter/client call is awaited outside named `ctx.exec` |
+| `pumped/no-untyped-throw` | factory throws bare builtin error rather than a declared fault |
+| `pumped/prefer-destructured-deps` | factory uses `deps.x` rather than destructuring |
 
-## Preference-tier DO/DON'Ts
+## preference:
 
-| Rule | Why | Violation |
-|---|---|---|
-| DO transport -> capability -> feature | effects remain traceable | feature imports process/network client |
-| DO resource ownership by user boundary | lifecycle is honest | request tx as atom; `current` mistaken for sibling-shared |
-| DO state for work, stream for view/wakeup | conflation cannot lose work | queue items only in `changes`/stream |
-| DO signal after durable commit | consumers see committed work | signal increment before transaction commit |
-| DO atomic aggregate writes | retries/races stay controlled | row and audit write in separate commits |
-| DO parse at boundary, typed internally | trusted paths avoid runtime cost | zod parses internal handoff |
-| DO child flow controller deps | composition is visible | same-file hidden `ctx.exec({ flow })` |
-| DO named `ctx.exec({ fn, name })` foreign calls | observability has edges | direct awaited client method |
-| DO root extensions | policy is consistent | logging/spans in each flow |
-| DO explicit request tags, no ALS | context is testable | ambient request lookup |
-| DO deterministic gates/manual ticks | tests prove ordering | `setTimeout` sleep test |
-| DO assert close and recovery | lifecycle failure is testable | only output assertion after abort/crash |
-| DO atom-watch only in atom deps; resource-watch only in resource deps | invalidation ownership is valid | atom watch in resource/flow deps |
-| DO remember select `eq` only suppresses notification | performance reasoning stays correct | claim selector stops recomputing |
-| DO `prepare()` for staged/retry/fanout | no work/span before execution | eager child exec to stage loop |
-| DO bounded drain and keep-alive signals | memory/liveness stay controlled | drain infinite feed; GC'd wake signal |
-| DON'T facade objects or ceremony generics | graph remains directly consumable | `{ run, stop }` facade; `atom<Port>` |
-| DON'T hand-write inferable wiring types | types reflect graph | interface repeating inferred factory output |
-| DO named types at transfer boundaries | contracts stay clear | named glue type for local deps |
+| Review criterion | Concrete acceptance check |
+|---|---|
+| Layers | Raw IO is in a transport atom; a capability mediates it; feature depends only on capability. A preset can replace the transport. |
+| Root ownership | Each root/test spells out `createScope` and boundary context; no product composition helper owns either. |
+| Ports | Multiple implementations arrive through a tag carrying a flow/interface; root selects implementation and test supplies a collecting one. |
+| Tag behavior | Required/optional/all is chosen deliberately; required absence is tested as a loud resolution failure. |
+| State and wakes | Durable/state queue holds work; a signal only wakes drainers. Burst wakeups cannot lose jobs. |
+| Commit ordering | Transaction commits before signal. A commit failure proves no consumer observes uncommitted work. |
+| Aggregate atomicity | A multi-write invariant is one transaction; failure leaves neither partial aggregate nor audit-only record. |
+| Boundary parsing | Wire input uses `parse`; internal handoff uses `typed<T>()`; boundary maps parse failure to its protocol response. |
+| Shutdown | Stop flow flips state and wakes loops; root awaits them and supplies actual close outcome. |
+| Derived/watch | Derived atom uses atom controller `resolve + watch`; resource watch is only a resource dep and invalidates/reacquires correctly. |
+| Scheduling | Job declares cadence, overlap, catch-up; manual backend test proves one tick without a clock sleep. |
+| Naming/style | No suffixes/facades/ceremony generics/inferable wiring types; only transfer contracts receive named types. |
+| Fault taxonomy | Flow planned failure is declared `faults` + `ctx.fail`; adapter/library exceptional failure uses a structured named error class; neither is swallowed. |
+| Test seam | Test uses scope presets/tags/extensions and public flow only; fake matches the real edge's shape. |
+| Deterministic concurrency | Gates or iterator coordination establish ordering; no sleep-based assertion. |
+| Lifecycle/recovery | Tests close contexts honestly, assert abort outcome, and use two scopes plus shared durable fake for recovery. |
+| Type contract | Test stores one execution promise, asserts its type, then awaits that same promise. |
+| Extensions | Root installs extensions; wrappers call `next()` and record close outcome; business code only names foreign edges. |
+| Request boundary | Boundary creates tagged context and closes it; product nodes declare request tags rather than use ALS. |
+| Prepare | A keyed `prepare` stages retry/fanout; `ready` is awaited only for staged readiness and `exec` starts work. |
+| Streams | Conflated `changes` is a view/wakeup; generator stream is pull-driven; drain has a finite `take`. |
+| Liveness/GC | Signals required across churn use `keepAlive`; GC settings are intentional and `flush` precedes pending-work assertions. |
+| Resource ownership | `current` versus `boundary` matches sharing intent; commit/rollback is in `onClose`, and release is not confused with close. |
+| Equality/select | Tag `eq` and `same` have distinct intent; `scope.select` equality gates notification only; controller `set` is used only on resolved atom state. |
