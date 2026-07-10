@@ -110,6 +110,26 @@ const water = flow({
 
 A tag carrying a flow becomes a context-bound `FlowHandle` in deps. `required` fails loud; `optional` is handle-or-undefined; `all` collects every matching role. `controller(flow, { name, tags, key })` configures a child handle only. `prepare({ input })` stages a re-executable invocation; `step.ready` may be awaited, and `step.exec()` performs the child execution.
 
+### Tag resolution order, precisely
+
+For a flow's `tags.required/optional/all` dep, resolution reads `ctx.data.seekTag(tag)`, which checks the current context's data first, then walks `ctx.parent` up to the root context — so nearer contexts win. That per-context data is seeded at two points, in this order: `scope.createContext({ tags })`/`ctx.exec({ tags })` write directly (win outright); `flow({ tags })`'s own declared tags and the scope's `createScope({ tags })` only fill keys not already set (`ctx.data.has`/`seekHas` guard). Net order, highest precedence first: exec-site tags → flow's own declared tags → nearest ancestor context tags → scope tags → tag's own `default`.
+
+For an atom's tag dep, there is no `ctx` — resolution calls `tag.find(this.tags)` directly against the scope's own tag list. Exec-site and context tags never reach an atom; only `createScope({ tags })` and the tag's `default` matter. This is because atoms are scope-singletons: one resolved value shared by the whole scope, not re-evaluated per context.
+
+A required tag with no binding anywhere throws `Tag "<label>" not found` (or, for an atom mid-sync-resolution, causes that resolution attempt to bail and retry on the async path, which then throws) the first time the declaring node resolves — never at `createScope()` itself. Optional returns `undefined` at that same lazy point instead of throwing.
+
+### Params traceability
+
+`ctx.exec({ fn, params, name })` calls `fn(ctx, ...params)` — `params` are real call arguments, not documentation. The child execution context's `ctx.input` is set to exactly the `params` array, so any installed extension's `wrapExec(next, target, ctx)` can read `ctx.input` to see what was actually passed. A closure that captures a local instead of threading it through `params` still runs correctly, but that value is absent from `ctx.input` — tracing/audit extensions cannot record what the call actually used:
+
+```ts
+// Untraceable: extensions see target + ctx.input === [], never `orderId`.
+await ctx.exec({ fn: () => billing.charge(orderId), params: [], name: "billing.charge" })
+
+// Traceable: ctx.input === [orderId]; wrapExec/audit can record it.
+await ctx.exec({ fn: (_ctx, orderId) => billing.charge(orderId), params: [orderId], name: "billing.charge" })
+```
+
 ## Controllers, select, and scope
 
 ```ts

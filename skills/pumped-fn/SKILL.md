@@ -13,62 +13,68 @@ root/test -> createScope({ presets, tags, extensions })
                  -> context -> current/boundary resources -> close result
 ```
 
+## References
+
+- Choosing/writing a primitive (atom, flow, resource, tag, controller) → [primitives.md](references/primitives.md)
+- Writing or fixing a test → [testing.md](references/testing.md)
+- Extensions, scheduler, request context → [extensions.md](references/extensions.md)
+- Lint/typecheck/test loop, 24 exact lint mappings → [review.md](references/review.md)
+- A full runnable composition (root + test) → [worked-example.md](references/worked-example.md)
+
+## Workflow
+
+Write the graph, then close the loop before calling anything done: run `pnpm lint`, fix every diagnostic including warnings, re-run until 0 (`pumped-lite-lint --max-warnings 0 src bin tests`), then `pnpm typecheck && pnpm test`. Below, `(lint catches this)` marks a machine-enforced rule — trust the loop, don't hand-audit for it. `(review catches this)` is human-only; see [review.md](references/review.md) for the full preference table.
+
+## Tag resolution order
+
+A tag is injectable, passable config, not a constructed value. Lookup for `tags.required/optional/all` in a flow's deps walks, in order: exec-site tags (`ctx.exec({ tags: [...] })`) → the flow's own declared `tags` (fills only keys exec-site didn't set) → ancestor context tags, nearest first (`scope.createContext({ tags })`) → scope tags (`createScope({ tags })`, fills only what no context set) → the tag's own `default`. An atom's tag deps see only scope-level tags — atoms are scope-singletons, not context-scoped.
+
+A required tag with no binding anywhere does **not** fail at `createScope()`. It fails lazily, the first time the node that declares it resolves: an atom throws `Tag "<label>" not found` during its own resolution; a flow throws the same during its deps resolution when executed. `tags.optional` returns `undefined`. Elaboration: [primitives.md](references/primitives.md).
+
 ## Non-negotiable shape
 
-- I-1: Put raw IO in a transport atom, then expose a capability atom, then feature flow: `socket -> mailer -> sendDigest`; test with `preset(socket, fakeSocket)`, never a feature-level `fetch`.
-- I-2: Only a root/test creates scope/context: `bin: const ctx = scope.createContext()`; a product helper accepts data, not `scope` or `ctx`.
-- I-3: A child is a declared controller dep: `deps: { validate: controller(validate) }` then `validate.exec({ input })`; this permits `preset(validate, fake)`.
-- I-4: Declare ambient facts: `deps: { tenant: tags.required(tenant) }`; a missing binding must fail at resolution, never become an unchecked `undefined` read.
-- I-5: A role tag is a port: `const deliver = tag<Lite.Flow<void, Note>>()`; root supplies `deliver(emailDelivery)`, test supplies `deliver(collectingDelivery)`.
-- I-6: Persist must-not-drop work, then wake a drainer: `jobs.update(xs => [...xs, job]); signal.update(n => n + 1)`; `changes(signal)` is a wakeup, not the job queue.
-- I-7: Commit then signal: `await store.commit(job); signal.update(n => n + 1)`; a failed commit must leave no wakeup that advertises invisible work.
-- I-8: Keep one aggregate invariant in one transaction: `await db.transaction(tx => tx.insert(task).insert(audit))`; retries may see both rows or neither.
-- I-9: Parse wire input at its entry: `parse: raw => CreateNote.parse(raw)`; an internal child uses `parse: typed<Note>()`.
-- I-10: Shutdown is choreography: `stop.exec()` flips `stopping`, bumps wakeups, root awaits loop promises, then closes the boundary with its real result.
-- I-11: A derived atom watches an atom dep: `controller(profile, { resolve: true, watch: true })`; mutate profile and assert the derived atom is re-resolved, not manually subscribed.
-- I-12: Schedule a flow with explicit `overlap` and `catchUp`; production binds a backend tag, test triggers a manual backend once—never sleep for a timer.
-- I-13: Definition names carry domain only: `const queue = atom(...)`, `const deliver = flow(...)`; reject `queueAtom` and `deliverFlow`.
-- I-14: Trusted code is direct: no inline comments, defensive null guards, or catch-and-continue; TSDoc only on public contracts. Fix the graph/type instead of casting to `any`.
-- I-15: Destructure dependencies at the edge: `factory: (ctx, { store, clock }) => ...`, not `deps.store` throughout.
-- I-16: Replace module mutable state with an atom: not `let count = 0`; use `const count = atom({ factory: () => 0 })` plus a controller.
-- I-17: Planned flow failure is structured data: `faults: typed<{ kind: "quota"; userId: string }>()` and `ctx.fail({ kind: "quota", userId })`. At adapter/library boundaries only, throw a named error class with `kind/op/entity`; never bare `Error`, and never swallow either form.
-- I-18: Do not spread handles to alter tags. Make a thin entry flow with declared deps and execute the shared flow through `controller(shared)`.
-- I-19: Let graph inference work: `atom({ factory: ... })`, direct exported flows, and `type Note` only at transfer boundaries; no facade object, `atom<Port>`, or local wiring interface.
-- I-20: A test has exactly `createScope({ presets, tags, extensions })` plus public execution. If it needs a mock/import reach/test branch, make the dependency a graph edge.
-- I-21: Preset a real-shaped edge: `preset(mailer, { send: async note => sent.push(note) })`; invoke the public flow and assert `sent`, not a test product mode.
-- I-22: Race tests use gates: await `entered.wait`, assert intermediate state, call `release.open()`, await the same public promise. No elapsed-time assertion.
-- I-23: Close honestly: after success `await ctx.close({ ok: true })`; after a caught boundary failure `await ctx.close({ ok: false, error })`. Parent-owned resources follow parent close; a completed current-owned child is already settled.
-- I-24: Type-check the promise you execute once: `const run = ctx.exec({ flow: publish, input }); expectTypeOf(run)...; await run`.
-- I-25: Install extension objects at each root: `createScope({ extensions: [audit] })`; business flows name edges but do not emit their own cross-cutting spans.
-- I-26: Every foreign call is named and tagged when useful: `ctx.exec({ fn: (_ctx, note) => client.send(note), params: [note], name: "mail.send", tags: [step({ workflow: true, kind: "delivery" })] })`; inspect extension records by workflow/run id.
-- I-27: Extension wrappers execute continuations: `wrapExec: async (next, target, ctx) => { ctx.onClose(record); return next() }`; `wrapResolve: async next => next()`.
-- I-28: Boundary code creates a request context with request tags, stores/passes it in framework-owned request state, executes public flow, and closes it. Product code declares tags; it never reads ALS.
-- I-29: `typed<T>()` is the trusted, zero-parser path; prove a child receives a typed `Note` while only the boundary runs schema parsing.
-- I-30: `const retry = child.prepare({ key: job.id, input: job })`; await `retry.ready` when staging is needed, then `await retry.exec()` for each deliberate retry/fanout. Binding alone does no run.
-- I-31: `changes(signal)` may conflate 1→3 into one wakeup, so drain state. A generator is pull-driven: `for await (const item of ctx.execStream({ flow: scan }))` requests the next item only after consuming one.
-- I-32: Keep a required wake signal alive: `atom({ keepAlive: true, factory: () => 0 })`; `await scope.drain(feed, { take: 10 })` is bounded. Configure GC deliberately and `await scope.flush()` before asserting pending graph work is finished.
+Read [primitives.md](references/primitives.md) for the primitive decision table before writing a factory.
+
+- I-1: Don't call `fetch`/a DB driver directly inside a feature flow. `(lint catches this: no-ambient-io-outside-boundary, no-naked-globals)` Do: raw IO in a transport atom, then a capability atom, then the feature flow — `socket -> mailer -> sendDigest`; test with `preset(socket, fakeSocket)`, never a feature-level `fetch`.
+- I-2: Don't write a product helper that accepts `scope` or `ctx`. `(lint catches this: no-scope-argument, no-ctx-argument, no-scope-reach)` Do: only a root/test creates scope/context — `bin: const ctx = scope.createContext()`; a helper accepts data.
+- I-3: Don't call a child flow with `ctx.exec({ flow: child })` from inside another flow body. `(lint catches this: no-direct-flow-composition)` Do: declare it as a controller dep — `deps: { validate: controller(validate) }` then `validate.exec({ input })`; this permits `preset(validate, fake)`.
+- I-4: Don't read a tag with `ctx.data.getTag`/`seekTag` inside a factory that never declared it. `(lint catches this: no-implicit-tag-read)` Do: declare ambient facts — `deps: { tenant: tags.required(tenant) }`; a missing binding fails at resolution (see Tag resolution order above), never an unchecked `undefined` read.
+- I-5: Don't hardcode one delivery implementation inside a flow that has multiple real backends. Do: make a role tag a port — `const deliver = tag<Lite.Flow<void, Note>>()`; root supplies `deliver(emailDelivery)`, test supplies `deliver(collectingDelivery)`.
+- I-6: Don't push work directly into a wakeup signal. Do: persist must-not-drop work, then wake a drainer — `jobs.update(xs => [...xs, job]); signal.update(n => n + 1)`; `changes(signal)` is a wakeup, not the job queue.
+- I-7: Don't signal before the write that makes the work durable has landed. Do: commit then signal — `await store.commit(job); signal.update(n => n + 1)`; a failed commit must leave no wakeup that advertises invisible work.
+- I-8: Don't split one aggregate invariant across two transactions. Do: keep it in one — `await db.transaction(tx => tx.insert(task).insert(audit))`; retries may see both rows or neither.
+- I-9: Don't parse wire input deep inside internal children. Do: parse at the entry — `parse: raw => CreateNote.parse(raw)`; an internal child uses `parse: typed<Note>()`.
+- I-10: Don't let shutdown be an ad hoc `process.exit`. Do: choreograph it — `stop.exec()` flips `stopping`, bumps wakeups, root awaits loop promises, then closes the boundary with its real result.
+- I-11: Don't manually `.subscribe()` a derived atom to a source atom. Do: use a controller dep watch — `controller(profile, { resolve: true, watch: true })`; mutate profile and assert the derived atom re-resolves.
+- I-12: Don't `sleep`/timer-poll in a scheduled-flow test. Do: bind an explicit `overlap`/`catchUp`; production binds a durable backend, test binds a manual backend and drives ticks.
+- I-13: Don't suffix a definition handle with its kind (`queueAtom`, `deliverFlow`). `(lint catches this: no-definition-handle-suffix)` Do: name it by domain — `const queue = atom(...)`, `const deliver = flow(...)`.
+- I-14: Don't add inline comments, defensive null guards, or catch-and-continue in trusted code. `(review catches this)` Do: fix the graph/type instead of casting to `any`; TSDoc only on public contracts.
+- I-15: Don't thread `deps.store`/`deps.clock` through a factory body. `(lint catches this: prefer-destructured-deps)` Do: destructure at the edge — `factory: (ctx, { store, clock }) => ...`.
+- I-16: Don't keep `let count = 0` at module scope inside a graph module. `(lint catches this: no-module-state)` Do: replace it with an atom — `const count = atom({ factory: () => 0 })` plus a controller.
+- I-17: Don't `throw new Error(...)` or swallow a caught failure for a planned outcome. `(lint catches this: no-untyped-throw, no-swallowed-error)` Do: `faults: typed<{ kind: "quota"; userId: string }>()` and `ctx.fail({ kind: "quota", userId })`; at adapter/library boundaries only, throw a named error class with `kind/op/entity`.
+- I-18: Don't spread a handle to bolt on tags (`{ ...shared, tags: [...] }`). `(lint catches this: no-handle-spread, no-direct-flow-composition)` Do: make a thin entry flow with declared deps and execute the shared flow through `controller(shared)`.
+- I-19: Don't write `atom<Port>(...)`, a facade object bundling flows behind methods, or a hand-written interface restating an inferable signature. `(review catches this)` Do: let graph inference work — `atom({ factory: ... })`, direct exported flows, `type Note` only at transfer boundaries.
+- I-20: Don't reach for `vi.mock`, a global patch, or a test-only branch. `(lint catches this: no-module-mocks, no-test-only-branches)` Do: a test is exactly `createScope({ presets, tags, extensions })` plus public execution; if it needs a mock/reach/branch, make the dependency a graph edge.
+- I-21: Don't add a test-only "product mode" to a flow. `(lint catches this: no-test-only-branches)` Do: preset a real-shaped edge — `preset(mailer, { send: async note => sent.push(note) })`; invoke the public flow and assert `sent`.
+- I-22: Don't assert on elapsed time in a race test. `(review catches this)` Do: use gates — await `entered.wait`, assert intermediate state, call `release.open()`, await the same public promise.
+- I-23: Don't close a context immediately in a catch without recording the failure. Do: close honestly — success `await ctx.close({ ok: true })`; a caught boundary failure `await ctx.close({ ok: false, error })`. Parent-owned resources follow parent close; a completed current-owned child is already settled.
+- I-24: Don't fire-and-forget the promise a test executes. `(review catches this)` Do: store it once — `const run = ctx.exec({ flow: publish, input }); expectTypeOf(run)...; await run`.
+- I-25: Don't emit cross-cutting spans from inside a business flow. `(review catches this)` Do: install extension objects at each root — `createScope({ extensions: [audit] })`; business flows name edges but don't self-instrument.
+- I-26: Don't call a foreign SDK by closing over a local value inside `fn` — `ctx.exec({ fn: () => client.op(x), params: [] })` hides `x` from every extension. `(lint catches this: no-unattributed-await)` Do: flow it through `params` so `wrapExec`'s `ctx.input` records exactly what was called — `ctx.exec({ fn: (_ctx, x) => client.op(x), params: [x], name: "client.op" })`. `fn` receives `(ctx, ...params)`; a closed-over value stays invisible to tracing.
+- I-27: Don't write an extension that never calls `next()`, or that records before the continuation settles. `(review catches this)` Do: execute continuations — `wrapExec: async (next, target, ctx) => { ctx.onClose(record); return next() }`; `wrapResolve: async next => next()`.
+- I-28: Don't read `AsyncLocalStorage` from product code. `(review catches this)` Do: boundary code creates a request context with request tags, stores/passes it in framework-owned request state, executes the public flow, closes it; product code only declares tags.
+- I-29: Don't run schema parsing again on an already-trusted internal handoff. `(review catches this)` Do: `typed<T>()` is the zero-parser trusted path; only the boundary runs schema parsing.
+- I-30: Don't call `child.prepare(...)` inside a retry loop. `(review catches this)` Do: one staging site — `const retry = child.prepare({ key: job.id, input: job })`; await `retry.ready` if needed, then `await retry.exec()` per deliberate retry/fanout.
+- I-31: Don't treat `changes(signal)` as the job queue, or drain a generator without pulling. Do: `changes(signal)` may conflate 1→3 into one wakeup, so drain state; `for await (const item of ctx.execStream({ flow: scan }))` requests the next item only after consuming one.
+- I-32: Don't let a required wake signal get garbage-collected, or assert pending graph work without flushing. Do: `atom({ keepAlive: true, factory: () => 0 })`; `await scope.drain(feed, { take: 10 })` is bounded; `await scope.flush()` before asserting pending work is finished.
 
 ## Ownership, lifecycle, and primitives
 
-Use `atom` for scope-lived state/capability, `flow` for per-action work, `resource` for context-owned values, `tag` for contextual facts/roles, `controller` for child flows or intentional state control, and extensions for cross-cutting policy.
-
-Decide by where the value comes FROM: an atom's factory CONSTRUCTS its value inside the graph; a value SUPPLIED from outside (composition root, deployment, request) is a tag — an injected foreign client/capability is always a tag (or port flow), never an atom.
-
-`resource({ ownership: "current" })` is private to a top-level action and shared by its nested executions. `ownership: "boundary"` is shared by a boundary and descendants. Register transactional outcome behavior in the resource factory: `ctx.onClose(result => result.ok ? tx.commit() : tx.rollback())`; `ctx.release(resource)` releases the owner-local value but does not replace an honest later close result.
-
-Use `scope.select(atom, selector, { eq })`, never a top-level `select` import. `eq` suppresses subscriber notification, not selector recomputation. Atom controllers may `set`/`update`; resource controllers only resolve/release/observe. Put atom `watch: true` only in atom deps and resource `watch: true` only in resource deps.
-
-For tags, `tags.optional(port)` returns undefined and `tags.all(port)` returns all role bindings. `tag({ eq })` controls value equality; `tag.same(a, b)` compares tagged entries. `ctx.data.seekTag(tag)` searches a parent chain and `getTag(tag)` is local-only; product factories should prefer declared `tags.required/optional/all`. A service-pattern atom may use a named `ctx.exec({ fn, params, name })` for one adapter call, not an ambient client.
-
-GC/flush are reference details: `createScope({ gc: { enabled: true, graceMs: 3000 } })` sets collection policy; `scope.flush()` awaits pending operations. Adjacent surfaces exist: `@pumped-fn/lite-react`, `@pumped-fn/lite-hono` (out of v1). For incremental adoption, wrap one legacy leaf in a transport atom, expose a capability, preset it in its first seam test, then migrate callers one boundary at a time.
+Use `atom` for scope-lived state/capability, `flow` for per-action work, `resource` for context-owned values, `tag` for contextual facts/roles, `controller` for child flows or intentional state control, and extensions for cross-cutting policy. Decide by where the value comes FROM: an atom's factory CONSTRUCTS its value inside the graph; a value SUPPLIED from outside (composition root, deployment, request) is a tag — an injected foreign client/capability is always a tag (or port flow), never an atom. Full decision table and resource-ownership semantics: [primitives.md](references/primitives.md).
 
 ## Execution and testing
 
-Foreign execution always supplies `params`, including zero arguments: `await ctx.exec({ fn: () => client.ping(), params: [], name: "client.ping" })`. Flow execution instead uses `ctx.exec({ flow, input })`. Consume a generator stream before awaiting `.result`; breaking it is an aborted close.
-
-Roots/tests own setup and teardown. A test executes one promise once, asserts its result and observable fake calls, closes the context, then disposes the scope. Use a shared durable fake across two scopes for recovery tests. For a resource transaction, put awaited commit and its subsequent signal in the same successful `onClose` callback; inline store transactions are a separate commit-then-signal pattern.
-
-Before the final gate run, diff each exported flow's return value against every prescribed shape in the spec; a field the spec also uses as a total is a count, not a list.
+Foreign execution always supplies `params`, including zero arguments: `await ctx.exec({ fn: () => client.ping(), params: [], name: "client.ping" })`. Flow execution instead uses `ctx.exec({ flow, input })`. Consume a generator stream before awaiting `.result`; breaking it is an aborted close. Roots/tests own setup and teardown: one promise executed once, asserted, context closed honestly, scope disposed. Deterministic races, recovery, and shutdown patterns: [testing.md](references/testing.md).
 
 ## Trap corpus
 
@@ -84,8 +90,6 @@ Before the final gate run, diff each exported flow's return value against every 
 - Flows/resources accept `name`; `atom()` does not. For resolve observability, name a resource and use a named factory function expression for an atom. In `wrapExec`, use `ctx.name` and `ctx.parent?.name`; record after `await next()` for completion order.
 - Watch an upstream resource from resource deps. Atom watch belongs in atom deps and is runtime-enforced. Bridge atom state to a resource with an owner-bound subscription that releases/re-resolves itself; dependent re-establishment is lazy on the next use.
 
-## Review and references
+## Setup and review loop
 
-One-time setup: install `@pumped-fn/lite-lint` as a devDependency and wire `"lint": "pumped-lite-lint --max-warnings 0 src bin tests"`; `--max-warnings 0` is mandatory because warn-tier rules count.
-
-Run the project loop: `pnpm lint && pnpm typecheck && pnpm test`. Read [review.md](references/review.md) for the 24 exact lint mappings and preference review; [primitives.md](references/primitives.md), [testing.md](references/testing.md), and [extensions.md](references/extensions.md) for elaboration; [worked-example.md](references/worked-example.md) for a runnable composition.
+Copy `templates/workspace/` (config only: package.json, tsconfig.json, vitest.config.ts), then create `src/`, `bin/`, `tests/` before the first lint run — `pumped-lite-lint` `stat()`s each configured path and crashes uncaught on a missing one; it does not treat missing as zero files. `"lint": "pumped-lite-lint --max-warnings 0 src bin tests"` is already wired; `--max-warnings 0` is mandatory since warn-tier rules count. Then `pnpm lint && pnpm typecheck && pnpm test`. [review.md](references/review.md) has the 24 lint mappings and preference table; [worked-example.md](references/worked-example.md) is a runnable composition.

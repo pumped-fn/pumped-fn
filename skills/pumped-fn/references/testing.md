@@ -59,3 +59,60 @@ Await `entered.wait`, assert the intermediate observable state, call `release.op
 Concurrency correctness comes from controlled edges, not elapsed time.
 
 For a resource-backed transaction, put awaited `commit` and the subsequent `signal` in the same successful `ctx.onClose` callback; assert that order through a fake durable store. For an inline store transaction, commit then signal in the flow. Put the work item in state, not in the wakeup iterator. For graceful shutdown, execute a public `stop` flow that flips a state atom and signals loops, then await loop results before closing the root context.
+
+## Minimal starter composition
+
+The smallest complete `src/`, `bin/`, `tests/` set — one atom, one tag with a `default`, one flow, a root, and a test through `preset`/tag override:
+
+`src/app.ts`
+
+```ts
+import { atom, flow, tag, tags, typed } from "@pumped-fn/lite"
+
+export const recipient = tag<string>({ label: "app.recipient", default: "world" })
+export const salutation = atom({ factory: () => "hello" })
+
+export const greet = flow({
+  name: "greet",
+  parse: typed<void>(),
+  deps: { salutation, recipient: tags.required(recipient) },
+  factory: (_ctx, { salutation, recipient }) => ({ text: `${salutation}, ${recipient}` }),
+})
+```
+
+`bin/main.ts`
+
+```ts
+import { createScope } from "@pumped-fn/lite"
+import { greet } from "../src/app.ts"
+
+const scope = createScope()
+const ctx = scope.createContext()
+const { text } = await ctx.exec({ flow: greet })
+console.log(text)
+await ctx.close({ ok: true })
+await scope.dispose()
+```
+
+`tests/app.test.ts`
+
+```ts
+import { createScope, preset } from "@pumped-fn/lite"
+import { describe, expect, it } from "vitest"
+import { greet, recipient, salutation } from "../src/app.ts"
+
+describe("greet", () => {
+  it("derives the greeting from the preset salutation and tag override", async () => {
+    const scope = createScope({
+      presets: [preset(salutation, "howdy")],
+      tags: [recipient("gardeners")],
+    })
+    const ctx = scope.createContext()
+    await expect(ctx.exec({ flow: greet })).resolves.toEqual({ text: "howdy, gardeners" })
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+})
+```
+
+`tags: [recipient("gardeners")]` at `createScope` is what the root context inherits since nothing more specific sets `recipient` first — this is the scope layer in the tag resolution order (see SKILL.md's "Tag resolution order").
