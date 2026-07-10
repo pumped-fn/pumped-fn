@@ -2,6 +2,8 @@
 
 Trace each edge: declaration, owner, scope substitution, and close behavior. This file has two tiers. `lint:` is only a mapping to one machine rule; `preference:` is human review only.
 
+Run lint with `pumped-lite-lint` from the `@pumped-fn/lite-lint` package.
+
 ## lint:
 
 | Rule | Reject when |
@@ -63,3 +65,4 @@ Trace each edge: declaration, owner, scope substitution, and close behavior. Thi
 | Whole-state replacement | Prefer `ctrl.set(wholeValue)` for replacement; this is readability, not different semantics from `update`. |
 | Scheduler teardown | Await `registration.stop()` before `scope.dispose()`. |
 | Observability names | Name resources and atom factory functions; after `await next()`, use `ctx.name` and `ctx.parent?.name`. |
+| Contract fidelity | Each exported flow's result matches the spec's prescribed shape literally; a field name that recurs across the spec (per-pass `printed`, dispatcher `{ passes, printed }` totals) keeps ONE type everywhere — an aggregate-named field (`printed`, `count`, totals) is a number unless the spec shows elements. Diff every export's return against the spec before the final gate run. |
