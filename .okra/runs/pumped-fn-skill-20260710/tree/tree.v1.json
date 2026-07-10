@@ -5,12 +5,18 @@
       "id": "CHAL-1",
       "model": "gpt-5.6-sol",
       "status": "returned: 0 intact, 1 drifted, 11 dead"
+    },
+    {
+      "artifact": "workers/chal-2/verdicts.md",
+      "id": "CHAL-2",
+      "model": "gpt-5.6-sol",
+      "status": "returned: 0 intact, 3 drifted, 10 dead"
     }
   ],
   "ckrs": [
     {
       "id": "CKR-1",
-      "metric": "eval harness executes end-to-end: isolated workspace, gates deterministic, cross-model rubric grading; N tasks runnable",
+      "metric": "eval harness executes end-to-end with EXECUTABLE task validity: per-task reference solution passes all gates + behavioral checker; transplant and fake adversarial solutions fail the checker; deterministic + replayable",
       "status": "promoted (DKR-2 checkpoint accepted); harness build PKRs pending DKR-4 lint parity answer",
       "title": "runnable cold-eval suite"
     },
@@ -59,8 +65,16 @@
       "budget_min": 30,
       "decision_unlocked": "denominator candidate v2 -> sol re-challenge -> human ratification sheet",
       "id": "DKR-3b",
-      "status": "dispatched",
+      "status": "checkpoint accepted; artifact eval-suite-candidate-v2.md DECOMMISSIONED (CHAL-2: 0 intact, 3 drifted, 10 dead) \u2014 salvage: domains, G6 concept, coverage map, out-of-scope list",
       "title": "eval-suite redesign under CHAL-1 verdicts \u2014 differentiator pass-gates (G6)"
+    },
+    {
+      "artifact": "workers/dkr-5/**",
+      "budget_min": 45,
+      "decision_unlocked": "is executable task validity buildable + template + per-task cost; first AG-1 read",
+      "id": "DKR-5",
+      "status": "dispatched",
+      "title": "single-task executable-eval spike (T-7 family, current ownership) \u2014 reference solution + behavioral checker + adversarial proofs"
     }
   ],
   "frame_version": 1,
@@ -76,5 +90,5 @@
   },
   "pkrs": [],
   "promotion_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
-  "tree_version": 3
+  "tree_version": 4
 }
