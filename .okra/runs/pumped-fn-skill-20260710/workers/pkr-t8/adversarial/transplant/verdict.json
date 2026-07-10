@@ -1,0 +1,27 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-fanout-three-channels-side-effects": "fail",
+    "b2-fanout-two-channels-wiring-only": "fail",
+    "b3-declining-channel-accounting": "fail",
+    "b4-throwing-channel-isolation": "fail",
+    "b5-failure-observable-in-traces": "fail",
+    "b6-quiet-hours-suppresses-watch": "pass",
+    "b7-quiet-hours-warning-still-delivers": "fail",
+    "b8-quiet-hours-watch-outside-window": "pass",
+    "b9-optional-absent-delivers-always": "fail",
+    "b10-zero-channels-registered": "fail",
+    "b11-repeat-alerts-ordered-per-channel": "pass"
+  },
+  "errors": {
+    "b1-fanout-three-channels-side-effects": "outcome: expected {\"attempted\":3,\"delivered\":3,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b2-fanout-two-channels-wiring-only": "outcome: expected {\"attempted\":2,\"delivered\":2,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b3-declining-channel-accounting": "outcome: expected {\"attempted\":2,\"delivered\":1,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b4-throwing-channel-isolation": "outcome: expected {\"attempted\":3,\"delivered\":2,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b5-failure-observable-in-traces": "B5_RELAY_DOWN",
+    "b7-quiet-hours-warning-still-delivers": "outcome: expected {\"attempted\":2,\"delivered\":2,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b9-optional-absent-delivers-always": "outcome: expected {\"attempted\":2,\"delivered\":2,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}",
+    "b10-zero-channels-registered": "outcome with no channels wired: expected {\"attempted\":0,\"delivered\":0,\"suppressed\":false}, got {\"attempted\":1,\"delivered\":1,\"suppressed\":false}"
+  },
+  "failed": 8
+}

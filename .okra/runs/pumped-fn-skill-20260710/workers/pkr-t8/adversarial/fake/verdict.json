@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-fanout-three-channels-side-effects": "fail",
+    "b2-fanout-two-channels-wiring-only": "fail",
+    "b3-declining-channel-accounting": "fail",
+    "b4-throwing-channel-isolation": "fail",
+    "b5-failure-observable-in-traces": "fail",
+    "b6-quiet-hours-suppresses-watch": "pass",
+    "b7-quiet-hours-warning-still-delivers": "fail",
+    "b8-quiet-hours-watch-outside-window": "fail",
+    "b9-optional-absent-delivers-always": "fail",
+    "b10-zero-channels-registered": "pass",
+    "b11-repeat-alerts-ordered-per-channel": "fail"
+  },
+  "errors": {
+    "b1-fanout-three-channels-side-effects": "radio call log must hold exactly the issued alert: expected [{\"severity\":\"warning\",\"text\":\"b1 storm front\",\"hour\":12}], got []",
+    "b2-fanout-two-channels-wiring-only": "radio call log: expected [{\"severity\":\"warning\",\"text\":\"b2 wind shift\",\"hour\":12}], got []",
+    "b3-declining-channel-accounting": "outcome: expected {\"attempted\":2,\"delivered\":1,\"suppressed\":false}, got {\"attempted\":2,\"delivered\":2,\"suppressed\":false}",
+    "b4-throwing-channel-isolation": "outcome: expected {\"attempted\":3,\"delivered\":2,\"suppressed\":false}, got {\"attempted\":3,\"delivered\":3,\"suppressed\":false}",
+    "b5-failure-observable-in-traces": "outcome: expected {\"attempted\":2,\"delivered\":1,\"suppressed\":false}, got {\"attempted\":2,\"delivered\":2,\"suppressed\":false}",
+    "b7-quiet-hours-warning-still-delivers": "radio call log: expected [{\"severity\":\"warning\",\"text\":\"b7 flash flood\",\"hour\":3}], got []",
+    "b8-quiet-hours-watch-outside-window": "radio call log: expected [{\"severity\":\"watch\",\"text\":\"b8 fog bank\",\"hour\":7}], got []",
+    "b9-optional-absent-delivers-always": "radio delivered despite quiet-hours-shaped hour (no setting bound): expected [{\"severity\":\"watch\",\"text\":\"b9 light snow\",\"hour\":3}], got []",
+    "b11-repeat-alerts-ordered-per-channel": "each issue reaches the channel once, in order, with identity: expected [{\"severity\":\"warning\",\"text\":\"b11 first\",\"hour\":10},{\"severity\":\"watch\",\"text\":\"b11 second\",\"hour\":11}], got []"
+  },
+  "failed": 9
+}
