@@ -1,0 +1,49 @@
+name: Pages artifact dry run
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pages-dry-run.yml'
+      - 'playground/compare/**'
+      - 'pkg/core/lite/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    name: Build and verify without deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm -F @pumped-fn/compare exec playwright install --with-deps chromium
+
+      - name: Stage and verify Pages artifact
+        run: pnpm pages:dry-run
+
+      - name: Upload verified dry-run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumped-fn-pages-dry-run
+          path: playground/compare/dist-pages
+          if-no-files-found: error
+          retention-days: 7

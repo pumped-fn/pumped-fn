@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-07-10",
+  "scenario": "account-onboarding",
+  "sources": [
+    {
+      "id": "pumped-fn",
+      "repository": "https://github.com/pumped-fn/pumped-fn",
+      "commit": "ca2a8fa3ae462129034c9f05f6630f1099955ca0",
+      "package": "@pumped-fn/lite@4.0.0",
+      "license": "MIT",
+      "files": [
+        "docs/vs-effect.md",
+        "docs/vs-di-containers.md",
+        "pkg/core/lite/src/index.ts"
+      ],
+      "adaptation": "Uses a root-context-owned boundary resource with named acquisition, required request tags, a typed flow fault, createScope, and root-context-owned cleanup."
+    },
+    {
+      "id": "effect",
+      "repository": "https://github.com/Effect-TS/examples",
+      "commit": "91e24b045af2bcdbeb2e78e075825ed20a0038a7",
+      "package": "effect@3.21.3",
+      "license": "MIT",
+      "files": [
+        "examples/http-server/src/Accounts.ts",
+        "examples/http-server/src/Sql.ts",
+        "examples/http-server/src/Uuid.ts",
+        "examples/http-server/src/Accounts/Http.ts",
+        "examples/http-server/test/Accounts.test.ts"
+      ],
+      "documentation": [
+        "https://effect.website/docs/requirements-management/services/",
+        "https://effect.website/docs/requirements-management/layers/",
+        "https://effect.website/docs/resource-management/introduction/"
+      ],
+      "adaptation": "Keeps the official example's Effect.Service composition, service layers, typed failures, spans, and replaceable runtime dependencies. SQL, HTTP, policy, and repositories are collapsed into the shared browser-safe database contract; ManagedRuntime adapts the long-lived layer to the Lane Promise boundary."
+    },
+    {
+      "id": "awilix",
+      "repository": "https://github.com/jeffijoe/awilix",
+      "commit": "f72d175ddb950c3f13ef41e8be98b24471d59900",
+      "package": "awilix@13.0.5",
+      "license": "MIT",
+      "files": [
+        "README.md",
+        "examples/koa/index.js",
+        "examples/typescript/src/index.ts"
+      ],
+      "adaptation": "Keeps strict proxy injection, a singleton disposable database, a scoped account service, and request child scopes."
+    },
+    {
+      "id": "inversify",
+      "repository": "https://github.com/inversify/monorepo",
+      "commit": "7c605a9bd99e9cb8b611f65a53e6d940cb0f0e1e",
+      "package": "inversify@8.1.2",
+      "license": "MIT",
+      "files": [
+        "packages/container/libraries/inversify/src/index.ts",
+        "packages/container/libraries/container/src/container/services/Container.ts",
+        "packages/container/libraries/container/src/binding/models/BindingFluentSyntax.ts",
+        "packages/container/libraries/inversify/src/test/bugs/issue_1564.int.spec.ts"
+      ],
+      "documentation": [
+        "https://inversify.io/docs/introduction/getting-started/",
+        "https://inversify.io/docs/api/container/"
+      ],
+      "adaptation": "Keeps the official decorator-based constructor injection, Container bindings, async dynamic resolution, singleton lifetime, child request containers, and asynchronous deactivation while replacing application IO with the shared browser-safe contract."
+    },
+    {
+      "id": "sandpack",
+      "repository": "https://github.com/codesandbox/sandpack",
+      "package": "@codesandbox/sandpack-react@2.20.0",
+      "license": "Apache-2.0",
+      "documentation": [
+        "https://sandpack.codesandbox.io/"
+      ],
+      "adaptation": "Only the runtime provider and preview are used in this spike; the comparison UI remains owned by pumped-fn."
+    }
+  ]
+}

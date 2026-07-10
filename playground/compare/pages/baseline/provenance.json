@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "authority": "human-ratified-current-live-site",
+  "publishedUrl": "https://pumped-fn.github.io/pumped-fn/",
+  "capturedOn": "2026-07-10",
+  "sourceCommit": "4cc7e3390023d8175696490e60898afd7f1df229",
+  "sourceWorkflowRunId": 26397840611,
+  "sourceWorkflowJobId": 77702640221,
+  "expiredPagesArtifactId": 7197170064,
+  "pathCount": 109,
+  "manifestSha256": "c42adfed65a98655176c35457308c19fb6841821c26c1eff65b4bbd8d02c72a4",
+  "rootSha256": "cdddf6dba4fb8c1709bc40543866560fcb209b9a1463e43546c5d7e5977268d8",
+  "archiveSha256": "184f408035c1d335763f904a22c49a4d10dcbd06271306b9cabc56d94db27993",
+  "archiveEntryListSha256": "3a521c1d18b2318bc5924ea123148ac2d4c084f1af7d968774b496108488cea1"
+}

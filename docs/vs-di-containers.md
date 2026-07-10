@@ -2,6 +2,8 @@
 
 Use pumped-fn when the container question is really a testability question. The goal is not "no decorators" by itself; the goal is one graph seam where hidden IO, async setup, substitutions, and request facts become visible.
 
+Run the [source-locked account-onboarding comparison](../playground/compare/README.md) to execute pumped-fn, Awilix, Inversify, and plain TypeScript against the same black-box contract in Node and an editable browser sandbox.
+
 ## 1. Footguns
 
 Start with the common footgun: time hidden inside a function.

@@ -128,6 +128,14 @@ Use this comparison when you are choosing between a small scope seam and a full 
 
 Read the comparison: [pumped-fn vs Effect](docs/vs-effect.md).
 
+## Run the comparison
+
+The [source-locked comparison lab](playground/compare/README.md) runs one account-onboarding contract through pumped-fn, Effect, Awilix, Inversify, and plain TypeScript. The same checked-in files run in tests and in an editable browser sandbox.
+
+```sh
+pnpm compare:verify
+```
+
 ## Adopt one route at a time
 
 Keep the existing server. Add a scope at one composition boundary, move one leaf dependency into an atom, and run one flow from the route. Existing consumers can keep the old function while new graph consumers get the preset seam.
