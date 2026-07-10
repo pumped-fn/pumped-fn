@@ -1,0 +1,40 @@
+{
+  "name": "@pumped-fn/compare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:pages": "PUMPED_COMPARE_BASE_PATH=/pumped-fn/compare/ vite build",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -F @pumped-fn/lite-lint build && node ../../pkg/tool/lint/dist/cli.mjs README.md cases src sandbox scripts",
+    "browser:smoke": "node scripts/sandpack-smoke.mjs",
+    "pages:stage": "pnpm build:pages && node scripts/stage-pages.mjs",
+    "pages:verify": "node scripts/verify-pages.mjs",
+    "pages:browser:smoke": "node scripts/pages-browser-smoke.mjs",
+    "pages:dry-run": "pnpm pages:stage && pnpm pages:verify && pnpm pages:browser:smoke",
+    "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build && pnpm browser:smoke"
+  },
+  "dependencies": {
+    "@codesandbox/sandpack-react": "catalog:",
+    "@pumped-fn/lite": "workspace:*",
+    "awilix": "catalog:",
+    "effect": "catalog:",
+    "inversify": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

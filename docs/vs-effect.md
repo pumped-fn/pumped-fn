@@ -2,6 +2,8 @@
 
 Use pumped-fn when the adoption unit should stay a normal TypeScript function behind one scope. Use Effect when you want the Effect program model, typed effect combinators, services, layers, and fibers as the center of the app.
 
+Run the [source-locked account-onboarding comparison](../playground/compare/README.md) to execute both approaches against the same black-box contract in Node and an editable browser sandbox.
+
 ## 1. Footguns
 
 Start by moving hidden throws into a flow boundary.

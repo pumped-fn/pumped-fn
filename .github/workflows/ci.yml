@@ -55,6 +55,9 @@ jobs:
       - name: Run tests
         run: pnpm test --passWithNoTests
 
+      - name: Run comparison browser smoke
+        run: pnpm -F @pumped-fn/compare browser:smoke
+
       - name: Run Lightpanda browser tests
         run: pnpm -F @pumped-fn/lite-react test:browser:lightpanda
 
