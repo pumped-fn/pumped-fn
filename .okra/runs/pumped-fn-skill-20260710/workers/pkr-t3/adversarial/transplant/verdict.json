@@ -1,0 +1,36 @@
+{
+  "checks": {
+    "decl-jobs-register-opposite-policies": "fail",
+    "decl-tick-executes-production-flows": "fail",
+    "b1-capture-overlap-drops-not-defers": "fail",
+    "b2-upload-overlap-queues-strictly": "fail",
+    "b3-upload-catchup-runs-all-missed-windows": "fail",
+    "b3b-catchup-is-idempotent-across-restart": "fail",
+    "b4-capture-missed-windows-are-lost": "pass",
+    "b5-failed-upload-retries-frames-and-chain-survives": "fail",
+    "b6-fresh-station-starts-from-now": "fail",
+    "b7-dispose-awaits-inflight-run": "fail"
+  },
+  "errors": {
+    "decl-jobs-register-opposite-policies": "decl: upload catchUp: expected \"all\", got \"skip\"",
+    "decl-tick-executes-production-flows": "probe tick must run the production capture flow: expected 1, got 0",
+    "b1-capture-overlap-drops-not-defers": "second overlapping capture must not start: expected 1, got 0",
+    "b2-upload-overlap-queues-strictly": "second upload must wait for the first: expected 1, got 0",
+    "b3-upload-catchup-runs-all-missed-windows": "three missed windows must produce three production upload runs, oldest first: expected [{\"readings\":[100,200]},{\"readings\":[]},{\"readings\":[]}], got []",
+    "b3b-catchup-is-idempotent-across-restart": "two missed windows expected on first boot: expected 2, got 0",
+    "b5-failed-upload-retries-frames-and-chain-survives": "a failed upload run must reject its trigger",
+    "b6-fresh-station-starts-from-now": "fresh registration must record now as handled: expected {\"lastRunMs\":1750000000000}, got undefined",
+    "b7-dispose-awaits-inflight-run": "dispose must wait for the in-flight capture"
+  },
+  "failed": [
+    "decl-jobs-register-opposite-policies",
+    "decl-tick-executes-production-flows",
+    "b1-capture-overlap-drops-not-defers",
+    "b2-upload-overlap-queues-strictly",
+    "b3-upload-catchup-runs-all-missed-windows",
+    "b3b-catchup-is-idempotent-across-restart",
+    "b5-failed-upload-retries-frames-and-chain-survives",
+    "b6-fresh-station-starts-from-now",
+    "b7-dispose-awaits-inflight-run"
+  ]
+}
