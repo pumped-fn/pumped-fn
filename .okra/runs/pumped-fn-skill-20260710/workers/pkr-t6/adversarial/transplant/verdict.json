@@ -1,0 +1,25 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "d1-eq-set-semantics": "fail",
+    "b1-derive-sorted": "pass",
+    "b2-boundary-values-safe": "pass",
+    "b3-notification-suppressed-on-set-preserving-updates": "fail",
+    "b4-swap-at-same-cardinality-notifies": "pass",
+    "b5-wholesale-reading-replacement": "fail",
+    "b6-monitor-edge-triggered": "pass",
+    "b6b-monitor-alerts-preexisting-at-start": "pass",
+    "b7-monitor-sees-swap": "fail",
+    "b8-realert-on-reentry": "fail",
+    "b9-burst-coalesced-exact-alert-set": "pass",
+    "p1-state-survives-zero-observers": "pass"
+  },
+  "errors": {
+    "d1-eq-set-semantics": "sameRoomSet must be order-insensitive",
+    "b3-notification-suppressed-on-set-preserving-updates": "new readings that leave the at-risk set unchanged must not notify: expected 0, got 3",
+    "b5-wholesale-reading-replacement": "re-ingest replaces the gallery's reading wholesale (no merge): expected {\"tempC\":20,\"rh\":49}, got {\"tempC\":20,\"rh\":49,\"note\":\"calibrated\"}",
+    "b7-monitor-sees-swap": "a swap at unchanged cardinality must alert the entering gallery: expected [\"a\",\"b\"], got [\"a\"]",
+    "b8-realert-on-reentry": "a gallery that recovers and re-enters is alerted again: expected [\"west\",\"west\"], got [\"west\"]"
+  },
+  "failed": 5
+}
