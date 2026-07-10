@@ -1,19 +1,21 @@
 :root {
-  color: #dfe8e1;
-  background: #111713;
+  color: #1f1f1f;
+  background: #ffffff;
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
   padding: 24px;
+  background: #ffffff;
 }
 
 #app > header p {
   margin: 0 0 8px;
-  color: #7ea98a;
+  color: #737373;
   font-size: 0.7rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -31,18 +33,18 @@ h1 {
 
 article {
   padding: 16px;
-  border: 1px solid #34423a;
-  border-radius: 8px;
-  background: #18211b;
+  border: 1px solid #d4d4d4;
+  border-radius: 4px;
+  background: #fafafa;
 }
 
 article span {
   display: inline-block;
   margin-bottom: 16px;
   padding: 4px 7px;
+  border: 1px solid #a3a3a3;
   border-radius: 999px;
-  background: #244e31;
-  color: #a9e2b8;
+  color: #404040;
   font-size: 0.68rem;
 }
 
@@ -56,11 +58,11 @@ dl {
   grid-template-columns: 1fr auto;
   gap: 7px;
   margin: 0;
-  color: #9eafa4;
+  color: #737373;
   font-size: 0.7rem;
 }
 
 dd {
   margin: 0;
-  color: #e5ede7;
+  color: #262626;
 }

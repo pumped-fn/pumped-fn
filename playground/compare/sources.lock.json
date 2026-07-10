@@ -10,6 +10,8 @@
       "package": "@pumped-fn/lite@4.0.0",
       "license": "MIT",
       "files": [
+        "docs/test-without-mocks.md",
+        "docs/observability.md",
         "docs/vs-effect.md",
         "docs/vs-di-containers.md",
         "pkg/core/lite/src/index.ts"
@@ -32,7 +34,8 @@
       "documentation": [
         "https://effect.website/docs/requirements-management/services/",
         "https://effect.website/docs/requirements-management/layers/",
-        "https://effect.website/docs/resource-management/introduction/"
+        "https://effect.website/docs/resource-management/introduction/",
+        "https://effect.website/docs/observability/tracing/"
       ],
       "adaptation": "Keeps the official example's Effect.Service composition, service layers, typed failures, spans, and replaceable runtime dependencies. SQL, HTTP, policy, and repositories are collapsed into the shared browser-safe database contract; ManagedRuntime adapts the long-lived layer to the Lane Promise boundary."
     },
@@ -47,7 +50,7 @@
         "examples/koa/index.js",
         "examples/typescript/src/index.ts"
       ],
-      "adaptation": "Keeps strict proxy injection, a singleton disposable database, a scoped account service, and request child scopes."
+      "adaptation": "Keeps strict proxy injection, a singleton disposable database, a scoped account service, and request child scopes. The operations proof injects a small browser-safe Trace value and wraps provision explicitly in this lane."
     },
     {
       "id": "inversify",
@@ -65,7 +68,7 @@
         "https://inversify.io/docs/introduction/getting-started/",
         "https://inversify.io/docs/api/container/"
       ],
-      "adaptation": "Keeps the official decorator-based constructor injection, Container bindings, async dynamic resolution, singleton lifetime, child request containers, and asynchronous deactivation while replacing application IO with the shared browser-safe contract."
+      "adaptation": "Keeps the official decorator-based constructor injection, Container bindings, async dynamic resolution, singleton lifetime, child request containers, and asynchronous deactivation while replacing application IO with the shared browser-safe contract. The operations proof binds a small browser-safe Trace value and wraps provision explicitly in this lane."
     },
     {
       "id": "sandpack",

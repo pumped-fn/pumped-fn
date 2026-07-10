@@ -16,13 +16,13 @@ async function run() {
   root.dataset.comparisonReady = "true"
   root.innerHTML = `
     <header>
-      <p>Browser contract result</p>
-      <h1>All five lanes completed the same lifecycle</h1>
+      <p>Executable lifecycle</p>
+      <h1>Success · duplicate rollback · success</h1>
     </header>
     <div class="results">
       ${results.map((result) => `
         <article>
-          <span>contract passed</span>
+          <span>passed</span>
           <h2>${result.lane}</h2>
           <dl>
             <dt>requests</dt><dd>3</dd>

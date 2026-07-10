@@ -5,16 +5,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "PUMPED_COMPARE_BASE_PATH=/pumped-fn/compare/ vite build",
+    "build:pages": "PUMPED_COMPARE_BASE_PATH=/pumped-fn/ vite build",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -F @pumped-fn/lite-lint build && node ../../pkg/tool/lint/dist/cli.mjs README.md cases src sandbox scripts vite.config.ts",
     "browser:smoke": "node scripts/sandpack-smoke.mjs",
     "pages:stage": "pnpm build:pages && node scripts/stage-pages.mjs",
-    "pages:verify": "node scripts/verify-pages.mjs",
+    "pages:verify": "node --test scripts/adapters/color-audit.check.mjs && node scripts/verify-pages.mjs",
     "pages:browser:smoke": "node scripts/pages-browser-smoke.mjs",
     "pages:verify:public": "node scripts/adapters/pages-public.mjs",
+    "pages:stage:rollback": "node scripts/stage-pages-rollback.mjs",
+    "pages:verify:rollback": "node scripts/verify-pages-rollback.mjs",
+    "pages:verify:public:rollback": "node scripts/adapters/pages-public-rollback.mjs",
     "pages:dry-run": "pnpm pages:stage && pnpm pages:verify && pnpm pages:browser:smoke",
+    "pages:rollback:dry-run": "pnpm pages:stage:rollback && pnpm pages:verify:rollback",
     "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build && pnpm browser:smoke"
   },
   "dependencies": {
