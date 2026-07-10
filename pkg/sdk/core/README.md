@@ -16,7 +16,7 @@ Primitive families in this package:
 - **Event buffers** — `events`, `inspect()`, `RunLog` for per-run and per-boundary inspection.
 - **Guards** — `guard()` for anti-goal state shared across runs.
 - **Sandboxes** — `sandbox` tag and CLI harness bwrap isolation.
-- **CLI workers** — `cliWorker()`, `claudeCliWorker()`, `codexCliWorker()`, `WorkerRegistry`.
+- **CLI workers** — `cliWorker()` and `WorkerRegistry`; provider-specific workers live in provider packages.
 - **Eval harness** — `suite()`, `runEval()`, deterministic checks, judge quorum, `summary()`.
 - **Agents and models** — `agent()`, `tool()`, `skill()`, `sub()`, `model` tag: one family of primitives, built on the same `ctx.exec()` seam as everything else.
 
@@ -45,10 +45,10 @@ flowchart TD
   Config --> Local["otherwise run next()"]
   Local --> Tool["tool or subagent flow"]
   Local --> Model["model tag provider"]
-  Model --> CLI["optional Codex/Claude CLI worker"]
+  Model --> Provider["Claude CLI, Codex CLI/ACP, or pi-ai"]
   Tool --> Events["events resource"]
   Model --> Events
-  CLI --> Events
+  Provider --> Events
   Events --> Log["write completed"]
   Remote --> Log
 ```
@@ -76,8 +76,8 @@ flowchart TD
 - `summary()` for JSON-safe eval reports.
 - `http()` for Fetch request adapters.
 - `material()`, `patchMaterial()`, and `derivedMaterial()` for small task-scoped JSON materials.
-- `cliWorker()`, `claudeCliWorker()`, and `codexCliWorker()` for real CLI-backed work.
-- `claudeHarness()` and `codexHarness()` for non-interactive CLI model adapters with optional bwrap isolation.
+- `cliWorker()` for generic real CLI-backed work.
+- `formatModelPrompt()` and `parseModelResponse()` as reference-level provider building blocks.
 
 `step()` is one defaulted config tag. Flow tags set defaults. Exec tags override per call.
 
@@ -465,11 +465,9 @@ The CLI helpers are convenience adapters. Harnesses turn popular local CLIs into
 
 ```ts
 import { createScope } from "@pumped-fn/lite"
-import { agent, guard } from "@pumped-fn/sdk"
-import { claude } from "@pumped-fn/sdk-claude"
-import { codex } from "@pumped-fn/sdk-codex"
-
-const shared = guard("review-guard")
+import { agent } from "@pumped-fn/sdk"
+import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
+import { codex, codexConfig } from "@pumped-fn/sdk-codex"
 
 const reviewer = agent({
   name: "reviewer",
@@ -477,22 +475,21 @@ const reviewer = agent({
 
 const scope = createScope({
   tags: [
-    codex({
+    codex,
+    codexConfig({
+      auth: { kind: "global" },
       sandbox: "read-only",
-      guard: shared,
       timeoutMs: 120_000,
     }),
   ],
 })
 
-const otherScope = createScope({ tags: [claude({ guard: shared })] })
+const otherScope = createScope({ tags: [claude, claudeConfig({ auth: { kind: "global" } })] })
 ```
 
-`@pumped-fn/sdk-codex` and `@pumped-fn/sdk-claude` return lazy `model` tags. Tagging a scope does not create the CLI harness; first model use does. Replace them with each other or `model(fake)` at `createScope` or `createContext` without changing the agent graph.
+`@pumped-fn/sdk-codex`, `@pumped-fn/sdk-claude`, and `@pumped-fn/sdk-pi` export stable module-level `model` tags. Their sibling config tags carry auth and provider settings. Replace a provider with another provider tag or `model(fake)` at `createScope` or `createContext` without changing the agent graph.
 
-`codexHarness()` uses `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` uses `claude -p --no-session-persistence` and rejects `--bare`; pass explicit `extraArgs` for other CLI flags. The default prompt asks for JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first non-empty value is stored in material state and injected into later prompts. Pass a shared `guard("name")` atom when multiple harnesses should see the same anti-goal.
-
-Harnesses default to bwrap isolation with network enabled because the CLIs need provider access. The sandbox mounts the workspace read-only by default, a temporary home, minimal runtime/cert/DNS paths, and only explicit credential directories such as `isolate: { network: true, codexHome: process.env.CODEX_HOME }`. Use `isolate: false` only when another trusted boundary already isolates the process.
+The CLI providers run `codex exec --ephemeral --ignore-user-config` and `claude -p --no-session-persistence`. Claude rejects `--bare`. Explicit isolation remains available through config; global auth directories must be writable when isolated.
 
 For stable tests, prefer provider state plus presets.
 

@@ -3,11 +3,13 @@ import { basename, extname, resolve } from "node:path"
 import ts from "typescript"
 
 export type RuleId =
+  | "pumped/config-via-tags"
   | "pumped/no-ambient-io-outside-boundary"
   | "pumped/no-ctx-argument"
   | "pumped/no-definition-handle-suffix"
   | "pumped/no-direct-flow-composition"
   | "pumped/no-handle-spread"
+  | "pumped/no-handle-factory"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
   | "pumped/no-jsdom-backend"
@@ -49,9 +51,10 @@ export interface ScanResult {
  * `allowGlobals` list identifiers that are exempt from their rule's checks
  * (tag labels for no-implicit-tag-read, global names for no-naked-globals).
  * `allowBuiltins` lists builtin error constructor names exempt from
- * no-untyped-throw. `severity` overrides a rule's default severity ("error",
- * "warn", or "off" to disable it entirely). Seven dependency-graph and
- * error-taxonomy rules — no-implicit-tag-read, no-naked-globals,
+ * no-untyped-throw. `allowHandleFactories` lists documented low-level handle
+ * constructors. `severity` overrides a rule's default severity ("error",
+ * "warn", or "off" to disable it entirely). Eight dependency-graph and
+ * error-taxonomy rules — config-via-tags, no-implicit-tag-read, no-naked-globals,
  * no-module-state, prefer-destructured-deps, no-untyped-throw,
  * no-swallowed-error, and no-handle-spread — default to "warn" severity (see `defaultSeverity`) so
  * they surface in `--json` output and local runs without failing the root
@@ -66,6 +69,7 @@ export interface RuleConfig {
   allowImplicit?: string[]
   allowGlobals?: string[]
   allowBuiltins?: string[]
+  allowHandleFactories?: string[]
 }
 
 export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
@@ -76,6 +80,7 @@ export interface ScanOptions {
 }
 
 const defaultSeverity: Partial<Record<RuleId, Severity>> = {
+  "pumped/config-via-tags": "warn",
   "pumped/no-handle-spread": "warn",
   "pumped/no-implicit-tag-read": "warn",
   "pumped/no-naked-globals": "warn",
@@ -134,9 +139,9 @@ type Imports = {
   viObjects: Set<string>
 }
 
-type CreatorKind = "atom" | "flow" | "resource" | "tag" | "scopedValue"
+type CreatorKind = "atom" | "flow" | "material" | "resource" | "tag" | "scopedValue"
 
-const creatorNames = new Set(["atom", "flow", "resource", "tag", "scopedValue"])
+const creatorNames = new Set(["atom", "flow", "material", "resource", "tag", "scopedValue"])
 const graphNodeCreatorKinds = new Set<CreatorKind>(["atom", "flow", "resource"])
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])
 const textExtensions = new Set([...sourceExtensions, ".json", ".md", ".mdx"])
@@ -362,6 +367,10 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
         imports.creators.add(local)
         imports.creatorKinds.set(local, imported as CreatorKind)
       }
+      if (moduleName === "@pumped-fn/sdk" && imported === "material") {
+        imports.creators.add(local)
+        imports.creatorKinds.set(local, "material")
+      }
       if (moduleName === "@testing-library/react" && imported === "render") {
         imports.render.add(local)
       }
@@ -440,6 +449,86 @@ function returnsCreateScope(node: ts.FunctionDeclaration | ts.ArrowFunction | ts
     && ts.isCallExpression(statement.expression)
     && isCreateScopeCall(statement.expression.expression, imports)
   )
+}
+
+function returnedExpressions(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression): ts.Expression[] {
+  if (!node.body) return []
+  if (!ts.isBlock(node.body)) return [node.body]
+  const expressions: ts.Expression[] = []
+  function walk(current: ts.Node): void {
+    if (current !== node.body && (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isArrowFunction(current))) return
+    if (ts.isReturnStatement(current) && current.expression) expressions.push(current.expression)
+    ts.forEachChild(current, walk)
+  }
+  walk(node.body)
+  return expressions
+}
+
+function localCreatorNames(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression, imports: Imports): Set<string> {
+  const names = new Set<string>()
+  if (!node.body) return names
+  function walk(current: ts.Node): void {
+    if (current !== node.body && (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isArrowFunction(current))) return
+    if (
+      ts.isVariableDeclaration(current)
+      && ts.isIdentifier(current.name)
+      && current.initializer
+      && ts.isCallExpression(current.initializer)
+      && isCreatorCall(current.initializer.expression, imports)
+    ) {
+      names.add(current.name.text)
+    }
+    ts.forEachChild(current, walk)
+  }
+  walk(node.body)
+  return names
+}
+
+function expressionReturnsHandle(expression: ts.Expression, imports: Imports, locals: Set<string>): boolean {
+  if (ts.isIdentifier(expression) && locals.has(expression.text)) return true
+  let found = false
+  function walk(current: ts.Node): void {
+    if (found) return
+    if (ts.isCallExpression(current) && isCreatorCall(current.expression, imports)) {
+      found = true
+      return
+    }
+    if (ts.isIdentifier(current) && locals.has(current.text)) {
+      found = true
+      return
+    }
+    ts.forEachChild(current, walk)
+  }
+  walk(expression)
+  return found
+}
+
+function returnsHandle(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression, imports: Imports): boolean {
+  const locals = localCreatorNames(node, imports)
+  return returnedExpressions(node).some((expression) => expressionReturnsHandle(expression, imports, locals))
+}
+
+function enclosingParameterClosures(
+  node: ts.CallExpression,
+  imports: Imports,
+): Array<{ name: ts.Identifier; owner: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression }> {
+  const config = unitCallObject(node, imports)
+  const factory = config && objectProperty(config, "factory")
+  if (!factory || (!ts.isArrowFunction(factory.initializer) && !ts.isFunctionExpression(factory.initializer))) return []
+  let current: ts.Node | undefined = node.parent
+  while (current) {
+    if (ts.isFunctionDeclaration(current) || ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      const references = collectIdentifierReferences(factory.initializer.body)
+      const owner = current
+      return current.parameters.flatMap((parameter) =>
+        ts.isIdentifier(parameter.name) && references.has(parameter.name.text)
+          ? [{ name: parameter.name, owner }]
+          : []
+      )
+    }
+    current = current.parent
+  }
+  return []
 }
 
 function exported(node: ts.Node): boolean {
@@ -984,6 +1073,10 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
   const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
+  const allowHandleFactories = new Set([
+    ...(options?.rules?.["pumped/no-handle-factory"]?.allowHandleFactories ?? []),
+    ...(options?.rules?.["pumped/config-via-tags"]?.allowHandleFactories ?? []),
+  ])
   const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
   const hasGraphNodes = unitFactoryNodes.length > 0
   const creatorHandleNames = collectCreatorHandleNames(sourceFile, imports)
@@ -1153,6 +1246,20 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
     if (ts.isCallExpression(node)) {
       const name = calledName(node.expression)
+      if (isCreatorCall(node.expression, imports)) {
+        for (const closure of enclosingParameterClosures(node, imports)) {
+          const ownerName = closure.owner.name && ts.isIdentifier(closure.owner.name) ? closure.owner.name.text : null
+          if (ownerName && allowHandleFactories.has(ownerName)) continue
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/config-via-tags",
+            closure.name,
+            `Configuration parameter "${closure.name.text}" is closed over by a graph factory; declare configuration as a tag dependency instead.`,
+          )
+        }
+      }
       if (
         ts.isPropertyAccessExpression(node.expression)
         && ts.isIdentifier(node.expression.expression)
@@ -1616,6 +1723,16 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     }
 
     if (ts.isFunctionDeclaration(node) && exported(node)) {
+      if (node.name && !allowHandleFactories.has(node.name.text) && returnsHandle(node, imports)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-handle-factory",
+          node.name,
+          "Export stable module-level handles instead of a function that constructs and returns a handle.",
+        )
+      }
       if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
@@ -1643,6 +1760,20 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
       && exported(variableStatement(node) ?? node)
     ) {
+      if (
+        ts.isIdentifier(node.name)
+        && !allowHandleFactories.has(node.name.text)
+        && returnsHandle(node.initializer, imports)
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-handle-factory",
+          node.name,
+          "Export stable module-level handles instead of a function that constructs and returns a handle.",
+        )
+      }
       if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.initializer.parameters)) {
         pushNodeDiagnostic(
           diagnostics,

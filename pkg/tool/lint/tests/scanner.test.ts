@@ -975,6 +975,63 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("finds exported handle factories through direct, wrapped, and local returns", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { model } from "@pumped-fn/sdk"
+
+      export function direct() {
+        return flow({ factory: () => "ok" })
+      }
+
+      export const wrapped = () => model(flow({ factory: () => "ok" }))
+
+      export function local() {
+        const run = flow({ factory: () => "ok" })
+        return model(run)
+      }
+
+      function internal() {
+        return flow({ factory: () => "ok" })
+      }
+    `)).toEqual([
+      "pumped/no-handle-factory",
+      "pumped/no-handle-factory",
+      "pumped/no-handle-factory",
+    ])
+  })
+
+  it("allows configured core handle constructors", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function cliWorker(options: { name: string }) {
+        return flow({ name: options.name, factory: () => "ok" })
+      }
+    `, "src/example.ts", {
+      rules: {
+        "pumped/no-handle-factory": { allowHandleFactories: ["cliWorker"] },
+        "pumped/config-via-tags": { allowHandleFactories: ["cliWorker"] },
+      },
+    })).toEqual([])
+  })
+
+  it("finds provider options closed over by graph factories", () => {
+    const found = diagnostics(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function provider(options: { model: string }) {
+        return flow({ factory: () => options.model })
+      }
+    `)
+    expect(found.map((diagnostic) => diagnostic.ruleId)).toEqual([
+      "pumped/no-handle-factory",
+      "pumped/config-via-tags",
+    ])
+    expect(found[0]?.severity).toBe("error")
+    expect(found[1]?.severity).toBe("warn")
+  })
+
   function unattributedAwaitCount(source: string, filePath = "src/example.ts") {
     return ids(source, filePath).filter((id) => id === "pumped/no-unattributed-await").length
   }

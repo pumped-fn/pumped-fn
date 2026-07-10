@@ -1,22 +1,16 @@
 {
-  "name": "@pumped-fn/sdk-codex",
+  "name": "@pumped-fn/sdk-pi",
   "version": "2.0.0",
   "private": false,
-  "description": "Codex CLI model provider for @pumped-fn/sdk",
+  "description": "In-process pi-ai model provider for @pumped-fn/sdk",
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.cts",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
     }
   },
   "files": [
@@ -38,8 +32,7 @@
     "@pumped-fn/lite": "^3.1.0"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "catalog:",
-    "@agentclientprotocol/codex-acp": "catalog:"
+    "@earendil-works/pi-ai": "catalog:"
   },
   "devDependencies": {
     "@pumped-fn/sdk": "workspace:*",
@@ -51,10 +44,13 @@
     "vite": "catalog:",
     "vitest": "catalog:"
   },
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "directory": "pkg/sdk/codex",
+    "directory": "pkg/sdk/pi",
     "url": "git+https://github.com/pumped-fn/pumped-fn.git"
   }
 }

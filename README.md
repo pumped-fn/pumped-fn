@@ -12,6 +12,7 @@ createScope({ presets, tags, extensions })
   -> scope-owned graph
   -> execution context per request, job, action, or test
   -> flows, resources, tags, and wrapped execution edges
+  -> module-level Model providers: Claude CLI, Codex CLI/ACP, or pi-ai
 ```
 
 ## Test without mocking modules
@@ -185,6 +186,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | `pkg/sdk/claude` | `@pumped-fn/sdk-claude` | [README](pkg/sdk/claude/README.md) |
 | `pkg/sdk/codex` | `@pumped-fn/sdk-codex` | [README](pkg/sdk/codex/README.md) |
 | `pkg/sdk/core` | `@pumped-fn/sdk` | [README](pkg/sdk/core/README.md) |
+| `pkg/sdk/pi` | `@pumped-fn/sdk-pi` | [README](pkg/sdk/pi/README.md) |
 | `pkg/sdk/test` | `@pumped-fn/sdk-test` | [README](pkg/sdk/test/README.md) |
 | `pkg/tool/codemod` | `@pumped-fn/codemod` | [README](pkg/tool/codemod/README.md) |
 | `pkg/tool/lint` | `@pumped-fn/lite-lint` | [README](pkg/tool/lint/README.md) |

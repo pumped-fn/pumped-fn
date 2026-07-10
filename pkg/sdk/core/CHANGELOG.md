@@ -1,5 +1,11 @@
 # @pumped-fn/agent-sdk
 
+## Unreleased
+
+### Major Changes
+
+- Remove `claudeCliWorker`, `codexCliWorker`, `claudeHarness`, `codexHarness`, and their provider-specific option types. Provider packages now own stable module-level handles and config tags. Add `formatModelPrompt` and `parseModelResponse` as reference-level building blocks.
+
 ## 2.0.0
 
 ### Major Changes
