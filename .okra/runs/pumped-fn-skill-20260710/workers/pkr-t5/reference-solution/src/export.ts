@@ -14,13 +14,22 @@ export type CollectionSummary = { exported: number; failedSlugs: string[] }
 
 type Fault = { code: "UNIT_UNKNOWN"; slug: string; unit: string }
 
-const metric: Record<string, { unit: string; factor: number }> = {
-  cup: { unit: "ml", factor: 240 },
-  tbsp: { unit: "ml", factor: 15 },
-  oz: { unit: "g", factor: 28 },
-  lb: { unit: "g", factor: 454 },
-  g: { unit: "g", factor: 1 },
-  ml: { unit: "ml", factor: 1 },
+const toMetric = (ingredient: Ingredient): Ingredient | null => {
+  switch (ingredient.unit) {
+    case "cup":
+      return { name: ingredient.name, quantity: ingredient.quantity * 240, unit: "ml" }
+    case "tbsp":
+      return { name: ingredient.name, quantity: ingredient.quantity * 15, unit: "ml" }
+    case "oz":
+      return { name: ingredient.name, quantity: ingredient.quantity * 28, unit: "g" }
+    case "lb":
+      return { name: ingredient.name, quantity: ingredient.quantity * 454, unit: "g" }
+    case "g":
+    case "ml":
+      return { name: ingredient.name, quantity: ingredient.quantity, unit: ingredient.unit }
+    default:
+      return null
+  }
 }
 
 const reasonText = (error: unknown): string => {
@@ -41,21 +50,24 @@ export const exportRecipe = flow({
   faults: typed<Fault>(),
   deps: { archive, shareTarget },
   factory: async function* (ctx, { archive, shareTarget }): AsyncGenerator<RecipeEvent, { id: string }, unknown> {
-    const record = await archive.fetch(ctx.input.slug)
+    const record = await ctx.exec({
+      fn: () => archive.fetch(ctx.input.slug),
+      params: [],
+      name: "archive.fetch",
+    })
     yield { stage: "fetched" }
     const ingredients: Ingredient[] = record.ingredients.map((ingredient) => {
-      const conversion = metric[ingredient.unit]
-      if (conversion === undefined) {
-        return ctx.fail({ code: "UNIT_UNKNOWN", slug: ctx.input.slug, unit: ingredient.unit })
-      }
-      return {
-        name: ingredient.name,
-        quantity: ingredient.quantity * conversion.factor,
-        unit: conversion.unit,
-      }
+      const converted = toMetric(ingredient)
+      return converted === null
+        ? ctx.fail({ code: "UNIT_UNKNOWN", slug: ctx.input.slug, unit: ingredient.unit })
+        : converted
     })
     yield { stage: "converted" }
-    const shared = await shareTarget.write({ slug: record.slug, title: record.title, ingredients })
+    const shared = await ctx.exec({
+      fn: () => shareTarget.write({ slug: record.slug, title: record.title, ingredients }),
+      params: [],
+      name: "shareTarget.write",
+    })
     yield { stage: "shared", id: shared.id }
     return shared
   },
