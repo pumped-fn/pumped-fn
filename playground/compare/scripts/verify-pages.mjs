@@ -4,6 +4,7 @@ import {
   fileManifest,
   listFiles,
   loadBaseline,
+  parseManifest,
   sha256,
   stageManifestPath,
   stageRoot,
@@ -42,6 +43,9 @@ if (revision.comparisonAssetPathCount !== compareAssetPaths.length) {
 }
 if (revision.comparisonAssetManifestSha256 !== sha256(compareManifest)) {
   throw new Error("revision metadata has the wrong comparison manifest")
+}
+if (JSON.stringify(revision.comparisonAssets) !== JSON.stringify(parseManifest(compareManifest))) {
+  throw new Error("revision metadata has the wrong comparison assets")
 }
 
 const expectedStagedManifest = await fileManifest(stageRoot, stagedPaths)

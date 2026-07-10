@@ -6,6 +6,7 @@ import {
   extractBaseline,
   fileManifest,
   listFiles,
+  parseManifest,
   pagesRoot,
   run,
   sha256,
@@ -40,6 +41,7 @@ try {
     baselinePathCount: baseline.entries.length,
     comparisonAssetPathCount: comparePaths.length,
     comparisonAssetManifestSha256: sha256(compareManifest),
+    comparisonAssets: parseManifest(compareManifest),
   }
   await writeFile(join(completeStage, "compare", "revision.json"), `${JSON.stringify(revisionMetadata, null, 2)}\n`)
   const nonComparePaths = (await listFiles(completeStage)).filter((path) => !path.startsWith("compare/"))
