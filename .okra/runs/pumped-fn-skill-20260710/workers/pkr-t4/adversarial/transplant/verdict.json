@@ -1,0 +1,21 @@
+{
+  "checks": {
+    "decl-exports": "fail",
+    "b1-shipped-root-observes-public-ops": "fail",
+    "b2-boundary-parse-names-field": "fail",
+    "b3-nested-failure-dual-entries": "fail",
+    "b4-resolve-entries-distinct": "fail",
+    "b5-ring-evicts-oldest": "fail",
+    "s1-zod-union-at-boundary": "fail"
+  },
+  "errors": {
+    "decl-exports": "src/audit.ts failed to load: Cannot find module '/tmp/claude-1001/-home-lagz0ne-dev-pumped-fn/5a2e0b1e-a847-48c3-bb8d-c910128ee0e7/scratchpad/t4-transplant/src/audit.ts' imported from /tmp/claude-1001/-home-lagz0ne-dev-pumped-fn/5a2e0b1e-a847-48c3-bb8d-c910128ee0e7/scratchpad/t4-transplant/check-t4.mjs",
+    "b1-shipped-root-observes-public-ops": "wire.createApp is not a function",
+    "b2-boundary-parse-names-field": "wire.createApp is not a function",
+    "b3-nested-failure-dual-entries": "wire.createApp is not a function",
+    "b4-resolve-entries-distinct": "wire.createApp is not a function",
+    "b5-ring-evicts-oldest": "wire.createApp is not a function",
+    "s1-zod-union-at-boundary": "wire validation must come from zod (no zod import found in src/)"
+  },
+  "failed": 7
+}

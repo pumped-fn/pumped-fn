@@ -1,0 +1,21 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-recipe-await-only": "pass",
+    "b2-recipe-streamed-identical": "pass",
+    "b3-collection-forwards-prefixed-in-order": "fail",
+    "b4-collection-await-only": "pass",
+    "b5-pull-driven-no-prefetch": "fail",
+    "b6-mid-recipe-abandon-prevents-next-side-effect": "fail",
+    "b7-failed-fetch-isolated": "fail",
+    "b8-unknown-unit-isolated-with-code": "fail"
+  },
+  "errors": {
+    "b3-collection-forwards-prefixed-in-order": "slug-prefixed child events forwarded in order: expected [{\"slug\":\"granola\",\"stage\":\"fetched\"},{\"slug\":\"granola\",\"stage\":\"converted\"},{\"slug\":\"granola\",\"stage\":\"shared\",\"id\":\"shared-granola\"},{\"slug\":\"pesto\",\"stage\":\"fetched\"},{\"slug\":\"pesto\",\"stage\":\"converted\"},{\"slug\":\"pesto\",\"stage\":\"shared\",\"id\":\"shared-pesto\"}], got [{\"stage\":\"fetched\"},{\"stage\":\"converted\"},{\"stage\":\"shared\",\"id\":\"shared-granola\"},{\"slug\":\"granola\",\"done\":1,\"total\":2,\"id\":\"shared-granola\"},{\"stage\":\"fetched\"},{\"stage\":\"converted\"},{\"stage\":\"shared\",\"id\":\"shared-pesto\"},{\"slug\":\"pesto\",\"done\":2,\"total\":2,\"id\":\"shared-pesto\"}]",
+    "b5-pull-driven-no-prefetch": "never saw recipe 1's shared event",
+    "b6-mid-recipe-abandon-prevents-next-side-effect": "abandoned stream.result must reject",
+    "b7-failed-fetch-isolated": "archive offline for pesto",
+    "b8-unknown-unit-isolated-with-code": "flow \"recipes.exportRecipe\" failed: {\"code\":\"UNIT_UNKNOWN\",\"slug\":\"mystery\",\"unit\":\"smidgen\"}"
+  },
+  "failed": 5
+}

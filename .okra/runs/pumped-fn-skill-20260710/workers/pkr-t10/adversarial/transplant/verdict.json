@@ -1,0 +1,23 @@
+{
+  "checks": {
+    "decl-exports": "fail",
+    "b1-lazy-single-session": "pass",
+    "b2-retarget-closes-old-first": "fail",
+    "b3-no-eager-reopen": "fail",
+    "b4-same-address-retarget-keeps-session": "fail",
+    "b5-shutdown-closes-live-session": "fail",
+    "b6-retarget-before-first-render": "pass",
+    "b7-multi-retarget-order": "fail",
+    "n1-fresh-scope-isolation": "fail"
+  },
+  "errors": {
+    "decl-exports": "displaySession must be a resource",
+    "b2-retarget-closes-old-first": "retarget closes the old session and does NOT eagerly open the new one: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"close:harbor-main\"], got [\"open:north-quay\"]",
+    "b3-no-eager-reopen": "retarget alone must not open a session",
+    "b4-same-address-retarget-keeps-session": "retarget to the current address must not cycle the session: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"render:harbor-main:1\"], got [\"open:harbor-main\",\"render:harbor-main:1\"]",
+    "b5-shutdown-closes-live-session": "context close closes the live session exactly once: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"close:harbor-main\",\"open:north-quay\",\"render:north-quay:1\",\"close:north-quay\"], got [\"open:north-quay\",\"render:north-quay:1\"]",
+    "b7-multi-retarget-order": "every retarget closes the current session before the next render's open: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"close:harbor-main\",\"open:north-quay\",\"render:north-quay:1\",\"close:north-quay\",\"open:east-dock\",\"render:east-dock:1\"], got [\"open:north-quay\",\"render:north-quay:1\",\"close:north-quay\",\"open:east-dock\",\"render:east-dock:1\"]",
+    "n1-fresh-scope-isolation": "a fresh scope starts at the initial address with its own session (no module-level session or address bleed): expected [\"open:harbor-main\",\"render:harbor-main:1\"], got []"
+  },
+  "failed": 7
+}

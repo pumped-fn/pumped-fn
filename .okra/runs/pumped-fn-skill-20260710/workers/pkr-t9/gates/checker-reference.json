@@ -1,0 +1,15 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-vendor-call-log-per-retry-policy": "pass",
+    "b2-transcript-roundtrip-cross-context": "pass",
+    "b3-error-class-stops-immediately": "pass",
+    "b4-exhaustion-counts-vendor-calls": "pass",
+    "b5-mixed-batch-isolation": "pass",
+    "b6-vendor-edge-traced-per-attempt": "pass",
+    "b7-attempt-ledger-matches-script": "pass",
+    "s1-prepare-staging-site-present": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "d1-eq-set-semantics": "pass",
+    "b1-derive-sorted": "pass",
+    "b2-boundary-values-safe": "pass",
+    "b3-notification-suppressed-on-set-preserving-updates": "pass",
+    "b4-swap-at-same-cardinality-notifies": "pass",
+    "b5-wholesale-reading-replacement": "pass",
+    "b6-monitor-edge-triggered": "pass",
+    "b6b-monitor-alerts-preexisting-at-start": "pass",
+    "b7-monitor-sees-swap": "pass",
+    "b8-realert-on-reentry": "pass",
+    "b9-burst-coalesced-exact-alert-set": "pass",
+    "p1-state-survives-zero-observers": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

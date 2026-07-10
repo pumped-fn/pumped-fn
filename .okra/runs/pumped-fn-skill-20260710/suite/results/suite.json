@@ -1,0 +1,140 @@
+{
+  "formula": "suite_% = 100 * sum(multiplier * admitted_score) / sum(multiplier); tiers: B=0.75, C=1.0, D=1.25",
+  "tasks": {
+    "T-1": {
+      "tier": "B",
+      "multiplier": 0.75,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-2": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-3": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-4": {
+      "tier": "D",
+      "multiplier": 1.25,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-5": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-6": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-7": {
+      "tier": "D",
+      "multiplier": 1.25,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-8": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-9": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    },
+    "T-10": {
+      "tier": "C",
+      "multiplier": 1,
+      "gates": {
+        "lint": 0,
+        "tsgo": 0,
+        "vitest": 0,
+        "smoke": 0,
+        "checker": 0
+      },
+      "checker_exit": 0,
+      "admitted_score": 1
+    }
+  },
+  "weighted_sum": 10.25,
+  "multiplier_sum": 10.25,
+  "suite_pct": 100,
+  "passed": 10,
+  "finished_at": "2026-07-10T05:52:34.770Z"
+}

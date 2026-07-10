@@ -1,0 +1,18 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-fanout-three-channels-side-effects": "pass",
+    "b2-fanout-two-channels-wiring-only": "pass",
+    "b3-declining-channel-accounting": "pass",
+    "b4-throwing-channel-isolation": "pass",
+    "b5-failure-observable-in-traces": "pass",
+    "b6-quiet-hours-suppresses-watch": "pass",
+    "b7-quiet-hours-warning-still-delivers": "pass",
+    "b8-quiet-hours-watch-outside-window": "pass",
+    "b9-optional-absent-delivers-always": "pass",
+    "b10-zero-channels-registered": "pass",
+    "b11-repeat-alerts-ordered-per-channel": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

@@ -1,0 +1,22 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-adjustment-through-preset-connection": "pass",
+    "b2-sequential-siblings-fresh-record": "fail",
+    "b3-concurrent-siblings-distinct": "fail",
+    "b4-nested-steps-share-record": "pass",
+    "n1-standalone-apply-no-plan": "pass",
+    "b5-driver-swap-per-scope": "pass",
+    "b6-status-derives-from-site-and-readings": "pass",
+    "b7-status-reacts-to-reading-updates": "pass",
+    "b8-connection-cleanup-on-dispose": "pass",
+    "t1-weather-call-traced-and-substitutable": "pass",
+    "n2-missing-site-config-fails-loud": "pass",
+    "n3-missing-driver-fails-loud": "pass"
+  },
+  "errors": {
+    "b2-sequential-siblings-fresh-record": "second operation log must not accumulate: expected [\"plan:60\",\"apply:60\"], got [\"plan:34\",\"apply:34\",\"plan:60\",\"apply:60\"]",
+    "b3-concurrent-siblings-distinct": "concurrent sibling A log: expected [\"plan:34\",\"apply:34\"], got [\"plan:60\",\"plan:34\",\"apply:34\",\"apply:34\"]"
+  },
+  "failed": 2
+}

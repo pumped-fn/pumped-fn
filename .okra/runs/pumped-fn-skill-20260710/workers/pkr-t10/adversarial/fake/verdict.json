@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-lazy-single-session": "pass",
+    "b2-retarget-closes-old-first": "fail",
+    "b3-no-eager-reopen": "fail",
+    "b4-same-address-retarget-keeps-session": "fail",
+    "b5-shutdown-closes-live-session": "fail",
+    "b6-retarget-before-first-render": "pass",
+    "b7-multi-retarget-order": "pass",
+    "n1-fresh-scope-isolation": "pass"
+  },
+  "errors": {
+    "b2-retarget-closes-old-first": "retarget closes the old session and does NOT eagerly open the new one: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"close:harbor-main\"], got []",
+    "b3-no-eager-reopen": "old session closed exactly once: expected [\"close:harbor-main\"], got []",
+    "b4-same-address-retarget-keeps-session": "retarget to the current address must not cycle the session: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"render:harbor-main:1\"], got []",
+    "b5-shutdown-closes-live-session": "context close closes the live session exactly once: expected [\"open:harbor-main\",\"render:harbor-main:1\",\"close:harbor-main\",\"open:north-quay\",\"render:north-quay:1\",\"close:north-quay\"], got [\"open:north-quay\",\"render:north-quay:1\"]"
+  },
+  "failed": 4
+}

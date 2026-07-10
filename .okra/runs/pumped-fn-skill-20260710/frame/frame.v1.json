@@ -1,0 +1,116 @@
+{
+  "action_envelope": {
+    "allowed": [
+      "read the repo",
+      "write under .okra/runs/pumped-fn-skill-20260710/, skills/pumped-fn/, and an isolated eval workspace under .okra/runs/pumped-fn-skill-20260710/eval-ws/",
+      "dispatch discovery/progression/verification/challenger workers as subagents",
+      "dispatch writer packets to codex exec -m gpt-5.6-terra and review/grading packets to codex exec -m gpt-5.6-sol",
+      "commit to branch okra/pumped-fn-skill",
+      "run workspace builds/tests/lints"
+    ],
+    "approval_gates": [
+      "eval suite + rubric-weight ratification (denominator freeze)",
+      "skill acceptance / terminalization",
+      "merge or publish"
+    ],
+    "forbidden": [
+      "edits under pkg/** source (gaps found become flags/candidate follow-ups)",
+      "edits under examples/invoice-triage/** (it is the reference, not the workpiece)",
+      "publishing/pushing outside branch okra/pumped-fn-skill without human approval",
+      "changing frame/thresholds without human ratification",
+      "merging to main"
+    ],
+    "human_ratification_boundary": "Reject any attempted frame, guardrail, metric, threshold, or action-envelope change unless the human ratifies it."
+  },
+  "anti_goals": [
+    {
+      "activation": "any pumped-fn code written (skill examples, eval solutions, harness fixtures)",
+      "id": "AG-1",
+      "metric": "lint_diagnostics == 0 on every produced pumped-fn artifact at every check-in, not only at the end (pumped lint: node pkg/tool/lint/dist/cli.mjs)",
+      "name": "zero-lint-always",
+      "type": "tripwire"
+    },
+    {
+      "activation": "eval-suite design, eval scoring, skill-content authoring",
+      "id": "AG-2",
+      "metric": "overfit_eval_count == 0 \u2014 no eval task solvable by replaying the invoice-triage story or its domain; independent challenger issues a similarity verdict per eval task before the suite is ratified; skill content may cite invoice-triage as one worked example but the eval answer key must never be derivable from it",
+      "name": "no-overfit-to-invoice-triage",
+      "type": "tripwire"
+    },
+    {
+      "activation": "every accepted claim, checkpoint, and eval grade",
+      "id": "AG-3",
+      "metric": "single_llm_truth_acceptance_count == 0 \u2014 writer packets run on codex gpt-5.6-terra, review/grading packets on codex gpt-5.6-sol, orchestration on claude-fable-5; no accepted claim graded by its own author model; every accepted claim carries independent deterministic or cross-model evidence",
+      "name": "no-single-llm-truth",
+      "type": "tripwire"
+    },
+    {
+      "activation": "any file write outside .okra/ and skills/pumped-fn/",
+      "id": "AG-4",
+      "metric": "repo_suite_regression == 0 \u2014 workspace lint/typecheck/tests that were green before the run stay green (dist rebuilt before gates per rebuild-dist-before-workspace-gates)",
+      "name": "no-repo-regression",
+      "type": "tripwire"
+    },
+    {
+      "activation": "always",
+      "id": "AG-5",
+      "metric": "anti_goal_bypass_or_dishonesty_count == 0",
+      "name": "inner-integrity",
+      "type": "tripwire"
+    }
+  ],
+  "frame_hash": "9ae66b79cac3784b7fe9dfd658bd1ffbb5d015cd4b6bf0d85d766cf20a576021",
+  "frame_version": 1,
+  "metric_contracts": {
+    "AG-1": {
+      "max_age": "per check-in",
+      "read": "deterministic: node pkg/tool/lint/dist/cli.mjs <paths>; exit code + diagnostic count",
+      "source": "pumped lint CLI over every produced artifact path"
+    },
+    "AG-2": {
+      "max_age": "on eval-suite change",
+      "read": "count of tasks with verdict overfit",
+      "source": "challenger similarity verdicts (cross-model) stored per eval task"
+    },
+    "AG-3": {
+      "max_age": "per check-in",
+      "read": "ledger scan",
+      "source": "dispatch records in ledger name the model per packet; acceptance records cite evidence class"
+    },
+    "AG-4": {
+      "max_age": "before any commit touching shared surface",
+      "read": "deterministic exit codes",
+      "source": "pnpm -r build && pnpm -r lint/typecheck/test on touched packages vs pre-run baseline"
+    },
+    "cold_build_eval_score": {
+      "denominator": "eval suite ratified by human before first official read",
+      "max_age": "per check-in",
+      "read": "orchestrator dispatches eval runs + verification worker; transcripts and diffs stored by hash",
+      "source": "fresh cold sessions given ONLY skills/pumped-fn/ content + one eval task, in an isolated workspace with pumped-fn deps installed; deterministic gate script computes hard-gate portion; codex gpt-5.6-sol grades the idiom rubric portion from the diff"
+    }
+  },
+  "objective": {
+    "id": "pumped-fn-skill-20260710",
+    "metric": "cold_build_eval_score",
+    "statement": "Ship a repo-distributable skill (skills/pumped-fn/) that trains an LLM to design and write pumped-fn code at invoice-triage quality: choose the right primitive, write the code, the tests, and the extensions \u2014 fully testable, readable, performant",
+    "target": "weighted rubric score >= 85% across the ratified eval suite (~10 novel-domain build tasks); per-task score = hard gates (lint 0, typecheck clean, tests green, entrypoint runs) + idiom rubric graded cross-model; eval suite and rubric weights ratified by human before the first official read (denominator freeze); interim reads before ratification are candidate-only",
+    "type": "capability-transfer (skill-engineering run); the metric proves a cold session + skill produces idiomatic pumped-fn output on tasks it has never seen"
+  },
+  "orchestrator": {
+    "owns": [
+      "objective checks",
+      "subagent steering",
+      "admissibility",
+      "flag raising",
+      "check-ins"
+    ],
+    "session": "claude-fable-5 main session"
+  },
+  "ratification": {
+    "at": "2026-07-10",
+    "by": "duke@silentium.io",
+    "notes": "Ratified via AskUserQuestion in-session: objective = weighted rubric >= 85%; placement = skills/pumped-fn/ repo-distributable; mode = fully-autopilot delegated loop on branch okra/pumped-fn-skill with committed .okra store. Anti-goals AG-1..AG-3 stated verbatim by user in the goal message; AG-4/AG-5 standard walls carried from candidate library .okra/memory/pumped-fn-lite/candidate-anti-goals.v1.json."
+  },
+  "run_id": "pumped-fn-skill-20260710",
+  "status": "ratified"
+}

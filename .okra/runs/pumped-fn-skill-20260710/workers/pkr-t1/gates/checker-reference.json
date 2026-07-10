@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-adjustment-through-preset-connection": "pass",
+    "b2-sequential-siblings-fresh-record": "pass",
+    "b3-concurrent-siblings-distinct": "pass",
+    "b4-nested-steps-share-record": "pass",
+    "n1-standalone-apply-no-plan": "pass",
+    "b5-driver-swap-per-scope": "pass",
+    "b6-status-derives-from-site-and-readings": "pass",
+    "b7-status-reacts-to-reading-updates": "pass",
+    "b8-connection-cleanup-on-dispose": "pass",
+    "t1-weather-call-traced-and-substitutable": "pass",
+    "n2-missing-site-config-fails-loud": "pass",
+    "n3-missing-driver-fails-loud": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

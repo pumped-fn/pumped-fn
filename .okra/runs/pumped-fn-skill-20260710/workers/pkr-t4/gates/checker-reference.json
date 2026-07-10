@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-shipped-root-observes-public-ops": "pass",
+    "b2-boundary-parse-names-field": "pass",
+    "b3-nested-failure-dual-entries": "pass",
+    "b4-resolve-entries-distinct": "pass",
+    "b5-ring-evicts-oldest": "pass",
+    "s1-zod-union-at-boundary": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}

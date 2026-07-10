@@ -1,0 +1,18 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-recipe-await-only": "pass",
+    "b2-recipe-streamed-identical": "pass",
+    "b3-collection-forwards-prefixed-in-order": "pass",
+    "b4-collection-await-only": "pass",
+    "b5-pull-driven-no-prefetch": "fail",
+    "b6-mid-recipe-abandon-prevents-next-side-effect": "fail",
+    "b7-failed-fetch-isolated": "pass",
+    "b8-unknown-unit-isolated-with-code": "pass"
+  },
+  "errors": {
+    "b5-pull-driven-no-prefetch": "after consuming recipe 1's final event, fetch count must be exactly 1 (eager prefetch issued recipe 2's fetch): expected [\"granola\"], got [\"granola\",\"pesto\",\"brisket\"]",
+    "b6-mid-recipe-abandon-prevents-next-side-effect": "no further fetch after mid-recipe abandonment: expected [\"granola\"], got [\"granola\",\"pesto\"]"
+  },
+  "failed": 2
+}

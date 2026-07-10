@@ -1,0 +1,2 @@
+{"ts":"2026-07-10T03:14:23Z","worker":"dkr-3","event":"start","detail":"begin eval-suite design; reading dkr-1 register"}
+{"ts":"2026-07-10T03:15:17Z","worker":"dkr-3","event":"register-read","detail":"dkr-1 register verified sha256 32b6c2f0; drafting 10-task set A1/B1/C6/D2 with domains: greenhouse, library-holds, observatory, scooter-fleet, recipe-import, museum-climate, chess-tx, weather-alerts, podcast-retry, radio-logbook"}

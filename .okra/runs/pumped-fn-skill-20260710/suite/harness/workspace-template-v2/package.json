@@ -1,0 +1,22 @@
+{
+  "name": "pumped-task-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "pumped-lite-lint --max-warnings 0 src bin tests",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "start": "tsx bin/main.ts"
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "file:PACK_TARBALL_LITE"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite-lint": "file:PACK_TARBALL_LINT",
+    "@types/node": "25.9.5",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "tsx": "4.23.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

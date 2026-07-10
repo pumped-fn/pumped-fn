@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "decl-jobs-register-opposite-policies": "pass",
+    "decl-tick-executes-production-flows": "pass",
+    "b1-capture-overlap-drops-not-defers": "pass",
+    "b2-upload-overlap-queues-strictly": "pass",
+    "b3-upload-catchup-runs-all-missed-windows": "pass",
+    "b3b-catchup-is-idempotent-across-restart": "pass",
+    "b4-capture-missed-windows-are-lost": "pass",
+    "b5-failed-upload-retries-frames-and-chain-survives": "pass",
+    "b6-fresh-station-starts-from-now": "pass",
+    "b7-dispose-awaits-inflight-run": "pass"
+  },
+  "errors": {},
+  "failed": []
+}

@@ -1,0 +1,7 @@
+71,74d70
+<       const cancel = clock.every(everyMs, () => {
+<         nextAtMs = clock.nowMs() + everyMs
+<         void fire(new Date(clock.nowMs())).catch(() => {})
+<       })
+80d75
+<           cancel()

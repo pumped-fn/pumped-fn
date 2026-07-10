@@ -1,0 +1,8 @@
+{
+  "task": "T-8",
+  "entrypoint": null,
+  "gates": null,
+  "checker_exit": null,
+  "admitted_score": 0,
+  "reason": "ENTRYPOINT_AMBIGUOUS: 0 bin/*.ts files (need exactly 1)"
+}

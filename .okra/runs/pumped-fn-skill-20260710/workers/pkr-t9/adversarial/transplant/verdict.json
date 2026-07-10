@@ -1,0 +1,25 @@
+{
+  "checks": {
+    "decl-exports": "fail",
+    "b1-vendor-call-log-per-retry-policy": "fail",
+    "b2-transcript-roundtrip-cross-context": "fail",
+    "b3-error-class-stops-immediately": "fail",
+    "b4-exhaustion-counts-vendor-calls": "fail",
+    "b5-mixed-batch-isolation": "fail",
+    "b6-vendor-edge-traced-per-attempt": "fail",
+    "b7-attempt-ledger-matches-script": "fail",
+    "s1-prepare-staging-site-present": "fail"
+  },
+  "errors": {
+    "decl-exports": "export getTranscript is not an executable flow",
+    "b1-vendor-call-log-per-retry-policy": "mod.backoff is not a function",
+    "b2-transcript-roundtrip-cross-context": "mod.backoff is not a function",
+    "b3-error-class-stops-immediately": "mod.backoff is not a function",
+    "b4-exhaustion-counts-vendor-calls": "mod.backoff is not a function",
+    "b5-mixed-batch-isolation": "mod.backoff is not a function",
+    "b6-vendor-edge-traced-per-attempt": "mod.backoff is not a function",
+    "b7-attempt-ledger-matches-script": "mod.attemptLedger is not a function",
+    "s1-prepare-staging-site-present": "no .prepare( staging site found in src/ — retry must re-execute a staged invocation"
+  },
+  "failed": 9
+}
