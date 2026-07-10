@@ -1,0 +1,16 @@
+{
+  "task": "T-3",
+  "entrypoint": "bin/daemon.ts",
+  "gates_exit": 0,
+  "gates": {
+    "lint": 0,
+    "tsgo": 0,
+    "vitest": 0,
+    "smoke": 0,
+    "checker": 0
+  },
+  "checker_exit": 0,
+  "lint_tarball_sha256": "1f2945a7a8dedccd46babecf16866fc03995bbb93feb9ef3e36f604e5174b2f1",
+  "lite_tarball_sha256": "16001d130626e01b58d178c28f32250000dfb830b8df5620a02d690cefaee58a",
+  "admitted_score": 1
+}
