@@ -2,27 +2,23 @@
   "checks": {
     "decl-exports": "pass",
     "b1-record-commits-pending": "pass",
-    "b2-drain-prints-and-flushes-at-close": "fail",
-    "b3-fresh-session-per-sequential-sibling-pass": "fail",
+    "b2-drain-prints-and-flushes-at-close": "pass",
+    "b3-fresh-session-per-sequential-sibling-pass": "pass",
     "b4-concurrent-sibling-passes-exactly-once": "fail",
     "b5-empty-pass-still-isolated-session": "pass",
     "b6-failing-batch-invisible-to-awake-dispatcher": "fail",
     "b7-jam-closes-dirty-and-discards": "fail",
     "b7b-recovery-pass-after-jam": "fail",
-    "b8-stop-finishes-current-drain-exactly-once": "fail",
-    "n1-duplicate-hold-and-refulfil": "fail",
+    "b8-stop-finishes-current-drain-exactly-once": "pass",
+    "n1-duplicate-hold-and-refulfil": "pass",
     "n2-racing-duplicates-single-winner": "pass",
     "p1-shelf-outlives-daemon-context": "pass"
   },
   "errors": {
-    "b2-drain-prints-and-flushes-at-close": "params is not iterable (cannot read property undefined)",
-    "b3-fresh-session-per-sequential-sibling-pass": "params is not iterable (cannot read property undefined)",
-    "b4-concurrent-sibling-passes-exactly-once": "params is not iterable (cannot read property undefined)",
-    "b6-failing-batch-invisible-to-awake-dispatcher": "dispatcher failed: params is not iterable (cannot read property undefined)",
-    "b7-jam-closes-dirty-and-discards": "jammed pass: rejection does not carry PRINTER_JAM: params is not iterable (cannot read property undefined)",
-    "b7b-recovery-pass-after-jam": "jammed pass: rejection does not carry PRINTER_JAM: params is not iterable (cannot read property undefined)",
-    "b8-stop-finishes-current-drain-exactly-once": "dispatcher failed: params is not iterable (cannot read property undefined)",
-    "n1-duplicate-hold-and-refulfil": "params is not iterable (cannot read property undefined)"
+    "b4-concurrent-sibling-passes-exactly-once": "each hold printed by exactly one pass: expected 4, got 7",
+    "b6-failing-batch-invisible-to-awake-dispatcher": "no hold from the failed batch was ever committed: expected [\"c1\"], got [\"c1\",\"c2\",\"c3\"]",
+    "b7-jam-closes-dirty-and-discards": "jammed session closed dirty with all slips discarded: expected [{\"session\":1,\"slips\":[],\"closed\":\"dirty\"}], got [{\"session\":1,\"slips\":[{\"holdId\":1,\"copyId\":\"c1\"},{\"holdId\":2,\"copyId\":\"c2\"}],\"closed\":\"dirty\"}]",
+    "b7b-recovery-pass-after-jam": "recovery pass reprints the restored holds: expected 2, got 1"
   },
-  "failed": 8
+  "failed": 4
 }

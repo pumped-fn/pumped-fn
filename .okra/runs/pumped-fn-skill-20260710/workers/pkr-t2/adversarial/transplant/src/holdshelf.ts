@@ -81,10 +81,11 @@ export const drainPass = flow({
           return ctx.fail({ code: "PRINTER_JAM", holdId: hold.holdId })
         }
         await ctx.exec({
-          fn: () => {
+          fn: (_ctx) => {
             record.slips.push({ holdId: hold.holdId, copyId: hold.copyId })
             hold.status = "printed"
           },
+          params: [],
           name: "printer.print",
         })
       }
