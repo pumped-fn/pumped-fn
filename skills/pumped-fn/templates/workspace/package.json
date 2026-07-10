@@ -1,0 +1,20 @@
+{
+  "name": "pumped-fn-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node /home/lagz0ne/dev/pumped-fn/pkg/tool/lint/dist/cli.mjs --max-warnings 0 src bin tests",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "start": "tsx bin/main.ts"
+  },
+  "dependencies": {
+    "@pumped-fn/lite": "file:PACK_TARBALL_LITE"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20250628.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}
