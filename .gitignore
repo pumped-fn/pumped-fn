@@ -362,3 +362,4 @@ examples/reactivity-bench/
 !.okra/runs/
 .okra/runs/*
 !.okra/runs/example-operational-20260707/
+!.okra/runs/pumped-fn-skill-20260710/

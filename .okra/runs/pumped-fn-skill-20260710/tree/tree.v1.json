@@ -1,0 +1,56 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-1",
+      "metric": "eval harness executes end-to-end: isolated workspace, gates deterministic, cross-model rubric grading; N tasks runnable",
+      "status": "candidate \u2014 not promoted until DKR-2 checkpoint accepted",
+      "title": "runnable cold-eval suite"
+    },
+    {
+      "id": "CKR-2",
+      "metric": "cold_build_eval_score (the objective metric)",
+      "status": "candidate \u2014 not promoted until DKR-1 checkpoint accepted",
+      "title": "skill content at skills/pumped-fn/"
+    }
+  ],
+  "dkrs": [
+    {
+      "artifact": "workers/dkr-1/idiom-register.md",
+      "budget_min": 20,
+      "decision_unlocked": "promote CKR-2 content outline; fund DKR-3 eval design",
+      "id": "DKR-1",
+      "status": "dispatched",
+      "title": "idiom inventory \u2014 what must the skill teach"
+    },
+    {
+      "artifact": "workers/dkr-2/architecture-note.md",
+      "budget_min": 20,
+      "decision_unlocked": "fund CKR-1 harness PKRs; skill scaffold shape",
+      "id": "DKR-2",
+      "status": "dispatched",
+      "title": "skill architecture + cold-eval harness transfer"
+    },
+    {
+      "artifact": "workers/dkr-3/eval-suite-candidate.md",
+      "budget_min": 25,
+      "decision_unlocked": "eval set candidate for human ratification (denominator freeze)",
+      "id": "DKR-3",
+      "status": "pending DKR-1 checkpoint acceptance",
+      "title": "eval-suite design \u2014 novel domains, difficulty ladder, rubric weights"
+    }
+  ],
+  "frame_version": 1,
+  "orchestrator": {
+    "owns": [
+      "objective checks",
+      "subagent steering",
+      "admissibility",
+      "flag raising",
+      "check-ins"
+    ],
+    "session": "claude-fable-5 main session"
+  },
+  "pkrs": [],
+  "promotion_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
+  "tree_version": 1
+}
