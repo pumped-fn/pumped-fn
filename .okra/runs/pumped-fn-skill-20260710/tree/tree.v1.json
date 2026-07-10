@@ -3,13 +3,13 @@
     {
       "id": "CKR-1",
       "metric": "eval harness executes end-to-end: isolated workspace, gates deterministic, cross-model rubric grading; N tasks runnable",
-      "status": "candidate \u2014 not promoted until DKR-2 checkpoint accepted",
+      "status": "promoted (DKR-2 checkpoint accepted); harness build PKRs pending DKR-4 lint parity answer",
       "title": "runnable cold-eval suite"
     },
     {
       "id": "CKR-2",
       "metric": "cold_build_eval_score (the objective metric)",
-      "status": "candidate \u2014 not promoted until DKR-1 checkpoint accepted",
+      "status": "promoted (DKR-1 checkpoint accepted); content outline = decision table + rings a-e + 10 concept-only surfaces via non-invoice examples; skill authoring PKRs pending eval-set ratification",
       "title": "skill content at skills/pumped-fn/"
     }
   ],
@@ -19,7 +19,7 @@
       "budget_min": 20,
       "decision_unlocked": "promote CKR-2 content outline; fund DKR-3 eval design",
       "id": "DKR-1",
-      "status": "dispatched",
+      "status": "checkpoint accepted (ledger dkr_checkpoint_acceptance)",
       "title": "idiom inventory \u2014 what must the skill teach"
     },
     {
@@ -27,7 +27,7 @@
       "budget_min": 20,
       "decision_unlocked": "fund CKR-1 harness PKRs; skill scaffold shape",
       "id": "DKR-2",
-      "status": "dispatched",
+      "status": "checkpoint accepted (ledger dkr_checkpoint_acceptance)",
       "title": "skill architecture + cold-eval harness transfer"
     },
     {
@@ -35,8 +35,16 @@
       "budget_min": 25,
       "decision_unlocked": "eval set candidate for human ratification (denominator freeze)",
       "id": "DKR-3",
-      "status": "pending DKR-1 checkpoint acceptance",
+      "status": "dispatched",
       "title": "eval-suite design \u2014 novel domains, difficulty ladder, rubric weights"
+    },
+    {
+      "artifact": "workers/dkr-4/lint-gate-note.md",
+      "budget_min": 15,
+      "decision_unlocked": "AG-1 readability in eval workspaces; AG-3 executability",
+      "id": "DKR-4",
+      "status": "dispatched",
+      "title": "lint-gate integrity outside repo + codex model-id availability"
     }
   ],
   "frame_version": 1,
@@ -52,5 +60,5 @@
   },
   "pkrs": [],
   "promotion_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
-  "tree_version": 1
+  "tree_version": 2
 }
