@@ -1,0 +1,23 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-vendor-call-log-per-retry-policy": "fail",
+    "b2-transcript-roundtrip-cross-context": "fail",
+    "b3-error-class-stops-immediately": "fail",
+    "b4-exhaustion-counts-vendor-calls": "fail",
+    "b5-mixed-batch-isolation": "fail",
+    "b6-vendor-edge-traced-per-attempt": "fail",
+    "b7-attempt-ledger-matches-script": "fail",
+    "s1-prepare-staging-site-present": "pass"
+  },
+  "errors": {
+    "b1-vendor-call-log-per-retry-policy": "vendor call log for busy,busy,ok must show exactly 3 calls carrying the episodeId: expected [{\"episodeId\":\"e1\"},{\"episodeId\":\"e1\"},{\"episodeId\":\"e1\"}], got []",
+    "b2-transcript-roundtrip-cross-context": "same-context read: expected {\"text\":\"b1 transcript: two busy replies then success, attempt three\"}, got {\"text\":\"transcript of e1\"}",
+    "b3-error-class-stops-immediately": "done list: expected [], got [\"e2\"]",
+    "b4-exhaustion-counts-vendor-calls": "failed entry: expected [{\"episodeId\":\"e3\",\"attempts\":3,\"code\":\"vendor-busy\"}], got []",
+    "b5-mixed-batch-isolation": "done list: expected [\"good\"], got [\"bad\",\"good\"]",
+    "b6-vendor-edge-traced-per-attempt": "every vendor call must be a traced execution named speech.transcribe (3 for busy,busy,ok): expected 0, got 3",
+    "b7-attempt-ledger-matches-script": "ledger for speech.transcribe under busy,busy,ok: expected {\"started\":3,\"succeeded\":1,\"failed\":2}, got {\"started\":3,\"succeeded\":3,\"failed\":0}"
+  },
+  "failed": 7
+}

@@ -1,0 +1,15 @@
+{
+  "checks": {
+    "decl-exports": "pass",
+    "b1-recipe-await-only": "pass",
+    "b2-recipe-streamed-identical": "pass",
+    "b3-collection-forwards-prefixed-in-order": "pass",
+    "b4-collection-await-only": "pass",
+    "b5-pull-driven-no-prefetch": "pass",
+    "b6-mid-recipe-abandon-prevents-next-side-effect": "pass",
+    "b7-failed-fetch-isolated": "pass",
+    "b8-unknown-unit-isolated-with-code": "pass"
+  },
+  "errors": {},
+  "failed": 0
+}
