@@ -66,6 +66,18 @@ Foreign execution always supplies `params`, including zero arguments: `await ctx
 
 Roots/tests own setup and teardown. A test executes one promise once, asserts its result and observable fake calls, closes the context, then disposes the scope. Use a shared durable fake across two scopes for recovery tests. For a resource transaction, put awaited commit and its subsequent signal in the same successful `onClose` callback; inline store transactions are a separate commit-then-signal pattern.
 
+## Trap corpus
+
+- Fn edges require `params` even at arity zero: `ctx.exec({ fn: ping, params: [], name: "client.ping" })`; omitting it throws `params is not iterable`.
+- Retry only a declared flow's fault: `if (isFault(transcribeEpisode, error) && error.fault.code === "busy")`. The test is `error.flow === flow.name`; a deps handle or `controller(child, { name })` rename misclassifies it.
+- `prepare()` captures options once, but each `step.exec()` parses, resolves deps, and runs wrappers again. Keep one staging site outside the retry loop; no runtime signal proves it was staged once.
+- `tags.all(port)` on an atom collects every scope binding; on a flow it yields one value per context level. Put multi-binding fan-out in a registry atom. Do not bind an array of flows: projection does not recurse and execution throws.
+- For a resolved atom controller, `set(value)` and `update(() => value)` behave alike. Prefer `ctrl.set(wholeValue)` when replacing all state; that is readability, not stronger semantics.
+- Export pure functions. Inline `scope.select`/`scope.exec` at a root: exported scope-taking functions are flagged even in composition files. The filename allowlist is exact: `main`, `bootstrap`, `wire`, `adapter`, `composition`, `http`, `transport`, or `server`; `bin/monitor.ts` is not a root.
+- Keep lookup tables inside a factory function, not module scope: closed-over module containers trigger `no-module-state`. Wrap awaited port methods in named fn edges; `setTimeout` remains ambient IO, including `bin/`.
+- Flows/resources accept `name`; `atom()` does not. For resolve observability, name a resource and use a named factory function expression for an atom. In `wrapExec`, use `ctx.name` and `ctx.parent?.name`; record after `await next()` for completion order.
+- Watch an upstream resource from resource deps. Atom watch belongs in atom deps and is runtime-enforced. Bridge atom state to a resource with an owner-bound subscription that releases/re-resolves itself; dependent re-establishment is lazy on the next use.
+
 ## Review and references
 
 Run the project loop: `pnpm lint && pnpm typecheck && pnpm test`. Read [review.md](references/review.md) for the 24 exact lint mappings and preference review; [primitives.md](references/primitives.md), [testing.md](references/testing.md), and [extensions.md](references/extensions.md) for elaboration; [worked-example.md](references/worked-example.md) for a runnable composition.

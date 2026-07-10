@@ -55,7 +55,11 @@ Trace each edge: declaration, owner, scope substitution, and close behavior. Thi
 | Extensions | Root installs extensions; wrappers call `next()` and record close outcome; business code only names foreign edges. |
 | Request boundary | Boundary creates tagged context and closes it; product nodes declare request tags rather than use ALS. |
 | Prepare | A keyed `prepare` stages retry/fanout; `ready` is awaited only for staged readiness and `exec` starts work. |
+| Prepare staging | Keep one `prepare()` site outside retries; each `exec()` is a full execution. |
 | Streams | Conflated `changes` is a view/wakeup; generator stream is pull-driven; drain has a finite `take`. |
 | Liveness/GC | Signals required across churn use `keepAlive`; GC settings are intentional and `flush` precedes pending-work assertions. |
 | Resource ownership | `current` versus `boundary` matches sharing intent; commit/rollback is in `onClose`, and release is not confused with close. |
 | Equality/select | Tag `eq` and `same` have distinct intent; `scope.select` equality gates notification only; controller `set` is used only on resolved atom state. |
+| Whole-state replacement | Prefer `ctrl.set(wholeValue)` for replacement; this is readability, not different semantics from `update`. |
+| Scheduler teardown | Await `registration.stop()` before `scope.dispose()`. |
+| Observability names | Name resources and atom factory functions; after `await next()`, use `ctx.name` and `ctx.parent?.name`. |
