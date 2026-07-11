@@ -186,6 +186,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | `pkg/sdk/claude` | `@pumped-fn/sdk-claude` | [README](pkg/sdk/claude/README.md) |
 | `pkg/sdk/codex` | `@pumped-fn/sdk-codex` | [README](pkg/sdk/codex/README.md) |
 | `pkg/sdk/core` | `@pumped-fn/sdk` | [README](pkg/sdk/core/README.md) |
+| `pkg/sdk/mcp` | `@pumped-fn/sdk-mcp` | [README](pkg/sdk/mcp/README.md) |
 | `pkg/sdk/pi` | `@pumped-fn/sdk-pi` | [README](pkg/sdk/pi/README.md) |
 | `pkg/sdk/test` | `@pumped-fn/sdk-test` | [README](pkg/sdk/test/README.md) |
 | `pkg/tool/codemod` | `@pumped-fn/codemod` | [README](pkg/tool/codemod/README.md) |

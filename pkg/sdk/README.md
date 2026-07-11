@@ -16,6 +16,7 @@ and runs them.
 | `codex/` | `@pumped-fn/sdk-codex` | Module-level Codex CLI and ACP model providers. |
 | `claude/` | `@pumped-fn/sdk-claude` | Module-level Claude CLI model provider. |
 | `pi/` | `@pumped-fn/sdk-pi` | In-process pi-ai model provider with native tool calls. |
+| `mcp/` | `@pumped-fn/sdk-mcp` | Expose flows as an MCP server; each flow carries its schema as a tag. |
 | `bash/` | `@pumped-fn/sdk-just-bash` | just-bash sandbox provider tag. |
 | `test/` | `@pumped-fn/sdk-test` | In-memory logs, fake routing, and test helpers. |
 

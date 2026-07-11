@@ -1,0 +1,47 @@
+{
+  "name": "@pumped-fn/sdk-mcp",
+  "version": "2.0.0",
+  "private": false,
+  "description": "Expose pumped-fn flows as an MCP server",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@pumped-fn/lite": "^3.1.0",
+    "zod": "^3.25.0 || ^4.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:"
+  },
+  "devDependencies": {
+    "@pumped-fn/lite": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "pkg/sdk/mcp",
+    "url": "git+https://github.com/pumped-fn/pumped-fn.git"
+  }
+}
