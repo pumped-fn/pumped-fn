@@ -43,6 +43,8 @@ pumped-lite-lint --json src tests
 | `pumped/no-untyped-throw` (warn) | `throw new Error(...)` and other builtin error constructors (`TypeError`, `RangeError`, etc.) inside atom/flow/resource factories; throw a domain error class carrying structured fields (kind/op/entity) so traces and edges can discriminate planned vs unplanned failures. Rethrow of a caught identifier (`throw error`) and user-defined error classes both pass. |
 | `pumped/no-swallowed-error` (warn) | Catch clauses inside atom/flow/resource factories that neither rethrow nor reference the caught error (empty catch bodies, `catch {}` with no throw, or bodies that discard the binding); swallowing the error here blinds the trace seam. Wrapping with a cause (`throw new StoreError(msg, error)`), rethrowing, or passing the error to a dep (e.g. logging) all pass. |
 | `pumped/no-handle-spread` (warn) | Object literals that spread a lite handle (`{ ...sharedFlow, tags: [...] }`), detected conservatively — the spread identifier is a same-file `atom`/`flow`/`resource`/... creator result, or the object literal also sets a `tags` property alongside any spread (the retrofit fingerprint); spreads fork node identity and silently miss presets targeting the original. Wrap the shared flow in a thin entry flow (`deps: { run: controller(sharedFlow) }`, `factory: (ctx, { run }) => run.exec(...)`) instead. Plain data object spreads are not flagged. |
+| `pumped/no-handle-factory` | Exported function declarations and exported arrow/function expressions that directly return an `atom`/`flow`/`resource`/`material`/`tag`, return one through a wrapper such as `model(...)`, or return a same-function local handle. Configure documented core constructors with `allowHandleFactories`; composition roots remain unrestricted because they return scopes, not handles. Known syntactic false negatives: handles routed through helper calls, assignments, collections, or cross-function aliases. |
+| `pumped/config-via-tags` (warn) | A graph factory that reads a direct identifier parameter from its enclosing function. Provider configuration belongs in a module-level tag declared through `deps`. Configure documented low-level constructors with `allowHandleFactories`. Known syntactic false negatives: destructured parameters, aliases, and values forwarded through helpers. |
 | `pumped/no-unattributed-await` | Inside an atom/flow/resource factory, an awaited (or `.then()`-chained) call rooted at the factory's deps parameter, unless it's graph machinery (`exec`/`execStream`/`prepare` by method name; `resolve` only when the dep's initializer is a `controller(...)` call) or the enclosing flow's `tags` array carries a `step(...)` tag imported from `@pumped-fn/sdk`; awaited foreign calls only happen inside declared spans. `for await` iteration and sync calls on deps are not flagged, and a nested function parameter that shadows the deps binding name is respected. Known false negatives, accepted for a syntactic rule: `exec`/`execStream`/`prepare` name collisions on non-handle deps, aliased bindings, rest/nested deps patterns, spread-built tags arrays, and un-awaited returned promises. |
 
 The default path walk skips `before.*` example files, generated output, lockfiles, and dependency
@@ -52,7 +54,7 @@ directories where examples intentionally contain bad shapes or third-party code.
 
 Every diagnostic carries a `severity` of `"error"` or `"warn"`.
 
-> **Note:** The CLI exits nonzero only when at least one `"error"` diagnostic is found. `"warn"` diagnostics still print and appear in `--json`, but they do not fail the process; `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, `pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, `pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` as an incremental cleanup inventory, while all other rules default to `"error"`.
+> **Note:** The CLI exits nonzero only when at least one `"error"` diagnostic is found. `"warn"` diagnostics still print and appear in `--json`, but they do not fail the process; `pumped/config-via-tags`, `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, `pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, `pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` as an incremental cleanup inventory, while all other rules default to `"error"`.
 
 ## Config
 
@@ -65,6 +67,7 @@ const result = await scanPaths(["src", "tests"], {
   rules: {
     "pumped/no-implicit-tag-read": { allowImplicit: ["requestId"] },
     "pumped/no-naked-globals": { allowGlobals: ["fetch"] },
+    "pumped/no-handle-factory": { allowHandleFactories: ["cliWorker"] },
   },
 })
 ```
@@ -76,6 +79,9 @@ const result = await scanPaths(["src", "tests"], {
 (`JSON`, `Math`, `Object`, `Array`, `String`, `Number`, `structuredClone`, `URL`).
 `allowBuiltins` lists builtin error constructor names (e.g. `"TypeError"`) that are exempt from
 `no-untyped-throw`; empty by default.
+`allowHandleFactories` lists documented low-level constructors such as `agent`, `tool`, `skill`,
+`sub`, `session`, `guard`, `material`, `channel`, `schedule`, or `cliWorker`. Use the same list for
+`no-handle-factory` and `config-via-tags` when a constructor intentionally captures its inputs.
 
 ## API
 

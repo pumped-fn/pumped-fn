@@ -5,35 +5,49 @@ import { effect } from "../cases/account-onboarding/lanes/effect"
 import { inversify } from "../cases/account-onboarding/lanes/inversify"
 import { plain } from "../cases/account-onboarding/lanes/plain"
 import { pumped } from "../cases/account-onboarding/lanes/pumped"
-import { runScenario } from "../cases/account-onboarding/scenario"
+import { runScenario, type ScenarioResult } from "../cases/account-onboarding/scenario"
+import { renderLifecycle } from "./lifecycle"
+import { mountReactivity } from "./reactivity"
+import { mountThroughput } from "./throughput"
 
 const lanes: Lane[] = [pumped, effect, awilix, inversify, plain]
 
+const views = [
+  { id: "lifecycle", label: "Lifecycle" },
+  { id: "throughput", label: "Throughput" },
+  { id: "reactivity", label: "Reactivity" },
+]
+
 async function run() {
-  const results = await Promise.all(lanes.map(runScenario))
   const root = document.querySelector<HTMLElement>("#app")!
+  const results: ScenarioResult[] = []
+  for (const lane of lanes) {
+    root.textContent = `running ${lane.id}…`
+    results.push(await runScenario(lane))
+  }
   root.dataset.results = JSON.stringify(results)
   root.dataset.comparisonReady = "true"
   root.innerHTML = `
-    <header>
-      <p>Executable lifecycle</p>
-      <h1>Success · duplicate rollback · success</h1>
-    </header>
-    <div class="results">
-      ${results.map((result) => `
-        <article>
-          <span>passed</span>
-          <h2>${result.lane}</h2>
-          <dl>
-            <dt>requests</dt><dd>3</dd>
-            <dt>commits</dt><dd>${result.events.filter((event) => event === "database.transaction.commit").length}</dd>
-            <dt>rollbacks</dt><dd>${result.events.filter((event) => event === "database.transaction.rollback").length}</dd>
-            <dt>acquire / release</dt><dd>1 / 1</dd>
-          </dl>
-        </article>
+    <nav class="tabs">
+      ${views.map((view, index) => `
+        <button type="button" class="tab${index === 0 ? " is-active" : ""}" data-view="${view.id}">${view.label}</button>
       `).join("")}
-    </div>
+    </nav>
+    ${views.map((view, index) => `<section class="view" data-view="${view.id}"${index === 0 ? "" : " hidden"}></section>`).join("")}
   `
+  const section = (id: string) => root.querySelector<HTMLElement>(`section[data-view="${id}"]`)!
+  renderLifecycle(section("lifecycle"), results)
+  mountThroughput(section("throughput"), lanes)
+  mountReactivity(section("reactivity"))
+  const tabs = [...root.querySelectorAll<HTMLButtonElement>(".tab")]
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const other of tabs) other.classList.toggle("is-active", other === tab)
+      for (const view of root.querySelectorAll<HTMLElement>("section.view")) {
+        view.hidden = view.dataset.view !== tab.dataset.view
+      }
+    })
+  }
 }
 
 void run()

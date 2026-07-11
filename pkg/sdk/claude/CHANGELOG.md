@@ -1,5 +1,11 @@
 # @pumped-fn/agent-sdk-claude
 
+## Unreleased
+
+### Major Changes
+
+- Replace the `claude(options)` factory and re-exported core harness constructors with `claude`, `claudeTurn`, `claudeRun`, and `claudeConfig` module-level exports.
+
 ## 2.0.0
 
 ### Major Changes

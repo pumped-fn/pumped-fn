@@ -812,151 +812,10 @@ export function guard(name: string, text = ""): Lite.Atom<MaterialState<GuardSta
   })
 }
 
-export interface ClaudeCliWorkerOptions {
-  name?: string
-  command?: string
-  extraArgs?: readonly string[]
-  isolate?: boolean | CliIsolateOptions
-  timeoutMs?: number
-  tags?: Lite.Tagged<any>[]
-}
-
-export function claudeCliWorker(options: ClaudeCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
-  assertNoClaudeBare(options.extraArgs ?? [])
-  return cliWorker({
-    name: options.name ?? "claude",
-    command: options.command ?? "claude",
-    args: (input) => cliPromptArgs(["-p", ...(options.extraArgs ?? [])], input.prompt),
-    isolate: options.isolate,
-    timeoutMs: options.timeoutMs,
-    kind: "llm",
-    tags: options.tags,
-  })
-}
-
-export interface CodexCliWorkerOptions {
-  name?: string
-  command?: string
-  sandbox?: "read-only" | "workspace-write" | "danger-full-access"
-  extraArgs?: readonly string[]
-  isolate?: boolean | CliIsolateOptions
-  timeoutMs?: number
-  tags?: Lite.Tagged<any>[]
-}
-
-export function codexCliWorker(options: CodexCliWorkerOptions = {}): Lite.Flow<string, PromptInput> {
-  return cliWorker({
-    name: options.name ?? "codex",
-    command: options.command ?? "codex",
-    args: (input) => cliPromptArgs([
-      "exec",
-      "-s",
-      options.sandbox ?? "read-only",
-      ...(options.extraArgs ?? []),
-    ], input.prompt),
-    isolate: options.isolate,
-    timeoutMs: options.timeoutMs,
-    kind: "llm",
-    tags: options.tags,
-  })
-}
-
-export interface CliHarnessOptions {
-  name?: string
-  command?: string
-  extraArgs?: readonly string[]
-  isolate?: boolean | CliIsolateOptions
-  timeoutMs?: number
-  guard?: Lite.Atom<MaterialState<GuardState>> | false
-  prompt?: (request: ModelRequest, guard: GuardState) => string
-  parse?: (output: string) => ModelResponse
-  tags?: Lite.Tagged<any>[]
-}
-
-export interface CodexHarnessOptions extends CliHarnessOptions {
-  sandbox?: "read-only" | "workspace-write" | "danger-full-access"
-}
-
-export function claudeHarness(options: CliHarnessOptions = {}): Model {
-  const worker = claudeCliWorker({
-    name: options.name ?? "claude-harness",
-    command: options.command,
-    extraArgs: ["--no-session-persistence", ...(options.extraArgs ?? [])],
-    isolate: options.isolate ?? { network: true },
-    timeoutMs: options.timeoutMs,
-    tags: options.tags,
-  })
-  return cliHarnessModel(worker, {
-    guard: options.guard === undefined ? guard(`${options.name ?? "claude-harness"}-guard`) : options.guard,
-    prompt: options.prompt,
-    parse: options.parse,
-  })
-}
-
-export function codexHarness(options: CodexHarnessOptions = {}): Model {
-  const worker = codexCliWorker({
-    name: options.name ?? "codex-harness",
-    command: options.command,
-    sandbox: options.sandbox,
-    extraArgs: ["--ephemeral", "--ignore-user-config", ...(options.extraArgs ?? [])],
-    isolate: options.isolate ?? { network: true },
-    timeoutMs: options.timeoutMs,
-    tags: options.tags,
-  })
-  return cliHarnessModel(worker, {
-    guard: options.guard === undefined ? guard(`${options.name ?? "codex-harness"}-guard`) : options.guard,
-    prompt: options.prompt,
-    parse: options.parse,
-  })
-}
-
-interface CliHarnessConfig {
-  guard: Lite.Atom<MaterialState<GuardState>> | false
-  prompt?: (request: ModelRequest, guard: GuardState) => string
-  parse?: (output: string) => ModelResponse
-}
-
-function cliHarnessModel(
-  worker: Lite.Flow<string, PromptInput>,
-  config: CliHarnessConfig
-): Model {
-  return flow({
-    name: worker.name,
-    parse: typed<ModelRequest>(),
-    deps: { worker },
-    factory: async (ctx, { worker }) => {
-      const current = config.guard ? await ctx.resolve(config.guard) : undefined
-      const state = current?.state ?? { text: "" }
-      const output = await worker.exec({
-        input: { prompt: config.prompt ? config.prompt(ctx.input, state) : modelPrompt(ctx.input, state) },
-      })
-      const response = config.parse ? config.parse(output) : parseModelOutput(output)
-      if (config.guard && current) await collectGuard(ctx, config.guard, current, response)
-      return response
-    },
-  })
-}
-
-async function collectGuard(
-  ctx: Lite.ExecutionContext,
-  store: Lite.Atom<MaterialState<GuardState>>,
-  current: MaterialState<GuardState>,
-  response: ModelResponse
-): Promise<void> {
-  const text = guardTextOf(response.guard)
-  if (!text || current.state.text) return
-  await patchMaterial(ctx, store, [
-    { op: "replace", path: "/text", value: text },
-  ], { expectedRevision: current.revision })
-}
-
-function modelPrompt(request: ModelRequest, guard: GuardState): string {
+export function formatModelPrompt(request: ModelRequest): string {
   return [
     "Return JSON only.",
-    "Schema: {\"content\":string,\"stop\"?:boolean,\"guard\"?:string,\"skillCalls\"?:array,\"toolCalls\"?:array,\"subagentCalls\"?:array}.",
-    guard.text
-      ? `Guard:\n${guard.text}`
-      : "First run only: set guard to the anti-goal that should prevent this agent from drifting.",
+    "Schema: {\"content\":string,\"stop\"?:boolean,\"skillCalls\"?:array,\"toolCalls\"?:array,\"subagentCalls\"?:array}.",
     `Agent: ${request.agentName}`,
     request.instructions ? `Instructions:\n${request.instructions}` : undefined,
     request.skills.length ? `Available skills:\n${request.skills.map(formatCapability).join("\n")}` : undefined,
@@ -968,7 +827,7 @@ function modelPrompt(request: ModelRequest, guard: GuardState): string {
   ].filter((item) => item !== undefined).join("\n\n")
 }
 
-function parseModelOutput(output: string): ModelResponse {
+export function parseModelResponse(output: string): ModelResponse {
   const value = readJson(output)
   if (!isRecord(value)) return { content: output, stop: true }
   const response: ModelResponse = {
@@ -1062,15 +921,6 @@ function formatMessage(message: Message): string {
   return message.name ? `${message.role}(${message.name}): ${message.content}` : `${message.role}: ${message.content}`
 }
 
-function assertNoClaudeBare(args: readonly string[]): void {
-  if (args.some((arg) => arg === "--bare" || arg.startsWith("--bare="))) throw new Error("Claude harness must not use --bare")
-}
-
-function cliPromptArgs(args: readonly string[], prompt: string): string[] {
-  if (args.includes("--")) throw new Error("CLI helper extraArgs cannot include --")
-  return [...args, "--", prompt]
-}
-
 type MaybePromise<T> = T | Promise<T>
 
 export type Role = "system" | "user" | "assistant" | "tool" | "subagent" | "skill"
@@ -1079,6 +929,8 @@ export interface Message {
   role: Role
   content: string
   name?: string
+  id?: string
+  input?: unknown
 }
 
 export interface ToolCall {
@@ -1712,6 +1564,7 @@ async function executeAgentTurn(
         role: "skill",
         name: result.name,
         content: result.content,
+        ...(result.id ? { id: result.id, input: { name: result.name } } : {}),
       })
     }
 
@@ -1722,6 +1575,7 @@ async function executeAgentTurn(
         role: "tool",
         name: result.name,
         content: stringifyAgentValue(result.output),
+        ...(result.id ? { id: result.id, input: result.input } : {}),
       })
     }
 
@@ -1732,6 +1586,7 @@ async function executeAgentTurn(
         role: "subagent",
         name: result.name,
         content: result.output.content,
+        ...(result.id ? { id: result.id, input: result.input } : {}),
       })
     }
   }

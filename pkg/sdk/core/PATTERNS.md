@@ -332,25 +332,25 @@ Use provider packages when the runtime must call real local tools like Claude or
 
 ```ts
 import { createScope } from "@pumped-fn/lite"
-import { agent, guard, model } from "@pumped-fn/sdk"
-import { claude } from "@pumped-fn/sdk-claude"
-import { codex } from "@pumped-fn/sdk-codex"
-
-const shared = guard("review-guard")
+import { agent, model } from "@pumped-fn/sdk"
+import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
+import { codex, codexConfig } from "@pumped-fn/sdk-codex"
 
 const reviewer = agent({
   name: "reviewer",
 })
 
-const codexScope = createScope({ tags: [codex({ sandbox: "read-only", guard: shared })] })
-const claudeScope = createScope({ tags: [claude({ guard: shared })] })
+const codexScope = createScope({
+  tags: [codex, codexConfig({ auth: { kind: "global" }, sandbox: "read-only" })],
+})
+const claudeScope = createScope({
+  tags: [claude, claudeConfig({ auth: { kind: "global" } })],
+})
 ```
 
-`codex()` and `claude()` are lazy `model` tags. Tagging a scope is configuration only; the CLI harness is built on first model use. Replace either provider with `model(fake)` at the same seam for tests.
+`codex` and `claude` are stable module-level `model` tags. Their config is explicit through `codexConfig` and `claudeConfig`. Replace either provider with `model(fake)` at the same seam for tests, or preset the provider's effect flow for a narrower unit test.
 
-`codexHarness()` runs `codex exec --ephemeral --ignore-user-config`. `claudeHarness()` runs `claude -p --no-session-persistence` and rejects `--bare`. Harness prompts request JSON with `content`, optional `guard`, and optional skill/tool/subagent calls. `guard` is the anti-goal; the first value collected from a run is kept in material state and injected into later prompts.
-
-Harnesses default to bwrap isolation with network enabled. The default sandbox mounts only the workspace, temporary home, minimal runtime/cert/DNS paths, and explicit credential directories such as `codexHome`. Keep CLI workers at the edge. Stable domain tests should use provider state and presets.
+The providers run `codex exec --ephemeral --ignore-user-config` and `claude -p --no-session-persistence`; Claude rejects `--bare`. Keep CLI workers at the edge and bind writable auth state when isolation is enabled.
 
 ## 11. Durable Step
 

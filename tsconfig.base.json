@@ -87,6 +87,9 @@
       "@pumped-fn/sdk-just-bash": [
         "./pkg/sdk/bash/src/index.ts"
       ],
+      "@pumped-fn/sdk-pi": [
+        "./pkg/sdk/pi/src/index.ts"
+      ],
       "@pumped-fn/sdk-test": [
         "./pkg/sdk/test/src/index.ts"
       ],

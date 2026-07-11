@@ -13,8 +13,9 @@ and runs them.
 | Directory | Package | Role |
 | --- | --- | --- |
 | `core/` | `@pumped-fn/sdk` | Durable workflows, sessions, materials, events, guards, sandboxes, CLI workers, eval harness, and the agent/tool/skill primitive family. |
-| `codex/` | `@pumped-fn/sdk-codex` | Codex CLI model provider tag. |
-| `claude/` | `@pumped-fn/sdk-claude` | Claude CLI model provider tag. |
+| `codex/` | `@pumped-fn/sdk-codex` | Module-level Codex CLI and ACP model providers. |
+| `claude/` | `@pumped-fn/sdk-claude` | Module-level Claude CLI model provider. |
+| `pi/` | `@pumped-fn/sdk-pi` | In-process pi-ai model provider with native tool calls. |
 | `bash/` | `@pumped-fn/sdk-just-bash` | just-bash sandbox provider tag. |
 | `test/` | `@pumped-fn/sdk-test` | In-memory logs, fake routing, and test helpers. |
 
@@ -26,7 +27,13 @@ should name the integration surface, while package names carry the `sdk` prefix.
 ## Content Rules
 
 SDK packages should compose through Lite scopes, tags, flows, resources, and extensions. Provider
-packages expose lazy provider tags and keep provider-specific setup out of the core package.
+packages expose module-level handles plus config tags and keep provider-specific setup out of the core package.
+
+## Testing
+
+Provider packages carry `*.integration.test.ts` suites that invoke the machine's authenticated
+CLIs and provider APIs. They skip unless `PUMPED_INTEGRATION=1` is set (pi additionally requires
+`ANTHROPIC_API_KEY`), so default `pnpm test` runs stay hermetic.
 
 ## Boundaries
 

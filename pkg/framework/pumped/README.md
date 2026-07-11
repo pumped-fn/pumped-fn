@@ -39,9 +39,9 @@ like any other tag. Wiring a provider is a one-liner on the app config:
 
 ```ts
 // src/app.ts
-import { claude } from "@pumped-fn/sdk-claude"
+import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
 
-export default { tags: [claude()] }
+export default { tags: [claude, claudeConfig({ auth: { kind: "global" } })] }
 ```
 
 ### One scope per process

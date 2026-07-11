@@ -1,5 +1,11 @@
 # @pumped-fn/agent-sdk-codex
 
+## Unreleased
+
+### Major Changes
+
+- Replace the `codex(options)` factory and re-exported core harness constructors with stable CLI handles and config tags. Add the `codexAcp` model and its scope-owned ACP connection resource.
+
 ## 2.0.0
 
 ### Major Changes

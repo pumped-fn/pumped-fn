@@ -7,6 +7,7 @@ const authoredFiles = [
   "src/styles.css",
   "sandbox/styles.css",
 ]
+export const editorSyntaxPalette = ["#cf222e", "#8250df", "#0550ae", "#116329", "#0a3069"]
 const unsupportedColorFunction = /\b(?:color|color-mix|hsl|hsla|hwb|lab|lch|oklab|oklch)\s*\(/gi
 const colorToken = /#[\da-fA-F]{3,8}\b|rgba?\([^)]*\)/g
 
@@ -41,7 +42,20 @@ export async function auditAuthoredGrayscale() {
     const source = await readFile(join(compareRoot, relativePath), "utf8")
     checkedColorCount += auditAuthoredSource(source, relativePath)
   }
+  checkedColorCount += auditEditorTheme(await readFile(join(compareRoot, "src/editor/code-theme.ts"), "utf8"))
   if (checkedColorCount === 0) throw new Error("authored grayscale audit found no color tokens")
+  return checkedColorCount
+}
+
+export function auditEditorTheme(source) {
+  const unsupported = [...source.matchAll(unsupportedColorFunction)].map(([match]) => match)
+  if (unsupported.length > 0) throw new Error(`unsupported editor theme color syntax: ${unsupported.join(", ")}`)
+  let checkedColorCount = 0
+  for (const [token] of source.matchAll(colorToken)) {
+    if (!editorSyntaxPalette.includes(token.toLowerCase())) assertGrayscale(token, "src/editor/code-theme.ts")
+    checkedColorCount += 1
+  }
+  if (checkedColorCount === 0) throw new Error("editor theme audit found no color tokens")
   return checkedColorCount
 }
 
@@ -57,6 +71,7 @@ export function auditAuthoredSource(source, relativePath) {
     for (const [, property, rawValue] of source.matchAll(/(?:^|[;{\n])\s*([\w-]+)\s*:\s*([^;{}]+);/g)) {
       if (property === "color-scheme" || !/(?:color|background|border|outline|shadow|fill|stroke)/i.test(property)) continue
       const remainder = rawValue
+        .replace(/!important/gi, " ")
         .replace(colorToken, " ")
         .replace(/-?\d*\.?\d+(?:px|rem|em|%|s|deg)?/gi, " ")
         .replace(/\b(?:solid|none|transparent|currentcolor|inherit|initial|unset|revert|inset|outset)\b/gi, " ")
@@ -65,23 +80,17 @@ export function auditAuthoredSource(source, relativePath) {
       if (remainder !== "") throw new Error(`unsupported authored color syntax in ${relativePath}: ${property}: ${rawValue.trim()}`)
     }
   }
-  if (relativePath === "src/app.tsx") {
-    const theme = source.match(/const grayscaleTheme = \{\s*colors:\s*\{([\s\S]*?)\n\s*},\s*syntax:\s*\{([\s\S]*?)\n\s*},\s*font:/)
-    if (!theme) throw new Error("grayscaleTheme colors and syntax blocks are missing")
-    for (const block of theme.slice(1)) {
-      for (const [, token] of block.matchAll(/"([^"]+)"/g)) {
-        if (token === "italic") continue
-        assertGrayscale(token, "src/app.tsx grayscaleTheme")
-      }
-    }
-  }
   return checkedColorCount
 }
 
 export async function auditComputedGrayscale(page) {
   const findings = []
+  const paletteRgb = editorSyntaxPalette.map((token) => {
+    const [red, green, blue] = hexChannels(token)
+    return `rgb(${red}, ${green}, ${blue})`
+  })
   for (const frame of page.frames()) {
-    findings.push(...await frame.evaluate(() => {
+    findings.push(...await frame.evaluate((syntaxPalette) => {
       const properties = [
         "background-color",
         "background-image",
@@ -102,11 +111,26 @@ export async function auditComputedGrayscale(page) {
       const unsupported = /\b(?:color|color-mix|hsl|hsla|hwb|lab|lch|oklab|oklch)\s*\(/i
       const rgb = /rgba?\(\s*(\d+(?:\.\d+)?)\s*(?:,|\s)\s*(\d+(?:\.\d+)?)\s*(?:,|\s)\s*(\d+(?:\.\d+)?)(?:\s*(?:,|\/)\s*[\d.]+)?\s*\)/g
       const localFindings = []
+      const syntaxProperties = new Set([
+        "color",
+        "caret-color",
+        "text-decoration-color",
+        "text-emphasis-color",
+        "border-bottom-color",
+        "border-left-color",
+        "border-right-color",
+        "border-top-color",
+        "column-rule-color",
+        "outline-color",
+      ])
       for (const element of document.querySelectorAll("*")) {
+        const isSyntaxToken = [...element.classList].some((name) => name.startsWith("sp-syntax-")) ||
+          element.closest?.('[class*="sp-syntax-"], .cm-tooltip') !== null
         for (const pseudo of [null, "::before", "::after"]) {
           const style = getComputedStyle(element, pseudo)
           for (const property of properties) {
             const value = style.getPropertyValue(property)
+            if (isSyntaxToken && syntaxProperties.has(property) && syntaxPalette.includes(value)) continue
             if (unsupported.test(value)) {
               localFindings.push(`${element.tagName}${pseudo ?? ""} ${property} unsupported ${value}`)
               continue
@@ -121,7 +145,7 @@ export async function auditComputedGrayscale(page) {
         }
       }
       return localFindings
-    }))
+    }, paletteRgb))
   }
   if (findings.length > 0) throw new Error(`computed non-grayscale colors\n${findings.join("\n")}`)
   return 0

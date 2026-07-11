@@ -5,11 +5,20 @@ import {
   SandpackProvider,
   useSandpack,
 } from "@codesandbox/sandpack-react"
+import { useEffect } from "react"
+import { codeTheme } from "./editor/code-theme"
+import { useTypeIntel } from "./editor/type-intel"
 import { sandboxDependencies, sandboxFiles } from "./sandbox-files"
 
 type Dimension = "Build" | "Test" | "Operate"
 
 const dimensions: Dimension[] = ["Build", "Test", "Operate"]
+
+const dimensionLead: Record<Dimension, string> = {
+  Build: "How the object graph is declared and wired.",
+  Test: "How one dependency is replaced without patching a module.",
+  Operate: "How execution is observed without instrumenting call sites.",
+}
 
 const lanes = [
   {
@@ -96,44 +105,20 @@ const lanes = [
 
 const visibleFiles = lanes.flatMap((lane) => dimensions.map((dimension) => lane.files[dimension]))
 
-const grayscaleTheme = {
-  colors: {
-    surface1: "#ffffff",
-    surface2: "#f5f5f5",
-    surface3: "#e8e8e8",
-    disabled: "#a3a3a3",
-    base: "#1f1f1f",
-    clickable: "#404040",
-    hover: "#000000",
-    accent: "#000000",
-    error: "#242424",
-    errorSurface: "#eeeeee",
-    warning: "#3d3d3d",
-    warningSurface: "#f2f2f2",
-  },
-  syntax: {
-    plain: "#262626",
-    comment: { color: "#737373", fontStyle: "italic" },
-    keyword: "#000000",
-    definition: "#404040",
-    punctuation: "#525252",
-    property: "#171717",
-    tag: "#333333",
-    static: "#595959",
-    string: "#666666",
-  },
-  font: {
-    body: "ui-sans-serif, system-ui, sans-serif",
-    mono: "ui-monospace, SFMono-Regular, Consolas, monospace",
-    size: "14px",
-    lineHeight: "1.5",
-  },
-} as const
+const lineCounts = Object.fromEntries(
+  Object.entries(sandboxFiles).map(([path, source]) => [path, source.trimEnd().split("\n").length]),
+)
+
+function wireShortcutBoundary(handler: (event: KeyboardEvent) => void): () => void {
+  window.addEventListener("keydown", handler)
+  return () => window.removeEventListener("keydown", handler)
+}
 
 function Comparison() {
   const { sandpack } = useSandpack()
   const selectedLane = lanes.find((lane) => dimensions.some((item) => lane.files[item] === sandpack.activeFile))!
   const dimension = dimensions.find((item) => selectedLane.files[item] === sandpack.activeFile)!
+  const intel = useTypeIntel(sandpack.activeFile)
 
   function selectDimension(next: Dimension): void {
     sandpack.openFile(selectedLane.files[next])
@@ -143,27 +128,42 @@ function Comparison() {
     sandpack.openFile(lane.files[dimension])
   }
 
+  useEffect(() => {
+    return wireShortcutBoundary((event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.target instanceof HTMLElement && event.target.closest(".cm-editor, input, textarea, select")) return
+      const next = dimensions[Number.parseInt(event.key, 10) - 1]
+      if (next) sandpack.openFile(selectedLane.files[next])
+    })
+  }, [sandpack, selectedLane])
+
   return (
     <>
       <section className="comparison" aria-label="Five lane comparison">
-        <div className="dimension-tabs" aria-label="Comparison dimension">
-          {dimensions.map((item) => (
-            <button
-              aria-pressed={dimension === item}
-              key={item}
-              onClick={() => selectDimension(item)}
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
+        <div className="dimension-bar">
+          <div className="dimension-tabs" aria-label="Comparison dimension">
+            {dimensions.map((item) => (
+              <button
+                aria-pressed={dimension === item}
+                key={item}
+                onClick={() => selectDimension(item)}
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <p className="dimension-lead">{dimensionLead[dimension]}</p>
         </div>
         <div className="lane-grid">
           {lanes.map((lane) => (
             <article data-active={lane.id === selectedLane.id} key={lane.id}>
-              <button className="lane-name" onClick={() => selectLane(lane)} type="button">
-                {lane.label}
-              </button>
+              <div className="lane-head">
+                <button className="lane-name" onClick={() => selectLane(lane)} type="button">
+                  {lane.label}
+                </button>
+                <span className="lane-lines">{lineCounts[lane.files[dimension]]} lines</span>
+              </div>
               <p>{lane.values[dimension]}</p>
               <div className="lane-meta">
                 <code>{lane.files[dimension]}</code>
@@ -175,45 +175,85 @@ function Comparison() {
       </section>
 
       <section className="source-heading" aria-labelledby="source-title">
-        <h2 id="source-title">{dimension}: {selectedLane.label}</h2>
-        <code>{selectedLane.files[dimension]}</code>
+        <div>
+          <h2 id="source-title">{dimension}: {selectedLane.label}</h2>
+          <p className="source-hint">
+            Edit anything — the preview re-runs the shared contract. Hover a symbol for its inferred type,
+            Ctrl-Space completes, keys 1·2·3 switch dimension.
+          </p>
+        </div>
+        <div className="source-status">
+          <span className="intel-status" data-live={intel !== undefined}>
+            {intel === undefined ? "type intelligence warming" : "type intelligence live"}
+          </span>
+          <code>{selectedLane.files[dimension]}</code>
+        </div>
       </section>
+
+      <SandpackLayout>
+        <SandpackCodeEditor extensions={intel} key={sandpack.activeFile} showLineNumbers showTabs={false} />
+        <SandpackPreview showOpenInCodeSandbox={false} showRefreshButton />
+      </SandpackLayout>
     </>
   )
 }
 
 export function App() {
   return (
-    <main>
-      <header className="hero">
-        <h1>Build, test, and operate the same account workflow.</h1>
-        <p>Five checked-in implementations. Select a dimension, inspect its source, edit it, and run the shared contract.</p>
-        <dl className="contract-strip">
-          <div><dt>Request 1</dt><dd>success</dd></div>
-          <div><dt>Request 2</dt><dd>typed duplicate · rollback</dd></div>
-          <div><dt>Request 3</dt><dd>new actor · success</dd></div>
-          <div><dt>Database</dt><dd>one acquire · one release</dd></div>
-        </dl>
-      </header>
-      <section className="lab" aria-label="Executable dependency comparison">
-        <SandpackProvider
-          customSetup={{ dependencies: sandboxDependencies, entry: "/sandbox/main.ts" }}
-          files={sandboxFiles}
-          options={{
-            activeFile: "/cases/account-onboarding/lanes/pumped.ts",
-            initMode: "immediate",
-            visibleFiles,
-          }}
-          template="vanilla-ts"
-          theme={grayscaleTheme}
-        >
-          <Comparison />
-          <SandpackLayout>
-            <SandpackCodeEditor showLineNumbers />
-            <SandpackPreview showOpenInCodeSandbox={false} showRefreshButton />
-          </SandpackLayout>
-        </SandpackProvider>
-      </section>
-    </main>
+    <>
+      <nav className="topbar" aria-label="Site">
+        <a className="wordmark" href="https://github.com/pumped-fn/pumped-fn">
+          pumped-fn<span>/compare</span>
+        </a>
+        <div className="topbar-links">
+          <a href="https://www.npmjs.com/package/@pumped-fn/lite">npm</a>
+          <a href="https://github.com/pumped-fn/pumped-fn">GitHub</a>
+        </div>
+      </nav>
+      <main>
+        <header className="hero">
+          <h1>Build, test, and operate the same account workflow.</h1>
+          <p>
+            Five checked-in implementations of one contract — pumped-fn, Effect, Awilix, Inversify, and plain
+            TypeScript. Read each source with live type intelligence, edit it, and watch the shared lifecycle,
+            throughput, and reactivity proofs run in your browser.
+          </p>
+          <dl className="contract-strip">
+            <div><dt>Request 1</dt><dd>success</dd></div>
+            <div><dt>Request 2</dt><dd>typed duplicate · rollback</dd></div>
+            <div><dt>Request 3</dt><dd>new actor · success</dd></div>
+            <div><dt>Database</dt><dd>one acquire · one release</dd></div>
+          </dl>
+        </header>
+        <section className="lab" aria-label="Executable dependency comparison">
+          <SandpackProvider
+            customSetup={{ dependencies: sandboxDependencies, entry: "/sandbox/main.ts" }}
+            files={sandboxFiles}
+            options={{
+              activeFile: "/cases/account-onboarding/lanes/pumped.ts",
+              initMode: "immediate",
+              visibleFiles,
+            }}
+            template="vanilla-ts"
+            theme={codeTheme}
+          >
+            <Comparison />
+          </SandpackProvider>
+        </section>
+        <footer className="footer">
+          <p>
+            Same black-box contract, idiomatic internals. Sources are pinned in{" "}
+            <a href="https://github.com/pumped-fn/pumped-fn/blob/main/playground/compare/sources.lock.json">
+              sources.lock.json
+            </a>
+            ; benchmarks run in this tab, on your machine.
+          </p>
+          <div className="footer-links">
+            <a href="https://github.com/pumped-fn/pumped-fn">github.com/pumped-fn</a>
+            <a href="https://www.npmjs.com/package/@pumped-fn/lite">@pumped-fn/lite</a>
+          </div>
+        </footer>
+      </main>
+    </>
   )
 }
