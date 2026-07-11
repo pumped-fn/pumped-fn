@@ -1,0 +1,33 @@
+export const codeTheme = {
+  colors: {
+    surface1: "#ffffff",
+    surface2: "#f6f6f6",
+    surface3: "#ebebeb",
+    disabled: "#a3a3a3",
+    base: "#1f1f1f",
+    clickable: "#404040",
+    hover: "#000000",
+    accent: "#000000",
+    error: "#242424",
+    errorSurface: "#eeeeee",
+    warning: "#3d3d3d",
+    warningSurface: "#f2f2f2",
+  },
+  syntax: {
+    plain: "#1f1f1f",
+    comment: { color: "#737373", fontStyle: "italic" as const },
+    keyword: "#cf222e",
+    definition: "#8250df",
+    punctuation: "#525252",
+    property: "#0550ae",
+    tag: "#116329",
+    static: "#0550ae",
+    string: "#0a3069",
+  },
+  font: {
+    body: "Inter, ui-sans-serif, system-ui, sans-serif",
+    mono: "ui-monospace, SFMono-Regular, Consolas, monospace",
+    size: "13.5px",
+    lineHeight: "1.6",
+  },
+} as const

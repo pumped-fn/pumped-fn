@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:pages": "PUMPED_COMPARE_BASE_PATH=/pumped-fn/ vite build",
+    "dev": "pnpm -F @pumped-fn/lite build && vite",
+    "build": "pnpm -F @pumped-fn/lite build && vite build",
+    "build:pages": "pnpm -F @pumped-fn/lite build && PUMPED_COMPARE_BASE_PATH=/pumped-fn/ vite build",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -F @pumped-fn/lite-lint build && node ../../pkg/tool/lint/dist/cli.mjs README.md cases src sandbox scripts vite.config.ts",
@@ -22,8 +22,15 @@
     "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build && pnpm browser:smoke"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "catalog:",
+    "@codemirror/lint": "catalog:",
+    "@codemirror/state": "catalog:",
+    "@codemirror/view": "catalog:",
     "@codesandbox/sandpack-react": "catalog:",
     "@pumped-fn/lite": "workspace:*",
+    "@typescript/vfs": "catalog:",
+    "@valtown/codemirror-ts": "catalog:",
+    "comlink": "catalog:",
     "awilix": "catalog:",
     "effect": "catalog:",
     "inversify": "catalog:",

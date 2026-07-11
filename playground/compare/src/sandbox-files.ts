@@ -18,8 +18,11 @@ import testPlain from "../cases/account-onboarding/tests/plain.test.ts?raw"
 import testPumped from "../cases/account-onboarding/tests/pumped.test.ts?raw"
 import trace from "../cases/account-onboarding/trace.ts?raw"
 import index from "../sandbox/index.html?raw"
+import lifecycle from "../sandbox/lifecycle.ts?raw"
 import main from "../sandbox/main.ts?raw"
+import reactivity from "../sandbox/reactivity.ts?raw"
 import styles from "../sandbox/styles.css?raw"
+import throughput from "../sandbox/throughput.ts?raw"
 import tsconfig from "../sandbox/tsconfig.json?raw"
 
 export const sandboxFiles = {
@@ -44,8 +47,11 @@ export const sandboxFiles = {
   "/cases/account-onboarding/tests/plain.test.ts": testPlain,
   "/cases/account-onboarding/tests/pumped.test.ts": testPumped,
   "/cases/account-onboarding/trace.ts": trace,
+  "/sandbox/lifecycle.ts": lifecycle,
   "/sandbox/main.ts": main,
+  "/sandbox/reactivity.ts": reactivity,
   "/sandbox/styles.css": styles,
+  "/sandbox/throughput.ts": throughput,
 }
 
 export const sandboxDependencies = {
