@@ -5,6 +5,9 @@ packages:
   - playground/*
 
 catalogMode: strict
+
+ignoredBuiltDependencies:
+  - '@google/genai'
 cleanupUnusedCatalogs: true
 minimumReleaseAge: 1440
 trustPolicy: no-downgrade
