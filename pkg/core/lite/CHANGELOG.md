@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 5.0.0
+
+### Major Changes
+
+- 55b7d92: Remove the text-only `pumped-lite` CLI. The Lite package no longer installs a bin entry; use the package documentation directly.
+
 ## 4.0.0
 
 ### Major Changes
@@ -24,7 +30,6 @@ Migration:
   at each use site.
 - Replace a `serviceValue` record closed over a runtime value with flows that depend on
   that value's atom/tag and act on it directly.
-
 
 ## 3.6.0
 

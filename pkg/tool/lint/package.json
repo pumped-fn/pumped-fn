@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-lint",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Static anti-pattern scanner for @pumped-fn/lite and @pumped-fn/lite-react",
   "type": "module",
   "main": "./dist/index.cjs",
