@@ -1,0 +1,37 @@
+name: Bootstrap npm packages
+
+on:
+  workflow_dispatch:
+
+concurrency: npm-bootstrap
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -F @pumped-fn/sdk-pi build
+
+      - run: pnpm -F @pumped-fn/sdk-mcp build
+
+      - run: pnpm -F @pumped-fn/sdk-pi publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - run: pnpm -F @pumped-fn/sdk-mcp publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
