@@ -74,9 +74,23 @@ export interface RuleConfig {
 
 export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
 
+/**
+ * `compositionPaths` extends the built-in composition-root path convention
+ * (`main|bootstrap|wire|adapter|composition|http|transport|server` filenames)
+ * with project-specific
+ * regexes (RegExp source strings tested against the normalized file path).
+ * Matching files receive exactly the same treatment as built-in composition
+ * paths: ambient IO and naked globals are allowed, scope arguments are
+ * softened to the glue diagnostic, scope factories are allowed, and
+ * unattributed awaits are allowed. Every other rule still applies. Use it for
+ * composition/acceptance roots the
+ * built-in filename convention misses (e.g. probe harnesses); it is a path
+ * classification, not a per-line suppression.
+ */
 export interface ScanOptions {
   cwd?: string
   rules?: RuleOptions
+  compositionPaths?: string[]
 }
 
 const defaultSeverity: Partial<Record<RuleId, Severity>> = {
@@ -196,17 +210,22 @@ function isBrowserTestPath(filePath: string): boolean {
   return /\.browser\.test\.[cm]?[jt]sx?$/.test(normalizePath(filePath))
 }
 
-function isCompositionPath(filePath: string): boolean {
-  return compositionPathPattern.test(normalizePath(filePath))
+function compileCompositionPaths(options?: ScanOptions): RegExp[] {
+  return (options?.compositionPaths ?? []).map((source) => new RegExp(source))
 }
 
-function isReactFeaturePath(filePath: string): boolean {
-  return extname(filePath).endsWith("x") && !isTestPath(filePath) && !isCompositionPath(filePath)
-}
-
-function isAmbientAllowedPath(filePath: string): boolean {
+function isCompositionPath(filePath: string, extraCompositionPaths: RegExp[] = []): boolean {
   const normalized = normalizePath(filePath)
-  return isTestPath(normalized) || isCompositionPath(normalized) || /(?:^|\/)(?:infra|transport|adapters?)\//.test(normalized)
+  return compositionPathPattern.test(normalized) || extraCompositionPaths.some((pattern) => pattern.test(normalized))
+}
+
+function isReactFeaturePath(filePath: string, extraCompositionPaths: RegExp[] = []): boolean {
+  return extname(filePath).endsWith("x") && !isTestPath(filePath) && !isCompositionPath(filePath, extraCompositionPaths)
+}
+
+function isAmbientAllowedPath(filePath: string, extraCompositionPaths: RegExp[] = []): boolean {
+  const normalized = normalizePath(filePath)
+  return isTestPath(normalized) || isCompositionPath(normalized, extraCompositionPaths) || /(?:^|\/)(?:infra|transport|adapters?)\//.test(normalized)
 }
 
 function textLocation(source: string, index: number): Pick<Diagnostic, "line" | "column"> {
@@ -573,8 +592,8 @@ function declarationName(node: ts.Node): string | null {
   return null
 }
 
-function ambientAllowedAt(node: ts.Node, filePath: string): boolean {
-  if (isAmbientAllowedPath(filePath)) return true
+function ambientAllowedAt(node: ts.Node, filePath: string, extraCompositionPaths: RegExp[] = []): boolean {
+  if (isAmbientAllowedPath(filePath, extraCompositionPaths)) return true
   let current: ts.Node | undefined = node
   while (current) {
     const name = declarationName(current)
@@ -1064,11 +1083,12 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     extname(filePath).endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   )
   const imports = collectImports(sourceFile)
-  const reactFeature = isReactFeaturePath(filePath)
-  const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath)
-  const allowScopeFactory = isCompositionPath(filePath)
+  const extraCompositionPaths = compileCompositionPaths(options)
+  const reactFeature = isReactFeaturePath(filePath, extraCompositionPaths)
+  const allowScopeArgument = isTestPath(filePath) || isCompositionPath(filePath, extraCompositionPaths)
+  const allowScopeFactory = isCompositionPath(filePath, extraCompositionPaths)
   const allowScopeReach = isTestPath(filePath)
-  const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath)
+  const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath, extraCompositionPaths)
   const localFlows = new Set<string>()
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
@@ -1404,7 +1424,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         )
       }
 
-      if (isAmbientCall(node.expression) && !ambientAllowedAt(node, filePath)) {
+      if (isAmbientCall(node.expression) && !ambientAllowedAt(node, filePath, extraCompositionPaths)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,
@@ -1491,7 +1511,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         }
 
         const globalName = nakedGlobalName(node)
-        if (globalName && !allowGlobals.has(globalName) && !ambientAllowedAt(node, filePath)) {
+        if (globalName && !allowGlobals.has(globalName) && !ambientAllowedAt(node, filePath, extraCompositionPaths)) {
           pushNodeDiagnostic(
             diagnostics,
             sourceFile,
@@ -1506,7 +1526,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           ts.isIdentifier(node.expression)
           && imports.nodeBuiltins.has(node.expression.text)
           && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.text)!)
-          && !ambientAllowedAt(node, filePath)
+          && !ambientAllowedAt(node, filePath, extraCompositionPaths)
         ) {
           pushNodeDiagnostic(
             diagnostics,
@@ -1523,7 +1543,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           && ts.isIdentifier(node.expression.expression)
           && imports.nodeBuiltins.has(node.expression.expression.text)
           && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.expression.text)!)
-          && !ambientAllowedAt(node, filePath)
+          && !ambientAllowedAt(node, filePath, extraCompositionPaths)
         ) {
           pushNodeDiagnostic(
             diagnostics,
@@ -1540,7 +1560,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (
       ts.isNewExpression(node)
       && enclosingUnitConfig(node, imports)
-      && !ambientAllowedAt(node, filePath)
+      && !ambientAllowedAt(node, filePath, extraCompositionPaths)
     ) {
       const globalName = nakedGlobalName(node)
       if (globalName && !allowGlobals.has(globalName)) {
@@ -1562,7 +1582,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       && node.name.text === "env"
       && enclosingUnitConfig(node, imports)
       && !allowGlobals.has("process.env")
-      && !ambientAllowedAt(node, filePath)
+      && !ambientAllowedAt(node, filePath, extraCompositionPaths)
     ) {
       pushNodeDiagnostic(
         diagnostics,
@@ -1733,7 +1753,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Export stable module-level handles instead of a function that constructs and returns a handle.",
         )
       }
-      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.parameters)) {
+      if (allowScopeArgument && isCompositionPath(filePath, extraCompositionPaths) && hasScopeOrExecutionContextParameter(node.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,
@@ -1774,7 +1794,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "Export stable module-level handles instead of a function that constructs and returns a handle.",
         )
       }
-      if (allowScopeArgument && isCompositionPath(filePath) && hasScopeOrExecutionContextParameter(node.initializer.parameters)) {
+      if (allowScopeArgument && isCompositionPath(filePath, extraCompositionPaths) && hasScopeOrExecutionContextParameter(node.initializer.parameters)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,

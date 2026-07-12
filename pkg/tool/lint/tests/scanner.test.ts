@@ -521,6 +521,35 @@ describe("lite lint scanner", () => {
     `, "src/example.ts", { rules: { "pumped/no-naked-globals": { allowGlobals: ["Math.random"] } } })).toEqual(["pumped/no-ambient-io-outside-boundary"])
   })
 
+  it("extends the composition-root path convention via compositionPaths", () => {
+    const options: ScanOptions = { compositionPaths: ["(?:^|/)(?:probe-[^/]+|smoke-edge)\\.[cm]?[jt]s$"] }
+    const probeSource = `
+      const startedAt = Date.now()
+      export async function runProbe(url: string) {
+        await fetch(url)
+        return startedAt
+      }
+    `
+
+    expect(ids(probeSource, "src/probe-gateway.ts", options)).toEqual([])
+    expect(ids(probeSource, "src/probe-gateway.ts")).toEqual([
+      "pumped/no-ambient-io-outside-boundary",
+      "pumped/no-ambient-io-outside-boundary",
+    ])
+    expect(ids(probeSource, "src/feature.ts", options)).toEqual([
+      "pumped/no-ambient-io-outside-boundary",
+      "pumped/no-ambient-io-outside-boundary",
+    ])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      export function makeStore() {
+        return atom({ name: "store", factory: () => new Map<string, string>() })
+      }
+    `, "src/probe-gateway.ts", options)).toEqual(["pumped/no-handle-factory"])
+  })
+
   it("finds module-level mutable state in graph files", () => {
     expect(ids(`
       import { atom } from "@pumped-fn/lite"

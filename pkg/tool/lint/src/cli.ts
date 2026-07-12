@@ -2,6 +2,7 @@
 
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { scanPaths, type Diagnostic, type RuleOptions } from "./index"
 
 interface CliArgs {
@@ -15,6 +16,7 @@ interface CliArgs {
 interface CliConfig {
   rules?: RuleOptions
   maxWarnings?: number
+  compositionPaths?: string[]
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -48,7 +50,7 @@ function usage(): string {
     "",
     "Scans @pumped-fn/lite and @pumped-fn/lite-react source for documented anti-patterns.",
     "",
-    "--config <path>       JSON file with { rules, maxWarnings } to override rule severities.",
+    "--config <path>       JSON file with { rules, maxWarnings, compositionPaths } to override rule severities and extend the composition-root path convention.",
     "--max-warnings <n>    Fail the build once the warning count exceeds n (0 means any warning fails).",
   ].join("\n")
 }
@@ -63,17 +65,17 @@ async function loadConfig(configPath: string | null, cwd: string): Promise<CliCo
   return JSON.parse(contents) as CliConfig
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2))
+export async function main(argv = process.argv.slice(2), cwd = process.cwd()): Promise<void> {
+  const args = parseArgs(argv)
   if (args.help) {
     console.log(usage())
     return
   }
 
-  const config = await loadConfig(args.configPath, process.cwd())
+  const config = await loadConfig(args.configPath, cwd)
   const maxWarnings = args.maxWarnings ?? config.maxWarnings ?? null
 
-  const result = await scanPaths(args.paths, { rules: config.rules })
+  const result = await scanPaths(args.paths, { cwd, rules: config.rules, compositionPaths: config.compositionPaths })
   if (args.json) {
     console.log(JSON.stringify(result, null, 2))
   } else if (result.diagnostics.length === 0) {
@@ -92,7 +94,9 @@ async function main(): Promise<void> {
   if (hasErrors || exceedsMaxWarnings) process.exitCode = 1
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? "")) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

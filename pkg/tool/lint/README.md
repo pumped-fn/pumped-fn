@@ -12,6 +12,7 @@ The rules encode the [code review guide](../../../docs/code-review-guide.md).
 ```sh
 pumped-lite-lint src tests
 pumped-lite-lint --json src tests
+pumped-lite-lint --config pumped-lite-lint.json src tests
 ```
 
 > **Note:** In this repo, root `pnpm lint` builds the tool and scans the public docs plus practical examples.
@@ -58,7 +59,23 @@ Every diagnostic carries a `severity` of `"error"` or `"warn"`.
 
 ## Config
 
-`scanPaths`/`scanText` accept an optional `rules` object to configure per-rule allowlists:
+The API accepts `rules` and `compositionPaths`. The CLI reads the same options from the JSON file
+passed to `--config`, alongside `maxWarnings`:
+
+```json
+{
+  "compositionPaths": ["(?:^|/)(?:probe-[^/]+|smoke-edge)\\.[cm]?[jt]s$"],
+  "maxWarnings": 0
+}
+```
+
+Each `compositionPaths` entry is a JavaScript regular-expression source string tested against the
+normalized file path. A match extends the built-in composition-root filename convention. It allows
+ambient IO, naked globals, scope factories, scope arguments with the existing glue diagnostic, and
+unattributed awaits on that path. Other rules still apply. Use it to classify a project-specific
+composition or acceptance root, not to suppress individual lines.
+
+`rules` configures per-rule allowlists:
 
 ```ts
 import { scanPaths } from "@pumped-fn/lite-lint"
