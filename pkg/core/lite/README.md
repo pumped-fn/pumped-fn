@@ -14,12 +14,6 @@ npm install @pumped-fn/lite
 
 Upgrading from older versions: see [`MIGRATION.md`](./MIGRATION.md).
 
-```bash
-npx @pumped-fn/lite
-npx @pumped-fn/lite primitives
-npx @pumped-fn/lite diagrams
-```
-
 ## What It Owns
 
 Lite owns the application boundary below framework adapters:

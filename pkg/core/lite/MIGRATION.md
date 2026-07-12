@@ -2,6 +2,12 @@
 
 This guide helps AI agents migrate code from `@pumped-fn/core-next` to `@pumped-fn/lite`.
 
+## Next major: CLI removal
+
+The next major version removes the text-only `pumped-lite` CLI from `@pumped-fn/lite`. The package
+no longer installs a `pumped-lite` bin or supports the previous `npx @pumped-fn/lite` commands. Read
+the package documentation directly instead.
+
 ## Quick Reference
 
 | core-next | lite | Notes |

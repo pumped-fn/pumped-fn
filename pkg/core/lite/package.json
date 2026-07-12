@@ -6,9 +6,6 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
-  "bin": {
-    "pumped-lite": "bin/pumped-lite.mjs"
-  },
   "exports": {
     ".": {
       "import": {
@@ -22,7 +19,6 @@
     }
   },
   "files": [
-    "bin",
     "dist",
     "README.md",
     "PATTERNS.md",
