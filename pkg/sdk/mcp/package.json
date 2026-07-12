@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": false,
   "description": "Expose pumped-fn flows as an MCP server",
   "type": "module",
@@ -13,8 +13,14 @@
       "default": "./dist/index.mjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsgo --noEmit",
