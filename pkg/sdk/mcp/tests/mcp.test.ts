@@ -40,7 +40,7 @@ const boom = flow({
 
 const coerce = flow({
   name: "coerce",
-  parse: typed<{ n: number }>(),
+  parse: (raw) => z.object({ n: z.string().transform(Number) }).parse(raw),
   tags: [mcpToolMeta({ description: "Double a numeric string", inputSchema: { n: z.string().transform(Number) } })],
   factory: (ctx) => ({ doubled: ctx.input.n * 2 }),
 })
@@ -50,6 +50,24 @@ const big = flow({
   parse: typed<void>(),
   tags: [mcpToolMeta({ description: "Return a bigint", inputSchema: {} })],
   factory: () => ({ big: 42n }),
+})
+
+let releaseSlow: (() => void) | undefined
+let slowStarted: (() => void) | undefined
+let slowFinished = false
+
+const slow = flow({
+  name: "slow",
+  parse: typed<void>(),
+  tags: [mcpToolMeta({ description: "Wait for release", inputSchema: {} })],
+  factory: async () => {
+    slowStarted?.()
+    await new Promise<void>((resolve) => {
+      releaseSlow = resolve
+    })
+    slowFinished = true
+    return "done"
+  },
 })
 
 async function connected(server: McpServer) {
@@ -69,6 +87,10 @@ async function serve(tools: Parameters<typeof mcpConfig>[0]["tools"]) {
   const client = await connected(server)
   return {
     client,
+    async shutdown() {
+      await ctx.close()
+      await scope.dispose()
+    },
     async close() {
       await client.close()
       await ctx.close()
@@ -105,6 +127,29 @@ it("serializes BigInt output instead of failing the call", async () => {
   expect(result.isError).toBeFalsy()
   expect(result.content).toEqual([{ type: "text", text: JSON.stringify({ big: "42" }) }])
   await close()
+})
+
+it("drains active tool calls before closing the server", async () => {
+  const started = new Promise<void>((resolve) => {
+    slowStarted = resolve
+  })
+  const { client, shutdown } = await serve([slow])
+  const call = client.callTool({ name: "slow", arguments: {} })
+  await started
+  let closed = false
+  const closing = shutdown().then(() => {
+    closed = true
+  })
+  await Promise.resolve()
+  expect(closed).toBe(false)
+  releaseSlow?.()
+  expect(await call).toMatchObject({ content: [{ type: "text", text: "done" }] })
+  expect(slowFinished).toBe(true)
+  await closing
+  await client.close()
+  releaseSlow = undefined
+  slowStarted = undefined
+  slowFinished = false
 })
 
 it("maps a tool failure to an MCP error result", async () => {
