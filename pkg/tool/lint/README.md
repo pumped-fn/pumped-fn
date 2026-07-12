@@ -70,7 +70,7 @@ passed to `--config`, alongside `maxWarnings`:
 ```
 
 Each `compositionPaths` entry is a JavaScript regular-expression source string tested against the
-normalized file path. A match extends the built-in composition-root filename convention. It allows
+normalized absolute file path. A match extends the built-in composition-root filename convention. It allows
 ambient IO, naked globals, scope factories, scope arguments with the existing glue diagnostic, and
 unattributed awaits on that path. Other rules still apply. Use it to classify a project-specific
 composition or acceptance root, not to suppress individual lines.

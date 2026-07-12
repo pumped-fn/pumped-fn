@@ -1,10 +1,14 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { execFile } from "node:child_process"
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { main } from "../src/cli.js"
 
 const roots: string[] = []
+const exec = promisify(execFile)
 
 afterEach(async () => {
   process.exitCode = undefined
@@ -29,5 +33,16 @@ describe("lint CLI", () => {
 
     expect(process.exitCode).toBeUndefined()
     expect(log).toHaveBeenCalledWith("pumped-lite-lint: 1 files scanned, 0 diagnostics")
+  })
+
+  it("runs through a symlinked package bin", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pumped-lite-lint-bin-"))
+    roots.push(root)
+    const bin = join(root, "pumped-lite-lint")
+    await symlink(fileURLToPath(new URL("../dist/cli.mjs", import.meta.url)), bin)
+
+    const { stdout } = await exec(process.execPath, [bin, "--help"])
+
+    expect(stdout).toContain("Usage: pumped-lite-lint")
   })
 })

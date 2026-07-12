@@ -78,7 +78,7 @@ export type RuleOptions = Partial<Record<RuleId, RuleConfig>>
  * `compositionPaths` extends the built-in composition-root path convention
  * (`main|bootstrap|wire|adapter|composition|http|transport|server` filenames)
  * with project-specific
- * regexes (RegExp source strings tested against the normalized file path).
+ * regexes (RegExp source strings tested against the normalized absolute file path).
  * Matching files receive exactly the same treatment as built-in composition
  * paths: ambient IO and naked globals are allowed, scope arguments are
  * softened to the glue diagnostic, scope factories are allowed, and

@@ -29,6 +29,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "pretest": "pnpm build",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run"
   },
