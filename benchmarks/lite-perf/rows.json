@@ -1,0 +1,397 @@
+{
+  "schema": "pumped-fn.lite-perf-row-manifest.v1",
+  "lanes": {
+    "lite": {
+      "project": "node",
+      "target": "bench/lite",
+      "expected_count": 39,
+      "modules": ["@pumped-fn/lite"],
+      "rows": [
+        {
+          "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):Map.get",
+          "file": "bench/lite/baseline.bench.ts",
+          "group": "baselines (interpretation floors)",
+          "name": "Map.get",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):object literal allocation",
+          "file": "bench/lite/baseline.bench.ts",
+          "group": "baselines (interpretation floors)",
+          "name": "object literal allocation",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):await Promise.resolve(value)",
+          "file": "bench/lite/baseline.bench.ts",
+          "group": "baselines (interpretation floors)",
+          "name": "await Promise.resolve(value)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):await new microtask chain (.then)",
+          "file": "bench/lite/baseline.bench.ts",
+          "group": "baselines (interpretation floors)",
+          "name": "await new microtask chain (.then)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:createContext + close",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "createContext + close",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:exec flow (no deps, sync factory)",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "exec flow (no deps, sync factory)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:exec flow (1 resolved atom dep)",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "exec flow (1 resolved atom dep)",
+          "metric": "hz",
+          "representative": true
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:exec fn",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "exec fn",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:exec nested flows depth 10",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "exec nested flows depth 10",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:createContext + 100 onClose + close",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "createContext + 100 onClose + close",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/flow.bench.ts:execution context:onClose subscribe + unsubscribe x100 (FIFO)",
+          "file": "bench/lite/flow.bench.ts",
+          "group": "execution context",
+          "name": "onClose subscribe + unsubscribe x100 (FIFO)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:creation:atom() no deps",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "creation",
+          "name": "atom() no deps",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:creation:createScope()",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "creation",
+          "name": "createScope()",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):1 atom, sync factory",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "1 atom, sync factory",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):1 atom, async factory",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "1 atom, async factory",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):chain depth 10, sync factories",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "chain depth 10, sync factories",
+          "metric": "p75",
+          "representative": true
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):chain depth 100, sync factories",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "chain depth 100, sync factories",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):chain depth 10, async factories",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "chain depth 10, async factories",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):wide 50 sync deps",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "wide 50 sync deps",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/resolve-cold.bench.ts:cold resolve (fresh scope per iteration):diamond on chain-10 base",
+          "file": "bench/lite/resolve-cold.bench.ts",
+          "group": "cold resolve (fresh scope per iteration)",
+          "name": "diamond on chain-10 base",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/select-events.bench.ts:scope.select — 100 active handles:set: selected value changes (all fire)",
+          "file": "bench/lite/select-events.bench.ts",
+          "group": "scope.select — 100 active handles",
+          "name": "set: selected value changes (all fire)",
+          "metric": "hz",
+          "representative": true
+        },
+        {
+          "id": "lite:bench/lite/select-events.bench.ts:scope.select — 100 active handles:set: selected value unchanged (all suppressed)",
+          "file": "bench/lite/select-events.bench.ts",
+          "group": "scope.select — 100 active handles",
+          "name": "set: selected value unchanged (all suppressed)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/select-events.bench.ts:subscription churn:ctrl.on + unsubscribe",
+          "file": "bench/lite/select-events.bench.ts",
+          "group": "subscription churn",
+          "name": "ctrl.on + unsubscribe",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/select-events.bench.ts:subscription churn:scope.on + unsubscribe",
+          "file": "bench/lite/select-events.bench.ts",
+          "group": "subscription churn",
+          "name": "scope.on + unsubscribe",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/select-events.bench.ts:subscription churn:select handle create + subscribe + dispose",
+          "file": "bench/lite/select-events.bench.ts",
+          "group": "subscription churn",
+          "name": "select handle create + subscribe + dispose",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:controller.set — no dependents:set, 0 listeners",
+          "file": "bench/lite/update.bench.ts",
+          "group": "controller.set — no dependents",
+          "name": "set, 0 listeners",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:controller.set — no dependents:set, 1 listener",
+          "file": "bench/lite/update.bench.ts",
+          "group": "controller.set — no dependents",
+          "name": "set, 1 listener",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:controller.set — no dependents:set, 100 listeners",
+          "file": "bench/lite/update.bench.ts",
+          "group": "controller.set — no dependents",
+          "name": "set, 100 listeners",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:controller.set — no dependents:set identical value, 100 listeners",
+          "file": "bench/lite/update.bench.ts",
+          "group": "controller.set — no dependents",
+          "name": "set identical value, 100 listeners",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:controller.set — no dependents:update(fn), 0 listeners",
+          "file": "bench/lite/update.bench.ts",
+          "group": "controller.set — no dependents",
+          "name": "update(fn), 0 listeners",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:invalidation cascade (set + flush):watch chain depth 10",
+          "file": "bench/lite/update.bench.ts",
+          "group": "invalidation cascade (set + flush)",
+          "name": "watch chain depth 10",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:invalidation cascade (set + flush):watch chain depth 50",
+          "file": "bench/lite/update.bench.ts",
+          "group": "invalidation cascade (set + flush)",
+          "name": "watch chain depth 50",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:invalidation cascade (set + flush):watch fan-out 100 dependents",
+          "file": "bench/lite/update.bench.ts",
+          "group": "invalidation cascade (set + flush)",
+          "name": "watch fan-out 100 dependents",
+          "metric": "p75",
+          "representative": true
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:invalidation cascade (set + flush):watch fan-out 100, eq suppresses all",
+          "file": "bench/lite/update.bench.ts",
+          "group": "invalidation cascade (set + flush)",
+          "name": "watch fan-out 100, eq suppresses all",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/update.bench.ts:invalidation cascade (set + flush):invalidate single atom + flush",
+          "file": "bench/lite/update.bench.ts",
+          "group": "invalidation cascade (set + flush)",
+          "name": "invalidate single atom + flush",
+          "metric": "p75",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/warm.bench.ts:warm paths (already resolved):scope.resolve()",
+          "file": "bench/lite/warm.bench.ts",
+          "group": "warm paths (already resolved)",
+          "name": "scope.resolve()",
+          "metric": "hz",
+          "representative": true
+        },
+        {
+          "id": "lite:bench/lite/warm.bench.ts:warm paths (already resolved):controller.get()",
+          "file": "bench/lite/warm.bench.ts",
+          "group": "warm paths (already resolved)",
+          "name": "controller.get()",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/warm.bench.ts:warm paths (already resolved):controller.state",
+          "file": "bench/lite/warm.bench.ts",
+          "group": "warm paths (already resolved)",
+          "name": "controller.state",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite:bench/lite/warm.bench.ts:warm paths (already resolved):scope.controller() lookup",
+          "file": "bench/lite/warm.bench.ts",
+          "group": "warm paths (already resolved)",
+          "name": "scope.controller() lookup",
+          "metric": "hz",
+          "representative": false
+        }
+      ]
+    },
+    "lite-react": {
+      "project": "browser",
+      "target": "bench/react",
+      "expected_count": 8,
+      "modules": ["@pumped-fn/lite", "@pumped-fn/lite-react"],
+      "rows": [
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):100 useAtom consumers re-render",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "100 useAtom consumers re-render",
+          "metric": "hz",
+          "representative": true
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):100 useAtom consumers, identical value set (no re-render)",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "100 useAtom consumers, identical value set (no re-render)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):100 useSelect consumers, selector hits (re-render)",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "100 useSelect consumers, selector hits (re-render)",
+          "metric": "hz",
+          "representative": true
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):100 useSelect consumers, selector misses (no re-render)",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "100 useSelect consumers, selector misses (no re-render)",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):100 useSelect consumers, inline selector, hits",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "100 useSelect consumers, inline selector, hits",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:update propagation (act + set + flush):parent re-render, 100 useAtom children, value unchanged",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "update propagation (act + set + flush)",
+          "name": "parent re-render, 100 useAtom children, value unchanged",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:mount/unmount:mount + unmount 100 useAtom consumers",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "mount/unmount",
+          "name": "mount + unmount 100 useAtom consumers",
+          "metric": "hz",
+          "representative": false
+        },
+        {
+          "id": "lite-react:bench/react/react.browser.bench.tsx:mount/unmount:mount + unmount 100 useSelect consumers",
+          "file": "bench/react/react.browser.bench.tsx",
+          "group": "mount/unmount",
+          "name": "mount + unmount 100 useSelect consumers",
+          "metric": "hz",
+          "representative": true
+        }
+      ]
+    }
+  }
+}

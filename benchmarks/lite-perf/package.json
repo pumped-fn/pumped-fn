@@ -7,6 +7,12 @@
     "bench": "vitest bench --run",
     "bench:lite": "vitest bench --run bench/lite",
     "bench:react": "vitest bench --run bench/react",
+    "perf:capture:lite": "node scripts/capture.mjs --lane lite",
+    "perf:capture:react": "node scripts/capture.mjs --lane lite-react",
+    "perf:capture:all": "node scripts/capture-all.mjs",
+    "perf:record": "node scripts/record.mjs",
+    "perf:compare": "node scripts/compare.mjs",
+    "perf:test": "node scripts/harness.test.mjs",
     "test": "vitest run tests"
   },
   "devDependencies": {
