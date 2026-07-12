@@ -2,4 +2,4 @@
 
 ## 2.0.0
 
-- Initial release: expose @pumped-fn/sdk flows as an MCP server via the `mcpServer` resource, `mcpTool` role tag, and `mcpToolMeta` schema tag.
+- Initial release: expose @pumped-fn/lite flows as MCP tools via the `mcpServer` resource, `mcpConfig` tag, and `mcpToolMeta` schema tag.
