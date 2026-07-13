@@ -2,8 +2,9 @@ import { PassThrough } from "node:stream"
 import { EventEmitter } from "node:events"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal, agent, currentAgent, currentTool, model, turn, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { abortSignal, agent, currentAgent, currentTool, model, turn, validation, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
 import { expect, expectTypeOf, it } from "vitest"
+import * as z from "zod"
 import * as claudeModule from "../src/index"
 import {
   claude,
@@ -80,6 +81,7 @@ it("resolves managed tools before the Claude request", async () => {
   })
   const inspect = currentTool({
     description: "Inspect input.",
+    inputSchema: z.string(),
     flow: flow({
       name: "inspect",
       parse: typed<string>(),
@@ -90,13 +92,19 @@ it("resolves managed tools before the Claude request", async () => {
   const run = turn({ agent: managed })
   const scope = createScope({
     presets: [preset(claudeRun, fake)],
-    tags: [claude, claudeConfig(managedConfig())],
+    tags: [
+      claude,
+      claudeConfig(managedConfig()),
+      validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema))),
+    ],
   })
   const ctx = scope.createContext()
 
   const result = await ctx.exec({ flow: run, input: { prompt: "run" } })
 
   expect(prompts[0]?.prompt).toContain("inspect")
+  expect(prompts[0]?.prompt).toContain("Input JSON Schema:")
+  expect(prompts[0]?.prompt).toContain('"type":"string"')
   expect(prompts[1]?.prompt).toContain("tool:claude")
   expect(result.toolResults).toMatchObject([{ name: "inspect", output: "tool:claude" }])
   await ctx.close()

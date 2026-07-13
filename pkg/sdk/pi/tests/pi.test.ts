@@ -2,6 +2,7 @@ import type {
   AssistantMessage,
   AssistantMessageEventStream,
   Api,
+  Context,
   Model as PiModel,
   MutableModels,
 } from "@earendil-works/pi-ai"
@@ -46,7 +47,7 @@ const response: AssistantMessage = {
   timestamp: 1,
 }
 
-function collection(result = response): MutableModels {
+function collection(result = response, capture?: (context: Context) => void): MutableModels {
   return {
     getProviders: () => [],
     getProvider: () => undefined,
@@ -55,7 +56,10 @@ function collection(result = response): MutableModels {
     refresh: async () => undefined,
     getAuth: async () => undefined,
     stream: () => unavailable(),
-    complete: async () => result,
+    complete: async (_model, context) => {
+      capture?.(context)
+      return result
+    },
     streamSimple: () => unavailable(),
     completeSimple: async () => result,
     setProvider: () => undefined,
@@ -69,8 +73,9 @@ function unavailable(): AssistantMessageEventStream {
 }
 
 it("maps native pi-ai tool calls and records usage", async () => {
+  let received: Context | undefined
   const scope = createScope({
-    presets: [preset(models, collection())],
+    presets: [preset(models, collection(response, (context) => { received = context }))],
     tags: [piConfig({ provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext()
@@ -81,7 +86,16 @@ it("maps native pi-ai tool calls and records usage", async () => {
       agentName: "planner",
       instructions: "Plan.",
       messages: [{ role: "user", content: "start" }],
-      tools: [{ name: "lookup", description: "Look up a value." }],
+      tools: [{
+        name: "lookup",
+        description: "Look up a value.",
+        inputSchema: {
+          type: "object",
+          properties: { id: { type: "integer" } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+      }],
       skills: [{ name: "search", description: "Search sources." }],
       loadedSkills: [],
       subagents: [{ name: "reviewer", description: "Review the plan." }],
@@ -95,6 +109,12 @@ it("maps native pi-ai tool calls and records usage", async () => {
     skillCalls: [{ name: "search", id: "skill-1" }],
     subagentCalls: [{ name: "reviewer", input: { prompt: "check" }, id: "sub-1" }],
     stop: false,
+  })
+  expect(received?.tools?.[0]?.parameters).toEqual({
+    type: "object",
+    properties: { id: { type: "integer" } },
+    required: ["id"],
+    additionalProperties: false,
   })
   expect((await ctx.resolve(events)).events.at(-1)?.output).toMatchObject({
     provider: "test",

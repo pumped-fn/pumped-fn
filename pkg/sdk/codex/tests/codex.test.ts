@@ -1,6 +1,7 @@
 import { createScope, flow, preset, typed } from "@pumped-fn/lite"
-import { agent, complete, currentAgent, currentTool, model, turn, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { agent, complete, currentAgent, currentTool, model, turn, validation, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
 import { expect, expectTypeOf, it } from "vitest"
+import * as z from "zod"
 import * as codexModule from "../src/index"
 import {
   codex,
@@ -123,6 +124,7 @@ it("resolves managed tools before the Codex request", async () => {
   })
   const inspect = currentTool({
     description: "Inspect input.",
+    inputSchema: z.string(),
     flow: flow({
       name: "inspect",
       parse: typed<string>(),
@@ -133,13 +135,19 @@ it("resolves managed tools before the Codex request", async () => {
   const run = turn({ agent: managed })
   const scope = createScope({
     presets: [preset(codexRun, fake)],
-    tags: [codex, codexConfig(managedConfig())],
+    tags: [
+      codex,
+      codexConfig(managedConfig()),
+      validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema))),
+    ],
   })
   const ctx = scope.createContext()
 
   const result = await ctx.exec({ flow: run, input: { prompt: "run" } })
 
   expect(prompts[0]?.prompt).toContain("inspect")
+  expect(prompts[0]?.prompt).toContain("Input JSON Schema:")
+  expect(prompts[0]?.prompt).toContain('"type":"string"')
   expect(prompts[1]?.prompt).toContain("tool:codex")
   expect(result.toolResults).toMatchObject([{ name: "inspect", output: "tool:codex" }])
   await ctx.close()

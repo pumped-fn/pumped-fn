@@ -1,18 +1,26 @@
 import { createScope, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { toJsonSchema } from "@valibot/to-json-schema"
 import { describe, expect, it } from "vitest"
+import * as v from "valibot"
+import * as z from "zod"
 import {
   agent,
   currentAgent,
   currentTool,
   model,
   step,
+  ToolInputError,
   tool,
   turn,
+  validation,
   type Model,
   type ModelRequest,
   type ModelResponse,
   type Step,
 } from "../src/index"
+
+const validationTag = validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema)))
+const valibotValidationTag = validation.engine(validation.standard<v.GenericSchema>((schema) => toJsonSchema(schema)))
 
 function provider(response: (request: ModelRequest) => ModelResponse): Model {
   return flow({
@@ -64,12 +72,14 @@ describe("managed tools", () => {
     })
     const first = currentTool({
       description: "First.",
-      flow: flow({ name: "first", factory: () => "first" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "first", parse: typed<unknown>(), factory: () => "first" }),
       deps: { ready: ready("first") },
     })
     const second = currentTool({
       description: "Second.",
-      flow: flow({ name: "second", factory: () => "second" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "second", parse: typed<unknown>(), factory: () => "second" }),
       deps: { ready: ready("second") },
     })
     const managed = currentAgent({ name: "managed", tools: { first, second } })
@@ -77,7 +87,7 @@ describe("managed tools", () => {
     let advertised: readonly string[] = []
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider((request) => {
+      tags: [validationTag, model(provider((request) => {
         modelCalls++
         expect([...resolved]).toEqual(["first", "second"])
         advertised = request.tools.map((item) => item.name)
@@ -109,13 +119,14 @@ describe("managed tools", () => {
     const selected = currentTool({
       name: "selected",
       description: "Selected.",
+      inputSchema: z.string(),
       flow: declared,
       deps,
     })
     const managed = currentAgent({ name: "managed", tools: { selected } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({
+      tags: [validationTag, model(provider(() => ({
         content: "calling",
         toolCalls: [{ name: "selected", input: "item" }],
       })))],
@@ -142,18 +153,20 @@ describe("managed tools", () => {
     })
     const first = currentTool({
       description: "First.",
-      flow: flow({ name: "first", factory: () => "first" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "first", parse: typed<unknown>(), factory: () => "first" }),
       deps: { dependency: managedDependency("tool-dependency") },
     })
     const second = currentTool({
       description: "Second.",
-      flow: flow({ name: "second", factory: () => "second" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "second", parse: typed<unknown>(), factory: () => "second" }),
       deps: { dependency: managedDependency("agent-dependency") },
     })
     const managed = currentAgent({ name: "managed", tools: { first, second } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({ content: "done", stop: true })))],
+      tags: [validationTag, model(provider(() => ({ content: "done", stop: true })))],
     })
     const ctx = scope.createContext()
 
@@ -167,14 +180,15 @@ describe("managed tools", () => {
     const policy = tag<string>({ label: "policy" })
     const guarded = currentTool({
       description: "Guarded.",
-      flow: flow({ name: "guarded", factory: () => "ok" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "guarded", parse: typed<unknown>(), factory: () => "ok" }),
       deps: { policy: tags.required(policy) },
     })
     const managed = currentAgent({ name: "managed", tools: { guarded } })
     let modelCalls = 0
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => {
+      tags: [validationTag, model(provider(() => {
         modelCalls++
         return { content: "unexpected", stop: true }
       }))],
@@ -186,10 +200,95 @@ describe("managed tools", () => {
     await close(scope, ctx)
   })
 
+  it("requires an explicit validation engine before advertising tools", async () => {
+    const inspect = currentTool({
+      description: "Inspect.",
+      inputSchema: z.object({ id: z.string() }),
+      flow: flow({
+        name: "inspect",
+        parse: typed<{ id: string }>(),
+        factory: (ctx) => ctx.input.id,
+      }),
+    })
+    let modelCalls = 0
+    const run = turn({ agent: currentAgent({ name: "managed", tools: { inspect } }) })
+    const scope = createScope({
+      tags: [model(provider(() => {
+        modelCalls++
+        return { content: "unexpected", stop: true }
+      }))],
+    })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run, input: { prompt: "run" } })).rejects.toThrow("agent.validation.engine")
+    expect(modelCalls).toBe(0)
+    await close(scope, ctx)
+  })
+
+  it("advertises and enforces the Zod input schema before tool execution", async () => {
+    let executions = 0
+    let advertised: unknown
+    const inspect = currentTool({
+      description: "Inspect.",
+      inputSchema: z.object({ id: z.uuid() }),
+      flow: flow({
+        name: "inspect",
+        parse: typed<{ id: string }>(),
+        factory: (ctx) => {
+          executions++
+          return ctx.input.id
+        },
+      }),
+    })
+    const run = turn({ agent: currentAgent({ name: "managed", tools: { inspect } }) })
+    const scope = createScope({
+      tags: [validationTag, model(provider((request) => {
+        advertised = request.tools[0]?.inputSchema
+        return { content: "calling", toolCalls: [{ name: "inspect", input: { id: "not-a-uuid" } }] }
+      }))],
+    })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run, input: { prompt: "run" } })).rejects.toBeInstanceOf(ToolInputError)
+    expect(advertised).toMatchObject({
+      properties: { id: { format: "uuid", type: "string" } },
+      required: ["id"],
+      type: "object",
+    })
+    expect(executions).toBe(0)
+    await close(scope, ctx)
+  })
+
+  it("switches to a Valibot engine at the scope seam", async () => {
+    const sum = currentTool({
+      description: "Add values.",
+      inputSchema: v.object({ left: v.number(), right: v.number() }),
+      flow: flow({
+        name: "sum",
+        parse: typed<{ left: number; right: number }>(),
+        factory: (ctx) => ctx.input.left + ctx.input.right,
+      }),
+    })
+    const run = turn({ agent: currentAgent({ name: "managed", tools: { sum } }) })
+    const scope = createScope({
+      tags: [valibotValidationTag, model(provider(() => ({
+        content: "calling",
+        toolCalls: [{ name: "sum", input: { left: 20, right: 22 } }],
+      })))],
+    })
+    const ctx = scope.createContext()
+
+    const result = await ctx.exec({ flow: run, input: { prompt: "run", maxRounds: 1 } })
+
+    expect(result.toolResults[0]?.output).toBe(42)
+    await close(scope, ctx)
+  })
+
   it("dispatches the tool selected from the advertised snapshot", async () => {
     const selected = currentTool({
       name: "selected",
       description: "Selected.",
+      inputSchema: z.object({ id: z.string() }),
       flow: flow({
         name: "selected-flow",
         parse: typed<{ id: string }>(),
@@ -199,7 +298,8 @@ describe("managed tools", () => {
     const other = currentTool({
       name: "other",
       description: "Other.",
-      flow: flow({ name: "other-flow", factory: () => "other" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "other-flow", parse: typed<unknown>(), factory: () => "other" }),
     })
     const managed = currentAgent({ name: "managed", tools: { selected, other } })
     const responses = [
@@ -209,7 +309,7 @@ describe("managed tools", () => {
     let advertised: readonly string[] = []
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider((request) => {
+      tags: [validationTag, model(provider((request) => {
         advertised = request.tools.map((item) => item.name)
         return responses[request.round] ?? responses[1]!
       }))],
@@ -227,7 +327,13 @@ describe("managed tools", () => {
     const selected = currentTool({
       name: "selected",
       description: "Selected.",
-      flow: flow({ name: "selected-flow", tags: [step({ timeoutMs: 17 })], factory: () => "selected" }),
+      inputSchema: z.unknown(),
+      flow: flow({
+        name: "selected-flow",
+        parse: typed<unknown>(),
+        tags: [step({ timeoutMs: 17 })],
+        factory: () => "selected",
+      }),
     })
     const managed = currentAgent({ name: "managed", tools: { selected } })
     const observations: { name: string | undefined; step: Step | undefined }[] = []
@@ -241,7 +347,7 @@ describe("managed tools", () => {
     const run = turn({ agent: managed })
     const scope = createScope({
       extensions: [observer],
-      tags: [model(provider(() => ({
+      tags: [validationTag, model(provider(() => ({
         content: "calling",
         toolCalls: [{ name: "selected", input: "item" }],
       })))],
@@ -258,17 +364,19 @@ describe("managed tools", () => {
     const first = currentTool({
       name: "same",
       description: "First.",
-      flow: flow({ name: "first", factory: () => "first" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "first", parse: typed<unknown>(), factory: () => "first" }),
     })
     const second = currentTool({
       name: "same",
       description: "Second.",
-      flow: flow({ name: "second", factory: () => "second" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "second", parse: typed<unknown>(), factory: () => "second" }),
     })
     const managed = currentAgent({ name: "managed", tools: { first, second } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({ content: "unexpected", stop: true })))],
+      tags: [validationTag, model(provider(() => ({ content: "unexpected", stop: true })))],
     })
     const ctx = scope.createContext()
 
@@ -307,8 +415,10 @@ describe("managed tools", () => {
     })
     const failing = currentTool({
       description: "Failing.",
+      inputSchema: z.unknown(),
       flow: flow({
         name: "failing",
+        parse: typed<unknown>(),
         factory: () => {
           throw new Error("tool failed")
         },
@@ -318,7 +428,7 @@ describe("managed tools", () => {
     const managed = currentAgent({ name: "managed", tools: { failing } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({ content: "calling", toolCalls: [{ name: "failing", input: null }] })))],
+      tags: [validationTag, model(provider(() => ({ content: "calling", toolCalls: [{ name: "failing", input: null }] })))],
     })
     const ctx = scope.createContext()
 
@@ -340,13 +450,14 @@ describe("managed tools", () => {
     })
     const selected = currentTool({
       description: "Selected.",
-      flow: flow({ name: "selected", factory: () => "selected" }),
+      inputSchema: z.unknown(),
+      flow: flow({ name: "selected", parse: typed<unknown>(), factory: () => "selected" }),
       deps: { dependency },
     })
     const managed = currentAgent({ name: "managed", tools: { selected } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({ content: "calling", toolCalls: [{ name: "selected", input: null }] })))],
+      tags: [validationTag, model(provider(() => ({ content: "calling", toolCalls: [{ name: "selected", input: null }] })))],
     })
     const ctx = scope.createContext()
 
@@ -359,6 +470,7 @@ describe("managed tools", () => {
     const backend = tag<string>({ label: "backend" })
     const lookup = currentTool({
       description: "Lookup.",
+      inputSchema: z.string(),
       flow: flow({
         name: "lookup",
         parse: typed<string>(),
@@ -369,7 +481,7 @@ describe("managed tools", () => {
     const managed = currentAgent({ name: "managed", tools: { lookup } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({
+      tags: [validationTag, model(provider(() => ({
         content: "lookup",
         toolCalls: [{ name: "lookup", input: "item" }],
       })))],
@@ -391,6 +503,7 @@ describe("managed tools", () => {
     const approval = tag<boolean>({ label: "approval" })
     const approved = currentTool({
       description: "Approved action.",
+      inputSchema: z.object({ approved: z.boolean() }),
       flow: flow({
         name: "approved",
         parse: typed<{ approved: boolean }>(),
@@ -401,7 +514,7 @@ describe("managed tools", () => {
     const managed = currentAgent({ name: "managed", tools: { approved } })
     const run = turn({ agent: managed })
     const scope = createScope({
-      tags: [model(provider(() => ({
+      tags: [validationTag, model(provider(() => ({
         content: "calling",
         toolCalls: [{ name: "approved", input: { approved: true } }],
       })))],

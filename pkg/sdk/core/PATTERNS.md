@@ -211,11 +211,16 @@ const result = await ctx.exec({
 
 ## 4.1 Managed Tools (2.x)
 
-Use `currentTool()` when a tool flow needs context-owned dependencies. Put those resources in the keyed `tools` record passed to `currentAgent()`; resolution creates one frozen, ordered snapshot of projected flow handles before `turn()` calls the model. The model provider remains the `model` tag used by `complete`.
+Use `currentTool()` when a tool flow needs context-owned dependencies. Put those resources in the keyed `tools` record passed to `currentAgent()`; resolution creates one frozen, ordered snapshot of validated projected flow handles before `turn()` calls the model. The model provider remains the `model` tag used by `complete`.
 
 ```ts
+import { createScope, tags } from "@pumped-fn/lite"
+import { currentAgent, currentTool, model, turn, validation } from "@pumped-fn/sdk"
+import * as z from "zod"
+
 const search = currentTool({
   description: "Search records.",
+  inputSchema: z.object({ query: z.string().min(1) }),
   flow: searchFlow,
   deps: { backend: tags.required(searchBackend) },
 })
@@ -226,10 +231,26 @@ const managed = currentAgent({
 })
 
 const run = turn({ agent: managed })
+const scope = createScope({
+  tags: [
+    model(provider),
+    validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema))),
+  ],
+})
+const ctx = scope.createContext()
 const result = await ctx.exec({ flow: run, input: { prompt: "find 42" } })
 ```
 
-The managed agent has no `.turn` member. A tool call can only dispatch through the exact flow handle advertised in its resolved snapshot, so model input cannot provide required tags or replace the backend dependency.
+The managed agent has no `.turn` member. A tool call can only dispatch through the exact flow handle and input schema advertised in its resolved snapshot. Invalid model input fails before the flow starts. Model input cannot provide required tags or replace the backend dependency. There is no default validation engine.
+
+Valibot uses the same graph. Only the scope tag changes:
+
+```ts
+import { toJsonSchema } from "@valibot/to-json-schema"
+import * as v from "valibot"
+
+validation.engine(validation.standard<v.GenericSchema>((schema) => toJsonSchema(schema)))
+```
 
 Why: tools and subagent turns still run through `ctx.exec()`, so the same workflow extension can replay, suspend, route, or time out the work. `events` is a boundary resource, so run inspection is testable without a global observer.
 

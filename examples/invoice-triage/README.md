@@ -91,6 +91,7 @@ flowchart TD
 - Postgres-backed ingest through Drizzle migrations, store flows, and PGlite presets in tests.
 - Signal-driven workers and ops views using `queueSignal`, `storedSignal`, `outstanding`, `importing`, `drained`, and `stopping`.
 - Provider seams for the model tag, notifier client, clock, request id, reminder policy, and database URL.
+- A Zod-validated `findInvoice` managed tool, `invoiceAssistant` current resource, and `askInvoice` turn whose validation engine and model are selected at the scope seam.
 - Scheduler-backed cron registration, idempotent reminder claims, release-on-failure SQL, and deterministic manual ticks in tests.
 - Hono server, daemon, CLI, and OpenTelemetry spans over the same graph.
 
@@ -102,7 +103,7 @@ Business features are flows/resources; free functions are pure calculations; ctx
 
 Outbound and pull capabilities such as `intakeLines` are atoms because the graph controls when it consumes them. Anything that creates execution contexts is root-owned: the server root creates request contexts inline in handlers, and importing `bin/server.ts` only exports the Hono app without starting workers or a listener.
 
-External data is schema-validated with zod at parse and model-output boundaries; graph-internal handoffs stay typed.
+External data is schema-validated with Zod at parse, managed-tool input, and model-output boundaries; graph-internal handoffs stay typed. `src/assistant.ts` declares the tool schema once. The scope-injected `validation.engine` converts it to the JSON Schema shown to the model and validates each call before `invoice.findStored` executes.
 
 Database access lives in `src/store.ts`. `database` is an atom, and each store operation is a plain flow that deps it directly and runs its Drizzle SQL inline. Multi-write operations (`enqueue`, `settleInvoice`, `markReminderSent`) wrap their writes in `db.transaction(async (tx) => …)` so the two writes are atomic per operation; reads (`listStored`, `listPending`, `reviewCount`, `listAudit`) are plain `db.select`. Each write/read flow carries `step({ workflow: true, kind: "store" })`, so its SQL await is attributed to that step's span. There is no per-flow transaction boundary and no held transaction: SQL commits inline as each operation resolves, so a flow that mutates then bumps a signal is naturally post-commit.
 

@@ -150,8 +150,15 @@ function capabilityTool(capability: Capability): Tool {
   return {
     name: capability.name,
     description: capability.description,
-    parameters: Type.Object({}, { additionalProperties: true }),
+    parameters: parametersOf(capability),
   }
+}
+
+function parametersOf(capability: Capability): Tool["parameters"] {
+  if (capability.inputSchema === undefined) return Type.Object({}, { additionalProperties: true })
+  if (capability.inputSchema === true) return {} as Tool["parameters"]
+  if (capability.inputSchema === false) return { not: {} } as Tool["parameters"]
+  return capability.inputSchema as Tool["parameters"]
 }
 
 function skillTool(skills: readonly Capability[]): Tool {

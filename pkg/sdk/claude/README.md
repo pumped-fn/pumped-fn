@@ -8,26 +8,41 @@ Module-level managed Claude CLI model provider for `@pumped-fn/sdk`.
 agent -> model tag -> claude turn -> claude run -> scope-owned stream-json process
 ```
 
-Managed tools resolve in core before the provider request and need no provider registry.
+Managed tools resolve and publish their validated JSON Schema before the provider request. They need no provider registry.
 
 ```ts
-import { createScope } from "@pumped-fn/lite"
-import { agent } from "@pumped-fn/sdk"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { currentAgent, currentTool, turn, validation } from "@pumped-fn/sdk"
 import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
+import * as z from "zod"
 
-const triage = agent({ name: "triage" })
+const inspect = currentTool({
+  description: "Inspect a ticket by ID.",
+  inputSchema: z.object({ ticketId: z.string().min(1) }),
+  flow: flow({
+    name: "ticket.inspect",
+    parse: typed<{ ticketId: string }>(),
+    factory: (ctx) => ({ id: ctx.input.ticketId, status: "open" }),
+  }),
+})
+const triage = currentAgent({ name: "triage", tools: { inspect } })
+const run = turn({ agent: triage })
 const scope = createScope({
-  tags: [claude, claudeConfig({
-    auth: { kind: "global" },
-    cwd: process.cwd(),
-    roots: [],
-    permission: "deny",
-    shutdownTimeoutMs: 1_000,
-  })],
+  tags: [
+    claude,
+    claudeConfig({
+      auth: { kind: "global" },
+      cwd: process.cwd(),
+      roots: [],
+      permission: "deny",
+      shutdownTimeoutMs: 1_000,
+    }),
+    validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema))),
+  ],
 })
 const ctx = scope.createContext()
 
-await ctx.exec({ flow: triage.turn, input: { prompt: "Triage this ticket." } })
+await ctx.exec({ flow: run, input: { prompt: "Inspect ticket T-42." } })
 ```
 
 Global auth reuses the Claude CLI's writable `~/.claude` state. Token auth reads a long-lived token

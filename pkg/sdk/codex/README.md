@@ -4,17 +4,35 @@
 
 Module-level Codex CLI and ACP model providers for `@pumped-fn/sdk`.
 
-Managed tools resolve in core before the provider request and need no provider registry.
+Managed tools resolve and publish their validated JSON Schema before the provider request. They need no provider registry.
 
 ```ts
-import { createScope } from "@pumped-fn/lite"
-import { agent } from "@pumped-fn/sdk"
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { currentAgent, currentTool, turn, validation } from "@pumped-fn/sdk"
 import { codex, codexConfig } from "@pumped-fn/sdk-codex"
+import * as z from "zod"
 
-const triage = agent({ name: "triage" })
-const scope = createScope({
-  tags: [codex, codexConfig({ auth: { kind: "global" } })],
+const inspect = currentTool({
+  description: "Inspect a repository issue.",
+  inputSchema: z.object({ issue: z.number().int().positive() }),
+  flow: flow({
+    name: "issue.inspect",
+    parse: typed<{ issue: number }>(),
+    factory: (ctx) => ({ issue: ctx.input.issue, state: "open" }),
+  }),
 })
+const triage = currentAgent({ name: "triage", tools: { inspect } })
+const run = turn({ agent: triage })
+const scope = createScope({
+  tags: [
+    codex,
+    codexConfig({ auth: { kind: "global" } }),
+    validation.engine(validation.standard<z.ZodType>((schema) => z.toJSONSchema(schema))),
+  ],
+})
+const ctx = scope.createContext()
+
+await ctx.exec({ flow: run, input: { prompt: "Inspect issue 42." } })
 ```
 
 Global auth reuses writable `CODEX_HOME` state. API-key auth reads the configured environment name

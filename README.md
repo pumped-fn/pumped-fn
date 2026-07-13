@@ -11,7 +11,7 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 createScope({ presets, tags, extensions })
   -> scope-owned graph
   -> execution context per request, job, action, or test
-  -> currentTool resource -> currentAgent resource -> turn flow
+  -> currentTool resource + validation.engine tag -> currentAgent resource -> turn flow
   -> flows, resources, tags, and wrapped execution edges
   -> module-level Model providers: Claude CLI, Codex CLI/ACP, or pi-ai
 ```

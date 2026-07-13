@@ -38,16 +38,20 @@
     "@pumped-fn/lite": "^3.1.0"
   },
   "dependencies": {
+    "@standard-schema/spec": "catalog:",
     "@pumped-fn/lite-extension-suspense": "workspace:^"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
+    "@valibot/to-json-schema": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "license": "MIT",
   "repository": {

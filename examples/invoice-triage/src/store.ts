@@ -139,6 +139,17 @@ export const listStored = flow({
   },
 })
 
+export const findStored = flow({
+  name: "invoice.findStored",
+  parse: typed<{ invoiceId: string }>(),
+  deps: { db: database },
+  tags: [step({ workflow: true, kind: "store" })],
+  factory: async (ctx, { db }): Promise<StoredInvoice | undefined> => {
+    const [row] = await db.select().from(storedInvoices).where(eq(storedInvoices.id, ctx.input.invoiceId))
+    return row === undefined ? undefined : storedFromRow(row)
+  },
+})
+
 export const listPending = flow({
   name: "invoice.listPending",
   deps: { db: database },

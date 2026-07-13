@@ -2,7 +2,7 @@
 
 ## 2.x Compatibility
 
-The legacy `tool()` and `agent()` APIs remain unchanged. The 2.x managed-tool API adds `currentTool()`, `currentAgent()`, and `turn()` for an explicitly resolved tool snapshot: tools are resolved before the model call, and each advertised tool dispatches through the exact projected flow handle captured in that snapshot.
+The legacy `tool()` and `agent()` APIs remain unchanged. The 2.x managed-tool API adds `currentTool()`, `currentAgent()`, and `turn()` for an explicitly resolved tool snapshot: tools and their Standard Schema inputs resolve before the model call, and each advertised tool validates through the scope-injected `validation.engine` before dispatching through the exact projected flow handle captured in that snapshot. Zod and Valibot are supported without a built-in default.
 
 Generic runtime primitives on top of `@pumped-fn/lite`: durable workflow steps, sessions,
 materials, event buffers, guards, sandboxes, CLI workers, and an eval harness. Agents and models

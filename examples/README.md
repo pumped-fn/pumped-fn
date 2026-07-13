@@ -4,7 +4,7 @@
 
 | Directory | Package | What it shows | Run |
 | --- | --- | --- | --- |
-| `invoice-triage/` | `@pumped-fn/invoice-triage` | [Invoice triage](./invoice-triage/README.md) imports invoices into Postgres and triages them with a model provider across daemon, server, CLI, cron, and tests. | `docker compose -f examples/invoice-triage/compose.yaml up -d postgres`<br>`pnpm -F @pumped-fn/invoice-triage start < examples/invoice-triage/fixtures/demo.ndjson`<br>`PORT=3000 pnpm -F @pumped-fn/invoice-triage server`<br>`pnpm -F @pumped-fn/invoice-triage test` |
+| `invoice-triage/` | `@pumped-fn/invoice-triage` | [Invoice triage](./invoice-triage/README.md) imports invoices into Postgres, triages them with a model provider, and includes an executable Zod-validated managed invoice lookup tool at the same scope seam. | `docker compose -f examples/invoice-triage/compose.yaml up -d postgres`<br>`pnpm -F @pumped-fn/invoice-triage start < examples/invoice-triage/fixtures/demo.ndjson`<br>`PORT=3000 pnpm -F @pumped-fn/invoice-triage server`<br>`pnpm -F @pumped-fn/invoice-triage test` |
 
 Adding an example? See [CONTRIBUTING.md](./CONTRIBUTING.md).
 

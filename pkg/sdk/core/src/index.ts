@@ -1,4 +1,5 @@
 import { atom, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import type { StandardSchemaV1 } from "@standard-schema/spec"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -910,7 +911,12 @@ function guardTextOf(value: unknown): string | undefined {
 }
 
 function formatCapability(capability: Capability): string {
-  return `- ${capability.name}: ${capability.description}`
+  return [
+    `- ${capability.name}: ${capability.description}`,
+    capability.inputSchema === undefined
+      ? undefined
+      : `  Input JSON Schema: ${JSON.stringify(capability.inputSchema)}`,
+  ].filter((item) => item !== undefined).join("\n")
 }
 
 function formatLoadedSkill(skill: LoadedSkill): string {
@@ -998,6 +1004,7 @@ export interface TurnInput {
 export interface Capability {
   name: string
   description: string
+  inputSchema?: JsonSchema
 }
 
 export interface Tool<Output = unknown, Input = unknown> extends Capability {
@@ -1244,56 +1251,122 @@ export function agent(options: AgentOptions): Agent {
   return agent
 }
 
+export type JsonSchema = boolean | Readonly<object>
+
+export interface ValidationEngine {
+  validate(schema: StandardSchemaV1, input: unknown): MaybePromise<StandardSchemaV1.Result<unknown>>
+  toJsonSchema(schema: StandardSchemaV1): JsonSchema
+}
+
+export interface ValidationEngineOptions<Schema extends StandardSchemaV1> {
+  validate(schema: Schema, input: unknown): MaybePromise<StandardSchemaV1.Result<unknown>>
+  toJsonSchema(schema: Schema): JsonSchema
+}
+
+const validationEngine = tag<ValidationEngine>({ label: "agent.validation.engine" })
+
+function defineValidationEngine<Schema extends StandardSchemaV1>(
+  options: ValidationEngineOptions<Schema>
+): ValidationEngine {
+  return {
+    validate: (schema, input) => options.validate(schema as Schema, input),
+    toJsonSchema: (schema) => options.toJsonSchema(schema as Schema),
+  }
+}
+
+function standardValidationEngine<Schema extends StandardSchemaV1>(
+  toJsonSchema: (schema: Schema) => JsonSchema
+): ValidationEngine {
+  return defineValidationEngine<Schema>({
+    validate: (schema, input) => schema["~standard"].validate(input),
+    toJsonSchema,
+  })
+}
+
+export const validation = Object.freeze({
+  engine: validationEngine,
+  define: defineValidationEngine,
+  standard: standardValidationEngine,
+})
+
+export class ToolInputError extends Error {
+  override readonly name = "ToolInputError"
+
+  constructor(
+    readonly toolName: string,
+    readonly issues: readonly StandardSchemaV1.Issue[]
+  ) {
+    super(`Tool "${toolName}" input failed validation: ${issues.map((issue) => issue.message).join("; ")}`)
+  }
+}
+
 export interface CurrentTool<Output, Input, Yield = never> {
   readonly name: string
   readonly description: string
+  readonly inputSchema: JsonSchema
   readonly flow: Lite.FlowHandle<Output, Input, Yield>
+  readonly validate: (input: unknown) => MaybePromise<StandardSchemaV1.Result<unknown>>
 }
 
 interface CurrentToolResourceValue {
   readonly name: string
   readonly description: string
-  readonly flow: Lite.FlowHandle<unknown, unknown, unknown>
+  readonly inputSchema: JsonSchema
+  readonly flow: Lite.FlowHandle<any, any, any>
+  readonly validate: (input: unknown) => MaybePromise<StandardSchemaV1.Result<unknown>>
 }
 
 type CurrentToolResource = Lite.Resource<CurrentToolResourceValue>
 
 export interface CurrentToolOptions<
   Output,
-  Input,
+  Schema extends StandardSchemaV1,
   Fault = never,
   Yield = never,
   D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
 > {
   name?: string
   description: string
-  flow: Lite.Flow<Output, Input, Fault, Yield>
-  deps?: D & { flow?: never }
+  inputSchema: Schema
+  flow: Lite.Flow<Output, StandardSchemaV1.InferOutput<Schema>, Fault, Yield>
+  deps?: D & { flow?: never; validation?: never }
 }
 
 export function currentTool<
   Output,
-  Input,
+  const Schema extends StandardSchemaV1,
   Fault = never,
   Yield = never,
   const D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
->(options: CurrentToolOptions<Output, Input, Fault, Yield, D>): Lite.Resource<CurrentTool<Output, Input, Yield>> {
+>(options: CurrentToolOptions<Output, Schema, Fault, Yield, D>): Lite.Resource<
+  CurrentTool<Output, StandardSchemaV1.InferOutput<Schema>, Yield>
+> {
   const name = options.name ?? options.flow.name
   if (!name) throw new Error("Current agent tool requires a name")
-  const deps = { ...(options.deps ?? {}), flow: options.flow }
+  const deps = {
+    ...(options.deps ?? {}),
+    validation: tags.required(validation.engine),
+    flow: options.flow,
+  }
   return resource({
     name,
     ownership: "current",
     deps,
-    factory: (_ctx, resolved) => Object.freeze({
+    factory: (_ctx, { flow, validation }) => Object.freeze({
       name,
       description: options.description,
-      flow: resolved.flow,
+      inputSchema: freezeJsonSchema(validation.toJsonSchema(options.inputSchema)),
+      flow,
+      validate: (input: unknown) => validation.validate(options.inputSchema, input),
     }),
   })
 }
 
 export type CurrentToolValue<T> = T extends Lite.Resource<infer Value> ? Value : never
+
+function freezeJsonSchema(schema: JsonSchema): JsonSchema {
+  return typeof schema === "boolean" ? schema : Object.freeze(schema)
+}
 
 export interface CurrentAgentOptions<Tools extends Record<string, CurrentToolResource>> {
   name: string
@@ -1822,8 +1895,10 @@ async function executeCurrentAgentTool<Tools extends Record<string, CurrentToolR
     targetName: target.name,
     input: call.input,
   })
+  const validated = await target.validate(call.input)
+  if (validated.issues) throw new ToolInputError(target.name, validated.issues)
   const output = await target.flow.exec({
-    input: call.input,
+    input: validated.value as any,
     name: target.name,
     tags: [agentStepTag({ workflow: true, kind: "tool" }, target.flow.flow.tags)],
   })
@@ -1967,10 +2042,15 @@ function agentToolCapability(tool: AnyTool): Capability {
   }
 }
 
-function currentToolCapability(tool: { name: string; description: string }): Capability {
+function currentToolCapability(tool: {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+}): Capability {
   return {
     name: tool.name,
     description: tool.description,
+    inputSchema: tool.inputSchema,
   }
 }
 
