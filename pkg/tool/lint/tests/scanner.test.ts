@@ -617,6 +617,97 @@ describe("lite lint scanner", () => {
     `)).toEqual(["pumped/no-naked-globals"])
   })
 
+  it("allows ambient effects inside explicitly owned boundary definitions", () => {
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const session = resource({
+        name: "session",
+        ownership: "boundary",
+        factory: (ctx) => {
+          ctx.cleanup(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
+          return process.env.SESSION_ID
+        },
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import { resource as defineResource } from "@pumped-fn/lite"
+
+      const session = defineResource({
+        name: "session",
+        ownership: "boundary",
+        factory: () => Date.now(),
+      })
+    `)).toEqual([])
+
+    expect(ids(`
+      import * as Lite from "@pumped-fn/lite"
+
+      const session = Lite.resource({
+        name: "session",
+        ownership: "boundary",
+        factory: () => Math.random(),
+      })
+    `)).toEqual([])
+  })
+
+  it("keeps ambient effects invalid without explicit boundary ownership", () => {
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const session = resource({
+        name: "session",
+        factory: () => setTimeout(() => undefined, 0),
+      })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const session = resource({
+        name: "session",
+        ownership: "current",
+        factory: () => setTimeout(() => undefined, 0),
+      })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { atom } from "@pumped-fn/lite"
+
+      const session = atom({
+        name: "session",
+        ownership: "boundary",
+        factory: () => setTimeout(() => undefined, 0),
+      })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+  })
+
+  it("keeps ambient effects outside the boundary factory or inside nested creators invalid", () => {
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const session = resource({
+        name: process.env.SESSION_NAME,
+        ownership: "boundary",
+        factory: () => "session",
+      })
+    `)).toEqual(["pumped/no-naked-globals"])
+
+    expect(ids(`
+      import { atom, resource } from "@pumped-fn/lite"
+
+      const session = resource({
+        name: "session",
+        ownership: "boundary",
+        factory: () => atom({
+          name: "nested",
+          factory: () => setTimeout(() => undefined, 0),
+        }),
+      })
+    `)).toEqual(["pumped/no-ambient-io-outside-boundary", "pumped/no-naked-globals"])
+  })
+
   it("allows naked globals outside factory bodies and via the allowlist", () => {
     expect(ids(`
       const stamped = Date.now()

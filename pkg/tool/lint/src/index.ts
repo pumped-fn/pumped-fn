@@ -649,8 +649,39 @@ function declarationName(node: ts.Node): string | null {
   return null
 }
 
-function ambientAllowedAt(node: ts.Node, filePath: string, extraCompositionPaths: RegExp[] = []): boolean {
+function nearestCreatorConfig(node: ts.Node, imports: Imports) {
+  const sourceFile = node.getSourceFile()
+  let current: ts.Node | undefined = node
+  while (current) {
+    if (ts.isObjectLiteralExpression(current)) {
+      const call: ts.Node = current.parent
+      if (ts.isCallExpression(call) && call.arguments[0] === current) {
+        const kind = unshadowedCreatorKind(call.expression, sourceFile, imports)
+        if (kind !== null) return { config: current, kind }
+      }
+    }
+    current = current.parent
+  }
+  return null
+}
+
+function insideOwnedBoundary(node: ts.Node, imports: Imports): boolean {
+  const nearest = nearestCreatorConfig(node, imports)
+  if (nearest === null) return false
+  const ownership = objectProperty(nearest.config, "ownership")
+  const factory = objectProperty(nearest.config, "factory")
+  let ancestor: ts.Node | undefined = node
+  while (ancestor && ancestor !== nearest.config && ancestor !== factory?.initializer) ancestor = ancestor.parent
+  return nearest.kind === "resource"
+    && ownership !== null
+    && ts.isStringLiteral(ownership.initializer)
+    && ownership.initializer.text === "boundary"
+    && ancestor === factory?.initializer
+}
+
+function ambientAllowedAt(node: ts.Node, filePath: string, imports: Imports, extraCompositionPaths: RegExp[] = []): boolean {
   if (isAmbientAllowedPath(filePath, extraCompositionPaths)) return true
+  if (insideOwnedBoundary(node, imports)) return true
   let current: ts.Node | undefined = node
   while (current) {
     const name = declarationName(current)
@@ -1505,7 +1536,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         )
       }
 
-      if (isAmbientCall(node.expression) && !ambientAllowedAt(node, filePath, extraCompositionPaths)) {
+      if (isAmbientCall(node.expression) && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)) {
         pushNodeDiagnostic(
           diagnostics,
           sourceFile,
@@ -1592,7 +1623,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         }
 
         const globalName = nakedGlobalName(node)
-        if (globalName && !allowGlobals.has(globalName) && !ambientAllowedAt(node, filePath, extraCompositionPaths)) {
+        if (globalName && !allowGlobals.has(globalName) && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)) {
           pushNodeDiagnostic(
             diagnostics,
             sourceFile,
@@ -1607,7 +1638,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           ts.isIdentifier(node.expression)
           && imports.nodeBuiltins.has(node.expression.text)
           && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.text)!)
-          && !ambientAllowedAt(node, filePath, extraCompositionPaths)
+          && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)
         ) {
           pushNodeDiagnostic(
             diagnostics,
@@ -1624,7 +1655,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           && ts.isIdentifier(node.expression.expression)
           && imports.nodeBuiltins.has(node.expression.expression.text)
           && !allowGlobals.has(imports.nodeBuiltins.get(node.expression.expression.text)!)
-          && !ambientAllowedAt(node, filePath, extraCompositionPaths)
+          && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)
         ) {
           pushNodeDiagnostic(
             diagnostics,
@@ -1641,7 +1672,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     if (
       ts.isNewExpression(node)
       && enclosingUnitConfig(node, imports)
-      && !ambientAllowedAt(node, filePath, extraCompositionPaths)
+      && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)
     ) {
       const globalName = nakedGlobalName(node)
       if (globalName && !allowGlobals.has(globalName)) {
@@ -1661,9 +1692,9 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       && ts.isIdentifier(node.expression)
       && node.expression.text === "process"
       && node.name.text === "env"
-      && enclosingUnitConfig(node, imports)
+      && nearestCreatorConfig(node, imports)
       && !allowGlobals.has("process.env")
-      && !ambientAllowedAt(node, filePath, extraCompositionPaths)
+      && !ambientAllowedAt(node, filePath, imports, extraCompositionPaths)
     ) {
       pushNodeDiagnostic(
         diagnostics,
