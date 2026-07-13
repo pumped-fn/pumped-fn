@@ -1,0 +1,12 @@
+{
+  "type": "dkr_checkpoint_acceptance",
+  "observed_at": "2026-07-13T04:25:00Z",
+  "accepted_checkpoints": [
+    {"unit_id":"DKR-2","checkpoint_ref":"workers/DKR-2/checkpoint.json","review_ref":"drafts/dkr-2-3-independent-review.json","decision":"accepted_behavioral_contract"},
+    {"unit_id":"DKR-3","checkpoint_ref":"drafts/dkr-3-checkpoint.json","review_ref":"drafts/dkr-2-3-independent-review.json","decision":"accepted_explicit_authority_and_cleanup_contract"},
+    {"unit_id":"DKR-L1","checkpoint_ref":"workers/DKR-L1/checkpoint.json","review_ref":"drafts/dkr-l1-independent-review.json","decision":"accepted_three_part_authoring_read"}
+  ],
+  "single_llm_truth_acceptance_count": 0,
+  "unsupported_claim_acceptance_count": 0,
+  "next_decision": "Promote bounded CKRs and PKRs only"
+}

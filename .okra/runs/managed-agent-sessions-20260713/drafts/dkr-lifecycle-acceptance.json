@@ -1,0 +1,25 @@
+{
+  "type": "dkr_checkpoint_acceptance",
+  "checkpoint_id": "checkpoint.DKR-LIFECYCLE.round-1",
+  "decision": "partially_accepted",
+  "accepted_conclusions": [
+    "AG-2 requires bounded graceful shutdown, SIGKILL escalation, and a second fail-closed bound",
+    "Claude and Codex need lifecycle hardening PKRs",
+    "Static graph evidence must include the provider boundary resource",
+    "Double close must terminate external resources exactly once"
+  ],
+  "rejected_conclusions": [
+    "Codex credential declaration closes AG-3"
+  ],
+  "rejection_reason": "The frozen AG-3 metric counts undeclared roots and permission grants, not credentials. Credential declaration remains AG-10 work supported by DKR-3, not by this checkpoint.",
+  "evidence_refs_or_hashes": [
+    "workers/DKR-LIFECYCLE/progress.jsonl#seq=1",
+    "workers/DKR-LIFECYCLE-VALIDATOR/progress.jsonl#seq=1",
+    "workers/DKR-LIFECYCLE-VALIDATOR/progress.jsonl#seq=2",
+    "frame/frame.v2.json#AG-2",
+    "frame/frame.v2.json#AG-3",
+    "workers/DKR-2/shared-session-contract.md"
+  ],
+  "downstream_advance": "allowed_for_lifecycle_and_static_conformance_only",
+  "observed_at": "2026-07-13T05:03:00Z"
+}

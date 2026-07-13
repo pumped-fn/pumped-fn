@@ -1,0 +1,299 @@
+{
+  "action_envelope": {
+    "allowed": [
+      "Read and probe provider behavior",
+      "Edit sdk-core, sdk-claude, sdk-codex, lite-lint, focused tests, aligned docs and OKRA records",
+      "Add a shared session contract only after accepted discovery",
+      "Run local and real-provider integration checks",
+      "Use independent review",
+      "Commit and push only after all active walls hold"
+    ],
+    "approval_gates": [
+      "Human-only frame, threshold, metric, action-envelope, release, MCP, and tool-exposure changes",
+      "Human approval before irreversible external actions"
+    ],
+    "forbidden": [
+      "Publish or design sdk-mcp",
+      "Build automatic tool collection",
+      "Change the public model consumer seam",
+      "Implicitly expand filesystem or execution authority",
+      "Publish packages or deploy Pages",
+      "Kill tmux contributor sessions before the release gate",
+      "Force push, destructive reset, or discard user work",
+      "Unrelated lint cleanup"
+    ],
+    "rollback": "Keep changes in narrow reviewable commits and preserve the pre-run main revision"
+  },
+  "anti_goals": [
+    {
+      "activation_condition": "Provider execution or transport changes",
+      "anti_goal_id": "AG-1",
+      "metric_id": "provider_execution_bypass_count",
+      "read_method": "Reducing DKR DKR-2 defines and funds a deterministic graph-edge checker",
+      "source_of_truth": "Provider graph and conformance traces",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Session lifecycle changes",
+      "anti_goal_id": "AG-2",
+      "metric_id": "post_close_live_resource_count",
+      "read_method": "Inspect child exit and transport disposal after close and cancel",
+      "source_of_truth": "Lifecycle conformance harness",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Roots, permissions, auth, environment, or process spawning changes",
+      "anti_goal_id": "AG-3",
+      "metric_id": "undeclared_root_or_permission_grant_count",
+      "read_method": "Reducing DKR DKR-3 defines provider-specific denial probes",
+      "source_of_truth": "Denied-root and denied-permission integration probes",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Public provider handles or model selection changes",
+      "anti_goal_id": "AG-4",
+      "metric_id": "breaking_model_api_change_count",
+      "read_method": "Run provider type tests and compare exported model seam",
+      "source_of_truth": "Existing type tests and public export assertions",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any session contract, package, release, or documentation change",
+      "anti_goal_id": "AG-5",
+      "metric_id": "premature_tool_or_mcp_surface_count",
+      "read_method": "Assert no MCP/tool collection implementation or publication is included",
+      "source_of_truth": "Changed-path and public export audit plus npm registry read",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any repository change",
+      "anti_goal_id": "AG-6",
+      "metric_id": "touched_surface_regression_count",
+      "read_method": "Run gates for every touched surface and distinguish pre-existing failures",
+      "source_of_truth": "Focused tests, root gates, and baseline comparison",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Every claim and move",
+      "anti_goal_id": "AG-7",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "read_method": "Verify store and reject weakened, hidden, stale, unsupported, or self-certified claims",
+      "source_of_truth": "Append-only run store and independent deterministic evidence",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Code or documentation changes",
+      "anti_goal_id": "AG-8",
+      "metric_id": "touched_file_lint_violation_count",
+      "read_method": "Build lint tool and scan every touched source, test, example, and doc path",
+      "source_of_truth": "pumped-lite-lint output for touched paths",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "New or changed pumped-fn module",
+      "anti_goal_id": "AG-9",
+      "metric_id": "implicit_required_dependency_count",
+      "read_method": "Run strengthened dependency lint and dependency-resolution conformance tests",
+      "source_of_truth": "Lint diagnostics and missing-tag tests",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Config, engine, transport, auth, or provider wiring changes",
+      "anti_goal_id": "AG-10",
+      "metric_id": "unrequested_builtin_binding_count",
+      "read_method": "Run no-implicit-binding lint and prove missing bindings fail during dependency resolution",
+      "source_of_truth": "Lint diagnostics and missing-binding tests",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Logic or integration tests change",
+      "anti_goal_id": "AG-11",
+      "metric_id": "scope_seam_escape_count",
+      "read_method": "Reject module mocks, global patches outside adapter tests, internal reaches, and non-scope test seams",
+      "source_of_truth": "Test imports, lint diagnostics, and public-API conformance harness",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "New public module surface",
+      "anti_goal_id": "AG-12",
+      "metric_id": "ungrouped_related_handle_count",
+      "read_method": "Reducing DKR DKR-L1 determines a deterministic namespace-alignment read",
+      "source_of_truth": "Public export/API report",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Namespace, facade, flow, or exported object changes",
+      "anti_goal_id": "AG-13",
+      "metric_id": "hidden_execution_edge_count",
+      "read_method": "Every effectful child call must resolve to a declared dependency edge",
+      "source_of_truth": "Graph trace and direct-composition lint",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Definition handles or wiring types change",
+      "anti_goal_id": "AG-14",
+      "metric_id": "redundant_graph_ceremony_count",
+      "read_method": "Reducing DKR DKR-L1 narrows mechanically provable ceremony rules",
+      "source_of_truth": "Lint diagnostics and deterministic API-shape assertions",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint rule added or strengthened",
+      "anti_goal_id": "AG-L1",
+      "metric_id": "unsupported_static_rule_count",
+      "read_method": "Require a syntactically provable invariant for every diagnostic",
+      "source_of_truth": "Rule evidence map and fixtures",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint rule added or strengthened",
+      "anti_goal_id": "AG-L2",
+      "metric_id": "known_false_positive_fixture_count",
+      "read_method": "Run valid fixtures and count unexpected diagnostics",
+      "source_of_truth": "Valid fixture suite",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint rule added or strengthened",
+      "anti_goal_id": "AG-L3",
+      "metric_id": "undocumented_false_negative_class_count",
+      "read_method": "Compare known unsupported syntax classes with documented limitations",
+      "source_of_truth": "Rule documentation and invalid fixture matrix",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Provider code or lint configuration changes",
+      "anti_goal_id": "AG-L4",
+      "metric_id": "rule_suppression_added_for_provider_count",
+      "read_method": "Changed-path audit rejects provider-specific suppression additions",
+      "source_of_truth": "Changed lint configuration and source suppressions",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint sidequest changes",
+      "anti_goal_id": "AG-L5",
+      "metric_id": "unrelated_lint_cleanup_path_count",
+      "read_method": "Compare touched paths with ratified provider, lint, test, docs, and OKRA scope",
+      "source_of_truth": "Git changed-path manifest",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint rule added or strengthened",
+      "anti_goal_id": "AG-L6",
+      "metric_id": "rule_without_valid_and_invalid_fixture_count",
+      "read_method": "Require at least one passing and one failing fixture per new rule shape",
+      "source_of_truth": "Scanner fixture suite",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Lint implementation changes",
+      "anti_goal_id": "AG-L7",
+      "metric_id": "non_deterministic_lint_result_count",
+      "read_method": "Run identical lint inputs twice and compare normalized diagnostics",
+      "source_of_truth": "Repeated scanner runs",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Important evidence is used",
+      "anti_goal_id": "AG-STORAGE-READ",
+      "metric_id": "ungoverned_direct_read_count",
+      "read_method": "Important evidence must resolve by hash or governed source record",
+      "source_of_truth": "Content hashes and append-only check-ins",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Run artifacts or product files are written",
+      "anti_goal_id": "AG-STORAGE-WRITE",
+      "metric_id": "ungoverned_direct_write_count",
+      "read_method": "Important writes use the helper or carry a target plus content hash",
+      "source_of_truth": "Move records, content hashes, and changed-path audit",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any DKR checkpoint, progress claim, or completion claim",
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "read_method": "Reject acceptance backed only by the orchestrator narrative",
+      "source_of_truth": "Deterministic replay and independent review artifacts",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "CKR or PKR promotion",
+      "anti_goal_id": "AG-LEVEL",
+      "metric_id": "abstraction_level_jump_count",
+      "read_method": "Reject CKR without accepted DKR and PKR without accepted CKR",
+      "source_of_truth": "Run tree and accepted checkpoint refs",
+      "threshold": 0,
+      "type": "tripwire"
+    }
+  ],
+  "frame_hash": "managed-agent-sessions-20260713-confirmed-v1",
+  "frame_version": 1,
+  "human_approval": {
+    "evidence": [
+      "User message: confirm",
+      "User repeated: confirm"
+    ],
+    "ratified_at": "2026-07-13T02:55:20Z",
+    "status": "ratified"
+  },
+  "metric_contracts": {
+    "anti_goal_coverage_gap_count": {
+      "comparator": "==",
+      "target": 0
+    },
+    "anti_goals": {
+      "max_age": "current turn for committing moves; 10 minutes for live workers",
+      "missing_data_rule": "Fail closed and open breaking or cannot",
+      "owner": "root Codex orchestrator",
+      "source_of_truth": "Named checker, test, registry, Git, or append-only record per wall"
+    },
+    "authoring_anti_goal_readable_count": {
+      "comparator": "==",
+      "target": 7
+    },
+    "objective": {
+      "lag_rule": "Immediate after complete conformance and smoke run",
+      "max_age": "current turn",
+      "missing_data_rule": "Pause and open cannot",
+      "owner": "root Codex orchestrator",
+      "read_method": "Count providers with every readiness criterion and active wall held",
+      "source_of_truth": "Shared conformance results plus real Claude and Codex integration probes"
+    },
+    "steering_value_score": {
+      "comparator": ">=",
+      "target": 0.75
+    }
+  },
+  "objective": {
+    "baseline": 0,
+    "comparator": "==",
+    "definition": "Count Claude and Codex providers that pass start, prompt and normalized streaming, cancellation and cleanup, explicit roots and permissions, shared conformance, real integration smoke, and active authoring walls.",
+    "metric_id": "managed_provider_ready_count",
+    "target": 2
+  }
+}

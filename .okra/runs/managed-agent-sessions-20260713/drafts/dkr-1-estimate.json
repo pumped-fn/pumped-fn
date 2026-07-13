@@ -1,0 +1,5 @@
+{
+  "estimate": {"time_min": 20, "turns": 1, "tokens": null},
+  "observed_at": "2026-07-13T03:02:00Z",
+  "dispatch_ref": "DKR-1 independent replay packet"
+}

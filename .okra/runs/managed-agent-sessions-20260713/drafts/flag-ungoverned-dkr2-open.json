@@ -1,0 +1,12 @@
+{
+  "type": "breaking",
+  "flag_id": "breaking.DKR-2.ungoverned-write",
+  "status": "open",
+  "opened_at": "2026-07-13T04:12:00Z",
+  "owner": "Codex /root",
+  "severity": "blocking-commit",
+  "requires_human_by": null,
+  "affected": ["AG-STORAGE-WRITE","DKR-2"],
+  "evidence": ["ledger.jsonl#seq=11","sha256:b5d05048359ef58b381fdfa8ee983bbe177f4b2ec4fcbe7e99d5e395c9921b15"],
+  "blocking_effect": "Pause committing moves until the raw progress write is preserved and rebuilt through the helper"
+}

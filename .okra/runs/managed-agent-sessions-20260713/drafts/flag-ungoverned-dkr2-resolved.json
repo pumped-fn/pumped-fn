@@ -1,0 +1,14 @@
+{
+  "type": "breaking",
+  "flag_id": "breaking.DKR-2.ungoverned-write",
+  "status": "resolved",
+  "opened_at": "2026-07-13T04:12:00Z",
+  "resolved_at": "2026-07-13T04:14:00Z",
+  "owner": "Codex /root",
+  "severity": "blocking-commit",
+  "requires_human_by": null,
+  "affected": ["AG-STORAGE-WRITE","DKR-2"],
+  "evidence": ["sha256:b5d05048359ef58b381fdfa8ee983bbe177f4b2ec4fcbe7e99d5e395c9921b15","workers/DKR-2/progress.jsonl#seq=1","command:okra-store.sh verify exit 0"],
+  "resolution": "Preserved raw content, emitted the process event, rebuilt progress through worker-report, and verified the store",
+  "approver": "orchestrator within frozen remediation authority"
+}

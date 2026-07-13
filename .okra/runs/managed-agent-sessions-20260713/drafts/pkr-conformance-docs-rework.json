@@ -1,0 +1,10 @@
+{
+  "event_type": "rework_event",
+  "unit_id": "PKR-CONFORMANCE-DOCS",
+  "observed_at": "2026-07-13T04:45:23Z",
+  "evidence_refs_or_hashes": [
+    "command:pnpm --filter @pumped-fn/sdk-codex test -> ReferenceError codexAcpTurn is not defined",
+    "pkg/sdk/codex/tests/codex.test.ts"
+  ],
+  "cause": "The first namespace identity assertion omitted the existing codexAcpTurn import; the focused test exposed it before handoff"
+}

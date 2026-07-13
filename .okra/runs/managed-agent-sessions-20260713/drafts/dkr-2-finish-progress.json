@@ -1,0 +1,16 @@
+{
+  "type": "worker_finish",
+  "worker_id": "DKR-2",
+  "unit_id": "DKR-2",
+  "observed_at": "2026-07-13T04:05:03Z",
+  "assignment": "Define the smallest shared managed-session contract without hiding graph edges",
+  "status": "checkpoint_written_pending_independent_review",
+  "artifact_ref": "workers/DKR-2/shared-session-contract.md",
+  "checkpoint_ref": "workers/DKR-2/checkpoint.json",
+  "replay_ref": "workers/DKR-2/replay.sh",
+  "questions_unanswered": ["Claude multi-turn and cancellation acknowledgement","zero-live-resource proof for both providers","cross-platform lifecycle counters","namespace migration shape"],
+  "candidate_ckrs": ["CKR-1","CKR-3","CKR-4"],
+  "candidate_pkrs": ["PKR-2A","PKR-2B","PKR-2C","PKR-2D"],
+  "downstream_advance": "blocked",
+  "reason": "AG-2 and independent replay remain unknown"
+}

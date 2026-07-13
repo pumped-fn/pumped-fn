@@ -1,0 +1,17 @@
+{
+  "type": "independent_review",
+  "reviewer": "Claude Opus",
+  "transport": "claude -p",
+  "scope": "Current managed Claude/Codex and lite-lint diff",
+  "decision": "one_doc_blocker",
+  "findings": [
+    {
+      "path": "pkg/sdk/codex/README.md",
+      "line": 38,
+      "finding": "The Claude provider-switch config omitted required shutdownTimeoutMs"
+    }
+  ],
+  "code_blocker_count": 0,
+  "follow_up": "PKR-OPUS-DOC-FIX",
+  "observed_at": "2026-07-13T05:23:30Z"
+}

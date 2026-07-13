@@ -1,0 +1,17 @@
+{
+  "unit_id": "DKR-1",
+  "status": "checkpoint_ready_for_orchestrator",
+  "observed_at": "2026-07-13T03:05:00Z",
+  "decision_target": "Choose the managed Claude session transport and lifecycle",
+  "evidence_refs_or_hashes": [
+    "sha256:05207b52bfc601e9c3dda7b3fa0793366adbaeca0d094d5b66e9b293ed0182fe",
+    "sha256:2fa1d8830d4ebd1ec9ab5ef1f5dc2143aa1032041a093783ad6d44a3959ba35d",
+    "drafts/dkr-1-review.json"
+  ],
+  "confidence_probability_update": {"before":0.5,"after":0.88},
+  "risk_or_anti_goal_implications": ["AG-1 reduced by structured process boundary","AG-3 remains open for direct execFile enforcement probe","AG-5 held because MCP is unnecessary for session control"],
+  "candidate_ckrs": ["CKR-2"],
+  "candidate_pkrs": [],
+  "questions_unanswered": ["multi-turn lifetime","interrupt acknowledgement","cleanup","direct execFile permission enforcement"],
+  "flag_if_missing_or_stale": "cannot"
+}

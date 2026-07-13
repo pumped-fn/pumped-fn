@@ -1,14 +1,17 @@
 import { createScope, flow, preset, typed } from "@pumped-fn/lite"
-import { agent, model, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { agent, complete, model, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
 import { expect, expectTypeOf, it } from "vitest"
+import * as codexModule from "../src/index"
 import {
   codex,
   codexAcp,
   codexAcpConfig,
   codexAcpPrompt,
+  codexAcpTurn,
   codexConfig,
   codexRun,
   codexTurn,
+  engine,
 } from "../src/index"
 
 const fake = flow({
@@ -43,8 +46,14 @@ it("provides Codex through stable module handles", async () => {
 it("provides ACP through a preset prompt edge", async () => {
   const target = agent({ name: "review" })
   const scope = createScope({
-    presets: [preset(codexAcpPrompt, fakeAcp)],
-    tags: [codexAcp, codexAcpConfig({ permission: "deny" })],
+    presets: [preset(codexModule.run, fakeAcp)],
+    tags: [codexModule.provider, codexModule.config({
+      auth: { kind: "global" },
+      cwd: process.cwd(),
+      additionalDirectories: [],
+      permission: "deny",
+      shutdownTimeoutMs: 5_000,
+    })],
   })
   const ctx = scope.createContext()
 
@@ -54,6 +63,23 @@ it("provides ACP through a preset prompt edge", async () => {
 
   await ctx.close()
   await scope.dispose()
+})
+
+it("exports the managed ACP path as module namespace handles", () => {
+  expect(codexModule.config).toBe(codexAcpConfig)
+  expect(codexModule.engine).toBe(engine)
+  expect(codexModule.run).toBe(codexAcpPrompt)
+  expect(codexModule.turn).toBe(codexAcpTurn)
+  expect(codexModule.provider).toBe(codexAcp)
+  expectTypeOf(codexModule.turn).toMatchTypeOf<Model>()
+})
+
+it("declares the public model through the provider turn, prompt, and boundary", () => {
+  expect(complete.deps?.["impl"]).toMatchObject({ tag: model, mode: "required" })
+  expect(codexAcp.tag).toBe(model)
+  expect(codexAcp.value).toBe(codexAcpTurn)
+  expect(codexAcpTurn.deps?.["prompt"]).toMatchObject({ flow: codexAcpPrompt })
+  expect(codexAcpPrompt.deps?.["acp"]).toBe(codexModule.acp)
 })
 
 it("can replace the model tag per context", async () => {

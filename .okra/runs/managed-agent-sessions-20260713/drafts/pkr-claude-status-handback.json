@@ -1,0 +1,14 @@
+{
+  "type": "worker_unknown",
+  "unit_id": "PKR-CLAUDE",
+  "observed_at": "2026-07-13T04:39:30Z",
+  "status": "handback",
+  "cause": "okra-store verify reports generated status is stale after the governed PKR-CLAUDE worker report",
+  "evidence_refs_or_hashes": [
+    "workers/PKR-CLAUDE/progress.jsonl#seq=1",
+    "record_hash:1879cf4539f49baad6fec7d7059ced013d52a6a14202c3a135d9a1ce7d69ce4d",
+    "command:okra-store.sh verify -> generated status is stale for worker progress logs"
+  ],
+  "required_owner_action": "Orchestrator regenerates status and reruns store verification",
+  "downstream_advance": "blocked_pending_independent_verification_and_status_refresh"
+}

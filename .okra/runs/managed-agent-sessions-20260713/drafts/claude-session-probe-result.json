@@ -1,0 +1,13 @@
+{
+  "binary": "claude",
+  "exit": {"code":0,"signal":null},
+  "stderr": "",
+  "permissionMode": "dontAsk",
+  "tools": [],
+  "cwd": "/home/lagz0ne/dev/pumped-fn",
+  "sessionIds": ["13f65b72-51a2-4c25-9271-91a21b3baff3"],
+  "results": [
+    {"subtype":"success","is_error":false,"result":"TURN_ONE_OK"},
+    {"subtype":"success","is_error":false,"result":"TURN_TWO_OK"}
+  ]
+}

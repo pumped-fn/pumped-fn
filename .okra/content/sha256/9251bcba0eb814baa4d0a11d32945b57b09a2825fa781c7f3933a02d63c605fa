@@ -1,0 +1,36 @@
+{
+  "checkpoint_id": "checkpoint.DKR-1.round-1",
+  "conclusion_id": "claude.stream-json-managed-session-candidate",
+  "decision_target": "Choose the managed Claude session transport and lifecycle",
+  "source_of_truth": "Installed Claude Code 2.1.207 help, two live stream-json probes, and independent Claude Opus 4.8 High replay",
+  "read_method": "Replay the help read and one tools-disabled stream-json turn, then inspect init, assistant, result, tool count, and session IDs",
+  "observed_at": "2026-07-13T03:04:00Z",
+  "recorded_at": "2026-07-13T03:06:00Z",
+  "max_age": "7 days or any Claude CLI version change",
+  "freshness_status": "fresh",
+  "confidence": 0.88,
+  "evidence_refs_or_hashes": [
+    "sha256:05207b52bfc601e9c3dda7b3fa0793366adbaeca0d094d5b66e9b293ed0182fe",
+    "sha256:2fa1d8830d4ebd1ec9ab5ef1f5dc2143aa1032041a093783ad6d44a3959ba35d",
+    "sha256:23f1449c8dcdb7f7a325b787ee6be2b6d6607523cb8333b50a9f885f123cdac4"
+  ],
+  "replay_command_or_checker": "printf '%s\\n' '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Reply with exactly: PUMPED_SESSION_OK\"}}' | claude -p --verbose --input-format stream-json --output-format stream-json --tools '' --permission-mode dontAsk --no-session-persistence",
+  "questions_answered": [
+    "Claude stream-json is a supported candidate session transport without MCP",
+    "Structured init, assistant, result, hook, usage, permission-denial, and session identity events are available",
+    "Roots, tool selection, permissions, session identity, persistence, and hook events have explicit CLI controls"
+  ],
+  "questions_unanswered": [
+    "Multi-turn stdin lifetime and interrupt acknowledgement",
+    "Process and transport cleanup",
+    "Direct execFile permission enforcement across inherited environments"
+  ],
+  "decision": "accepted_learning_continue_DKR1_lifecycle_and_DKR3_authority_probes",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "replayed_3_accepted_0_rejected_for_bounded_transport_claims; unsupported_alias_cause_rejected_by_orchestrator",
+  "risk_or_anti_goal_implications": [
+    "AG-1 risk reduced: session IO can remain behind declared flows and a scope-owned resource",
+    "AG-3 remains open: permission enforcement is not accepted until direct execFile probes agree",
+    "AG-5 held: MCP and automatic tool collection are unnecessary for this session-control milestone"
+  ]
+}

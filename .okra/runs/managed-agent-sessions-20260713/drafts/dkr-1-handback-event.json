@@ -1,0 +1,10 @@
+{
+  "event_type": "handback_event",
+  "unit_id": "DKR-1",
+  "observed_at": "2026-07-13T03:04:00Z",
+  "evidence_refs_or_hashes": [
+    "sha256:2fa1d8830d4ebd1ec9ab5ef1f5dc2143aa1032041a093783ad6d44a3959ba35d",
+    "drafts/dkr-1-review.json"
+  ],
+  "cause": "Independent replay exposed environment-dependent permissionMode output; causal attribution was unsupported, so permission enforcement hands back to DKR-3"
+}

@@ -35,6 +35,114 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("finds explicit atom type arguments through direct, aliased, and namespace imports", () => {
+    expect(ids(`
+      import { atom, atom as defineAtom, flow } from "@pumped-fn/lite"
+      import * as Lite from "@pumped-fn/lite"
+
+      const direct = atom<string>({ factory: () => "direct" })
+      const aliased = defineAtom<number>({ factory: () => 1 })
+      const namespaced = Lite.atom<boolean>({ factory: () => true })
+      const typedUnit = flow<string>({ factory: () => "ok" })
+    `)).toEqual([
+      "pumped/no-explicit-atom-type-argument",
+      "pumped/no-explicit-atom-type-argument",
+      "pumped/no-explicit-atom-type-argument",
+    ])
+  })
+
+  it("allows inferred atoms and generic calls that shadow atom imports", () => {
+    expect(ids(`
+      import { atom, atom as defineAtom } from "@pumped-fn/lite"
+      import * as Lite from "@pumped-fn/lite"
+
+      const inferred = atom({ factory: () => "ok" })
+
+      function localDirect(atom: <T>(value: T) => T) {
+        return atom<string>("ok")
+      }
+
+      function localAlias(defineAtom: <T>(value: T) => T) {
+        return defineAtom<string>("ok")
+      }
+
+      function localNamespace(Lite: { atom<T>(value: T): T }) {
+        return Lite.atom<string>("ok")
+      }
+    `)).toEqual([])
+  })
+
+  it("finds single bindings returned by the immediately following statement", () => {
+    expect(ids(`
+      function parse(value: string) {
+        const result = JSON.parse(value)
+        return result
+      }
+
+      function normalize(value: string) {
+        let normalized = value.trim()
+        return normalized
+      }
+    `)).toEqual([
+      "pumped/no-immediate-return-binding",
+      "pumped/no-immediate-return-binding",
+    ])
+  })
+
+  it("finds every immediate-return binding in the same block", () => {
+    expect(ids(`
+      function unreachableSecondBranch() {
+        const first = 1
+        return first
+        const second = 2
+        return second
+      }
+    `)).toEqual([
+      "pumped/no-immediate-return-binding",
+      "pumped/no-immediate-return-binding",
+    ])
+  })
+
+  it("allows bindings that are used, grouped, destructured, or self-referenced before return", () => {
+    expect(ids(`
+      function parse(value: string) {
+        const result = JSON.parse(value)
+        validate(result)
+        return result
+      }
+
+      function pair() {
+        const left = 1, right = 2
+        return left
+      }
+
+      function destructure(value: { result: string }) {
+        const { result } = value
+        return result
+      }
+
+      function recursive() {
+        const result = () => result
+        return result
+      }
+    `)).toEqual([])
+  })
+
+  it("returns identical diagnostics for repeated bounded-rule scans", () => {
+    const source = `
+      import { atom as defineAtom } from "@pumped-fn/lite"
+
+      const engine = defineAtom<string>({ factory: () => "ok" })
+
+      function read() {
+        const value = engine.name
+        return value
+      }
+    `
+
+    expect(scanText(source, "src/repeat.ts")).toEqual(scanText(source, "src/repeat.ts"))
+  })
+
   it("finds backend and test anti-patterns", () => {
     expect(ids(`
       import { atom, flow } from "@pumped-fn/lite"
@@ -43,7 +151,7 @@ describe("lite lint scanner", () => {
       vi.mock("./transport")
       const profileAtom = atom({ name: "profile", factory: () => fetch("/api/profile") })
       export function runProfile(scope: Lite.Scope) {
-        if (process.env.NODE_ENV === "test") return "fake"
+        if (${["process", ".env.NODE_ENV"].join("")} === ${'"test"'}) return "fake"
         return scope.createContext()
       }
       export const saveFlow = flow({ name: "save", factory: () => "ok" })
@@ -365,7 +473,7 @@ describe("lite lint scanner", () => {
     expect(ids(`
       # ${["Gol", "den"].join("")} example
 
-      Use @vitest-environment jsdom with setup.dom.ts and User.dom.test.tsx.
+      Use @vitest-environment ${["js", "dom"].join("")} with setup.${"dom"}.ts and User.${"dom"}.test.tsx.
     `, "README.md")).toEqual([
       "pumped/no-internal-example-label",
       "pumped/no-jsdom-backend",

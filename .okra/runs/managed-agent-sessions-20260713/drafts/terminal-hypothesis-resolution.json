@@ -1,0 +1,18 @@
+{
+  "type": "hypothesis_resolution",
+  "hypothesis_id": "H3",
+  "challenger_verdict": "drifted",
+  "decision": "intact_for_frozen_objective",
+  "reason": "The challenger identified coarse but explicit caller policy, not an undeclared root or permission grant. Codex grant requires the caller to select grant, command and args are declared adapter configuration, and the installed codex-acp 1.1.2 binary does not parse process.argv. Removing explicit grant remains a human policy change outside this frame.",
+  "evidence_refs_or_hashes": [
+    "workers/PKR-TERMINAL-CHALLENGER/progress.jsonl#seq=1",
+    "workers/DKR-LIFECYCLE-VALIDATOR/progress.jsonl#seq=1",
+    "workers/DKR-LIFECYCLE-VALIDATOR/progress.jsonl#seq=2",
+    "workers/PKR-HARDEN-VALIDATOR/progress.jsonl#seq=1",
+    "ledger.jsonl#record=ab49560e47fe56652b73015ba521b8a81f0583289784cc8afd4850c4e71925fc",
+    "node_modules/@agentclientprotocol/codex-acp@1.1.2/dist/index.js process.argv search returned no matches"
+  ],
+  "policy_residual": "Codex grant remains explicit and coarse; changing or removing it requires a human policy decision",
+  "downstream_advance": "allowed",
+  "observed_at": "2026-07-13T05:35:00Z"
+}

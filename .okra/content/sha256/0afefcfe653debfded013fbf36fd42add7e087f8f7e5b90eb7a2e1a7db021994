@@ -1,0 +1,59 @@
+{
+  "checkpoint_id": "checkpoint.DKR-L1.round-1",
+  "conclusion_id": "authoring-doctrine-three-part-read",
+  "decision_target": "Classify authoring doctrine into reliable lint, compile/API assertions, or scope conformance tests",
+  "source_of_truth": "Ratified frame and tree, AGENTS.md, pumped-fn authoring skill, current lite-lint parser implementation, scanner fixtures and documentation, root lint command, and current Claude/Codex provider source and tests",
+  "read_method": "Run workers/DKR-L1/replay-dkr-l1.sh against workers/DKR-L1/lint-rule-coverage-map.md, then independently inspect the candidate rule invariants and the existing adapter-spy mismatch",
+  "observed_at": "2026-07-13T04:10:06Z",
+  "recorded_at": "2026-07-13T04:14:00Z",
+  "max_age": "Current source hashes; stale on any change to AGENTS.md, lite-lint implementation, scanner tests, lint README, or root lint command",
+  "freshness_status": "fresh",
+  "confidence": 0.92,
+  "evidence_refs_or_hashes": [
+    "sha256:7e1d9f1b714319fbdb539bb8b32d2b16d06a055b57fd65fda5abbc1abc5c2ee9",
+    "sha256:472c729aab2799759c6e29b1e10cde45a2aaecd9ac499cbc510cb7405c1515d2",
+    "sha256:85f0372edced14cca3933a06ee0518991660229090f721d1e5d878eac1c14273",
+    "sha256:b0023b317c12fc21e271d5f793c07bd9ff99c239263fc8fe590239595bc4f731",
+    "sha256:1209b7959fbe3cb1461428e2f137cf251854cf95bc68955c99af2dde499d6e54"
+  ],
+  "replay_command_or_checker": ".okra/runs/managed-agent-sessions-20260713/workers/DKR-L1/replay-dkr-l1.sh .okra/runs/managed-agent-sessions-20260713/workers/DKR-L1/lint-rule-coverage-map.md",
+  "questions_answered": [
+    "Current lite-lint already covers the common local syntax for all seven authoring walls, but cannot alone prove any wall whose meaning depends on public API relationships or runtime graph behavior",
+    "No general namespace-alignment, implicit-binding, facade-object, any, defensive-null, or wiring-type rule is supportable with the current parser-only evidence",
+    "Explicit atom generics and immediate single-binding returns have narrow reliable AST invariants suitable for candidate lint rules",
+    "AG-8 requires exact touched-path JSON diagnostic counting because warnings do not fail and root lint omits provider package source",
+    "AG-11 has a known mismatch: blanket spyOn rejection conflicts with the allowed adapter atom global-fake test exception",
+    "A lint plus exact API assertion plus scope conformance bundle gives each authoring wall a deterministic candidate read"
+  ],
+  "questions_unanswered": [
+    "DKR-2 must choose the exact namespace and shared session public surface before AG-12 and AG-14 API assertions can be implemented",
+    "DKR-3 must identify the exact required engine, transport, auth, roots, permissions, and environment bindings before AG-10 conformance is final",
+    "The accepted runtime error and trace event contracts are needed before missing-binding and edge-attribution fixtures can assert stable semantic fields",
+    "Any compatibility change from current flat exports to a grouped namespace remains human-gated"
+  ],
+  "decision": "candidate_accept_three_part_read_and_fund_only_bounded_lint_api_conformance_paths",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay",
+  "confidence_probability_update": {
+    "before": 0.5,
+    "after": 0.92
+  },
+  "risk_or_anti_goal_implications": [
+    "AG-L1 is reduced by rejecting broad semantic parser rules and funding only two narrow AST invariants",
+    "AG-L2 and AG-L3 are reduced by paired valid/invalid fixtures and an explicit limitation register",
+    "AG-L4 and AG-L5 remain protected because no suppression or broad cleanup is proposed",
+    "AG-L6 and AG-L7 become executable requirements on every candidate lint PKR",
+    "AG-7 and AG-INDEPENDENCE remain active because this writer checkpoint is not accepted without independent replay",
+    "AG-LEVEL remains active because CKR-L1 and candidate PKRs are not promoted by this worker"
+  ],
+  "candidate_ckrs": [
+    "CKR-L1 authoring_anti_goal_readable_count == 7"
+  ],
+  "candidate_pkrs": [
+    "PKR-LINT-1 add two narrow syntax rules with paired and repeat fixtures",
+    "PKR-LINT-2 reconcile adapter-global test fakes with module-spy rejection",
+    "PKR-LINT-3 add touched-path JSON diagnostic counting without broad cleanup",
+    "PKR-API-1 add exact provider API assertions after DKR-2 acceptance",
+    "PKR-CONFORMANCE-1 add missing-binding, substitution, public-entrypoint, cleanup, and edge cases after DKR-2 and DKR-3 acceptance"
+  ]
+}

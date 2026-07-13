@@ -5,7 +5,15 @@ import { claudeConfig, claudeTurn } from "../src/index"
 const integration = it.skipIf(process.env["PUMPED_INTEGRATION"] !== "1")
 
 integration("invokes the authenticated Claude CLI", async () => {
-  const scope = createScope({ tags: [claudeConfig({ auth: { kind: "global" }, isolate: false })] })
+  const scope = createScope({
+    tags: [claudeConfig({
+      auth: { kind: "global" },
+      cwd: process.cwd(),
+      roots: [],
+      permission: "deny",
+      shutdownTimeoutMs: 1_000,
+    })],
+  })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({

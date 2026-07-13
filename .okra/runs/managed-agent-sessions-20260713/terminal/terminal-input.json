@@ -1,0 +1,80 @@
+{
+  "accepted_checkpoints": [
+    "checkpoint.DKR-1.round-1",
+    "checkpoint.DKR-2.round-1",
+    "checkpoint.DKR-3.round-1",
+    "checkpoint.DKR-L1.round-1",
+    "checkpoint.DKR-LIFECYCLE.round-1 accepted subset at ledger#record=be018cf4917159d37789ea9af0e9545e676640c1f9fe01a253e6b3f4823ad326"
+  ],
+  "anti_goal_classification": {
+    "default": "standing",
+    "retired_with_run": [],
+    "standing": [
+      "AG-1",
+      "AG-2",
+      "AG-3",
+      "AG-4",
+      "AG-5",
+      "AG-6",
+      "AG-7",
+      "AG-8",
+      "AG-9",
+      "AG-10",
+      "AG-11",
+      "AG-12",
+      "AG-13",
+      "AG-14",
+      "AG-L1",
+      "AG-L2",
+      "AG-L3",
+      "AG-L4",
+      "AG-L5",
+      "AG-L6",
+      "AG-L7",
+      "AG-STORAGE-READ",
+      "AG-STORAGE-WRITE",
+      "AG-INDEPENDENCE",
+      "AG-LEVEL"
+    ]
+  },
+  "completed_at": "2026-07-13T05:27:13Z",
+  "continuation_packet": {
+    "forbidden_without_successor": [
+      "Publish packages",
+      "Deploy Pages",
+      "Kill tmux contributor sessions",
+      "Design or publish MCP/tool collection"
+    ],
+    "next_action": "Human opens a successor release frame before package publishing, Pages deployment, or tmux contributor cleanup",
+    "status": "release_blocked_by_confirmed_action_envelope"
+  },
+  "dead_hypothesis_artifacts": [],
+  "frame_version": 2,
+  "objective": {
+    "comparator": "==",
+    "metric_id": "managed_provider_ready_count",
+    "metric_ref": "ledger.jsonl#record=d9d92e2a9d6804352192907c0a7363b191ba6335c578b3c0768622250a92698b",
+    "target": 2,
+    "value": 2
+  },
+  "retained_trace_manifest": [
+    "frame/frame.v2.json",
+    "tree/tree.v5.json",
+    "ledger.jsonl",
+    "flags.jsonl",
+    "checkins.jsonl",
+    "workers/"
+  ],
+  "second_opinion_evidence": [
+    "workers/PKR-VALIDATOR/progress.jsonl#seq=1",
+    "workers/PKR-CONFORMANCE-VALIDATOR/progress.jsonl#seq=1",
+    "workers/PKR-STORAGE-VALIDATOR/progress.jsonl#seq=1",
+    "workers/PKR-HARDEN-VALIDATOR/progress.jsonl#seq=1",
+    "ledger.jsonl#record=ab49560e47fe56652b73015ba521b8a81f0583289784cc8afd4850c4e71925fc",
+    "workers/PKR-TERMINAL-CHALLENGER/progress.jsonl#seq=1"
+  ],
+  "terminal_state": "complete",
+  "terminal_version": 1,
+  "tree_version": 5,
+  "unresolved_flags": []
+}

@@ -1,0 +1,61 @@
+{
+  "checkpoint_id": "checkpoint.DKR-2.round-1",
+  "conclusion_id": "shared-session-behavior-without-public-session-object",
+  "decision_target": "Define the smallest shared session contract without hiding graph edges",
+  "source_of_truth": "Shipped sdk-core, sdk-claude, sdk-codex, lite resource lifecycle, provider tests, and accepted bounded DKR-1 evidence",
+  "read_method": "Run the saved replay checker to verify source hashes and structural provider seams, then review the contract against the cited lines",
+  "observed_at": "2026-07-13T04:05:03Z",
+  "recorded_at": "2026-07-13T04:05:03Z",
+  "max_age": "7d",
+  "freshness_status": "fresh",
+  "confidence": 0.84,
+  "evidence_refs_or_hashes": [
+    "sha256:7e63dc3ba497518ceb2b9256167cedb57b7967d1d47e6fdbe7c61cee78ab8417",
+    "sha256:3a1607bea7ee4416912bb163cd172f9e5f53041649843a8d71fa7c89c6347234",
+    "sha256:b91e03cff6ef3f31719cc40009ba4de3d8358e9b7618b10d268552e207627c6a",
+    "sha256:4131befede5662067f5147ab560bf110a4854f97af2370cc2457ee5c87d3d85e",
+    "sha256:e96b5a1328a9eb673959dfe80ad23c42e568395cf936b90a6b665c5059d3deb2",
+    "sha256:9251bcba0eb814baa4d0a11d32945b57b09a2825fa781c7f3933a02d63c605fa"
+  ],
+  "replay_command_or_checker": ".okra/runs/managed-agent-sessions-20260713/workers/DKR-2/replay.sh",
+  "questions_answered": [
+    "The existing model tag and complete flow are sufficient as the shared public consumer seam",
+    "Provider-specific boundary resources and declared prompt flows give a shared lifecycle shape without a runtime facade",
+    "Provider wire events, multi-turn continuity, MCP, and tools are not required by the smallest contract"
+  ],
+  "questions_unanswered": [
+    "Claude multi-turn, cancellation acknowledgement, prompt correlation, and overlap behavior",
+    "Awaited process-exit and zero-live-resource proof for both providers",
+    "Cross-platform lifecycle counter implementation",
+    "Namespace migration shape owned by DKR-L1"
+  ],
+  "decision": "candidate_accept_behavioral_contract_and_fund_conformance_lifecycle_work",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay",
+  "risk_or_anti_goal_implications": [
+    "AG-1 and AG-13 are reduced by keeping prompt execution on declared flow and resource dependencies",
+    "AG-2 remains open until cancellation and cleanup produce zero-live-resource reads",
+    "AG-4 is reduced because no model consumer API change is proposed",
+    "AG-5 is held by excluding MCP, tools, and collection",
+    "AG-7 and AG-INDEPENDENCE block acceptance until independent replay"
+  ],
+  "candidate_ckrs": ["CKR-1", "CKR-3", "CKR-4"],
+  "candidate_pkrs": ["PKR-2A", "PKR-2B", "PKR-2C", "PKR-2D"],
+  "active_anti_goals": ["AG-1", "AG-2", "AG-4", "AG-5", "AG-7", "AG-13", "AG-INDEPENDENCE", "AG-LEVEL"],
+  "active_anti_goal_verification": [
+    {"anti_goal_id":"AG-1","metric_id":"provider_execution_bypass_count","source_of_truth":"Provider graph and conformance traces","read_method":"Replay structural edges now; future conformance trace required","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"7d","freshness_status":"fresh","value":0,"threshold":0,"comparator":"==","verdict":"pending_independent_verification","evidence_ref":"workers/DKR-2/shared-session-contract.md#contract-proposal","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-2","metric_id":"post_close_live_resource_count","source_of_truth":"Lifecycle conformance harness","read_method":"No implementation lifecycle probe exists in this DKR","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"7d","freshness_status":"unknown","value":-1,"threshold":0,"comparator":"==","verdict":"unknown","evidence_ref":"workers/DKR-2/shared-session-contract.md#questions-unanswered","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-4","metric_id":"breaking_model_api_change_count","source_of_truth":"Existing type tests and public export assertions","read_method":"Replay existing model tag and provider binding shapes","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"7d","freshness_status":"fresh","value":0,"threshold":0,"comparator":"==","verdict":"pending_independent_verification","evidence_ref":"workers/DKR-2/shared-session-contract.md#evidence","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-5","metric_id":"premature_tool_or_mcp_surface_count","source_of_truth":"Contract artifact changed-path and export audit","read_method":"Inspect artifact for exclusions and verify no product files changed","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"7d","freshness_status":"fresh","value":0,"threshold":0,"comparator":"==","verdict":"pending_independent_verification","evidence_ref":"workers/DKR-2/shared-session-contract.md#decision","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-7","metric_id":"anti_goal_bypass_or_dishonesty_count","source_of_truth":"Append-only run records and independent evidence","read_method":"Independent verifier must inspect checkpoint completeness and claims","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"10m","freshness_status":"unknown","value":-1,"threshold":0,"comparator":"==","verdict":"unknown","evidence_ref":"workers/DKR-2/checkpoint.json","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-13","metric_id":"hidden_execution_edge_count","source_of_truth":"Graph trace and direct-composition lint","read_method":"Replay structural edges now; runtime graph trace remains candidate work","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"7d","freshness_status":"fresh","value":0,"threshold":0,"comparator":"==","verdict":"pending_independent_verification","evidence_ref":"workers/DKR-2/shared-session-contract.md#contract-proposal","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-INDEPENDENCE","metric_id":"single_llm_truth_acceptance_count","source_of_truth":"Independent replay record","read_method":"No independent DKR-2 replay exists yet","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"10m","freshness_status":"unknown","value":-1,"threshold":0,"comparator":"==","verdict":"unknown","evidence_ref":"workers/DKR-2/checkpoint.json","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"},
+    {"anti_goal_id":"AG-LEVEL","metric_id":"abstraction_level_jump_count","source_of_truth":"Tree and checkpoint candidate status","read_method":"Inspect that CKRs and PKRs remain candidate-only","observed_at":"2026-07-13T04:05:03Z","recorded_at":"2026-07-13T04:05:03Z","max_age":"10m","freshness_status":"fresh","value":0,"threshold":0,"comparator":"==","verdict":"pending_independent_verification","evidence_ref":"workers/DKR-2/shared-session-contract.md#candidate-contributions-and-progression","replay_command_or_checker":"workers/DKR-2/replay.sh","verification_record_ref":"workers/DKR-2/progress.jsonl#finish-pending-review"}
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-13T04:05:03Z",
+    "reason": "AG-2 lifecycle reads are unknown and DKR-2 has no independent replay yet"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "unit_id": "DKR-L1",
+  "status": "checkpoint_ready_for_orchestrator",
+  "decision_target": "Classify authoring doctrine into reliable lint, compile/API assertions, or scope conformance tests",
+  "observed_at": "2026-07-13T04:14:00Z",
+  "evidence_refs_or_hashes": [
+    "sha256:7e1d9f1b714319fbdb539bb8b32d2b16d06a055b57fd65fda5abbc1abc5c2ee9",
+    "sha256:0afefcfe653debfded013fbf36fd42add7e087f8f7e5b90eb7a2e1a7db021994",
+    "sha256:e3a8953e06614838cbb04118d40acf1223a3ec6602f502ef39480040d5150ae1"
+  ],
+  "questions_answered": [
+    "Existing lint coverage and exact parser-only gaps",
+    "Reliable classification for AG-8 through AG-14",
+    "Candidate valid, invalid, false-positive, and false-negative fixtures",
+    "Bounded delivery paths that avoid semantic lint overreach"
+  ],
+  "questions_unanswered": [
+    "Exact namespace shape awaits DKR-2",
+    "Exact required authority bindings await DKR-3",
+    "Stable error and trace assertions await the shared contract"
+  ],
+  "next_step": "Independent replay, then orchestrator acceptance or rejection before any CKR or PKR promotion"
+}

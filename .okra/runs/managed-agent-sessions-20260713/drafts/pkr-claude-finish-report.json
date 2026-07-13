@@ -1,0 +1,63 @@
+{
+  "type": "worker_finish",
+  "unit_id": "PKR-CLAUDE",
+  "observed_at": "2026-07-13T04:38:49Z",
+  "status": "candidate_done_pending_independent_verification",
+  "contribution_metric": {
+    "metric_id": "claude_managed_conformance_pass_rate",
+    "value": 1,
+    "target": 1,
+    "comparator": "==",
+    "read": "7/7 focused managed conformance cases passed; real authenticated stream-json smoke passed"
+  },
+  "changed_paths": [
+    "pkg/sdk/claude/src/index.ts",
+    "pkg/sdk/claude/tests/claude.test.ts",
+    "pkg/sdk/claude/tests/claude.integration.test.ts",
+    "pkg/sdk/claude/README.md"
+  ],
+  "evidence_refs_or_hashes": [
+    "sha256:4a722eb33e0c841a46c57606a743d7baa02df561c418dcadea1cdc8dabeaf1dc",
+    "sha256:8980eedf5e49399d07948fddc3fbe5aa4ded780b2c047ee154c31001f6ee2961",
+    "sha256:3371787fd269e6aea3f66c64d5c0da997c7536a46ba21c11e35530824829d51b",
+    "sha256:ff20b2a1eec9c52c2b0085922137fe7a36e588af9592c1e01c3b354cd1046645"
+  ],
+  "commands": [
+    "pnpm --filter @pumped-fn/sdk-claude typecheck -> exit 0",
+    "pnpm --filter @pumped-fn/sdk-claude test -> 1 passed, 1 skipped; 9 passed, 1 skipped",
+    "pnpm --filter @pumped-fn/sdk-claude build -> exit 0",
+    "PUMPED_INTEGRATION=1 pnpm --filter @pumped-fn/sdk-claude test -- --run tests/claude.integration.test.ts -> 2 files passed; 9 tests passed",
+    "node pkg/tool/lint/dist/cli.mjs --json --max-warnings 0 pkg/sdk/claude/src pkg/sdk/claude/tests pkg/sdk/claude/README.md -> diagnostics empty; 4 files scanned",
+    "git diff --check -- pkg/sdk/claude -> exit 0"
+  ],
+  "implementation": [
+    "Scope-owned boundary resource starts one sequential Claude stream-json process",
+    "Abort and timeout send SIGINT, close the session, block queued prompts, and scope cleanup awaits child close",
+    "ClaudeConfig requires absolute cwd, explicit roots, and deny permission at the type level",
+    "Authority flags are fixed and extraArgs cannot override tools, permissions, roots, MCP, or session identity",
+    "Existing claude, claudeTurn, claudeRun, and claudeConfig handles remain; config, engine, run, turn, and provider aliases are additive",
+    "Engine and timer capabilities are explicit graph dependencies and engine replacement is tested through createScope presets"
+  ],
+  "active_anti_goals": [
+    "AG-1",
+    "AG-2",
+    "AG-3",
+    "AG-4",
+    "AG-5",
+    "AG-6",
+    "AG-8",
+    "AG-9",
+    "AG-10",
+    "AG-11",
+    "AG-12",
+    "AG-13",
+    "AG-14",
+    "AG-STORAGE-WRITE",
+    "AG-INDEPENDENCE"
+  ],
+  "unknowns": [
+    "Independent verification has not accepted the contribution or wall reads",
+    "No estimate record for PKR-CLAUDE was present in the ledger, so this worker did not back-fit or append an actual-duration record"
+  ],
+  "downstream_advance": "blocked_pending_independent_verification"
+}

@@ -1,0 +1,121 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-1",
+      "metric_id": "shared_session_conformance_pass_rate",
+      "source_dkr": "DKR-2",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-2",
+      "metric_id": "claude_provider_ready",
+      "source_dkr": "DKR-1",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-3",
+      "metric_id": "codex_provider_ready",
+      "source_dkr": "DKR-2",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-4",
+      "metric_id": "public_provider_switch_example_count",
+      "source_dkr": "DKR-2",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-L1",
+      "metric_id": "authoring_anti_goal_readable_count",
+      "source_dkr": "DKR-L1",
+      "status": "candidate",
+      "target": 7
+    }
+  ],
+  "dkrs": [
+    {
+      "artifact": "claude-session-control-surface.md",
+      "budget": {
+        "time_min": 45,
+        "turns": 1
+      },
+      "decision_target": "Choose the managed Claude session transport and lifecycle",
+      "id": "DKR-1",
+      "output": "Executable DKR checkpoint with replayable probes and confidence",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-1",
+        "AG-2",
+        "AG-3",
+        "AG-5"
+      ]
+    },
+    {
+      "artifact": "shared-session-contract.md",
+      "budget": {
+        "time_min": 45,
+        "turns": 1
+      },
+      "decision_target": "Define the smallest shared session contract without hiding graph edges",
+      "id": "DKR-2",
+      "output": "Executable DKR checkpoint, contract proposal, lifecycle diagram, and conformance cases",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-1",
+        "AG-4",
+        "AG-13"
+      ]
+    },
+    {
+      "artifact": "provider-authority-matrix.md",
+      "budget": {
+        "time_min": 35,
+        "turns": 1
+      },
+      "decision_target": "Define explicit roots, permissions, environment, credentials, and denial behavior",
+      "id": "DKR-3",
+      "output": "Executable DKR checkpoint and provider grant matrix",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-3",
+        "AG-10"
+      ]
+    },
+    {
+      "artifact": "lint-rule-coverage-map.md",
+      "budget": {
+        "time_min": 40,
+        "turns": 1
+      },
+      "decision_target": "Classify authoring doctrine into reliable lint, compile/API assertions, or scope conformance tests",
+      "id": "DKR-L1",
+      "output": "Executable DKR checkpoint with valid, invalid, false-positive, and false-negative examples",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-8",
+        "AG-9",
+        "AG-10",
+        "AG-11",
+        "AG-12",
+        "AG-13",
+        "AG-14",
+        "AG-L1",
+        "AG-L2",
+        "AG-L3"
+      ]
+    }
+  ],
+  "frame_version": 1,
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until the objective metric reaches target, a human changes or stops the frame, or a blocking flag requires human resolution"
+  },
+  "pkrs": [],
+  "tree_version": 1
+}

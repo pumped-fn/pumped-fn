@@ -1,0 +1,62 @@
+{
+  "type": "worker_finish",
+  "unit_id": "PKR-CLAUDE-HARDEN",
+  "observed_at": "2026-07-13T05:12:24Z",
+  "status": "candidate_done_pending_independent_verification",
+  "contribution_metric": {
+    "metric_id": "claude_bounded_cleanup_pass_rate",
+    "value": 1,
+    "target": 1,
+    "comparator": "==",
+    "read": "13/13 focused unit cases and 1/1 authenticated integration case passed"
+  },
+  "changed_paths": [
+    "pkg/sdk/claude/src/index.ts",
+    "pkg/sdk/claude/tests/claude.test.ts",
+    "pkg/sdk/claude/tests/claude.integration.test.ts",
+    "pkg/sdk/claude/README.md"
+  ],
+  "evidence_refs_or_hashes": [
+    "sha256:58218c2c494c8ce8b3a27f8f0f11d2b2ad5b8dd832b96e1e8f195106100faa73",
+    "sha256:ffc6fae47af21d47145003f97d26280a2cb42cb6e313d1302fedff2e3272ca99",
+    "sha256:5d53245fc7fde9bd94d809bef8be1608a0a634bae11600fe0754dbd50d591f2d",
+    "sha256:79af5b1a6b37ba1e27ee624b2a636f5b5f1612a83e422dc9c07caaabadfeb844"
+  ],
+  "commands": [
+    "pnpm --filter @pumped-fn/sdk-claude typecheck -> exit 0",
+    "pnpm --filter @pumped-fn/sdk-claude test -> 1 file passed, 1 skipped; 13 tests passed, 1 skipped",
+    "pnpm --filter @pumped-fn/sdk-claude build -> exit 0",
+    "PUMPED_INTEGRATION=1 pnpm --filter @pumped-fn/sdk-claude exec vitest run tests/claude.integration.test.ts -> 1 file passed; 1 test passed",
+    "node pkg/tool/lint/dist/cli.mjs --json --max-warnings 0 pkg/sdk/claude/src pkg/sdk/claude/tests pkg/sdk/claude/README.md -> diagnostics empty; 4 files scanned",
+    "git diff --check -- pkg/sdk/claude -> exit 0",
+    "rg -n extraArgs pkg/sdk/claude -> no matches"
+  ],
+  "implementation": [
+    "ClaudeConfig requires shutdownTimeoutMs and timing remains replaceable through the public clock atom",
+    "Cleanup requests stdin close when idle or SIGINT when a prompt is active, waits one configured bound, sends SIGKILL, then waits the same bound again",
+    "Cleanup rejects with ClaudeShutdownError when the child remains live after the second bound and never reports the child as closed",
+    "A memoized cleanup promise and shutdown phase make repeated context close and scope dispose issue exactly one termination action",
+    "Free-form extraArgs is removed; fixed managed arguments cannot override credentials, roots, permissions, tools, MCP, or session identity",
+    "Public graph assertions preserve claudeTurn to claudeRun to claudeSession to engine with no facade, MCP, or tool projection"
+  ],
+  "active_anti_goals": [
+    "AG-1",
+    "AG-2",
+    "AG-3",
+    "AG-4",
+    "AG-5",
+    "AG-6",
+    "AG-8",
+    "AG-9",
+    "AG-10",
+    "AG-11",
+    "AG-13",
+    "AG-STORAGE-WRITE",
+    "AG-INDEPENDENCE"
+  ],
+  "unknowns": [
+    "Independent verification has not accepted the contribution metric or anti-goal reads",
+    "Cross-provider convergence remains outside this Claude-only PKR"
+  ],
+  "downstream_advance": "blocked_pending_independent_verification"
+}

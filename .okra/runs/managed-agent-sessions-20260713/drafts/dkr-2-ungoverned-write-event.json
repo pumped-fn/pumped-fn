@@ -1,0 +1,7 @@
+{
+  "event_type": "ungoverned_write_event",
+  "unit_id": "DKR-2",
+  "observed_at": "2026-07-13T04:12:00Z",
+  "evidence_refs_or_hashes": ["sha256:b5d05048359ef58b381fdfa8ee983bbe177f4b2ec4fcbe7e99d5e395c9921b15"],
+  "cause": "Discovery worker wrote progress.jsonl directly instead of through okra-store worker-report; raw content was preserved and the log was rebuilt through the helper"
+}

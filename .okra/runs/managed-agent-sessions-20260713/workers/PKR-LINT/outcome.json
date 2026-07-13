@@ -1,0 +1,107 @@
+{
+  "unit_id": "PKR-LINT",
+  "status": "candidate_done_pending_independent_validation",
+  "linked_ckr": "CKR-L1",
+  "source_dkr_checkpoint": "checkpoint.DKR-L1.round-1",
+  "contribution_metric": {
+    "metric_id": "bounded_lint_rule_pass_count",
+    "target": 2,
+    "comparator": "==",
+    "candidate_value": 2,
+    "decision": "pending_independent_validation"
+  },
+  "changed_files": [
+    {
+      "path": "pkg/tool/lint/src/index.ts",
+      "sha256": "4da1fe3ab4f5283e9cea1bd5f240abd56c7075e723632efda9eac0f3dd884570",
+      "intent": "Add the two bounded parser rules, import-shadow evidence, complete block matching, and warning inventory severity for the broad immediate-return rule"
+    },
+    {
+      "path": "pkg/tool/lint/tests/scanner.test.ts",
+      "sha256": "5bea0b1f25891ded2e54cda6d13e4119ab135d0665bcd0f7ff1ab4232d7678f0",
+      "intent": "Add valid, invalid, alias, namespace-shadow, same-block multi-match, conservative-reference, and deterministic-repeat fixtures"
+    },
+    {
+      "path": "pkg/tool/lint/README.md",
+      "sha256": "f3f86f142a9c621154a8f7a21340f68f64d62838f1920b767e0e868b22ce12a3",
+      "intent": "Document both rules, severities, and known syntactic false-negative classes"
+    }
+  ],
+  "verification": [
+    {
+      "command": "pnpm -F @pumped-fn/lite-lint test",
+      "runs": 2,
+      "result": "2 test files passed; 75 tests passed on both final runs"
+    },
+    {
+      "command": "pnpm -F @pumped-fn/lite-lint typecheck",
+      "runs": 1,
+      "result": "tsgo --noEmit exited 0"
+    },
+    {
+      "command": "pnpm lint",
+      "runs": 1,
+      "result": "exited 0; 91 files scanned; one historical no-immediate-return-binding warning in invoice-triage; example alignment ok"
+    },
+    {
+      "command": "scanPaths exact touched files twice",
+      "runs": 2,
+      "result": "identical=true; filesScanned=3; diagnostics=[]"
+    },
+    {
+      "command": "git diff --check -- pkg/tool/lint",
+      "runs": 1,
+      "result": "exited 0"
+    }
+  ],
+  "active_anti_goal_evidence": [
+    {
+      "metric_id": "touched_file_lint_violation_count",
+      "candidate_value": 0,
+      "evidence": "Two identical scans of the exact three touched files returned zero diagnostics"
+    },
+    {
+      "metric_id": "unsupported_static_rule_count",
+      "candidate_value": 0,
+      "evidence": "Rules implement only the two DKR-accepted local AST invariants"
+    },
+    {
+      "metric_id": "known_false_positive_fixture_count",
+      "candidate_value": 0,
+      "evidence": "Inferred atom, generic shadow calls, used/grouped/destructured/self-referenced bindings all return no bounded diagnostics"
+    },
+    {
+      "metric_id": "undocumented_false_negative_class_count",
+      "candidate_value": 0,
+      "evidence": "README names re-export/wrapper misses and conservative immediate-return misses"
+    },
+    {
+      "metric_id": "rule_suppression_added_for_provider_count",
+      "candidate_value": 0,
+      "evidence": "No provider or lint configuration changed"
+    },
+    {
+      "metric_id": "unrelated_lint_cleanup_path_count",
+      "candidate_value": 0,
+      "evidence": "Only pkg/tool/lint implementation, focused scanner fixtures, and README changed"
+    },
+    {
+      "metric_id": "rule_without_valid_and_invalid_fixture_count",
+      "candidate_value": 0,
+      "evidence": "Both rules have passing and failing scanner fixtures"
+    },
+    {
+      "metric_id": "non_deterministic_lint_result_count",
+      "candidate_value": 0,
+      "evidence": "Scanner suite passed twice and exact touched scans were byte-equivalent"
+    }
+  ],
+  "handback": {
+    "subpart": "Adapter atom global-fake exception for pumped/no-module-mocks",
+    "status": "not_changed_unknown_requires_narrower_contract",
+    "reason": "The parser can identify a global spy target, but no current syntax or repository path convention proves that the test is the adapter atom's own unit test. Allowing global spies in every test weakens AG-11; inventing an adapter path convention or suppression exceeds this PKR.",
+    "needed_decision": "Fund a narrow DKR or define a human-approved adapter-test path/config contract before changing no-module-mocks"
+  },
+  "reviewer_audit_status": "pending_independent_replay",
+  "observed_at": "2026-07-13T04:35:25Z"
+}

@@ -1,0 +1,10 @@
+{
+  "type": "independent_review",
+  "reviewer": "claude-opus-4-8 high",
+  "observed_at": "2026-07-13T04:17:00Z",
+  "accepted_claims": ["DKR-2-CLAIM-1","DKR-2-CLAIM-2","DKR-3-CLAIM-3","DKR-3-CLAIM-4","DKR-3-CLAIM-5","DKR-3-CLAIM-6"],
+  "rejected_claims": ["DKR-2-CLAIM-7"],
+  "rejection": "Generated status became stale after later DKR-L1 progress; orchestrator regenerated status and okra-store verify then passed",
+  "evidence_refs_or_hashes": ["workers/DKR-2/replay.sh","drafts/claude-session-probe.mjs","drafts/claude-cancel-probe.mjs","pkg/sdk/codex/src/index.ts","ACP 1.2.1 schema","Codex ACP integration failure output"],
+  "decision": "bounded DKR-2 and DKR-3 technical claims accepted; provider readiness remains unclaimed"
+}

@@ -1,0 +1,7 @@
+{
+  "event_type": "rework_event",
+  "unit_id": "DKR-3",
+  "observed_at": "2026-07-13T03:12:00Z",
+  "evidence_refs_or_hashes": ["command:node drafts/claude-cancel-probe.mjs exit 1 with result/error_during_execution and dead PID"],
+  "cause": "Initial checker expected SIGINT to remain the process exit signal; Claude handles it and exits code 0 after emitting a cancellation result"
+}

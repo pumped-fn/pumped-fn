@@ -1,0 +1,22 @@
+{
+  "unit_id": "PKR-LINT",
+  "status": "candidate_done_pending_independent_validation",
+  "contribution_metric": "bounded_lint_rule_pass_count == 2",
+  "candidate_value": 2,
+  "observed_at": "2026-07-13T04:35:25Z",
+  "evidence_refs_or_hashes": [
+    "sha256:fba1c5c5e6129bd84ca62aa0f7b5955b7ea92e5724c814fedcae96d727174d2e",
+    "sha256:4da1fe3ab4f5283e9cea1bd5f240abd56c7075e723632efda9eac0f3dd884570",
+    "sha256:5bea0b1f25891ded2e54cda6d13e4119ab135d0665bcd0f7ff1ab4232d7678f0",
+    "sha256:f3f86f142a9c621154a8f7a21340f68f64d62838f1920b767e0e868b22ce12a3"
+  ],
+  "verification_summary": [
+    "Scanner suite passed twice: 75/75",
+    "Typecheck passed",
+    "Root lint passed with one historical warning",
+    "Exact touched-file scan repeated identically with zero diagnostics",
+    "Diff check passed"
+  ],
+  "unknown_handback": "No reliable syntax or path evidence proves an adapter atom's own global-fake test; no-module-mocks was not weakened",
+  "next_step": "Independent replay and active-wall validation before accepting the candidate metric"
+}

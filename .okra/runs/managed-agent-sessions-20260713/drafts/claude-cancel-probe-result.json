@@ -1,0 +1,7 @@
+{
+  "interruptedAtInit": true,
+  "exit": {"code":0,"signal":null},
+  "processAlive": false,
+  "stderr": "",
+  "eventTypes": ["system/hook_started","system/hook_response","system/init","user","result/error_during_execution"]
+}

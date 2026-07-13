@@ -1,0 +1,19 @@
+{
+  "checkpoint_id": "checkpoint.DKR-3.round-1",
+  "conclusion_id": "provider.authority-explicit-roots-deny-default-awaited-cleanup",
+  "decision_target": "Define explicit roots, permissions, environment, credentials, and denial behavior",
+  "source_of_truth": "Direct Claude Node spawn probes, shipped provider code/tests, installed ACP 1.2.1 schema, real Codex ACP smoke, and npm registry versions",
+  "read_method": "Replay Claude two-turn and cancel probes; inspect Codex ACP new-session, permission, cancel, and cleanup paths; rerun focused ACP integration smoke",
+  "observed_at": "2026-07-13T04:10:00Z",
+  "recorded_at": "2026-07-13T04:11:00Z",
+  "max_age": "7 days or any Claude, Codex, codex-acp, or ACP SDK version change",
+  "freshness_status": "fresh",
+  "confidence": 0.9,
+  "evidence_refs_or_hashes": ["drafts/claude-session-probe-result.json","drafts/claude-cancel-probe-result.json","drafts/provider-authority-matrix.md","pkg/sdk/codex/src/index.ts","pkg/sdk/claude/src/index.ts","ACP schema/schema.json","command:PUMPED_INTEGRATION=1 pnpm --filter @pumped-fn/sdk-codex test -- tests/codex.integration.test.ts -t invokes Codex through ACP"],
+  "replay_command_or_checker": "node .okra/runs/managed-agent-sessions-20260713/drafts/claude-session-probe.mjs && node .okra/runs/managed-agent-sessions-20260713/drafts/claude-cancel-probe.mjs && PUMPED_INTEGRATION=1 pnpm --filter @pumped-fn/sdk-codex test -- tests/codex.integration.test.ts -t 'invokes Codex through ACP'",
+  "questions_answered": ["Claude direct spawn preserves explicit permission mode and one session across two turns","Claude SIGINT produces a structured cancellation result and leaves no live PID","ACP provides cwd, additional roots, permission callbacks, mandatory cancel, and empty MCP configuration","Shipped Codex ACP omits additional roots and does not await child exit"],
+  "questions_unanswered": ["codex-acp 1.1.2 compatibility with gpt-5.6-sol","Final structured permission-policy type after shared-contract DKR"],
+  "decision": "candidate_accept_explicit_roots_fail_closed_permissions_and_awaited_cleanup; fund isolated codex-acp compatibility PKR after DKR-2",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay"
+}

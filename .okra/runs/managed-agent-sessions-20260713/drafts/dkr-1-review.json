@@ -1,0 +1,15 @@
+{
+  "type": "independent_review",
+  "unit_id": "DKR-1",
+  "reviewer": "claude-opus-4-8 high",
+  "observed_at": "2026-07-13T03:04:00Z",
+  "claims": [
+    {"claim_id":"DKR-1.C1.flag-surface","decision":"accepted","value":"6 of 6 required CLI control categories present","threshold":"6 of 6","evidence_refs_or_hashes":["sha256:05207b52bfc601e9c3dda7b3fa0793366adbaeca0d094d5b66e9b293ed0182fe"]},
+    {"claim_id":"DKR-1.C2.tools-disabled-turn","decision":"accepted","value":"exit 0; init, assistant, result present; one session id; zero tools","threshold":"all conditions hold","evidence_refs_or_hashes":["sha256:2fa1d8830d4ebd1ec9ab5ef1f5dc2143aa1032041a093783ad6d44a3959ba35d"]},
+    {"claim_id":"DKR-1.C3.candidate-transport-inference","decision":"accepted","value":"structured no-MCP turn succeeded and conclusion remains candidate-only","threshold":"premises replay and no lifecycle overclaim","evidence_refs_or_hashes":["DKR-1.C1.flag-surface","DKR-1.C2.tools-disabled-turn"]},
+    {"claim_id":"DKR-1.R1.alias-caused-permission-bypass","decision":"rejected_unsupported_cause","value":"nested validator observed bypassPermissions, but whence and file identify a real binary and sdk-core uses execFile","threshold":"causal claim requires replayable evidence","evidence_refs_or_hashes":["command:whence -va claude","pkg/sdk/core/src/index.ts:582"]}
+  ],
+  "accepted_count": 3,
+  "rejected_count": 1,
+  "next_unknown": "Why the nested validator process observed bypassPermissions while the direct root probe observed dontAsk; verify through Node execFile under DKR-3"
+}

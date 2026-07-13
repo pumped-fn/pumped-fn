@@ -1,0 +1,35 @@
+{
+  "checkpoint_id": "checkpoint.DKR-1.round-1",
+  "conclusion_id": "claude.stream-json-managed-session-candidate",
+  "decision_target": "Choose the managed Claude session transport and lifecycle",
+  "source_of_truth": "Installed Claude Code 2.1.207 help and live stream-json probe",
+  "read_method": "Replay the help read and one tools-disabled stream-json turn from the pumped-fn repository",
+  "observed_at": "2026-07-13T03:00:00Z",
+  "recorded_at": "2026-07-13T03:01:00Z",
+  "max_age": "7 days or any Claude CLI version change",
+  "freshness_status": "fresh",
+  "confidence": 0.88,
+  "evidence_refs_or_hashes": [
+    "workers/DKR-1/progress.jsonl#latest",
+    "command:claude --version",
+    "command:claude --help",
+    "command:printf stream-json user message | claude -p --verbose --input-format stream-json --output-format stream-json --tools '' --permission-mode dontAsk --no-session-persistence"
+  ],
+  "replay_command_or_checker": "printf '%s\\n' '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Reply with exactly: PUMPED_SESSION_OK\"}}' | claude -p --verbose --input-format stream-json --output-format stream-json --tools '' --permission-mode dontAsk --no-session-persistence",
+  "questions_answered": [
+    "A pumped-owned Claude process can exchange structured input and lifecycle/result events without MCP or a new IPC protocol",
+    "The parent can explicitly set roots, tools, permissions, session identity, and persistence policy"
+  ],
+  "questions_unanswered": [
+    "Multi-turn process behavior and interrupt acknowledgement need a focused lifecycle probe",
+    "The final shared contract must not expose Claude-specific hook or rate-limit shapes"
+  ],
+  "decision": "candidate_accept_use_stream_json_as_claude_transport_and_fund_lifecycle_probe",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay",
+  "risk_or_anti_goal_implications": [
+    "Reduces AG-1 risk because process IO can remain behind declared flows and a scope-owned resource",
+    "Reduces AG-3 risk because roots and permissions are explicit CLI inputs",
+    "Keeps AG-5 held because no MCP or tool projection is required for session control"
+  ]
+}

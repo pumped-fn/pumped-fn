@@ -8,10 +8,12 @@ export type RuleId =
   | "pumped/no-ctx-argument"
   | "pumped/no-definition-handle-suffix"
   | "pumped/no-direct-flow-composition"
+  | "pumped/no-explicit-atom-type-argument"
   | "pumped/no-handle-spread"
   | "pumped/no-handle-factory"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
+  | "pumped/no-immediate-return-binding"
   | "pumped/no-jsdom-backend"
   | "pumped/no-module-mocks"
   | "pumped/no-module-state"
@@ -53,10 +55,10 @@ export interface ScanResult {
  * `allowBuiltins` lists builtin error constructor names exempt from
  * no-untyped-throw. `allowHandleFactories` lists documented low-level handle
  * constructors. `severity` overrides a rule's default severity ("error",
- * "warn", or "off" to disable it entirely). Eight dependency-graph and
+ * "warn", or "off" to disable it entirely). Nine dependency-graph, style, and
  * error-taxonomy rules — config-via-tags, no-implicit-tag-read, no-naked-globals,
  * no-module-state, prefer-destructured-deps, no-untyped-throw,
- * no-swallowed-error, and no-handle-spread — default to "warn" severity (see `defaultSeverity`) so
+ * no-swallowed-error, no-handle-spread, and no-immediate-return-binding — default to "warn" severity (see `defaultSeverity`) so
  * they surface in `--json` output and local runs without failing the root
  * `pnpm lint` exit code, which today only scans docs and practical examples
  * rather than the whole monorepo — a wide, unaudited sweep of those rules
@@ -96,6 +98,7 @@ export interface ScanOptions {
 const defaultSeverity: Partial<Record<RuleId, Severity>> = {
   "pumped/config-via-tags": "warn",
   "pumped/no-handle-spread": "warn",
+  "pumped/no-immediate-return-binding": "warn",
   "pumped/no-implicit-tag-read": "warn",
   "pumped/no-naked-globals": "warn",
   "pumped/no-module-state": "warn",
@@ -134,10 +137,12 @@ function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Dia
 type Imports = {
   createScope: Set<string>
   controller: Map<string, number>
+  creatorImportEnds: Map<string, number>
   creatorKinds: Map<string, CreatorKind>
   creators: Set<string>
   flow: Set<string>
   liteNamespaces: Set<string>
+  liteNamespaceImportEnds: Map<string, number>
   liteReactNamespaces: Set<string>
   mockFns: Set<string>
   nodeBuiltins: Map<string, string>
@@ -321,10 +326,12 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
     createScope: new Set(),
     controller: new Map(),
+    creatorImportEnds: new Map(),
     creatorKinds: new Map(),
     creators: new Set(),
     flow: new Set(),
     liteNamespaces: new Set(),
+    liteNamespaceImportEnds: new Map(),
     liteReactNamespaces: new Set(),
     mockFns: new Set(),
     nodeBuiltins: new Map(),
@@ -362,7 +369,10 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     if (!clause.namedBindings) continue
 
     if (ts.isNamespaceImport(clause.namedBindings)) {
-      if (moduleName === "@pumped-fn/lite") imports.liteNamespaces.add(clause.namedBindings.name.text)
+      if (moduleName === "@pumped-fn/lite") {
+        imports.liteNamespaces.add(clause.namedBindings.name.text)
+        imports.liteNamespaceImportEnds.set(clause.namedBindings.name.text, clause.namedBindings.name.getEnd())
+      }
       if (moduleName === "@pumped-fn/lite-react") imports.liteReactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "react") imports.reactNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@testing-library/react") imports.testLibraryNamespaces.add(clause.namedBindings.name.text)
@@ -384,10 +394,12 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if ((moduleName === "@pumped-fn/lite" || moduleName === "@pumped-fn/lite-react") && creatorNames.has(imported)) {
         imports.creators.add(local)
+        imports.creatorImportEnds.set(local, specifier.name.getEnd())
         imports.creatorKinds.set(local, imported as CreatorKind)
       }
       if (moduleName === "@pumped-fn/sdk" && imported === "material") {
         imports.creators.add(local)
+        imports.creatorImportEnds.set(local, specifier.name.getEnd())
         imports.creatorKinds.set(local, "material")
       }
       if (moduleName === "@testing-library/react" && imported === "render") {
@@ -446,6 +458,51 @@ function isNamespaceCall(expression: ts.Expression, namespaces: Set<string>, nam
 
 function isCreatorCall(expression: ts.Expression, imports: Imports): boolean {
   return creatorKind(expression, imports) !== null
+}
+
+function unshadowedCreatorKind(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): CreatorKind | null {
+  if (ts.isIdentifier(expression)) {
+    const kind = imports.creatorKinds.get(expression.text)
+    const importEnd = imports.creatorImportEnds.get(expression.text)
+    return kind && importEnd !== undefined && !shadowsName(expression, sourceFile, expression.text, importEnd) ? kind : null
+  }
+  if (
+    !ts.isPropertyAccessExpression(expression)
+    || !ts.isIdentifier(expression.expression)
+    || !creatorNames.has(expression.name.text)
+  ) return null
+  const namespace = expression.expression
+  const importEnd = imports.liteNamespaceImportEnds.get(namespace.text)
+  if (importEnd === undefined || shadowsName(namespace, sourceFile, namespace.text, importEnd)) return null
+  return expression.name.text as CreatorKind
+}
+
+function immediateReturnBindings(block: ts.Block): ts.VariableDeclaration[] {
+  const matches: ts.VariableDeclaration[] = []
+  for (let index = 0; index < block.statements.length - 1; index++) {
+    const statement = block.statements[index]
+    const next = block.statements[index + 1]
+    if (
+      !statement
+      || !next
+      || !ts.isVariableStatement(statement)
+      || statement.declarationList.declarations.length !== 1
+      || !ts.isReturnStatement(next)
+      || !next.expression
+      || !ts.isIdentifier(next.expression)
+    ) continue
+    const declaration = statement.declarationList.declarations[0]
+    if (!declaration || !declaration.initializer || !ts.isIdentifier(declaration.name) || declaration.name.text !== next.expression.text) continue
+    const bindingName = declaration.name.text
+    let sameNameCount = 0
+    function count(node: ts.Node): void {
+      if (ts.isIdentifier(node) && node.text === bindingName) sameNameCount++
+      ts.forEachChild(node, count)
+    }
+    count(block)
+    if (sameNameCount === 2) matches.push(declaration)
+  }
+  return matches
 }
 
 function isFlowCall(expression: ts.Expression, imports: Imports): boolean {
@@ -1169,6 +1226,19 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   }
 
   function visit(node: ts.Node): void {
+    if (ts.isBlock(node)) {
+      for (const declaration of immediateReturnBindings(node)) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-immediate-return-binding",
+          declaration.name,
+          `Inline "${declaration.name.getText(sourceFile)}" instead of declaring it only to return it immediately.`,
+        )
+      }
+    }
+
     if (!allowScopeReach) {
       const ctxBinding = graphFactoryCtxAt(node)
       if (
@@ -1266,6 +1336,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
     if (ts.isCallExpression(node)) {
       const name = calledName(node.expression)
+      const explicitAtomType = node.typeArguments?.[0]
+      if (explicitAtomType && unshadowedCreatorKind(node.expression, sourceFile, imports) === "atom") {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-explicit-atom-type-argument",
+          explicitAtomType,
+          "Let atom infer its value type; type substitutes with satisfies and Lite.Utils.AtomValue instead.",
+        )
+      }
       if (isCreatorCall(node.expression, imports)) {
         for (const closure of enclosingParameterClosures(node, imports)) {
           const ownerName = closure.owner.name && ts.isIdentifier(closure.owner.name) ? closure.owner.name.text : null

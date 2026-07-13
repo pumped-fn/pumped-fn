@@ -27,7 +27,15 @@ integration("invokes the authenticated Codex CLI", async () => {
 }, 120_000)
 
 integration("invokes Codex through ACP", async () => {
-  const scope = createScope({ tags: [codexAcpConfig({ permission: "deny" })] })
+  const scope = createScope({
+    tags: [codexAcpConfig({
+      auth: { kind: "global" },
+      cwd: process.cwd(),
+      additionalDirectories: [],
+      permission: "deny",
+      shutdownTimeoutMs: 5_000,
+    })],
+  })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({

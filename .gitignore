@@ -1,3 +1,28 @@
+# BEGIN OKRA managed ignore
+# Keep OKRA recovery records trackable by default:
+# - .okra/content/sha256/** and .okra/memory/**
+# - .okra/runs/**/{frame,tree,ledger.jsonl,flags.jsonl,checkins.jsonl,moves,workers/**/progress.jsonl,drafts,terminal}
+# Ignore only volatile/generated files.
+.runs/
+.okra/*.lock
+.okra/**/*.lock
+.okra/status.md
+.okra/**/status.md
+.okra/*.tmp.*
+.okra/**/*.tmp.*
+.okra/tmp/
+.okra/.tmp/
+.okra/runtime/
+.okra/cache/
+.okra/runs/*/tmp/
+.okra/runs/*/.tmp/
+.okra/runs/*/runtime/
+.okra/runs/*/cache/
+.okra/runs/**/workers/**/*.raw
+.okra/runs/**/workers/**/*.stdout
+.okra/runs/**/workers/**/*.stderr
+# END OKRA managed ignore
+
 # Logs
 logs
 *.log
@@ -335,7 +360,6 @@ docs/reports/
 docs/superpowers/
 .agents/
 .claude/
-.okra/*
 .c3/
 troubleshooting.md
 skills-lock.json
@@ -357,9 +381,3 @@ examples/reactivity-bench/
 
 # test fixtures are sources, never binaries
 !pkg/*/*/tests/fixtures/**
-!.okra/memory/
-.okra/memory/*/*
-!.okra/memory/*/candidate-anti-goals.v1.json
-!.okra/runs/
-.okra/runs/*
-!.okra/runs/example-operational-20260707/

@@ -25,6 +25,8 @@ pumped-lite-lint --config pumped-lite-lint.json src tests
 | `pumped/no-jsdom-backend` | Browser-emulator test markers and DOM-suffixed observer tests; rendered observer tests use Vitest Browser Mode. |
 | `pumped/no-test-only-branches` | Product branches keyed on test mode; use presets instead. |
 | `pumped/no-definition-handle-suffix` | `fooAtom`, `runFlow`, `txResource`, `requestTag`; rely on inference. |
+| `pumped/no-explicit-atom-type-argument` | Explicit type arguments on `atom<T>(...)`; let the atom infer its value and type substitutes with `satisfies` and `Lite.Utils.AtomValue`. Direct, aliased, and namespace imports from `@pumped-fn/lite` are recognized. Known syntactic false negatives: re-exported aliases and wrapper functions. |
+| `pumped/no-immediate-return-binding` (warn) | A block-local identifier with an initializer returned unchanged by the immediately following statement when that return is its only same-named reference in the block; inline the expression. Known conservative false negatives: destructuring, multi-declaration statements, aliases, and any other same-spelled identifier in the block. |
 | `pumped/no-direct-flow-composition` | Flows calling child flows with hidden `ctx.exec({ flow })` or raw same-file flow deps; use `controller(childFlow)` deps. |
 | `pumped/no-ctx-argument` | Factory context parameters passed as call arguments or embedded directly in object/array literals/spreads; `ctx` is a receiver, and ctx-taking contracts should be reified as a flow reached via deps. Direct parameter tracking only in v1; aliases are not followed. |
 | `pumped/no-shared-scope-factory` | Helpers that return preconfigured `createScope(...)`; each use site should own tags, presets, and extensions. |
@@ -55,7 +57,7 @@ directories where examples intentionally contain bad shapes or third-party code.
 
 Every diagnostic carries a `severity` of `"error"` or `"warn"`.
 
-> **Note:** The CLI exits nonzero only when at least one `"error"` diagnostic is found. `"warn"` diagnostics still print and appear in `--json`, but they do not fail the process; `pumped/config-via-tags`, `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, `pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, `pumped/no-swallowed-error`, and `pumped/no-handle-spread` default to `"warn"` as an incremental cleanup inventory, while all other rules default to `"error"`.
+> **Note:** The CLI exits nonzero only when at least one `"error"` diagnostic is found. `"warn"` diagnostics still print and appear in `--json`, but they do not fail the process; `pumped/config-via-tags`, `pumped/no-implicit-tag-read`, `pumped/no-naked-globals`, `pumped/no-module-state`, `pumped/prefer-destructured-deps`, `pumped/no-untyped-throw`, `pumped/no-swallowed-error`, `pumped/no-handle-spread`, and `pumped/no-immediate-return-binding` default to `"warn"` as an incremental cleanup inventory, while all other rules default to `"error"`.
 
 ## Config
 

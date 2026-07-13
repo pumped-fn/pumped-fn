@@ -1,0 +1,32 @@
+{
+  "tree_version": 5,
+  "frame_version": 2,
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": ["objective checks", "check-ins", "OKR board", "subagent steering"],
+    "terminal_condition": "Continue until the objective metric reaches target, a human changes or stops the frame, or a blocking flag requires human resolution"
+  },
+  "dkrs": [
+    {"id":"DKR-1","artifact":"claude-session-control-surface.md","budget":{"turns":1,"time_min":45},"decision_target":"Choose the managed Claude session transport and lifecycle","risk_or_anti_goal_uncertainty":["AG-1","AG-2","AG-3","AG-5"],"output":"Executable DKR checkpoint with replayable probes and confidence"},
+    {"id":"DKR-2","artifact":"shared-session-contract.md","budget":{"turns":1,"time_min":45},"decision_target":"Define the smallest shared session contract without hiding graph edges","risk_or_anti_goal_uncertainty":["AG-1","AG-4","AG-13"],"output":"Executable DKR checkpoint, contract proposal, lifecycle diagram, and conformance cases"},
+    {"id":"DKR-3","artifact":"provider-authority-matrix.md","budget":{"turns":1,"time_min":35},"decision_target":"Define explicit roots, permissions, environment, credentials, and denial behavior","risk_or_anti_goal_uncertainty":["AG-3","AG-10"],"output":"Executable DKR checkpoint and provider grant matrix"},
+    {"id":"DKR-L1","artifact":"lint-rule-coverage-map.md","budget":{"turns":1,"time_min":40},"decision_target":"Classify authoring doctrine into reliable lint, compile/API assertions, or scope conformance tests","risk_or_anti_goal_uncertainty":["AG-8","AG-9","AG-10","AG-11","AG-12","AG-13","AG-14","AG-L1","AG-L2","AG-L3"],"output":"Executable DKR checkpoint with valid, invalid, false-positive, and false-negative examples"},
+    {"id":"DKR-LIFECYCLE","artifact":"workers/DKR-LIFECYCLE/progress.jsonl#seq=1","budget":{"turns":1,"time_min":8},"decision_target":"Close remaining cleanup uncertainty without changing the shared runtime contract","risk_or_anti_goal_uncertainty":["AG-2","AG-3"],"output":"Partially accepted checkpoint: bounded lifecycle and static conformance only"}
+  ],
+  "ckrs": [
+    {"id":"CKR-1","status":"active","metric_id":"shared_session_conformance_pass_rate","target":1,"source_dkr":"DKR-2"},
+    {"id":"CKR-2","status":"active","metric_id":"claude_provider_ready","target":1,"source_dkr":"DKR-1"},
+    {"id":"CKR-3","status":"active","metric_id":"codex_provider_ready","target":1,"source_dkr":"DKR-2"},
+    {"id":"CKR-4","status":"active","metric_id":"public_provider_switch_example_count","target":1,"source_dkr":"DKR-2"},
+    {"id":"CKR-L1","status":"active","metric_id":"authoring_anti_goal_readable_count","target":7,"source_dkr":"DKR-L1"}
+  ],
+  "pkrs": [
+    {"id":"PKR-LINT","linked_ckr":"CKR-L1","source_dkr_checkpoint":"checkpoint.DKR-L1.round-1","contribution_metric":"bounded_lint_rule_pass_count == 2","active_anti_goals":["AG-8","AG-11","AG-14","AG-L1","AG-L2","AG-L3","AG-L4","AG-L5","AG-L6","AG-L7"],"status":"accepted"},
+    {"id":"PKR-CLAUDE","linked_ckr":"CKR-2","source_dkr_checkpoint":"checkpoint.DKR-1.round-1","contribution_metric":"claude_managed_conformance_pass_rate == 1","active_anti_goals":["AG-1","AG-2","AG-3","AG-4","AG-5","AG-6","AG-8","AG-9","AG-10","AG-11","AG-12","AG-13","AG-14"],"status":"accepted"},
+    {"id":"PKR-CODEX","linked_ckr":"CKR-3","source_dkr_checkpoint":"checkpoint.DKR-2.round-1","contribution_metric":"codex_managed_conformance_pass_rate == 1","active_anti_goals":["AG-1","AG-2","AG-3","AG-4","AG-5","AG-6","AG-8","AG-9","AG-10","AG-11","AG-12","AG-13","AG-14"],"status":"accepted"},
+    {"id":"PKR-CONFORMANCE","linked_ckr":"CKR-1","source_dkr_checkpoint":"checkpoint.DKR-2.round-1","contribution_metric":"shared_session_conformance_pass_rate == 1","active_anti_goals":["AG-1","AG-2","AG-3","AG-4","AG-5","AG-11","AG-13"],"status":"accepted"},
+    {"id":"PKR-DOCS","linked_ckr":"CKR-4","source_dkr_checkpoint":"checkpoint.DKR-2.round-1","contribution_metric":"public_provider_switch_example_count == 1","active_anti_goals":["AG-4","AG-5","AG-6","AG-8","AG-12","AG-14"],"status":"accepted"},
+    {"id":"PKR-CLAUDE-HARDEN","linked_ckr":"CKR-2","source_dkr_checkpoint":"ledger#record=be018cf4917159d37789ea9af0e9545e676640c1f9fe01a253e6b3f4823ad326","contribution_metric":"claude_bounded_cleanup_pass_rate == 1","active_anti_goals":["AG-1","AG-2","AG-3","AG-4","AG-5","AG-6","AG-8","AG-9","AG-10","AG-11","AG-13"],"status":"accepted"},
+    {"id":"PKR-CODEX-HARDEN","linked_ckr":"CKR-3","source_dkr_checkpoint":"ledger#record=be018cf4917159d37789ea9af0e9545e676640c1f9fe01a253e6b3f4823ad326","contribution_metric":"codex_bounded_cleanup_pass_rate == 1","active_anti_goals":["AG-1","AG-2","AG-3","AG-4","AG-5","AG-6","AG-8","AG-9","AG-10","AG-11","AG-13"],"status":"accepted"}
+  ]
+}
