@@ -1,5 +1,5 @@
 import { createScope, flow, preset, typed } from "@pumped-fn/lite"
-import { agent, complete, model, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { agent, complete, currentAgent, currentTool, model, turn, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
 import { expect, expectTypeOf, it } from "vitest"
 import * as codexModule from "../src/index"
 import {
@@ -106,3 +106,46 @@ it("can replace the model tag per context", async () => {
   await fakeCtx.close()
   await scope.dispose()
 })
+
+it("resolves managed tools before the Codex request", async () => {
+  const prompts: PromptInput[] = []
+  const responses = [
+    JSON.stringify({ content: "calling", stop: false, toolCalls: [{ name: "inspect", input: "codex" }] }),
+    JSON.stringify({ content: "done", stop: true }),
+  ]
+  const fake = flow({
+    name: "codex.managed-tools.fake",
+    parse: typed<PromptInput>(),
+    factory: (ctx) => {
+      prompts.push(ctx.input)
+      return responses.shift()!
+    },
+  })
+  const inspect = currentTool({
+    description: "Inspect input.",
+    flow: flow({
+      name: "inspect",
+      parse: typed<string>(),
+      factory: (ctx) => `tool:${ctx.input}`,
+    }),
+  })
+  const managed = currentAgent({ name: "managed", tools: { inspect } })
+  const run = turn({ agent: managed })
+  const scope = createScope({
+    presets: [preset(codexRun, fake)],
+    tags: [codex, codexConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+
+  const result = await ctx.exec({ flow: run, input: { prompt: "run" } })
+
+  expect(prompts[0]?.prompt).toContain("inspect")
+  expect(prompts[1]?.prompt).toContain("tool:codex")
+  expect(result.toolResults).toMatchObject([{ name: "inspect", output: "tool:codex" }])
+  await ctx.close()
+  await scope.dispose()
+})
+
+function managedConfig(): Parameters<typeof codexConfig>[0] {
+  return { auth: { kind: "global" } }
+}

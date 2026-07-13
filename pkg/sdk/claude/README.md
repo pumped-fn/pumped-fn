@@ -8,6 +8,8 @@ Module-level managed Claude CLI model provider for `@pumped-fn/sdk`.
 agent -> model tag -> claude turn -> claude run -> scope-owned stream-json process
 ```
 
+Managed tools resolve in core before the provider request and need no provider registry.
+
 ```ts
 import { createScope } from "@pumped-fn/lite"
 import { agent } from "@pumped-fn/sdk"

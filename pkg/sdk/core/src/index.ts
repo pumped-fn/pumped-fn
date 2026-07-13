@@ -978,10 +978,14 @@ export interface SandboxExecResult {
   exitCode: number
 }
 
+export interface SandboxExecOptions {
+  signal?: AbortSignal
+}
+
 export interface Sandbox {
   readFile(path: string): MaybePromise<string>
   writeFile(path: string, content: string): MaybePromise<void>
-  exec(command: string, args?: readonly string[]): MaybePromise<SandboxExecResult>
+  exec(command: string, args?: readonly string[], options?: SandboxExecOptions): MaybePromise<SandboxExecResult>
 }
 
 export interface TurnInput {
@@ -1238,6 +1242,117 @@ export function agent(options: AgentOptions): Agent {
     maxRounds,
   }
   return agent
+}
+
+export interface CurrentTool<Output, Input, Yield = never> {
+  readonly name: string
+  readonly description: string
+  readonly flow: Lite.FlowHandle<Output, Input, Yield>
+}
+
+interface CurrentToolResourceValue {
+  readonly name: string
+  readonly description: string
+  readonly flow: Lite.FlowHandle<unknown, unknown, unknown>
+}
+
+type CurrentToolResource = Lite.Resource<CurrentToolResourceValue>
+
+export interface CurrentToolOptions<
+  Output,
+  Input,
+  Fault = never,
+  Yield = never,
+  D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
+> {
+  name?: string
+  description: string
+  flow: Lite.Flow<Output, Input, Fault, Yield>
+  deps?: D & { flow?: never }
+}
+
+export function currentTool<
+  Output,
+  Input,
+  Fault = never,
+  Yield = never,
+  const D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
+>(options: CurrentToolOptions<Output, Input, Fault, Yield, D>): Lite.Resource<CurrentTool<Output, Input, Yield>> {
+  const name = options.name ?? options.flow.name
+  if (!name) throw new Error("Current agent tool requires a name")
+  const deps = { ...(options.deps ?? {}), flow: options.flow }
+  return resource({
+    name,
+    ownership: "current",
+    deps,
+    factory: (_ctx, resolved) => Object.freeze({
+      name,
+      description: options.description,
+      flow: resolved.flow,
+    }),
+  })
+}
+
+export type CurrentToolValue<T> = T extends Lite.Resource<infer Value> ? Value : never
+
+export interface CurrentAgentOptions<Tools extends Record<string, CurrentToolResource>> {
+  name: string
+  description?: string
+  instructions?: string
+  tools: Tools
+  maxRounds?: number
+}
+
+export interface CurrentAgent<Tools extends Record<string, CurrentToolResource>> {
+  readonly name: string
+  readonly description?: string
+  readonly instructions: string
+  readonly tools: readonly CurrentToolValue<Tools[keyof Tools]>[]
+  readonly maxRounds: number
+}
+
+export function currentAgent<const Tools extends Record<string, CurrentToolResource>>(
+  options: CurrentAgentOptions<Tools>
+): Lite.Resource<CurrentAgent<Tools>> {
+  const maxRounds = options.maxRounds ?? 4
+  return resource({
+    name: options.name,
+    ownership: "current",
+    deps: options.tools,
+    factory: (_ctx, tools) => {
+      const values = Object.values(tools)
+      const names = new Set<string>()
+      for (const tool of values) {
+        if (names.has(tool.name)) throw new Error(`Current agent "${options.name}" has duplicate tool name "${tool.name}"`)
+        names.add(tool.name)
+      }
+      return Object.freeze({
+        name: options.name,
+        description: options.description,
+        instructions: options.instructions ?? "",
+        tools: Object.freeze(values),
+        maxRounds,
+      })
+    },
+  })
+}
+
+export interface TurnOptions<Tools extends Record<string, CurrentToolResource>> {
+  name?: string
+  agent: Lite.Resource<CurrentAgent<Tools>>
+  tags?: Lite.Tagged<unknown>[]
+}
+
+export function turn<const Tools extends Record<string, CurrentToolResource>>(
+  options: TurnOptions<Tools>
+): Lite.Flow<TurnResult, TurnInput> {
+  return flow({
+    name: options.name ?? `${options.agent.name ?? "agent"}-turn`,
+    parse: typed<TurnInput>(),
+    deps: { agent: options.agent, complete },
+    tags: agentStepTags({ workflow: true, kind: "agent" }, options.tags),
+    factory: (ctx, deps) => executeCurrentAgentTurn(ctx, deps.agent, deps.complete),
+  })
 }
 
 function execTurn(
@@ -1610,6 +1725,122 @@ async function executeAgentTurn(
   }
 }
 
+async function executeCurrentAgentTurn<Tools extends Record<string, CurrentToolResource>>(
+  ctx: Lite.ExecutionContext & { readonly input: TurnInput },
+  agent: CurrentAgent<Tools>,
+  complete: Lite.FlowHandle<ModelResponse, ModelRequest>
+): Promise<TurnResult> {
+  const messages = initialMessages(ctx.input)
+  const toolResults: ToolResult[] = []
+  const subagentResults: SubResult[] = []
+  const skillResults: SkillResult[] = []
+  const maxRounds = ctx.input.maxRounds ?? agent.maxRounds
+  let content = ""
+  let rounds = 0
+  const startIndex = (await ctx.resolve(events)).events.length
+
+  await recordAgentEvent(ctx, {
+    type: "agent_start",
+    agentName: agent.name,
+    input: ctx.input,
+  })
+
+  for (let round = 0; round < maxRounds; round++) {
+    rounds = round + 1
+    await recordAgentEvent(ctx, {
+      type: "agent_model_start",
+      agentName: agent.name,
+      round,
+      input: messages,
+    })
+    const response = await complete.exec({
+      input: {
+        agentName: agent.name,
+        instructions: agent.instructions,
+        messages,
+        tools: agent.tools.map(currentToolCapability),
+        skills: [],
+        loadedSkills: [],
+        subagents: [],
+        round,
+      },
+    })
+    if (response.skillCalls !== undefined) throw new Error(`Current agent "${agent.name}" does not support skillCalls`)
+    if (response.subagentCalls !== undefined) throw new Error(`Current agent "${agent.name}" does not support subagentCalls`)
+    content = response.content
+    await recordAgentEvent(ctx, {
+      type: "agent_model_end",
+      agentName: agent.name,
+      round,
+      output: response,
+    })
+
+    const toolCalls = response.toolCalls ?? []
+    if (response.content) messages.push({ role: "assistant", content: response.content })
+    if (response.stop === true || toolCalls.length === 0) break
+
+    for (const call of toolCalls) {
+      const result = await executeCurrentAgentTool(ctx, agent, call)
+      toolResults.push(result)
+      messages.push({
+        role: "tool",
+        name: result.name,
+        content: stringifyAgentValue(result.output),
+        ...(result.id ? { id: result.id, input: result.input } : {}),
+      })
+    }
+  }
+
+  await recordAgentEvent(ctx, {
+    type: "agent_end",
+    agentName: agent.name,
+    output: content,
+  })
+
+  const buffer = await ctx.resolve(events)
+  return {
+    agentName: agent.name,
+    content,
+    messages,
+    skillResults,
+    toolResults,
+    subagentResults,
+    rounds,
+    events: buffer.events.slice(startIndex),
+  }
+}
+
+async function executeCurrentAgentTool<Tools extends Record<string, CurrentToolResource>>(
+  ctx: Lite.ExecutionContext,
+  agent: CurrentAgent<Tools>,
+  call: ToolCall
+): Promise<ToolResult> {
+  const target = findByName(agent.tools, call.name, "tool")
+  await recordAgentEvent(ctx, {
+    type: "agent_tool_start",
+    agentName: agent.name,
+    targetName: target.name,
+    input: call.input,
+  })
+  const output = await target.flow.exec({
+    input: call.input,
+    name: target.name,
+    tags: [agentStepTag({ workflow: true, kind: "tool" }, target.flow.flow.tags)],
+  })
+  await recordAgentEvent(ctx, {
+    type: "agent_tool_end",
+    agentName: agent.name,
+    targetName: target.name,
+    output,
+  })
+  return {
+    name: target.name,
+    id: call.id,
+    input: call.input,
+    output,
+  }
+}
+
 async function executeAgentSkill(
   ctx: Lite.ExecutionContext,
   agent: Agent,
@@ -1730,6 +1961,13 @@ function agentStepTag(defaults: Step, source: Lite.Tagged<any>[] = []): Lite.Tag
 }
 
 function agentToolCapability(tool: AnyTool): Capability {
+  return {
+    name: tool.name,
+    description: tool.description,
+  }
+}
+
+function currentToolCapability(tool: { name: string; description: string }): Capability {
   return {
     name: tool.name,
     description: tool.description,

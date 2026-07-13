@@ -209,6 +209,28 @@ const result = await ctx.exec({
 })
 ```
 
+## 4.1 Managed Tools (2.x)
+
+Use `currentTool()` when a tool flow needs context-owned dependencies. Put those resources in the keyed `tools` record passed to `currentAgent()`; resolution creates one frozen, ordered snapshot of projected flow handles before `turn()` calls the model. The model provider remains the `model` tag used by `complete`.
+
+```ts
+const search = currentTool({
+  description: "Search records.",
+  flow: searchFlow,
+  deps: { backend: tags.required(searchBackend) },
+})
+
+const managed = currentAgent({
+  name: "managed-search",
+  tools: { search },
+})
+
+const run = turn({ agent: managed })
+const result = await ctx.exec({ flow: run, input: { prompt: "find 42" } })
+```
+
+The managed agent has no `.turn` member. A tool call can only dispatch through the exact flow handle advertised in its resolved snapshot, so model input cannot provide required tags or replace the backend dependency.
+
 Why: tools and subagent turns still run through `ctx.exec()`, so the same workflow extension can replay, suspend, route, or time out the work. `events` is a boundary resource, so run inspection is testable without a global observer.
 
 ## 5. Agent Evals

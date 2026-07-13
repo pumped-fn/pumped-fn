@@ -1,5 +1,5 @@
 import { Bash } from "just-bash"
-import { sandbox as agentSandbox, type Sandbox } from "@pumped-fn/sdk"
+import { sandbox as agentSandbox, type Sandbox, type SandboxExecOptions } from "@pumped-fn/sdk"
 import type { Lite } from "@pumped-fn/lite"
 import { dirname } from "node:path/posix"
 
@@ -31,8 +31,8 @@ export function createSandbox(options: JustBashOptions = {}): Sandbox {
       const result = await run().exec(`mkdir -p ${quote(dirname(path))} && cat > ${quote(path)}`, { stdin: content })
       if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `writeFile failed for ${path}`)
     },
-    async exec(command, args = []) {
-      const result = await run().exec([command, ...args].map(quote).join(" "))
+    async exec(command, args = [], options?: SandboxExecOptions) {
+      const result = await run().exec([command, ...args].map(quote).join(" "), { signal: options?.signal })
       return {
         stdout: result.stdout,
         stderr: result.stderr,

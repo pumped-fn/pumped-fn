@@ -4,6 +4,8 @@
 
 Module-level Codex CLI and ACP model providers for `@pumped-fn/sdk`.
 
+Managed tools resolve in core before the provider request and need no provider registry.
+
 ```ts
 import { createScope } from "@pumped-fn/lite"
 import { agent } from "@pumped-fn/sdk"

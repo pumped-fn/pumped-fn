@@ -2,7 +2,7 @@ import { PassThrough } from "node:stream"
 import { EventEmitter } from "node:events"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal, agent, model, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { abortSignal, agent, currentAgent, currentTool, model, turn, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
 import { expect, expectTypeOf, it } from "vitest"
 import * as claudeModule from "../src/index"
 import {
@@ -61,6 +61,45 @@ it("can replace the model tag per context", async () => {
 
   await claudeCtx.close()
   await fakeCtx.close()
+  await scope.dispose()
+})
+
+it("resolves managed tools before the Claude request", async () => {
+  const prompts: PromptInput[] = []
+  const responses = [
+    JSON.stringify({ content: "calling", stop: false, toolCalls: [{ name: "inspect", input: "claude" }] }),
+    JSON.stringify({ content: "done", stop: true }),
+  ]
+  const fake = flow({
+    name: "claude.managed-tools.fake",
+    parse: typed<PromptInput>(),
+    factory: (ctx) => {
+      prompts.push(ctx.input)
+      return responses.shift()!
+    },
+  })
+  const inspect = currentTool({
+    description: "Inspect input.",
+    flow: flow({
+      name: "inspect",
+      parse: typed<string>(),
+      factory: (ctx) => `tool:${ctx.input}`,
+    }),
+  })
+  const managed = currentAgent({ name: "managed", tools: { inspect } })
+  const run = turn({ agent: managed })
+  const scope = createScope({
+    presets: [preset(claudeRun, fake)],
+    tags: [claude, claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+
+  const result = await ctx.exec({ flow: run, input: { prompt: "run" } })
+
+  expect(prompts[0]?.prompt).toContain("inspect")
+  expect(prompts[1]?.prompt).toContain("tool:claude")
+  expect(result.toolResults).toMatchObject([{ name: "inspect", output: "tool:claude" }])
+  await ctx.close()
   await scope.dispose()
 })
 

@@ -1,5 +1,9 @@
 # @pumped-fn/sdk
 
+## 2.x Compatibility
+
+The legacy `tool()` and `agent()` APIs remain unchanged. The 2.x managed-tool API adds `currentTool()`, `currentAgent()`, and `turn()` for an explicitly resolved tool snapshot: tools are resolved before the model call, and each advertised tool dispatches through the exact projected flow handle captured in that snapshot.
+
 Generic runtime primitives on top of `@pumped-fn/lite`: durable workflow steps, sessions,
 materials, event buffers, guards, sandboxes, CLI workers, and an eval harness. Agents and models
 are one primitive family built on the same seam, not the headline.

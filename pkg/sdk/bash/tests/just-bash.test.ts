@@ -88,3 +88,13 @@ it("can be replaced per execution context without rebuilding flows", async () =>
   await fakeCtx.close()
   await scope.dispose()
 })
+
+it("forwards cancellation and prevents late boundary effects", async () => {
+  const target = createSandbox({ bash: new Bash() })
+  const controller = new AbortController()
+  const execution = target.exec("bash", ["-c", "sleep 100; printf late"], { signal: controller.signal })
+
+  setImmediate(() => controller.abort())
+
+  await expect(execution).resolves.toMatchObject({ stdout: "", stderr: "", exitCode: 124 })
+})
