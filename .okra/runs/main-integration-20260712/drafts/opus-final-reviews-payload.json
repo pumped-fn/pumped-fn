@@ -1,0 +1,32 @@
+{
+  "type": "independent_review_set",
+  "reviewer": "claude-opus-4-8",
+  "effort": "high",
+  "base_head": "5c2217348790ef652abc448b2567cb31793cabe5",
+  "reviews": [
+    {
+      "scope": "integrated range 81af2bb2..5c221734",
+      "verdict": "CLEAR",
+      "session_id": "63341e74-f778-4ab2-9ca0-60ecba388d9d",
+      "turns": 43,
+      "terminal_reason": "completed"
+    },
+    {
+      "scope": "CI containment workflow diff",
+      "diff_sha256": "3580eb42204859be50fead433e22540890315458cfbc167c47b1bd4278980742",
+      "verdict": "CLEAR",
+      "session_id": "4e2ae075-dc20-4009-91a0-6f9daaf236fe",
+      "turns": 11,
+      "terminal_reason": "completed"
+    },
+    {
+      "scope": "final nearest-creator lint diff",
+      "diff_sha256": "d2b2574ba5db5d3c1ce90a96c3abb51b74ef207582c99d202835c68308dfd668",
+      "verdict": "CLEAR",
+      "session_id": "5942eaf5-1804-482c-94dd-ce86dc2e0f86",
+      "turns": 12,
+      "terminal_reason": "completed"
+    }
+  ],
+  "unresolved_blocker_count": 0
+}

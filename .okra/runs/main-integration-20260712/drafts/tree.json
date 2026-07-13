@@ -1,0 +1,26 @@
+{
+  "tree_version": 1,
+  "frame_version": 1,
+  "orchestrator": {
+    "owner": "root Codex session",
+    "responsibilities": ["objective checks", "check-ins", "OKR board", "subagent steering"]
+  },
+  "dkrs": [
+    "DKR-TMUX-PROVENANCE",
+    "DKR-DIRTY-MAIN-AUDIT",
+    "DKR-BRANCH-INVENTORY"
+  ],
+  "ckrs": [
+    "CKR-WORK-PRESERVED",
+    "CKR-MAIN-STABLE",
+    "CKR-INDEPENDENTLY-CLEAR"
+  ],
+  "pkrs": [
+    "PKR-CI-FIX",
+    "PKR-LINT-COMPOSITION-PATHS",
+    "PKR-LITE-CLI-REMOVAL",
+    "PKR-PERF-HARNESS",
+    "PKR-SDK-MCP",
+    "PKR-PUMPED-SKILL"
+  ]
+}

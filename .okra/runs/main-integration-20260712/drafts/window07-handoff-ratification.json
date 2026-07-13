@@ -1,0 +1,14 @@
+{
+  "type": "action_authorization",
+  "approver": "human",
+  "action": "Notify tmux window 07 after completion",
+  "required_payload": [
+    "final main commit",
+    "published package versions",
+    "verified Pages URL and revision",
+    "tmux 04 and 05 shutdown status"
+  ],
+  "timing": "after release and live Pages verification",
+  "evidence": "User message: once done, let the tmux window 07 knows that we are done",
+  "recorded_at": "2026-07-12T06:52:00Z"
+}

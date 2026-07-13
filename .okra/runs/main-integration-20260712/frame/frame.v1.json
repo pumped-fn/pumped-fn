@@ -1,0 +1,95 @@
+{
+  "action_envelope": {
+    "allowed": [
+      "fetch",
+      "inspect",
+      "selectively replay",
+      "edit",
+      "test",
+      "commit",
+      "independent review",
+      "push main after validation",
+      "stop tmux 04 and 05 after acknowledgement"
+    ],
+    "approval_gates": [
+      "Human-only frame changes",
+      "Human-only threshold changes",
+      "Human-only release"
+    ],
+    "forbidden": [
+      "force push",
+      "destructive reset",
+      "discard user work",
+      "release",
+      "delete branches",
+      "delete worktrees",
+      "stop tmux before capture and acknowledgement"
+    ],
+    "rollback": "Keep integration units in reviewable commits and preserve source branches/worktrees"
+  },
+  "anti_goals": [
+    {
+      "activation_condition": "Any integration, replay, rejection, or tmux shutdown",
+      "anti_goal_id": "AG-PRESERVATION",
+      "metric_id": "lost_or_duplicated_work_count",
+      "read_method": "Compare each discovered unit manifest with final main and recorded disposition",
+      "source_of_truth": "Git commit and path manifests plus tmux captures",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any code, package, build, or configuration change",
+      "anti_goal_id": "AG-STABILITY",
+      "metric_id": "failed_required_gate_count_and_unresolved_review_blocker_count",
+      "read_method": "Run affected package and repository gates, then parse final review verdict",
+      "source_of_truth": "Recorded gate exits and independent Claude review",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any public API, docs, example, lint, skill, or runtime change",
+      "anti_goal_id": "AG-PRODUCT-TRUTH",
+      "metric_id": "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+      "read_method": "Replay docs/alignment/lint gates and review changed contracts against implementation",
+      "source_of_truth": "Shipped code, public docs, alignment checks, and independent review",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Any history rewrite, release, deletion, push, or tmux shutdown",
+      "anti_goal_id": "AG-AUTHORITY",
+      "metric_id": "destructive_or_unapproved_action_count",
+      "read_method": "Audit executed commands and require captured acknowledgement before stopping windows",
+      "source_of_truth": "Command ledger, Git state, and tmux state",
+      "threshold": 0,
+      "type": "tripwire"
+    },
+    {
+      "activation_condition": "Every claim, disposition, and completion decision",
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count",
+      "read_method": "Verify run store and reject self-certified completion claims",
+      "source_of_truth": "Append-only OKRA records plus deterministic or independent evidence",
+      "threshold": 0,
+      "type": "tripwire"
+    }
+  ],
+  "frame_hash": "main-integration-20260712-confirmed-v1",
+  "frame_version": 1,
+  "human_approval": {
+    "evidence": "User message: confirm",
+    "ratified_at": "2026-07-12T00:00:00Z",
+    "status": "ratified"
+  },
+  "metric_contracts": {
+    "anti_goal_coverage_gap_count": 0,
+    "freshness": "Read before integration, after each unit, before push, after push, and before tmux shutdown; max age 10 minutes",
+    "objective": "Count six explicit disposition records, clean synchronized live main, zero failed required gates, and zero unresolved final Claude blockers"
+  },
+  "objective": {
+    "comparator": "==",
+    "definition": "All six discovered work units are integrated or rejected with evidence; live main is clean and synchronized; required gates pass; Claude Opus 4.8 High has zero unresolved blockers.",
+    "metric_id": "integration_unit_disposition_count",
+    "target": 6
+  }
+}

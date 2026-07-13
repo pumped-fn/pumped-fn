@@ -1,0 +1,15 @@
+{
+  "type": "frame_ratification",
+  "frame_version": 2,
+  "approver": "human",
+  "evidence": "User message: once done, cut those releases, expect new pages updated",
+  "changes": {
+    "objective_extension": "Publish the integrated package releases and verify the updated public Pages deployment",
+    "action_envelope_additions": [
+      "run the repository release workflow after final validation",
+      "publish changeset-governed package releases",
+      "deploy and verify GitHub Pages"
+    ]
+  },
+  "ratified_at": "2026-07-12T06:50:00Z"
+}
