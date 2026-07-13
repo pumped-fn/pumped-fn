@@ -53,7 +53,16 @@ jobs:
         run: pnpm typecheck
 
       - name: Run tests
-        run: pnpm test --passWithNoTests
+        timeout-minutes: 15
+        run: pnpm -r --workspace-concurrency=2 test --passWithNoTests
+
+      - name: Diagnose test failure
+        if: failure()
+        run: |
+          nproc
+          lscpu
+          free -h
+          ps -eo pid,ppid,stat,etime,%cpu,%mem,wchan:32,comm --sort=-%cpu
 
       - name: Run comparison browser smoke
         run: pnpm -F @pumped-fn/compare browser:smoke
