@@ -1,0 +1,21 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "anti_goal_id": "AG-PRODUCT-TRUTH",
+  "metric_id": "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+  "value": 0,
+  "threshold": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-13T07:31:12Z",
+  "recorded_at": "2026-07-13T07:31:12Z",
+  "source": "Repository alignment, scoped lint, browser smoke, and independent final review",
+  "freshness": {
+    "status": "fresh",
+    "max_age": "10m"
+  },
+  "evidence_refs_or_hashes": [
+    "workers/final-correction-validator/progress.jsonl#seq=1",
+    "drafts/opus-final-reviews-payload.json"
+  ],
+  "decision": "held"
+}

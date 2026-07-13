@@ -1,0 +1,20 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "integration_unit_disposition_count",
+  "value": 6,
+  "target": 6,
+  "comparator": "==",
+  "observed_at": "2026-07-13T07:31:12Z",
+  "recorded_at": "2026-07-13T07:31:12Z",
+  "source": "Git ancestry for the six governed unit commits plus HEAD and origin/main equality",
+  "freshness": {
+    "status": "fresh",
+    "max_age": "10m"
+  },
+  "evidence_refs_or_hashes": [
+    "git:3357d7d7b799b896aaa43e12fcbcaa77660be264",
+    "workers/final-correction-validator/progress.jsonl#seq=1"
+  ],
+  "decision": "target_met"
+}

@@ -1,0 +1,89 @@
+{
+  "type": "terminal_verification",
+  "worker_id": "terminal-validator",
+  "observed_at": "2026-07-13T07:37:00Z",
+  "decision": "accepted",
+  "accepted": 10,
+  "rejected": 0,
+  "unknown": 0,
+  "claims": [
+    {
+      "claim_id": "objective_6_of_6",
+      "decision": "accepted",
+      "evidence_refs": [
+        "ledger.jsonl#seq=8",
+        "terminal/main-integration-terminal.v1.json#objective",
+        "git:3357d7d7b799b896aaa43e12fcbcaa77660be264"
+      ]
+    },
+    {
+      "claim_id": "live_workflow_green",
+      "decision": "accepted",
+      "evidence_refs": [
+        "https://github.com/pumped-fn/pumped-fn/actions/runs/29231688912"
+      ]
+    },
+    {
+      "claim_id": "opus_high_clear",
+      "decision": "accepted",
+      "evidence_refs": [
+        "terminal/main-integration-terminal.v1.json#second_opinion_evidence",
+        "workers/release-state-validator/progress.jsonl#seq=1"
+      ]
+    },
+    {
+      "claim_id": "human_tmux_waiver",
+      "decision": "accepted",
+      "evidence_refs": [
+        "ledger.jsonl#seq=7"
+      ]
+    },
+    {
+      "claim_id": "fresh_direct_reads",
+      "decision": "accepted",
+      "evidence_refs": [
+        "ledger.jsonl#seq=8 through seq=14"
+      ]
+    },
+    {
+      "claim_id": "terminal_checkin",
+      "decision": "accepted",
+      "evidence_refs": [
+        "checkins.jsonl#seq=1"
+      ]
+    },
+    {
+      "claim_id": "terminal_matches_ledger",
+      "decision": "accepted",
+      "evidence_refs": [
+        "ledger.jsonl#seq=15",
+        "sha256:19e66baba66c4ab968264d5f9cc81b0e4d71e2b411f61c4e7bb238175f1b0a7e"
+      ]
+    },
+    {
+      "claim_id": "five_walls_held_and_standing",
+      "decision": "accepted",
+      "evidence_refs": [
+        "ledger.jsonl#seq=9 through seq=13",
+        "terminal/main-integration-terminal.v1.json#anti_goal_terminal_reads"
+      ]
+    },
+    {
+      "claim_id": "no_candidates_or_flags",
+      "decision": "accepted",
+      "evidence_refs": [
+        "terminal/main-integration-terminal.v1.json",
+        "flags.jsonl"
+      ]
+    },
+    {
+      "claim_id": "pumped_skill_untouched_and_store_valid",
+      "decision": "accepted",
+      "evidence_refs": [
+        "workers/unit-manifest-audit/progress.jsonl#seq=1",
+        "terminal/main-integration-terminal.v1.json"
+      ]
+    }
+  ],
+  "unknowns": []
+}

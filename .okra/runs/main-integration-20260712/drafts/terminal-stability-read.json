@@ -1,0 +1,21 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "anti_goal_id": "AG-STABILITY",
+  "metric_id": "failed_required_gate_count_and_unresolved_review_blocker_count",
+  "value": 0,
+  "threshold": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-13T07:31:12Z",
+  "recorded_at": "2026-07-13T07:31:12Z",
+  "source": "GitHub Release run 29231688912 and Claude Opus 4.8 High final review",
+  "freshness": {
+    "status": "fresh",
+    "max_age": "10m"
+  },
+  "evidence_refs_or_hashes": [
+    "https://github.com/pumped-fn/pumped-fn/actions/runs/29231688912",
+    "workers/release-state-validator/progress.jsonl#seq=1"
+  ],
+  "decision": "held"
+}

@@ -1,0 +1,9 @@
+{
+  "type": "human_action_waiver",
+  "action": "stop tmux window 04 session pumped-skill",
+  "decision": "waived",
+  "approver": "human",
+  "evidence": "User message: ah, that can be skipped. Now, let's get back to /goal",
+  "effect": "Leave pumped-skill, its attached client, branch, and worktree untouched",
+  "recorded_at": "2026-07-13T07:31:12Z"
+}

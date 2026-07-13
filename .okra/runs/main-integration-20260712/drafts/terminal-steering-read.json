@@ -1,0 +1,21 @@
+{
+  "type": "metric_read",
+  "metric_kind": "objective_support",
+  "metric_id": "steering_value_score",
+  "value": 1,
+  "target": 0.75,
+  "comparator": ">=",
+  "observed_at": "2026-07-13T07:31:12Z",
+  "recorded_at": "2026-07-13T07:31:12Z",
+  "source": "Terminal check-in changed the decision from blocked cleanup to human-waived terminalization while preserving all direct metrics",
+  "freshness": {
+    "status": "fresh",
+    "max_age": "10m"
+  },
+  "evidence_refs_or_hashes": [
+    "ledger.jsonl#seq=7",
+    "ledger.jsonl#seq=8",
+    "ledger.jsonl#seq=13"
+  ],
+  "decision": "target_met"
+}

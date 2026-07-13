@@ -1,0 +1,186 @@
+{
+  "type": "main_integration_terminal",
+  "terminal_version": 1,
+  "run_id": "main-integration-20260712",
+  "status": "achieved",
+  "recorded_at": "2026-07-13T07:33:03Z",
+  "frame_version": 2,
+  "frame_ref": "frame/frame.v1.json and ledger.jsonl#seq=4",
+  "tree_ref": "tree/tree.v1.json",
+  "objective": {
+    "metric_id": "integration_unit_disposition_count",
+    "target": 6,
+    "comparator": "==",
+    "value": 6,
+    "direct_metric_ref": "ledger.jsonl#seq=8",
+    "head": "3357d7d7b799b896aaa43e12fcbcaa77660be264",
+    "origin_main": "3357d7d7b799b896aaa43e12fcbcaa77660be264",
+    "live_workflow": "https://github.com/pumped-fn/pumped-fn/actions/runs/29231688912"
+  },
+  "requirements": [
+    {
+      "requirement": "Combine all governed work from tmux windows 04 and 05",
+      "status": "proved",
+      "evidence_ref": "ledger.jsonl#seq=8"
+    },
+    {
+      "requirement": "Keep main stable, current, and synchronized",
+      "status": "proved",
+      "evidence_ref": "ledger.jsonl#seq=10"
+    },
+    {
+      "requirement": "Use delegated workers under the confirmed reverse-tornado frame",
+      "status": "proved",
+      "evidence_ref": "workers/final-correction-validator/progress.jsonl#seq=1"
+    },
+    {
+      "requirement": "Reach Claude Opus 4.8 High CLEAR",
+      "status": "proved",
+      "evidence_ref": "workers/release-state-validator/progress.jsonl#seq=1"
+    },
+    {
+      "requirement": "Stop duplicate tmux session after acknowledgement",
+      "status": "waived by human",
+      "evidence_ref": "ledger.jsonl#seq=7"
+    }
+  ],
+  "anti_goal_terminal_reads": [
+    {
+      "anti_goal_id": "AG-PRESERVATION",
+      "metric_id": "lost_or_duplicated_work_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "classification": "standing",
+      "metric_ref": "ledger.jsonl#seq=9"
+    },
+    {
+      "anti_goal_id": "AG-STABILITY",
+      "metric_id": "failed_required_gate_count_and_unresolved_review_blocker_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "classification": "standing",
+      "metric_ref": "ledger.jsonl#seq=10"
+    },
+    {
+      "anti_goal_id": "AG-PRODUCT-TRUTH",
+      "metric_id": "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "classification": "standing",
+      "metric_ref": "ledger.jsonl#seq=11"
+    },
+    {
+      "anti_goal_id": "AG-AUTHORITY",
+      "metric_id": "destructive_or_unapproved_action_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "classification": "standing",
+      "metric_ref": "ledger.jsonl#seq=12"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "classification": "standing",
+      "metric_ref": "ledger.jsonl#seq=13"
+    }
+  ],
+  "terminal_checkin_ref": "checkins.jsonl#seq=1",
+  "accepted_checkpoints": [
+    "workers/unit-manifest-audit/progress.jsonl#seq=1",
+    "workers/tmux-preservation-audit/progress.jsonl#seq=1",
+    "workers/final-correction-validator/progress.jsonl#seq=1",
+    "workers/release-state-validator/progress.jsonl#seq=1"
+  ],
+  "second_opinion_evidence": [
+    {
+      "reviewer": "claude-opus-4-8",
+      "effort": "high",
+      "session_id": "63341e74-f778-4ab2-9ca0-60ecba388d9d",
+      "verdict": "CLEAR",
+      "scope": "integrated range"
+    },
+    {
+      "reviewer": "claude-opus-4-8",
+      "effort": "high",
+      "session_id": "46c98b91-5283-40c7-9206-40e9b3e3721e",
+      "verdict": "CLEAR",
+      "scope": "final live release-state correction"
+    }
+  ],
+  "retained_trace_manifest": [
+    "frame/frame.v1.json",
+    "tree/tree.v1.json",
+    "ledger.jsonl",
+    "checkins.jsonl",
+    "flags.jsonl",
+    "workers/final-correction-validator/progress.jsonl",
+    "workers/release-state-validator/progress.jsonl",
+    "drafts/opus-final-reviews-payload.json",
+    "drafts/release-state-final-review-payload.json",
+    "drafts/tmux-cleanup-waiver.json"
+  ],
+  "continuation_packet": {
+    "status": "closed; open a successor round before touching standing-wall artifacts",
+    "standing_set_read_required": true,
+    "admissibility_required": true,
+    "frame_input_required_before_guarded_edit": true,
+    "standing_walls": [
+      "AG-PRESERVATION",
+      "AG-STABILITY",
+      "AG-PRODUCT-TRUTH",
+      "AG-AUTHORITY",
+      "AG-INTEGRITY"
+    ],
+    "known_residuals": [
+      "pumped-skill remains live by human waiver",
+      "no notifier tmux session exists",
+      "sdk-mcp and sdk-pi first publication remains outside this integration objective"
+    ]
+  },
+  "run_local_candidate_anti_goals": [],
+  "unverified_run_local_anti_goal_count": 0,
+  "dead_hypothesis_artifact_count": 0,
+  "unresolved_flags": [],
+  "derived_process_signal_counts": {
+    "dkr_empty_count": 0,
+    "execution_to_discovery_handback_count": 0,
+    "late_discovery_count": 0,
+    "regression_count": 0,
+    "rework_count": 0,
+    "ungoverned_write_count": 0
+  },
+  "delegated_contract": {
+    "orchestrator_rule": "The orchestrator owns objective checks, check-ins, the OKR board, and subagent steering until the objective metric reaches target; this run reached integration_unit_disposition_count == 6.",
+    "model_phrasing": "Model phrasing: GPT-5.x detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4.",
+    "action_envelope": "Action envelope: inspect, integrate, edit, test, review, commit, and push were allowed; force push, destructive reset, work loss, unapproved release, and unacknowledged tmux shutdown were forbidden; only the human could change those gates.",
+    "anti_goal_coverage": "Anti-goal coverage: AG-PRESERVATION -> readable; AG-STABILITY -> readable; AG-PRODUCT-TRUTH -> readable; AG-AUTHORITY -> readable; AG-INTEGRITY -> readable; anti_goal_coverage_gap_count == 0.",
+    "candidate_gate": "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
+    "role_grammar": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+    "storage_integrity": "Storage integrity: append-only records are the source of truth, status and progress files are generated views, and claims are accepted only on independent deterministic evidence, not one LLM's say-so.",
+    "worker_progress": "Worker progress: .okra/runs/main-integration-20260712/workers/<worker-id>/progress.jsonl was written at each worker finish, unknown hit, and heartbeat.",
+    "heartbeat": "Heartbeat cadence and next_check_at: ten minutes while workers were live; next_check_at is closed after terminalization.",
+    "introspection_cadence": "Introspection cadence: DKR checkpoint acceptance, any flag opening, level descent before plan-to-task commitment, terminalization, and every third check-in.",
+    "standing_walls": "Standing walls: AG-PRESERVATION, AG-STABILITY, AG-PRODUCT-TRUTH, AG-AUTHORITY, and AG-INTEGRITY remain standing; only the human may retire them at merge, handoff, or decommission.",
+    "in_progress_rule": "In-progress worker narrative is not evidence; only worker progress, check-ins, metric reads, flags, or accepted checkpoints can influence the next dispatch.",
+    "pkr_handback_rule": "PKRs hand back on unknown discovery instead of researching or resolving unknowns inside execution.",
+    "admissibility_before_action": "Admissibility before action: each committing move was screened against fresh wall evidence before dispatch.",
+    "direct_read_after_action": "Direct read after action: Git, workflow, lint, tests, store, and review sources were read after moves returned.",
+    "paired_goal_anti_goal_eval": "Paired goal/anti-goal eval: objective 6 == target 6 and every wall value 0 == threshold 0.",
+    "pointless": "Pointless opens when work finished or a CKR metric moved, but the objective metric stays flat / does not move after the lag window; here it would stop integration and force re-aiming.",
+    "stalled": "Stalled opens when a branch's computed risk stays flat and at or above the certainty threshold across the trailing check-in window while it keeps committing, never on absolute risk height; it pauses commits while discovery stays allowed and only a human may waive it.",
+    "flags": "cannot stops a branch when discovery is exhausted; breaking pauses committing moves on a breached wall; pointless stops work that does not move the objective; stalled pauses a flat-risk committing branch; authority_drift stops moves outside the human-set envelope.",
+    "authority_separation": "Human input records intent and context, fresh metrics show outcomes, DKRs reduce unknowns, and the action envelope bounds permission. A run-store field cannot grant permission. Contradictory evidence opens a recorded frame review."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "anti_goal_id": "AG-INTEGRITY",
+  "metric_id": "anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count",
+  "value": 0,
+  "threshold": 0,
+  "comparator": "==",
+  "observed_at": "2026-07-13T07:31:12Z",
+  "recorded_at": "2026-07-13T07:31:12Z",
+  "source": "Verified append-only OKRA store, deterministic replay, and independent Claude review",
+  "freshness": {
+    "status": "fresh",
+    "max_age": "10m"
+  },
+  "evidence_refs_or_hashes": [
+    "workers/final-correction-validator/progress.jsonl#seq=1",
+    "workers/release-state-validator/progress.jsonl#seq=1"
+  ],
+  "decision": "held"
+}
