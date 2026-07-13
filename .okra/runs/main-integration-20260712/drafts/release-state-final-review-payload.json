@@ -1,0 +1,49 @@
+{
+  "type": "release_state_final_review",
+  "worker_id": "release-state-validator",
+  "observed_at": "2026-07-13T07:18:00Z",
+  "base_head": "540bc579701537354997cb49f397806fc7137c3d",
+  "failed_run": {
+    "run_id": 29230578666,
+    "url": "https://github.com/pumped-fn/pumped-fn/actions/runs/29230578666",
+    "test_step": "success",
+    "browser_smoke_step": "success",
+    "lightpanda_step": "success",
+    "release_step": "failure",
+    "failure": "ordinary no-changeset push attempted first publication of sdk-pi and sdk-mcp"
+  },
+  "correction": {
+    "path": ".github/workflows/release.yml",
+    "sha256": "e3af640f16d0709e1d506b7c8884c84123194589ba1175bbca1b3c22d4a4a984",
+    "diff_sha256": "482143c6ffd77eef9654ada05e84f0a0f64f8907907c348ef62ac69eb23f9674",
+    "ordinary_no_changeset": "skip changesets action",
+    "pending_changeset": "create or update release PR",
+    "version_subject": "publish versioned packages",
+    "bootstrap_authority": ".github/workflows/npm-bootstrap.yml remains manual"
+  },
+  "validation": {
+    "actionlint_exit": 0,
+    "diff_check_exit": 0,
+    "repository_verify_exit": 0,
+    "repository_lint_exit": 0,
+    "lint_diagnostics": 1,
+    "lint_diagnostic_status": "pre-existing warning",
+    "detector_table_exit": 0,
+    "changeset_status_exit": 0
+  },
+  "independent_review": {
+    "reviewer": "claude-opus-4-8",
+    "effort": "high",
+    "session_id": "46c98b91-5283-40c7-9206-40e9b3e3721e",
+    "turns": 11,
+    "verdict": "CLEAR",
+    "unresolved_blocker_count": 0
+  },
+  "anti_goals": {
+    "lost_or_duplicated_work_count": 0,
+    "failed_required_gate_count": 0,
+    "unresolved_review_blocker_count": 0,
+    "destructive_or_unapproved_action_count": 0,
+    "single_llm_truth_acceptance_count": 0
+  }
+}

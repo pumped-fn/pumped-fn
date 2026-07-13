@@ -77,7 +77,25 @@ jobs:
         id: release_title
         run: echo "title=$(bash scripts/get-release-title.sh)" >> $GITHUB_OUTPUT
 
+      - name: Detect release work
+        id: release_state
+        shell: bash
+        run: |
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md -print -quit | grep -q .; then
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          subject=$(git log -1 --format=%s)
+          if [[ "$subject" =~ ^chore:\ version\ packages(\ \(#[0-9]+\))?$ ]]; then
+            echo "is_version_commit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_version_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release Pull Request or Publish
+        if: "${{ steps.release_state.outputs.has_changesets == 'true' || steps.release_state.outputs.is_version_commit == 'true' }}"
         id: changesets
         uses: changesets/action@v1.9.0
         with:

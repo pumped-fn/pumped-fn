@@ -1,0 +1,15 @@
+{
+  "type": "admissibility",
+  "action": "cancel GitHub Actions run 29226782625",
+  "reason": "The run has remained in Run tests since 2026-07-13T05:39:11Z and blocks the validated bounded replacement run 29230578666.",
+  "source_of_truth": "gh run view 29226782625 and gh run list --branch main",
+  "active_step": "Run tests",
+  "publish_step_started": false,
+  "projected_anti_goal_values": {
+    "lost_or_duplicated_work_count": 0,
+    "destructive_or_unapproved_action_count": 0,
+    "anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count": 0
+  },
+  "decision": "admit",
+  "decided_at": "2026-07-13T07:00:00Z"
+}
