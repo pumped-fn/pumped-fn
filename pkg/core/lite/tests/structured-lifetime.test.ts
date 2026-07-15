@@ -34,6 +34,95 @@ function abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
 }
 
 describe("ExecutionContext structured lifetime", () => {
+  it("runs one owned boundary or keeps a managed boundary open side by side", async () => {
+    const tenant = tag<string>({ label: "tenant" })
+    const events: string[] = []
+    const lease = resource({
+      deps: { tenant: tags.required(tenant) },
+      factory: (ctx, { tenant }) => {
+        ctx.cleanup((target, value) => { target.push(`close:${value}`) }, events, tenant)
+        return tenant
+      },
+    })
+    const read = flow({
+      deps: { lease },
+      factory: (_ctx, { lease }) => lease,
+    })
+    const scope = createScope()
+
+    const oneShot = scope.run({ flow: read, tags: [tenant("one-shot")] })
+    expectTypeOf(oneShot).toEqualTypeOf<Promise<string>>()
+    await expect(oneShot).resolves.toBe("one-shot")
+    expect(events).toEqual(["close:one-shot"])
+
+    const ctx = scope.createContext({ tags: [tenant("managed")] })
+    await expect(ctx.exec({ flow: read })).resolves.toBe("managed")
+    await expect(ctx.exec({ flow: read })).resolves.toBe("managed")
+    expect(events).toEqual(["close:one-shot"])
+
+    await ctx.close()
+    expect(events).toEqual(["close:one-shot", "close:managed"])
+    await scope.dispose()
+  })
+
+  it("closes scope.run failures with the failed result", async () => {
+    const closes: Lite.CloseResult[] = []
+    const lease = resource({
+      factory: (ctx) => {
+        ctx.onClose((result, target) => { target.push(result) }, closes)
+        return "lease"
+      },
+    })
+    const fail = flow({
+      deps: { lease },
+      factory: () => { throw new Error("failed") },
+    })
+    const scope = createScope()
+
+    await expect(scope.run({ flow: fail })).rejects.toThrow("failed")
+    expect(closes).toEqual([{ ok: false, error: expect.any(Error) }])
+    await scope.dispose()
+  })
+
+  it("seeds scope.run tags once and keeps them above flow defaults", async () => {
+    const value = tag<string>({ label: "value" })
+    const read = flow({
+      tags: [value("flow")],
+      deps: { values: tags.all(value) },
+      factory: (_ctx, { values }) => values,
+    })
+    const scope = createScope()
+
+    await expect(scope.run({ flow: read, tags: [value("run")] })).resolves.toEqual(["run"])
+    await scope.dispose()
+  })
+
+  it("joins caller cancellation to the scope.run owner boundary", async () => {
+    const started = deferred()
+    const lease = resource({
+      factory: (ctx) => new Promise<string>((_resolve, reject) => {
+        const abort = () => reject(ctx.signal.reason)
+        ctx.signal.addEventListener("abort", abort, { once: true })
+        ctx.cleanup((signal, listener) => signal.removeEventListener("abort", listener), ctx.signal, abort)
+        started.resolve()
+      }),
+    })
+    const read = flow({
+      deps: { lease },
+      factory: (_ctx, { lease }) => lease,
+    })
+    const scope = createScope()
+    const caller = new AbortController()
+    const pending = scope.run({ flow: read, signal: caller.signal })
+    const error = new Error("cancelled")
+
+    await started.promise
+    caller.abort(error)
+
+    await expect(pending).rejects.toBe(error)
+    await scope.dispose()
+  })
+
   it("passes inferred resource cleanup dependencies", async () => {
     const events: string[] = []
     const backend = resource({

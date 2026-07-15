@@ -224,6 +224,7 @@ type ExecFlowRuntimeOptions = {
   name?: string
   tags?: Lite.Tagged<any>[]
   signal?: AbortSignal
+  blockedTags?: Lite.Tagged<any>[]
 }
 
 function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
@@ -2083,6 +2084,90 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
+  run<Output, Input, Yield = never>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Promise<Output>
+  run<Output, const Args extends unknown[]>(options: Lite.ExecFnOptions<Output, Args>): Promise<Output>
+  async run(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+    const ctx = this.createContext(options.tags || options.signal
+      ? { tags: options.tags, signal: options.signal }
+      : undefined) as ExecutionContextImpl
+    try {
+      const output = await ctx.exec("flow" in options
+        ? { ...options, tags: undefined, signal: undefined, blockedTags: options.tags }
+        : { ...options, tags: undefined, signal: undefined })
+      await ctx.close({ ok: true })
+      return output
+    } catch (error) {
+      await ctx.close({ ok: false, error })
+      throw error
+    }
+  }
+
+  runStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  runStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown>
+  runStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown> {
+    let consumed = false
+    let started = false
+    let settleResult!: (value: unknown) => void
+    let failResult!: (error: unknown) => void
+    const result = new Promise<unknown>((resolve, reject) => {
+      settleResult = resolve
+      failResult = reject
+    })
+    result.catch(() => {})
+    const owner = this
+
+    return {
+      get result() {
+        if (!started) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("runStream() results can be consumed only once.")
+        consumed = true
+        return (async function* () {
+          started = true
+          let ctx: ExecutionContextImpl | undefined
+          let closed = false
+          try {
+            ctx = owner.createContext(options.tags || options.signal
+              ? { tags: options.tags, signal: options.signal }
+              : undefined) as ExecutionContextImpl
+            const stream = ctx.execStream({
+              ...options,
+              tags: undefined,
+              signal: undefined,
+              blockedTags: options.tags,
+            })
+            for await (const value of stream) yield value
+            const output = await stream.result
+            await ctx.close({ ok: true })
+            closed = true
+            settleResult(output)
+            return output
+          } catch (error) {
+            try {
+              await ctx?.close({ ok: false, error })
+            } finally {
+              closed = true
+              failResult(error)
+            }
+            throw error
+          } finally {
+            if (!closed && ctx) {
+              const error = new DOMException("Flow stream aborted", "AbortError")
+              ctx.abort(error)
+              try {
+                await ctx.close({ ok: false, error })
+              } finally {
+                failResult(error)
+              }
+            }
+          }
+        })()
+      },
+    } as Lite.FlowStream<unknown, unknown>
+  }
+
   createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
     if (this.disposed) throw new Error("Scope is disposed")
     assertCreateContextOptions(options)
@@ -2116,16 +2201,16 @@ class ScopeImpl implements Lite.Scope {
 function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
   if (options === undefined) return
   if (options === null || typeof options !== "object" || Array.isArray(options)) {
-    throw new Error("createContext() expects { tags, parent }")
+    throw new Error("createContext() expects { tags, parent, signal }")
   }
 
   const record = options as Record<string, unknown>
-  const invalidKey = Object.keys(record).find((key) => key !== "tags" && key !== "parent")
+  const invalidKey = Object.keys(record).find((key) => key !== "tags" && key !== "parent" && key !== "signal")
   if (invalidKey) {
-    throw new Error(`createContext() expects { tags, parent }; received "${invalidKey}"`)
+    throw new Error(`createContext() expects { tags, parent, signal }; received "${invalidKey}"`)
   }
   if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
-    throw new Error("createContext() expects { tags, parent }")
+    throw new Error("createContext() expects { tags, parent, signal }")
   }
 }
 
@@ -2499,11 +2584,16 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     } as Lite.FlowStream<unknown, unknown>
   }
 
-  private seedTags(childCtx: ExecutionContextImpl, execTags?: Lite.Tagged<any>[], flowTags?: Lite.Tagged<any>[]): void {
+  private seedTags(
+    childCtx: ExecutionContextImpl,
+    execTags?: Lite.Tagged<any>[],
+    flowTags?: Lite.Tagged<any>[],
+    blockedTags?: Lite.Tagged<any>[]
+  ): void {
     if (execTags) for (let i = 0; i < execTags.length; i++) {
       childCtx.appendTagValue(execTags[i]!.key, execTags[i]!.value)
     }
-    const blocked = new Set((execTags ?? []).map((tagged) => tagged.key))
+    const blocked = new Set([...(execTags ?? []), ...(blockedTags ?? [])].map((tagged) => tagged.key))
     if (flowTags) for (let i = 0; i < flowTags.length; i++) {
       if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
     }
@@ -2516,7 +2606,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     streaming: boolean
   }> {
     this.assertOpen()
-    const { flow, input, rawInput, name: execName, tags: execTags } = options
+    const { flow, input, rawInput, name: execName, tags: execTags, blockedTags } = options
     const presetValue = this.scope.getFlowPreset(flow)
     if (presetValue !== undefined && isFlow(presetValue)) {
       return this.createChildInvocation({ ...options, flow: presetValue })
@@ -2532,7 +2622,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         signal: options.signal
       })
 
-      this.seedTags(childCtx, execTags, flow.tags)
+      this.seedTags(childCtx, execTags, flow.tags, blockedTags)
 
       return {
         flow,
@@ -2761,7 +2851,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.closePromise
   }
 
-  private abort(reason: unknown): void {
+  abort(reason: unknown): void {
     if (!this.abortController.signal.aborted) this.abortController.abort(reason)
   }
 

@@ -49,7 +49,7 @@ export function requireAsyncGenerator(value: unknown): AsyncGenerator<unknown, u
 }
 
 export function streamResultBeforeStartError(): Error {
-  return new Error("execStream().result is unavailable before iteration begins; use exec() to drain a streaming flow to its final output.")
+  return new Error("execStream()/runStream().result is unavailable before iteration begins; use exec() to drain from a context or run() from a scope.")
 }
 
 const streamingExecSymbol = Symbol("pumped-fn.streamingExec")

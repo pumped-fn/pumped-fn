@@ -8,7 +8,7 @@ see `pkg/core/lite/dist/index.d.mts`.
 
 Before adding helpers around the graph, keep ownership at the real boundary: composition roots and tests
 own `createScope({ presets, tags, extensions })`; product work enters through atoms, flows, resources,
-tags, controllers, flow handles, or `ctx.exec`; transport atoms wrap raw ambient IO; capability atoms
+tags, controllers, flow handles, `scope.run*`, or `ctx.exec*`; transport atoms wrap raw ambient IO; capability atoms
 depend on transports; feature nodes depend on capabilities. For review rules, see the
 [code review guide](../../../docs/code-review-guide.md).
 
@@ -18,7 +18,8 @@ For foreign integration, wrap the client in an adapter atom (the substitution se
 
 ### Request Lifecycle
 
-Model a request boundary with cleanup and shared context.
+Use `scope.run*` when one execution owns the boundary. Use `createContext` with `ctx.exec*` when several
+executions share resources, tags, and cancellation.
 
 ```mermaid
 sequenceDiagram
@@ -28,18 +29,23 @@ sequenceDiagram
     participant Flow
 
     App->>Scope: createScope()
-    App->>Scope: scope.createContext({ tags })
-    Scope-->>App: ctx
-
-    App->>Ctx: ctx.exec({ flow, input, tags })
-    Ctx->>Flow: factory(childCtx, deps)
-    Flow-->>Ctx: output
-    Ctx->>Ctx: childCtx.close(result)
-    Ctx-->>App: output
-
-    App->>Ctx: ctx.onClose(result => cleanup)
-    App->>Ctx: ctx.close(result?)
-    Ctx->>Ctx: run onClose(CloseResult) LIFO
+    alt one execution
+        App->>Scope: scope.run({ flow, input, tags })
+        Scope->>Ctx: create owned context
+        Ctx->>Flow: factory(childCtx, deps)
+        Flow-->>Ctx: output
+        Ctx->>Ctx: close(CloseResult)
+        Ctx-->>App: output
+    else managed lifetime
+        App->>Scope: scope.createContext({ tags })
+        Scope-->>App: ctx
+        App->>Ctx: ctx.exec({ flow, input, tags })
+        Ctx->>Flow: factory(childCtx, deps)
+        Flow-->>Ctx: output
+        Ctx-->>App: output
+        App->>Ctx: ctx.close(result?)
+        Ctx->>Ctx: run onClose(CloseResult) LIFO
+    end
 ```
 
 ### Extensions Pipeline

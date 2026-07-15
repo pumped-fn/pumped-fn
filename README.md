@@ -9,9 +9,10 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  └─ execution context -> session.run -> agent.turn
-                                       ├─ role + selected capability flows
-                                       └─ provider + backend adapters
+  ├─ run / runStream -> owned execution context ─┐
+  └─ createContext -> exec / execStream ─────────┴─ session.run -> agent.turn
+                                                               ├─ role + selected capability flows
+                                                               └─ provider + backend adapters
 ```
 
 Executing the entry flow activates its complete recursively declared dependency tree before the entry factory starts. Required tags are checked at runtime during activation. A missing provider, tool backend, validation engine, or session binding fails before semantic work begins. Tests replace the same graph edges at `createScope`; they do not mock the tree.
@@ -49,9 +50,7 @@ const scope = createScope({
   tags: [clock({ now: () => new Date() })],
 })
 
-const ctx = scope.createContext()
-await ctx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
-await ctx.close()
+await scope.run({ flow: saveInvoice, input: { id: "inv-1" } })
 await scope.dispose()
 
 const calls: string[] = []
@@ -67,12 +66,10 @@ const testScope = createScope({
   tags: [clock({ now: () => new Date("2026-07-05T12:00:00.000Z") })],
 })
 
-const testCtx = testScope.createContext()
-const result = await testCtx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
+const result = await testScope.run({ flow: saveInvoice, input: { id: "inv-1" } })
 
 if (result.id !== "inv-1" || calls.length !== 1) throw new Error("unexpected save")
 
-await testCtx.close()
 await testScope.dispose()
 ```
 
@@ -92,11 +89,8 @@ const greet = flow({
 })
 
 const scope = createScope()
-const ctx = scope.createContext()
+console.log(await scope.run({ flow: greet, input: { name: "Ada" } }))
 
-console.log(await ctx.exec({ flow: greet, input: { name: "Ada" } }))
-
-await ctx.close()
 await scope.dispose()
 ```
 
@@ -104,7 +98,7 @@ The core package has zero runtime dependencies and ~12 kB min+gzip.
 
 ## Mental model
 
-A `scope` is the composition and test boundary. `atom` values live in the scope. `flow` executions live in an execution context. `resource` values are owned by that context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution. Streaming flows use `execStream`.
+A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
 
 SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 

@@ -104,12 +104,10 @@ const loadUser = flow({
 })
 
 const scope = createScope({ tags: [tenant("acme")] })
-const ctx = scope.createContext()
-const user = await ctx.exec({ flow: loadUser, input: { id: "u1" } })
+const user = await scope.run({ flow: loadUser, input: { id: "u1" } })
 
 if (user.name !== "acme:u1") throw new Error("unexpected user")
 
-await ctx.close()
 await scope.dispose()
 ```
 
@@ -120,6 +118,40 @@ What this demonstrates:
 - `users` is a capability atom. It exposes domain operations without exposing transport plumbing.
 - `loadUser` is a flow. It receives input through an execution context and uses declared dependencies.
 - The composition root chooses the tenant and owns cleanup.
+
+### One execution or a managed lifetime
+
+`scope.run` and `scope.runStream` create and close one execution boundary. Use an explicit context when
+resources, tags, or cancellation must span several executions.
+
+| One owned execution | Managed execution lifetime |
+| --- | --- |
+| `scope.run({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.exec({ flow, input })` |
+| `scope.runStream({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.execStream({ flow, input })` |
+| Scope closes the temporary context after success, failure, or stream cancellation | The caller closes `ctx` after the last related execution |
+
+```ts
+const loadUser = flow({
+  parse: typed<{ id: string }>(),
+  factory: (ctx) => ctx.input,
+})
+
+const result = await scope.run({ flow: loadUser, input: { id: "u1" } })
+
+const ctx = scope.createContext()
+try {
+  const first = await ctx.exec({ flow: loadUser, input: { id: "u1" } })
+  const second = await ctx.exec({ flow: loadUser, input: { id: "u2" } })
+  console.log(first, second)
+} finally {
+  await ctx.close()
+}
+```
+
+Both paths use the same parsing, presets, extensions, tag precedence, dependency activation, and cleanup
+rules. `scope.run*` seeds its tags on the temporary owner boundary. For a managed lifetime, put shared tags
+on `createContext`; `ctx.exec({ tags })` remains an invocation-local override. `scope.run*` is lifecycle
+ownership, not a second execution model.
 
 Flows compose through dependencies. The dependency value is a context-bound handle, so nested execution
 keeps the `ctx.exec` options shape, parsing, presets, extensions, tags, and resource cleanup while making
@@ -474,6 +506,8 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `scope.changes(target, options?)` / `ctx.changes(...)` | Async-iterate atom values, select slices, or state transitions, conflated to latest |
 | `scope.resolveStream(atom)` / `ctx.resolveStream(atom)` | Consume an async-iterable atom through a scope-driven fan-out view |
 | `scope.drain(atom, options?)` | Collect an async-iterable atom into an array, optionally `take`-bounded |
+| `scope.run(options)` | Execute one flow or traced function in a temporary context and close it with the outcome |
+| `scope.runStream(options)` | Stream one generator flow from a temporary context; completion or cancellation closes it |
 | `ctx.execStream(options)` | Consume a generator flow's yields; `result` carries the final output, break cancels |
 | `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |
 | `flowHandle.prepare(options)` | Activate a controller child with its tags; `ready` resolves after dependencies and resources, then `exec()` or `execStream()` runs once |

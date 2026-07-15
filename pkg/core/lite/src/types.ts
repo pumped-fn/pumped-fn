@@ -56,6 +56,9 @@ export namespace Lite {
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     flush(): Promise<void>
+    run<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
+    run<Output, const Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    runStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     createContext(options?: CreateContextOptions): ExecutionContext
     on<Args extends unknown[]>(
       event: AtomState,
@@ -78,6 +81,7 @@ export namespace Lite {
   export interface CreateContextOptions {
     tags?: Tagged<any>[]
     parent?: ExecutionContext
+    signal?: AbortSignal
   }
 
   export interface ScopeOptions {

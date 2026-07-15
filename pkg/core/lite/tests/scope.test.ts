@@ -673,11 +673,11 @@ describe("ExecutionContext", () => {
       })
 
       await expect(contextOnlyCtx.resolve(taggedAtom)).rejects.toThrow('Tag "ctx-resolve-request" not found')
-      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags, parent }")
+      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags, parent, signal }")
       expect(() => scope.createContext({ tag: [requestTag("typo")] } as never))
-        .toThrow('createContext() expects { tags, parent }; received "tag"')
+        .toThrow('createContext() expects { tags, parent, signal }; received "tag"')
       expect(() => scope.createContext({ tags: requestTag("bad") } as never))
-        .toThrow("createContext() expects { tags, parent }")
+        .toThrow("createContext() expects { tags, parent, signal }")
 
       await ctx.close()
       await contextOnlyCtx.close()
