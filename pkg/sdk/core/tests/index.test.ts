@@ -1,6 +1,6 @@
 import { createScope, flow, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import { material, patchMaterial, workerRegistry } from "../src/index"
+import { formatModelPrompt, material, patchMaterial, workerRegistry } from "../src/index"
 
 describe("sdk public surface", () => {
   it("registers named workers and rejects unknown workers", () => {
@@ -42,5 +42,26 @@ describe("sdk public surface", () => {
 
     await ctx.close()
     await scope.dispose()
+  })
+
+  it("includes a canonically ordered tool schema in model prompts", () => {
+    const prompt = formatModelPrompt({
+      agentName: "analyst",
+      instructions: "",
+      messages: [],
+      tools: [{
+        name: "inspect",
+        description: "Inspect data.",
+        inputSchema: { properties: { "é": { type: "number" }, z: { type: "string" } }, type: "object" },
+      }],
+      skills: [],
+      loadedSkills: [],
+      subagents: [],
+      round: 0,
+    })
+
+    expect(prompt).toContain(
+      'Input schema: {"properties":{"z":{"type":"string"},"é":{"type":"number"}},"type":"object"}',
+    )
   })
 })

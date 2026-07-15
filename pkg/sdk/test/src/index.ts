@@ -11,6 +11,8 @@ import {
   type WorkflowEventLog,
   type WorkflowExtensionOptions,
 } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
+import * as session from "@pumped-fn/sdk/session"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -25,6 +27,79 @@ type MaybePromise<T> = T | Promise<T>
 
 export function modelStub(respond: (request: ModelRequest) => MaybePromise<ModelResponse>): Model {
   return flow({ name: "model.stub", parse: typed<ModelRequest>(), factory: (ctx) => respond(ctx.input) })
+}
+
+export interface AttemptStubResult {
+  readonly events: readonly agent.ModelEvent[]
+  readonly result: ModelResponse
+}
+
+class SessionStoreStubError extends Error {
+  readonly kind = "session-store-stub"
+
+  constructor(
+    readonly op: "load" | "commit",
+    readonly entity: session.SessionId,
+    message: string,
+  ) {
+    super(message)
+    this.name = "SessionStoreStubError"
+  }
+}
+
+export function attemptStub(
+  respond: AttemptStubResult | ((request: ModelRequest) => MaybePromise<AttemptStubResult>),
+): agent.Attempt {
+  return flow({
+    name: "attempt.stub",
+    parse: typed<ModelRequest>(),
+    factory: async function* (ctx): AsyncGenerator<agent.ModelEvent, ModelResponse, unknown> {
+      const response = typeof respond === "function" ? await respond(ctx.input) : respond
+      for (const event of response.events) yield event
+      return response.result
+    },
+  })
+}
+
+export function sessionStoreStub(records: readonly session.SessionRecord[] = []) {
+  const values = new Map(records.map((record) => [record.id, record]))
+  const load: session.Load = flow({
+    name: "session.store.stub.load",
+    parse: typed<{ id: session.SessionId }>(),
+    factory: (ctx) => {
+      const found = values.get(ctx.input.id)
+      if (!found) {
+        throw new SessionStoreStubError("load", ctx.input.id, `Session ${JSON.stringify(ctx.input.id)} not found`)
+      }
+      return found
+    },
+  })
+  const commit: session.Commit = flow({
+    name: "session.store.stub.commit",
+    parse: typed<{ record: session.SessionRecord; expectedVersion: number }>(),
+    factory: (ctx) => {
+      const current = values.get(ctx.input.record.id)
+      if (current?.version !== ctx.input.expectedVersion) {
+        throw new SessionStoreStubError(
+          "commit",
+          ctx.input.record.id,
+          `Session ${JSON.stringify(ctx.input.record.id)} version conflict`,
+        )
+      }
+      const stored = Object.freeze({ ...ctx.input.record, version: ctx.input.expectedVersion + 1 })
+      values.set(stored.id, stored)
+      return { version: stored.version }
+    },
+  })
+  return Object.freeze({
+    records: values as ReadonlyMap<session.SessionId, session.SessionRecord>,
+    load,
+    commit,
+    binding: Object.freeze({
+      load: session.store.load(load),
+      commit: session.store.commit(commit),
+    }),
+  })
 }
 
 export class MemorySuspenseLog implements SuspenseEventLog {
@@ -63,9 +138,9 @@ export class MemorySuspenseLog implements SuspenseEventLog {
 
 export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog, RunLog {}
 
-export const localRemoteRunner: RemoteRunner = {
+export const localRemoteRunner = Object.freeze({
   run: (_event, next) => next(),
-}
+} satisfies RemoteRunner)
 
 export function suspense(
   options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}

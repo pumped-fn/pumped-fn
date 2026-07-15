@@ -2,9 +2,8 @@
 
 ## Purpose
 
-`pkg/sdk/` holds runtime-primitive packages built on Lite: durable workflow steps, sessions,
-materials, event buffers, guards, sandboxes, CLI workers, and an eval harness. Agents and models
-are one family of primitives in this lane, not the whole of it. `@pumped-fn/sdk` is the
+`pkg/sdk/` holds runtime-primitive packages built on Lite: durable workflow steps, session records
+and runtimes, roles, tools, provider attempts, materials, sandboxes, CLI workers, and an eval harness. `@pumped-fn/sdk` is the
 counterpart to `@pumped-fn/pumped`: the SDK provides the primitives, `pumped` discovers, assembles,
 and runs them.
 
@@ -12,13 +11,13 @@ and runs them.
 
 | Directory | Package | Role |
 | --- | --- | --- |
-| `core/` | `@pumped-fn/sdk` | Durable workflows, sessions, materials, events, guards, sandboxes, CLI workers, eval harness, and the agent/tool/skill primitive family. |
+| `core/` | `@pumped-fn/sdk` | Root workflow/model surface plus canonical `agent`, `session`, `validation`, and `sandbox` subpaths. |
 | `codex/` | `@pumped-fn/sdk-codex` | Module-level Codex CLI and ACP model providers. |
 | `claude/` | `@pumped-fn/sdk-claude` | Module-level Claude CLI model provider. |
 | `pi/` | `@pumped-fn/sdk-pi` | In-process pi-ai model provider with native tool calls. |
 | `mcp/` | `@pumped-fn/sdk-mcp` | Expose flows as an MCP server; each flow carries its schema as a tag. |
-| `bash/` | `@pumped-fn/sdk-just-bash` | just-bash sandbox provider tag. |
-| `test/` | `@pumped-fn/sdk-test` | In-memory logs, fake routing, and test helpers. |
+| `bash/` | `@pumped-fn/sdk-just-bash` | just-bash sandbox port-flow implementors. |
+| `test/` | `@pumped-fn/sdk-test` | In-memory logs, provider attempts, session stores, and scope-seam harnesses. |
 
 ## Naming
 
@@ -27,8 +26,7 @@ should name the integration surface, while package names carry the `sdk` prefix.
 
 ## Content Rules
 
-SDK packages should compose through Lite scopes, tags, flows, resources, and extensions. Provider
-packages expose module-level handles plus config tags and keep provider-specific setup out of the core package.
+SDK packages compose through Lite scopes, namespaced tags, flows, resources, and extensions. A role and session are resources. A turn and every effect are flows. Provider packages expose module-level scalar and streaming handles while keeping provider-specific setup out of core.
 
 ## Testing
 

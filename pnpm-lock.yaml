@@ -57,6 +57,9 @@ catalogs:
     '@opentelemetry/api':
       specifier: 1.9.1
       version: 1.9.1
+    '@standard-schema/spec':
+      specifier: 1.1.0
+      version: 1.1.0
     '@tanstack/react-start':
       specifier: 1.168.26
       version: 1.168.26
@@ -90,6 +93,9 @@ catalogs:
     '@typescript/vfs':
       specifier: 1.6.4
       version: 1.6.4
+    '@valibot/to-json-schema':
+      specifier: 1.7.1
+      version: 1.7.1
     '@valtown/codemirror-ts':
       specifier: 2.3.1
       version: 2.3.1
@@ -177,6 +183,9 @@ catalogs:
     unrun:
       specifier: 0.3.1
       version: 0.3.1
+    valibot:
+      specifier: 1.4.2
+      version: 1.4.2
     vite:
       specifier: 8.0.16
       version: 8.0.16
@@ -974,6 +983,9 @@ importers:
       '@pumped-fn/lite-extension-suspense':
         specifier: workspace:^
         version: link:../../ext/suspense
+      '@standard-schema/spec':
+        specifier: 'catalog:'
+        version: 1.1.0
     devDependencies:
       '@pumped-fn/lite':
         specifier: workspace:*
@@ -984,18 +996,27 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260526.1
+      '@valibot/to-json-schema':
+        specifier: 'catalog:'
+        version: 1.7.1(valibot@1.4.2(typescript@6.0.3))
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(@typescript/native-preview@7.0.0-dev.20260526.1)(tsx@4.22.3)(typescript@6.0.3)(unrun@0.3.1)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      valibot:
+        specifier: 'catalog:'
+        version: 1.4.2(typescript@6.0.3)
       vite:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
 
   pkg/sdk/mcp:
     dependencies:
@@ -2614,6 +2635,11 @@ packages:
     resolution: {integrity: sha512-PJFXFS4ZJKiJ9Qiuix6Dz/OwEIqHD7Dme1UwZhTK11vR+5dqW2ACbdndWQexBzCx+CPuMe5WBYQWCsFyGlQLlQ==}
     peerDependencies:
       typescript: '*'
+
+  '@valibot/to-json-schema@1.7.1':
+    resolution: {integrity: sha512-3qkmU6KXWh8GIThEAW3kuRHPQBMjWkKy+Ppz3WkUucx53DTpOa6siMn4xDGSOhlVyMrDaJTCTMLYPZVAIk1P0A==}
+    peerDependencies:
+      valibot: ^1.4.0
 
   '@valtown/codemirror-ts@2.3.1':
     resolution: {integrity: sha512-v5XiI4WA+bUy0XDgkrqZksqBWgIUeyLZuC94Px/rhXBph8ASmVXaimlGDtt0vH/9t8aDdIZYdr59r9H3oKMFOg==}
@@ -4747,6 +4773,14 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
+  valibot@1.4.2:
+    resolution: {integrity: sha512-gjdCvJ6d3RyHAneqxMYMW9QMCwYMb3jpOO0IyHZV1bnRHFBHrX3VkIILt5XYR0WhwHiH7Mty8ovuPZ/O3gamrg==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
@@ -6714,6 +6748,10 @@ snapshots:
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3))':
+    dependencies:
+      valibot: 1.4.2(typescript@6.0.3)
 
   '@valtown/codemirror-ts@2.3.1(@codemirror/autocomplete@6.20.3)(@codemirror/lint@6.9.7)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)':
     dependencies:
@@ -8760,6 +8798,10 @@ snapshots:
 
   util-deprecate@1.0.2:
     optional: true
+
+  valibot@1.4.2(typescript@6.0.3):
+    optionalDependencies:
+      typescript: 6.0.3
 
   vary@1.1.2: {}
 

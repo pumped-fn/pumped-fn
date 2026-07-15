@@ -6,45 +6,40 @@ Module-level Codex CLI and ACP model providers for `@pumped-fn/sdk`.
 
 ```ts
 import { createScope } from "@pumped-fn/lite"
-import { agent } from "@pumped-fn/sdk"
-import { codex, codexConfig } from "@pumped-fn/sdk-codex"
+import * as codex from "@pumped-fn/sdk-codex"
 
-const triage = agent({ name: "triage" })
 const scope = createScope({
-  tags: [codex, codexConfig({ auth: { kind: "global" } })],
+  tags: [codex.codexConfig({ auth: { kind: "global" } })],
 })
+const ctx = scope.createContext()
+await ctx.exec({ flow: codex.codexTurn, input: {
+  agentName: "triage",
+  instructions: "Triage the ticket.",
+  messages: [{ role: "user", content: "Login fails after refresh." }],
+  tools: [], skills: [], loadedSkills: [], subagents: [], round: 0,
+} })
+await ctx.close()
+await scope.dispose()
 ```
 
 Global auth reuses writable `CODEX_HOME` state. API-key auth reads the configured environment name
 and passes it to `codex exec` as `CODEX_API_KEY`:
 
 ```ts
-codexConfig({ auth: { kind: "api-key", env: "MY_CODEX_KEY" } })
+codex.codexConfig({ auth: { kind: "api-key", env: "MY_CODEX_KEY" } })
 ```
 
 ACP uses `@agentclientprotocol/codex-acp` over stdio through the official TypeScript client. Its auth,
 working directory, extra roots, permission policy, and shutdown bound are required. Paths must be
 absolute. An empty `additionalDirectories` array means no extra roots. Every permission decision is
-recorded in the SDK event buffer.
+emitted as a provider status event by streaming attempts.
 
 ```ts
 import * as codex from "@pumped-fn/sdk-codex"
-import * as claude from "@pumped-fn/sdk-claude"
 import { createScope } from "@pumped-fn/lite"
-import { agent } from "@pumped-fn/sdk"
 
-const triage = agent({ name: "triage" })
-const claudeScope = createScope({
-  tags: [claude.provider, claude.config({
-    auth: { kind: "global" },
-    cwd: process.cwd(),
-    roots: [],
-    permission: "deny",
-    shutdownTimeoutMs: 1_000,
-  })],
-})
-const codexScope = createScope({
-  tags: [codex.provider, codex.config({
+const scope = createScope({
+  tags: [codex.config({
     auth: { kind: "global" },
     cwd: process.cwd(),
     additionalDirectories: [],
@@ -52,21 +47,29 @@ const codexScope = createScope({
     shutdownTimeoutMs: 5_000,
   })],
 })
-
-for (const scope of [claudeScope, codexScope]) {
-  const ctx = scope.createContext()
-  await ctx.exec({ flow: triage.turn, input: { prompt: "Triage this ticket." } })
-  await ctx.close()
-  await scope.dispose()
-}
+const ctx = scope.createContext()
+await ctx.resolve(codex.engine)
+await ctx.exec({ flow: codex.turn, input: {
+  agentName: "triage",
+  instructions: "Triage the ticket.",
+  messages: [{ role: "user", content: "Login fails after refresh." }],
+  tools: [], skills: [], loadedSkills: [], subagents: [], round: 0,
+} })
+await ctx.close()
+await scope.dispose()
 ```
 
-The same `triage` graph switches between managed Claude and Codex by changing only scope tags.
 Each ACP prompt sends `cwd`, `additionalDirectories`, and `mcpServers: []`. Pumped-fn tool collection
 and MCP projection remain deferred. Abort sends `session/cancel`. Scope cleanup closes the ACP
 connection and child within `shutdownTimeoutMs`, escalates to `SIGKILL` for one more bound, waits for
 the child process and transport to close, and clears request correlation state. Cleanup rejects with
 `CodexShutdownError` instead of reporting success if the second bound expires.
+
+`codexAttempt` normalizes the CLI lifecycle to the SDK `ModelEvent` stream. `codexAcpAttempt`
+normalizes ACP message chunks and reuses the ACP session for the same SDK session and branch.
+Correlation, cancellation, and continuation are keyed per ACP session, so overlapping attempts do
+not consume each other's chunks or cancel each other. `codexAttemptBinding` and
+`codexAcpAttemptBinding` inject either implementation through the SDK `agent.attempt` tag.
 
 The stable CLI handles remain `codex`, `codexTurn`, and `codexRun`; ACP keeps `codexAcp`,
 `codexAcpTurn`, `codexAcpPrompt`, `codexAcpConfig`, and `acp`. Package-module imports expose the

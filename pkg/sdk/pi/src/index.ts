@@ -4,6 +4,7 @@ import {
   getSupportedThinkingLevels,
   validateToolCall,
   type AssistantMessage,
+  type AssistantMessageEvent,
   type Api,
   type Context,
   type Message as PiMessage,
@@ -13,10 +14,9 @@ import {
   type ToolCall as PiToolCall,
 } from "@earendil-works/pi-ai"
 import { builtinModels } from "@earendil-works/pi-ai/providers/all"
-import { atom, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
   abortSignal,
-  events,
   model,
   step,
   type Capability,
@@ -24,6 +24,7 @@ import {
   type ModelRequest,
   type ModelResponse,
 } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
 
 export interface PiConfig {
   provider: string
@@ -71,11 +72,10 @@ export const supportedModels = flow({
   factory: (ctx, { models }) => models.getModels(ctx.input.provider),
 })
 
-export const piTurn = flow({
-  name: "pi.complete",
+export const piAttempt: agent.Attempt = flow({
+  name: "pi.attempt",
   parse: typed<ModelRequest>(),
   deps: {
-    buffer: events,
     clock,
     config: tags.required(piConfig),
     environment,
@@ -83,7 +83,7 @@ export const piTurn = flow({
     signal: tags.optional(abortSignal),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { buffer, clock, config, environment, models, signal }) => {
+  factory: async function* (ctx, { clock, config, environment, models, signal }) {
     const selected = requireModel(models, config)
     if (config.thinking && !getSupportedThinkingLevels(selected).includes(config.thinking)) {
       throw new PiProviderError(
@@ -99,27 +99,54 @@ export const piTurn = flow({
       ...(tools.length ? { tools } : {}),
     }
     const apiKey = config.apiKeyEnv ? requireEnvironment(environment, config.apiKeyEnv, config) : undefined
-    const response = config.thinking
-      ? await models.completeSimple(selected, context, { reasoning: config.thinking, apiKey, signal })
-      : await models.complete(selected, context, { apiKey, signal })
-    if (response.stopReason === "error" || response.stopReason === "aborted") {
-      throw new PiProviderError(response.errorMessage ?? `pi-ai ${response.stopReason}`, config.provider, config.modelId)
+    const controller = new AbortController()
+    const abort = () => controller.abort(signal?.reason)
+    signal?.addEventListener("abort", abort, { once: true })
+    if (signal?.aborted) abort()
+    const stream = config.thinking
+      ? models.streamSimple(selected, context, { reasoning: config.thinking, apiKey, signal: controller.signal })
+      : models.stream(selected, context, { apiKey, signal: controller.signal })
+    let response: AssistantMessage | undefined
+    let completed = false
+    try {
+      for await (const event of stream) {
+        const normalized = piEvent(event)
+        if (normalized) yield normalized
+        if (event.type === "done") response = event.message
+        if (event.type === "error") response = event.error
+      }
+      response ??= await stream.result()
+      if (response.stopReason === "error" || response.stopReason === "aborted") {
+        throw new PiProviderError(response.errorMessage ?? `pi-ai ${response.stopReason}`, config.provider, config.modelId)
+      }
+      completed = true
+      return responseOf(response, tools)
+    } finally {
+      signal?.removeEventListener("abort", abort)
+      if (!completed) controller.abort(new DOMException("Pi attempt stream closed", "AbortError"))
     }
-    buffer.record({
-      type: "agent_model_end",
-      agentName: ctx.input.agentName,
-      round: ctx.input.round,
-      output: {
-        provider: config.provider,
-        modelId: config.modelId,
-        usage: response.usage,
-      },
-    })
-    return responseOf(response, tools)
   },
 })
 
+export const piAttemptBinding = agent.attempt(piAttempt)
+
+export const piTurn = flow({
+  name: "pi.complete",
+  parse: typed<ModelRequest>(),
+  deps: { attempt: controller(piAttempt) },
+  factory: (ctx, { attempt }) => attempt.exec({ input: ctx.input }),
+})
+
 export const pi = model(piTurn)
+
+function piEvent(event: AssistantMessageEvent): agent.ModelEvent | undefined {
+  if (event.type === "start") return { type: "provider_status", status: "started" }
+  if (event.type === "text_delta") return { type: "content_delta", content: event.delta }
+  if (event.type === "thinking_delta") return { type: "reasoning_delta", content: event.delta }
+  if (event.type === "done") return { type: "provider_status", status: "completed" }
+  if (event.type === "error") return { type: "provider_status", status: event.reason }
+  return undefined
+}
 
 function requireModel(models: Models, config: PiConfig): PiModel<Api> {
   const selected = models.getModel(config.provider, config.modelId)
@@ -150,7 +177,13 @@ function capabilityTool(capability: Capability): Tool {
   return {
     name: capability.name,
     description: capability.description,
-    parameters: Type.Object({}, { additionalProperties: true }),
+    parameters: capability.inputSchema === undefined
+      ? Type.Object({}, { additionalProperties: true })
+      : Type.Unsafe(capability.inputSchema === true
+        ? {}
+        : capability.inputSchema === false
+          ? { not: {} }
+          : capability.inputSchema),
   }
 }
 

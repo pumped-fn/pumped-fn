@@ -1,4 +1,4 @@
-import { atom, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { atom, flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -9,6 +9,7 @@ import {
   type SuspenseStepEntry,
   type SuspenseStepKey,
 } from "@pumped-fn/lite-extension-suspense"
+import type { TurnInput, TurnResult } from "./agent.js"
 
 export type WorkerKind = "code" | "llm" | "cli" | string
 export type MaterialKind = "json" | "text" | "binary" | "reference"
@@ -910,7 +911,30 @@ function guardTextOf(value: unknown): string | undefined {
 }
 
 function formatCapability(capability: Capability): string {
-  return `- ${capability.name}: ${capability.description}`
+  const schema = capability.inputSchema === undefined
+    ? ""
+    : `\n  Input schema: ${JSON.stringify(canonicalJson(capability.inputSchema))}`
+  return `- ${capability.name}: ${capability.description}${schema}`
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value
+  if (Array.isArray(value)) return value.map(canonicalJson)
+  return Object.fromEntries(Object.entries(value)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([left], [right]) => compareUtf8(left, right))
+    .map(([key, entry]) => [key, canonicalJson(entry)]))
+}
+
+function compareUtf8(left: string, right: string): number {
+  const leftBytes = new TextEncoder().encode(left)
+  const rightBytes = new TextEncoder().encode(right)
+  const length = Math.min(leftBytes.length, rightBytes.length)
+  for (let index = 0; index < length; index++) {
+    const difference = leftBytes[index]! - rightBytes[index]!
+    if (difference !== 0) return difference
+  }
+  return leftBytes.length - rightBytes.length
 }
 
 function formatLoadedSkill(skill: LoadedSkill): string {
@@ -972,177 +996,20 @@ export interface ModelRequest {
 
 export type Model = Lite.Flow<ModelResponse, ModelRequest>
 
-export interface SandboxExecResult {
-  stdout: string
-  stderr: string
-  exitCode: number
-}
-
-export interface Sandbox {
-  readFile(path: string): MaybePromise<string>
-  writeFile(path: string, content: string): MaybePromise<void>
-  exec(command: string, args?: readonly string[]): MaybePromise<SandboxExecResult>
-}
-
-export interface TurnInput {
-  messages?: readonly Message[]
-  prompt?: string
-  maxRounds?: number
-  metadata?: Lite.JsonValue
-}
-
 export interface Capability {
   name: string
   description: string
-}
-
-export interface Tool<Output = unknown, Input = unknown> extends Capability {
-  flow: Lite.Flow<Output, Input>
-}
-
-type AnyTool = Tool<any, any>
-
-export interface Skill {
-  name: string
-  description?: string
-  load(ctx: Lite.ExecutionContext): MaybePromise<string>
+  inputSchema?: boolean | Readonly<Record<string, unknown>>
 }
 
 export interface LoadedSkill {
-  name: string
-  description?: string
-  content: string
+  readonly name: string
+  readonly description?: string
+  readonly content: string
 }
-
-export interface Sub extends Capability {
-  agent: Agent
-}
-
-export interface Agent {
-  name: string
-  description?: string
-  instructions: string
-  tools: readonly AnyTool[]
-  skills: readonly Skill[]
-  subagents: readonly Sub[]
-  turn: Lite.Flow<TurnResult, TurnInput>
-  maxRounds: number
-}
-
-export interface AgentOptions {
-  name: string
-  description?: string
-  instructions?: string
-  tools?: readonly AnyTool[]
-  skills?: readonly Skill[]
-  subagents?: readonly Sub[]
-  maxRounds?: number
-  tags?: Lite.Tagged<any>[]
-}
-
-export interface ChannelOptions<Input> {
-  name: string
-  parse: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
-  agent: Agent
-  input(ctx: Lite.ExecutionContext & { readonly input: Input }): MaybePromise<TurnInput>
-  tags?: Lite.Tagged<any>[]
-}
-
-export interface ScheduleOptions {
-  name: string
-  agent: Agent
-  input(ctx: Lite.ExecutionContext): MaybePromise<TurnInput>
-  tags?: Lite.Tagged<any>[]
-}
-
-export interface ToolResult {
-  name: string
-  id?: string
-  input: unknown
-  output: unknown
-}
-
-export interface SkillResult {
-  name: string
-  id?: string
-  content: string
-}
-
-export interface SubResult {
-  name: string
-  id?: string
-  input: TurnInput
-  output: TurnResult
-}
-
-export interface TurnResult {
-  agentName: string
-  content: string
-  messages: readonly Message[]
-  skillResults: readonly SkillResult[]
-  toolResults: readonly ToolResult[]
-  subagentResults: readonly SubResult[]
-  rounds: number
-  events: readonly Event[]
-}
-
-export interface SessionState {
-  messages: readonly Message[]
-}
-
-export interface SessionOptions {
-  messages?: readonly Message[]
-  tags?: Lite.Tagged<any>[]
-  keepAlive?: boolean
-}
-
-export type EventType =
-  | "agent_start"
-  | "agent_model_start"
-  | "agent_model_end"
-  | "agent_skill_start"
-  | "agent_skill_end"
-  | "agent_tool_start"
-  | "agent_tool_end"
-  | "agent_subagent_start"
-  | "agent_subagent_end"
-  | "agent_end"
-
-export interface Event {
-  index: number
-  type: EventType
-  agentName: string
-  targetName?: string
-  round?: number
-  input?: unknown
-  output?: unknown
-}
-
-export interface EventBuffer {
-  readonly events: readonly Event[]
-  record(event: Omit<Event, "index">): Event
-}
-
-export const events = resource<EventBuffer>({
-  name: "agent.events",
-  ownership: "boundary",
-  factory: () => {
-    let next = 0
-    const events: Event[] = []
-    return {
-      get events() {
-        return events
-      },
-      record(event) {
-        const stored = { ...event, index: next++ }
-        events.push(stored)
-        return stored
-      },
-    }
-  },
-})
 
 export const model = tag<Model>({ label: "agent.model" })
+
 export const complete = flow({
   name: "model.complete",
   parse: typed<ModelRequest>(),
@@ -1150,147 +1017,48 @@ export const complete = flow({
   tags: [step({ workflow: true, kind: "llm" })],
   factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
 })
-export const sandbox = tag<Sandbox>({ label: "agent.sandbox" })
 
-export function session(name: string, options: SessionOptions = {}): Lite.Atom<MaterialState<SessionState>> {
-  return material(name, {
-    kind: "json",
-    initialState: { messages: options.messages ?? [] },
-    tags: options.tags,
-    keepAlive: options.keepAlive,
-  })
+export interface ChannelOptions<Output, FlowInput, Input> {
+  readonly name: string
+  readonly parse: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
+  readonly turn: Lite.Flow<Output, FlowInput>
+  readonly input: (ctx: Lite.ExecutionContext & { readonly input: Input }) => MaybePromise<FlowInput>
+  readonly tags?: Lite.Tagged<any>[]
 }
 
-export interface ToolOptions<Output, Input> {
-  name?: string
-  description: string
-  flow: Lite.Flow<Output, Input>
-}
-
-export function tool<Output, Input>(options: ToolOptions<Output, Input>): Tool<Output, Input> {
-  const name = options.name ?? options.flow.name
-  if (!name) throw new Error("Agent tool requires a name")
-  return {
-    name,
-    description: options.description,
-    flow: options.flow,
-  }
-}
-
-export interface SkillOptions {
-  name: string
-  description?: string
-  content?: string
-  load?: (ctx: Lite.ExecutionContext) => MaybePromise<string>
-}
-
-export function skill(options: SkillOptions): Skill {
-  if (options.load) {
-    return {
-      name: options.name,
-      description: options.description,
-      load: options.load,
-    }
-  }
-  const content = options.content ?? ""
-  return {
-    name: options.name,
-    description: options.description,
-    load: () => content,
-  }
-}
-
-export interface SubOptions {
-  name?: string
-  description: string
-  agent: Agent
-}
-
-export function sub(options: SubOptions): Sub {
-  return {
-    name: options.name ?? options.agent.name,
-    description: options.description,
-    agent: options.agent,
-  }
-}
-
-export function agent(options: AgentOptions): Agent {
-  const tools = options.tools ?? []
-  const skills = options.skills ?? []
-  const subagents = options.subagents ?? []
-  const maxRounds = options.maxRounds ?? 4
-  let agent: Agent
-  const turn = flow({
-    name: options.name,
-    parse: typed<TurnInput>(),
-    deps: { complete },
-    tags: agentStepTags({ workflow: true, kind: "agent" }, options.tags),
-    factory: (ctx, deps) => executeAgentTurn(ctx, agent, deps.complete),
-  })
-  agent = {
-    name: options.name,
-    description: options.description,
-    instructions: options.instructions ?? "",
-    tools,
-    skills,
-    subagents,
-    turn,
-    maxRounds,
-  }
-  return agent
-}
-
-function execTurn(
-  ctx: Lite.ExecutionContext,
-  agent: Agent,
-  input: TurnInput,
-  tags: readonly Lite.Tagged<any>[] = []
-): Promise<TurnResult> {
-  return ctx.exec({
-    flow: agent.turn,
-    input,
-    name: agent.name,
-    tags: [...tags],
-  })
-}
-
-export async function send(
-  ctx: Lite.ExecutionContext,
-  session: Lite.Atom<MaterialState<SessionState>>,
-  agent: Agent,
-  input: TurnInput
-): Promise<TurnResult> {
-  const current = await ctx.resolve(session)
-  const result = await execTurn(ctx, agent, {
-    ...input,
-    messages: [
-      ...current.state.messages,
-      ...(input.messages ?? []),
-    ],
-  })
-  await patchMaterial(ctx, session, [
-    { op: "replace", path: "/messages", value: serializeMessages(result.messages) },
-  ], { expectedRevision: current.revision })
-  return result
-}
-
-export function channel<Input>(options: ChannelOptions<Input>): Lite.Flow<TurnResult, Input> {
-  const flowOptions = {
-    name: options.name,
-    tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
-    factory: async (ctx: Lite.ExecutionContext & { readonly input: Input }) =>
-      execTurn(ctx, options.agent, await options.input(ctx)),
-  }
+export function channel<Output, FlowInput, Input>(
+  options: ChannelOptions<Output, FlowInput, Input>,
+): Lite.Flow<Output, Input> {
   return typeof options.parse === "function"
-    ? flow<TurnResult, Input>({ ...flowOptions, parse: options.parse })
-    : flow<TurnResult, Input>({ ...flowOptions, parse: options.parse })
+    ? flow<Output, Input, { turn: Lite.Flow<Output, FlowInput> }>({
+        name: options.name,
+        parse: options.parse,
+        tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
+        deps: { turn: options.turn },
+        factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
+      })
+    : flow<Output, Input, { turn: Lite.Flow<Output, FlowInput> }>({
+        name: options.name,
+        parse: options.parse,
+        tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
+        deps: { turn: options.turn },
+        factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
+      })
 }
 
-export function schedule(options: ScheduleOptions): Lite.Flow<TurnResult, void> {
+export interface ScheduleOptions<Output, Input> {
+  readonly name: string
+  readonly turn: Lite.Flow<Output, Input>
+  readonly input: (ctx: Lite.ExecutionContext) => MaybePromise<Input>
+  readonly tags?: Lite.Tagged<any>[]
+}
+
+export function schedule<Output, Input>(options: ScheduleOptions<Output, Input>): Lite.Flow<Output, void> {
   return flow({
     name: options.name,
     tags: agentStepTags({ workflow: true, kind: "schedule" }, options.tags),
-    factory: async (ctx) => execTurn(ctx, options.agent, await options.input(ctx)),
+    deps: { turn: options.turn },
+    factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
   })
 }
 
@@ -1322,14 +1090,14 @@ export interface EvalCase {
 
 export interface Suite {
   name: string
-  agent: Agent
+  turn: Lite.Flow<TurnResult, TurnInput>
   cases: readonly EvalCase[]
   judges: readonly Judge[]
 }
 
 export interface SuiteOptions {
   name: string
-  agent: Agent
+  turn: Lite.Flow<TurnResult, TurnInput>
   cases: readonly EvalCase[]
   judges?: readonly Judge[]
 }
@@ -1373,10 +1141,10 @@ export interface RunLog extends WorkflowEventLog {
   entries(query?: Partial<RunQuery>): MaybePromise<readonly WorkflowStepEntry[]>
 }
 
-export interface HttpOptions {
+export interface HttpOptions<Output = TurnResult, Input = TurnInput> {
   name?: string
-  agent: Agent
-  input?: (request: Request) => MaybePromise<TurnInput>
+  turn: Lite.Flow<Output, Input>
+  input?: (request: Request) => MaybePromise<Input>
   tags?: (request: Request) => MaybePromise<Lite.Tagged<any>[]>
 }
 
@@ -1389,7 +1157,7 @@ export function suite(options: SuiteOptions): Suite {
   assertJudgeQuorum(judges)
   return {
     name: options.name,
-    agent: options.agent,
+    turn: options.turn,
     cases: options.cases,
     judges,
   }
@@ -1427,7 +1195,7 @@ export async function runEval(ctx: Lite.ExecutionContext, target: Suite): Promis
   assertJudgeQuorum(target.judges)
   const cases: EvalCaseReport[] = []
   for (const item of target.cases) {
-    const result = await execTurn(ctx, target.agent, item.input)
+    const result = await ctx.exec({ flow: target.turn, input: item.input })
     const checks = await runEvalChecks(result, item.checks ?? [])
     const judges = await runEvalJudges(ctx, result, target.judges)
     cases.push({
@@ -1475,285 +1243,34 @@ export function summary(report: EvalReport): Lite.JsonValue {
       subagents: item.result.subagentResults.map((call) => ({ name: call.name, output: call.output.content })),
       events: item.result.events.map((event) => ({
         type: event.type,
-        agentName: event.agentName,
-        targetName: event.targetName,
-        round: event.round,
+        ...(event.agentName === undefined ? {} : { agentName: event.agentName }),
+        ...(event.targetName === undefined ? {} : { targetName: event.targetName }),
+        ...(event.round === undefined ? {} : { round: event.round }),
       })),
     })),
   })
 }
 
-export function http(options: HttpOptions): Lite.Flow<Response, Request> {
+export function http<Output, Input>(options: HttpOptions<Output, Input>): Lite.Flow<Response, Request> {
   return flow({
-    name: options.name ?? `${options.agent.name}-http`,
+    name: options.name ?? `${options.turn.name ?? "turn"}-http`,
     parse: typed<Request>(),
     tags: agentStepTags({ workflow: true, kind: "channel" }),
-    factory: async (ctx: Lite.ExecutionContext & { readonly input: Request }) => {
+    deps: { turn: options.turn },
+    factory: async (ctx: Lite.ExecutionContext & { readonly input: Request }, deps) => {
       const request = ctx.input
-      const input = options.input ? await options.input(request) : await request.json() as TurnInput
+      const input = options.input ? await options.input(request) : await request.json() as Input
       const tags = options.tags ? await options.tags(request) : []
-      return Response.json(jsonValue(await execTurn(ctx, options.agent, input, tags)))
+      return Response.json(jsonValue(await deps.turn.exec({ rawInput: input, tags })))
     },
   })
 }
 
-async function executeAgentTurn(
-  ctx: Lite.ExecutionContext & { readonly input: TurnInput },
-  agent: Agent,
-  complete: Lite.FlowHandle<ModelResponse, ModelRequest>
-): Promise<TurnResult> {
-  const messages = initialMessages(ctx.input)
-  const loadedSkills: LoadedSkill[] = []
-  const skillResults: SkillResult[] = []
-  const toolResults: ToolResult[] = []
-  const subagentResults: SubResult[] = []
-  const maxRounds = ctx.input.maxRounds ?? agent.maxRounds
-  let content = ""
-  let rounds = 0
-  const startIndex = (await ctx.resolve(events)).events.length
-
-  await recordAgentEvent(ctx, {
-    type: "agent_start",
-    agentName: agent.name,
-    input: ctx.input,
-  })
-
-  for (let round = 0; round < maxRounds; round++) {
-    rounds = round + 1
-    await recordAgentEvent(ctx, {
-      type: "agent_model_start",
-      agentName: agent.name,
-      round,
-      input: messages,
-    })
-    const response = await complete.exec({
-      input: {
-        agentName: agent.name,
-        instructions: agent.instructions,
-        messages,
-        tools: agent.tools.map(agentToolCapability),
-        skills: agent.skills.map(agentSkillCapability),
-        loadedSkills,
-        subagents: agent.subagents.map(agentSubagentCapability),
-        round,
-      },
-    })
-    content = response.content
-    await recordAgentEvent(ctx, {
-      type: "agent_model_end",
-      agentName: agent.name,
-      round,
-      output: response,
-    })
-
-    const skillCalls = response.skillCalls ?? []
-    const toolCalls = response.toolCalls ?? []
-    const subagentCalls = response.subagentCalls ?? []
-    if (response.content) messages.push({ role: "assistant", content: response.content })
-    if (response.stop === true || (skillCalls.length === 0 && toolCalls.length === 0 && subagentCalls.length === 0)) break
-
-    for (const call of skillCalls) {
-      const result = await executeAgentSkill(ctx, agent, call)
-      loadedSkills.push({
-        name: result.name,
-        content: result.content,
-        description: findByName(agent.skills, result.name, "skill").description,
-      })
-      skillResults.push(result)
-      messages.push({
-        role: "skill",
-        name: result.name,
-        content: result.content,
-        ...(result.id ? { id: result.id, input: { name: result.name } } : {}),
-      })
-    }
-
-    for (const call of toolCalls) {
-      const result = await executeAgentTool(ctx, agent, call)
-      toolResults.push(result)
-      messages.push({
-        role: "tool",
-        name: result.name,
-        content: stringifyAgentValue(result.output),
-        ...(result.id ? { id: result.id, input: result.input } : {}),
-      })
-    }
-
-    for (const call of subagentCalls) {
-      const result = await executeAgentSubagent(ctx, agent, call)
-      subagentResults.push(result)
-      messages.push({
-        role: "subagent",
-        name: result.name,
-        content: result.output.content,
-        ...(result.id ? { id: result.id, input: result.input } : {}),
-      })
-    }
-  }
-
-  await recordAgentEvent(ctx, {
-    type: "agent_end",
-    agentName: agent.name,
-    output: content,
-  })
-
-  const buffer = await ctx.resolve(events)
-  return {
-    agentName: agent.name,
-    content,
-    messages,
-    skillResults,
-    toolResults,
-    subagentResults,
-    rounds,
-    events: buffer.events.slice(startIndex),
-  }
-}
-
-async function executeAgentSkill(
-  ctx: Lite.ExecutionContext,
-  agent: Agent,
-  call: SkillCall
-): Promise<SkillResult> {
-  const target = findByName(agent.skills, call.name, "skill")
-  await recordAgentEvent(ctx, {
-    type: "agent_skill_start",
-    agentName: agent.name,
-    targetName: target.name,
-  })
-  const content = await ctx.exec({
-    fn: (skillCtx) => target.load(skillCtx),
-    params: [],
-    name: target.name,
-    tags: [agentStepTag({ workflow: true, kind: "skill" })],
-  })
-  await recordAgentEvent(ctx, {
-    type: "agent_skill_end",
-    agentName: agent.name,
-    targetName: target.name,
-    output: content,
-  })
-  return {
-    name: target.name,
-    id: call.id,
-    content,
-  }
-}
-
-async function executeAgentTool(
-  ctx: Lite.ExecutionContext,
-  agent: Agent,
-  call: ToolCall
-): Promise<ToolResult> {
-  const target = findByName(agent.tools, call.name, "tool")
-  await recordAgentEvent(ctx, {
-    type: "agent_tool_start",
-    agentName: agent.name,
-    targetName: target.name,
-    input: call.input,
-  })
-  const output = await ctx.exec({
-    flow: target.flow as Lite.Flow<unknown, unknown>,
-    rawInput: call.input,
-    name: target.name,
-    tags: [agentStepTag({ workflow: true, kind: "tool" }, target.flow.tags)],
-  })
-  await recordAgentEvent(ctx, {
-    type: "agent_tool_end",
-    agentName: agent.name,
-    targetName: target.name,
-    output,
-  })
-  return {
-    name: target.name,
-    id: call.id,
-    input: call.input,
-    output,
-  }
-}
-
-async function executeAgentSubagent(
-  ctx: Lite.ExecutionContext,
-  agent: Agent,
-  call: SubCall
-): Promise<SubResult> {
-  const target = findByName(agent.subagents, call.name, "subagent")
-  await recordAgentEvent(ctx, {
-    type: "agent_subagent_start",
-    agentName: agent.name,
-    targetName: target.name,
-    input: call.input,
-  })
-  const output = await ctx.exec({
-    flow: target.agent.turn,
-    input: call.input,
-    name: target.name,
-    tags: [agentStepTag({ workflow: true, kind: "subagent" }, target.agent.turn.tags)],
-  })
-  await recordAgentEvent(ctx, {
-    type: "agent_subagent_end",
-    agentName: agent.name,
-    targetName: target.name,
-    output,
-  })
-  return {
-    name: target.name,
-    id: call.id,
-    input: call.input,
-    output,
-  }
-}
-
-async function recordAgentEvent(
-  ctx: Lite.ExecutionContext,
-  event: Omit<Event, "index">
-): Promise<Event> {
-  return (await ctx.resolve(events)).record(event)
-}
-
-function initialMessages(input: TurnInput): Message[] {
-  return [
-    ...(input.messages ?? []),
-    ...(input.prompt ? [{ role: "user" as const, content: input.prompt }] : []),
-  ]
-}
-
 function agentStepTags(defaults: Step, source: Lite.Tagged<any>[] = []): Lite.Tagged<any>[] {
   return [
-    agentStepTag(defaults, source),
+    step(Object.assign({}, defaults, ...step.collect(source))),
     ...source.filter((tagged) => tagged.key !== step.key),
   ]
-}
-
-function agentStepTag(defaults: Step, source: Lite.Tagged<any>[] = []): Lite.Tagged<Step> {
-  return step(Object.assign({}, defaults, ...step.collect(source)))
-}
-
-function agentToolCapability(tool: AnyTool): Capability {
-  return {
-    name: tool.name,
-    description: tool.description,
-  }
-}
-
-function agentSkillCapability(skill: Skill): Capability {
-  return {
-    name: skill.name,
-    description: skill.description ?? "",
-  }
-}
-
-function agentSubagentCapability(subagent: Sub): Capability {
-  return {
-    name: subagent.name,
-    description: subagent.description,
-  }
-}
-
-function findByName<T extends { name: string }>(items: readonly T[], name: string, kind: string): T {
-  const found = items.find((item) => item.name === name)
-  if (!found) throw new Error(`Agent ${kind} "${name}" not found`)
-  return found
 }
 
 function runStep(entry: WorkflowStepEntry): RunStep {
@@ -1809,17 +1326,6 @@ function jsonValue(value: unknown, seen = new WeakSet<object>()): Lite.JsonValue
     return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, jsonValue(item, seen)]))
   }
   return String(value)
-}
-
-function serializeMessages(messages: readonly Message[]): Lite.JsonValue {
-  return messages.map((message) => {
-    const serialized: Record<string, Lite.JsonValue> = {
-      role: message.role,
-      content: message.content,
-    }
-    if (message.name !== undefined) serialized["name"] = message.name
-    return serialized
-  })
 }
 
 async function runEvalChecks(

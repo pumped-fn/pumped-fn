@@ -5,6 +5,7 @@
 ### Major Changes
 
 - Replace the `codex(options)` factory and re-exported core harness constructors with stable CLI handles and config tags. Add the `codexAcp` model and its scope-owned ACP connection resource.
+- Add provider-neutral CLI and ACP attempt bindings with normalized stream events, atomically reserved branch-scoped ACP continuation, isolated correlation, bounded consumer-stop, and selected-session cancellation. Scalar turns drain the same attempt paths.
 
 ## 2.0.0
 

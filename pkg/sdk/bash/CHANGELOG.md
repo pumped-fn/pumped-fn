@@ -1,4 +1,10 @@
-# @pumped-fn/agent-sdk-just-bash
+# @pumped-fn/sdk-just-bash
+
+## 3.0.0
+
+### Major Changes
+
+- Replace the sandbox method bag with session-mediated read, write, and streaming exec port implementors. Add explicit authority, readiness, workspace, and engine resources with cancellation, timeout, output-cap, and session-isolation checks.
 
 ## 2.0.0
 

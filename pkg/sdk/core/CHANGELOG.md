@@ -1,5 +1,11 @@
 # @pumped-fn/agent-sdk
 
+## 3.0.0
+
+### Major Changes
+
+- Replace the Agent facade and material session with resource-backed role, tool, session, work, and attempt primitives. Keep the scalar Model seam and move agent, session, validation, and sandbox contracts to canonical subpaths.
+
 ## Unreleased
 
 ### Major Changes

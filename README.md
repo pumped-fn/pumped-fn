@@ -9,10 +9,10 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  -> scope-owned graph
-  -> execution context per request, job, action, or test
-  -> flows, resources, tags, and wrapped execution edges
-  -> module-level Model providers: Claude CLI, Codex CLI/ACP, or pi-ai
+  ├─ scope-owned graph -> execution context -> flows, resources, tags
+  └─ SDK session resource -> work attempt -> role resource -> turn flow
+                                               └─ tool resource -> effect flow
+  Claude CLI, Codex CLI/ACP, and pi-ai bind the shared provider-attempt edge.
 ```
 
 ## Test without mocking modules

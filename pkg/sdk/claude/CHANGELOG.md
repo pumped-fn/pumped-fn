@@ -5,6 +5,7 @@
 ### Major Changes
 
 - Replace the `claude(options)` factory and re-exported core harness constructors with `claude`, `claudeTurn`, `claudeRun`, and `claudeConfig` module-level exports.
+- Add a provider-neutral streaming attempt binding backed by isolated per-session Claude process leases. The scalar turn drains the same attempt path. Abort and consumer cancellation release only the selected lease.
 
 ## 2.0.0
 

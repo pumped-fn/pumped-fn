@@ -34,8 +34,8 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/sdk": "^2.0.0",
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/sdk": "^3.0.0",
+    "@pumped-fn/lite": "^5.0.0"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "catalog:",
